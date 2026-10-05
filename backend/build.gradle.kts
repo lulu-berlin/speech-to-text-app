@@ -1,7 +1,7 @@
 plugins {
     application
-    kotlinJvm()
-    kotlinSerialization()
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 group = "stt"
@@ -12,13 +12,14 @@ repositories {
 }
 
 dependencies {
-    implementation("io.ktor:ktor-server-core")
-    implementation("io.ktor:ktor-server-netty")
-    implementation("io.ktor:ktor-serialization-kotlinx-json")
-    implementation("ch.qos.logback:logback-classic")
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.logback.classic)
 
-    testImplementation("io.ktor:ktor-server-test-host")
-    testImplementation("io.kotest:kotest-runner-junit5")
+    testImplementation(libs.ktor.server.test.host.jvm)
+    testImplementation(libs.kotest.runner.junit5)
 }
 
 application {

@@ -12,3 +12,10 @@ devenv.local.yaml
 # Git worktrees for subagent tasks (only the README is tracked)
 /workspaces/*
 !/workspaces/README.md
+
+# Build outputs (roadmap item 02)
+build/
+.gradle/
+node_modules/
+dist/
+result
