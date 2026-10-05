@@ -57,13 +57,27 @@ Commits: one commit per green cycle (test + code, subject `Test: <scenario>`), o
 
 ## Testing
 
-- Backend: Kotest + `kotlinx-coroutines-test` (`runTest`, virtual time for engine/queue tests). Tests that need real ffmpeg, whisper-cli, or ONNX models are tagged `Integration` and runnable separately.
-- Frontend: Vitest + React Testing Library (+ MSW for API mocks).
-- Exact commands are added by roadmap item 02.
+- Backend: Kotest (`BehaviorSpec`) + `kotlinx-coroutines-test` (`runTest`, virtual time for engine/queue tests). Tests that need real ffmpeg, whisper-cli, or ONNX models are tagged `Integration`; they are run with Kotest tags when they exist (command to be pinned by the item that adds them). HTTP route tests use Ktor `testApplication`.
+- Frontend: Vitest + React Testing Library (jsdom) (+ MSW for API mocks from the first API item on).
+- Formatting is part of the standard commands (ADR 0015): see [Commands](#commands).
 
 ## Commands
 
-Added by roadmap item 02 once the build exists.
+Run backend commands from `backend/`, frontend commands from `frontend/`.
+
+Backend (Gradle 8.14 via devenv, no wrapper — ADR 0014):
+
+- `gradle check` — formatting gate (`ktlintCheck`) + all unit tests. The standard verification command.
+- `gradle test` — unit tests only.
+- `gradle ktlintFormat` — auto-format Kotlin sources.
+- `gradle run` — start the server (port `STT_PORT`, default 8080; set `STT_STATIC_DIR` to a built frontend to serve the UI).
+
+Frontend (pnpm — ADR 0012):
+
+- `pnpm install` — install dependencies from `pnpm-lock.yaml`.
+- `pnpm test` — `vitest run` + `prettier --check src index.html`. The standard verification command.
+- `pnpm build` — `tsc --noEmit` + `vite build` (output: `frontend/dist/`).
+- `pnpm dev` — Vite dev server; proxies `/api` to `http://localhost:8080`.
 
 ## Git
 
