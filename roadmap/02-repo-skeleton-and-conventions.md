@@ -57,7 +57,7 @@ Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(disc
 - [x] With `STT_STATIC_DIR` unset, `/api/health` still responds 200 and an unknown non-`/api` path returns 404 (static serving disabled)
 - [x] `STT_PORT` unset → port defaults to 8080 (config unit test)
 - [x] `STT_PORT` set to a non-numeric value → startup fails with a clear error, no silent fallback to the default (config unit test)
-- [ ] The frontend root renders (one Vitest + RTL render test) — implemented+verified via node in-sandbox; tick once `pnpm test` is green in the user's devenv shell
+- [x] The frontend root renders (one Vitest + RTL render test) — green in the user's devenv shell (`pnpm test`) and in-sandbox via node
 
 ## Acceptance criteria
 
