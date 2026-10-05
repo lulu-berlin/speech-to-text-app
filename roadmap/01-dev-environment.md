@@ -1,6 +1,6 @@
 # 01 — Dev environment
 
-Status: in-review
+Status: in-progress
 Depends on: —
 
 ## Goal
