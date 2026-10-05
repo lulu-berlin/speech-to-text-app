@@ -75,7 +75,7 @@ Backend (Gradle 8.14 via devenv, no wrapper — ADR 0014):
 Frontend (pnpm — ADR 0012):
 
 - `pnpm install` — install dependencies from `pnpm-lock.yaml`.
-- `pnpm test` — `vitest run` + `prettier --check src index.html`. The standard verification command.
+- `pnpm test` — `vitest run` + `prettier --check` over all frontend-owned files (`src`, `index.html`, `vite.config.ts`, `package.json`, `tsconfig.json`, `.prettierrc`). The standard verification command.
 - `pnpm build` — `tsc --noEmit` + `vite build` (output: `frontend/dist/`).
 - `pnpm dev` — Vite dev server; proxies `/api` to `http://localhost:8080`.
 
