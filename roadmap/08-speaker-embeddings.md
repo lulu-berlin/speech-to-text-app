@@ -45,6 +45,7 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] Mel filterbank edges for 80 bins between 20 Hz and 7600 Hz at FFT size 512 match hand-computed bin positions
 - [ ] Silence and a pure tone produce the expected relative fbank energies (tone bin dominates)
 - [ ] Global-mean normalization makes every feature column average to zero
+- [ ] The ONNX Runtime native library loads from the JVM inside the devenv shell (moved from item 01)
 - [ ] Model metadata is read (`output_dim` 512, `sample_rate` 16000, `feature_normalize_type` global-mean); unsupported values are rejected
 - [ ] A segment shorter than 2 s becomes a centered, zero-padded 2 s window
 - [ ] A segment longer than 20 s becomes the centered 20 s slice

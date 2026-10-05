@@ -43,7 +43,7 @@ graph TD
 
 | Item | Status | Depends on |
 | ---- | ------ | ---------- |
-| [01 — Dev environment](01-dev-environment.md) | draft | — |
+| [01 — Dev environment](01-dev-environment.md) | spec-approved | — |
 | [02 — Repo skeleton and conventions](02-repo-skeleton-and-conventions.md) | draft | 01 |
 | [03 — Database schema](03-database-schema.md) | draft | 02 |
 | [04 — Queue domain model](04-queue-domain-model.md) | draft | 03 |
