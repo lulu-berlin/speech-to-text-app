@@ -29,4 +29,18 @@ class SpaFallbackSpec :
                 }
             }
         }
+
+        given("a path merely starting with /api (not under it)") {
+            `when`("requesting it with static serving enabled") {
+                then("it gets the SPA fallback, not 404") {
+                    Files.writeString(staticDir.toPath().resolve("index.html"), "<h1>index</h1>")
+                    testApplication {
+                        application { sttApp(Config(staticDir = staticDir.toPath())) }
+                        val response = client.get("/apiary")
+                        response.status.shouldBe(HttpStatusCode.OK)
+                        response.bodyAsText().shouldBe("<h1>index</h1>")
+                    }
+                }
+            }
+        }
     })
