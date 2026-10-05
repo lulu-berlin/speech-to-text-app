@@ -1,0 +1,71 @@
+# AGENTS.md
+
+## Project
+
+A web app that transcribes uploaded audio files with speaker diarization. Backend: Kotlin + Ktor + SQLite; frontend: TypeScript + React + styled-components, served by the backend; one monorepo. Users upload many files into a work queue that is processed one task after another; the queue can be paused, each task can be paused or canceled, and tasks can be reordered. The queue and all transcription output are stored in the database, and past transcriptions stay viewable. All async work runs on Kotlin coroutines. Dependencies come from devenv; the final deliverable is a Nix flake derivation that runs backend, database, frontend, and the whisper model. `docs/oracle/transcribe.py` is the behavioral oracle for transcription, diarization, and output formats.
+
+- Pending work: [roadmap/README.md](roadmap/README.md)
+- Decisions: [docs/decisions/](docs/decisions/README.md)
+
+## Non-negotiable rules
+
+- **No code change is valid without the user's explicit approval.** Specs and test lists are approved before coding; every refactor is approved individually; diffs are approved before merging into `main`. Agents never merge, push, or rewrite `main` on their own.
+- **TDD is mandatory** and follows Kent Beck's Canon TDD exactly as written in [§ Canon TDD](#canon-tdd).
+- **Every spec and decision is documented.** Specs live in `roadmap/<NN-slug>.md` while pending and move to `docs/specs/<area>.md` when done; decisions are ADRs in [docs/decisions/](docs/decisions/README.md).
+- **No Python in the app, build, or tests.** [docs/oracle/transcribe.py](docs/oracle/transcribe.py) is the reference oracle only: read it to port behavior; never run it from the app, build, or tests ([ADR 0002](docs/decisions/0002-no-python-oracle-only.md)).
+- **All async/concurrent work uses Kotlin coroutines**: structured concurrency, an application-level `CoroutineScope` with `SupervisorJob`; blocking I/O (JDBC, subprocesses, file I/O) only inside `withContext(Dispatchers.IO)`; no raw `Thread`, `ExecutorService`, or `CompletableFuture` in app code.
+- **Dependencies come only from `devenv.nix` (dev) and `flake.nix` (packaging)**; never install tools ad hoc. An agent that needs a new tool proposes the `devenv.nix` change for approval.
+- **Clean, readable code following `docs/conventions/`** (created and approved in roadmap item [02](roadmap/02-repo-skeleton-and-conventions.md)). Until then, ask before choosing structure or naming.
+
+## Repository layout
+
+Planned until roadmap item 02 lands; today only `AGENTS.md`, the devenv files, `docs/decisions/`, `docs/oracle/`, `roadmap/`, and `workspaces/` exist.
+
+```
+AGENTS.md  devenv.nix  flake.nix (item 02/16)
+backend/   Gradle (Kotlin DSL) Ktor app
+frontend/  Vite + React + TS + styled-components
+nix/       shared Nix expressions (models, packages)
+docs/decisions/  docs/specs/  docs/conventions/  docs/oracle/transcribe.py (reference oracle)
+roadmap/   pending work, one file per item
+workspaces/  git worktrees (ignored)
+```
+
+## Canon TDD
+
+Source: https://newsletter.kentbeck.com/p/canon-tdd
+
+1. **Test list, written with the user.** Before any test code for a roadmap item, the agent and the user write the list of behavioral test scenarios (basic case, edge cases, failure cases, "must not break existing behavior" cases) in the item's `## Test list` as `- [ ]` checkboxes. Behavioral analysis only: no implementation design in the list. The list is approved together with the spec.
+2. **Exactly one test.** The agent proposes which list item to do next, with a one-line reason; the user confirms. The agent turns only that item into one concrete, runnable, automated test with setup, invocation, and real assertions (working backwards from the assertion is encouraged). Run it and record the failure output (red). Never convert several list items into tests ahead of time.
+3. **Make it pass, for real.** Change the code so this test and all previous tests pass. Forbidden: deleting or weakening assertions; copying actual computed values into expected values (expected values come from independent derivation: hand calculation, the oracle's logic, or the spec); refactoring while going green. Scenarios discovered on the way are appended to the test list marked `(discovered)` and confirmed with the user at the next checkpoint. If a discovery invalidates the work done, stop and ask the user whether to push on or start over with a different test order.
+4. **Refactor checkpoint — always ask.** After every green, stop and ask the user whether to refactor, giving concrete suggestions (duplication to remove, names to improve, extractions, simplifications, test readability), or state "no refactoring suggested" with the reason. Refactor only what the user approves; keep all tests green; never mix refactoring with behavior change; don't refactor beyond the current session's need; don't abstract early (duplication is a hint, not a command).
+5. **Tick the item** in the test list; go back to step 2 until the list is empty.
+
+Commits: one commit per green cycle (test + code, subject `Test: <scenario>`), one separate commit per approved refactor (subject `Refactor: <what>`).
+
+## Workflow
+
+1. Pick the next roadmap item whose `Depends on` items are done.
+2. Consult the user: walk through the item's Proposal and Open questions, and write the Test list together (Canon TDD step 1). Update the file with the answers. When the user approves, set `Status: spec-approved` and add a dated line to its Approval log. New decisions become new ADRs. Commit the approved roadmap file on `main`.
+3. `git worktree add workspaces/<NN-slug> -b roadmap/<NN-slug> main`; set `Status: in-progress` in the worktree's copy of the roadmap file (the copy on `main` stays `spec-approved` until merge). See [workspaces/README.md](workspaces/README.md).
+4. Spawn one subagent per worktree per **single TDD cycle**. Input: the roadmap file path, the worktree path as its only writable area, the confirmed next test-list item (or the approved refactor), the Canon TDD rules, and "do not merge". The subagent performs exactly that one step (Canon steps 2–3, or one approved refactor), commits, ticks/updates the test list in the worktree's copy of the roadmap file, and stops.
+5. The subagent returns: test name, red output, green output (full suite), diff summary, refactor suggestions, discovered scenarios, proposed next test. It never decides refactors or the next test itself.
+6. The orchestrating agent relays this to the user (refactor? which suggestions? confirm discovered scenarios? confirm next test?) and spawns the next single-cycle subagent in the same worktree with the user's answer. Repeat until the test list is empty. Independent items (no dependency between them) may progress in parallel worktrees, each still with per-cycle user checkpoints.
+7. Present the full diff (`git diff main...roadmap/<NN-slug>`) and test output to the user; set `Status: in-review` in the worktree's roadmap file. Changes requested → back to step 4.
+8. On approval: rebase the branch onto `main` in the worktree, run `git merge --ff-only roadmap/<NN-slug>` in the main tree, move the spec and final test list into `docs/specs/<area>.md`, delete the roadmap file, update `roadmap/README.md`, and remove the worktree and branch.
+
+## Testing
+
+- Backend: Kotest + `kotlinx-coroutines-test` (`runTest`, virtual time for engine/queue tests). Tests that need real ffmpeg, whisper-cli, or ONNX models are tagged `Integration` and runnable separately.
+- Frontend: Vitest + React Testing Library (+ MSW for API mocks).
+- Exact commands are added by roadmap item 02.
+
+## Commands
+
+Added by roadmap item 02 once the build exists.
+
+## Git
+
+- Default branch `main`; feature branches `roadmap/<NN-slug>`, checked out as worktrees under `workspaces/`.
+- Commit subjects: `Test: …` / `Refactor: …` inside TDD cycles; imperative subjects otherwise.
+- Commit identity comes from the environment; `pull.rebase=true`.
