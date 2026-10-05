@@ -1,6 +1,6 @@
 # 02 — Repo skeleton and conventions
 
-Status: in-progress
+Status: in-review
 Depends on: [01](../docs/specs/dev-environment.md) (done)
 
 ## Goal
@@ -72,3 +72,6 @@ Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(disc
 ## Approval log
 
 - 2026-10-05: consultation decisions 1–7 approved as presented; `STT_STATIC_DIR`-unset behavior (static disabled, 404 for non-`/api`, health unaffected) approved; test list of 8 items approved; `docs/conventions/backend.md` and `docs/conventions/frontend.md` drafts approved; ADRs 0012–0014 approved. User allowed an ephemeral sandbox `pnpm` install (session-only, for agent verification; the real provision is the committed `pkgs.pnpm` in devenv.nix).
+- 2026-10-05: user added a mid-item requirement: automatic code formatting with enforcement (ktlint + prettier, ADR 0015).
+- 2026-10-05: user requested the built artifact expose `bin/speech-to-text-app`; implemented as the flake `default` package (merged frontend + backend distribution + makeWrapper java wrapper).
+- 2026-10-05: user-verified acceptance runs: `pnpm test`/`pnpm build` green; `nix build .` green (both parts); `./result/bin/speech-to-text-app` served `{"status":"ok"}`, `/` 200, SPA fallback 200, `/api/nope` 404.
