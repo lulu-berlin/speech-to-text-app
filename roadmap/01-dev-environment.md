@@ -13,13 +13,14 @@ Make `devenv.nix` provide every tool and model the app needs during development 
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): no Python toolchain is added.
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): speaker model URL and sha256; ONNX Runtime Java.
 - [ADR 0008 — Default whisper model](../docs/decisions/0008-default-whisper-model.md): whisper model URL and sha256.
+- [ADR 0010 — Development toolchain in devenv](../docs/decisions/0010-development-toolchain.md): agents add needed tools to `devenv.nix` directly; devenv's default Node; global `tsc` kept.
 
 ## Proposal (pending approval)
 
 Done on 2026-10-05 by standing user instruction ("whichever tool you need for development, add it to devenv.nix"), pending the user's shell check:
 
-- `languages.javascript.enable = true;` and `languages.javascript.npm.enable = true;` (node + npm, devenv's default Node package from the pinned nixpkgs).
-- Kept `languages.kotlin` (JDK 21, Gradle), `languages.typescript` (global `tsc`), `git`, the `whisper-cpp` Vulkan override, `ffmpeg`, `vulkan-tools`, `sqlite`.
+- `languages.javascript.enable = true;` and `languages.javascript.npm.enable = true;` (node + npm, devenv's default Node package from the pinned nixpkgs; ADR 0010).
+- Kept `languages.kotlin` (JDK 21, Gradle), `languages.typescript` (global `tsc`; ADR 0010), `git`, the `whisper-cpp` Vulkan override, `ffmpeg`, `vulkan-tools`, `sqlite`.
 - Added `curl` and `jq` for manual API/SSE smoke checks.
 - ONNX Runtime: no Nix change needed. The native library bundled in `com.microsoft.onnxruntime:onnxruntime` 1.30.0 loads under the devenv JDK without `LD_LIBRARY_PATH` (the JVM already maps libstdc++); a session on the CAM++ model was created successfully in the agent sandbox. `pkgs.onnxruntime` + `-Donnxruntime.native.path` stays the fallback if it ever fails on the user's machine.
 - `nix/models.nix`: `fetchurl` of both models (hashes from ADR 0003 / ADR 0008, re-checked 2026-10-05 against the download / HF `x-linked-etag`), imported by `devenv.nix`, exported as `STT_WHISPER_MODEL` and `STT_SPEAKER_MODEL`. Reused by the flake in item 16.
@@ -32,8 +33,7 @@ Nix evaluation cannot run inside the agent sandbox; every check here is run by t
 
 ## Open questions for the user
 
-- Node version: nixpkgs default (chosen now) or a pinned LTS (e.g. `pkgs.nodejs_22`)?
-- Keep `tsc` 7 globally (kept now via `languages.typescript`) or rely only on the project-local `typescript` from `frontend/package.json`?
+None open. (Node version and global `tsc` were decided in ADR 0010.)
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -56,3 +56,4 @@ Seed — to be refined and approved with the user before any test is written:
 ## Approval log
 
 - 2026-10-05: user instructed agents to add every needed development tool to `devenv.nix` directly; node/npm, curl, jq, and `nix/models.nix` added under that instruction.
+- 2026-10-05: user accepted devenv's default Node and keeping the global `tsc`; recorded as ADR 0010.
