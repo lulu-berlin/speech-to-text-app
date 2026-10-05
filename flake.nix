@@ -59,9 +59,12 @@
           gradleFlagsArray+=("-Dorg.gradle.jvmargs=-Xmx384m -XX:MaxMetaspaceSize=256m")
         '';
 
-        # `gradle check` includes ktlintCheck + tests (ADR 0015); installDist produces
-        # bin/ + all runtime jars (the plain jar has no dependencies on its own).
+        # The Nix check runs `gradle check` (ktlintCheck + tests, ADR 0015): nixpkgs'
+        # gradle setup hook defaults gradleCheckTask to `test` (verified in the pinned
+        # nixpkgs setup-hook.sh), so it must be overridden. installDist produces bin/ +
+        # all runtime jars (the plain jar has no dependencies on its own).
         gradleBuildTask = "installDist";
+        gradleCheckTask = "check";
         doCheck = true;
 
         installPhase = ''
