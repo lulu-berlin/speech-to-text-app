@@ -20,8 +20,10 @@
         version = "0.1.0-SNAPSHOT";
         src = self;
 
-        # Gradle must run in backend/; the gradle setup hook runs in `${src}`.
-        sourceRoot = "backend";
+        # Directory sources unpack to `./source/` (stripHash of the store path);
+        # nixpkgs cds into `$sourceRoot` after unpackPhase, so it must include the
+        # `source/` prefix. Gradle then runs in backend/.
+        sourceRoot = "source/backend";
 
         nativeBuildInputs = [
           pkgs.gradle
@@ -62,7 +64,7 @@
         version = "0.1.0";
         src = self;
 
-        sourceRoot = "frontend";
+        sourceRoot = "source/frontend";
 
         # pnpm 11 for the committed pnpm-lock.yaml (lockfileVersion 9, ADR 0012).
         nativeBuildInputs = [
