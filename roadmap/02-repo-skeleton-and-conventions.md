@@ -24,7 +24,7 @@ Create the minimal runnable backend and frontend, a minimal `flake.nix` as an ea
   - `GET /api/health` → `{"status":"ok"}`.
   - Static files served from directory `STT_STATIC_DIR`, with SPA fallback to `index.html` for non-`/api` paths; unknown `/api/...` paths return 404, never `index.html`.
   - `STT_STATIC_DIR` unset → static serving disabled (non-`/api` paths 404), `/api/health` unaffected, startup logs a warning.
-- `frontend/`: Vite + React + TypeScript (strict) + styled-components; Vitest + React Testing Library; dependencies via pnpm (ADR 0012); the Vite dev server proxies `/api` to the backend.
+- `frontend/`: Vite + React + TypeScript (strict) + styled-components; Vitest + React Testing Library; dependencies via pnpm (ADR 0012); the Vite dev server proxies `/api` to the backend. `pnpm-workspace.yaml` exempts `@vitejs/plugin-react@6.1.2` from pnpm's minimum-release-age policy: the version (published 2026-10-05) is younger than pnpm 11's 10-day cutoff, and without the exemption `pnpm install --frozen-lockfile` fails with `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` (verified with pnpm 11.25.0). Drop the exemption at the next lockfile refresh after ~2026-10-15, once the version clears the cutoff.
 - Wiring via the Ktor DI plugin (`ktor-server-di`, ADR 0013): decided and recorded, but not wired in item 02 — the skeleton's single health route uses plain parameter wiring. Item 03 (database schema) is the first item that wires the plugin (first real service: the database connection).
 - Configuration via env vars prefixed `STT_`:
   - `STT_PORT` (default 8080, valid range 1–65535), `STT_DATA_DIR`, `STT_STATIC_DIR`, `STT_WHISPER_CLI`, `STT_WHISPER_MODEL`, `STT_SPEAKER_MODEL`, `STT_FFMPEG`, `STT_DEVICE`, `STT_THREADS`.
@@ -57,11 +57,11 @@ Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(disc
 - [x] With `STT_STATIC_DIR` unset, `/api/health` still responds 200 and an unknown non-`/api` path returns 404 (static serving disabled)
 - [x] `STT_PORT` unset → port defaults to 8080 (config unit test)
 - [x] `STT_PORT` set to a non-numeric value → startup fails with a clear error, no silent fallback to the default (config unit test)
-- [ ] (discovered, confirmed 2026-10-05) `STT_PORT` set to a non-numeric value → the error names `STT_PORT` and shows the bad value (config unit test; strengthens the item above's assertion to the new error contract, failing-case behavior unchanged)
-- [ ] (discovered, confirmed 2026-10-05) `STT_PORT` outside 1–65535 (0, 70000) → fails at config load with a clear error; endpoints 1 and 65535 load fine (config unit test)
-- [ ] (discovered, confirmed 2026-10-05) With static serving on, a path merely starting with `/api` (e.g. `/apiary`) gets the SPA fallback, not 404 (http test)
-- [ ] (discovered, confirmed 2026-10-05) The exact path `/api` returns 404, never `index.html` (http test; pins the boundary while the fix above lands)
-- [ ] (discovered, confirmed 2026-10-05) With `STT_STATIC_DIR` unset, startup logs a warning that static serving is disabled (boot test)
+- [x] (discovered, confirmed 2026-10-05) `STT_PORT` set to a non-numeric value → the error names `STT_PORT` and shows the bad value (config unit test; strengthens the item above's assertion to the new error contract, failing-case behavior unchanged)
+- [x] (discovered, confirmed 2026-10-05) `STT_PORT` outside 1–65535 (0, 70000) → fails at config load with a clear error; endpoints 1 and 65535 load fine (config unit test)
+- [x] (discovered, confirmed 2026-10-05) With static serving on, a path merely starting with `/api` (e.g. `/apiary`) gets the SPA fallback, not 404 (http test)
+- [x] (discovered, confirmed 2026-10-05) The exact path `/api` returns 404, never `index.html` (http test; pins the boundary while the fix above lands)
+- [x] (discovered, confirmed 2026-10-05) With `STT_STATIC_DIR` unset, startup logs a warning that static serving is disabled (boot test)
 - [x] The frontend root renders (one Vitest + RTL render test) — green in the user's devenv shell (`pnpm test`) and in-sandbox via node
 
 ## Acceptance criteria
@@ -80,4 +80,5 @@ Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(disc
 - 2026-10-05: user added a mid-item requirement: automatic code formatting with enforcement (ktlint + prettier, ADR 0015).
 - 2026-10-05: user requested the built artifact expose `bin/speech-to-text-app`; implemented as the flake `default` package (merged frontend + backend distribution + makeWrapper java wrapper).
 - 2026-10-05: user-verified acceptance runs: `pnpm test`/`pnpm build` green; `nix build .` green (both parts); `./result/bin/speech-to-text-app` served `{"status":"ok"}`, `/` 200, SPA fallback 200, `/api/nope` 404.
-- 2026-10-05 (review fixes): implement the `STT_STATIC_DIR`-unset startup warning with a (discovered) test item; `STT_PORT` errors fail fast at config load naming the variable and value, valid range 1–65535 (two (discovered) items); the `/api` boundary excludes exactly `/api` and `/api/...` — `/apiary` gets the SPA fallback, exact `/api` 404s (two (discovered) items); spec decision table points the Kotest style at conventions; ADR 0014's flake-scope part is superseded by ADR 0016 (which records the wrapper's CLI-argument behavior); the Nix build runs `gradleCheckTask = "check"`; the first Ktor DI wiring is item 03 (the database connection); the `@vitejs/plugin-react@6.1.2` minimum-release-age exemption in `pnpm-workspace.yaml` is removed (re-verification of `pnpm install` pending user).
+- 2026-10-05 (review fixes): implement the `STT_STATIC_DIR`-unset startup warning with a (discovered) test item; `STT_PORT` errors fail fast at config load naming the variable and value, valid range 1–65535 (two (discovered) items); the `/api` boundary excludes exactly `/api` and `/api/...` — `/apiary` gets the SPA fallback, exact `/api` 404s (two (discovered) items); spec decision table points the Kotest style at conventions; ADR 0014's flake-scope part is superseded by ADR 0016 (which records the wrapper's CLI-argument behavior); the Nix build runs `gradleCheckTask = "check"`; the first Ktor DI wiring is item 03 (the database connection).
+- 2026-10-05 (review fixes, decision 9 revisited): removal of the `@vitejs/plugin-react@6.1.2` exemption in `pnpm-workspace.yaml` was verified in-sandbox to break `pnpm install --frozen-lockfile` (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, pnpm 11.25.0 supply-chain policy). The user chose to keep the exemption; the reason and drop date are recorded in the Proposal.
