@@ -25,10 +25,10 @@ Create the minimal runnable backend and frontend, a minimal `flake.nix` as an ea
   - Static files served from directory `STT_STATIC_DIR`, with SPA fallback to `index.html` for non-`/api` paths; unknown `/api/...` paths return 404, never `index.html`.
   - `STT_STATIC_DIR` unset → static serving disabled (non-`/api` paths 404), `/api/health` unaffected, startup logs a warning.
 - `frontend/`: Vite + React + TypeScript (strict) + styled-components; Vitest + React Testing Library; dependencies via pnpm (ADR 0012); the Vite dev server proxies `/api` to the backend.
-- Wiring via the Ktor DI plugin (`ktor-server-di`, ADR 0013).
+- Wiring via the Ktor DI plugin (`ktor-server-di`, ADR 0013): decided and recorded, but not wired in item 02 — the skeleton's single health route uses plain parameter wiring. Item 03 (database schema) is the first item that wires the plugin (first real service: the database connection).
 - Configuration via env vars prefixed `STT_`:
-  - `STT_PORT` (default 8080), `STT_DATA_DIR`, `STT_STATIC_DIR`, `STT_WHISPER_CLI`, `STT_WHISPER_MODEL`, `STT_SPEAKER_MODEL`, `STT_FFMPEG`, `STT_DEVICE`, `STT_THREADS`.
-  - Invalid values fail fast at startup (clear error, no silent default).
+  - `STT_PORT` (default 8080, valid range 1–65535), `STT_DATA_DIR`, `STT_STATIC_DIR`, `STT_WHISPER_CLI`, `STT_WHISPER_MODEL`, `STT_SPEAKER_MODEL`, `STT_FFMPEG`, `STT_DEVICE`, `STT_THREADS`.
+  - Invalid values fail fast at startup with an error naming the variable and the bad value (no silent default); an out-of-range `STT_PORT` fails at config load, not later inside the server.
 - Minimal `flake.nix` that builds both parts (backend via `gradle.fetchDeps`, frontend via `fetchPnpmDeps`); finished in item 16.
 - Append build-output ignores to `.gitignore`: `build/`, `.gradle/`, `node_modules/`, `dist/`, `result`.
 - Write `docs/conventions/backend.md` and `docs/conventions/frontend.md` (approved 2026-10-05): package structure, naming, error handling, test style, component/file layout, theming.
@@ -39,12 +39,12 @@ Create the minimal runnable backend and frontend, a minimal `flake.nix` as an ea
 | # | Question | Decision | Recorded in |
 | -- | -------- | -------- | ----------- |
 | 1 | Backend package structure | By feature (`stt/{config,http,queue,transcribe,audio,diarization,outputs,db}`) | ADR 0013, conventions |
-| 2 | Kotest spec style | `BehaviorSpec` (given/when/then) | ADR 0006, conventions |
+| 2 | Kotest spec style | `BehaviorSpec` (given/when/then) | conventions (ADR 0006 defers there) |
 | 3 | Gradle version catalog (`gradle/libs.versions.toml`) | Yes | ADR 0014 |
 | 4 | Frontend package manager | pnpm | ADR 0012 |
 | 5 | Ktor dependency wiring | Ktor DI plugin (`ktor-server-di`) | ADR 0013 |
 | 6 | Gradle wrapper vs devenv Gradle | No wrapper; devenv Gradle in dev, nixpkgs gradle in the Nix build | ADR 0014 |
-| 7 | Minimal flake scope | Builds both parts now (`nix build .`); app wrapper and full `STT_*` env wiring finished in item 16 | ADR 0014 |
+| 7 | Minimal flake scope | Builds both parts now (`nix build .`); the app wrapper (`bin/speech-to-text-app`, java entry point via makeWrapper) ships in item 02 (user request, 2026-10-05); full `STT_*` env wiring, model assets, and `nix run .` finish in item 16 | ADR 0014 as amended by ADR 0016 |
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -57,6 +57,11 @@ Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(disc
 - [x] With `STT_STATIC_DIR` unset, `/api/health` still responds 200 and an unknown non-`/api` path returns 404 (static serving disabled)
 - [x] `STT_PORT` unset → port defaults to 8080 (config unit test)
 - [x] `STT_PORT` set to a non-numeric value → startup fails with a clear error, no silent fallback to the default (config unit test)
+- [ ] (discovered, confirmed 2026-10-05) `STT_PORT` set to a non-numeric value → the error names `STT_PORT` and shows the bad value (config unit test; strengthens the item above's assertion to the new error contract, failing-case behavior unchanged)
+- [ ] (discovered, confirmed 2026-10-05) `STT_PORT` outside 1–65535 (0, 70000) → fails at config load with a clear error; endpoints 1 and 65535 load fine (config unit test)
+- [ ] (discovered, confirmed 2026-10-05) With static serving on, a path merely starting with `/api` (e.g. `/apiary`) gets the SPA fallback, not 404 (http test)
+- [ ] (discovered, confirmed 2026-10-05) The exact path `/api` returns 404, never `index.html` (http test; pins the boundary while the fix above lands)
+- [ ] (discovered, confirmed 2026-10-05) With `STT_STATIC_DIR` unset, startup logs a warning that static serving is disabled (boot test)
 - [x] The frontend root renders (one Vitest + RTL render test) — green in the user's devenv shell (`pnpm test`) and in-sandbox via node
 
 ## Acceptance criteria
@@ -75,3 +80,4 @@ Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(disc
 - 2026-10-05: user added a mid-item requirement: automatic code formatting with enforcement (ktlint + prettier, ADR 0015).
 - 2026-10-05: user requested the built artifact expose `bin/speech-to-text-app`; implemented as the flake `default` package (merged frontend + backend distribution + makeWrapper java wrapper).
 - 2026-10-05: user-verified acceptance runs: `pnpm test`/`pnpm build` green; `nix build .` green (both parts); `./result/bin/speech-to-text-app` served `{"status":"ok"}`, `/` 200, SPA fallback 200, `/api/nope` 404.
+- 2026-10-05 (review fixes): implement the `STT_STATIC_DIR`-unset startup warning with a (discovered) test item; `STT_PORT` errors fail fast at config load naming the variable and value, valid range 1–65535 (two (discovered) items); the `/api` boundary excludes exactly `/api` and `/api/...` — `/apiary` gets the SPA fallback, exact `/api` 404s (two (discovered) items); spec decision table points the Kotest style at conventions; ADR 0014's flake-scope part is superseded by ADR 0016 (which records the wrapper's CLI-argument behavior); the Nix build runs `gradleCheckTask = "check"`; the first Ktor DI wiring is item 03 (the database connection); the `@vitejs/plugin-react@6.1.2` minimum-release-age exemption in `pnpm-workspace.yaml` is removed (re-verification of `pnpm install` pending user).
