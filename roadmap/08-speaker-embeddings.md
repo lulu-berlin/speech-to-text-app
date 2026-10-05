@@ -9,7 +9,7 @@ Compute one L2-normalized speaker embedding per transcribed segment, in Kotlin, 
 
 ## Already decided
 
-- [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): model, sha256, front-end parameters, metadata keys, input shape `[1, T, 80]`, 192-d output.
+- [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): model, sha256, front-end parameters, metadata keys, input shape `[1, T, 80]`, 512-d output.
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): windowing ported from oracle `embed_windows`; segments < 0.5 s are excluded from clustering (item 09) but still embedded.
 - [ADR 0004 — Chunked transcription with SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): in-JVM phases pause cooperatively via a pause gate between embedding windows.
 
@@ -45,7 +45,7 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] Mel filterbank edges for 80 bins between 20 Hz and 7600 Hz at FFT size 512 match hand-computed bin positions
 - [ ] Silence and a pure tone produce the expected relative fbank energies (tone bin dominates)
 - [ ] Global-mean normalization makes every feature column average to zero
-- [ ] Model metadata is read (`output_dim` 192, `sample_rate` 16000, `feature_normalize_type` global-mean); unsupported values are rejected
+- [ ] Model metadata is read (`output_dim` 512, `sample_rate` 16000, `feature_normalize_type` global-mean); unsupported values are rejected
 - [ ] A segment shorter than 2 s becomes a centered, zero-padded 2 s window
 - [ ] A segment longer than 20 s becomes the centered 20 s slice
 - [ ] A segment past the end of the audio uses the last 2 s (or the whole audio if shorter)

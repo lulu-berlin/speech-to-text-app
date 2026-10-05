@@ -14,7 +14,7 @@ A web app that transcribes uploaded audio files with speaker diarization. Backen
 - **Every spec and decision is documented.** Specs live in `roadmap/<NN-slug>.md` while pending and move to `docs/specs/<area>.md` when done; decisions are ADRs in [docs/decisions/](docs/decisions/README.md).
 - **No Python in the app, build, or tests.** [docs/oracle/transcribe.py](docs/oracle/transcribe.py) is the reference oracle only: read it to port behavior; never run it from the app, build, or tests ([ADR 0002](docs/decisions/0002-no-python-oracle-only.md)).
 - **All async/concurrent work uses Kotlin coroutines**: structured concurrency, an application-level `CoroutineScope` with `SupervisorJob`; blocking I/O (JDBC, subprocesses, file I/O) only inside `withContext(Dispatchers.IO)`; no raw `Thread`, `ExecutorService`, or `CompletableFuture` in app code.
-- **Dependencies come only from `devenv.nix` (dev) and `flake.nix` (packaging)**; never install tools ad hoc. An agent that needs a new tool proposes the `devenv.nix` change for approval.
+- **Dependencies come only from `devenv.nix` (dev) and `flake.nix` (packaging)**; never install tools ad hoc. An agent that needs a new development tool adds it to `devenv.nix` itself (standing user instruction, 2026-10-05), commits it as its own change, and tells the user to re-enter the shell; Nix-level results are verified by the user.
 - **Clean, readable code following `docs/conventions/`** (created and approved in roadmap item [02](roadmap/02-repo-skeleton-and-conventions.md)). Until then, ask before choosing structure or naming.
 
 ## Repository layout
