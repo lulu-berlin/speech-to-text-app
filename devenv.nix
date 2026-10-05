@@ -44,18 +44,6 @@ in
   env.STT_WHISPER_MODEL = "${models.whisper}";
   env.STT_SPEAKER_MODEL = "${models.speaker}";
 
-  # https://devenv.sh/processes/
-  # processes.dev.exec = "${lib.getExe pkgs.watchexec} -n -- ls -la";
-
-  # https://devenv.sh/services/
-  # services.postgres.enable = true;
-
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
-
   # https://devenv.sh/tests/
   # `devenv test`: test list of roadmap item 01 (dev environment).
   # Expected hashes are written out here on purpose, independent of nix/models.nix.
@@ -78,9 +66,4 @@ in
     echo "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b  $STT_SPEAKER_MODEL" | sha256sum -c --status - \
       && ok "speaker model sha256 (ADR 0003)" || fail "speaker model sha256 (ADR 0003)"
   '';
-
-  # https://devenv.sh/git-hooks/
-  # git-hooks.hooks.shellcheck.enable = true;
-
-  # See full reference at https://devenv.sh/reference/options/
 }
