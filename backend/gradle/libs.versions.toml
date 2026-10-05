@@ -6,6 +6,7 @@ kotlin = "2.3.21"
 ktor = "3.6.0"
 kotest = "6.2.5"
 logback = "1.6.5"
+ktlint = "1.8.0"
 
 [libraries]
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
@@ -15,6 +16,7 @@ ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serializatio
 ktor-server-test-host-jvm = { group = "io.ktor", name = "ktor-server-test-host-jvm", version.ref = "ktor" }
 kotest-runner-junit5 = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
+ktlint-cli = { group = "com.pinterest.ktlint", name = "ktlint-cli", version.ref = "ktlint" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version = "2.3.21" }
