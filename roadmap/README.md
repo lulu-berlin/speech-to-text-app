@@ -10,13 +10,13 @@ Pending work, one file per item. Every item is specified, given a test list, and
 - `spec-approved`: proposal, open questions, and test list approved by the user (dated line in the item's Approval log).
 - `in-progress`: being implemented in `workspaces/<NN-slug>` on branch `roadmap/<NN-slug>` (status set in the worktree's copy).
 - `in-review`: full diff presented to the user.
-- `done`: merged into `main`; file removed from `roadmap/`.
+- `done`: merged into `main`; file removed from `roadmap/`, its row links to the spec in `docs/specs/`.
 
 ## Dependency graph
 
 ```mermaid
 graph TD
-  01[01 dev environment] --> 02[02 repo skeleton and conventions]
+  01[01 dev environment ✓]:::done --> 02[02 repo skeleton and conventions]
   02 --> 03[03 database schema]
   03 --> 04[04 queue domain model]
   02 --> 05[05 process runner]
@@ -37,13 +37,14 @@ graph TD
   02 --> 16[16 Nix flake package]
   14 --> 16
   15 --> 16
+  classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
 ## Items
 
 | Item | Status | Depends on |
 | ---- | ------ | ---------- |
-| [01 — Dev environment](01-dev-environment.md) | spec-approved | — |
+| [01 — Dev environment](../docs/specs/dev-environment.md) | done | — |
 | [02 — Repo skeleton and conventions](02-repo-skeleton-and-conventions.md) | draft | 01 |
 | [03 — Database schema](03-database-schema.md) | draft | 02 |
 | [04 — Queue domain model](04-queue-domain-model.md) | draft | 03 |

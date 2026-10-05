@@ -19,7 +19,7 @@ A web app that transcribes uploaded audio files with speaker diarization. Backen
 
 ## Repository layout
 
-Planned until roadmap item 02 lands; today only `AGENTS.md`, the devenv files, `docs/decisions/`, `docs/oracle/`, `roadmap/`, and `workspaces/` exist.
+Planned until roadmap item 02 lands; today only `AGENTS.md`, the devenv files, `nix/models.nix`, `docs/decisions/`, `docs/specs/`, `docs/oracle/`, `roadmap/`, and `workspaces/` exist.
 
 ```
 AGENTS.md  devenv.nix  flake.nix (item 02/16)
