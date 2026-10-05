@@ -1,6 +1,6 @@
 # 01 — Dev environment
 
-Status: draft
+Status: spec-approved
 Depends on: —
 
 ## Goal
@@ -15,7 +15,7 @@ Make `devenv.nix` provide every tool and model the app needs during development 
 - [ADR 0008 — Default whisper model](../docs/decisions/0008-default-whisper-model.md): whisper model URL and sha256.
 - [ADR 0010 — Development toolchain in devenv](../docs/decisions/0010-development-toolchain.md): agents add needed tools to `devenv.nix` directly; devenv's default Node; global `tsc` kept.
 
-## Proposal (pending approval)
+## Proposal
 
 Done on 2026-10-05 by standing user instruction ("whichever tool you need for development, add it to devenv.nix"), pending the user's shell check:
 
@@ -28,8 +28,9 @@ Done on 2026-10-05 by standing user instruction ("whichever tool you need for de
 Remaining:
 
 - Remove template boilerplate in `devenv.nix`: `env.GREET`, `scripts.hello`, the `enterShell` greeting, the `enterTest` git-version check.
+- Replace `enterTest` with the test list below as automated checks, run by `devenv test`. The expected model hashes are written out in the test, independent of `nix/models.nix`.
 
-Nix evaluation cannot run inside the agent sandbox; every check here is run by the user.
+Nix evaluation cannot run inside the agent sandbox; `devenv test` red/green runs are done by the user.
 
 ## Open questions for the user
 
@@ -37,18 +38,21 @@ None open. (Node version and global `tsc` were decided in ADR 0010.)
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Each item is one check in `enterTest` (`devenv test`), except where marked manual.
 
-- [ ] Entering the shell provides `node` and `npm`
-- [ ] Entering the shell still provides `gradle`, a JDK 21 `java`, `kotlin`, `whisper-cli`, `ffmpeg`, `sqlite3`
-- [ ] `STT_WHISPER_MODEL` points to an existing file whose sha256 matches ADR 0008
-- [ ] `STT_SPEAKER_MODEL` points to an existing file whose sha256 matches ADR 0003
-- [ ] Entering the shell prints no template greeting (`hello from devenv`)
-- [ ] The ONNX Runtime native library loads from the JVM inside the shell (checked once the backend exists in item 02/08)
+- [ ] The shell provides `node` and `npm`
+- [ ] The shell provides a JDK 21 `java`, `kotlin`, and `gradle`
+- [ ] The shell provides `whisper-cli`, `ffmpeg`, `sqlite3`, `curl`, and `jq`
+- [ ] `STT_WHISPER_MODEL` points to a file whose sha256 matches ADR 0008
+- [ ] `STT_SPEAKER_MODEL` points to a file whose sha256 matches ADR 0003
+- [ ] Entering the shell prints no template greeting (`hello from devenv`) — manual: `devenv shell -- true`
+
+Moved to item 08: "The ONNX Runtime native library loads from the JVM inside the shell" (needs the backend build).
 
 ## Acceptance criteria
 
-- User runs `devenv shell -- node --version && npm --version && gradle --version && whisper-cli --help && test -f "$STT_WHISPER_MODEL" && test -f "$STT_SPEAKER_MODEL"` successfully.
+- User runs `devenv test` in `workspaces/01-dev-environment`: all checks pass.
+- `devenv shell -- true` prints no `hello from devenv`.
 - `devenv.nix` contains no `env.GREET`, `scripts.hello`, `enterShell` greeting, or `enterTest` git check.
 - `nix/models.nix` exists and is imported by `devenv.nix`; hashes match ADR 0003 and ADR 0008.
 - All test-list items ticked and green; user approved the diff.
@@ -57,3 +61,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 - 2026-10-05: user instructed agents to add every needed development tool to `devenv.nix` directly; node/npm, curl, jq, and `nix/models.nix` added under that instruction.
 - 2026-10-05: user accepted devenv's default Node and keeping the global `tsc`; recorded as ADR 0010.
+- 2026-10-05: user asked to finish item 01; proposal accepted as written, test list finalized by the agent (seed + `curl`/`jq`, ONNX check moved to item 08) and presented to the user with the diff for review.
