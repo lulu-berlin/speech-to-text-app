@@ -1,7 +1,7 @@
 # 02 — Repo skeleton and conventions
 
 Status: draft
-Depends on: [01](01-dev-environment.md)
+Depends on: [01](../docs/specs/dev-environment.md) (done)
 
 ## Goal
 
