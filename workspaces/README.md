@@ -4,7 +4,7 @@ Home for per-task git worktrees. Only this README is tracked; everything else in
 
 ## Purpose
 
-Each roadmap item is implemented in its own git worktree here, at `workspaces/<NN-slug>`, on branch `roadmap/<NN-slug>`. The work is done by a sequence of single-TDD-cycle subagents: one test or one approved refactor per subagent run, with a user checkpoint after each run.
+Each roadmap item is implemented in its own git worktree here, at `workspaces/<NN-slug>`, on branch `roadmap/<NN-slug>`. The work is done by one workspace agent in its own omp instance, started by the user in the repository root with a startup prompt from the main-tree agent. That agent runs the item's TDD cycles with the user, with a checkpoint after each cycle ([ADR 0011](../docs/decisions/0011-one-omp-instance-per-workspace.md)).
 
 ## Create
 
@@ -21,7 +21,8 @@ git worktree remove workspaces/<NN-slug> && git branch -d roadmap/<NN-slug>
 
 ## Rules
 
-- Never edit the main working tree from a worktree.
+- A workspace agent edits files only inside its own worktree and runs git only from inside it (`git -C workspaces/<NN-slug> …`).
+- Never edit the main working tree from a workspace agent.
 - Never nest worktrees.
 
 The full lifecycle (spec approval, per-cycle checkpoints, review, merge) is described in [AGENTS.md § Workflow](../AGENTS.md#workflow).
