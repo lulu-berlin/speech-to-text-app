@@ -1,0 +1,20 @@
+# Dependency versions, one place (ADR 0014). Ktor 3.6.0 is built against
+# Kotlin 2.3.21 and kotlinx-serialization 1.11.0; keep the pair when bumping.
+
+[versions]
+kotlin = "2.3.21"
+ktor = "3.6.0"
+kotest = "6.2.5"
+logback = "1.6.5"
+
+[libraries]
+ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { group = "io.ktor", name = "ktor-server-netty", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-server-test-host = { group = "io.ktor", name = "ktor-server-test-host", version.ref = "ktor" }
+kotest-runner-junit5 = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }
+logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
+
+[build-plugins]
+kotlin-jvm = { version = "2.3.21", artifact = "org.jetbrains.kotlin:kotlin-gradle-plugin#org.jetbrains.kotlin.jvm" }
+kotlin-serialization = { version = "2.3.21", artifact = "org.jetbrains.kotlin:kotlin-gradle-plugin#org.jetbrains.kotlin.plugin.serialization" }
