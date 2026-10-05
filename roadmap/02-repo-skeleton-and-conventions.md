@@ -1,6 +1,6 @@
 # 02 — Repo skeleton and conventions
 
-Status: in-review
+Status: in-progress
 Depends on: [01](../docs/specs/dev-environment.md) (done)
 
 ## Goal
