@@ -28,6 +28,9 @@ class Config(
             val value =
                 raw.toIntOrNull()
                     ?: throw IllegalArgumentException(PORT_LIMIT_ERROR.format(raw))
+            if (value !in 1..65535) {
+                throw IllegalArgumentException(PORT_LIMIT_ERROR.format(raw))
+            }
             return value
         }
     }
