@@ -26,6 +26,9 @@ in
     # Manual API/SSE smoke checks against the backend (`curl -N` for SSE)
     pkgs.curl
     pkgs.jq
+
+    # Frontend package manager (ADR 0012)
+    pkgs.pnpm
   ];
 
   # https://devenv.sh/languages/
