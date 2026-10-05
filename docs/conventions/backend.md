@@ -37,7 +37,7 @@ src/main/kotlin/stt/      Main.kt (boot: config, coroutine scope, Ktor app)
 
 ## Error handling
 
-- Unknown `/api/...` → 404 (JSON), never the SPA fallback. The `/api` boundary and the static/SPA logic are kept apart so no static-file change can break it.
+- Unknown `/api/...` → 404 (bare status, no body for unknown routes; decided in roadmap item 02), never the SPA fallback. The `/api` boundary and the static/SPA logic are kept apart so no static-file change can break it.
 - Domain failures map to HTTP errors with JSON bodies; no stack traces in responses; unexpected errors → 500.
 - 4xx/5xx shapes stay constant across items unless a later spec changes them.
 
@@ -46,6 +46,16 @@ src/main/kotlin/stt/      Main.kt (boot: config, coroutine scope, Ktor app)
 - All async work on Kotlin coroutines; an application-level `CoroutineScope` (with `SupervisorJob`) is created in `Main.kt` and provided via DI.
 - Blocking I/O (JDBC, subprocesses, file I/O) only inside `withContext(Dispatchers.IO)`.
 - No raw `Thread`, `ExecutorService`, or `CompletableFuture` in app code.
+
+## Formatting (ADR 0015)
+
+- Kotlin is formatted with ktlint; `gradle check` fails on violations, `gradle ktlintFormat` auto-fixes. Run format before every cycle.
+- ktlint's standard rules apply: import ordering (lexicographic, `java`/`javax`/`kotlin` and aliases last), class-signature layout, final newline at EOF.
+
+## Language notes
+
+- Kotlin 2.x has no `??` operator; the elvis is `?:` (`env["STT_PORT"]?.toInt() ?: 8080`). `??` is a parse error in Kotlin 2.3.
+- Null-checking a map/getter result before method chaining works best as `x?.foo() ?: default`; keep `?:` where a default follows a nullable expression.
 
 ## Tests (ADR 0006)
 
