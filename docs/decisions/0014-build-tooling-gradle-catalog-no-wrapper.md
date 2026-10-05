@@ -1,6 +1,6 @@
 # 0014 — Build tooling: Gradle catalog, no wrapper, flake scope
 
-Status: accepted · Date: 2026-10-05
+Status: accepted (flake-scope part superseded by 0016) · Date: 2026-10-05
 
 ## Context
 Roadmap item 02 fixes how the backend is built and how much of the Nix flake lands in item 02. Questions raised in consultation: Gradle version catalog yes/no, Gradle wrapper vs the devenv-provided Gradle, and whether the "minimal flake.nix that builds both parts" fits item 02 or should move to item 16 (today's nixpkgs documents `gradle.fetchDeps` with a MITM lockfile `deps.json` and an `updateScript` for generating it).
