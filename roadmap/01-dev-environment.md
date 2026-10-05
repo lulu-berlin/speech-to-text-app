@@ -1,6 +1,6 @@
 # 01 — Dev environment
 
-Status: spec-approved
+Status: in-review
 Depends on: —
 
 ## Goal
@@ -48,6 +48,8 @@ Each item is one check in `enterTest` (`devenv test`), except where marked manua
 - [ ] Entering the shell prints no template greeting (`hello from devenv`) — manual: `devenv shell -- true`
 
 Moved to item 08: "The ONNX Runtime native library loads from the JVM inside the shell" (needs the backend build).
+
+Agent sandbox run, 2026-10-05 (`enterTest` body executed with bash, no Nix): red `FAILED: node and npm` (no node in the sandbox); with stub `node`/`npm` on PATH and the real downloaded models all five checks print `ok`; with the speaker model passed as `STT_WHISPER_MODEL` the whisper hash check fails. Items are ticked only after the user's `devenv test` run.
 
 ## Acceptance criteria
 
