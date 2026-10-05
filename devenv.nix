@@ -10,9 +10,6 @@ let
   models = import ./nix/models.nix { inherit pkgs; };
 in
 {
-  # https://devenv.sh/basics/
-  env.GREET = "devenv";
-
   # https://devenv.sh/packages/
   packages = [ 
     pkgs.git 
@@ -53,17 +50,6 @@ in
   # https://devenv.sh/services/
   # services.postgres.enable = true;
 
-  # https://devenv.sh/scripts/
-  scripts.hello.exec = ''
-    echo hello from $GREET
-  '';
-
-  # https://devenv.sh/basics/
-  enterShell = ''
-    hello         # Run scripts directly
-    git --version # Use packages
-  '';
-
   # https://devenv.sh/tasks/
   # tasks = {
   #   "myproj:setup".exec = "mytool build";
@@ -71,9 +57,26 @@ in
   # };
 
   # https://devenv.sh/tests/
+  # `devenv test`: test list of roadmap item 01 (dev environment).
+  # Expected hashes are written out here on purpose, independent of nix/models.nix.
   enterTest = ''
-    echo "Running tests"
-    git --version | grep --color=auto "${pkgs.git.version}"
+    ok() { echo "ok: $1"; }
+    fail() { echo "FAILED: $1" >&2; exit 1; }
+
+    { node --version && npm --version; } >/dev/null 2>&1 \
+      && ok "node and npm" || fail "node and npm"
+
+    { java -version 2>&1 | grep -q 'version "21\.' && kotlin -version && gradle --version; } >/dev/null 2>&1 \
+      && ok "JDK 21 java, kotlin, gradle" || fail "JDK 21 java, kotlin, gradle"
+
+    { whisper-cli --help && ffmpeg -version && sqlite3 --version && curl --version && jq --version; } >/dev/null 2>&1 \
+      && ok "whisper-cli, ffmpeg, sqlite3, curl, jq" || fail "whisper-cli, ffmpeg, sqlite3, curl, jq"
+
+    echo "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2  $STT_WHISPER_MODEL" | sha256sum -c --status - \
+      && ok "whisper model sha256 (ADR 0008)" || fail "whisper model sha256 (ADR 0008)"
+
+    echo "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b  $STT_SPEAKER_MODEL" | sha256sum -c --status - \
+      && ok "speaker model sha256 (ADR 0003)" || fail "speaker model sha256 (ADR 0003)"
   '';
 
   # https://devenv.sh/git-hooks/
