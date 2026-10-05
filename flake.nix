@@ -136,20 +136,18 @@
           dontBuild = true;
           installPhase = ''
             runHook preInstall
-            mkdir -p $out/bin $out/lib
-            # Merge the static frontend and the backend runtime jars, then expose
-            # the app entry point: java with the classpath in the CLASSPATH env
-            # (colon-joined at install time - a shell glob in --add-flags would
-            # split per-jar at runtime), bundled frontend as the default
-            # STT_STATIC_DIR (models and data dir wiring land in roadmap item 16).
-            cp -rL ${frontend}/. $out/
+            mkdir -p $out/bin $out/lib $out/share/stt-app/static
+            # The frontend lives in its own directory ($out/share/stt-app/static): the app
+            # serves it over HTTP, so the backend jars and the wrapper must NOT sit inside
+            # the static root (review fix: /lib/*.jar and /bin/* were previously exposed).
+            cp -rL ${frontend}/. $out/share/stt-app/static/
             cp -rL ${backend}/lib/. $out/lib/
             CP="$(printf '%s:' "$out"/lib/*.jar)"
             # --set, not --set-default: the -default form silently keeps a
             # set-but-empty variable (devenv exports an empty CLASSPATH),
             # and the packaged app always needs its own jars and frontend.
             makeWrapper ${pkgs.jre}/bin/java $out/bin/speech-to-text-app \
-              --set STT_STATIC_DIR "$out" \
+              --set STT_STATIC_DIR "$out/share/stt-app/static" \
               --set CLASSPATH "$CP" \
               --add-flags "stt.MainKt"
             runHook postInstall
