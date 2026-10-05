@@ -1,6 +1,6 @@
 # 01 — Dev environment
 
-Status: in-progress
+Status: in-review
 Depends on: —
 
 ## Goal
@@ -55,8 +55,11 @@ Agent sandbox run, 2026-10-05 (`enterTest` body executed with bash, no Nix): red
 
 User runs, 2026-10-05 (in `workspaces/01-dev-environment`):
 
-- `devenv test`: all steps reported ✓ (Validating lock, Configuring cachix, Configuring shell, Evaluating Nix, Loading tasks, Running tasks, Building tests, Running tests — 3.7s), no failure output. Per devenv 2.x, per-check `ok:` lines are hidden in the activity log; all-✓ is the pass signal. Exit code: confirmed by the user's re-run on the final branch state.
-- `devenv shell -- true`: no output (no template greeting).
+- `devenv test` (commit `3922136`): all steps reported ✓ (Validating lock, Configuring cachix, Configuring shell, Evaluating Nix, Loading tasks, Running tasks, Building tests, Running tests — 3.7s), no failure output.
+- `devenv test` (final branch state, after both refactors): all steps reported ✓ (Running tests — 3.8s), no failure output, exit 0.
+- `devenv shell -- true` (final branch state): no output (no template greeting), exit 0.
+
+Per devenv 2.x, per-check `ok:` lines are hidden in the activity log; the pass signal is all-✓ steps + exit 0.
 
 ## Acceptance criteria
 
@@ -72,3 +75,4 @@ User runs, 2026-10-05 (in `workspaces/01-dev-environment`):
 - 2026-10-05: user accepted devenv's default Node and keeping the global `tsc`; recorded as ADR 0010.
 - 2026-10-05: user asked to finish item 01; proposal accepted as written, test list finalized by the agent (seed + `curl`/`jq`, ONNX check moved to item 08) and presented to the user with the diff for review.
 - 2026-10-05: user ran `devenv test` (all steps ✓, no failure output) and `devenv shell -- true` (no output); all six test-list items ticked green. User decided that the `devenv test` green summary is the reporting signal (devenv 2.x hides per-check output in its activity log) and that the remaining commented-out template sections are removed as a `Refactor:` commit.
+- 2026-10-05: user approved and the agent committed two `Refactor:` commits: dropping the commented-out template sections and dropping the now-unused `lib`/`config`/`inputs` args. User declined an ADR for the test-reporting decision (roadmap note suffices). Final re-run on the branch head: `devenv test` exit 0, `devenv shell -- true` exit 0 with no greeting — all green.
