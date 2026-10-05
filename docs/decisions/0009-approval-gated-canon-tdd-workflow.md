@@ -1,6 +1,6 @@
 # 0009 — Approval-gated Canon TDD workflow
 
-Status: accepted · Date: 2026-10-05
+Status: accepted, workflow steps 4–6 replaced by [0011](0011-one-omp-instance-per-workspace.md) · Date: 2026-10-05
 
 ## Context
 The app is built by AI agents. The user wants every change approved, every spec and decision documented, and development driven by Kent Beck's Canon TDD (https://newsletter.kentbeck.com/p/canon-tdd), with the user involved in writing the test list and deciding every refactor. Parallel agent work must not disturb the main working tree.
