@@ -7,7 +7,9 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class HealthResponse(val status: String)
+data class HealthResponse(
+    val status: String,
+)
 
 fun Application.healthRoutes() {
     routing {
