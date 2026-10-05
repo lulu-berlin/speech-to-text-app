@@ -20,3 +20,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0012 | [Frontend dependency management: pnpm](0012-frontend-dependency-management-pnpm.md)      | accepted | 2026-10-05 |
 | 0013 | [Backend structure: feature packages with Ktor DI](0013-backend-feature-packages-kotlin-di.md) | accepted | 2026-10-05 |
 | 0014 | [Build tooling: Gradle catalog, no wrapper](0014-build-tooling-gradle-catalog-no-wrapper.md) | accepted | 2026-10-05 |
+| 0015 | [Code formatting: ktlint and prettier](0015-code-formatting-ktlint-prettier.md)          | accepted | 2026-10-05 |

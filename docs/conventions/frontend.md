@@ -31,6 +31,10 @@ src/
 - All backend access goes through `/api` (same-origin in production, where the backend serves `dist/`; Vite dev server proxies `/api` to the backend).
 - Typed API client in `src/shared/api/` (added with the first API item); components never fetch directly.
 
+## Formatting (ADR 0015)
+
+- Frontend files are formatted with prettier (`.prettierrc` at repo root: semi, single quotes, print width 100, trailing commas); `prettier --check` runs inside `pnpm test` and fails the command on violations. Format before committing.
+
 ## Errors
 
 - Views render a shared error state when a load fails; action failures show inline errors; never swallow errors silently.
