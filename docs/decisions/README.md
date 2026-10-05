@@ -15,3 +15,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0007 | [Server-Sent Events for live updates](0007-sse-live-updates.md)                          | accepted | 2026-10-05 |
 | 0008 | [Default whisper model](0008-default-whisper-model.md)                                  | accepted | 2026-10-05 |
 | 0009 | [Approval-gated Canon TDD workflow](0009-approval-gated-canon-tdd-workflow.md)          | accepted | 2026-10-05 |
+| 0010 | [Development toolchain in devenv](0010-development-toolchain.md)                        | accepted | 2026-10-05 |
