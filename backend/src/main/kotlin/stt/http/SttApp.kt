@@ -5,6 +5,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.request.path
 import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
 import stt.config.Config
@@ -21,6 +22,8 @@ fun Application.sttApp(config: Config) {
     routing {
         if (staticDir != null) {
             staticFiles("/", staticDir.toFile()) {
+                // /api is API-only: the SPA fallback must never serve index.html there (cycle 4).
+                filter { call -> call.request.path().startsWith("/api") }
                 fallback { _, call ->
                     call.respondFile(File(staticDir.toFile(), "index.html"))
                 }
