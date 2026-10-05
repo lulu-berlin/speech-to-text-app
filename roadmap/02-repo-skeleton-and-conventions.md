@@ -16,6 +16,7 @@ Create the minimal runnable backend and frontend, a minimal `flake.nix` as an ea
 - [ADR 0012 — Frontend dependency management: pnpm](../docs/decisions/0012-frontend-dependency-management-pnpm.md)
 - [ADR 0013 — Backend structure: feature packages with Ktor DI](../docs/decisions/0013-backend-feature-packages-kotlin-di.md)
 - [ADR 0014 — Build tooling](../docs/decisions/0014-build-tooling-gradle-catalog-no-wrapper.md)
+- [ADR 0015 — Code formatting: ktlint and prettier](../docs/decisions/0015-code-formatting-ktlint-prettier.md) (user requirement added mid-item: `gradle check`/`pnpm test` enforce formatting)
 
 ## Proposal (approved on 2026-10-05)
 
@@ -49,14 +50,14 @@ Create the minimal runnable backend and frontend, a minimal `flake.nix` as an ea
 
 Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] `GET /api/health` responds 200 with body exactly `{"status":"ok"}` (Ktor `testApplication`)
-- [ ] A request for an existing file under `STT_STATIC_DIR` returns that file with its content
-- [ ] A request for an unknown non-`/api` path returns `index.html` (SPA fallback)
-- [ ] A request for an unknown `/api/...` path returns 404, not `index.html`
-- [ ] With `STT_STATIC_DIR` unset, `/api/health` still responds 200 and an unknown non-`/api` path returns 404 (static serving disabled)
-- [ ] `STT_PORT` unset → port defaults to 8080 (config unit test)
-- [ ] `STT_PORT` set to a non-numeric value → startup fails with a clear error, no silent fallback to the default (config unit test)
-- [ ] The frontend root page renders (one Vitest + RTL render test)
+- [x] `GET /api/health` responds 200 with body exactly `{"status":"ok"}` (Ktor `testApplication`)
+- [x] A request for an existing file under `STT_STATIC_DIR` returns that file with its content
+- [x] A request for an unknown non-`/api` path returns `index.html` (SPA fallback)
+- [x] A request for an unknown `/api/...` path returns 404, not `index.html`
+- [x] With `STT_STATIC_DIR` unset, `/api/health` still responds 200 and an unknown non-`/api` path returns 404 (static serving disabled)
+- [x] `STT_PORT` unset → port defaults to 8080 (config unit test)
+- [x] `STT_PORT` set to a non-numeric value → startup fails with a clear error, no silent fallback to the default (config unit test)
+- [ ] The frontend root renders (one Vitest + RTL render test) — implemented+verified via node in-sandbox; tick once `pnpm test` is green in the user's devenv shell
 
 ## Acceptance criteria
 
