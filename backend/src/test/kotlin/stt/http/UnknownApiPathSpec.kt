@@ -26,4 +26,17 @@ class UnknownApiPathSpec :
                 }
             }
         }
+
+        given("the exact /api path") {
+            `when`("requesting it with static serving enabled") {
+                then("404 is returned, not index.html") {
+                    Files.writeString(staticDir.toPath().resolve("index.html"), "<h1>index</h1>")
+                    testApplication {
+                        application { sttApp(Config(staticDir = staticDir.toPath())) }
+                        val response = client.get("/api")
+                        response.status.shouldBe(HttpStatusCode.NotFound)
+                    }
+                }
+            }
+        }
     })
