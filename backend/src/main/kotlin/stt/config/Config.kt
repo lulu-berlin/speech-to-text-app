@@ -25,10 +25,8 @@ class Config(
         }
 
         private fun parsePort(raw: String): Int {
-            val value =
-                raw.toIntOrNull()
-                    ?: throw IllegalArgumentException(PORT_LIMIT_ERROR.format(raw))
-            if (value !in 1..65535) {
+            val value = raw.toIntOrNull()
+            if (value == null || value !in 1..65535) {
                 throw IllegalArgumentException(PORT_LIMIT_ERROR.format(raw))
             }
             return value
