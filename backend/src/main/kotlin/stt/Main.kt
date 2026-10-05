@@ -6,7 +6,8 @@ import stt.config.Config
 import stt.http.sttApp
 
 fun main(args: Array<String>) {
-    embeddedServer(Netty, port = 8080) {
-        sttApp(Config.fromEnv())
+    val config = Config.fromEnv()
+    embeddedServer(Netty, port = config.port) {
+        sttApp(config)
     }.start(wait = true)
 }
