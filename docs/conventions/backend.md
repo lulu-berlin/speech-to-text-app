@@ -52,11 +52,6 @@ src/main/kotlin/stt/      Main.kt (boot: config, coroutine scope, Ktor app)
 - Kotlin is formatted with ktlint; `gradle check` fails on violations, `gradle ktlintFormat` auto-fixes. Run format before every cycle.
 - ktlint's standard rules apply: import ordering (lexicographic, `java`/`javax`/`kotlin` and aliases last), class-signature layout, final newline at EOF.
 
-## Language notes
-
-- Kotlin 2.x has no `??` operator; the elvis is `?:` (`env["STT_PORT"]?.toInt() ?: 8080`). `??` is a parse error in Kotlin 2.3.
-- Null-checking a map/getter result before method chaining works best as `x?.foo() ?: default`; keep `?:` where a default follows a nullable expression.
-
 ## Tests (ADR 0006)
 
 - Kotest `BehaviorSpec` (given/when/then); scenario wording matches the item's test list.

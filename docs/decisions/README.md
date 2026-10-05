@@ -19,5 +19,6 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0011 | [One omp instance per roadmap workspace](0011-one-omp-instance-per-workspace.md)        | accepted | 2026-10-05 |
 | 0012 | [Frontend dependency management: pnpm](0012-frontend-dependency-management-pnpm.md)      | accepted | 2026-10-05 |
 | 0013 | [Backend structure: feature packages with Ktor DI](0013-backend-feature-packages-kotlin-di.md) | accepted | 2026-10-05 |
-| 0014 | [Build tooling: Gradle catalog, no wrapper](0014-build-tooling-gradle-catalog-no-wrapper.md) | accepted | 2026-10-05 |
+| 0014 | [Build tooling: Gradle catalog, no wrapper](0014-build-tooling-gradle-catalog-no-wrapper.md) | accepted, flake-scope part superseded by [0016](0016-flake-scope-correction-app-wrapper.md) | 2026-10-05 |
 | 0015 | [Code formatting: ktlint and prettier](0015-code-formatting-ktlint-prettier.md)          | accepted | 2026-10-05 |
+| 0016 | [Flake scope correction: app wrapper in item 02](0016-flake-scope-correction-app-wrapper.md) | accepted | 2026-10-05 |

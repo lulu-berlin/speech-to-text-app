@@ -1,5 +1,6 @@
-# Minimal flake building both parts (roadmap item 02, decision 7; ADR 0014).
-# Finished in roadmap item 16 (app wrapper, models, nix run .).
+# Minimal flake building both parts (roadmap item 02, decision 7; ADR 0014 as amended
+# by ADR 0016). The app wrapper (bin/speech-to-text-app) ships in item 02 (ADR 0016);
+# full STT_* env wiring, models, and nix run . are finished in roadmap item 16.
 # Nix evaluation happens on the user's machine - this file is unverified here.
 {
   description = "Speech-to-Text app (backend + frontend build check, roadmap item 02)";

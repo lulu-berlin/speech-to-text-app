@@ -18,7 +18,7 @@ src/
 
 - Components PascalCase; file named after the component; named exports only (no default exports).
 - Props type named `<ComponentName>Props`.
-- TypeScript strict mode on; ``import type`` for type-only imports.
+- TypeScript strict mode on; `import type` for type-only imports.
 
 ## Theming (styled-components)
 
