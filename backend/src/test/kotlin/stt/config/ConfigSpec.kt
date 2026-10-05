@@ -28,4 +28,22 @@ class ConfigSpec :
                 }
             }
         }
+
+        given("an environment with an STT_PORT outside 1-65535") {
+            `when`("loading configuration") {
+                then("it fails with an error naming STT_PORT and the value; endpoints 1 and 65535 load") {
+                    for (bad in listOf("0", "70000")) {
+                        val error =
+                            shouldThrow<IllegalArgumentException> {
+                                Config.fromEnv(mapOf("STT_PORT" to bad))
+                            }
+                        error.message.shouldContain("STT_PORT")
+                        error.message.shouldContain(bad)
+                    }
+                    for (good in listOf("1", "65535")) {
+                        Config.fromEnv(mapOf("STT_PORT" to good)).port.shouldBe(good.toInt())
+                    }
+                }
+            }
+        }
     })
