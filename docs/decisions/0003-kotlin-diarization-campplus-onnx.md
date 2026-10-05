@@ -11,7 +11,7 @@ ADR 0002 excludes Python, so the oracle's speechbrain ECAPA-TDNN embedder (PyTor
   - Asset: `https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`
   - sha256: `357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b`
   - License: Apache-2.0
-  - Output: 192-dimensional embedding.
+  - Output: 512-dimensional embedding (ONNX output `embedding`, shape `[N, 512]`; metadata `output_dim = 512`, verified 2026-10-05).
 - Front-end: an 80-dim Kaldi fbank implemented in Kotlin, using the sherpa-onnx `features.h` defaults this model was exported for:
   - 16 kHz sample rate, 80 mel bins
   - 25 ms frame length, 10 ms frame shift
@@ -28,5 +28,5 @@ ADR 0002 excludes Python, so the oracle's speechbrain ECAPA-TDNN embedder (PyTor
 - No PyTorch/Python in the app; the model is a single ONNX file fetched by Nix with a pinned hash (development and packaging).
 - The fbank front-end (including its FFT) must be written and unit-tested in Kotlin, since no dependency provides an equivalent Kaldi-compatible implementation.
 - Embedding values differ from the oracle's, so tests compare clustering behavior on hand-built embeddings and same/different-speaker ordering on fixture clips, not oracle embedding numbers.
-- ONNX Runtime ships a native library; on NixOS it may need `LD_LIBRARY_PATH` or `-Donnxruntime.native.path` set (handled in roadmap item 01).
+- ONNX Runtime ships a native library inside the Maven artifact; it loads under the devenv (Nix) JDK 21 without `LD_LIBRARY_PATH`, because the JVM already maps libstdc++ (verified 2026-10-05 with onnxruntime 1.30.0 by creating a session on this model).
 - Threshold re-tuning needs fixture clips with known speakers.

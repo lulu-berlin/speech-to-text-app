@@ -6,6 +6,9 @@
   ...
 }:
 
+let
+  models = import ./nix/models.nix { inherit pkgs; };
+in
 {
   # https://devenv.sh/basics/
   env.GREET = "devenv";
@@ -25,11 +28,24 @@
     pkgs.vulkan-tools
 
     pkgs.sqlite
+
+    # Manual API/SSE smoke checks against the backend (`curl -N` for SSE)
+    pkgs.curl
+    pkgs.jq
   ];
 
   # https://devenv.sh/languages/
+  # Kotlin brings JDK 21 + Gradle. The ONNX Runtime native lib bundled in the
+  # Maven artifact loads under this JDK without LD_LIBRARY_PATH (verified 2026-10-05).
   languages.kotlin.enable = true;
   languages.typescript.enable = true;
+  # Node + npm for the Vite/React frontend
+  languages.javascript.enable = true;
+  languages.javascript.npm.enable = true;
+
+  # Models for the app and integration tests (pinned in nix/models.nix)
+  env.STT_WHISPER_MODEL = "${models.whisper}";
+  env.STT_SPEAKER_MODEL = "${models.speaker}";
 
   # https://devenv.sh/processes/
   # processes.dev.exec = "${lib.getExe pkgs.watchexec} -n -- ls -la";

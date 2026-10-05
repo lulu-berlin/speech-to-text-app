@@ -16,30 +16,24 @@ Make `devenv.nix` provide every tool and model the app needs during development 
 
 ## Proposal (pending approval)
 
-Current `devenv.nix` (observed): packages `git`, `whisper-cpp` overridden with `vulkanSupport = true`, `ffmpeg`, `vulkan-tools`, `sqlite`; `languages.kotlin.enable = true`; `languages.typescript.enable = true`; plus template boilerplate. Node/npm are not on PATH today.
+Done on 2026-10-05 by standing user instruction ("whichever tool you need for development, add it to devenv.nix"), pending the user's shell check:
 
-- Add `languages.javascript.enable = true;` and `languages.javascript.npm.enable = true;` (node + npm).
-- Keep `languages.kotlin` (JDK 21, Gradle) and `languages.typescript`.
-- Keep the `whisper-cpp` Vulkan override, `ffmpeg`, `vulkan-tools`, `sqlite` (and `git`).
-- ONNX Runtime native library:
-  - Default: rely on the native library bundled in the Maven artifact `com.microsoft.onnxruntime:onnxruntime`, and expose `LD_LIBRARY_PATH` containing `pkgs.stdenv.cc.cc.lib` (libstdc++) so the bundled lib loads on NixOS.
-  - Only if the bundled lib fails to load on NixOS: add `pkgs.onnxruntime` and point the JVM at it with `-Donnxruntime.native.path=<path>`.
-- Create `nix/models.nix`: `fetchurl` of both models with the hashes from ADR 0003 and ADR 0008:
-  - whisper: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin`, sha256 `394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2`.
-  - speaker: `https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`, sha256 `357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b`.
-  - Imported by `devenv.nix`, which exports `STT_WHISPER_MODEL` and `STT_SPEAKER_MODEL` env vars pointing at the store paths. The same file is reused by the flake in item 16.
-- Remove template boilerplate currently in `devenv.nix`:
-  - `env.GREET = "devenv";` (line 11)
-  - `scripts.hello.exec` echoing `hello from $GREET` (lines 41–43)
-  - `enterShell` running `hello` and `git --version` (lines 46–49)
-  - `enterTest` with the `git --version | grep ... "${pkgs.git.version}"` check (lines 58–61)
+- `languages.javascript.enable = true;` and `languages.javascript.npm.enable = true;` (node + npm, devenv's default Node package from the pinned nixpkgs).
+- Kept `languages.kotlin` (JDK 21, Gradle), `languages.typescript` (global `tsc`), `git`, the `whisper-cpp` Vulkan override, `ffmpeg`, `vulkan-tools`, `sqlite`.
+- Added `curl` and `jq` for manual API/SSE smoke checks.
+- ONNX Runtime: no Nix change needed. The native library bundled in `com.microsoft.onnxruntime:onnxruntime` 1.30.0 loads under the devenv JDK without `LD_LIBRARY_PATH` (the JVM already maps libstdc++); a session on the CAM++ model was created successfully in the agent sandbox. `pkgs.onnxruntime` + `-Donnxruntime.native.path` stays the fallback if it ever fails on the user's machine.
+- `nix/models.nix`: `fetchurl` of both models (hashes from ADR 0003 / ADR 0008, re-checked 2026-10-05 against the download / HF `x-linked-etag`), imported by `devenv.nix`, exported as `STT_WHISPER_MODEL` and `STT_SPEAKER_MODEL`. Reused by the flake in item 16.
+
+Remaining:
+
+- Remove template boilerplate in `devenv.nix`: `env.GREET`, `scripts.hello`, the `enterShell` greeting, the `enterTest` git-version check.
 
 Nix evaluation cannot run inside the agent sandbox; every check here is run by the user.
 
 ## Open questions for the user
 
-- Node version: nixpkgs default or a pinned LTS (e.g. `pkgs.nodejs_22`)?
-- Keep `tsc` 7 globally (via `languages.typescript`) or rely only on the project-local `typescript` from `frontend/package.json`?
+- Node version: nixpkgs default (chosen now) or a pinned LTS (e.g. `pkgs.nodejs_22`)?
+- Keep `tsc` 7 globally (kept now via `languages.typescript`) or rely only on the project-local `typescript` from `frontend/package.json`?
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -61,4 +55,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Approval log
 
-_Empty — add dated lines (YYYY-MM-DD: what was approved) on approval._
+- 2026-10-05: user instructed agents to add every needed development tool to `devenv.nix` directly; node/npm, curl, jq, and `nix/models.nix` added under that instruction.
