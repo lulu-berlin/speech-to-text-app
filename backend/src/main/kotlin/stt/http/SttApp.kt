@@ -23,7 +23,12 @@ fun Application.sttApp(config: Config) {
         if (staticDir != null) {
             staticFiles("/", staticDir.toFile()) {
                 // /api is API-only: the SPA fallback must never serve index.html there (cycle 4).
-                filter { call -> call.request.path().startsWith("/api") }
+                // Only /api and /api/... are excluded — /apiary-style prefixes must keep the
+                // SPA fallback (review fix).
+                filter { call ->
+                    val path = call.request.path()
+                    path == "/api" || path.startsWith("/api/")
+                }
                 fallback { _, call ->
                     call.respondFile(File(staticDir.toFile(), "index.html"))
                 }
