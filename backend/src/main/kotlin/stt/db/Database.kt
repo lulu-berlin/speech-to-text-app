@@ -46,15 +46,7 @@ class Database private constructor(
         suspend fun open(dataDir: Path): Database =
             withContext(Dispatchers.IO) {
                 val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
-                val connection =
-                    try {
-                        Files.createDirectories(dataDir)
-                        DriverManager.getConnection(url)
-                    } catch (e: Exception) {
-                        throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e.message), e)
-                    }
-                connection.createStatement().use { st -> st.execute("PRAGMA journal_mode = WAL") }
-                connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
+                val connection = openConnection(dataDir, url)
                 try {
                     Flyway
                         .configure()
@@ -67,6 +59,23 @@ class Database private constructor(
                 }
                 Database(connection)
             }
+
+        /** Creates [dataDir] when missing, connects to [url], then applies the pragmas in ADR 0017 order. */
+        private fun openConnection(
+            dataDir: Path,
+            url: String,
+        ): Connection {
+            val connection =
+                try {
+                    Files.createDirectories(dataDir)
+                    DriverManager.getConnection(url)
+                } catch (e: Exception) {
+                    throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e.message), e)
+                }
+            connection.createStatement().use { st -> st.execute("PRAGMA journal_mode = WAL") }
+            connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
+            return connection
+        }
     }
 
     override fun close() {
