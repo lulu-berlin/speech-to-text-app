@@ -22,6 +22,23 @@ class ReadLinesSpec :
                 }
             }
         }
+
+        given("a line far longer than one read chunk, with multi-byte characters split across chunk boundaries") {
+            `when`("the drain reads it from an exited child") {
+                then("the long line and the line after it are delivered intact") {
+                    // 1 + 2 × 50,000 = 100,001 bytes: odd, so chunk boundaries fall inside 'ä' (2 bytes in UTF-8).
+                    val longLine = "a" + "ä".repeat(50_000)
+                    val pipe = LatePipe("$longLine\nnext\n".toByteArray())
+                    pipe.write()
+                    val delivered = mutableListOf<String>()
+
+                    val lines = readLines(pipe, ExitingChild(onIsAlive = {})) { delivered += it }
+
+                    lines.shouldBe(listOf(longLine, "next"))
+                    delivered.shouldBe(listOf(longLine, "next"))
+                }
+            }
+        }
     })
 
 /** A pipe whose [bytes] are only written (become available) when [write] is called. */
