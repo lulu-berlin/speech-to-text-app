@@ -17,13 +17,17 @@ enum class TaskStatus {
      * not here.
      */
     fun transition(to: TaskStatus): TransitionOutcome {
-        val allowed =
-            when (this) {
-                QUEUED -> setOf(RUNNING, PAUSED, CANCELED)
-                RUNNING -> setOf(PAUSED, COMPLETED, FAILED, CANCELED)
-                PAUSED -> setOf(QUEUED, CANCELED)
-                COMPLETED, FAILED, CANCELED -> emptySet()
-            }
+        val allowed = allowedTargets[this].orEmpty()
         return if (to in allowed) TransitionOutcome.Accepted(to) else TransitionOutcome.Rejected(this, to)
+    }
+
+    companion object {
+        /** Spec's allowed targets per source; terminal sources have none. */
+        private val allowedTargets: Map<TaskStatus, Set<TaskStatus>> =
+            mapOf(
+                QUEUED to setOf(RUNNING, PAUSED, CANCELED),
+                RUNNING to setOf(PAUSED, COMPLETED, FAILED, CANCELED),
+                PAUSED to setOf(QUEUED, CANCELED),
+            )
     }
 }
