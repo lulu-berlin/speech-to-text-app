@@ -1,0 +1,46 @@
+package stt.http
+
+import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.engine.spec.tempdir
+import io.kotest.matchers.booleans.shouldBeFalse
+import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeSameInstanceAs
+import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.testing.testApplication
+import stt.config.Config
+import stt.db.Database
+import java.nio.file.Files
+
+class DatabaseDependencySpec :
+    BehaviorSpec({
+
+        given("the application module") {
+            `when`("the application starts") {
+                then("it opens \$STT_DATA_DIR/stt.db and provides it via DI; a Database the test provides first replaces it unopened") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val dbFile = dataDir.resolve("stt.db")
+                    testApplication {
+                        application { sttApp(Config(dataDir = dataDir)) }
+                        startApplication()
+                        Files.exists(dbFile).shouldBeTrue()
+                        val db = application.dependencies.resolve<Database>()
+                        db.connection.metaData.url
+                            .shouldBe("jdbc:sqlite:$dbFile")
+                    }
+
+                    val moduleDataDir = tempdir("stt-module-data").toPath()
+                    val override = Database.open(tempdir("stt-override-data").toPath())
+                    testApplication {
+                        application {
+                            dependencies.provide<Database> { override }
+                            sttApp(Config(dataDir = moduleDataDir))
+                        }
+                        startApplication()
+                        application.dependencies.resolve<Database>().shouldBeSameInstanceAs(override)
+                        Files.exists(moduleDataDir.resolve("stt.db")).shouldBeFalse()
+                    }
+                }
+            }
+        }
+    })

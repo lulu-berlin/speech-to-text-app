@@ -5,18 +5,28 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.di.DependencyKey
+import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.path
 import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
 import stt.config.Config
+import stt.db.Database
 import java.io.File
 
 /**
- * Application composition (ADR 0013): plugins are installed here, feature modules
- * are loaded. The service graph grows here as later items add their modules.
+ * Application composition (ADR 0013): plugins are installed here, services are
+ * registered with Ktor DI, feature modules are loaded. `dependencies {}` installs
+ * the DI plugin itself, so a test may provide overrides before calling this.
+ * The Database is required, so DI opens it at startup rather than on first use
+ * (ADR 0017); DI closes it when the application stops.
  */
 fun Application.sttApp(config: Config) {
     install(ContentNegotiation) { json() }
+    dependencies {
+        provide<Database> { Database.open(config.dataDir) }
+        require(DependencyKey<Database>())
+    }
     healthRoutes()
     val staticDir = config.staticDir
     routing {
