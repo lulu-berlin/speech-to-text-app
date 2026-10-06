@@ -1,6 +1,7 @@
 package stt.db
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.TestConfiguration
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -16,16 +17,13 @@ class DatabaseSpec :
         given("an audio row for an existing task") {
             `when`("inserting another audio row with the same sha256 for a second task") {
                 then("the insert is rejected by the database (at most one task per audio content)") {
-                    runTest {
-                        val dataDir = tempdir("stt-db").toPath()
-                        Database.open(dataDir).use { db ->
-                            insertTask(db, 1)
-                            insertAudio(db, taskId = 1, sha256 = "aaaabbbbccccdddd", sizeBytes = 3)
+                    withDatabase { db ->
+                        insertTask(db, 1)
+                        insertAudio(db, taskId = 1, sha256 = "aaaabbbbccccdddd", sizeBytes = 3)
 
-                            insertTask(db, 2)
-                            shouldThrow<java.sql.SQLException> {
-                                insertAudio(db, taskId = 2, sha256 = "aaaabbbbccccdddd", sizeBytes = 3)
-                            }
+                        insertTask(db, 2)
+                        shouldThrow<java.sql.SQLException> {
+                            insertAudio(db, taskId = 2, sha256 = "aaaabbbbccccdddd", sizeBytes = 3)
                         }
                     }
                 }
@@ -102,6 +100,14 @@ private fun rowCount(
         statement.executeQuery("SELECT count(*) FROM \"$table\"").use { rows ->
             rows.next().shouldBeTrue()
             rows.getInt(1)
+        }
+    }
+
+private fun TestConfiguration.withDatabase(block: suspend (Database) -> Unit) =
+    runTest {
+        val dataDir = tempdir("stt-db").toPath()
+        Database.open(dataDir).use { db ->
+            block(db)
         }
     }
 
