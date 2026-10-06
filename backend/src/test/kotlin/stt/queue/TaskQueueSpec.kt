@@ -100,4 +100,15 @@ class TaskQueueSpec :
                 }
             }
         }
+
+        given("a paused queue of two queued tasks") {
+            `when`("the tasks are reordered") {
+                then("the new order is applied and the queue stays paused") {
+                    val queue = queuedQueue(1L, 2L).pause()
+                    queue.reorder(listOf(2L, 1L)).shouldBe(
+                        ReorderOutcome.Accepted(TaskQueue(listOf(2L to QUEUED, 1L to QUEUED), paused = true)),
+                    )
+                }
+            }
+        }
     })
