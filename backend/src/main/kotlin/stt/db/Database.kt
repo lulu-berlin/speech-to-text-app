@@ -70,7 +70,7 @@ class Database private constructor(
                     Files.createDirectories(dataDir)
                     DriverManager.getConnection(url)
                 } catch (e: Exception) {
-                    throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e.message), e)
+                    throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e), e)
                 }
             connection.createStatement().use { st -> st.execute("PRAGMA journal_mode = WAL") }
             connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
