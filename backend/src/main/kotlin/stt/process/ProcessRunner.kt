@@ -70,7 +70,7 @@ class ProcessRunner internal constructor(
         val executable = withContext(Dispatchers.IO) { resolveInPath(command[0]) }
         return coroutineScope {
             val process = spawn(listOf("setsid", executable) + command.drop(1))
-            val group = ProcessGroup(process.pid())
+            val group = ProcessGroup(process.pid(), process::isAlive)
             synchronized(runLock) {
                 currentGroup = group
                 if (paused) group.pause()
