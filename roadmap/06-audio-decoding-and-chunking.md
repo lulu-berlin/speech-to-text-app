@@ -1,7 +1,7 @@
 # 06 — Audio decoding and chunking
 
 Status: draft
-Depends on: [05](05-process-runner.md)
+Depends on: [03](../docs/specs/database-schema.md) (done), [05](05-process-runner.md)
 
 ## Goal
 
@@ -31,8 +31,8 @@ Turn an uploaded audio file into (a) mono 16 kHz PCM for speaker embeddings and 
 - Target and cap lengths (proposed 5 min / 6 min) and silence thresholds (proposed `noise=-30dB`, `d=0.5`)?
 - Should a very short trailing chunk (e.g. < 30 s) be merged into the previous one?
 - Duration source: decoded sample count or ffprobe?
-- Persisting into `chunks` needs the table from item 03, which is not in `Depends on`: add [03](03-database-schema.md) as a dependency, or leave persistence to item 11?
-- Temp directory location (under `$STT_DATA_DIR/tmp/<task-id>` proposed) and when it is deleted (after completion / cancel).
+- ~~Persisting into `chunks` needs the table from item 03: add 03 as a dependency, or leave persistence to item 11?~~ Resolved by [ADR 0019](../docs/decisions/0019-schema-ownership-and-evolution.md): item 03 owns the `chunks` table and `ChunkRepository`; 03 is now in `Depends on`. Still open: does this item persist the plan itself, or hand it to item 11?
+- Temp directory location (under `$STT_DATA_DIR/tmp/<task-id>` proposed) and when it is deleted (after completion / cancel). Constraint from item 03 ([spec](../docs/specs/database-schema.md), ADR 0017): `$STT_DATA_DIR/tmp` holds upload spool files; `Database.open` deletes every file directly in it and fails startup (naming `STT_DATA_DIR`) when it finds a non-empty directory there. A per-task directory under `tmp/` left behind by a crash would therefore stop the app from starting: use another location (e.g. `$STT_DATA_DIR/work/<task-id>`) or change item 03's cleanup through a migration-style follow-up.
 
 ## Test list (written with the user; Canon TDD step 1)
 

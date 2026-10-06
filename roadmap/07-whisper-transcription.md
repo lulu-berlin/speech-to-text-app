@@ -1,7 +1,7 @@
 # 07 — Whisper transcription
 
 Status: draft
-Depends on: [06](06-audio-decoding-and-chunking.md)
+Depends on: [03](../docs/specs/database-schema.md) (done), [06](06-audio-decoding-and-chunking.md)
 
 ## Goal
 
@@ -38,7 +38,7 @@ Transcribe each planned chunk with one whisper-cli run, turn its JSON output int
 - Prompt tail length (proposed: last ~200 characters of the previous chunk's text, cut at a word boundary)?
 - Fixture model for integration tests: `ggml-tiny.en` fetched via `nix/models.nix` (proposed)?
 - Fixture speech clip: source and license (must be redistributable in the repo, or fetched by hash)?
-- Persisting segments and chunk status needs item 03's tables, which is not in `Depends on`: add [03](03-database-schema.md) as a dependency?
+- ~~Persisting segments and chunk status needs item 03's tables: add 03 as a dependency?~~ Resolved by [ADR 0019](../docs/decisions/0019-schema-ownership-and-evolution.md): item 03 owns `chunks`/`segments` and their repositories; 03 is now in `Depends on`. Note for the one-transaction persistence in the Proposal: item 03's repositories each run their own transaction (`ChunkRepository.insertAll`, `SegmentRepository.insertAll`) and offer no "mark chunk DONE + insert its segments" operation yet; this item adds it.
 - Should whisper-cli's output JSON and the chunk WAV be deleted right after the chunk is persisted?
 
 ## Test list (written with the user; Canon TDD step 1)
