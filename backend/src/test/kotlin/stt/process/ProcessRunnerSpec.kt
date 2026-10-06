@@ -288,6 +288,34 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a callback that throws") {
+            `when`("running a command whose output triggers it") {
+                then("run fails with that exception and kills the process tree") {
+                    val pids = CompletableDeferred<List<Long>>()
+                    var exception: IllegalStateException? = null
+                    try {
+                        exception =
+                            withTimeout(2.seconds) {
+                                shouldThrow<IllegalStateException> {
+                                    ProcessRunner(gracePeriod = 300.milliseconds).run(
+                                        listOf("sh", "-c", "echo \$\$; seq 1 100000; sleep 100"),
+                                        onStdoutLine = { line ->
+                                            pids.complete(parsePids(line))
+                                            throw IllegalStateException("boom")
+                                        },
+                                    )
+                                }
+                            }
+                    } finally {
+                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
+                    }
+
+                    exception.message.shouldBe("boom")
+                    pids.getCompleted().filter(::isAlive).shouldBeEmpty()
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
