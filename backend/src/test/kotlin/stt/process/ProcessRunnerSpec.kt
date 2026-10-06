@@ -6,12 +6,14 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.comparables.shouldBeLessThan
+import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import stt.Integration
@@ -112,6 +114,45 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a counting shell loop") {
+            `when`("the runner is paused and then resumed") {
+                then("output freezes while paused and continues from the last delivered line after resume") {
+                    val runner = ProcessRunner()
+                    val delivered = mutableListOf<String>()
+                    val sawThree = CompletableDeferred<Unit>()
+                    var threshold = Int.MAX_VALUE
+                    val nextAfterResume = CompletableDeferred<Int>()
+                    val job =
+                        launch {
+                            runner.run(
+                                listOf("sh", "-c", "i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done"),
+                                onStdoutLine = { line ->
+                                    underLock(delivered) { delivered.add(line) }
+                                    if (line == "3") sawThree.complete(Unit)
+                                    if (line.toInt() > threshold) nextAfterResume.complete(line.toInt())
+                                },
+                            )
+                        }
+                    try {
+                        withTimeout(10.seconds) { sawThree.await() }
+                        runner.pause()
+
+                        val frozenCount = underLock(delivered) { delivered.size }
+                        delay(500.milliseconds)
+                        val windowCount = underLock(delivered) { delivered.size }
+                        (windowCount - frozenCount).shouldBeLessThanOrEqualTo(1)
+
+                        threshold = underLock(delivered) { delivered.last().toInt() }
+                        runner.resume()
+
+                        withTimeout(10.seconds) { nextAfterResume.await() }.shouldBe(threshold + 1)
+                    } finally {
+                        job.cancelAndJoin()
+                    }
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
@@ -166,3 +207,14 @@ private class CancelledRun(
     val elapsed: Duration,
     val pids: List<Long>,
 )
+
+/**
+ * The callback appends to `delivered` on an IO-dispatcher thread while the test coroutine counts
+ * it, so every access goes through the list's lock.
+ */
+private fun <T> underLock(
+    lock: Any,
+    block: () -> T,
+): T {
+    synchronized(lock) { return block() }
+}
