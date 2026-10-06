@@ -30,15 +30,17 @@ class DatabaseDependencySpec :
                     }
 
                     val moduleDataDir = tempdir("stt-module-data").toPath()
-                    val override = Database.open(tempdir("stt-override-data").toPath())
-                    testApplication {
-                        application {
-                            dependencies.provide<Database> { override }
-                            sttApp(Config(dataDir = moduleDataDir))
+                    // DI also closes the override on stop (probed 2026-10-06); use {} makes the test's ownership explicit.
+                    Database.open(tempdir("stt-override-data").toPath()).use { override ->
+                        testApplication {
+                            application {
+                                dependencies.provide<Database> { override }
+                                sttApp(Config(dataDir = moduleDataDir))
+                            }
+                            startApplication()
+                            application.dependencies.resolve<Database>().shouldBeSameInstanceAs(override)
+                            Files.exists(moduleDataDir.resolve("stt.db")).shouldBeFalse()
                         }
-                        startApplication()
-                        application.dependencies.resolve<Database>().shouldBeSameInstanceAs(override)
-                        Files.exists(moduleDataDir.resolve("stt.db")).shouldBeFalse()
                     }
                 }
             }
