@@ -1,6 +1,6 @@
 # 03 — Database schema
 
-Status: draft
+Status: spec-approved
 Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done)
 
 ## Goal
@@ -15,45 +15,65 @@ Define the SQLite schema for tasks, uploaded audio, chunks, transcript segments 
 - [ADR 0006 — Exposed, Flyway, Kotest](../docs/decisions/0006-exposed-flyway-kotest.md): Exposed DSL, Flyway versioned SQL migrations, Kotest.
 - [ADR 0008 — Default whisper model](../docs/decisions/0008-default-whisper-model.md): default value for `tasks.model`.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-06)
 
-- SQLite file `$STT_DATA_DIR/stt.db`; WAL journal mode; foreign keys on.
-- Flyway migration `V1__init.sql` with this draft schema:
-  - `tasks(id, original_filename, content_type, duration_ms NULL, status CHECK IN ('QUEUED','RUNNING','PAUSED','COMPLETED','FAILED','CANCELED'), phase NULL CHECK IN ('CHUNKING','TRANSCRIBING','DIARIZING'), queue_position NULL, language DEFAULT 'en', speakers_mode CHECK IN ('auto','off','fixed'), speakers_count NULL, max_speakers DEFAULT 8, model, progress REAL DEFAULT 0, error NULL, created_at, started_at NULL, finished_at NULL)`
-  - `audio(task_id PK FK → tasks ON DELETE CASCADE, data BLOB, size_bytes, sha256)` — separate table so task listings never load blobs.
-  - `chunks(task_id, idx, start_ms, end_ms, status CHECK IN ('PENDING','DONE'), PK(task_id, idx))`
-  - `segments(id, task_id, chunk_idx, seq, start_ms, end_ms, text, speaker NULL)`
-  - `queue_state(id = 1 CHECK, paused INTEGER)` — single row.
-- Exposed table objects plus repositories exposing `suspend` functions that run on `Dispatchers.IO`.
-- Audio is written and read as streams (never fully materialized in memory), so it can be piped to a temp file for ffmpeg/whisper-cli.
-- Transcript outputs are rendered on demand from `segments` (item 10), not stored.
+- SQLite file `$STT_DATA_DIR/stt.db`; WAL journal mode; foreign keys on. The app opens the database at startup and runs Flyway migrations on every open; `STT_DATA_DIR` unset or empty fails startup naming the variable, a missing directory is created, and an uncreatable/unwritable path fails startup naming the variable ([ADR 0017](../docs/decisions/0017-database-location-and-connection-contract.md)).
+- Flyway migration `V1__init.sql` creates:
+  - `tasks(id INTEGER PK, original_filename, content_type, duration_ms NULL, status CHECK IN ('QUEUED','RUNNING','PAUSED','COMPLETED','FAILED','CANCELED'), phase NULL CHECK IN ('CHUNKING','TRANSCRIBING','DIARIZING'), queue_position NULL, language DEFAULT 'en', speakers_mode CHECK IN ('auto','off','fixed'), speakers_count NULL, max_speakers DEFAULT 8, model, progress REAL DEFAULT 0, error NULL, created_at, started_at NULL, finished_at NULL)` — timestamps as INTEGER epoch millis UTC
+  - `audio(task_id INTEGER PK, FK → tasks ON DELETE CASCADE, size_bytes, sha256)` — one metadata row per task, no payload
+  - `audio_parts(task_id, part_no, part BLOB, PK(task_id, part_no), FK → tasks ON DELETE CASCADE)` — audio payload as fixed 1 MiB pages ([ADR 0018](../docs/decisions/0018-audio-payload-paged-blobs.md))
+  - `chunks(task_id, idx, start_ms, end_ms, status CHECK IN ('PENDING','DONE'), PK(task_id, idx), FK → tasks ON DELETE CASCADE)`
+  - `segments(id INTEGER PK, task_id, chunk_idx, seq, start_ms, end_ms, text, speaker NULL, FK → tasks ON DELETE CASCADE)`
+  - `queue_state(id = 1 CHECK, paused INTEGER CHECK IN (0, 1), PK(id))` — single row
+- Exposed table objects plus repositories in `stt/db` exposing `suspend` functions that run their JDBC work on `Dispatchers.IO`: `TaskRepository`, `AudioRepository`, `ChunkRepository`, `SegmentRepository`, `QueueStateRepository`, all backed by the `Database` service.
+- `Database` owns the JDBC `Connection` and is the first Ktor DI service, registered in the application module ([ADR 0013](../docs/decisions/0013-backend-feature-packages-kotlin-di.md), [ADR 0017](../docs/decisions/0017-database-location-and-connection-contract.md)); repositories stay plain constructor-injected until route/engine consumers arrive (item 12).
+- Audio is written from and read back to streams in page-sized windows — never the whole payload in memory: uploads stream in as `audio_parts` rows inside one transaction while `size_bytes` and `sha256` are computed on the fly; reads stream pages in `part_no` order to a temp file for ffmpeg/whisper-cli ([ADR 0018](../docs/decisions/0018-audio-payload-paged-blobs.md)).
+- Audio is kept after completion (history playback in item 15, re-processing); deletion is a future explicit feature, never a completion side effect ([ADR 0018](../docs/decisions/0018-audio-payload-paged-blobs.md)).
+- Transcript outputs (txt/srt/vtt/json) are rendered on demand from `segments` (item 10), not stored.
 
-## Open questions for the user
+## Open questions (answered 2026-10-06)
 
-- Keep or delete the audio BLOB after a task completes? (History playback in item 15 needs it.)
-- Store generated outputs (txt/srt/vtt/json) or render on demand? Proposal: render on demand from `segments`.
+- Keep or delete the audio BLOB after a task completes? → **Keep** (history playback, item 15; ADR 0005 made the DB the only copy). Recorded in ADR 0018.
+- Store generated outputs (txt/srt/vtt/json) or render on demand? → **Render on demand** from `segments` (item 10 owns rendering).
+
+## Decisions (consultation 2026-10-06)
+
+| # | Question | Decision | Recorded in |
+| -- | -------- | -------- | ----------- |
+| 1 | Keep or delete the audio BLOB after completion | Keep; deletion becomes an explicit feature | ADR 0018 |
+| 2 | Store generated outputs or render on demand | Render on demand from `segments` (item 10) | spec Proposal |
+| 3 | Do the `chunks`/`segments` tables and repositories belong here? | Yes: the full schema lands once in `V1__init.sql`; later items extend only via migrations | ADR 0019 |
+| 4 | BLOB streaming mechanics | Paged storage: `audio` metadata row + 1 MiB `audio_parts` pages; constant-memory writes/reads; `size_bytes`/`sha256` computed on the write stream (driver cannot stream single-row BLOBs, probed 2026-10-06) | ADR 0018 |
+| 5 | `STT_DATA_DIR` unset/empty | Fail fast naming the variable (consistent with the config rules); missing directory auto-created; DB at `$STT_DATA_DIR/stt.db`; connection opens at startup with WAL + FK | ADR 0017 |
+| 6 | Ktor DI introduction | `install(DI)` + `provide<Database> {}` in the application module; repositories plain-constructed in tests until item 12 consumers | spec Proposal, ADR 0013 conventions |
+| 7 | Timestamp storage | INTEGER epoch millis UTC | spec Proposal |
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] Migrations apply cleanly to an empty database
+- [ ] Migrations apply cleanly to an empty database; opening an existing database applies nothing and preserves its rows
 - [ ] The database opens in WAL mode with foreign keys enforced
 - [ ] A task saved through the repository reads back with identical fields
 - [ ] An invalid `status`, `phase` or `speakers_mode` value is rejected by the database
 - [ ] Chunks and segments saved for a task read back in `idx` / `seq` order
-- [ ] Deleting a task cascades to its audio
-- [ ] Audio is written and read back as a stream without loading the whole blob into memory, and its stored `sha256`/`size_bytes` match the content
+- [ ] Deleting a task cascades to its audio, audio pages, chunks, and segments
+- [ ] Audio larger than one page is written from and read back to streams without holding the whole payload in memory, byte-for-byte identical, and its stored `size_bytes`/`sha256` match independently derived values
 - [ ] Listing tasks does not read audio data
 - [ ] The queue paused flag round-trips and only one `queue_state` row can exist
+- [ ] `STT_DATA_DIR` unset or empty → config load fails with an error naming `STT_DATA_DIR`
+- [ ] Opening the database creates the data directory when missing and creates `stt.db`
+- [ ] The application module registers the Database via Ktor DI; an application loads with it and a `testApplication` may override the provider before services load
+- [ ] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
 
 ## Acceptance criteria
 
-- `V1__init.sql` creates all five tables on an empty DB; Flyway reports it applied.
+- `V1__init.sql` creates all six tables on an empty DB; Flyway reports it applied; reopening an existing DB applies nothing and preserves data.
 - `PRAGMA journal_mode` returns `wal` and `PRAGMA foreign_keys` returns `1` on connections opened by the app.
-- Repository functions are `suspend` and do their JDBC work on `Dispatchers.IO`.
+- Repository functions are `suspend` and do their JDBC work on `Dispatchers.IO`; audio payload moves in 1 MiB page windows (constant memory), never as a whole blob.
 - All test-list items ticked and green; user approved the diff.
+- New Maven dependencies (`ktor-server-di`, Exposed, Flyway, `sqlite-jdbc`) are integrated by the user: `deps.json` regenerated and `nix build .` green (cannot be verified inside the agent sandbox).
 
 ## Approval log
 
-_Empty — add dated lines (YYYY-MM-DD: what was approved) on approval._
+- 2026-10-06: consultation decisions 1–7 approved (decision menu): keep audio after completion; render outputs on demand; `chunks`/`segments` tables and repositories included in this item; paged 1 MiB audio storage; `STT_DATA_DIR` fail-fast with auto-created directory; Database-only Ktor DI wiring; INTEGER epoch-millis timestamps. Test list of 13 items approved. ADRs 0017–0019 approved as written. Driver capability probe (xerial `sqlite-jdbc` 3.49.1.0, run 2026-10-06 in the agent sandbox) recorded in ADR 0018: no incremental BLOB I/O, no binary streams, no `readfile`/`writefile`.

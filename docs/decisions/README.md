@@ -22,3 +22,6 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0014 | [Build tooling: Gradle catalog, no wrapper](0014-build-tooling-gradle-catalog-no-wrapper.md) | accepted, flake-scope part superseded by [0016](0016-flake-scope-correction-app-wrapper.md) | 2026-10-05 |
 | 0015 | [Code formatting: ktlint and prettier](0015-code-formatting-ktlint-prettier.md)          | accepted | 2026-10-05 |
 | 0016 | [Flake scope correction: app wrapper in item 02](0016-flake-scope-correction-app-wrapper.md) | accepted | 2026-10-05 |
+| 0017 | [Database location, data directory, and connection contract](0017-database-location-and-connection-contract.md) | accepted | 2026-10-06 |
+| 0018 | [Audio payload stored as paged BLOBs](0018-audio-payload-paged-blobs.md) | accepted | 2026-10-06 |
+| 0019 | [Schema ownership: one schema in item 03, migrations after](0019-schema-ownership-and-evolution.md) | accepted | 2026-10-06 |
