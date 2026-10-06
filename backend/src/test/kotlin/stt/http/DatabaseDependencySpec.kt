@@ -43,4 +43,20 @@ class DatabaseDependencySpec :
                 }
             }
         }
+
+        given("an application started with the module") {
+            `when`("the application stops") {
+                then("the Database provided by DI is closed") {
+                    lateinit var db: Database
+                    testApplication {
+                        application { sttApp(Config(dataDir = tempdir("stt-data").toPath())) }
+                        startApplication()
+                        db = application.dependencies.resolve<Database>()
+                        db.connection.isClosed.shouldBeFalse()
+                    }
+
+                    db.connection.isClosed.shouldBeTrue()
+                }
+            }
+        }
     })

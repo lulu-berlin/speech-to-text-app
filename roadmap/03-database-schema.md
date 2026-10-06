@@ -88,7 +88,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] A duplicate upload is rejected and leaves no temp file (discovered)
 - [x] Stale files in `$STT_DATA_DIR/tmp` are removed when the database opens (discovered)
 - [x] Opening fails naming `STT_DATA_DIR` when WAL cannot be enabled (discovered)
-- [ ] Stopping the application closes the Database provided by DI (discovered)
+- [x] Stopping the application closes the Database provided by DI (discovered)
 - [ ] The packaged app started with `STT_DATA_DIR` unset or empty exits non-zero with a one-line message naming `STT_DATA_DIR`; with it set, it starts and serves `/api/health` (discovered; manual, user-verified: red on the current build, green after `nix build .`)
 
 ## Acceptance criteria
