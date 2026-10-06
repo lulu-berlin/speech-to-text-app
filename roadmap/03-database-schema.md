@@ -20,7 +20,7 @@ Define the SQLite schema for tasks, uploaded audio, chunks, transcript segments 
 - SQLite file `$STT_DATA_DIR/stt.db`; WAL journal mode; foreign keys on. The app opens the database at startup and runs Flyway migrations on every open; `STT_DATA_DIR` unset or empty fails startup naming the variable, a missing directory is created, and an uncreatable/unwritable path fails startup naming the variable ([ADR 0017](../docs/decisions/0017-database-location-and-connection-contract.md)).
 - Flyway migration `V1__init.sql` creates:
   - `tasks(id INTEGER PK, original_filename, content_type, duration_ms NULL, status CHECK IN ('QUEUED','RUNNING','PAUSED','COMPLETED','FAILED','CANCELED'), phase NULL CHECK IN ('CHUNKING','TRANSCRIBING','DIARIZING'), queue_position NULL, language DEFAULT 'en', speakers_mode CHECK IN ('auto','off','fixed'), speakers_count NULL, max_speakers DEFAULT 8, model, progress REAL DEFAULT 0, error NULL, created_at, started_at NULL, finished_at NULL)` — timestamps as INTEGER epoch millis UTC
-  - `audio(task_id INTEGER PK, FK → tasks ON DELETE CASCADE, size_bytes, sha256)` — one metadata row per task, no payload
+  - `audio(task_id INTEGER PK, FK → tasks ON DELETE CASCADE, size_bytes, sha256 TEXT NOT NULL UNIQUE)` — one metadata row per task, no payload; the unique `sha256` enforces **at most one task per audio content** (the same bytes uploaded again, under any filename, is a duplicate: the second insert fails and its task creation rolls back)
   - `audio_parts(task_id, part_no, part BLOB, PK(task_id, part_no), FK → tasks ON DELETE CASCADE)` — audio payload as fixed 1 MiB pages ([ADR 0018](../docs/decisions/0018-audio-payload-paged-blobs.md))
   - `chunks(task_id, idx, start_ms, end_ms, status CHECK IN ('PENDING','DONE'), PK(task_id, idx), FK → tasks ON DELETE CASCADE)`
   - `segments(id INTEGER PK, task_id, chunk_idx, seq, start_ms, end_ms, text, speaker NULL, FK → tasks ON DELETE CASCADE)`
@@ -47,6 +47,7 @@ Define the SQLite schema for tasks, uploaded audio, chunks, transcript segments 
 | 5 | `STT_DATA_DIR` unset/empty | Fail fast naming the variable (consistent with the config rules); missing directory auto-created; DB at `$STT_DATA_DIR/stt.db`; connection opens at startup with WAL + FK | ADR 0017 |
 | 6 | Ktor DI introduction | `install(DI)` + `provide<Database> {}` in the application module; repositories plain-constructed in tests until item 12 consumers | spec Proposal, ADR 0013 conventions |
 | 7 | Timestamp storage | INTEGER epoch millis UTC | spec Proposal |
+| 8 | At most one task per audio content | `audio.sha256` is `UNIQUE`; task + its audio metadata row are written in one transaction, so a duplicate content is rejected and its task creation rolls back; strict rule — a FAILED/CANCELED task also blocks re-scheduling the same file until an explicit retry feature exists | ADR 0018, spec Proposal |
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -65,6 +66,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [ ] Opening the database creates the data directory when missing and creates `stt.db`
 - [ ] The application module registers the Database via Ktor DI; an application loads with it and a `testApplication` may override the provider before services load
 - [ ] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
+- [ ] The database rejects a second audio row with the same `sha256` (at most one task per audio content)
 
 ## Acceptance criteria
 
@@ -77,3 +79,4 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 ## Approval log
 
 - 2026-10-06: consultation decisions 1–7 approved (decision menu): keep audio after completion; render outputs on demand; `chunks`/`segments` tables and repositories included in this item; paged 1 MiB audio storage; `STT_DATA_DIR` fail-fast with auto-created directory; Database-only Ktor DI wiring; INTEGER epoch-millis timestamps. Test list of 13 items approved. ADRs 0017–0019 approved as written. Driver capability probe (xerial `sqlite-jdbc` 3.49.1.0, run 2026-10-06 in the agent sandbox) recorded in ADR 0018: no incremental BLOB I/O, no binary streams, no `readfile`/`writefile`.
+- 2026-10-06: post-approval delta (user): **at most one task per audio content** — `audio.sha256` becomes `UNIQUE`; duplicate content is rejected by the database and its task creation rolls back (task + audio metadata row written in one transaction); strict rule, so a FAILED/CANCELED task also blocks re-scheduling the same file until an explicit retry feature exists. ADR 0018 amended; test item 14 added; spec text and decisions table updated. Approved as presented.
