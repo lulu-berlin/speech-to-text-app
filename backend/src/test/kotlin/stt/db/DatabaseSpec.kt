@@ -1,7 +1,6 @@
 package stt.db
 
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.core.TestConfiguration
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -100,14 +99,6 @@ private fun rowCount(
         statement.executeQuery("SELECT count(*) FROM \"$table\"").use { rows ->
             rows.next().shouldBeTrue()
             rows.getInt(1)
-        }
-    }
-
-private fun TestConfiguration.withDatabase(block: suspend (Database) -> Unit) =
-    runTest {
-        val dataDir = tempdir("stt-db").toPath()
-        Database.open(dataDir).use { db ->
-            block(db)
         }
     }
 
