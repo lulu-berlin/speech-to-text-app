@@ -316,6 +316,22 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a descendant that left the process group and still holds the output pipes") {
+            `when`("the run is cancelled") {
+                then("run returns promptly with CancellationException") {
+                    val outcome =
+                        cancelAfterFirstLine(
+                            ProcessRunner(gracePeriod = 300.milliseconds),
+                            listOf("sh", "-c", "setsid sleep 1000 & echo \$\$ \$!; wait"),
+                        )
+
+                    outcome.thrown.shouldBeInstanceOf<CancellationException>()
+                    outcome.elapsed.shouldBeLessThan(2.seconds)
+                    outcome.aliveWhenRunThrew.shouldBe(listOf(outcome.pids[1]))
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
