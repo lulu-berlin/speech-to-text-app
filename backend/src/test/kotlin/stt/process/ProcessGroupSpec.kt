@@ -21,7 +21,7 @@ class ProcessGroupSpec :
                 then("terminate gives up one grace period after SIGKILL and logs a warning naming the group") {
                     val sent = mutableListOf<Int>()
                     val group =
-                        ProcessGroup(4242) { _, signal ->
+                        ProcessGroup(4242, childAlive = { false }) { _, signal ->
                             if (signal != 0) sent += signal
                             0
                         }

@@ -510,6 +510,43 @@ class ProcessRunnerSpec :
             }
         }
 
+        given("a pause() issued before the process group exists") {
+            `when`("setsid creates the group only after the pause") {
+                then("the process produces no output until resume(), then starts from its first line") {
+                    lateinit var runner: ProcessRunner
+                    val spawned = CompletableDeferred<Unit>()
+                    runner =
+                        ProcessRunner(2.seconds) { builder ->
+                            runner.pause()
+                            delayGroupCreation(builder).start().also { spawned.complete(Unit) }
+                        }
+                    val delivered = mutableListOf<String>()
+                    val firstLine = CompletableDeferred<String>()
+                    val job =
+                        launch {
+                            runner.run(
+                                countingLoop(),
+                                onStdoutLine = { line ->
+                                    underLock(delivered) { delivered.add(line) }
+                                    firstLine.complete(line)
+                                },
+                            )
+                        }
+                    try {
+                        withTimeout(10.seconds) { spawned.await() }
+                        delay(1.seconds)
+                        underLock(delivered) { delivered.toList() }.shouldBeEmpty()
+
+                        runner.resume()
+
+                        withTimeout(10.seconds) { firstLine.await() }.shouldBe("1")
+                    } finally {
+                        job.cancelAndJoin()
+                    }
+                }
+            }
+        }
+
         given("a runner whose previous run was paused and then cancelled") {
             `when`("the next run starts on the same runner") {
                 then("it is not frozen: it finishes and delivers its output") {
@@ -543,6 +580,14 @@ private fun countingLoop(headStart: Duration = Duration.ZERO): List<String> {
     val delay = if (headStart > Duration.ZERO) "sleep ${headStart.inWholeMilliseconds / 1000.0}; " else ""
     return listOf("sh", "-c", "${delay}i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done")
 }
+
+/**
+ * Delays the creation of the run's process group by 0.5 s: the built `setsid <cmd…>` is started through
+ * `sh -c 'sleep 0.5; exec "$@"'`, so the direct child stays in the JVM's group until it execs setsid.
+ * Lets a test land a pause() or a cancel while the group does not exist yet (ADR 0020).
+ */
+private fun delayGroupCreation(builder: ProcessBuilder): ProcessBuilder =
+    builder.command(listOf("sh", "-c", "sleep 0.5; exec \"\$@\"", "sh") + builder.command())
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
 private fun parsePids(line: String): List<Long> = line.split(" ").map(String::toLong)

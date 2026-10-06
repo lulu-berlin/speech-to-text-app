@@ -9,9 +9,15 @@ import kotlin.time.Duration
 /**
  * The process group of one run: the pid of a `setsid`-spawned child is its group id, and
  * kill(2) with the negated id reaches every process in the tree (ADR 0020). Linux signal numbers.
+ *
+ * start() returns before setsid has created the group, so every signal goes to the direct child
+ * first, then to the group: until setsid() runs, the child is the whole run, and a child that is
+ * stopped or killed can no longer create the group or fork into it.
  */
 internal class ProcessGroup(
     private val id: Long,
+    /** Whether the direct child is still unreaped; its pid is signalled only then, never a reused one. */
+    private val childAlive: () -> Boolean,
     /** kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). */
     private val kill: (pid: Int, signal: Int) -> Int = LibC.INSTANCE::kill,
 ) {
@@ -53,12 +59,14 @@ internal class ProcessGroup(
             true
         } ?: false
 
+    /** The child first: once it is stopped or dead it cannot add processes the group signal would miss. */
     private fun signal(signal: Int) {
+        if (childAlive()) kill(id.toInt(), signal)
         kill(target, signal)
     }
 
-    /** Signal 0 checks existence only: kill(2) succeeds while any process of the group exists. */
-    private fun hasMembers(): Boolean = kill(target, 0) == 0
+    /** The live child is a member even before setsid() creates the group; signal 0 checks the group's existence. */
+    private fun hasMembers(): Boolean = childAlive() || kill(target, 0) == 0
 
     private companion object {
         val logger: Logger = LoggerFactory.getLogger(ProcessGroup::class.java)
