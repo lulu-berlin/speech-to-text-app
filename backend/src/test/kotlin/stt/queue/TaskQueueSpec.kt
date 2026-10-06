@@ -152,4 +152,15 @@ class TaskQueueSpec :
                 }
             }
         }
+
+        given("a queue of two queued tasks with ids 1 and 2") {
+            `when`("a status change is requested for task 9, which is not in the queue") {
+                then("it is rejected as an unknown task and nothing is thrown") {
+                    val queue = queuedQueue(1L, 2L)
+                    queue.transition(9L, RUNNING).shouldBe(
+                        QueueTransitionOutcome.Rejected(QueueTransitionRejection.UnknownTask(9L)),
+                    )
+                }
+            }
+        }
     })
