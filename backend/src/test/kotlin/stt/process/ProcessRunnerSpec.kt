@@ -15,6 +15,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import stt.Integration
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -80,37 +81,16 @@ class ProcessRunnerSpec :
         given("a running shell whose background child is sleep 100") {
             `when`("the coroutine running it is cancelled") {
                 then("run throws CancellationException promptly, and only after the whole tree is dead") {
-                    val pids = CompletableDeferred<List<Long>>()
-                    var thrown: Throwable? = null
-                    var aliveWhenRunThrew: List<Long>? = null
+                    val outcome =
+                        cancelAfterFirstLine(
+                            ProcessRunner(gracePeriod = 300.milliseconds),
+                            listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
+                        )
 
-                    try {
-                        withTimeout(10.seconds) {
-                            val job =
-                                launch {
-                                    try {
-                                        ProcessRunner(gracePeriod = 300.milliseconds).run(
-                                            listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
-                                            onStdoutLine = { line -> pids.complete(parsePids(line)) },
-                                        )
-                                    } catch (e: CancellationException) {
-                                        thrown = e
-                                        aliveWhenRunThrew = if (pids.isCompleted) pids.getCompleted().filter(::isAlive) else emptyList()
-                                        throw e
-                                    }
-                                }
-                            pids.await()
-                            val cancelledAt = TimeSource.Monotonic.markNow()
-                            job.cancelAndJoin()
-                            cancelledAt.elapsedNow().shouldBeLessThan(2.seconds)
-                        }
-                    } finally {
-                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
-                    }
-
-                    thrown.shouldBeInstanceOf<CancellationException>()
-                    aliveWhenRunThrew.shouldBe(emptyList())
-                    pids.getCompleted().filter(::isAlive).shouldBeEmpty()
+                    outcome.thrown.shouldBeInstanceOf<CancellationException>()
+                    outcome.aliveWhenRunThrew.shouldBe(emptyList())
+                    outcome.elapsed.shouldBeLessThan(2.seconds)
+                    outcome.pids.filter(::isAlive).shouldBeEmpty()
                 }
             }
         }
@@ -119,38 +99,16 @@ class ProcessRunnerSpec :
             `when`("the coroutine running it is cancelled") {
                 then("the shell is killed forcibly after the grace period and run throws CancellationException") {
                     val gracePeriod = 300.milliseconds
-                    val pids = CompletableDeferred<List<Long>>()
-                    var thrown: Throwable? = null
-                    var aliveWhenRunThrew: List<Long>? = null
+                    val outcome =
+                        cancelAfterFirstLine(
+                            ProcessRunner(gracePeriod),
+                            listOf("sh", "-c", "trap '' TERM; echo \$\$; while :; do sleep 0.05; done"),
+                        )
 
-                    try {
-                        withTimeout(10.seconds) {
-                            val job =
-                                launch {
-                                    try {
-                                        ProcessRunner(gracePeriod).run(
-                                            listOf("sh", "-c", "trap '' TERM; echo \$\$; while :; do sleep 0.05; done"),
-                                            onStdoutLine = { line -> pids.complete(parsePids(line)) },
-                                        )
-                                    } catch (e: CancellationException) {
-                                        thrown = e
-                                        aliveWhenRunThrew = if (pids.isCompleted) pids.getCompleted().filter(::isAlive) else emptyList()
-                                        throw e
-                                    }
-                                }
-                            pids.await()
-                            val cancelledAt = TimeSource.Monotonic.markNow()
-                            job.cancelAndJoin()
-                            val elapsed = cancelledAt.elapsedNow()
-                            elapsed.shouldBeGreaterThanOrEqualTo(gracePeriod)
-                            elapsed.shouldBeLessThan(2.seconds)
-                        }
-                    } finally {
-                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
-                    }
-
-                    thrown.shouldBeInstanceOf<CancellationException>()
-                    aliveWhenRunThrew.shouldBe(emptyList())
+                    outcome.thrown.shouldBeInstanceOf<CancellationException>()
+                    outcome.aliveWhenRunThrew.shouldBe(emptyList())
+                    outcome.elapsed.shouldBeGreaterThanOrEqualTo(gracePeriod)
+                    outcome.elapsed.shouldBeLessThan(2.seconds)
                 }
             }
         }
@@ -164,3 +122,47 @@ private fun isAlive(pid: Long): Boolean = ProcessHandle.of(pid).map(ProcessHandl
 private fun killForcibly(pid: Long) {
     ProcessHandle.of(pid).ifPresent { it.destroyForcibly() }
 }
+
+/**
+ * Runs [runner] against [command], waits for the first line (the pid line) to arrive, cancels the
+ * run from the outside, then force-kills every reported pid. Returns what happened.
+ */
+private suspend fun cancelAfterFirstLine(
+    runner: ProcessRunner,
+    command: List<String>,
+): CancelledRun {
+    val pids = CompletableDeferred<List<Long>>()
+    var thrown: CancellationException? = null
+    var aliveWhenRunThrew: List<Long>? = null
+    var elapsed: Duration = Duration.ZERO
+
+    try {
+        withTimeout(10.seconds) {
+            val job =
+                launch {
+                    try {
+                        runner.run(command, onStdoutLine = { line -> pids.complete(parsePids(line)) })
+                    } catch (e: CancellationException) {
+                        thrown = e
+                        aliveWhenRunThrew = if (pids.isCompleted) pids.getCompleted().filter(::isAlive) else emptyList()
+                        throw e
+                    }
+                }
+            pids.await()
+            val cancelledAt = TimeSource.Monotonic.markNow()
+            job.cancelAndJoin()
+            elapsed = cancelledAt.elapsedNow()
+        }
+    } finally {
+        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
+    }
+
+    return CancelledRun(thrown, aliveWhenRunThrew, elapsed, pids.getCompleted())
+}
+
+private class CancelledRun(
+    val thrown: CancellationException?,
+    val aliveWhenRunThrew: List<Long>?,
+    val elapsed: Duration,
+    val pids: List<Long>,
+)
