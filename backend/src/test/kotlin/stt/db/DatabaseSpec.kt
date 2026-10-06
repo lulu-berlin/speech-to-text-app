@@ -137,14 +137,16 @@ class DatabaseSpec :
         }
 
         given("a database opened, closed, and opened again") {
-            `when`("reading the journal mode and the foreign-key setting on each connection") {
-                then("every connection is in WAL mode with foreign keys on") {
+            `when`("reading the journal mode, the foreign-key setting, and the WAL size limit on each connection") {
+                then("every connection is in WAL mode with foreign keys on and a 64 MiB WAL size limit") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
                         repeat(2) {
                             Database.open(dataDir).use { db ->
                                 pragma(db, "journal_mode").shouldBe("wal")
                                 pragma(db, "foreign_keys").shouldBe("1")
+                                // 64 MiB (ADR 0017) = 64 × 1024 × 1024 bytes.
+                                pragma(db, "journal_size_limit").shouldBe("67108864")
                             }
                         }
                     }

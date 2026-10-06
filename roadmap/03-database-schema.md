@@ -93,7 +93,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] The packaged app started with `STT_DATA_DIR` unset or empty exits non-zero with a one-line message naming `STT_DATA_DIR`; with it set, it starts and serves `/api/health` (discovered; manual, user-verified: red on the current build, green after `nix build .`)
 - [x] A migration that fails (e.g. an existing `stt.db` whose applied V1 checksum no longer matches) fails opening with an error naming `STT_DATA_DIR` (discovered)
 - [x] After a write larger than the WAL size limit, the WAL file shrinks back to at most the limit (discovered; review round 2: limit 16 KiB via an internal `Database.open` seam, a 1 MiB + 1 byte audio write, `PRAGMA wal_checkpoint(PASSIVE)` on the writer, then a one-page write; the `-wal` file ends at most 16 KiB; red: `1079472 should be <= 16384`, i.e. 262 frames kept after the completed checkpoint and the next write)
-- [ ] The writer connection opened by `Database.open(dataDir)` reports `PRAGMA journal_size_limit` 67108864 (discovered; review round 2: the WAL-limit test uses the seam, so nothing checked the 64 MiB production value)
+- [x] The writer connection opened by `Database.open(dataDir)` reports `PRAGMA journal_size_limit` 67108864 (discovered; review round 2: the WAL-limit test uses the seam, so nothing checked the 64 MiB production value; already implemented, so red by temporary mutation to 32 MiB: `expected:<67108864> but was:<33554432>`)
 
 ## Acceptance criteria
 
