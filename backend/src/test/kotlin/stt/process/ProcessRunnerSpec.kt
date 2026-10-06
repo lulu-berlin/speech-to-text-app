@@ -300,6 +300,20 @@ class ProcessRunnerSpec :
             }
         }
 
+        given("a command that copies its stdin to stdout until EOF, then prints done") {
+            `when`("running it") {
+                then("it sees an empty stdin at EOF, finishes, and prints only done") {
+                    val result =
+                        withTimeout(10.seconds) {
+                            ProcessRunner().run(listOf("sh", "-c", "cat; echo done"))
+                        }
+
+                    result.exitCode.shouldBe(0)
+                    result.stdout.shouldBe(listOf("done"))
+                }
+            }
+        }
+
         given("a callback that throws") {
             `when`("running a command whose output triggers it") {
                 then("run fails with that exception and kills the process tree") {

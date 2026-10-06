@@ -7,6 +7,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -76,11 +77,16 @@ class ProcessRunner internal constructor(
      * Starts [command] so the started process is never lost. A plain withContext discards its result
      * when the caller is cancelled while start() runs (prompt cancellation on the way back); the outer
      * NonCancellable context returns it regardless, so the caller can register and kill it (ADR 0020).
+     *
+     * stdin is /dev/null, not a pipe nobody writes or closes: a tool that reads stdin to EOF (ffmpeg
+     * without -nostdin) would otherwise wait forever.
      */
-    private suspend fun spawn(command: List<String>): Process =
-        withContext(NonCancellable) {
-            withContext(Dispatchers.IO) { startProcess(ProcessBuilder(command)) }
+    private suspend fun spawn(command: List<String>): Process {
+        val builder = ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.from(File("/dev/null")))
+        return withContext(NonCancellable) {
+            withContext(Dispatchers.IO) { startProcess(builder) }
         }
+    }
 
     /** Fails fast on a missing executable: resolves [name] to an absolute existing executable, or throws. */
     private fun resolveInPath(name: String): String =
