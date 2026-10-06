@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -35,13 +36,19 @@ class ProcessRunner(
             val process = withContext(Dispatchers.IO) { ProcessBuilder(listOf("setsid", executable) + command.drop(1)).start() }
             val group = ProcessGroup(process.pid())
             currentGroup.set(group)
+            val stdout = async(Dispatchers.IO) { readLines(process.inputStream, onStdoutLine) }
+            val stderr = async(Dispatchers.IO) { readLines(process.errorStream, onStderrLine) }
             try {
-                val stdout = async(Dispatchers.IO) { readLines(process.inputStream, onStdoutLine) }
-                val stderr = async(Dispatchers.IO) { readLines(process.errorStream, onStderrLine) }
                 val exitCode = awaitExit(process)
                 ProcessResult(exitCode, stdout.await(), stderr.await())
             } catch (e: CancellationException) {
-                withContext(NonCancellable) { group.terminate(gracePeriod) }
+                stdout.cancel()
+                stderr.cancel()
+                withContext(NonCancellable) {
+                    group.terminate(gracePeriod)
+                    stdout.cancelAndJoin()
+                    stderr.cancelAndJoin()
+                }
                 throw e
             } finally {
                 currentGroup.set(null)
@@ -80,12 +87,18 @@ class ProcessRunner(
         return Files.isRegularFile(file) && Files.isExecutable(file)
     }
 
-    private fun readLines(
+    private suspend fun readLines(
         stream: InputStream,
         onLine: (String) -> Unit,
     ): List<String> =
-        stream.bufferedReader().useLines { lines ->
-            lines.onEach(onLine).toList()
+        coroutineScope {
+            stream.bufferedReader().useLines { lines ->
+                lines
+                    .onEach { line ->
+                        ensureActive()
+                        onLine(line)
+                    }.toList()
+            }
         }
 
     /** A blocking waitFor cannot be cancelled, so the wait is sliced to observe cancellation. */
