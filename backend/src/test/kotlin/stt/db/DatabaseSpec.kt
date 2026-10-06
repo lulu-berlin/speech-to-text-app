@@ -121,6 +121,23 @@ class DatabaseSpec :
             }
         }
 
+        given("an existing stt.db whose recorded V1 checksum no longer matches V1__init.sql") {
+            `when`("opening the database") {
+                then("the failing migration fails opening with an error naming STT_DATA_DIR and the path") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        Database.open(dataDir).use { db ->
+                            execute(db, "UPDATE flyway_schema_history SET checksum = checksum + 1 WHERE version = '1'")
+                        }
+
+                        val error = shouldThrowAny { Database.open(dataDir) }
+                        error.message.shouldContain("STT_DATA_DIR")
+                        error.message.shouldContain(dataDir.toString())
+                    }
+                }
+            }
+        }
+
         given("a database opened, closed, and opened again") {
             `when`("reading the journal mode and the foreign-key setting on each connection") {
                 then("every connection is in WAL mode with foreign keys on") {

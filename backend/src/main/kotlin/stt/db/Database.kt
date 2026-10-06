@@ -84,6 +84,8 @@ class Database private constructor(
             "STT_DATA_DIR \"%s\" cannot be created or opened as the data directory: %s"
         private const val WAL_UNAVAILABLE_ERROR =
             "STT_DATA_DIR \"%s\": stt.db cannot be opened in WAL journal mode with foreign keys on: %s"
+        private const val MIGRATION_FAILED_ERROR =
+            "STT_DATA_DIR \"%s\": migrating stt.db failed: %s"
 
         suspend fun open(dataDir: Path): Database = open(dataDir, Mutex())
 
@@ -104,7 +106,7 @@ class Database private constructor(
                         .migrate()
                 } catch (e: Exception) {
                     connection.close()
-                    throw e
+                    throw IllegalStateException(MIGRATION_FAILED_ERROR.format(dataDir, e), e)
                 }
                 Database(connection, url, tmpDir, transactionLock)
             }
