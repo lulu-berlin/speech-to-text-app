@@ -67,6 +67,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [ ] The application module registers the Database via Ktor DI; an application loads with it and a `testApplication` may override the provider before services load
 - [ ] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
 - [x] The database rejects a second audio row with the same `sha256` (at most one task per audio content)
+- [ ] Concurrent repository calls do not interleave their transactions on the shared connection (discovered)
 
 ## Acceptance criteria
 
