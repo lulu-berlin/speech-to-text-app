@@ -11,6 +11,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -29,10 +30,26 @@ class ProcessRunner internal constructor(
      */
     private val currentGroup = AtomicReference<ProcessGroup?>(null)
 
+    /** Single-flight guard (ADR 0020): claimed when a run starts, released only by that run when it ends. */
+    private val inFlight = AtomicBoolean(false)
+
     suspend fun run(
         command: List<String>,
         onStdoutLine: (String) -> Unit = {},
         onStderrLine: (String) -> Unit = {},
+    ): ProcessResult {
+        check(inFlight.compareAndSet(false, true)) { "A run is already in flight: ProcessRunner is single-flight" }
+        try {
+            return runExclusively(command, onStdoutLine, onStderrLine)
+        } finally {
+            inFlight.set(false)
+        }
+    }
+
+    private suspend fun runExclusively(
+        command: List<String>,
+        onStdoutLine: (String) -> Unit,
+        onStderrLine: (String) -> Unit,
     ): ProcessResult {
         val executable = withContext(Dispatchers.IO) { resolveInPath(command[0]) }
         return coroutineScope {
