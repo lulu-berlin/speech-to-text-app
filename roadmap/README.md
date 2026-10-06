@@ -19,7 +19,7 @@ graph TD
   01[01 dev environment ✓]:::done --> 02[02 repo skeleton and conventions ✓]:::done
   02 --> 03[03 database schema ✓]:::done
   03 --> 04[04 queue domain model]
-  02 --> 05[05 process runner]
+  02 --> 05[05 process runner ✓]:::done
   05 --> 06[06 audio decoding and chunking]
   03 --> 06
   06 --> 07[07 whisper transcription]
@@ -50,8 +50,8 @@ graph TD
 | [01 — Dev environment](../docs/specs/dev-environment.md) | done | — |
 | [02 — Repo skeleton and conventions](../docs/specs/repo-skeleton-and-conventions.md) | done | 01 |
 | [03 — Database schema](../docs/specs/database-schema.md) | done | 02 |
-| [04 — Queue domain model](04-queue-domain-model.md) | draft | 03 |
-| [05 — Process runner](05-process-runner.md) | draft | 02 |
+| [04 — Queue domain model](04-queue-domain-model.md) | spec-approved | 03 |
+| [05 — Process runner](../docs/specs/process-runner.md) | done | 02 |
 | [06 — Audio decoding and chunking](06-audio-decoding-and-chunking.md) | draft | 03, 05 |
 | [07 — Whisper transcription](07-whisper-transcription.md) | draft | 03, 06 |
 | [08 — Speaker embeddings](08-speaker-embeddings.md) | draft | 06 |

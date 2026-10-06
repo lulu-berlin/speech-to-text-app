@@ -1,17 +1,18 @@
-# 05 — Process runner
+# Process runner
 
-Status: in-review
-Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done)
+Status: done (roadmap item 05, merged 2026-10-06)
+Depends on: [02 — repo skeleton and conventions](repo-skeleton-and-conventions.md)
 
 ## Goal
 
 A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from the backend: stream their output line by line, capture the exit code, kill them when the owning coroutine is cancelled, and freeze/unfreeze them with `SIGSTOP`/`SIGCONT` so a running transcription can be paused.
 
-## Already decided
+## Decisions
 
-- [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): all async work via Kotlin coroutines.
-- [ADR 0004 — Chunked transcription with SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): pause = `SIGSTOP` the current whisper-cli process, resume = `SIGCONT`.
-- [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): external tools are invoked directly, never through Python.
+- [ADR 0001 — Stack and monorepo](../decisions/0001-stack-and-monorepo.md): all async work via Kotlin coroutines.
+- [ADR 0004 — Chunked transcription with SIGSTOP pause](../decisions/0004-chunked-transcription-sigstop-pause.md): pause = `SIGSTOP` the current whisper-cli process, resume = `SIGCONT`.
+- [ADR 0002 — No Python, oracle only](../decisions/0002-no-python-oracle-only.md): external tools are invoked directly, never through Python.
+- Decided in this item: [ADR 0020 — Process runner: JNA signals, process groups, cancellation](../decisions/0020-process-runner-jna-signals-process-groups.md), [ADR 0021 — Integration tests: Kotest tags and `gradle integrationTest`](../decisions/0021-integration-tests-kotest-tags-gradle-task.md), [ADR 0022 — Kotlin compiler runs inside the Gradle daemon](../decisions/0022-kotlin-compiler-in-process.md).
 
 ## Proposal (approved 2026-10-06; decisions recorded under Open questions)
 
@@ -92,3 +93,4 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - 2026-10-06: review round 2, changes requested: `ProcessBuilder.start()` returns before `setsid` has created the group (measured: 27/200 runs), so kill(-pid) hits ESRCH and the error is dropped — a pause in that window is lost (test 67 only passed due to its 0.5 s head start) and a cancel in that window can still leak an unregistered process. User-approved fix: the runner waits inside the NonCancellable spawn until `getpgid(pid) == pid` (new JNA `getpgid` binding on libc — no new dependency) or the process has exited, polling `POLL_INTERVAL` with the first check immediate; a pending pause is applied only after registration. Bound: 5 s default as an internal constructor parameter; on a hit the runner SIGKILLs pid and -pid, waits for the child, and throws an `IOException` naming the program. Test setup (user-approved): the `startProcess` seam wraps the command as `sh -c 'sleep 0.5; exec "$@"' sh setsid <cmd…>` so the group appears 0.5 s after start; pause/cancel land inside that window. Two discovered items appended to the test list; no bound-hit unit test (per user choice). No new dependency added (ADR 0020 amended for the wait).
 - 2026-10-06: review round 2 fix design changed by the user after the first cycle: with the approved wait (poll until `getpgid(pid) == pid`, 50 ms), one line still escaped the pending pause between the group's creation and the next poll. Replaced by signalling the direct child's pid first, then the group, for every signal of the run (pid only while the `Process` is alive), and counting the live child as a group member; no wait, no `getpgid` binding, no group-creation bound or `IOException`. ADR 0020 amended accordingly. Red on the previous code: 9 lines delivered while paused; test setup: the `startProcess` seam starts the built `setsid <cmd…>` through `sh -c 'sleep 0.5; exec "$@"'`.
 - 2026-10-06: cancel-before-group item: green on arrival, because the child-signalling fix from the pause cycle already covers it. With the user's approval, the red was recorded against a temporary group-only `ProcessTree` (the code before a3f9e18, never committed): `expected:<false> but was:<true>`, so the spawned pid was alive when `run` threw.
+- 2026-10-06 (review round 3): no new findings; reviewer re-ran `gradle check` (45/45) and `gradle integrationTest` (22/22). The branch had been rebased onto `main` (`ceaf625`) by the workspace agent at the user's request (allowed since `ea348a4`, AGENTS.md workflow step 5); conflicts in `build.gradle.kts`, `libs.versions.toml` and `docs/decisions/README.md` resolved with `main`'s plain `kotlinx-coroutines-core` coordinate. User approved the diff. Branch rebased onto `main` (`ea348a4`, no conflicts; `gradle check` 45/45, `gradle integrationTest` 22/22 on the rebased head); user verified `nix build .` on the rebased head `71ca5af` (Flyway applied V1 on a fresh `STT_DATA_DIR`, `/api/health` → `{"status":"ok"}`); fast-forward merged into `main` (head `71ca5af`).
