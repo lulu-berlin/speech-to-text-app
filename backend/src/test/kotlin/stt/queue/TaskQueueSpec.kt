@@ -12,6 +12,7 @@ import stt.queue.TaskStatus.FAILED
 import stt.queue.TaskStatus.PAUSED
 import stt.queue.TaskStatus.QUEUED
 import stt.queue.TaskStatus.RUNNING
+import stt.queue.QueueCreationRejection as Creation
 
 class TaskQueueSpec :
     BehaviorSpec({
@@ -180,21 +181,21 @@ class TaskQueueSpec :
             `when`("a queue is built from each set through the factory") {
                 then("an invalid set is rejected with the first of duplicate > terminal > multiple running; a valid set is kept as given") {
                     TaskQueue.of(listOf(QueueEntry(1L, QUEUED), QueueEntry(1L, PAUSED))).shouldBe(
-                        QueueCreationOutcome.Rejected(QueueCreationRejection.DuplicateIds(setOf(1L))),
+                        QueueCreationOutcome.Rejected(Creation.DuplicateIds(setOf(1L))),
                     )
                     TaskQueue.of(listOf(QueueEntry(1L, QUEUED), QueueEntry(2L, COMPLETED), QueueEntry(3L, CANCELED))).shouldBe(
-                        QueueCreationOutcome.Rejected(QueueCreationRejection.TerminalEntries(setOf(2L, 3L))),
+                        QueueCreationOutcome.Rejected(Creation.TerminalEntries(setOf(2L, 3L))),
                     )
                     TaskQueue.of(listOf(QueueEntry(1L, RUNNING), QueueEntry(2L, RUNNING), QueueEntry(3L, QUEUED))).shouldBe(
-                        QueueCreationOutcome.Rejected(QueueCreationRejection.MultipleRunning(setOf(1L, 2L))),
+                        QueueCreationOutcome.Rejected(Creation.MultipleRunning(setOf(1L, 2L))),
                     )
                     // 1 duplicated, 1 terminal, 1 and 2 RUNNING → duplicate wins.
                     TaskQueue.of(listOf(QueueEntry(1L, RUNNING), QueueEntry(1L, COMPLETED), QueueEntry(2L, RUNNING))).shouldBe(
-                        QueueCreationOutcome.Rejected(QueueCreationRejection.DuplicateIds(setOf(1L))),
+                        QueueCreationOutcome.Rejected(Creation.DuplicateIds(setOf(1L))),
                     )
                     // 3 terminal, 1 and 2 RUNNING → terminal wins.
                     TaskQueue.of(listOf(QueueEntry(1L, RUNNING), QueueEntry(2L, RUNNING), QueueEntry(3L, FAILED))).shouldBe(
-                        QueueCreationOutcome.Rejected(QueueCreationRejection.TerminalEntries(setOf(3L))),
+                        QueueCreationOutcome.Rejected(Creation.TerminalEntries(setOf(3L))),
                     )
 
                     val valid = listOf(QueueEntry(1L, RUNNING), QueueEntry(2L, PAUSED), QueueEntry(3L, QUEUED))
