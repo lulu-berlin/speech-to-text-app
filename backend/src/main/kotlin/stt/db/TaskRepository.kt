@@ -28,13 +28,13 @@ class TaskRepository(
             taskId
         }
 
-    suspend fun find(id: Long): Task? =
+    suspend fun find(id: Long): StoredTask? =
         db.transaction {
             TasksTable
                 .selectAll()
                 .where { TasksTable.id eq id }
                 .singleOrNull()
-                ?.toTask()
+                ?.toStoredTask()
         }
 
     /** All tasks in creation (id) order; reads only `tasks`, never audio. */
@@ -43,7 +43,7 @@ class TaskRepository(
             TasksTable
                 .selectAll()
                 .orderBy(TasksTable.id)
-                .map { row -> StoredTask(row[TasksTable.id], row.toTask()) }
+                .map { it.toStoredTask() }
         }
 
     /** Deletes the task; its audio, pages, chunks, and segments go with it (ON DELETE CASCADE). */
@@ -72,6 +72,8 @@ internal fun JdbcTransaction.insertTaskRow(task: Task): Long =
         it[startedAt] = task.startedAt
         it[finishedAt] = task.finishedAt
     }[TasksTable.id]
+
+private fun ResultRow.toStoredTask() = StoredTask(this[TasksTable.id], toTask())
 
 private fun ResultRow.toTask() =
     Task(
