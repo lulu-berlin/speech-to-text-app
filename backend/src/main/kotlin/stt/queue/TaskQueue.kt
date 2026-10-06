@@ -27,13 +27,15 @@ data class TaskQueue(
         if (from.transition(to) is TransitionOutcome.Rejected) {
             return QueueTransitionOutcome.Rejected(QueueTransitionRejection.IllegalTransition(from, to))
         }
-        if (to == TaskStatus.RUNNING && entries.any { (entryId, status) -> entryId != id && status == TaskStatus.RUNNING }) {
+        if (to == TaskStatus.RUNNING && anotherTaskRunning(id)) {
             return QueueTransitionOutcome.Rejected(QueueTransitionRejection.AnotherTaskRunning)
         }
         return QueueTransitionOutcome.Accepted(
             copy(entries = entries.map { (entryId, status) -> entryId to if (entryId == id) to else status }),
         )
     }
+
+    private fun anotherTaskRunning(id: Long): Boolean = entries.any { (entryId, status) -> entryId != id && status == TaskStatus.RUNNING }
 
     /** Applies [ids] as the new order of all non-terminal tasks; statuses travel with their ids. */
     fun reorder(ids: List<Long>): ReorderOutcome {
