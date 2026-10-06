@@ -1,6 +1,6 @@
 # 02 — Repo skeleton and conventions
 
-Status: in-progress
+Status: in-review
 Depends on: [01](../docs/specs/dev-environment.md) (done)
 
 ## Goal
@@ -82,3 +82,4 @@ Approved 2026-10-05. Behaviors only; discovered scenarios are appended as `(disc
 - 2026-10-05: user-verified acceptance runs: `pnpm test`/`pnpm build` green; `nix build .` green (both parts); `./result/bin/speech-to-text-app` served `{"status":"ok"}`, `/` 200, SPA fallback 200, `/api/nope` 404.
 - 2026-10-05 (review fixes): implement the `STT_STATIC_DIR`-unset startup warning with a (discovered) test item; `STT_PORT` errors fail fast at config load naming the variable and value, valid range 1–65535 (two (discovered) items); the `/api` boundary excludes exactly `/api` and `/api/...` — `/apiary` gets the SPA fallback, exact `/api` 404s (two (discovered) items); spec decision table points the Kotest style at conventions; ADR 0014's flake-scope part is superseded by ADR 0016 (which records the wrapper's CLI-argument behavior); the Nix build runs `gradleCheckTask = "check"`; the first Ktor DI wiring is item 03 (the database connection).
 - 2026-10-05 (review fixes, decision 9 revisited): removal of the `@vitejs/plugin-react@6.1.2` exemption in `pnpm-workspace.yaml` was verified in-sandbox to break `pnpm install --frozen-lockfile` (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`, pnpm 11.25.0 supply-chain policy). The user chose to keep the exemption; the reason and drop date are recorded in the Proposal.
+- 2026-10-06 (second review fixes): user's post-fix `nix build .` succeeded from branch head b718f7a (result built 00:04, after the last commit at 23:53) — the Nix check with `gradleCheckTask = "check"` passed. Reviewer then ran `./result/bin/speech-to-text-app` and probed: `/api/health` → 200 `{"status":"ok"}`; `/`, `/some/route`, `/apiary` → 200 index.html; `/api`, `/api/nope` → 404; `/lib/config-1.4.9.jar` and `/bin/speech-to-text-app` → 200 index.html (the jar and wrapper are no longer served); log level INFO. Reviewer suites: `gradle clean check` 11/11 green, vitest 1/1, prettier/tsc/vite build green. Leftovers resolved: `.kotlin/` ignored (clean `git status` after `gradle clean check`), missing final newlines added, MainSpec logger level restored (approved 2026-10-06).
