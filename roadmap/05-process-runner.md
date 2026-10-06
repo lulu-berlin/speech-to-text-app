@@ -45,7 +45,7 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [x] Cancelling a stopped (SIGSTOP) process tree still terminates it
 - [x] Starting a non-existent executable fails with a clear error instead of hanging
 - [x] `pause()`/`resume()` on an already-exited process are no-ops
-- [ ] A final line without a trailing newline is still delivered
+- [x] A final line without a trailing newline is still delivered
 - [ ] Output larger than the pipe buffer (long `seq`) completes without deadlock
 - [ ] (discovered) Lines still buffered when `run` is cancelled are not delivered to the callbacks
 - [ ] (discovered) A callback that throws makes `run` fail with that exception and kills the process tree
