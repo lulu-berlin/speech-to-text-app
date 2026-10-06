@@ -19,15 +19,15 @@ Run the queue: take queued tasks one at a time in queue order and drive each thr
 
 - **Worker.** A single worker coroutine launched in the application `CoroutineScope` (`SupervisorJob`). It takes the QUEUED task with the lowest `queue_position` when the queue is not paused. Wakeups come from a `Channel`/`StateFlow` signalled by enqueue, resume, reorder, queue resume, and task completion — no polling. Concurrency stays 1.
 - **Phases per task** (status RUNNING, `phase` column from item 03):
-  1. `CHUNKING` — stream the audio BLOB to a task temp dir, probe duration, plan and export chunks (item 06); skipped if the chunk plan already exists in `chunks`.
+  1. `CHUNKING` — create the task's work directory `$STT_DATA_DIR/work/<task-id>` and stream the audio BLOB into it (`AudioRepository.copyTo`); item 06 decodes, yields the duration (decoded sample count), plans and exports chunks; the engine stores `duration_ms` and persists the plan through `ChunkRepository`. Skipped if the chunk plan already exists in `chunks` (resume reuses it). Per item 06's approved spec (2026-10-06), plan persistence, reuse on resume and the work directory's lifecycle belong here.
   2. `TRANSCRIBING` — chunk loop in `idx` order, skipping chunks already `DONE`; each chunk runs whisper-cli (item 07) with the previous chunk's trailing text as `--prompt`; segments + chunk `DONE` are written in one transaction; progress updated from whisper-cli's `-pp` output weighted by chunk duration.
   3. `DIARIZING` — unless `speakers_mode = off` or the task has no segments: item 09 assigns speakers and writes `segments.speaker`.
-  4. `COMPLETED` — `finished_at` set, temp dir deleted.
+  4. `COMPLETED` — `finished_at` set, work directory deleted.
 - **Queue pause.** Sets `queue_state.paused`; the running task's current external process is `SIGSTOP`ped (item 05) or its pause gate closed (in-JVM phase), and nothing new is dequeued. Queue resume reverses both.
 - **Task pause / resume.** Same mechanism for that one task; status PAUSED / back to RUNNING per item 04's state machine. Pausing a QUEUED task only changes its status.
-- **Cancel.** Cancels the task's `Job`; the process runner kills the child process (item 05); status CANCELED, temp dir deleted, `finished_at` set.
-- **Failure.** Any exception other than cancellation (non-zero whisper-cli/ffmpeg exit, unparsable JSON, model load error) → status FAILED with a readable message in `error`; the worker moves on to the next task.
-- **Restart recovery.** On startup, tasks found RUNNING become QUEUED at their existing `queue_position` and resume from the last `DONE` chunk (segments of an unfinished chunk were never committed, so that chunk is simply rerun).
+- **Cancel.** Cancels the task's `Job`; the process runner kills the child process (item 05); status CANCELED, work directory deleted, `finished_at` set.
+- **Failure.** Any exception other than cancellation (non-zero whisper-cli/ffmpeg exit, unparsable JSON, model load error) → status FAILED with a readable message in `error`, work directory deleted; the worker moves on to the next task.
+- **Restart recovery.** On startup, tasks found RUNNING become QUEUED at their existing `queue_position` and resume from the last `DONE` chunk (segments of an unfinished chunk were never committed, so that chunk is simply rerun). Work directories of tasks that are no longer pending (terminal or deleted) are removed.
 - **Events.** Every state change is emitted on a `SharedFlow<Event>` (`TaskUpdated`, `TaskProgress`, `QueueUpdated`) consumed by the SSE endpoint (item 12). DB writes happen before the corresponding event is emitted.
 - **Testability.** The runner, transcriber, chunker, and diarizer are injected interfaces so engine tests run under `runTest` with fakes and virtual time.
 

@@ -52,7 +52,7 @@ graph TD
 | [03 — Database schema](../docs/specs/database-schema.md) | done | 02 |
 | [04 — Queue domain model](04-queue-domain-model.md) | spec-approved | 03 |
 | [05 — Process runner](../docs/specs/process-runner.md) | done | 02 |
-| [06 — Audio decoding and chunking](06-audio-decoding-and-chunking.md) | draft | 03, 05 |
+| [06 — Audio decoding and chunking](06-audio-decoding-and-chunking.md) | spec-approved | 03, 05 |
 | [07 — Whisper transcription](07-whisper-transcription.md) | draft | 03, 06 |
 | [08 — Speaker embeddings](08-speaker-embeddings.md) | draft | 06 |
 | [09 — Diarization](09-diarization.md) | draft | 08 |
