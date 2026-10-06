@@ -153,6 +153,26 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a process tree stopped with SIGSTOP") {
+            `when`("the coroutine running it is cancelled") {
+                then("run terminates the tree within the grace period and throws CancellationException") {
+                    val gracePeriod = 300.milliseconds
+                    val runner = ProcessRunner(gracePeriod)
+                    val outcome =
+                        cancelAfterFirstLine(
+                            runner,
+                            listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
+                            beforeCancel = { runner.pause() },
+                        )
+
+                    outcome.thrown.shouldBeInstanceOf<CancellationException>()
+                    outcome.aliveWhenRunThrew.shouldBe(emptyList())
+                    outcome.elapsed.shouldBeLessThan(gracePeriod)
+                    outcome.pids.filter(::isAlive).shouldBeEmpty()
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
@@ -165,12 +185,14 @@ private fun killForcibly(pid: Long) {
 }
 
 /**
- * Runs [runner] against [command], waits for the first line (the pid line) to arrive, cancels the
- * run from the outside, then force-kills every reported pid. Returns what happened.
+ * Runs [runner] against [command], waits for the first line (the pid line) to arrive, invokes
+ * [beforeCancel] (e.g. to freeze the tree for the stopped-cancel scenario), cancels the run from
+ * the outside, then force-kills every reported pid. Returns what happened.
  */
 private suspend fun cancelAfterFirstLine(
     runner: ProcessRunner,
     command: List<String>,
+    beforeCancel: () -> Unit = {},
 ): CancelledRun {
     val pids = CompletableDeferred<List<Long>>()
     var thrown: CancellationException? = null
@@ -190,6 +212,7 @@ private suspend fun cancelAfterFirstLine(
                     }
                 }
             pids.await()
+            beforeCancel()
             val cancelledAt = TimeSource.Monotonic.markNow()
             job.cancelAndJoin()
             elapsed = cancelledAt.elapsedNow()
