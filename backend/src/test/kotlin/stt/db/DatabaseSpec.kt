@@ -91,17 +91,6 @@ private fun migratedCount(db: Database): Int =
         }
     }
 
-private fun rowCount(
-    db: Database,
-    table: String,
-): Int =
-    db.connection.createStatement().use { statement ->
-        statement.executeQuery("SELECT count(*) FROM \"$table\"").use { rows ->
-            rows.next().shouldBeTrue()
-            rows.getInt(1)
-        }
-    }
-
 private fun insertTask(
     db: Database,
     id: Int,

@@ -56,23 +56,12 @@ class TaskRepositorySpec :
                             tasks.createWithAudio(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
                         }
 
-                        countRows(db, "tasks").shouldBe(1)
-                        countRows(db, "audio").shouldBe(1)
-                        countRows(db, "audio_parts").shouldBe(1)
+                        rowCount(db, "tasks").shouldBe(1)
+                        rowCount(db, "audio").shouldBe(1)
+                        rowCount(db, "audio_parts").shouldBe(1)
                         tasks.find(firstId).shouldBe(first)
                     }
                 }
             }
         }
     })
-
-private fun countRows(
-    db: Database,
-    table: String,
-): Int =
-    db.connection.createStatement().use { st ->
-        st.executeQuery("SELECT COUNT(*) FROM $table").use { rs ->
-            rs.next()
-            rs.getInt(1)
-        }
-    }
