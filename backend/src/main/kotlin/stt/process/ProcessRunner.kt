@@ -5,10 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
@@ -32,7 +30,7 @@ class ProcessRunner(
                 val exitCode = awaitExit(process)
                 ProcessResult(exitCode, stdout.await(), stderr.await())
             } catch (e: CancellationException) {
-                withContext(NonCancellable) { terminate(group) }
+                withContext(NonCancellable) { group.terminate(gracePeriod) }
                 throw e
             }
         }
@@ -53,27 +51,7 @@ class ProcessRunner(
             }
             process.exitValue()
         }
-
-    /** SIGCONT first so a stopped tree can act on SIGTERM; SIGKILL if it outlives the grace period. */
-    private suspend fun terminate(group: ProcessGroup) {
-        group.signal(ProcessGroup.SIGCONT)
-        group.signal(ProcessGroup.SIGTERM)
-        if (!awaitEmpty(group, gracePeriod)) {
-            group.signal(ProcessGroup.SIGKILL)
-            awaitEmpty(group, Duration.INFINITE)
-        }
-    }
-
-    private suspend fun awaitEmpty(
-        group: ProcessGroup,
-        timeout: Duration,
-    ): Boolean =
-        withTimeoutOrNull(timeout) {
-            while (group.hasMembers()) delay(POLL_INTERVAL)
-            true
-        } ?: false
-
-    private companion object {
-        val POLL_INTERVAL = 50.milliseconds
-    }
 }
+
+/** Interval at which blocking waits (exit, group emptiness) re-check their condition and cancellation. */
+internal val POLL_INTERVAL = 50.milliseconds
