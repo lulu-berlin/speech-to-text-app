@@ -14,7 +14,7 @@ class StaticDisabledSpec :
             `when`("requesting /api/health and an unknown non-/api path") {
                 then("health responds 200 and the path returns 404") {
                     testApplication {
-                        application { sttApp(Config.fromEnv(mapOf())) }
+                        application { sttApp(Config.fromEnv(mapOf("STT_DATA_DIR" to "/var/lib/stt"))) }
                         client.get("/api/health").status.shouldBe(HttpStatusCode.OK)
                         client.get("/some/route").status.shouldBe(HttpStatusCode.NotFound)
                     }
