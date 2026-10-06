@@ -19,9 +19,9 @@ import org.jetbrains.exposed.v1.jdbc.Database as ExposedDatabase
 
 /**
  * The application's SQLite database (ADR 0006, ADR 0017): one file at
- * `$STT_DATA_DIR/stt.db`, WAL mode, foreign keys on, Flyway migrations applied
- * on every open. The data directory is created when missing; failures name
- * STT_DATA_DIR. All JDBC work runs on Dispatchers.IO (AGENTS.md).
+ * `$STT_DATA_DIR/stt.db`, WAL mode, foreign keys on, WAL size limit 64 MiB on the
+ * writer, Flyway migrations applied on every open. The data directory is created
+ * when missing; failures name STT_DATA_DIR. All JDBC work runs on Dispatchers.IO (AGENTS.md).
  *
  * One writer connection carries the write transactions, one at a time; every read
  * transaction opens its own read-only connection, which WAL lets run alongside the writer.
