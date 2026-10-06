@@ -124,6 +124,22 @@ class DatabaseSpec :
                 }
             }
         }
+
+        given("a database opened, closed, and opened again") {
+            `when`("reading the journal mode and the foreign-key setting on each connection") {
+                then("every connection is in WAL mode with foreign keys on") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        repeat(2) {
+                            Database.open(dataDir).use { db ->
+                                pragma(db, "journal_mode").shouldBe("wal")
+                                pragma(db, "foreign_keys").shouldBe("1")
+                            }
+                        }
+                    }
+                }
+            }
+        }
     })
 
 private val expectedTables =
@@ -153,6 +169,17 @@ private fun migratedCount(db: Database): Int =
         statement.executeQuery("SELECT count(*) FROM flyway_schema_history").use { rows ->
             rows.next().shouldBeTrue()
             rows.getInt(1)
+        }
+    }
+
+private fun pragma(
+    db: Database,
+    name: String,
+): String =
+    db.connection.createStatement().use { statement ->
+        statement.executeQuery("PRAGMA $name").use { rows ->
+            rows.next().shouldBeTrue()
+            rows.getString(1)
         }
     }
 
