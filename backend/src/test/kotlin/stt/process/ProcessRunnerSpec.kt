@@ -509,6 +509,33 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a runner whose previous run was paused and then cancelled") {
+            `when`("the next run starts on the same runner") {
+                then("it is not frozen: it finishes and delivers its output") {
+                    val runner = ProcessRunner(300.milliseconds)
+                    val sawThree = CompletableDeferred<Unit>()
+                    val first =
+                        launch {
+                            runner.run(countingLoop(), onStdoutLine = { if (it == "3") sawThree.complete(Unit) })
+                        }
+                    try {
+                        withTimeout(10.seconds) { sawThree.await() }
+                        runner.pause()
+                    } finally {
+                        first.cancelAndJoin()
+                    }
+
+                    val result =
+                        withTimeout(5.seconds) {
+                            runner.run(listOf("sh", "-c", "echo second"))
+                        }
+
+                    result.exitCode.shouldBe(0)
+                    result.stdout.shouldBe(listOf("second"))
+                }
+            }
+        }
     })
 
 /** A shell loop that prints 1, 2, 3, … every 50 ms, after [headStart] of silence. */

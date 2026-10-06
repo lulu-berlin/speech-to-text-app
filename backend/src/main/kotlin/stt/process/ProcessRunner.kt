@@ -50,7 +50,12 @@ class ProcessRunner internal constructor(
         try {
             return runExclusively(command, onStdoutLine, onStderrLine)
         } finally {
-            inFlight.set(false)
+            // Together under the lock: a pause() racing the end of this run cannot re-arm the flag
+            // after it was cleared, so a leftover pause never freezes the next run (ADR 0020).
+            synchronized(signalLock) {
+                paused = false
+                inFlight.set(false)
+            }
         }
     }
 
