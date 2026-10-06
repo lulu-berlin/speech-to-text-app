@@ -10,11 +10,12 @@ class ProcessRunner {
     suspend fun run(
         command: List<String>,
         onStdoutLine: (String) -> Unit = {},
+        onStderrLine: (String) -> Unit = {},
     ): ProcessResult =
         coroutineScope {
             val process = withContext(Dispatchers.IO) { ProcessBuilder(command).start() }
             val stdout = async(Dispatchers.IO) { readLines(process.inputStream, onStdoutLine) }
-            val stderr = async(Dispatchers.IO) { readLines(process.errorStream) {} }
+            val stderr = async(Dispatchers.IO) { readLines(process.errorStream, onStderrLine) }
             val exitCode = withContext(Dispatchers.IO) { process.waitFor() }
             ProcessResult(exitCode, stdout.await(), stderr.await())
         }
