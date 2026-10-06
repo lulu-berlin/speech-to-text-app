@@ -83,7 +83,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] A data directory that cannot be created or opened fails `Database.open` with an error naming `STT_DATA_DIR` (discovered)
 - [x] A second segment with the same task, `chunk_idx` and `seq` is rejected by the database (discovered)
 - [x] A read completes while a write transaction is held open (discovered)
-- [ ] A write completes while a `copyTo` is stalled on its target (discovered)
+- [x] A write completes while a `copyTo` is stalled on its target (discovered)
 - [ ] A task creation whose upload source stalls does not block other writes; when the source then fails, no task, pages, metadata, or temp file remain (discovered)
 - [ ] A duplicate upload is rejected and leaves no temp file (discovered)
 - [ ] Stale files in `$STT_DATA_DIR/tmp` are removed when the database opens (discovered)
