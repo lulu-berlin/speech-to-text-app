@@ -37,6 +37,15 @@ class TaskRepository(
                 ?.toTask()
         }
 
+    /** All tasks in creation (id) order; reads only `tasks`, never audio. */
+    suspend fun list(): List<StoredTask> =
+        db.transaction {
+            TasksTable
+                .selectAll()
+                .orderBy(TasksTable.id)
+                .map { row -> StoredTask(row[TasksTable.id], row.toTask()) }
+        }
+
     /** Deletes the task; its audio, pages, chunks, and segments go with it (ON DELETE CASCADE). */
     suspend fun delete(id: Long) {
         db.transaction { TasksTable.deleteWhere { TasksTable.id eq id } }

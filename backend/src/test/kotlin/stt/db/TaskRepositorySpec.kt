@@ -97,4 +97,24 @@ class TaskRepositorySpec :
                 }
             }
         }
+
+        given("two tasks with audio, one of them two pages long, and the audio page table made unreadable") {
+            `when`("listing tasks") {
+                then("both tasks come back in creation order without touching audio pages") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        val first = queuedTask("first.wav", createdAt = 1L)
+                        val second = queuedTask("second.wav", createdAt = 2L)
+                        val firstId = tasks.createWithAudio(first, ByteArray(1_048_577) { 7 }.inputStream())
+                        val secondId = tasks.createWithAudio(second, "short".byteInputStream())
+                        // Any read of audio pages now fails with "no such table".
+                        db.connection.createStatement().use { st ->
+                            st.execute("ALTER TABLE audio_parts RENAME TO audio_parts_hidden")
+                        }
+
+                        tasks.list().shouldBe(listOf(StoredTask(firstId, first), StoredTask(secondId, second)))
+                    }
+                }
+            }
+        }
     })
