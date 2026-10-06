@@ -10,7 +10,10 @@ class ProcessRunner {
     ): ProcessResult =
         withContext(Dispatchers.IO) {
             val process = ProcessBuilder(command).start()
-            val stdout = process.inputStream.bufferedReader().useLines { lines -> lines.onEach(onStdoutLine).toList() }
+            val stdout =
+                process.inputStream.bufferedReader().useLines { lines ->
+                    lines.onEach(onStdoutLine).toList()
+                }
             ProcessResult(process.waitFor(), stdout)
         }
 }
