@@ -14,18 +14,18 @@ import stt.withCapturedWarnings
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-class ProcessGroupSpec :
+class ProcessTreeSpec :
     BehaviorSpec({
         given("a process group whose members outlive SIGKILL (kill(2) keeps reporting members)") {
             `when`("it is terminated with a 2 s grace period") {
                 then("terminate gives up one grace period after SIGKILL and logs a warning naming the group") {
                     val sent = mutableListOf<Int>()
                     val group =
-                        ProcessGroup(4242, childAlive = { false }) { _, signal ->
+                        ProcessTree(4242, childAlive = { false }) { _, signal ->
                             if (signal != 0) sent += signal
                             0
                         }
-                    withCapturedWarnings(ProcessGroup::class.java.name) { events ->
+                    withCapturedWarnings(ProcessTree::class.java.name) { events ->
                         runTest {
                             withTimeout(1.minutes) { group.terminate(2.seconds) }
                             // Grace period after SIGTERM, then at most one more after SIGKILL (ADR 0020).

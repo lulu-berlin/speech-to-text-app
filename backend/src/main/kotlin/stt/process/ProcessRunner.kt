@@ -23,7 +23,7 @@ class ProcessRunner internal constructor(
     constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, ProcessBuilder::start)
 
     /**
-     * Guards the per-run state ([inFlight], [currentGroup], [paused]). Registering a group and applying
+     * Guards the per-run state ([inFlight], [currentTree], [paused]). Registering a tree and applying
      * a pending pause is one step relative to pause()/resume(), so a resume() can never be overtaken by
      * a stale SIGSTOP; ending a run clears the pause and releases the run in one step.
      */
@@ -33,10 +33,10 @@ class ProcessRunner internal constructor(
     private var inFlight = false
 
     /**
-     * The group of the single in-flight run. set when spawning finishes, cleared when the run does;
+     * The process tree of the single in-flight run. set when spawning finishes, cleared when the run does;
      * lets the non-suspending pause()/resume() reach the current run without blocking.
      */
-    private var currentGroup: ProcessGroup? = null
+    private var currentTree: ProcessTree? = null
 
     /** Per-run pause flag (ADR 0020): a pause() before the group exists is applied right after spawn. */
     private var paused = false
@@ -70,15 +70,15 @@ class ProcessRunner internal constructor(
         val executable = withContext(Dispatchers.IO) { resolveInPath(command[0]) }
         return coroutineScope {
             val process = spawn(listOf("setsid", executable) + command.drop(1))
-            val group = ProcessGroup(process.pid(), process::isAlive)
+            val tree = ProcessTree(process.pid(), process::isAlive)
             synchronized(runLock) {
-                currentGroup = group
-                if (paused) group.pause()
+                currentTree = tree
+                if (paused) tree.pause()
             }
             val stdout = async(Dispatchers.IO) { readLines(process.inputStream, process, onStdoutLine) }
             val stderr = async(Dispatchers.IO) { readLines(process.errorStream, process, onStderrLine) }
             try {
-                // A cancel that landed during spawn surfaces here, where the failure path kills the group.
+                // A cancel that landed during spawn surfaces here, where the failure path kills the tree.
                 ensureActive()
                 val exitCode = awaitExit(process)
                 ProcessResult(exitCode, stdout.await(), stderr.await())
@@ -88,13 +88,13 @@ class ProcessRunner internal constructor(
                 stdout.cancel()
                 stderr.cancel()
                 withContext(NonCancellable) {
-                    group.terminate(gracePeriod)
+                    tree.terminate(gracePeriod)
                     stdout.cancelAndJoin()
                     stderr.cancelAndJoin()
                 }
                 throw e
             } finally {
-                synchronized(runLock) { currentGroup = null }
+                synchronized(runLock) { currentTree = null }
             }
         }
     }
@@ -104,7 +104,7 @@ class ProcessRunner internal constructor(
         synchronized(runLock) {
             if (!inFlight) return
             paused = true
-            currentGroup?.pause()
+            currentTree?.pause()
         }
     }
 
@@ -112,7 +112,7 @@ class ProcessRunner internal constructor(
     fun resume() {
         synchronized(runLock) {
             paused = false
-            currentGroup?.resume()
+            currentTree?.resume()
         }
     }
 
@@ -162,5 +162,5 @@ class ProcessRunner internal constructor(
         }
 }
 
-/** Interval at which blocking waits (exit, group emptiness) re-check their condition and cancellation. */
+/** Interval at which blocking waits (exit, tree emptiness) re-check their condition and cancellation. */
 internal val POLL_INTERVAL = 50.milliseconds
