@@ -18,9 +18,13 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-class ProcessRunner(
-    private val gracePeriod: Duration = 2.seconds,
+class ProcessRunner internal constructor(
+    private val gracePeriod: Duration,
+    /** Starts the built process. A seam so tests can act inside the spawn window (ADR 0020). */
+    private val startProcess: (ProcessBuilder) -> Process,
 ) {
+    constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, ProcessBuilder::start)
+
     /**
      * The group of the single in-flight run. set when spawning finishes, cleared when the run does;
      * lets the non-suspending pause()/resume() reach the current run without blocking.
@@ -34,12 +38,14 @@ class ProcessRunner(
     ): ProcessResult {
         val executable = withContext(Dispatchers.IO) { resolveInPath(command[0]) }
         return coroutineScope {
-            val process = withContext(Dispatchers.IO) { ProcessBuilder(listOf("setsid", executable) + command.drop(1)).start() }
+            val process = spawn(listOf("setsid", executable) + command.drop(1))
             val group = ProcessGroup(process.pid())
             currentGroup.set(group)
             val stdout = async(Dispatchers.IO) { readLines(process.inputStream, process, onStdoutLine) }
             val stderr = async(Dispatchers.IO) { readLines(process.errorStream, process, onStderrLine) }
             try {
+                // A cancel that landed during spawn surfaces here, where the failure path kills the group.
+                ensureActive()
                 val exitCode = awaitExit(process)
                 ProcessResult(exitCode, stdout.await(), stderr.await())
             } catch (e: CancellationException) {
@@ -66,6 +72,16 @@ class ProcessRunner(
     fun resume() {
         currentGroup.get()?.resume()
     }
+
+    /**
+     * Starts [command] so the started process is never lost. A plain withContext discards its result
+     * when the caller is cancelled while start() runs (prompt cancellation on the way back); the outer
+     * NonCancellable context returns it regardless, so the caller can register and kill it (ADR 0020).
+     */
+    private suspend fun spawn(command: List<String>): Process =
+        withContext(NonCancellable) {
+            withContext(Dispatchers.IO) { startProcess(ProcessBuilder(command)) }
+        }
 
     /** Fails fast on a missing executable: resolves [name] to an absolute existing executable, or throws. */
     private fun resolveInPath(name: String): String =
