@@ -19,7 +19,7 @@ class TaskRepository(
                 it[phase] = task.phase
                 it[queuePosition] = task.queuePosition
                 it[language] = task.language
-                it[speakersMode] = task.speakersMode.dbValue
+                it[speakersMode] = task.speakersMode
                 it[speakersCount] = task.speakersCount
                 it[maxSpeakers] = task.maxSpeakers
                 it[model] = task.model
@@ -50,7 +50,7 @@ private fun ResultRow.toTask() =
         phase = this[TasksTable.phase],
         queuePosition = this[TasksTable.queuePosition],
         language = this[TasksTable.language],
-        speakersMode = SpeakersMode.fromDbValue(this[TasksTable.speakersMode]),
+        speakersMode = this[TasksTable.speakersMode],
         speakersCount = this[TasksTable.speakersCount],
         maxSpeakers = this[TasksTable.maxSpeakers],
         model = this[TasksTable.model],
