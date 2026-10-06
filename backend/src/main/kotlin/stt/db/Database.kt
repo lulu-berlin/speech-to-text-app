@@ -23,7 +23,7 @@ import org.jetbrains.exposed.v1.jdbc.Database as ExposedDatabase
  * STT_DATA_DIR. All JDBC work runs on Dispatchers.IO (AGENTS.md).
  */
 class Database private constructor(
-    val connection: Connection,
+    internal val connection: Connection,
 ) : AutoCloseable {
     // Exposed closes the connection at the end of every transaction; it gets a
     // view whose close() is a no-op so the owned connection (and its pragmas) lives on.
