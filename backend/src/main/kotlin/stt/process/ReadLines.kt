@@ -27,12 +27,15 @@ internal suspend fun readLines(
         if (stream.available() > 0) {
             val n = stream.read(chunk)
             if (n < 0) break
-            if (carryLen + n > carry.size) carry = carry.copyOf(carryLen + n + READ_CHUNK_SIZE)
+            // Doubling keeps a long line without '\n' linear in its length (amortized copies).
+            if (carryLen + n > carry.size) carry = carry.copyOf(maxOf(carry.size * 2, carryLen + n))
             System.arraycopy(chunk, 0, carry, carryLen, n)
+            // The carried-over bytes hold no '\n' (every line up to the last one was consumed), so
+            // only the new bytes need scanning.
+            val scanFrom = carryLen
             carryLen += n
             var start = 0
-            var consumed = 0
-            for (i in 0 until carryLen) {
+            for (i in scanFrom until carryLen) {
                 if (carry[i] == LINE_FEED) {
                     // Per line, not per chunk: no line reaches a callback after a cancel (ADR 0020).
                     context.ensureActive()
@@ -40,12 +43,11 @@ internal suspend fun readLines(
                     lines.add(line)
                     onLine(line)
                     start = i + 1
-                    consumed = start
                 }
             }
-            if (consumed > 0) {
-                System.arraycopy(carry, consumed, carry, 0, carryLen - consumed)
-                carryLen -= consumed
+            if (start > 0) {
+                System.arraycopy(carry, start, carry, 0, carryLen - start)
+                carryLen -= start
             }
         } else if (process.isAlive()) {
             delay(POLL_INTERVAL)
