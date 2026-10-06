@@ -181,6 +181,21 @@ class DatabaseSpec :
                 }
             }
         }
+
+        given("a data directory path whose parent directories do not exist either") {
+            `when`("opening the database") {
+                then("the directories are created and stt.db is created inside") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath().resolve("missing/nested/data")
+
+                        Database.open(dataDir).close()
+
+                        Files.isDirectory(dataDir).shouldBeTrue()
+                        Files.isRegularFile(dataDir.resolve("stt.db")).shouldBeTrue()
+                    }
+                }
+            }
+        }
     })
 
 private val expectedTables =

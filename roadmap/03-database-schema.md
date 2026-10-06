@@ -63,7 +63,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] Listing tasks does not read audio data
 - [x] The queue paused flag round-trips and only one `queue_state` row can exist
 - [x] `STT_DATA_DIR` unset or empty → config load fails with an error naming `STT_DATA_DIR`
-- [ ] Opening the database creates the data directory when missing and creates `stt.db`
+- [x] Opening the database creates the data directory when missing and creates `stt.db`
 - [x] The application module registers the Database via Ktor DI; an application loads with it and a `testApplication` may override the provider before services load
 - [x] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
 - [x] The database rejects a second audio row with the same `sha256` (at most one task per audio content)
