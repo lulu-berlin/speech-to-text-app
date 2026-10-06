@@ -28,6 +28,24 @@ import java.util.concurrent.TimeUnit
 class DatabaseSpec :
     BehaviorSpec({
 
+        given("a segment stored for task 1, chunk 0, seq 0") {
+            `when`("storing another segment with the same task, chunk_idx and seq") {
+                then("it is rejected by the database; the same seq in another chunk is accepted") {
+                    withDatabase { db ->
+                        insertTask(db, 1)
+                        execute(db, segmentInsert(chunkIdx = 0, seq = 0, text = "first"))
+
+                        shouldThrow<java.sql.SQLException> {
+                            execute(db, segmentInsert(chunkIdx = 0, seq = 0, text = "stored twice"))
+                        }
+
+                        execute(db, segmentInsert(chunkIdx = 1, seq = 0, text = "next chunk"))
+                        rowCount(db, "segments").shouldBe(2)
+                    }
+                }
+            }
+        }
+
         given("an audio row for an existing task") {
             `when`("inserting another audio row with the same sha256 for a second task") {
                 then("the insert is rejected by the database (at most one task per audio content)") {
@@ -248,6 +266,12 @@ private fun execute(
     db: Database,
     sql: String,
 ) = db.connection.createStatement().use { statement -> statement.executeUpdate(sql) }
+
+private fun segmentInsert(
+    chunkIdx: Int,
+    seq: Int,
+    text: String,
+) = "INSERT INTO segments (task_id, chunk_idx, seq, start_ms, end_ms, text) VALUES (1, $chunkIdx, $seq, 0, 900, '$text')"
 
 private fun taskInsert(
     status: String,

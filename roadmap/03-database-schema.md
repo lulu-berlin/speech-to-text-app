@@ -81,7 +81,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] An audio write whose source fails midway leaves no pages or metadata (discovered)
 - [x] A fresh database reports the queue as not paused (discovered)
 - [x] A data directory that cannot be created or opened fails `Database.open` with an error naming `STT_DATA_DIR` (discovered)
-- [ ] A second segment with the same task, `chunk_idx` and `seq` is rejected by the database (discovered)
+- [x] A second segment with the same task, `chunk_idx` and `seq` is rejected by the database (discovered)
 - [ ] A read completes while a write transaction is held open (discovered)
 - [ ] A write completes while a `copyTo` is stalled on its target (discovered)
 - [ ] A task creation whose upload source stalls does not block other writes; when the source then fails, no task, pages, metadata, or temp file remain (discovered)
