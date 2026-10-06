@@ -38,8 +38,8 @@ class TaskRepositorySpec :
                         val fullId = tasks.insert(full)
                         val sparseId = tasks.insert(sparse)
 
-                        tasks.find(fullId).shouldBe(full)
-                        tasks.find(sparseId).shouldBe(sparse)
+                        tasks.find(fullId).shouldBe(StoredTask(fullId, full))
+                        tasks.find(sparseId).shouldBe(StoredTask(sparseId, sparse))
                     }
                 }
             }
@@ -60,7 +60,7 @@ class TaskRepositorySpec :
                         rowCount(db, "tasks").shouldBe(1)
                         rowCount(db, "audio").shouldBe(1)
                         rowCount(db, "audio_parts").shouldBe(1)
-                        tasks.find(firstId).shouldBe(first)
+                        tasks.find(firstId).shouldBe(StoredTask(firstId, first))
                     }
                 }
             }
@@ -92,7 +92,7 @@ class TaskRepositorySpec :
                         rowCount(db, "audio_parts").shouldBe(1)
                         rowCount(db, "chunks").shouldBe(1)
                         rowCount(db, "segments").shouldBe(1)
-                        tasks.find(keptId).shouldBe(queuedTask("kept.wav", createdAt = 2L))
+                        tasks.find(keptId).shouldBe(StoredTask(keptId, queuedTask("kept.wav", createdAt = 2L)))
                     }
                 }
             }
