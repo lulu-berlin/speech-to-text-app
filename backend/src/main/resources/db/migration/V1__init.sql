@@ -48,6 +48,8 @@ CREATE TABLE chunks (
     PRIMARY KEY (task_id, idx)
 );
 
+-- UNIQUE (task_id, chunk_idx, seq): a chunk's segments cannot be stored twice (ADR 0004
+-- resume); it is also the index behind findByTask and the ON DELETE CASCADE lookup.
 CREATE TABLE segments (
     id        INTEGER PRIMARY KEY,
     task_id   INTEGER NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
@@ -56,7 +58,8 @@ CREATE TABLE segments (
     start_ms  INTEGER NOT NULL CHECK (start_ms >= 0),
     end_ms    INTEGER NOT NULL CHECK (end_ms >= 0),
     text      TEXT    NOT NULL,
-    speaker   TEXT
+    speaker   TEXT,
+    UNIQUE (task_id, chunk_idx, seq)
 );
 
 -- Single-row table: id is always 1 (CHECK + PRIMARY KEY allow exactly one row).
