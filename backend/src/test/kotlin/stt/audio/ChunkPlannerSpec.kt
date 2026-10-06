@@ -19,4 +19,22 @@ class ChunkPlannerSpec :
                 }
             }
         }
+
+        given("audio with no silences") {
+            `when`("the chunks are planned") {
+                then("it is cut every target length") {
+                    val durationMs = 12 * 60 * 1000L
+
+                    val chunks = planChunks(durationMs, emptyList(), TARGET_MS, CAP_MS)
+
+                    chunks.shouldBe(
+                        listOf(
+                            PlannedChunk(startMs = 0, endMs = 300_000),
+                            PlannedChunk(startMs = 300_000, endMs = 600_000),
+                            PlannedChunk(startMs = 600_000, endMs = 720_000),
+                        ),
+                    )
+                }
+            }
+        }
     })

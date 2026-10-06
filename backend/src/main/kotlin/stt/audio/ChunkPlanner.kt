@@ -6,4 +6,12 @@ fun planChunks(
     silences: List<Silence>,
     targetMs: Long,
     capMs: Long,
-): List<PlannedChunk> = listOf(PlannedChunk(startMs = 0, endMs = durationMs))
+): List<PlannedChunk> =
+    buildList {
+        var startMs = 0L
+        while (startMs < durationMs) {
+            val endMs = minOf(startMs + targetMs, durationMs)
+            add(PlannedChunk(startMs, endMs))
+            startMs = endMs
+        }
+    }
