@@ -2,7 +2,9 @@ package stt.queue
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import stt.queue.TaskStatus.CANCELED
 import stt.queue.TaskStatus.COMPLETED
+import stt.queue.TaskStatus.FAILED
 import stt.queue.TaskStatus.PAUSED
 import stt.queue.TaskStatus.QUEUED
 import stt.queue.TaskStatus.RUNNING
@@ -159,6 +161,20 @@ class TaskQueueSpec :
                     val queue = queuedQueue(1L, 2L)
                     queue.transition(9L, RUNNING).shouldBe(
                         QueueTransitionOutcome.Rejected(QueueTransitionRejection.UnknownTask(9L)),
+                    )
+                }
+            }
+        }
+
+        given("a queue where RUNNING task 1 is followed by QUEUED task 2, as before task 1 ends") {
+            `when`("task 1 fails, or (separately) task 2 is canceled") {
+                then("each change is accepted and the failed or canceled task leaves the queue") {
+                    val queue = TaskQueue(listOf(QueueEntry(1L, RUNNING), QueueEntry(2L, QUEUED)))
+                    queue.transition(1L, FAILED).shouldBe(
+                        QueueTransitionOutcome.Accepted(TaskQueue(listOf(QueueEntry(2L, QUEUED)))),
+                    )
+                    queue.transition(2L, CANCELED).shouldBe(
+                        QueueTransitionOutcome.Accepted(TaskQueue(listOf(QueueEntry(1L, RUNNING)))),
                     )
                 }
             }

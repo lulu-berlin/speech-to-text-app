@@ -52,7 +52,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Reordering a paused queue keeps it paused (discovered)
 - [x] A task that reaches a terminal status leaves the queue (discovered)
 - [x] Changing the status of a task that is not in the queue is rejected (discovered)
-- [ ] A task that fails or is canceled also leaves the queue (discovered)
+- [x] A task that fails or is canceled also leaves the queue (discovered)
 
 ## Acceptance criteria
 
