@@ -95,7 +95,7 @@ class ProcessRunnerSpec :
                                         )
                                     } catch (e: CancellationException) {
                                         thrown = e
-                                        aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
+                                        aliveWhenRunThrew = if (pids.isCompleted) pids.getCompleted().filter(::isAlive) else emptyList()
                                         throw e
                                     }
                                 }
@@ -134,7 +134,7 @@ class ProcessRunnerSpec :
                                         )
                                     } catch (e: CancellationException) {
                                         thrown = e
-                                        aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
+                                        aliveWhenRunThrew = if (pids.isCompleted) pids.getCompleted().filter(::isAlive) else emptyList()
                                         throw e
                                     }
                                 }
