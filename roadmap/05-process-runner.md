@@ -41,8 +41,8 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [x] Each stderr line is delivered to the `onStderrLine` callback as it is written
 - [x] Cancelling a running command (`sleep 100`) kills the process tree, leaves no process behind, and the call returns promptly with `CancellationException`
 - [x] A process that ignores SIGTERM is killed forcibly after the grace period
-- [ ] SIGSTOP freezes the output of a counting shell loop; SIGCONT resumes it from where it stopped
-- [ ] Cancelling a stopped (SIGSTOP) process tree still terminates it
+- [x] SIGSTOP freezes the output of a counting shell loop; SIGCONT resumes it from where it stopped
+- [x] Cancelling a stopped (SIGSTOP) process tree still terminates it
 - [ ] Starting a non-existent executable fails with a clear error instead of hanging
 - [ ] `pause()`/`resume()` on an already-exited process are no-ops
 - [ ] A final line without a trailing newline is still delivered
