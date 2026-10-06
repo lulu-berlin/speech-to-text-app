@@ -37,7 +37,7 @@ Define the pure Kotlin rules for task status transitions, queue reordering and t
 
 Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] Each allowed transition is accepted (table-driven)
+- [x] Each allowed transition is accepted (table-driven)
 - [ ] Every transition not in the allowed table is rejected, including any transition out of a terminal status (so a retry of a `COMPLETED`, `FAILED` or `CANCELED` task is rejected) (table-driven over all status pairs)
 - [ ] A `PAUSED` task keeps its queue position and can be reordered while paused
 - [ ] Reordering with exactly the current non-terminal ids applies the new order
