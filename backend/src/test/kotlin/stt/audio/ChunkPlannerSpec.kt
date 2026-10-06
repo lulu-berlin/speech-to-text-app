@@ -8,6 +8,8 @@ private val CAP_MS = minutes(6)
 
 private fun minutes(n: Int): Long = n * 60_000L
 
+private fun seconds(n: Int): Long = n * 1_000L
+
 class ChunkPlannerSpec :
     BehaviorSpec({
         given("a file shorter than the target length") {
@@ -34,6 +36,32 @@ class ChunkPlannerSpec :
                             PlannedChunk(startMs = 0, endMs = minutes(5)),
                             PlannedChunk(startMs = minutes(5), endMs = minutes(10)),
                             PlannedChunk(startMs = minutes(10), endMs = minutes(12)),
+                        ),
+                    )
+                }
+            }
+        }
+
+        given("audio with many silences") {
+            `when`("the chunks are planned") {
+                then("each cut lands at the midpoint of the silence nearest the target") {
+                    val durationMs = seconds(850)
+                    val silences =
+                        listOf(
+                            Silence(startMs = seconds(250), endMs = seconds(252)), // midpoint 251 s
+                            Silence(startMs = seconds(290), endMs = seconds(292)), // midpoint 291 s
+                            Silence(startMs = seconds(305), endMs = seconds(309)), // midpoint 307 s: nearest to 300 s
+                            Silence(startMs = seconds(595), endMs = seconds(597)), // midpoint 596 s
+                            Silence(startMs = seconds(610), endMs = seconds(616)), // midpoint 613 s: nearest to 307 + 300 = 607 s
+                        )
+
+                    val chunks = planChunks(durationMs, silences, TARGET_MS, CAP_MS)
+
+                    chunks.shouldBe(
+                        listOf(
+                            PlannedChunk(startMs = 0, endMs = seconds(307)),
+                            PlannedChunk(startMs = seconds(307), endMs = seconds(613)),
+                            PlannedChunk(startMs = seconds(613), endMs = seconds(850)),
                         ),
                     )
                 }
