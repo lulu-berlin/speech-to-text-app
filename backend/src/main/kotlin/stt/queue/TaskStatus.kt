@@ -10,6 +10,10 @@ enum class TaskStatus {
     CANCELED,
     ;
 
+    /** `COMPLETED`, `FAILED` and `CANCELED` are final; a task in one of them has left the queue. */
+    val isTerminal: Boolean
+        get() = this == COMPLETED || this == FAILED || this == CANCELED
+
     /**
      * Applies the transition `this` → [to] per the spec's per-task table
      * (roadmap item 04, as amended 2026-10-06). The whole-queue guard on

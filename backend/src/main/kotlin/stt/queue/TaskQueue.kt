@@ -17,7 +17,8 @@ data class TaskQueue(
 
     /**
      * Changes the status of task [id] to [to]: the per-task table decides legality, and
-     * `→ RUNNING` is additionally refused while another task is `RUNNING`.
+     * `→ RUNNING` is additionally refused while another task is `RUNNING`. A task that
+     * reaches a terminal status leaves the queue (it stays in the database for history).
      */
     fun transition(
         id: Long,
@@ -30,9 +31,13 @@ data class TaskQueue(
         if (to == TaskStatus.RUNNING && anotherTaskRunning(id)) {
             return QueueTransitionOutcome.Rejected(QueueTransitionRejection.AnotherTaskRunning)
         }
-        return QueueTransitionOutcome.Accepted(
-            copy(entries = entries.map { if (it.id == id) it.copy(status = to) else it }),
-        )
+        val updated =
+            if (to.isTerminal) {
+                entries.filterNot { it.id == id }
+            } else {
+                entries.map { if (it.id == id) it.copy(status = to) else it }
+            }
+        return QueueTransitionOutcome.Accepted(copy(entries = updated))
     }
 
     private fun anotherTaskRunning(id: Long): Boolean = entries.any { it.id != id && it.status == TaskStatus.RUNNING }

@@ -50,7 +50,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Pausing an already paused queue and resuming an already running queue are no-ops
 - [x] A `QUEUED` task cannot transition to `RUNNING` while another task is `RUNNING`; once no task is `RUNNING`, the transition is accepted (discovered)
 - [x] Reordering a paused queue keeps it paused (discovered)
-- [ ] A task that reaches a terminal status leaves the queue (discovered)
+- [x] A task that reaches a terminal status leaves the queue (discovered)
 - [ ] Changing the status of a task that is not in the queue is rejected (discovered)
 
 ## Acceptance criteria

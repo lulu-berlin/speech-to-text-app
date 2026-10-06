@@ -2,6 +2,7 @@ package stt.queue
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import stt.queue.TaskStatus.COMPLETED
 import stt.queue.TaskStatus.PAUSED
 import stt.queue.TaskStatus.QUEUED
 import stt.queue.TaskStatus.RUNNING
@@ -136,6 +137,17 @@ class TaskQueueSpec :
                     queue.transition(1L, PAUSED).shouldBe(QueueTransitionOutcome.Accepted(idle))
                     idle.transition(2L, RUNNING).shouldBe(
                         QueueTransitionOutcome.Accepted(TaskQueue(listOf(QueueEntry(1L, PAUSED), QueueEntry(2L, RUNNING)))),
+                    )
+                }
+            }
+        }
+
+        given("a queue where RUNNING task 1 is followed by QUEUED task 2") {
+            `when`("task 1 completes") {
+                then("the change is accepted and task 1 leaves the queue") {
+                    val queue = TaskQueue(listOf(QueueEntry(1L, RUNNING), QueueEntry(2L, QUEUED)))
+                    queue.transition(1L, COMPLETED).shouldBe(
+                        QueueTransitionOutcome.Accepted(TaskQueue(listOf(QueueEntry(2L, QUEUED)))),
                     )
                 }
             }
