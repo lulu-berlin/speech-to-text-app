@@ -68,6 +68,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [ ] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
 - [x] The database rejects a second audio row with the same `sha256` (at most one task per audio content)
 - [ ] Concurrent repository calls do not interleave their transactions on the shared connection (discovered)
+- [ ] Segments whose `seq` restarts in every chunk read back in (`chunk_idx`, `seq`) order (discovered)
 
 ## Acceptance criteria
 
