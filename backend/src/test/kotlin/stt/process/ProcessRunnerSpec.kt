@@ -133,7 +133,7 @@ class ProcessRunnerSpec :
                     val job =
                         launch {
                             runner.run(
-                                listOf("sh", "-c", "i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done"),
+                                countingLoop(),
                                 onStdoutLine = { line ->
                                     underLock(delivered) { delivered.add(line) }
                                     if (line == "3") sawThree.complete(Unit)
@@ -444,7 +444,7 @@ class ProcessRunnerSpec :
                     val job =
                         launch {
                             runner.run(
-                                listOf("sh", "-c", "i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done"),
+                                countingLoop(),
                                 onStdoutLine = { line ->
                                     underLock(delivered) { delivered.add(line) }
                                     if (line == "3") sawThree.complete(Unit)
@@ -488,7 +488,7 @@ class ProcessRunnerSpec :
                         launch {
                             runner.run(
                                 // The 0.5 s head start keeps output from racing the SIGSTOP right after spawn.
-                                listOf("sh", "-c", "sleep 0.5; i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done"),
+                                countingLoop(headStart = 500.milliseconds),
                                 onStdoutLine = { line ->
                                     underLock(delivered) { delivered.add(line) }
                                     firstLine.complete(line)
@@ -510,6 +510,12 @@ class ProcessRunnerSpec :
             }
         }
     })
+
+/** A shell loop that prints 1, 2, 3, … every 50 ms, after [headStart] of silence. */
+private fun countingLoop(headStart: Duration = Duration.ZERO): List<String> {
+    val delay = if (headStart > Duration.ZERO) "sleep ${headStart.inWholeMilliseconds / 1000.0}; " else ""
+    return listOf("sh", "-c", "${delay}i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done")
+}
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
 private fun parsePids(line: String): List<Long> = line.split(" ").map(String::toLong)
