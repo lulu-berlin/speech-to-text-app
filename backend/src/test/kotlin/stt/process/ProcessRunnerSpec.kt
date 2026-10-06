@@ -209,6 +209,26 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a command whose last line has no trailing newline") {
+            `when`("running it") {
+                then("the final line is still delivered to callback and result") {
+                    val delivered = mutableListOf<String>()
+
+                    val result =
+                        withTimeout(10.seconds) {
+                            ProcessRunner().run(
+                                listOf("sh", "-c", "printf 'one\\ntwo'"),
+                                onStdoutLine = { delivered += it },
+                            )
+                        }
+
+                    result.exitCode.shouldBe(0)
+                    result.stdout.shouldBe(listOf("one", "two"))
+                    delivered.shouldBe(listOf("one", "two"))
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
