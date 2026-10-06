@@ -21,7 +21,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.util.ArrayList
 import java.util.concurrent.CountDownLatch
@@ -181,6 +183,36 @@ class DatabaseSpec :
                                 .await()
                                 .isFailure
                                 .shouldBeTrue()
+                        }
+                    }
+                }
+            }
+        }
+
+        given("a stored task with audio whose copyTo is stalled on its target") {
+            `when`("another task is inserted while the copy is stalled") {
+                then("the insert completes; once released, the copy delivers the full audio") {
+                    withDatabase { db ->
+                        coroutineScope {
+                            val tasks = TaskRepository(db)
+                            val stored = queuedTask("stored.wav", createdAt = 1L)
+                            val id = tasks.createWithAudio(stored, "abc".byteInputStream())
+                            val target = StallingTarget()
+                            val copy = async { AudioRepository(db).copyTo(id, target) }
+                            withContext(Dispatchers.IO) { target.stalled.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+
+                            val other = queuedTask("other.wav", createdAt = 2L)
+                            val otherId =
+                                try {
+                                    // Real time: an insert that waits for the copy never finishes inside the bound.
+                                    withContext(Dispatchers.Default) { withTimeout(10_000) { tasks.insert(other) } }
+                                } finally {
+                                    target.release.countDown()
+                                }
+
+                            copy.await()
+                            target.bytes().decodeToString().shouldBe("abc")
+                            tasks.list().shouldBe(listOf(StoredTask(id, stored), StoredTask(otherId, other)))
                         }
                     }
                 }
@@ -367,6 +399,30 @@ private suspend fun CoroutineScope.holdWriteTransaction(
         }
     withContext(Dispatchers.IO) { held.await(10, TimeUnit.SECONDS).shouldBeTrue() }
     return HeldWrite(release, outcome)
+}
+
+/**
+ * A copy target that keeps what it receives, signals [stalled] on its first write, and blocks until [release].
+ * Its 30 s safety bound outlasts the tests' 10 s probes, so a probe can never finish because the stall gave up.
+ */
+private class StallingTarget : OutputStream() {
+    val stalled = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    private val received = ByteArrayOutputStream()
+
+    override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
+
+    override fun write(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ) {
+        received.write(b, off, len)
+        stalled.countDown()
+        release.await(30, TimeUnit.SECONDS)
+    }
+
+    fun bytes(): ByteArray = received.toByteArray()
 }
 
 /** A [Mutex] that counts its lock() calls, so a test can see a caller start waiting for it. */

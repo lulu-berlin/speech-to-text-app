@@ -42,7 +42,7 @@ class AudioRepository(
         taskId: Long,
         target: OutputStream,
     ) {
-        db.writeTransaction {
+        db.readTransaction {
             AudioPartsTable
                 .select(AudioPartsTable.part)
                 .where { AudioPartsTable.taskId eq taskId }
