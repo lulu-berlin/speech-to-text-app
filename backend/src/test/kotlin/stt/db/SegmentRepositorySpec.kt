@@ -18,10 +18,10 @@ class SegmentRepositorySpec :
                         segments.insertAll(
                             taskId,
                             listOf(
-                                Segment(chunkIdx = 1, seq = 3, startMs = 45_000L, endMs = 59_000L, text = "Bye.", speaker = null),
+                                Segment(chunkIdx = 1, seq = 1, startMs = 45_000L, endMs = 59_000L, text = "Bye.", speaker = null),
                                 Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speaker = "SPEAKER_01"),
                                 Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speaker = "SPEAKER_00"),
-                                Segment(chunkIdx = 1, seq = 2, startMs = 30_000L, endMs = 44_000L, text = "So.", speaker = "SPEAKER_00"),
+                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speaker = "SPEAKER_00"),
                             ),
                         )
                         segments.insertAll(
@@ -33,8 +33,8 @@ class SegmentRepositorySpec :
                             listOf(
                                 Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speaker = "SPEAKER_00"),
                                 Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speaker = "SPEAKER_01"),
-                                Segment(chunkIdx = 1, seq = 2, startMs = 30_000L, endMs = 44_000L, text = "So.", speaker = "SPEAKER_00"),
-                                Segment(chunkIdx = 1, seq = 3, startMs = 45_000L, endMs = 59_000L, text = "Bye.", speaker = null),
+                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speaker = "SPEAKER_00"),
+                                Segment(chunkIdx = 1, seq = 1, startMs = 45_000L, endMs = 59_000L, text = "Bye.", speaker = null),
                             ),
                         )
                     }
