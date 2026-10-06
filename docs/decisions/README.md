@@ -25,3 +25,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0017 | [Database location, data directory, and connection contract](0017-database-location-and-connection-contract.md) | accepted | 2026-10-06 |
 | 0018 | [Audio payload stored as paged BLOBs](0018-audio-payload-paged-blobs.md) | accepted | 2026-10-06 |
 | 0019 | [Schema ownership: one schema in item 03, migrations after](0019-schema-ownership-and-evolution.md) | accepted | 2026-10-06 |
+| 0020 | [Process runner: JNA signals, process groups, cancellation](0020-process-runner-jna-signals-process-groups.md) | accepted | 2026-10-06 |
+| 0021 | [Integration tests: Kotest tags and `gradle integrationTest`](0021-integration-tests-kotest-tags-gradle-task.md) | accepted | 2026-10-06 |
