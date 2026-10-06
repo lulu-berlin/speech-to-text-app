@@ -90,7 +90,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] Opening fails naming `STT_DATA_DIR` when WAL cannot be enabled (discovered)
 - [x] Stopping the application closes the Database provided by DI (discovered)
 - [x] The packaged app started with `STT_DATA_DIR` unset or empty exits non-zero with a one-line message naming `STT_DATA_DIR`; with it set, it starts and serves `/api/health` (discovered; manual, user-verified: red on the current build, green after `nix build .`)
-- [ ] A migration that fails (e.g. an existing `stt.db` whose applied V1 checksum no longer matches) fails opening with an error naming `STT_DATA_DIR` (discovered)
+- [x] A migration that fails (e.g. an existing `stt.db` whose applied V1 checksum no longer matches) fails opening with an error naming `STT_DATA_DIR` (discovered)
 
 ## Acceptance criteria
 
