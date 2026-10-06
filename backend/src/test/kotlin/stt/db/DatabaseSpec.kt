@@ -8,9 +8,18 @@ import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
 import java.util.ArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class DatabaseSpec :
     BehaviorSpec({
@@ -80,6 +89,41 @@ class DatabaseSpec :
                 }
             }
         }
+
+        given("a task creation whose audio source stalls inside its transaction, then fails") {
+            `when`("another task is inserted while that transaction is open") {
+                then("the failed creation leaves nothing behind and only the other task is kept") {
+                    withDatabase { db ->
+                        coroutineScope {
+                            val tasks = TaskRepository(db)
+                            val stalled = CountDownLatch(1)
+                            val release = CountDownLatch(1)
+                            val creation =
+                                async {
+                                    runCatching {
+                                        tasks.createWithAudio(
+                                            queuedTask("failing.wav", createdAt = 1L),
+                                            StallingFailingSource(stalled, release),
+                                        )
+                                    }
+                                }
+                            withContext(Dispatchers.IO) { stalled.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+
+                            val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
+                            val insert = async { tasks.insert(concurrent) }
+                            // Real time (runTest's virtual clock would skip it): the insert finishes now unless held back.
+                            withContext(Dispatchers.Default) { withTimeoutOrNull(500) { insert.join() } }
+                            release.countDown()
+
+                            creation.await().isFailure.shouldBeTrue()
+                            tasks.list().shouldBe(listOf(StoredTask(insert.await(), concurrent)))
+                            rowCount(db, "audio_parts").shouldBe(0)
+                            rowCount(db, "audio").shouldBe(0)
+                        }
+                    }
+                }
+            }
+        }
     })
 
 private val expectedTables =
@@ -134,4 +178,16 @@ private fun insertAudio(
     st.setInt(2, sizeBytes)
     st.setString(3, sha256)
     st.executeUpdate()
+}
+
+/** An audio source that signals [stalled] on its first read, waits for [release], then fails. */
+private class StallingFailingSource(
+    private val stalled: CountDownLatch,
+    private val release: CountDownLatch,
+) : InputStream() {
+    override fun read(): Int {
+        stalled.countDown()
+        release.await(10, TimeUnit.SECONDS)
+        throw IOException("audio source failed")
+    }
 }
