@@ -14,19 +14,20 @@ import java.nio.file.Path
 class MainSpec :
     BehaviorSpec({
 
-        fun captureLogs(): Pair<Logger, ListAppender<ILoggingEvent>> {
+        fun captureLogs(): Triple<Logger, ListAppender<ILoggingEvent>, Level?> {
             val appender = ListAppender<ILoggingEvent>()
             appender.start()
             val logger = LoggerFactory.getLogger("stt.Main") as Logger
+            val previousLevel = logger.level
             logger.level = Level.WARN
             logger.addAppender(appender)
-            return logger to appender
+            return Triple(logger, appender, previousLevel)
         }
 
         given("a configuration without STT_STATIC_DIR") {
             `when`("checking the boot warning") {
                 then("a warning naming STT_STATIC_DIR is logged, none when it is set") {
-                    val (logger, appender) = captureLogs()
+                    val (logger, appender, previousLevel) = captureLogs()
                     try {
                         warnIfStaticDirUnset(Config())
                         warnIfStaticDirUnset(Config(staticDir = Path.of("/some/dir")))
@@ -34,6 +35,7 @@ class MainSpec :
                         warnings.size.shouldBe(1)
                         warnings.single().formattedMessage.shouldContain("STT_STATIC_DIR")
                     } finally {
+                        logger.level = previousLevel
                         logger.detachAppender(appender)
                         appender.stop()
                     }
