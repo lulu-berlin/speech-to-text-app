@@ -5,6 +5,7 @@ import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -166,6 +167,25 @@ class DatabaseSpec :
 
                         Files.isDirectory(dataDir).shouldBeTrue()
                         Files.isRegularFile(dataDir.resolve("stt.db")).shouldBeTrue()
+                    }
+                }
+            }
+        }
+
+        given("a data directory whose tmp/ holds files left by a crashed upload, next to another file") {
+            `when`("opening the database") {
+                then("the files in tmp/ are removed and tmp/ stays; files outside tmp/ are kept") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        val tmpDir = Files.createDirectories(dataDir.resolve("tmp"))
+                        Files.writeString(tmpDir.resolve("upload-1.part"), "stale")
+                        Files.writeString(tmpDir.resolve("upload-2.part"), "stale")
+                        Files.writeString(dataDir.resolve("keep.txt"), "not a temp file")
+
+                        Database.open(dataDir).close()
+
+                        Files.list(tmpDir).use { it.toList() }.shouldBeEmpty()
+                        Files.readString(dataDir.resolve("keep.txt")).shouldBe("not a temp file")
                     }
                 }
             }

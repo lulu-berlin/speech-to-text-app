@@ -107,7 +107,10 @@ class Database private constructor(
                 Database(connection, url, tmpDir, transactionLock)
             }
 
-        /** Creates [dataDir] and [tmpDir] when missing, connects to [url], then applies the pragmas in ADR 0017 order. */
+        /**
+         * Creates [dataDir] and [tmpDir] when missing, removes the spool files a crashed upload left
+         * in [tmpDir], connects to [url], then applies the pragmas in ADR 0017 order.
+         */
         private fun openConnection(
             dataDir: Path,
             tmpDir: Path,
@@ -116,6 +119,7 @@ class Database private constructor(
             val connection =
                 try {
                     Files.createDirectories(tmpDir)
+                    Files.list(tmpDir).use { stale -> stale.forEach(Files::delete) }
                     DriverManager.getConnection(url)
                 } catch (e: Exception) {
                     throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e), e)
