@@ -4,6 +4,7 @@ package stt.process
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -110,6 +111,46 @@ class ProcessRunnerSpec :
                     thrown.shouldBeInstanceOf<CancellationException>()
                     aliveWhenRunThrew.shouldBe(emptyList())
                     pids.getCompleted().filter(::isAlive).shouldBeEmpty()
+                }
+            }
+        }
+
+        given("a running shell that ignores SIGTERM") {
+            `when`("the coroutine running it is cancelled") {
+                then("the shell is killed forcibly after the grace period and run throws CancellationException") {
+                    val gracePeriod = 300.milliseconds
+                    val pids = CompletableDeferred<List<Long>>()
+                    var thrown: Throwable? = null
+                    var aliveWhenRunThrew: List<Long>? = null
+
+                    try {
+                        withTimeout(10.seconds) {
+                            val job =
+                                launch {
+                                    try {
+                                        ProcessRunner(gracePeriod).run(
+                                            listOf("sh", "-c", "trap '' TERM; echo \$\$; while :; do sleep 0.05; done"),
+                                            onStdoutLine = { line -> pids.complete(parsePids(line)) },
+                                        )
+                                    } catch (e: CancellationException) {
+                                        thrown = e
+                                        aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
+                                        throw e
+                                    }
+                                }
+                            pids.await()
+                            val cancelledAt = TimeSource.Monotonic.markNow()
+                            job.cancelAndJoin()
+                            val elapsed = cancelledAt.elapsedNow()
+                            elapsed.shouldBeGreaterThanOrEqualTo(gracePeriod)
+                            elapsed.shouldBeLessThan(2.seconds)
+                        }
+                    } finally {
+                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
+                    }
+
+                    thrown.shouldBeInstanceOf<CancellationException>()
+                    aliveWhenRunThrew.shouldBe(emptyList())
                 }
             }
         }
