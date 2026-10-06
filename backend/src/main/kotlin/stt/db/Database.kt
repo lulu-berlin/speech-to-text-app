@@ -1,6 +1,8 @@
 package stt.db
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.v1.core.DatabaseConfig
@@ -33,10 +35,20 @@ class Database private constructor(
             databaseConfig = DatabaseConfig { defaultMaxAttempts = 1 },
         )
 
-    /** Runs [block] as one Exposed transaction on the owned connection, on Dispatchers.IO. */
+    // One connection carries one transaction at a time: a concurrent commit or rollback
+    // would otherwise also commit or roll back the other caller's work. Not reentrant:
+    // a transaction body must not call transaction() again.
+    private val transactionLock = Mutex()
+
+    /**
+     * Runs [block] as one Exposed transaction on the owned connection, on Dispatchers.IO;
+     * concurrent callers wait their turn (suspending, not blocking a thread).
+     */
     internal suspend fun <T> transaction(block: JdbcTransaction.() -> T): T =
-        withContext(Dispatchers.IO) {
-            transaction(exposed) { block() }
+        transactionLock.withLock {
+            withContext(Dispatchers.IO) {
+                transaction(exposed) { block() }
+            }
         }
 
     companion object {

@@ -67,7 +67,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] The application module registers the Database via Ktor DI; an application loads with it and a `testApplication` may override the provider before services load
 - [ ] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
 - [x] The database rejects a second audio row with the same `sha256` (at most one task per audio content)
-- [ ] Concurrent repository calls do not interleave their transactions on the shared connection (discovered)
+- [x] Concurrent repository calls do not interleave their transactions on the shared connection (discovered)
 - [x] Segments whose `seq` restarts in every chunk read back in (`chunk_idx`, `seq`) order (discovered)
 - [x] Creating a task whose audio duplicates existing content fails and leaves no task, pages, or metadata behind (discovered)
 - [ ] An audio write whose source fails midway leaves no pages or metadata (discovered)
