@@ -1,6 +1,6 @@
-package stt.db
+package stt.queue
 
-/** Stored in `tasks.status` by name. */
+/** Lifecycle status of a task in the queue; persisted by name into `tasks.status`. */
 enum class TaskStatus {
     QUEUED,
     RUNNING,

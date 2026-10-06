@@ -1,6 +1,7 @@
 package stt.db
 
 import org.jetbrains.exposed.v1.core.Table
+import stt.queue.TaskStatus
 
 /** Exposed mapping of `tasks` (schema owned by V1__init.sql). */
 internal object TasksTable : Table("tasks") {

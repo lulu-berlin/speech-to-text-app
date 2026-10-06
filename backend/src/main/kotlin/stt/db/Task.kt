@@ -1,5 +1,7 @@
 package stt.db
 
+import stt.queue.TaskStatus
+
 /** A transcription task as stored in `tasks`; timestamps are epoch millis UTC. */
 data class Task(
     val originalFilename: String,
