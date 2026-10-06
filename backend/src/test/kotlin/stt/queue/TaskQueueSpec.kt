@@ -68,36 +68,48 @@ class TaskQueueSpec :
 
         given("a queue of three queued tasks") {
             `when`("reordered with a list that omits one of their ids") {
-                then("the reorder is rejected") {
+                then("the reorder is rejected, naming the missing id") {
                     val queue = queuedQueue(1L, 2L, 3L)
-                    queue.reorder(listOf(1L, 3L)).shouldBe(ReorderOutcome.Rejected)
+                    queue.reorder(listOf(1L, 3L)).shouldBe(ReorderOutcome.Rejected(ReorderRejection.MissingIds(setOf(2L))))
                 }
             }
         }
 
         given("a queue of three queued tasks") {
             `when`("reordered with a list that adds an id not in the queue (unknown or an already finished task)") {
-                then("the reorder is rejected") {
+                then("the reorder is rejected, naming the unknown id") {
                     val queue = queuedQueue(1L, 2L, 3L)
-                    queue.reorder(listOf(1L, 2L, 3L, 9L)).shouldBe(ReorderOutcome.Rejected)
+                    queue.reorder(listOf(1L, 2L, 3L, 9L)).shouldBe(ReorderOutcome.Rejected(ReorderRejection.UnknownIds(setOf(9L))))
                 }
             }
         }
 
         given("a queue of three queued tasks") {
             `when`("reordered with a list that repeats one id instead of naming every task once") {
-                then("the reorder is rejected") {
+                then("the reorder is rejected, naming the duplicated id") {
                     val queue = queuedQueue(1L, 2L, 3L)
-                    queue.reorder(listOf(1L, 2L, 2L)).shouldBe(ReorderOutcome.Rejected)
+                    queue.reorder(listOf(1L, 2L, 2L)).shouldBe(ReorderOutcome.Rejected(ReorderRejection.DuplicateIds(setOf(2L))))
                 }
             }
         }
 
         given("a queue of three queued tasks with ids 1, 2 and 3") {
             `when`("reordered with a list that repeats id 1 while still naming every task") {
-                then("the reorder is rejected") {
+                then("the reorder is rejected, naming the duplicated id") {
                     val queue = queuedQueue(1L, 2L, 3L)
-                    queue.reorder(listOf(1L, 1L, 2L, 3L)).shouldBe(ReorderOutcome.Rejected)
+                    queue.reorder(listOf(1L, 1L, 2L, 3L)).shouldBe(ReorderOutcome.Rejected(ReorderRejection.DuplicateIds(setOf(1L))))
+                }
+            }
+        }
+
+        given("a queue of three queued tasks with ids 1, 2 and 3") {
+            `when`("reordered with a list for which several rejection reasons hold at once") {
+                then("the first of duplicate > unknown > missing is reported") {
+                    val queue = queuedQueue(1L, 2L, 3L)
+                    // [1, 1, 9]: 1 duplicated, 9 unknown, 2 and 3 missing → duplicate wins.
+                    queue.reorder(listOf(1L, 1L, 9L)).shouldBe(ReorderOutcome.Rejected(ReorderRejection.DuplicateIds(setOf(1L))))
+                    // [1, 2, 9]: 9 unknown, 3 missing → unknown wins.
+                    queue.reorder(listOf(1L, 2L, 9L)).shouldBe(ReorderOutcome.Rejected(ReorderRejection.UnknownIds(setOf(9L))))
                 }
             }
         }
