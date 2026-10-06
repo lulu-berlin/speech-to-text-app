@@ -69,6 +69,7 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [ ] (discovered) A process group that outlives SIGKILL does not hang cancellation: the wait ends after the grace period and a warning names the group
 - [ ] (discovered) A callback that throws after the direct child has exited still kills the remaining process tree
 - [ ] (discovered) A command that reads stdin to EOF finishes instead of hanging
+- [x] (discovered) A line longer than the read chunk is delivered intact
 
 ## Acceptance criteria
 
@@ -84,3 +85,4 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - 2026-10-06: Spec approved. All open questions answered in-session (see above); test list approved with 11 items (seed 8 + exited-no-op, unterminated final line, pipe-overrun; stdout callback streaming folded into item 1). Decisions recorded in ADRs 0020–0021.
 - 2026-10-06: Three discovered scenarios (dropped buffered lines on cancel, throwing callback, escaped pipe holder) confirmed by the user at the item-4 checkpoint and appended to the test list.
 - 2026-10-06: review round 1, changes requested: spawn-window cancel leak, final output lost at exit, single-flight enforcement with a per-run pause flag (cleared when `run` ends), unbounded wait after SIGKILL (bounded by the grace period + WARN), throwing callback after child exit skips the kill, stdin left open (now `/dev/null`), ADR/code mismatches (0020: `start()` IOExceptions not wrapped → ADR amended; pause/resume guard → ADR amended; per-line cancel check → code fixed, item 12 reopened with an exact bound; 0021: `kotest.tags=!Integration` → ADR amended). Test approaches: internal spawn seam, unit test of the drain loop, fake `kill(2)` backend. Low-priority refactors (geometric carry buffer, pause-test `threshold` race, `currentCoroutineContext().ensureActive()`) to be offered at refactor checkpoints; `\r` as line terminator noted in item 06 Open questions. 9 items (8 new, item 12 reopened) approved by the user.
+- 2026-10-06: discovered scenario (a line longer than the read chunk is delivered intact) confirmed by the user at the final-output checkpoint, as a safety net before the geometric carry-buffer refactor.
