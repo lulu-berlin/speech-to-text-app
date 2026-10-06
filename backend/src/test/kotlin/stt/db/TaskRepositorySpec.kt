@@ -2,8 +2,10 @@ package stt.db
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import java.nio.file.Files
 import java.sql.SQLException
 
 class TaskRepositorySpec :
@@ -61,6 +63,23 @@ class TaskRepositorySpec :
                         rowCount(db, "audio").shouldBe(1)
                         rowCount(db, "audio_parts").shouldBe(1)
                         tasks.find(firstId).shouldBe(StoredTask(firstId, first))
+                    }
+                }
+            }
+        }
+
+        given("a task created with some audio, and a duplicate upload of the same bytes") {
+            `when`("the duplicate is rejected") {
+                then("no upload temp file is left in the data directory's tmp/") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        tasks.createWithAudio(queuedTask("take1.wav", createdAt = 1L), "same bytes".byteInputStream())
+
+                        shouldThrow<SQLException> {
+                            tasks.createWithAudio(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
+                        }
+
+                        Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
                     }
                 }
             }

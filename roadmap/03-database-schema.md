@@ -85,7 +85,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] A read completes while a write transaction is held open (discovered)
 - [x] A write completes while a `copyTo` is stalled on its target (discovered)
 - [x] A task creation whose upload source stalls does not block other writes; when the source then fails, no task, pages, metadata, or temp file remain (discovered)
-- [ ] A duplicate upload is rejected and leaves no temp file (discovered)
+- [x] A duplicate upload is rejected and leaves no temp file (discovered)
 - [ ] Stale files in `$STT_DATA_DIR/tmp` are removed when the database opens (discovered)
 - [ ] Opening fails naming `STT_DATA_DIR` when WAL cannot be enabled (discovered)
 - [ ] Stopping the application closes the Database provided by DI (discovered)
