@@ -16,6 +16,7 @@ devenv.local.yaml
 # Build outputs (roadmap item 02)
 build/
 .gradle/
+.kotlin/
 node_modules/
 dist/
 result
