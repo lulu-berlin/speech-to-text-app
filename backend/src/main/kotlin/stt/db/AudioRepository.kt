@@ -88,12 +88,9 @@ private fun spool(
     file: Path,
 ): SpooledAudio {
     val digest = MessageDigest.getInstance("SHA-256")
-    val page = ByteArray(PAGE_SIZE)
     var sizeBytes = 0L
     Files.newOutputStream(file).use { out ->
-        while (true) {
-            val n = source.readNBytes(page, 0, PAGE_SIZE)
-            if (n == 0) break
+        source.forEachPage { page, n ->
             digest.update(page, 0, n)
             out.write(page, 0, n)
             sizeBytes += n
@@ -115,12 +112,9 @@ internal fun JdbcTransaction.writeAudioRows(
         it[sizeBytes] = audio.sizeBytes
         it[sha256] = audio.sha256
     }
-    val page = ByteArray(PAGE_SIZE)
     var partNo = 0
     Files.newInputStream(audio.file).use { input ->
-        while (true) {
-            val n = input.readNBytes(page, 0, PAGE_SIZE)
-            if (n == 0) break
+        input.forEachPage { page, n ->
             // The insert executes before the next read, so a full page buffer is reused safely.
             val bytes = if (n == PAGE_SIZE) page else page.copyOf(n)
             AudioPartsTable.insert {
@@ -130,5 +124,18 @@ internal fun JdbcTransaction.writeAudioRows(
             }
             partNo++
         }
+    }
+}
+
+/**
+ * Reads this stream to its end in windows of up to one page, calling [onWindow] with the shared
+ * page buffer and the window's length; the buffer is reused for the next window.
+ */
+private inline fun InputStream.forEachPage(onWindow: (page: ByteArray, length: Int) -> Unit) {
+    val page = ByteArray(PAGE_SIZE)
+    while (true) {
+        val n = readNBytes(page, 0, PAGE_SIZE)
+        if (n == 0) break
+        onWindow(page, n)
     }
 }
