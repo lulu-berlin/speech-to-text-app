@@ -1,6 +1,6 @@
 # 05 — Process runner
 
-Status: spec-approved
+Status: in-progress
 Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done)
 
 ## Goal
