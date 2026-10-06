@@ -62,12 +62,7 @@ data class TaskQueue private constructor(
     private fun reorderRejection(ids: List<Long>): ReorderRejection? {
         val currentIds = entries.map { it.id }.toSet()
         val namedIds = ids.toSet()
-        val duplicates =
-            ids
-                .groupingBy { it }
-                .eachCount()
-                .filterValues { it > 1 }
-                .keys
+        val duplicates = duplicateIds(ids)
         val unknown = namedIds - currentIds
         val missing = currentIds - namedIds
         return when {
@@ -97,12 +92,7 @@ data class TaskQueue private constructor(
         }
 
         private fun creationRejection(entries: List<QueueEntry>): QueueCreationRejection? {
-            val duplicates =
-                entries
-                    .groupingBy { it.id }
-                    .eachCount()
-                    .filterValues { it > 1 }
-                    .keys
+            val duplicates = duplicateIds(entries.map { it.id })
             val terminal = entries.filter { it.status.isTerminal }.map { it.id }.toSet()
             val running = entries.filter { it.status == TaskStatus.RUNNING }.map { it.id }.toSet()
             return when {
@@ -114,3 +104,11 @@ data class TaskQueue private constructor(
         }
     }
 }
+
+/** The ids that occur more than once in [ids]. */
+private fun duplicateIds(ids: List<Long>): Set<Long> =
+    ids
+        .groupingBy { it }
+        .eachCount()
+        .filterValues { it > 1 }
+        .keys
