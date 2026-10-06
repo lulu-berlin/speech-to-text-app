@@ -1,5 +1,7 @@
 package stt.db
 
+import stt.queue.TaskStatus
+
 /** A freshly queued task: every nullable field null, schema defaults for the rest. */
 internal fun queuedTask(
     filename: String,
