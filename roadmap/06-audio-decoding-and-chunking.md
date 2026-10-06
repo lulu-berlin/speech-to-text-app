@@ -43,7 +43,7 @@ Turn an uploaded audio file into (a) mono 16 kHz PCM for speaker embeddings and 
 
 Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Items that run real ffmpeg are tagged `Integration` (ADR 0021).
 
-- [ ] A file shorter than the target length becomes exactly one chunk covering the whole file
+- [x] A file shorter than the target length becomes exactly one chunk covering the whole file
 - [ ] Audio with no silences is cut every target length (no silence within the cap)
 - [ ] With many silences, each cut lands at the midpoint of the silence nearest the target
 - [ ] A silence beyond the cap is never chosen; the cut falls back to the target
