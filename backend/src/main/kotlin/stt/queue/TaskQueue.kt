@@ -15,6 +15,26 @@ data class TaskQueue(
     /** Resumes the whole queue. */
     fun resume(): TaskQueue = copy(paused = false)
 
+    /**
+     * Changes the status of task [id] to [to]: the per-task table decides legality, and
+     * `→ RUNNING` is additionally refused while another task is `RUNNING`.
+     */
+    fun transition(
+        id: Long,
+        to: TaskStatus,
+    ): QueueTransitionOutcome {
+        val from = entries.first { (entryId, _) -> entryId == id }.second
+        if (from.transition(to) is TransitionOutcome.Rejected) {
+            return QueueTransitionOutcome.Rejected(QueueTransitionRejection.IllegalTransition(from, to))
+        }
+        if (to == TaskStatus.RUNNING && entries.any { (entryId, status) -> entryId != id && status == TaskStatus.RUNNING }) {
+            return QueueTransitionOutcome.Rejected(QueueTransitionRejection.AnotherTaskRunning)
+        }
+        return QueueTransitionOutcome.Accepted(
+            copy(entries = entries.map { (entryId, status) -> entryId to if (entryId == id) to else status }),
+        )
+    }
+
     /** Applies [ids] as the new order of all non-terminal tasks; statuses travel with their ids. */
     fun reorder(ids: List<Long>): ReorderOutcome {
         val currentIds = entries.map { it.first }.toSet()

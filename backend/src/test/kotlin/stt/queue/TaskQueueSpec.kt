@@ -122,4 +122,20 @@ class TaskQueueSpec :
                 }
             }
         }
+
+        given("a queue with task 1 RUNNING and task 2 QUEUED") {
+            `when`("task 2 is started, then task 1 is paused and task 2 is started again") {
+                then("the first start is rejected because another task is running; the second is accepted") {
+                    val queue = TaskQueue(listOf(1L to RUNNING, 2L to QUEUED))
+                    queue.transition(2L, RUNNING).shouldBe(
+                        QueueTransitionOutcome.Rejected(QueueTransitionRejection.AnotherTaskRunning),
+                    )
+                    val idle = TaskQueue(listOf(1L to PAUSED, 2L to QUEUED))
+                    queue.transition(1L, PAUSED).shouldBe(QueueTransitionOutcome.Accepted(idle))
+                    idle.transition(2L, RUNNING).shouldBe(
+                        QueueTransitionOutcome.Accepted(TaskQueue(listOf(1L to PAUSED, 2L to RUNNING))),
+                    )
+                }
+            }
+        }
     })
