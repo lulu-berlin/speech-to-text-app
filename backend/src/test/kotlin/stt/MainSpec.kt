@@ -9,6 +9,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.slf4j.LoggerFactory
 import stt.config.Config
+import stt.config.TEST_DATA_DIR
 import java.nio.file.Path
 
 class MainSpec :
@@ -29,8 +30,8 @@ class MainSpec :
                 then("a warning naming STT_STATIC_DIR is logged, none when it is set") {
                     val (logger, appender, previousLevel) = captureLogs()
                     try {
-                        warnIfStaticDirUnset(Config())
-                        warnIfStaticDirUnset(Config(staticDir = Path.of("/some/dir")))
+                        warnIfStaticDirUnset(Config(dataDir = Path.of(TEST_DATA_DIR)))
+                        warnIfStaticDirUnset(Config(dataDir = Path.of(TEST_DATA_DIR), staticDir = Path.of("/some/dir")))
                         val warnings = appender.list.filter { it.level == Level.WARN }
                         warnings.size.shouldBe(1)
                         warnings.single().formattedMessage.shouldContain("STT_STATIC_DIR")

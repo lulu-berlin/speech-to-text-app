@@ -6,9 +6,10 @@ import java.nio.file.Path
  * Application configuration, read from `STT_*` environment variables by [fromEnv].
  * Unset or empty `STT_STATIC_DIR` disables static serving. `STT_PORT` defaults to 8080
  * when unset; an invalid value fails fast (throws) instead of falling back.
- * `STT_DATA_DIR` is required: unset or empty fails fast (ADR 0017).
+ * `STT_DATA_DIR` is required: unset or empty fails fast (ADR 0017); it has no default.
  */
 class Config(
+    val dataDir: Path,
     val port: Int = 8080,
     val staticDir: Path? = null,
 ) {
@@ -19,10 +20,12 @@ class Config(
             "STT_DATA_DIR must be set to the data directory (it holds stt.db)"
 
         fun fromEnv(env: Map<String, String> = System.getenv()): Config {
-            require(!env["STT_DATA_DIR"].isNullOrEmpty()) { DATA_DIR_MISSING_ERROR }
+            val dataDir = env["STT_DATA_DIR"]
+            require(!dataDir.isNullOrEmpty()) { DATA_DIR_MISSING_ERROR }
             val rawPort = env["STT_PORT"]
             val port = if (rawPort == null) 8080 else parsePort(rawPort)
             return Config(
+                dataDir = Path.of(dataDir),
                 port = port,
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
             )
