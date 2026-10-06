@@ -17,7 +17,7 @@ Define the pure Kotlin rules for task status transitions, queue reordering and t
 - Pure Kotlin state machine for task status (no DB, no coroutines). Allowed transitions:
   - `QUEUED` → `RUNNING`, `PAUSED`, `CANCELED`
   - `RUNNING` → `PAUSED`, `COMPLETED`, `FAILED`, `CANCELED`
-  - `PAUSED` → `QUEUED` (resume of a task that was waiting), `RUNNING` (resume of the running task), `CANCELED`
+  - `PAUSED` → `QUEUED` (resume: the task re-enters the queue; the engine starts it only when it is picked, so it may wait behind higher-priority tasks), `CANCELED`
   - Everything else is illegal and returns a typed error (no exception for expected rejections).
 - Terminal statuses: `COMPLETED`, `FAILED`, `CANCELED`.
 - A `PAUSED` task keeps its queue position and can be reordered while paused; the engine (item 11) skips it when it picks the next task (consultation 2026-10-06).
@@ -55,3 +55,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 
 - 2026-10-06: consultation decisions approved: a `PAUSED` task keeps its queue position and stays reorderable (the engine skips it); terminal statuses are final, with no re-queue/retry transition; deleting history entries belongs to item 12. Test list of 9 items approved with the spec. No new ADR: these are local queue semantics, recorded here and in the Proposal.
+- 2026-10-06 (during cycle 1): `PAUSED` → `RUNNING` removed from the transition table. Resuming a paused task always returns it to the queue (`PAUSED` → `QUEUED`); the engine is the only component that moves a task to `RUNNING`, so a resumed task may wait behind higher-priority tasks instead of jumping straight to running. Recorded in the Proposal; no new ADR (local queue semantics).
