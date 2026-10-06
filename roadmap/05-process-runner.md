@@ -65,7 +65,7 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [x] (discovered) Output written immediately before the process exits is always delivered
 - [x] (discovered) A second run while one is in flight fails fast and the first run stays pausable
 - [x] (discovered) pause() issued before the process is spawned takes effect: no output until resume()
-- [ ] (discovered) A pause() left over from a previous run (cancelled while paused) does not freeze the next run
+- [x] (discovered) A pause() left over from a previous run (cancelled while paused) does not freeze the next run
 - [ ] (discovered) A process group that outlives SIGKILL does not hang cancellation: the wait ends after the grace period and a warning names the group
 - [x] (discovered) A callback that throws after the direct child has exited still kills the remaining process tree
 - [x] (discovered) A command that reads stdin to EOF finishes instead of hanging
