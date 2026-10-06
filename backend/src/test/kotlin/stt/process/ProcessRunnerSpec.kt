@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -475,37 +476,15 @@ class ProcessRunnerSpec :
         given("a pause() issued while the process is being spawned") {
             `when`("the run starts") {
                 then("the process produces no output until resume(), then starts from its first line") {
-                    lateinit var runner: ProcessRunner
-                    val spawned = CompletableDeferred<Unit>()
-                    runner =
-                        ProcessRunner(2.seconds) { builder ->
-                            runner.pause()
-                            builder.start().also { spawned.complete(Unit) }
-                        }
-                    val delivered = mutableListOf<String>()
-                    val firstLine = CompletableDeferred<String>()
-                    val job =
-                        launch {
-                            runner.run(
-                                // The 0.5 s head start keeps output from racing the SIGSTOP right after spawn.
-                                countingLoop(headStart = 500.milliseconds),
-                                onStdoutLine = { line ->
-                                    underLock(delivered) { delivered.add(line) }
-                                    firstLine.complete(line)
-                                },
-                            )
-                        }
-                    try {
-                        withTimeout(10.seconds) { spawned.await() }
-                        delay(1.seconds)
-                        underLock(delivered) { delivered.toList() }.shouldBeEmpty()
+                    val run =
+                        pausedFromSpawn(
+                            start = ProcessBuilder::start,
+                            // The 0.5 s head start keeps output from racing the SIGSTOP right after spawn.
+                            command = countingLoop(headStart = 500.milliseconds),
+                        )
 
-                        runner.resume()
-
-                        withTimeout(10.seconds) { firstLine.await() }.shouldBe("1")
-                    } finally {
-                        job.cancelAndJoin()
-                    }
+                    run.deliveredWhilePaused.shouldBeEmpty()
+                    run.firstLineAfterResume.shouldBe("1")
                 }
             }
         }
@@ -513,36 +492,10 @@ class ProcessRunnerSpec :
         given("a pause() issued before the process group exists") {
             `when`("setsid creates the group only after the pause") {
                 then("the process produces no output until resume(), then starts from its first line") {
-                    lateinit var runner: ProcessRunner
-                    val spawned = CompletableDeferred<Unit>()
-                    runner =
-                        ProcessRunner(2.seconds) { builder ->
-                            runner.pause()
-                            delayGroupCreation(builder).start().also { spawned.complete(Unit) }
-                        }
-                    val delivered = mutableListOf<String>()
-                    val firstLine = CompletableDeferred<String>()
-                    val job =
-                        launch {
-                            runner.run(
-                                countingLoop(),
-                                onStdoutLine = { line ->
-                                    underLock(delivered) { delivered.add(line) }
-                                    firstLine.complete(line)
-                                },
-                            )
-                        }
-                    try {
-                        withTimeout(10.seconds) { spawned.await() }
-                        delay(1.seconds)
-                        underLock(delivered) { delivered.toList() }.shouldBeEmpty()
+                    val run = pausedFromSpawn(start = { delayGroupCreation(it).start() }, command = countingLoop())
 
-                        runner.resume()
-
-                        withTimeout(10.seconds) { firstLine.await() }.shouldBe("1")
-                    } finally {
-                        job.cancelAndJoin()
-                    }
+                    run.deliveredWhilePaused.shouldBeEmpty()
+                    run.firstLineAfterResume.shouldBe("1")
                 }
             }
         }
@@ -643,6 +596,51 @@ private class CancelledRun(
     val aliveWhenRunThrew: List<Long>?,
     val elapsed: Duration,
     val pids: List<Long>,
+)
+
+/**
+ * Runs [command] on a runner that is paused from inside its process start, which starts the built
+ * process with [start]; waits 1 s after the start, records what was delivered, then resumes and
+ * waits for the first line. Cancels the run either way.
+ */
+private suspend fun pausedFromSpawn(
+    start: (ProcessBuilder) -> Process,
+    command: List<String>,
+): PausedRun =
+    coroutineScope {
+        lateinit var runner: ProcessRunner
+        val spawned = CompletableDeferred<Unit>()
+        runner =
+            ProcessRunner(2.seconds) { builder ->
+                runner.pause()
+                start(builder).also { spawned.complete(Unit) }
+            }
+        val delivered = mutableListOf<String>()
+        val firstLine = CompletableDeferred<String>()
+        val job =
+            launch {
+                runner.run(
+                    command,
+                    onStdoutLine = { line ->
+                        underLock(delivered) { delivered.add(line) }
+                        firstLine.complete(line)
+                    },
+                )
+            }
+        try {
+            withTimeout(10.seconds) { spawned.await() }
+            delay(1.seconds)
+            val deliveredWhilePaused = underLock(delivered) { delivered.toList() }
+            runner.resume()
+            PausedRun(deliveredWhilePaused, withTimeout(10.seconds) { firstLine.await() })
+        } finally {
+            job.cancelAndJoin()
+        }
+    }
+
+private class PausedRun(
+    val deliveredWhilePaused: List<String>,
+    val firstLineAfterResume: String,
 )
 
 /**
