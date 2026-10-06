@@ -27,7 +27,7 @@ Turn an uploaded audio file into (a) mono 16 kHz PCM for speaker embeddings and 
   - repeat until the end of the audio; a file shorter than the target is one chunk;
   - a trailing chunk shorter than 30 s is merged into the previous chunk when the merged chunk stays at or below the cap; otherwise it stays separate, so the cap remains a hard limit (consultation 2026-10-06);
   - the planner is a pure function `(durationMs, silences, target, cap) → [(startMs, endMs)]`; chunks are contiguous and cover the whole file.
-- **Export chunk WAVs** (16 kHz mono, the input format whisper-cli expects) into the work directory, cut from the decoded 16 kHz PCM so boundaries are sample-exact.
+- **Export chunk WAVs** (16 kHz mono 16-bit PCM, `pcm_s16le`: the input format whisper-cli documents) into the work directory, cut from the decoded 16 kHz PCM so boundaries are sample-exact (sample format decided 2026-10-06).
 
 ## Open questions (answered 2026-10-06)
 
@@ -66,3 +66,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 
 - 2026-10-06: consultation decisions approved: chunk target 5 min / cap 6 min, `silencedetect` `noise=-30dB`, `d=0.5`, as constants; a trailing chunk under 30 s merges into the previous one only within the cap; duration from the decoded sample count; item 11 persists the plan, reuses it on resume, and owns the work directory's lifecycle; work directory `$STT_DATA_DIR/work/<task-id>`; ffmpeg writes the PCM to a file (the runner stays line-oriented); every ffmpeg run passes `-nostats` (the runner keeps splitting on `\n` only). Test list of 11 items approved with the spec. No new ADR: item-local processing decisions, recorded here; the cross-item ones (persistence and work directory in item 11) are also noted in item 11's draft.
+- 2026-10-06: chunk WAV sample format decided: 16-bit PCM (`pcm_s16le`), whisper.cpp's documented whisper-cli input (README v1.9.2: "currently runs only with 16-bit WAV files"), over float32 WAV (accepted by v1.9.2's miniaudio loader in code, but undocumented).
