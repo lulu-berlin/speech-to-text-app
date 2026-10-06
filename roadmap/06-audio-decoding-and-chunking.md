@@ -1,7 +1,7 @@
 # 06 — Audio decoding and chunking
 
 Status: draft
-Depends on: [03](../docs/specs/database-schema.md) (done), [05](05-process-runner.md)
+Depends on: [03](../docs/specs/database-schema.md) (done), [05](../docs/specs/process-runner.md) (done)
 
 ## Goal
 
