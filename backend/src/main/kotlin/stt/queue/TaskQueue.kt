@@ -1,12 +1,12 @@
 package stt.queue
 
 /**
- * The queue aggregate: the ordered non-terminal tasks (id → status) — a PAUSED
+ * The queue aggregate: the ordered non-terminal tasks — a PAUSED
  * task keeps its slot here and stays reorderable — and the queue paused flag.
  * Pure value: operations return a new instance or a typed rejection.
  */
 data class TaskQueue(
-    val entries: List<Pair<Long, TaskStatus>>,
+    val entries: List<QueueEntry>,
     val paused: Boolean = false,
 ) {
     /** Pauses the whole queue. */
@@ -23,7 +23,7 @@ data class TaskQueue(
         id: Long,
         to: TaskStatus,
     ): QueueTransitionOutcome {
-        val from = entries.first { (entryId, _) -> entryId == id }.second
+        val from = entries.first { it.id == id }.status
         if (from.transition(to) is TransitionOutcome.Rejected) {
             return QueueTransitionOutcome.Rejected(QueueTransitionRejection.IllegalTransition(from, to))
         }
@@ -31,18 +31,18 @@ data class TaskQueue(
             return QueueTransitionOutcome.Rejected(QueueTransitionRejection.AnotherTaskRunning)
         }
         return QueueTransitionOutcome.Accepted(
-            copy(entries = entries.map { (entryId, status) -> entryId to if (entryId == id) to else status }),
+            copy(entries = entries.map { if (it.id == id) it.copy(status = to) else it }),
         )
     }
 
-    private fun anotherTaskRunning(id: Long): Boolean = entries.any { (entryId, status) -> entryId != id && status == TaskStatus.RUNNING }
+    private fun anotherTaskRunning(id: Long): Boolean = entries.any { it.id != id && it.status == TaskStatus.RUNNING }
 
     /** Applies [ids] as the new order of all non-terminal tasks; statuses travel with their ids. */
     fun reorder(ids: List<Long>): ReorderOutcome {
-        val currentIds = entries.map { it.first }.toSet()
+        val currentIds = entries.map { it.id }.toSet()
         return if (ids.toSet() == currentIds) {
-            val byId = entries.toMap()
-            ReorderOutcome.Accepted(copy(entries = ids.map { id -> id to byId.getValue(id) }))
+            val byId = entries.associateBy { it.id }
+            ReorderOutcome.Accepted(copy(entries = ids.map { id -> byId.getValue(id) }))
         } else {
             ReorderOutcome.Rejected
         }

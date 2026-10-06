@@ -15,18 +15,18 @@ class TaskQueueSpec :
                     val queue =
                         TaskQueue(
                             listOf(
-                                1L to QUEUED,
-                                2L to PAUSED,
-                                3L to QUEUED,
+                                QueueEntry(1L, QUEUED),
+                                QueueEntry(2L, PAUSED),
+                                QueueEntry(3L, QUEUED),
                             ),
                         )
                     queue.reorder(listOf(1L, 3L, 2L)).shouldBe(
                         ReorderOutcome.Accepted(
                             TaskQueue(
                                 listOf(
-                                    1L to QUEUED,
-                                    3L to QUEUED,
-                                    2L to PAUSED,
+                                    QueueEntry(1L, QUEUED),
+                                    QueueEntry(3L, QUEUED),
+                                    QueueEntry(2L, PAUSED),
                                 ),
                             ),
                         ),
@@ -41,20 +41,20 @@ class TaskQueueSpec :
                     val queue =
                         TaskQueue(
                             listOf(
-                                1L to QUEUED,
-                                2L to RUNNING,
-                                3L to PAUSED,
-                                4L to QUEUED,
+                                QueueEntry(1L, QUEUED),
+                                QueueEntry(2L, RUNNING),
+                                QueueEntry(3L, PAUSED),
+                                QueueEntry(4L, QUEUED),
                             ),
                         )
                     queue.reorder(listOf(4L, 3L, 2L, 1L)).shouldBe(
                         ReorderOutcome.Accepted(
                             TaskQueue(
                                 listOf(
-                                    4L to QUEUED,
-                                    3L to PAUSED,
-                                    2L to RUNNING,
-                                    1L to QUEUED,
+                                    QueueEntry(4L, QUEUED),
+                                    QueueEntry(3L, PAUSED),
+                                    QueueEntry(2L, RUNNING),
+                                    QueueEntry(1L, QUEUED),
                                 ),
                             ),
                         ),
@@ -95,7 +95,7 @@ class TaskQueueSpec :
                 then("the paused flag toggles false to true and back, and the tasks are unchanged") {
                     val queue = queuedQueue(1L)
                     queue.paused.shouldBe(false)
-                    queue.pause().shouldBe(TaskQueue(listOf(1L to QUEUED), paused = true))
+                    queue.pause().shouldBe(TaskQueue(listOf(QueueEntry(1L, QUEUED)), paused = true))
                     queue.pause().resume().shouldBe(queue)
                 }
             }
@@ -106,7 +106,9 @@ class TaskQueueSpec :
                 then("the new order is applied and the queue stays paused") {
                     val queue = queuedQueue(1L, 2L).pause()
                     queue.reorder(listOf(2L, 1L)).shouldBe(
-                        ReorderOutcome.Accepted(TaskQueue(listOf(2L to QUEUED, 1L to QUEUED), paused = true)),
+                        ReorderOutcome.Accepted(
+                            TaskQueue(listOf(QueueEntry(2L, QUEUED), QueueEntry(1L, QUEUED)), paused = true),
+                        ),
                     )
                 }
             }
@@ -115,10 +117,10 @@ class TaskQueueSpec :
         given("a paused queue and a running queue, each with one queued task") {
             `when`("the paused queue is paused again and the running queue is resumed again") {
                 then("neither queue changes") {
-                    val paused = TaskQueue(listOf(1L to QUEUED), paused = true)
-                    val running = TaskQueue(listOf(1L to QUEUED), paused = false)
-                    paused.pause().shouldBe(TaskQueue(listOf(1L to QUEUED), paused = true))
-                    running.resume().shouldBe(TaskQueue(listOf(1L to QUEUED), paused = false))
+                    val paused = TaskQueue(listOf(QueueEntry(1L, QUEUED)), paused = true)
+                    val running = TaskQueue(listOf(QueueEntry(1L, QUEUED)), paused = false)
+                    paused.pause().shouldBe(TaskQueue(listOf(QueueEntry(1L, QUEUED)), paused = true))
+                    running.resume().shouldBe(TaskQueue(listOf(QueueEntry(1L, QUEUED)), paused = false))
                 }
             }
         }
@@ -126,14 +128,14 @@ class TaskQueueSpec :
         given("a queue with task 1 RUNNING and task 2 QUEUED") {
             `when`("task 2 is started, then task 1 is paused and task 2 is started again") {
                 then("the first start is rejected because another task is running; the second is accepted") {
-                    val queue = TaskQueue(listOf(1L to RUNNING, 2L to QUEUED))
+                    val queue = TaskQueue(listOf(QueueEntry(1L, RUNNING), QueueEntry(2L, QUEUED)))
                     queue.transition(2L, RUNNING).shouldBe(
                         QueueTransitionOutcome.Rejected(QueueTransitionRejection.AnotherTaskRunning),
                     )
-                    val idle = TaskQueue(listOf(1L to PAUSED, 2L to QUEUED))
+                    val idle = TaskQueue(listOf(QueueEntry(1L, PAUSED), QueueEntry(2L, QUEUED)))
                     queue.transition(1L, PAUSED).shouldBe(QueueTransitionOutcome.Accepted(idle))
                     idle.transition(2L, RUNNING).shouldBe(
-                        QueueTransitionOutcome.Accepted(TaskQueue(listOf(1L to PAUSED, 2L to RUNNING))),
+                        QueueTransitionOutcome.Accepted(TaskQueue(listOf(QueueEntry(1L, PAUSED), QueueEntry(2L, RUNNING)))),
                     )
                 }
             }
