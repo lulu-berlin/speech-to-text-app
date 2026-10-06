@@ -3,10 +3,13 @@ package stt.db
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
+import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -17,13 +20,17 @@ class AudioRepositorySpec :
 
         given("an audio stream of two full 1 MiB pages plus 12345 bytes") {
             `when`("it is written for a task and read back to a stream") {
-                then("pages are stored, the bytes come back identical in page windows, size_bytes/sha256 match") {
+                then(
+                    "the source is spooled to disk a page at a time, pages are stored, the bytes come back identical in page windows, size_bytes/sha256 match",
+                ) {
                     withDatabase { db ->
                         val size = 2 * MIB + 12_345
                         val taskId = TaskRepository(db).insert(queuedTask("long.wav", createdAt = 1L))
                         val audio = AudioRepository(db)
 
-                        audio.write(taskId, GeneratedBytes(size.toLong()))
+                        val source = SpoolWatchingSource(GeneratedBytes(size.toLong()), db.tmpDir)
+                        audio.write(taskId, source)
+                        source.largestUnspooled.shouldBeLessThanOrEqual(MIB.toLong())
 
                         val expectedSha256 = sha256Hex(GeneratedBytes(size.toLong()))
                         audio.metadata(taskId).shouldBe(AudioMetadata(sizeBytes = 2_109_497L, sha256 = expectedSha256))
@@ -74,6 +81,35 @@ private class GeneratedBytes(
         val n = minOf(len.toLong(), size - position).toInt()
         for (k in 0 until n) b[off + k] = byteAt(position++).toByte()
         return n
+    }
+}
+
+/**
+ * Wraps [source] and records, on every read, how many bytes it has delivered that are not yet
+ * in the spool files under [tmpDir]: the bytes the writer holds in memory at that moment.
+ */
+private class SpoolWatchingSource(
+    private val source: InputStream,
+    private val tmpDir: Path,
+) : InputStream() {
+    private var delivered = 0L
+    var largestUnspooled = 0L
+        private set
+
+    private fun watch() {
+        val spooled = Files.list(tmpDir).use { files -> files.mapToLong { Files.size(it) }.sum() }
+        largestUnspooled = maxOf(largestUnspooled, delivered - spooled)
+    }
+
+    override fun read(): Int = throw UnsupportedOperationException("read in windows")
+
+    override fun read(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ): Int {
+        watch()
+        return source.read(b, off, len).also { n -> if (n > 0) delivered += n }
     }
 }
 
