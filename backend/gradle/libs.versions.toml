@@ -7,6 +7,10 @@ ktor = "3.6.0"
 kotest = "6.2.5"
 logback = "1.6.5"
 ktlint = "1.8.0"
+kotlinx-coroutines = "1.11.0"
+exposed = "1.5.0"
+flyway = "13.9.0"
+sqlite-jdbc = "3.49.1.0"
 
 [libraries]
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
@@ -14,9 +18,17 @@ ktor-server-netty = { group = "io.ktor", name = "ktor-server-netty", version.ref
 ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-server-test-host-jvm = { group = "io.ktor", name = "ktor-server-test-host-jvm", version.ref = "ktor" }
+ktor-server-di = { group = "io.ktor", name = "ktor-server-di", version.ref = "ktor" }
 kotest-runner-junit5 = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 ktlint-cli = { group = "com.pinterest.ktlint", name = "ktlint-cli", version.ref = "ktlint" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+exposed-core = { group = "org.jetbrains.exposed", name = "exposed-core", version.ref = "exposed" }
+exposed-jdbc = { group = "org.jetbrains.exposed", name = "exposed-jdbc", version.ref = "exposed" }
+flyway-core = { group = "org.flywaydb", name = "flyway-core", version.ref = "flyway" }
+flyway-database-nc-sqlite = { group = "org.flywaydb", name = "flyway-database-nc-sqlite", version.ref = "flyway" }
+sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqlite-jdbc" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version = "2.3.21" }
