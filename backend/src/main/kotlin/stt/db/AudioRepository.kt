@@ -25,7 +25,7 @@ class AudioRepository(
         taskId: Long,
         source: InputStream,
     ) {
-        db.transaction { writeAudioRows(taskId, source) }
+        db.writeTransaction { writeAudioRows(taskId, source) }
     }
 
     suspend fun metadata(taskId: Long): AudioMetadata? =
@@ -42,7 +42,7 @@ class AudioRepository(
         taskId: Long,
         target: OutputStream,
     ) {
-        db.transaction {
+        db.writeTransaction {
             AudioPartsTable
                 .select(AudioPartsTable.part)
                 .where { AudioPartsTable.taskId eq taskId }

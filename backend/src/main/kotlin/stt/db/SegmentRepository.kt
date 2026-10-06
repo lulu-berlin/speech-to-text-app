@@ -12,7 +12,7 @@ class SegmentRepository(
         taskId: Long,
         segments: List<Segment>,
     ) {
-        db.transaction {
+        db.writeTransaction {
             SegmentsTable.batchInsert(segments, shouldReturnGeneratedValues = false) { segment ->
                 this[SegmentsTable.taskId] = taskId
                 this[SegmentsTable.chunkIdx] = segment.chunkIdx

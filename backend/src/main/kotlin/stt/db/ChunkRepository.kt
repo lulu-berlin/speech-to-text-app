@@ -11,7 +11,7 @@ class ChunkRepository(
         taskId: Long,
         chunks: List<Chunk>,
     ) {
-        db.transaction {
+        db.writeTransaction {
             ChunksTable.batchInsert(chunks, shouldReturnGeneratedValues = false) { chunk ->
                 this[ChunksTable.taskId] = taskId
                 this[ChunksTable.idx] = chunk.idx

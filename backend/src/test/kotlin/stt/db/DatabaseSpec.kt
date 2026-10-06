@@ -125,7 +125,7 @@ class DatabaseSpec :
                                 val holder =
                                     async {
                                         runCatching {
-                                            db.transaction {
+                                            db.writeTransaction {
                                                 insertTaskRow(queuedTask("held.wav", createdAt = 1L))
                                                 held.countDown()
                                                 release.await(10, TimeUnit.SECONDS)
@@ -165,7 +165,7 @@ class DatabaseSpec :
                             val holder =
                                 async {
                                     runCatching {
-                                        db.transaction {
+                                        db.writeTransaction {
                                             insertTaskRow(queuedTask("uncommitted.wav", createdAt = 2L))
                                             held.countDown()
                                             release.await(10, TimeUnit.SECONDS)
