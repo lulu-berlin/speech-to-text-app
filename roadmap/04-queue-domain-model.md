@@ -41,7 +41,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Every transition not in the allowed table is rejected, including any transition out of a terminal status (so a retry of a `COMPLETED`, `FAILED` or `CANCELED` task is rejected) (table-driven over all status pairs)
 - [x] A `PAUSED` task keeps its queue position and can be reordered while paused
 - [x] Reordering with exactly the current non-terminal ids applies the new order
-- [ ] Reordering with a missing id is rejected
+- [x] Reordering with a missing id is rejected
 - [ ] Reordering with an unknown or terminal-task id is rejected
 - [ ] Reordering with a duplicated id is rejected
 - [ ] Pausing and resuming the queue toggles the paused flag
