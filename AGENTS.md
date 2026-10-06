@@ -55,7 +55,7 @@ Commits: one commit per green cycle (test + code, subject `Test: <scenario>`), o
 
 ## Testing
 
-- Backend: Kotest (`BehaviorSpec`) + `kotlinx-coroutines-test` (`runTest`, virtual time for engine/queue tests). Tests that need real ffmpeg, whisper-cli, or ONNX models are tagged `Integration`; they are run with Kotest tags when they exist (command to be pinned by the item that adds them). HTTP route tests use Ktor `testApplication`.
+- Backend: Kotest (`BehaviorSpec`) + `kotlinx-coroutines-test` (`runTest`, virtual time for engine/queue tests). Tests that spawn real processes (from item 05 on) are tagged `Integration` (Kotest `Tag`, ADR 0021); they are excluded from `gradle test`/`gradle check` and run separately with `gradle integrationTest`. HTTP route tests use Ktor `testApplication`.
 - Frontend: Vitest + React Testing Library (jsdom) (+ MSW for API mocks from the first API item on).
 - Formatting is part of the standard commands (ADR 0015): see [Commands](#commands).
 
@@ -67,6 +67,7 @@ Backend (Gradle 8.14 via devenv, no wrapper — ADR 0014):
 
 - `gradle check` — formatting gate (`ktlintCheck`) + all unit tests. The standard verification command.
 - `gradle test` — unit tests only.
+- `gradle integrationTest` — Integration-tagged tests only (real processes; needs `setsid` from util-linux — ADR 0020/0021).
 - `gradle ktlintFormat` — auto-format Kotlin sources.
 - `gradle run` — start the server. `STT_DATA_DIR` is required (data directory holding `stt.db`, created when missing; startup fails without it — ADR 0017), e.g. `STT_DATA_DIR=/tmp/stt gradle run`. Port `STT_PORT`, default 8080; set `STT_STATIC_DIR` to a built frontend to serve the UI.
 

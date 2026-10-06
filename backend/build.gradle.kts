@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.server.di)
+    implementation(libs.jna)
     implementation(libs.logback.classic)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.exposed.core)
@@ -66,4 +67,20 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform {
         includeEngines("kotest")
     }
+}
+
+// Unit default: `gradle test`/`gradle check` run no Integration-tagged tests
+// (ADR 0021); `gradle integrationTest` runs only those. Kotest 6 filters via
+// the kotest.tags expression (`!Tag` = exclude).
+tasks.named<Test>("test") {
+    systemProperty("kotest.tags", "!Integration")
+}
+
+val integrationTest by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run Integration-tagged tests (real processes), ADR 0021"
+    useJUnitPlatform {
+        includeEngines("kotest")
+    }
+    systemProperty("kotest.tags", "Integration")
 }

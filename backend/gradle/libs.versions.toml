@@ -11,6 +11,7 @@ kotlinx-coroutines = "1.11.0"
 exposed = "1.5.0"
 flyway = "13.9.0"
 sqlite-jdbc = "3.49.1.0"
+jna = "5.14.0"
 
 [libraries]
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
@@ -20,6 +21,7 @@ ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serializatio
 ktor-server-test-host-jvm = { group = "io.ktor", name = "ktor-server-test-host-jvm", version.ref = "ktor" }
 ktor-server-di = { group = "io.ktor", name = "ktor-server-di", version.ref = "ktor" }
 kotest-runner-junit5 = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }
+jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 ktlint-cli = { group = "com.pinterest.ktlint", name = "ktlint-cli", version.ref = "ktlint" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
