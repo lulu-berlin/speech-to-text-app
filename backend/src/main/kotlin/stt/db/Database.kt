@@ -82,8 +82,8 @@ class Database private constructor(
     companion object {
         private const val DATA_DIR_UNUSABLE_ERROR =
             "STT_DATA_DIR \"%s\" cannot be created or opened as the data directory: %s"
-        private const val WAL_UNAVAILABLE_ERROR =
-            "STT_DATA_DIR \"%s\": stt.db cannot be opened in WAL journal mode with foreign keys on: %s"
+        private const val PRAGMAS_FAILED_ERROR =
+            "STT_DATA_DIR \"%s\": stt.db cannot be opened with WAL journal mode, foreign keys on, and the WAL size limit: %s"
         private const val MIGRATION_FAILED_ERROR =
             "STT_DATA_DIR \"%s\": migrating stt.db failed: %s"
 
@@ -163,7 +163,7 @@ class Database private constructor(
                 connection.createStatement().use { st -> st.execute("PRAGMA journal_size_limit = $journalSizeLimit") }
             } catch (e: Exception) {
                 connection.close()
-                throw dataDirFailure(WAL_UNAVAILABLE_ERROR, dataDir, e)
+                throw dataDirFailure(PRAGMAS_FAILED_ERROR, dataDir, e)
             }
         }
 
