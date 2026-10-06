@@ -400,38 +400,10 @@ class ProcessRunnerSpec :
         given("a run whose caller is cancelled while the process is being spawned") {
             `when`("the process start returns after the cancel") {
                 then("run throws CancellationException and the spawned process is already dead") {
-                    lateinit var job: Job
-                    val spawned = CompletableDeferred<Process>()
-                    val runner =
-                        ProcessRunner(300.milliseconds) { builder ->
-                            builder.start().also { process ->
-                                spawned.complete(process)
-                                job.cancel()
-                            }
-                        }
-                    var thrown: Throwable? = null
-                    var aliveWhenRunThrew: Boolean? = null
-                    try {
-                        withTimeout(10.seconds) {
-                            job =
-                                launch(start = CoroutineStart.LAZY) {
-                                    try {
-                                        runner.run(listOf("sleep", "100"))
-                                    } catch (e: CancellationException) {
-                                        thrown = e
-                                        aliveWhenRunThrew = isAlive(spawned.getCompleted().pid())
-                                        throw e
-                                    }
-                                }
-                            job.start()
-                            job.join()
-                        }
-                    } finally {
-                        if (spawned.isCompleted) killForcibly(spawned.getCompleted().pid())
-                    }
+                    val run = cancelledFromSpawn(start = ProcessBuilder::start)
 
-                    thrown.shouldBeInstanceOf<CancellationException>()
-                    aliveWhenRunThrew.shouldBe(false)
+                    run.thrown.shouldBeInstanceOf<CancellationException>()
+                    run.aliveWhenRunThrew.shouldBe(false)
                 }
             }
         }
@@ -439,38 +411,10 @@ class ProcessRunnerSpec :
         given("a run whose caller is cancelled before the process group exists") {
             `when`("setsid creates the group only after the cancel") {
                 then("run throws CancellationException and the spawned process is already dead") {
-                    lateinit var job: Job
-                    val spawned = CompletableDeferred<Process>()
-                    val runner =
-                        ProcessRunner(300.milliseconds) { builder ->
-                            delayGroupCreation(builder).start().also { process ->
-                                spawned.complete(process)
-                                job.cancel()
-                            }
-                        }
-                    var thrown: Throwable? = null
-                    var aliveWhenRunThrew: Boolean? = null
-                    try {
-                        withTimeout(10.seconds) {
-                            job =
-                                launch(start = CoroutineStart.LAZY) {
-                                    try {
-                                        runner.run(listOf("sleep", "100"))
-                                    } catch (e: CancellationException) {
-                                        thrown = e
-                                        aliveWhenRunThrew = isAlive(spawned.getCompleted().pid())
-                                        throw e
-                                    }
-                                }
-                            job.start()
-                            job.join()
-                        }
-                    } finally {
-                        if (spawned.isCompleted) killForcibly(spawned.getCompleted().pid())
-                    }
+                    val run = cancelledFromSpawn(start = { delayGroupCreation(it).start() })
 
-                    thrown.shouldBeInstanceOf<CancellationException>()
-                    aliveWhenRunThrew.shouldBe(false)
+                    run.thrown.shouldBeInstanceOf<CancellationException>()
+                    run.aliveWhenRunThrew.shouldBe(false)
                 }
             }
         }
@@ -680,6 +624,49 @@ private suspend fun pausedFromSpawn(
 private class PausedRun(
     val deliveredWhilePaused: List<String>,
     val firstLineAfterResume: String,
+)
+
+/**
+ * Runs `sleep 100` on a runner whose process start, done by [start], cancels the run right after
+ * starting the process. Records what `run` threw and whether the spawned pid was alive at that
+ * moment, then force-kills the pid.
+ */
+private suspend fun cancelledFromSpawn(start: (ProcessBuilder) -> Process): CancelledSpawn {
+    lateinit var job: Job
+    val spawned = CompletableDeferred<Process>()
+    val runner =
+        ProcessRunner(300.milliseconds) { builder ->
+            start(builder).also { process ->
+                spawned.complete(process)
+                job.cancel()
+            }
+        }
+    var thrown: Throwable? = null
+    var aliveWhenRunThrew: Boolean? = null
+    try {
+        withTimeout(10.seconds) {
+            job =
+                launch(start = CoroutineStart.LAZY) {
+                    try {
+                        runner.run(listOf("sleep", "100"))
+                    } catch (e: CancellationException) {
+                        thrown = e
+                        aliveWhenRunThrew = isAlive(spawned.getCompleted().pid())
+                        throw e
+                    }
+                }
+            job.start()
+            job.join()
+        }
+    } finally {
+        if (spawned.isCompleted) killForcibly(spawned.getCompleted().pid())
+    }
+    return CancelledSpawn(thrown, aliveWhenRunThrew)
+}
+
+private class CancelledSpawn(
+    val thrown: Throwable?,
+    val aliveWhenRunThrew: Boolean?,
 )
 
 /**
