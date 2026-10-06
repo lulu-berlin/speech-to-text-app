@@ -65,7 +65,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] `STT_DATA_DIR` unset or empty → config load fails with an error naming `STT_DATA_DIR`
 - [ ] Opening the database creates the data directory when missing and creates `stt.db`
 - [x] The application module registers the Database via Ktor DI; an application loads with it and a `testApplication` may override the provider before services load
-- [ ] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
+- [x] Foreign keys reject `chunks`/`segments`/`audio`/`audio_parts` rows referencing a missing task
 - [x] The database rejects a second audio row with the same `sha256` (at most one task per audio content)
 - [x] Concurrent repository calls do not interleave their transactions on the shared connection (discovered)
 - [x] Segments whose `seq` restarts in every chunk read back in (`chunk_idx`, `seq`) order (discovered)
