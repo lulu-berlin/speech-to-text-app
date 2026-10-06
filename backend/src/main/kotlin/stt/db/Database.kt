@@ -3,6 +3,7 @@ package stt.db
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.flywaydb.core.Flyway
+import org.jetbrains.exposed.v1.core.DatabaseConfig
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.lang.reflect.InvocationTargetException
@@ -24,7 +25,13 @@ class Database private constructor(
 ) : AutoCloseable {
     // Exposed closes the connection at the end of every transaction; it gets a
     // view whose close() is a no-op so the owned connection (and its pragmas) lives on.
-    private val exposed = ExposedDatabase.connect({ nonClosing(connection) })
+    // No retries: a transaction body may consume a one-shot stream (audio upload), and a
+    // retry after e.g. a UNIQUE violation would re-run it on a drained stream.
+    private val exposed =
+        ExposedDatabase.connect(
+            { nonClosing(connection) },
+            databaseConfig = DatabaseConfig { defaultMaxAttempts = 1 },
+        )
 
     /** Runs [block] as one Exposed transaction on the owned connection, on Dispatchers.IO. */
     internal suspend fun <T> transaction(block: JdbcTransaction.() -> T): T =

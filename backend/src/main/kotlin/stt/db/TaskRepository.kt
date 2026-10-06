@@ -2,8 +2,12 @@ package stt.db
 
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import java.io.InputStream
+import java.security.MessageDigest
+import java.util.HexFormat
 
 class TaskRepository(
     private val db: Database,
@@ -29,6 +33,59 @@ class TaskRepository(
                 it[startedAt] = task.startedAt
                 it[finishedAt] = task.finishedAt
             }[TasksTable.id]
+        }
+
+    /**
+     * Saves [task] and streams [audio] into its pages and metadata in one transaction,
+     * so audio content that already exists (UNIQUE sha256) rejects the whole creation.
+     */
+    suspend fun createWithAudio(
+        task: Task,
+        audio: InputStream,
+    ): Long =
+        db.transaction {
+            val taskId =
+                TasksTable.insert {
+                    it[originalFilename] = task.originalFilename
+                    it[contentType] = task.contentType
+                    it[durationMs] = task.durationMs
+                    it[status] = task.status
+                    it[phase] = task.phase
+                    it[queuePosition] = task.queuePosition
+                    it[language] = task.language
+                    it[speakersMode] = task.speakersMode
+                    it[speakersCount] = task.speakersCount
+                    it[maxSpeakers] = task.maxSpeakers
+                    it[model] = task.model
+                    it[progress] = task.progress
+                    it[error] = task.error
+                    it[createdAt] = task.createdAt
+                    it[startedAt] = task.startedAt
+                    it[finishedAt] = task.finishedAt
+                }[TasksTable.id]
+            val digest = MessageDigest.getInstance("SHA-256")
+            val page = ByteArray(1_048_576)
+            var sizeBytes = 0L
+            var partNo = 0
+            while (true) {
+                val n = audio.readNBytes(page, 0, page.size)
+                if (n == 0) break
+                digest.update(page, 0, n)
+                val bytes = if (n == page.size) page else page.copyOf(n)
+                AudioPartsTable.insert {
+                    it[AudioPartsTable.taskId] = taskId
+                    it[AudioPartsTable.partNo] = partNo
+                    it[part] = ExposedBlob(bytes)
+                }
+                sizeBytes += n
+                partNo++
+            }
+            AudioTable.insert {
+                it[AudioTable.taskId] = taskId
+                it[AudioTable.sizeBytes] = sizeBytes
+                it[sha256] = HexFormat.of().formatHex(digest.digest())
+            }
+            taskId
         }
 
     suspend fun find(id: Long): Task? =

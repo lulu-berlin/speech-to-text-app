@@ -1,7 +1,9 @@
 package stt.db
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import java.sql.SQLException
 
 class TaskRepositorySpec :
     BehaviorSpec({
@@ -41,4 +43,36 @@ class TaskRepositorySpec :
                 }
             }
         }
+
+        given("a task created with some audio") {
+            `when`("a second task is created with the same audio bytes under another filename") {
+                then("creation fails and leaves no task, pages, or metadata behind") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        val first = queuedTask("take1.wav", createdAt = 1L)
+                        val firstId = tasks.createWithAudio(first, "same bytes".byteInputStream())
+
+                        shouldThrow<SQLException> {
+                            tasks.createWithAudio(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
+                        }
+
+                        countRows(db, "tasks").shouldBe(1)
+                        countRows(db, "audio").shouldBe(1)
+                        countRows(db, "audio_parts").shouldBe(1)
+                        tasks.find(firstId).shouldBe(first)
+                    }
+                }
+            }
+        }
     })
+
+private fun countRows(
+    db: Database,
+    table: String,
+): Int =
+    db.connection.createStatement().use { st ->
+        st.executeQuery("SELECT COUNT(*) FROM $table").use { rs ->
+            rs.next()
+            rs.getInt(1)
+        }
+    }
