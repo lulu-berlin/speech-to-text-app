@@ -64,4 +64,36 @@ class TaskRepositorySpec :
                 }
             }
         }
+
+        given("two tasks, each with audio, chunks, and segments; the first with two audio pages") {
+            `when`("the first task is deleted") {
+                then("its audio, audio pages, chunks, and segments are gone; the second task's rows remain") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        val chunks = ChunkRepository(db)
+                        val segments = SegmentRepository(db)
+                        val doomedId =
+                            tasks.createWithAudio(queuedTask("doomed.wav", createdAt = 1L), ByteArray(1_048_577) { 1 }.inputStream())
+                        val keptId = tasks.createWithAudio(queuedTask("kept.wav", createdAt = 2L), "kept".byteInputStream())
+                        for (taskId in listOf(doomedId, keptId)) {
+                            chunks.insertAll(taskId, listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.DONE)))
+                            segments.insertAll(
+                                taskId,
+                                listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "x", speaker = null)),
+                            )
+                        }
+
+                        tasks.delete(doomedId)
+
+                        tasks.find(doomedId).shouldBe(null)
+                        rowCount(db, "tasks").shouldBe(1)
+                        rowCount(db, "audio").shouldBe(1)
+                        rowCount(db, "audio_parts").shouldBe(1)
+                        rowCount(db, "chunks").shouldBe(1)
+                        rowCount(db, "segments").shouldBe(1)
+                        tasks.find(keptId).shouldBe(queuedTask("kept.wav", createdAt = 2L))
+                    }
+                }
+            }
+        }
     })
