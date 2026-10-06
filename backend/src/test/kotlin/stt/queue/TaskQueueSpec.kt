@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import stt.queue.TaskStatus.PAUSED
 import stt.queue.TaskStatus.QUEUED
+import stt.queue.TaskStatus.RUNNING
 
 class TaskQueueSpec :
     BehaviorSpec({
@@ -26,6 +27,34 @@ class TaskQueueSpec :
                                     1L to QUEUED,
                                     3L to QUEUED,
                                     2L to PAUSED,
+                                ),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+
+        given("a queue of four non-terminal tasks in mixed statuses") {
+            `when`("reordered with exactly the same ids in reverse order") {
+                then("the new order is applied and every task keeps its status") {
+                    val queue =
+                        TaskQueue(
+                            listOf(
+                                1L to QUEUED,
+                                2L to RUNNING,
+                                3L to PAUSED,
+                                4L to QUEUED,
+                            ),
+                        )
+                    queue.reorder(listOf(4L, 3L, 2L, 1L)).shouldBe(
+                        ReorderOutcome.Accepted(
+                            TaskQueue(
+                                listOf(
+                                    4L to QUEUED,
+                                    3L to PAUSED,
+                                    2L to RUNNING,
+                                    1L to QUEUED,
                                 ),
                             ),
                         ),
