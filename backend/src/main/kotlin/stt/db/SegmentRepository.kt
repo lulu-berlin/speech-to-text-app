@@ -1,5 +1,6 @@
 package stt.db
 
+import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -24,13 +25,13 @@ class SegmentRepository(
         }
     }
 
-    /** The task's segments in `seq` order. */
+    /** The task's segments in (`chunk_idx`, `seq`) order; `seq` restarts in every chunk. */
     suspend fun findByTask(taskId: Long): List<Segment> =
         db.transaction {
             SegmentsTable
                 .selectAll()
                 .where { SegmentsTable.taskId eq taskId }
-                .orderBy(SegmentsTable.seq)
+                .orderBy(SegmentsTable.chunkIdx to SortOrder.ASC, SegmentsTable.seq to SortOrder.ASC)
                 .map { row ->
                     Segment(
                         chunkIdx = row[SegmentsTable.chunkIdx],
