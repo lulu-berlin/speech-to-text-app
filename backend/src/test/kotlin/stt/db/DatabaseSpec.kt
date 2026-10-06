@@ -160,6 +160,27 @@ class DatabaseSpec :
                 }
             }
         }
+
+        given("task rows with an invalid status, an invalid phase, or an upper-case speakers_mode") {
+            `when`("inserting them") {
+                then("each is rejected; the same row with valid values is accepted") {
+                    withDatabase { db ->
+                        val invalid =
+                            listOf(
+                                Triple("DONE", "CHUNKING", "auto"),
+                                Triple("QUEUED", "UPLOADING", "auto"),
+                                Triple("QUEUED", "CHUNKING", "AUTO"),
+                            )
+                        for ((status, phase, speakersMode) in invalid) {
+                            shouldThrow<java.sql.SQLException> { execute(db, taskInsert(status, phase, speakersMode)) }
+                        }
+
+                        execute(db, taskInsert("QUEUED", "CHUNKING", "auto"))
+                        rowCount(db, "tasks").shouldBe(1)
+                    }
+                }
+            }
+        }
     })
 
 private val expectedTables =
@@ -203,6 +224,13 @@ private fun execute(
     db: Database,
     sql: String,
 ) = db.connection.createStatement().use { statement -> statement.executeUpdate(sql) }
+
+private fun taskInsert(
+    status: String,
+    phase: String,
+    speakersMode: String,
+) = "INSERT INTO tasks (original_filename, content_type, status, phase, speakers_mode, created_at) " +
+    "VALUES ('a.wav', 'audio/wav', '$status', '$phase', '$speakersMode', 1)"
 
 private fun insertTask(
     db: Database,
