@@ -7,8 +7,11 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
+import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -143,6 +146,39 @@ class DatabaseSpec :
                                 pragma(db, "journal_mode").shouldBe("wal")
                                 pragma(db, "foreign_keys").shouldBe("1")
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        given("a database whose WAL size limit is 16 KiB (four 4 KiB SQLite pages)") {
+            `when`("a 1 MiB + 1 byte audio write grows the WAL, a PASSIVE checkpoint completes, and a one-page write follows") {
+                then("the WAL file shrinks back to at most the limit") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        val limit = 16L * 1024
+                        val payloadSize = 1_048_577
+                        val wal = dataDir.resolve("stt.db-wal")
+                        Database.open(dataDir, Mutex(), journalSizeLimit = limit).use { db ->
+                            TaskRepository(db).createWithAudio(
+                                queuedTask("large.wav", createdAt = 1L),
+                                ByteArray(payloadSize) { 3 }.inputStream(),
+                            )
+                            // Every payload byte is in a WAL frame until a checkpoint copies it into stt.db.
+                            Files.size(wal).shouldBeGreaterThanOrEqual(payloadSize.toLong())
+
+                            db.connection.createStatement().use { st ->
+                                st.executeQuery("PRAGMA wal_checkpoint(PASSIVE)").use { rows ->
+                                    rows.next().shouldBeTrue()
+                                    // busy = 0 and every WAL frame checkpointed: the next write resets the WAL.
+                                    rows.getInt(1).shouldBe(0)
+                                    rows.getInt(3).shouldBe(rows.getInt(2))
+                                }
+                            }
+                            QueueStateRepository(db).setPaused(true)
+
+                            Files.size(wal).shouldBeLessThanOrEqual(limit)
                         }
                     }
                 }
