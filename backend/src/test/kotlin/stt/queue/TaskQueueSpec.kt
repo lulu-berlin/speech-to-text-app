@@ -111,4 +111,15 @@ class TaskQueueSpec :
                 }
             }
         }
+
+        given("a paused queue and a running queue, each with one queued task") {
+            `when`("the paused queue is paused again and the running queue is resumed again") {
+                then("neither queue changes") {
+                    val paused = TaskQueue(listOf(1L to QUEUED), paused = true)
+                    val running = TaskQueue(listOf(1L to QUEUED), paused = false)
+                    paused.pause().shouldBe(TaskQueue(listOf(1L to QUEUED), paused = true))
+                    running.resume().shouldBe(TaskQueue(listOf(1L to QUEUED), paused = false))
+                }
+            }
+        }
     })

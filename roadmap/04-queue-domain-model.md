@@ -45,7 +45,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Reordering with an unknown or terminal-task id is rejected
 - [x] Reordering with a duplicated id is rejected
 - [x] Pausing and resuming the queue toggles the paused flag
-- [ ] Pausing an already paused queue and resuming an already running queue are no-ops
+- [x] Pausing an already paused queue and resuming an already running queue are no-ops
 - [ ] A `QUEUED` task cannot transition to `RUNNING` while another task is `RUNNING`; once no task is `RUNNING`, the transition is accepted (discovered)
 - [x] Reordering a paused queue keeps it paused (discovered)
 
