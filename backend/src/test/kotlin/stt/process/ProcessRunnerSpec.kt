@@ -305,6 +305,7 @@ class ProcessRunnerSpec :
                 then("run fails with that exception and kills the process tree") {
                     val pids = CompletableDeferred<List<Long>>()
                     var exception: IllegalStateException? = null
+                    var aliveWhenRunThrew: List<Long>? = null
                     try {
                         exception =
                             withTimeout(2.seconds) {
@@ -318,12 +319,14 @@ class ProcessRunnerSpec :
                                     )
                                 }
                             }
+                        // Checked before the cleanup below, which force-kills every pid.
+                        aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
                     } finally {
                         if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
                     }
 
                     exception.message.shouldBe("boom")
-                    pids.getCompleted().filter(::isAlive).shouldBeEmpty()
+                    aliveWhenRunThrew.shouldBe(emptyList())
                 }
             }
         }
