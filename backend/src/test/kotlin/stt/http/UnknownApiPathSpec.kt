@@ -6,21 +6,19 @@ import io.kotest.matchers.shouldBe
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
-import stt.config.Config
 import java.nio.file.Files
 
 class UnknownApiPathSpec :
     BehaviorSpec({
 
         val staticDir = tempdir()
-        val dataDir = tempdir("stt-data").toPath()
 
         given("a built frontend in STT_STATIC_DIR") {
             `when`("requesting an unknown /api path") {
                 then("404 is returned, not index.html") {
                     Files.writeString(staticDir.toPath().resolve("index.html"), "<h1>index</h1>")
                     testApplication {
-                        application { sttApp(Config(dataDir = dataDir, staticDir = staticDir.toPath())) }
+                        application { sttApp(testConfig(staticDir = staticDir.toPath())) }
                         val response = client.get("/api/unknown")
                         response.status.shouldBe(HttpStatusCode.NotFound)
                     }
@@ -33,7 +31,7 @@ class UnknownApiPathSpec :
                 then("404 is returned, not index.html") {
                     Files.writeString(staticDir.toPath().resolve("index.html"), "<h1>index</h1>")
                     testApplication {
-                        application { sttApp(Config(dataDir = dataDir, staticDir = staticDir.toPath())) }
+                        application { sttApp(testConfig(staticDir = staticDir.toPath())) }
                         val response = client.get("/api")
                         response.status.shouldBe(HttpStatusCode.NotFound)
                     }
