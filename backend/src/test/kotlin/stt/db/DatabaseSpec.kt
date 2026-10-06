@@ -1,11 +1,13 @@
 package stt.db
 
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.util.ArrayList
@@ -54,6 +56,25 @@ class DatabaseSpec :
                         Database.open(dataDir).use { second ->
                             rowCount(second, "tasks").shouldBe(1)
                             migratedCount(second).shouldBe(1)
+                        }
+                    }
+                }
+            }
+        }
+
+        given("a data directory that cannot be created, or whose stt.db cannot be opened") {
+            `when`("opening the database") {
+                then("it fails with an error naming STT_DATA_DIR and the path") {
+                    runTest {
+                        val regularFile = tempdir("stt-db").toPath().resolve("data")
+                        Files.writeString(regularFile, "not a directory")
+                        val dbIsADirectory = tempdir("stt-db").toPath()
+                        Files.createDirectory(dbIsADirectory.resolve("stt.db"))
+
+                        for (dataDir in listOf(regularFile, dbIsADirectory)) {
+                            val error = shouldThrowAny { Database.open(dataDir) }
+                            error.message.shouldContain("STT_DATA_DIR")
+                            error.message.shouldContain(dataDir.toString())
                         }
                     }
                 }
