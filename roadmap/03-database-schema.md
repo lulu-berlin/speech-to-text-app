@@ -70,7 +70,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] Concurrent repository calls do not interleave their transactions on the shared connection (discovered)
 - [x] Segments whose `seq` restarts in every chunk read back in (`chunk_idx`, `seq`) order (discovered)
 - [x] Creating a task whose audio duplicates existing content fails and leaves no task, pages, or metadata behind (discovered)
-- [ ] An audio write whose source fails midway leaves no pages or metadata (discovered)
+- [x] An audio write whose source fails midway leaves no pages or metadata (discovered)
 - [x] A fresh database reports the queue as not paused (discovered)
 - [x] A data directory that cannot be created or opened fails `Database.open` with an error naming `STT_DATA_DIR` (discovered)
 
