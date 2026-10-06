@@ -4,10 +4,13 @@ package stt.queue
  * The queue aggregate: the ordered non-terminal tasks — a PAUSED
  * task keeps its slot here and stays reorderable — and the queue paused flag.
  * Pure value: operations return a new instance or a typed rejection.
+ * Built only through [of]; the private constructor and `copy` keep every
+ * instance valid (unique ids, no terminal entry, at most one `RUNNING` task).
  */
-data class TaskQueue(
+@ConsistentCopyVisibility
+data class TaskQueue private constructor(
     val entries: List<QueueEntry>,
-    val paused: Boolean = false,
+    val paused: Boolean,
 ) {
     /** Pauses the whole queue. */
     fun pause(): TaskQueue = copy(paused = true)
@@ -72,6 +75,42 @@ data class TaskQueue(
             unknown.isNotEmpty() -> ReorderRejection.UnknownIds(unknown)
             missing.isNotEmpty() -> ReorderRejection.MissingIds(missing)
             else -> null
+        }
+    }
+
+    companion object {
+        /**
+         * Builds a queue from [entries] (in queue order) and the [paused] flag, as item 11
+         * restores them at boot. Rejects with the first of duplicate ids > terminal entries >
+         * more than one `RUNNING` task.
+         */
+        fun of(
+            entries: List<QueueEntry>,
+            paused: Boolean = false,
+        ): QueueCreationOutcome {
+            val rejection = creationRejection(entries)
+            return if (rejection != null) {
+                QueueCreationOutcome.Rejected(rejection)
+            } else {
+                QueueCreationOutcome.Accepted(TaskQueue(entries, paused))
+            }
+        }
+
+        private fun creationRejection(entries: List<QueueEntry>): QueueCreationRejection? {
+            val duplicates =
+                entries
+                    .groupingBy { it.id }
+                    .eachCount()
+                    .filterValues { it > 1 }
+                    .keys
+            val terminal = entries.filter { it.status.isTerminal }.map { it.id }.toSet()
+            val running = entries.filter { it.status == TaskStatus.RUNNING }.map { it.id }.toSet()
+            return when {
+                duplicates.isNotEmpty() -> QueueCreationRejection.DuplicateIds(duplicates)
+                terminal.isNotEmpty() -> QueueCreationRejection.TerminalEntries(terminal)
+                running.size > 1 -> QueueCreationRejection.MultipleRunning(running)
+                else -> null
+            }
         }
     }
 }
