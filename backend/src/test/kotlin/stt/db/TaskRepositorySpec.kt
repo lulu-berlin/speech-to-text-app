@@ -2,6 +2,7 @@ package stt.db
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import java.sql.SQLException
 
@@ -85,7 +86,7 @@ class TaskRepositorySpec :
 
                         tasks.delete(doomedId)
 
-                        tasks.find(doomedId).shouldBe(null)
+                        tasks.find(doomedId).shouldBeNull()
                         rowCount(db, "tasks").shouldBe(1)
                         rowCount(db, "audio").shouldBe(1)
                         rowCount(db, "audio_parts").shouldBe(1)
