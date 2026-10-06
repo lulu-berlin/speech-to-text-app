@@ -46,4 +46,21 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a command that writes two stderr lines") {
+            `when`("running it with an onStderrLine callback") {
+                then("each stderr line reaches the callback in order") {
+                    val delivered = mutableListOf<String>()
+
+                    withTimeout(10.seconds) {
+                        ProcessRunner().run(
+                            listOf("sh", "-c", "echo first-error >&2; echo second-error >&2"),
+                            onStderrLine = { delivered += it },
+                        )
+                    }
+
+                    delivered.shouldBe(listOf("first-error", "second-error"))
+                }
+            }
+        }
     })
