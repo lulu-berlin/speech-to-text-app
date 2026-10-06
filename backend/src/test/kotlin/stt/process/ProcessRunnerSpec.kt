@@ -13,6 +13,7 @@ class ProcessRunnerSpec :
         given("a command that prints three lines and exits successfully") {
             `when`("running it") {
                 then("the exit code is 0 and each stdout line reaches the callback and the result in order") {
+                    val expectedLines = listOf("one", "two", "three")
                     val delivered = mutableListOf<String>()
 
                     val result =
@@ -24,8 +25,8 @@ class ProcessRunnerSpec :
                         }
 
                     result.exitCode.shouldBe(0)
-                    result.stdout.shouldBe(listOf("one", "two", "three"))
-                    delivered.shouldBe(listOf("one", "two", "three"))
+                    result.stdout.shouldBe(expectedLines)
+                    delivered.shouldBe(expectedLines)
                 }
             }
         }
