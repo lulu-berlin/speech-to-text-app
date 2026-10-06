@@ -27,6 +27,11 @@ import org.jetbrains.exposed.v1.jdbc.Database as ExposedDatabase
  * transaction opens its own read-only connection, which WAL lets run alongside the writer.
  */
 class Database private constructor(
+    /**
+     * The writer connection, exposed for tests (raw SQL, PRAGMA checks) — test-only access by
+     * convention. `internal` does not enforce this: the backend is one Gradle module, so all app
+     * code can see it. App code must go through the repositories, which take the write lock.
+     */
     internal val connection: Connection,
     url: String,
     /** `$STT_DATA_DIR/tmp`: upload spool files (ADR 0018) live here until their write transaction ends. */
