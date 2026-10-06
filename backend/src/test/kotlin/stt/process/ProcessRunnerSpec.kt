@@ -229,6 +229,29 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a command whose output is much larger than a pipe buffer") {
+            `when`("running it") {
+                then("run completes without deadlock and delivers every line") {
+                    val delivered = mutableListOf<String>()
+
+                    val result =
+                        withTimeout(10.seconds) {
+                            ProcessRunner().run(
+                                listOf("seq", "1", "100000"),
+                                onStdoutLine = { delivered += it },
+                            )
+                        }
+
+                    result.exitCode.shouldBe(0)
+                    result.stdout.size.shouldBe(100000)
+                    result.stdout.first().shouldBe("1")
+                    result.stdout[49999].shouldBe("50000")
+                    result.stdout.last().shouldBe("100000")
+                    delivered.size.shouldBe(100000)
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
