@@ -1,6 +1,6 @@
 # 06 — Audio decoding and chunking
 
-Status: draft
+Status: spec-approved
 Depends on: [03](../docs/specs/database-schema.md) (done), [05](../docs/specs/process-runner.md) (done)
 
 ## Goal
@@ -13,50 +13,56 @@ Turn an uploaded audio file into (a) mono 16 kHz PCM for speaker embeddings and 
 - [ADR 0005 — Audio as SQLite BLOB](../docs/decisions/0005-audio-as-sqlite-blob.md): the upload is streamed from the BLOB to a temp file when ffmpeg needs it.
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): decoding behavior is ported from `docs/oracle/transcribe.py`.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-06)
 
-- **Port oracle `decode_pcm`** (`docs/oracle/transcribe.py`): run `ffmpeg -hide_banner -loglevel error -i <audio> -f f32le -ac 1 -ar 16000 -` and read the output as little-endian float32 samples (mono, 16 kHz). Failure behavior to keep: non-zero ffmpeg exit → error carrying ffmpeg's stderr; zero decoded samples → error "no audio decoded". The oracle holds the whole decode in memory; here the PCM is written to a file in the task temp dir (read back by item 08) instead of being kept on the heap. The process runs through the item 05 runner, so it is cancellable.
-- **Probe duration** of the source (stored as `tasks.duration_ms`), e.g. via the decoded sample count (`samples / 16`) or ffprobe.
-- **Chunk plan** from `ffmpeg -i <audio> -af silencedetect=noise=-30dB:d=0.5 -f null -` (parse `silence_start` / `silence_end` lines from stderr):
-  - target chunk length 5 min, hard cap 6 min;
+- **Scope.** Item 06 is processing logic over files: it takes the task's source audio file in its work directory and produces the decoded PCM, the duration, the chunk plan, and the chunk WAVs. It has no database dependency: writing the source file from the audio BLOB (`AudioRepository.copyTo`), persisting the plan through `ChunkRepository`, reusing it on resume, and creating and deleting the work directory are the engine's (item 11) (consultation 2026-10-06).
+- **Work directory** `$STT_DATA_DIR/work/<task-id>`, outside `$STT_DATA_DIR/tmp`, so item 03's upload-spool cleanup (which fails startup on a directory inside `tmp/`) is untouched. Item 11 deletes it when the task reaches a terminal status and removes the directories of tasks that are no longer pending at startup (consultation 2026-10-06).
+- **Port oracle `decode_pcm`** (`docs/oracle/transcribe.py`): `ffmpeg -hide_banner -nostats -loglevel error -i <source> -f f32le -ac 1 -ar 16000 <work-dir PCM file>`, run through the item 05 runner (cancellable, pausable). ffmpeg writes the little-endian float32 mono 16 kHz samples to a file instead of stdout, because the runner is line-oriented (ADR 0020); item 08 reads the file. Failure behavior kept from the oracle: non-zero ffmpeg exit → error carrying ffmpeg's stderr; zero decoded samples → error "no audio decoded" (consultation 2026-10-06).
+- **Duration** (`tasks.duration_ms`, stored by item 11) = decoded sample count / 16, i.e. the length of exactly the audio whisper-cli and the speaker model see; no ffprobe (consultation 2026-10-06).
+- **ffmpeg output on stderr.** Every ffmpeg run passes `-hide_banner -nostats`, so no `\r`-rewritten progress line reaches the runner, which splits on `\n` only (consultation 2026-10-06).
+- **Chunk plan** from `ffmpeg -hide_banner -nostats -i <source> -af silencedetect=noise=-30dB:d=0.5 -f null -` (parse `silence_start` / `silence_end` lines from stderr):
+  - target chunk length 5 min, hard cap 6 min, `noise=-30dB`, `d=0.5` — constants, not configuration (consultation 2026-10-06);
   - starting at the current chunk start, cut at the midpoint of the detected silence whose midpoint is nearest to `start + target`, considering only silences that end the chunk within the cap;
   - if no silence lies within the cap, cut at `start + target`;
   - repeat until the end of the audio; a file shorter than the target is one chunk;
-  - the planner is a pure function `(durationMs, silences, target, cap) → [(startMs, endMs)]`, chunks are contiguous and cover the whole file.
-- **Export chunk WAVs** (16 kHz mono, the input format whisper-cli expects) into a per-task temp directory, cut from the decoded 16 kHz stream so boundaries are sample-exact.
-- **Persist the chunk plan** in the `chunks` table (`task_id, idx, start_ms, end_ms, status = PENDING`); on resume the existing plan is reused, not recomputed.
+  - a trailing chunk shorter than 30 s is merged into the previous chunk when the merged chunk stays at or below the cap; otherwise it stays separate, so the cap remains a hard limit (consultation 2026-10-06);
+  - the planner is a pure function `(durationMs, silences, target, cap) → [(startMs, endMs)]`; chunks are contiguous and cover the whole file.
+- **Export chunk WAVs** (16 kHz mono, the input format whisper-cli expects) into the work directory, cut from the decoded 16 kHz PCM so boundaries are sample-exact.
 
-## Open questions for the user
+## Open questions (answered 2026-10-06)
 
-- Target and cap lengths (proposed 5 min / 6 min) and silence thresholds (proposed `noise=-30dB`, `d=0.5`)?
-- Should a very short trailing chunk (e.g. < 30 s) be merged into the previous one?
-- Duration source: decoded sample count or ffprobe?
-- ~~Persisting into `chunks` needs the table from item 03: add 03 as a dependency, or leave persistence to item 11?~~ Resolved by [ADR 0019](../docs/decisions/0019-schema-ownership-and-evolution.md): item 03 owns the `chunks` table and `ChunkRepository`; 03 is now in `Depends on`. Still open: does this item persist the plan itself, or hand it to item 11?
-- Temp directory location (under `$STT_DATA_DIR/tmp/<task-id>` proposed) and when it is deleted (after completion / cancel). Constraint from item 03 ([spec](../docs/specs/database-schema.md), ADR 0017): `$STT_DATA_DIR/tmp` holds upload spool files; `Database.open` deletes every file directly in it and fails startup (naming `STT_DATA_DIR`) when it finds a non-empty directory there. A per-task directory under `tmp/` left behind by a crash would therefore stop the app from starting: use another location (e.g. `$STT_DATA_DIR/work/<task-id>`) or change item 03's cleanup through a migration-style follow-up.
-- Should the process runner (item 05, ADR 0020) treat `\r` as a line terminator? It splits on `\n` only; ffmpeg's progress output (`-stats`) rewrites one line with `\r`, which then arrives as one ever-growing line, and only when ffmpeg finally writes `\n` or exits. Options: split on `\r` too in the runner, pass `-nostats` to ffmpeg, or leave as is.
+- Target and cap lengths and silence thresholds? → **5 min / 6 min, `noise=-30dB`, `d=0.5`**, as constants.
+- Should a very short trailing chunk (under 30 s) be merged into the previous one? → **Only if the merged chunk stays within the 6 min cap.**
+- Duration source? → **Decoded sample count** (`samples / 16` ms).
+- Persisting into `chunks` (table owned by item 03, ADR 0019): this item or item 11? → **Item 11** persists the plan and reuses it on resume; item 06 has no database dependency.
+- Temp directory location and deletion? → **`$STT_DATA_DIR/work/<task-id>`**, outside `tmp/`; item 11 deletes it at terminal status and cleans leftovers at startup.
+- (added at consultation) The decoded PCM is binary, but the item 05 runner is line-oriented (ADR 0020): how does it get out of ffmpeg? → **ffmpeg writes it to a file** in the work directory; no runner change.
+- Should the runner treat `\r` as a line terminator for ffmpeg's `-stats` progress? → **No: ffmpeg runs with `-nostats`**; no runner change.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Items that run real ffmpeg are tagged `Integration` (ADR 0021).
 
 - [ ] A file shorter than the target length becomes exactly one chunk covering the whole file
 - [ ] Audio with no silences is cut every target length (no silence within the cap)
 - [ ] With many silences, each cut lands at the midpoint of the silence nearest the target
 - [ ] A silence beyond the cap is never chosen; the cut falls back to the target
 - [ ] Planned chunks are contiguous, non-overlapping, and end exactly at the file duration
+- [ ] A trailing chunk shorter than 30 s is merged into the previous chunk when the merged chunk stays within the cap; otherwise it stays a separate chunk
 - [ ] `silencedetect` stderr lines are parsed into silence intervals (including a trailing silence without `silence_end`)
-- [ ] Decoding produces mono 16 kHz float32 samples whose count matches the source duration
-- [ ] Decoding a file ffmpeg cannot read fails with ffmpeg's error message
-- [ ] Decoding a file with no audio fails with "no audio decoded"
+- [ ] Integration: decoding writes mono 16 kHz float32 samples to the PCM file, and the duration is the sample count / 16 ms, matching the source's known length
+- [ ] Integration: decoding a file ffmpeg cannot read fails with ffmpeg's error message
+- [ ] Integration: decoding a file with no audio fails with "no audio decoded"
 - [ ] Integration: an ffmpeg-generated tone+silence fixture is split at the expected silence midpoints and the exported chunk WAVs have the planned lengths
 
 ## Acceptance criteria
 
-- Chunk planner unit tests cover: no silence, many silences, file shorter than target.
+- Chunk planner unit tests cover: no silence, many silences, file shorter than target, the short-tail merge rule.
 - Integration test (tagged `Integration`) on an ffmpeg-generated tone+silence fixture produces chunk WAVs whose boundaries match the planner output.
 - Decode errors surface the oracle's two failure cases (ffmpeg failure, no audio).
+- Item 06 has no dependency on the database or Ktor; every ffmpeg run passes `-hide_banner -nostats`, and no change is made to the item 05 runner.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
 
-_Empty — add dated lines (YYYY-MM-DD: what was approved) on approval._
+- 2026-10-06: consultation decisions approved: chunk target 5 min / cap 6 min, `silencedetect` `noise=-30dB`, `d=0.5`, as constants; a trailing chunk under 30 s merges into the previous one only within the cap; duration from the decoded sample count; item 11 persists the plan, reuses it on resume, and owns the work directory's lifecycle; work directory `$STT_DATA_DIR/work/<task-id>`; ffmpeg writes the PCM to a file (the runner stays line-oriented); every ffmpeg run passes `-nostats` (the runner keeps splitting on `\n` only). Test list of 11 items approved with the spec. No new ADR: item-local processing decisions, recorded here; the cross-item ones (persistence and work directory in item 11) are also noted in item 11's draft.
