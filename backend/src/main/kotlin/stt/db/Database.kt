@@ -31,7 +31,7 @@ class Database private constructor(
     url: String,
     // One connection carries one transaction at a time: a concurrent commit or rollback
     // would otherwise also commit or roll back the other caller's work. Not reentrant:
-    // a transaction body must not call transaction() again. Injectable so a test can observe it.
+    // a transaction body must not call writeTransaction() again. Injectable so a test can observe it.
     private val transactionLock: Mutex,
 ) : AutoCloseable {
     // Exposed closes the connection at the end of every transaction; it gets a
@@ -60,7 +60,7 @@ class Database private constructor(
      * Runs [block] as one write transaction on the writer connection, on Dispatchers.IO;
      * concurrent callers wait their turn (suspending, not blocking a thread).
      */
-    internal suspend fun <T> transaction(block: JdbcTransaction.() -> T): T =
+    internal suspend fun <T> writeTransaction(block: JdbcTransaction.() -> T): T =
         transactionLock.withLock {
             withContext(Dispatchers.IO) {
                 transaction(writer) { block() }

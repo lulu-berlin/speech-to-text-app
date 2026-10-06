@@ -12,7 +12,7 @@ class TaskRepository(
     private val db: Database,
 ) {
     /** Saves [task] and returns its generated id. */
-    suspend fun insert(task: Task): Long = db.transaction { insertTaskRow(task) }
+    suspend fun insert(task: Task): Long = db.writeTransaction { insertTaskRow(task) }
 
     /**
      * Saves [task] and streams [audio] into its pages and metadata in one transaction,
@@ -22,7 +22,7 @@ class TaskRepository(
         task: Task,
         audio: InputStream,
     ): Long =
-        db.transaction {
+        db.writeTransaction {
             val taskId = insertTaskRow(task)
             writeAudioRows(taskId, audio)
             taskId
@@ -48,7 +48,7 @@ class TaskRepository(
 
     /** Deletes the task; its audio, pages, chunks, and segments go with it (ON DELETE CASCADE). */
     suspend fun delete(id: Long) {
-        db.transaction { TasksTable.deleteWhere { TasksTable.id eq id } }
+        db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq id } }
     }
 }
 

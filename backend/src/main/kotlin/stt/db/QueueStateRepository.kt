@@ -7,7 +7,7 @@ class QueueStateRepository(
     private val db: Database,
 ) {
     suspend fun setPaused(paused: Boolean) {
-        db.transaction {
+        db.writeTransaction {
             QueueStateTable.upsert {
                 it[id] = QueueStateTable.ONLY_ROW_ID
                 it[QueueStateTable.paused] = paused
