@@ -13,7 +13,9 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -329,6 +331,45 @@ class ProcessRunnerSpec :
                     outcome.thrown.shouldBeInstanceOf<CancellationException>()
                     outcome.elapsed.shouldBeLessThan(2.seconds)
                     outcome.aliveWhenRunThrew.shouldBe(listOf(outcome.pids[1]))
+                }
+            }
+        }
+
+        given("a run whose caller is cancelled while the process is being spawned") {
+            `when`("the process start returns after the cancel") {
+                then("run throws CancellationException and the spawned process is already dead") {
+                    lateinit var job: Job
+                    val spawned = CompletableDeferred<Process>()
+                    val runner =
+                        ProcessRunner(300.milliseconds) { builder ->
+                            builder.start().also { process ->
+                                spawned.complete(process)
+                                job.cancel()
+                            }
+                        }
+                    var thrown: Throwable? = null
+                    var aliveWhenRunThrew: Boolean? = null
+                    try {
+                        withTimeout(10.seconds) {
+                            job =
+                                launch(start = CoroutineStart.LAZY) {
+                                    try {
+                                        runner.run(listOf("sleep", "100"))
+                                    } catch (e: CancellationException) {
+                                        thrown = e
+                                        aliveWhenRunThrew = isAlive(spawned.getCompleted().pid())
+                                        throw e
+                                    }
+                                }
+                            job.start()
+                            job.join()
+                        }
+                    } finally {
+                        if (spawned.isCompleted) killForcibly(spawned.getCompleted().pid())
+                    }
+
+                    thrown.shouldBeInstanceOf<CancellationException>()
+                    aliveWhenRunThrew.shouldBe(false)
                 }
             }
         }
