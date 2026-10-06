@@ -190,6 +190,25 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a runner whose run has already finished") {
+            `when`("pause and resume are called on it") {
+                then("they are no-ops") {
+                    val runner = ProcessRunner()
+                    val result =
+                        withTimeout(10.seconds) {
+                            runner.run(listOf("sh", "-c", "echo one"))
+                        }
+
+                    result.exitCode.shouldBe(0)
+                    result.stdout.shouldBe(listOf("one"))
+
+                    // The no-op contract: neither call throws, and the finished run is untouched.
+                    runner.pause()
+                    runner.resume()
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
