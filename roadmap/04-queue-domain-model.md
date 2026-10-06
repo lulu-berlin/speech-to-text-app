@@ -26,7 +26,8 @@ Define the pure Kotlin rules for task status transitions, queue reordering and t
 - A `PAUSED` task keeps its queue position and can be reordered while paused; the engine (item 11) skips it when it picks the next task (consultation 2026-10-06).
 - Terminal statuses are final: no transition re-queues a `COMPLETED`, `FAILED` or `CANCELED` task. A retry needs its own feature, because re-uploading the same audio is rejected by the `UNIQUE` `sha256` (ADR 0018) and a retry would have to reuse the existing task (consultation 2026-10-06).
 - Deleting a history entry is out of scope here: item 12 exposes the existing `TaskRepository.delete`, which the schema cascade already backs (consultation 2026-10-06).
-- Reorder = the full ordered list of ids of all non-terminal tasks; rejected if the id set differs from the current non-terminal set (missing, extra or duplicate ids).
+- Reorder = the full ordered list of ids of all non-terminal tasks, each named exactly once; anything else is rejected with a typed reason carrying the offending ids: duplicate ids (named more than once), unknown ids (not in the queue: never queued, or already terminal), missing ids (queued but not named). When several apply, the reported reason is the first of duplicate > unknown > missing: a repeated or unknown id usually takes the slot of a required one, so a missing id is mostly a symptom (e.g. `[1, 1, 9]` against `{1, 2, 3}` → duplicate `{1}`) (review round 1, 2026-10-06).
+- A queue is built only through a validating factory from its entries and paused flag (item 11 restores both from the database at boot). It rejects, with a typed reason carrying the offending ids: duplicate ids, terminal entries, more than one `RUNNING` task. When several apply, the reported reason is the first of duplicate > terminal > multiple running. An empty set of entries is valid. No other public path (constructor, `copy`) creates a queue (review round 1, 2026-10-06).
 - Queue paused flag modeled as part of the queue state (pausing an already paused queue is a no-op).
 
 ## Open questions (answered 2026-10-06)
@@ -53,6 +54,9 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A task that reaches a terminal status leaves the queue (discovered)
 - [x] Changing the status of a task that is not in the queue is rejected (discovered)
 - [x] A task that fails or is canceled also leaves the queue (discovered)
+- [ ] Reordering with a list that repeats an id while still naming every task is rejected (discovered)
+- [ ] A rejected reorder names its reason (missing, unknown, duplicate) with the offending ids, and the agreed precedence when several apply (discovered)
+- [ ] Building a queue with a duplicate id, a terminal entry, or more than one `RUNNING` task is rejected with its reason (agreed precedence); a valid set of entries is accepted (discovered)
 
 ## Acceptance criteria
 
@@ -69,3 +73,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-06 (after cycle 9): the queue applies a status change by task id and returns the updated queue or a typed rejection (illegal transition / another task running). A task reaching a terminal status leaves the queue aggregate but stays in the database for history. Added test item 12 `(discovered)`. Recorded in the Proposal; no new ADR (local queue semantics).
 - 2026-10-06 (after cycle 9): added test item 13 `(discovered)`: a status change for a task id that is not in the queue is rejected with its own typed reason.
 - 2026-10-06 (after cycle 12): added test item 14 `(discovered)`: `FAILED` and `CANCELED` remove a task from the queue just like `COMPLETED` (item 12 only exercised `COMPLETED`).
+- 2026-10-06: review round 1, changes requested: (1) `reorder` accepted a list repeating an id while still naming every task (item 7's test only covered a repeat that displaced an id); (2) an invalid queue could be constructed directly, so a validating factory replaces the public constructor (data class with `@ConsistentCopyVisibility`, so `copy` cannot bypass it); (3) a rejected reorder now names a typed reason. Precedences agreed: reorder duplicate > unknown > missing; factory duplicate > terminal > multiple running. Added test items 15–17 `(discovered)`, done in that order so item 15 is red on the pre-review code. Recorded in the Proposal; no new ADR (local queue semantics).
