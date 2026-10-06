@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import stt.Integration
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -125,7 +126,7 @@ class ProcessRunnerSpec :
                     val runner = ProcessRunner()
                     val delivered = mutableListOf<String>()
                     val sawThree = CompletableDeferred<Unit>()
-                    var threshold = Int.MAX_VALUE
+                    val threshold = AtomicInteger(Int.MAX_VALUE)
                     val nextAfterResume = CompletableDeferred<Int>()
                     val job =
                         launch {
@@ -134,7 +135,7 @@ class ProcessRunnerSpec :
                                 onStdoutLine = { line ->
                                     underLock(delivered) { delivered.add(line) }
                                     if (line == "3") sawThree.complete(Unit)
-                                    if (line.toInt() > threshold) nextAfterResume.complete(line.toInt())
+                                    if (line.toInt() > threshold.get()) nextAfterResume.complete(line.toInt())
                                 },
                             )
                         }
@@ -147,10 +148,10 @@ class ProcessRunnerSpec :
                         val windowCount = underLock(delivered) { delivered.size }
                         (windowCount - frozenCount).shouldBeLessThanOrEqualTo(1)
 
-                        threshold = underLock(delivered) { delivered.last().toInt() }
+                        threshold.set(underLock(delivered) { delivered.last().toInt() })
                         runner.resume()
 
-                        withTimeout(10.seconds) { nextAfterResume.await() }.shouldBe(threshold + 1)
+                        withTimeout(10.seconds) { nextAfterResume.await() }.shouldBe(threshold.get() + 1)
                     } finally {
                         job.cancelAndJoin()
                     }
