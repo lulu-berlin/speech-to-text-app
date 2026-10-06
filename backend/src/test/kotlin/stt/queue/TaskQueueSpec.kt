@@ -93,6 +93,15 @@ class TaskQueueSpec :
             }
         }
 
+        given("a queue of three queued tasks with ids 1, 2 and 3") {
+            `when`("reordered with a list that repeats id 1 while still naming every task") {
+                then("the reorder is rejected") {
+                    val queue = queuedQueue(1L, 2L, 3L)
+                    queue.reorder(listOf(1L, 1L, 2L, 3L)).shouldBe(ReorderOutcome.Rejected)
+                }
+            }
+        }
+
         given("a running queue with one queued task") {
             `when`("the queue is paused and then resumed") {
                 then("the paused flag toggles false to true and back, and the tasks are unchanged") {
