@@ -57,7 +57,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [ ] The database opens in WAL mode with foreign keys enforced
 - [x] A task saved through the repository reads back with identical fields
 - [ ] An invalid `status`, `phase` or `speakers_mode` value is rejected by the database
-- [ ] Chunks and segments saved for a task read back in `idx` / `seq` order
+- [x] Chunks and segments saved for a task read back in `idx` / `seq` order
 - [ ] Deleting a task cascades to its audio, audio pages, chunks, and segments
 - [ ] Audio larger than one page is written from and read back to streams without holding the whole payload in memory, byte-for-byte identical, and its stored `size_bytes`/`sha256` match independently derived values
 - [ ] Listing tasks does not read audio data
