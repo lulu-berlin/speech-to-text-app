@@ -63,7 +63,7 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [x] (discovered) Cancelling returns promptly even when a descendant has left the process group and still holds the output pipes
 - [x] (discovered) Cancelling run while the process is being spawned leaves no process behind
 - [x] (discovered) Output written immediately before the process exits is always delivered
-- [ ] (discovered) A second run while one is in flight fails fast and the first run stays pausable
+- [x] (discovered) A second run while one is in flight fails fast and the first run stays pausable
 - [ ] (discovered) pause() issued before the process is spawned takes effect: no output until resume()
 - [ ] (discovered) A pause() left over from a previous run (cancelled while paused) does not freeze the next run
 - [ ] (discovered) A process group that outlives SIGKILL does not hang cancellation: the wait ends after the grace period and a warning names the group

@@ -434,6 +434,43 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a runner with a counting loop in flight") {
+            `when`("a second run is started on the same runner") {
+                then("the second run fails fast with IllegalStateException and the first run stays pausable") {
+                    val runner = ProcessRunner()
+                    val delivered = mutableListOf<String>()
+                    val sawThree = CompletableDeferred<Unit>()
+                    val job =
+                        launch {
+                            runner.run(
+                                listOf("sh", "-c", "i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done"),
+                                onStdoutLine = { line ->
+                                    underLock(delivered) { delivered.add(line) }
+                                    if (line == "3") sawThree.complete(Unit)
+                                },
+                            )
+                        }
+                    try {
+                        withTimeout(10.seconds) { sawThree.await() }
+
+                        withTimeout(2.seconds) {
+                            shouldThrow<IllegalStateException> {
+                                runner.run(listOf("sh", "-c", "echo second"))
+                            }
+                        }
+
+                        runner.pause()
+                        val frozenCount = underLock(delivered) { delivered.size }
+                        delay(500.milliseconds)
+                        val windowCount = underLock(delivered) { delivered.size }
+                        (windowCount - frozenCount).shouldBeLessThanOrEqualTo(1)
+                    } finally {
+                        job.cancelAndJoin()
+                    }
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
