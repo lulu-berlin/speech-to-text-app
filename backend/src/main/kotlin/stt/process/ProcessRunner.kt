@@ -87,6 +87,11 @@ class ProcessRunner(
         return Files.isRegularFile(file) && Files.isExecutable(file)
     }
 
+    /**
+     * Reads [stream] line by line and delivers each to [onLine]. The coroutineScope is the
+     * receiver for the per-line ensureActive(): without it the cancellation check has no
+     * CoroutineContext to observe.
+     */
     private suspend fun readLines(
         stream: InputStream,
         onLine: (String) -> Unit,
