@@ -55,7 +55,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 
 - [x] Migrations apply cleanly to an empty database; opening an existing database applies nothing and preserves its rows
 - [ ] The database opens in WAL mode with foreign keys enforced
-- [ ] A task saved through the repository reads back with identical fields
+- [x] A task saved through the repository reads back with identical fields
 - [ ] An invalid `status`, `phase` or `speakers_mode` value is rejected by the database
 - [ ] Chunks and segments saved for a task read back in `idx` / `seq` order
 - [ ] Deleting a task cascades to its audio, audio pages, chunks, and segments

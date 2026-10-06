@@ -3,10 +3,15 @@ package stt.db
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.flywaydb.core.Flyway
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Proxy
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Connection
 import java.sql.DriverManager
+import org.jetbrains.exposed.v1.jdbc.Database as ExposedDatabase
 
 /**
  * The application's SQLite database (ADR 0006, ADR 0017): one file at
@@ -17,6 +22,16 @@ import java.sql.DriverManager
 class Database private constructor(
     val connection: Connection,
 ) : AutoCloseable {
+    // Exposed closes the connection at the end of every transaction; it gets a
+    // view whose close() is a no-op so the owned connection (and its pragmas) lives on.
+    private val exposed = ExposedDatabase.connect({ nonClosing(connection) })
+
+    /** Runs [block] as one Exposed transaction on the owned connection, on Dispatchers.IO. */
+    internal suspend fun <T> transaction(block: JdbcTransaction.() -> T): T =
+        withContext(Dispatchers.IO) {
+            transaction(exposed) { block() }
+        }
+
     companion object {
         suspend fun open(dataDir: Path): Database =
             withContext(Dispatchers.IO) {
@@ -44,3 +59,19 @@ class Database private constructor(
         connection.close()
     }
 }
+
+private fun nonClosing(connection: Connection): Connection =
+    Proxy.newProxyInstance(
+        Connection::class.java.classLoader,
+        arrayOf(Connection::class.java),
+    ) { _, method, args ->
+        if (method.name == "close") {
+            Unit
+        } else {
+            try {
+                method.invoke(connection, *(args ?: emptyArray()))
+            } catch (e: InvocationTargetException) {
+                throw e.targetException
+            }
+        }
+    } as Connection
