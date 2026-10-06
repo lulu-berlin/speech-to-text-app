@@ -29,7 +29,7 @@ class AudioRepository(
     }
 
     suspend fun metadata(taskId: Long): AudioMetadata? =
-        db.transaction {
+        db.readTransaction {
             AudioTable
                 .selectAll()
                 .where { AudioTable.taskId eq taskId }

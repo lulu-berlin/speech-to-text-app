@@ -27,7 +27,7 @@ class SegmentRepository(
 
     /** The task's segments in (`chunk_idx`, `seq`) order; `seq` restarts in every chunk. */
     suspend fun findByTask(taskId: Long): List<Segment> =
-        db.transaction {
+        db.readTransaction {
             SegmentsTable
                 .selectAll()
                 .where { SegmentsTable.taskId eq taskId }
