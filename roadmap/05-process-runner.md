@@ -43,7 +43,7 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [x] A process that ignores SIGTERM is killed forcibly after the grace period
 - [x] SIGSTOP freezes the output of a counting shell loop; SIGCONT resumes it from where it stopped
 - [x] Cancelling a stopped (SIGSTOP) process tree still terminates it
-- [ ] Starting a non-existent executable fails with a clear error instead of hanging
+- [x] Starting a non-existent executable fails with a clear error instead of hanging
 - [ ] `pause()`/`resume()` on an already-exited process are no-ops
 - [ ] A final line without a trailing newline is still delivered
 - [ ] Output larger than the pipe buffer (long `seq`) completes without deadlock

@@ -8,6 +8,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
@@ -27,9 +29,10 @@ class ProcessRunner(
         command: List<String>,
         onStdoutLine: (String) -> Unit = {},
         onStderrLine: (String) -> Unit = {},
-    ): ProcessResult =
-        coroutineScope {
-            val process = withContext(Dispatchers.IO) { ProcessBuilder(listOf("setsid") + command).start() }
+    ): ProcessResult {
+        val executable = withContext(Dispatchers.IO) { resolveInPath(command[0]) }
+        return coroutineScope {
+            val process = withContext(Dispatchers.IO) { ProcessBuilder(listOf("setsid", executable) + command.drop(1)).start() }
             val group = ProcessGroup(process.pid())
             currentGroup.set(group)
             try {
@@ -44,6 +47,7 @@ class ProcessRunner(
                 currentGroup.set(null)
             }
         }
+    }
 
     /** Freezes the current run (SIGSTOP the whole tree). No-op while no run is in flight. */
     fun pause() {
@@ -53,6 +57,27 @@ class ProcessRunner(
     /** Unfreezes the current run (SIGCONT the whole tree). No-op while no run is in flight. */
     fun resume() {
         currentGroup.get()?.resume()
+    }
+
+    /** Fails fast on a missing executable: resolves [name] to an absolute existing executable, or throws. */
+    private fun resolveInPath(name: String): String =
+        pathCandidates(name).firstOrNull { isExecutable(it) }
+            ?: throw ExecutableNotFoundException("Executable not found: $name")
+
+    private fun pathCandidates(name: String): List<String> =
+        if (name.contains('/')) {
+            listOf(name)
+        } else {
+            (System.getenv("PATH") ?: "")
+                .split(":")
+                .filter { it.startsWith("/") }
+                .map { dir -> "$dir/$name" }
+                .toList()
+        }
+
+    private fun isExecutable(path: String): Boolean {
+        val file = Path.of(path)
+        return Files.isRegularFile(file) && Files.isExecutable(file)
     }
 
     private fun readLines(

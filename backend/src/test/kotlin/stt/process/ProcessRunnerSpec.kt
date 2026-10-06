@@ -2,12 +2,14 @@
 
 package stt.process
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -170,6 +172,21 @@ class ProcessRunnerSpec :
                     outcome.aliveWhenRunThrew.shouldBe(emptyList())
                     outcome.elapsed.shouldBeLessThan(gracePeriod)
                     outcome.pids.filter(::isAlive).shouldBeEmpty()
+                }
+            }
+        }
+
+        given("a command that does not exist") {
+            `when`("running it") {
+                then("run fails fast with an ExecutableNotFoundException naming the command") {
+                    val exception =
+                        withTimeout(2.seconds) {
+                            shouldThrow<ExecutableNotFoundException> {
+                                ProcessRunner().run(listOf("stt-no-such-binary"))
+                            }
+                        }
+
+                    exception.message.shouldContain("stt-no-such-binary")
                 }
             }
         }
