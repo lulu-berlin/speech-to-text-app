@@ -40,12 +40,19 @@ class Database private constructor(
         }
 
     companion object {
+        private const val DATA_DIR_UNUSABLE_ERROR =
+            "STT_DATA_DIR \"%s\" cannot be created or opened as the data directory: %s"
+
         suspend fun open(dataDir: Path): Database =
             withContext(Dispatchers.IO) {
-                Files.createDirectories(dataDir)
-                val dbFile = dataDir.resolve("stt.db")
-                val url = "jdbc:sqlite:$dbFile"
-                val connection = DriverManager.getConnection(url)
+                val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
+                val connection =
+                    try {
+                        Files.createDirectories(dataDir)
+                        DriverManager.getConnection(url)
+                    } catch (e: Exception) {
+                        throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e.message), e)
+                    }
                 connection.createStatement().use { st -> st.execute("PRAGMA journal_mode = WAL") }
                 connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
                 try {
