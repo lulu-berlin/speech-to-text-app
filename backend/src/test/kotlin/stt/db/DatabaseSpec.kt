@@ -140,6 +140,26 @@ class DatabaseSpec :
                 }
             }
         }
+
+        given("no task with id 42") {
+            `when`("inserting a chunks, segments, audio, and audio_parts row for task 42") {
+                then("each insert is rejected; the same rows are accepted once task 42 exists") {
+                    withDatabase { db ->
+                        for (sql in task42RowInserts) {
+                            shouldThrow<java.sql.SQLException> { execute(db, sql) }
+                        }
+
+                        insertTask(db, 42)
+                        for (sql in task42RowInserts) {
+                            execute(db, sql)
+                        }
+                        for (table in listOf("chunks", "segments", "audio", "audio_parts")) {
+                            rowCount(db, table).shouldBe(1)
+                        }
+                    }
+                }
+            }
+        }
     })
 
 private val expectedTables =
@@ -170,6 +190,19 @@ private fun pragma(
     db: Database,
     name: String,
 ): String = singleValue(db, "PRAGMA $name")
+
+private val task42RowInserts =
+    listOf(
+        "INSERT INTO chunks (task_id, idx, start_ms, end_ms, status) VALUES (42, 0, 0, 1000, 'PENDING')",
+        "INSERT INTO segments (task_id, chunk_idx, seq, start_ms, end_ms, text) VALUES (42, 0, 0, 0, 900, 'x')",
+        "INSERT INTO audio (task_id, size_bytes, sha256) VALUES (42, 1, 'aa')",
+        "INSERT INTO audio_parts (task_id, part_no, part) VALUES (42, 0, x'00')",
+    )
+
+private fun execute(
+    db: Database,
+    sql: String,
+) = db.connection.createStatement().use { statement -> statement.executeUpdate(sql) }
 
 private fun insertTask(
     db: Database,
