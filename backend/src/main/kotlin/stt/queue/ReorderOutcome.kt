@@ -6,6 +6,7 @@ sealed interface ReorderOutcome {
         val queue: TaskQueue,
     ) : ReorderOutcome
 
-    /** [ids] is not exactly the set of current non-terminal ids (missing, unknown, terminal, or duplicate). */
-    data object Rejected : ReorderOutcome
+    data class Rejected(
+        val reason: ReorderRejection,
+    ) : ReorderOutcome
 }

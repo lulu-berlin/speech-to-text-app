@@ -44,14 +44,34 @@ data class TaskQueue(
 
     private fun anotherTaskRunning(id: Long): Boolean = entries.any { it.id != id && it.status == TaskStatus.RUNNING }
 
-    /** Applies [ids] as the new order of all non-terminal tasks; statuses travel with their ids. */
+    /**
+     * Applies [ids] as the new order of all non-terminal tasks, each named exactly once;
+     * statuses travel with their ids. Otherwise rejects with the first of
+     * duplicate > unknown > missing ids.
+     */
     fun reorder(ids: List<Long>): ReorderOutcome {
+        val rejection = reorderRejection(ids)
+        if (rejection != null) return ReorderOutcome.Rejected(rejection)
+        val byId = entries.associateBy { it.id }
+        return ReorderOutcome.Accepted(copy(entries = ids.map { id -> byId.getValue(id) }))
+    }
+
+    private fun reorderRejection(ids: List<Long>): ReorderRejection? {
         val currentIds = entries.map { it.id }.toSet()
-        return if (ids.size == currentIds.size && ids.toSet() == currentIds) {
-            val byId = entries.associateBy { it.id }
-            ReorderOutcome.Accepted(copy(entries = ids.map { id -> byId.getValue(id) }))
-        } else {
-            ReorderOutcome.Rejected
+        val namedIds = ids.toSet()
+        val duplicates =
+            ids
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
+        val unknown = namedIds - currentIds
+        val missing = currentIds - namedIds
+        return when {
+            duplicates.isNotEmpty() -> ReorderRejection.DuplicateIds(duplicates)
+            unknown.isNotEmpty() -> ReorderRejection.UnknownIds(unknown)
+            missing.isNotEmpty() -> ReorderRejection.MissingIds(missing)
+            else -> null
         }
     }
 }

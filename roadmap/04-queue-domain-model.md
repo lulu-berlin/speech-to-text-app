@@ -55,7 +55,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Changing the status of a task that is not in the queue is rejected (discovered)
 - [x] A task that fails or is canceled also leaves the queue (discovered)
 - [x] Reordering with a list that repeats an id while still naming every task is rejected (discovered)
-- [ ] A rejected reorder names its reason (missing, unknown, duplicate) with the offending ids, and the agreed precedence when several apply (discovered)
+- [x] A rejected reorder names its reason (missing, unknown, duplicate) with the offending ids, and the agreed precedence when several apply (discovered)
 - [ ] Building a queue with a duplicate id, a terminal entry, or more than one `RUNNING` task is rejected with its reason (agreed precedence); a valid set of entries is accepted (discovered)
 
 ## Acceptance criteria
