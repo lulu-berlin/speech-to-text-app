@@ -53,7 +53,9 @@ class ConcurrencySpec :
                                     .await()
                                     .isFailure
                                     .shouldBeTrue()
-                                tasks.list().shouldBe(listOf(StoredTask(insert.await(), concurrent)))
+                                // Reads no longer queue behind writes: await the insert's commit before listing.
+                                val concurrentId = insert.await()
+                                tasks.list().shouldBe(listOf(StoredTask(concurrentId, concurrent)))
                             }
                         }
                     }
