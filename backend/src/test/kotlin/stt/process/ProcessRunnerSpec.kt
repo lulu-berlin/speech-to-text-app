@@ -252,6 +252,42 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a command with output still buffered when the run is cancelled") {
+            `when`("the run is cancelled after the first line") {
+                then("buffered lines are not delivered to the callback") {
+                    val delivered = mutableListOf<String>()
+                    val firstLine = CompletableDeferred<Unit>()
+                    var thrown: Throwable? = null
+                    val job =
+                        launch {
+                            try {
+                                ProcessRunner(gracePeriod = 300.milliseconds).run(
+                                    listOf("sh", "-c", "seq 1 100000; sleep 100"),
+                                    onStdoutLine = { line ->
+                                        delivered.add(line)
+                                        firstLine.complete(Unit)
+                                    },
+                                )
+                            } catch (e: CancellationException) {
+                                thrown = e
+                                throw e
+                            }
+                        }
+                    try {
+                        withTimeout(10.seconds) {
+                            firstLine.await()
+                            job.cancelAndJoin()
+                        }
+                    } finally {
+                        job.cancelAndJoin()
+                    }
+
+                    thrown.shouldBeInstanceOf<CancellationException>()
+                    delivered.size.shouldBeLessThan(20000)
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
