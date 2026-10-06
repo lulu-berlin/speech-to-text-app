@@ -42,7 +42,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A `PAUSED` task keeps its queue position and can be reordered while paused
 - [x] Reordering with exactly the current non-terminal ids applies the new order
 - [x] Reordering with a missing id is rejected
-- [ ] Reordering with an unknown or terminal-task id is rejected
+- [x] Reordering with an unknown or terminal-task id is rejected
 - [ ] Reordering with a duplicated id is rejected
 - [ ] Pausing and resuming the queue toggles the paused flag
 - [ ] Pausing an already paused queue and resuming an already running queue are no-ops
