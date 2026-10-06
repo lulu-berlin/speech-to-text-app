@@ -62,4 +62,20 @@ class TaskQueueSpec :
                 }
             }
         }
+
+        given("a queue of three queued tasks") {
+            `when`("reordered with a list that omits one of their ids") {
+                then("the reorder is rejected") {
+                    val queue =
+                        TaskQueue(
+                            listOf(
+                                1L to QUEUED,
+                                2L to QUEUED,
+                                3L to QUEUED,
+                            ),
+                        )
+                    queue.reorder(listOf(1L, 3L)).shouldBe(ReorderOutcome.Rejected)
+                }
+            }
+        }
     })
