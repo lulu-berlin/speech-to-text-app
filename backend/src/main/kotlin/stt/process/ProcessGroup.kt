@@ -2,6 +2,8 @@ package stt.process
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 
 /**
@@ -9,18 +11,29 @@ import kotlin.time.Duration
  * kill(2) with the negated id reaches every process in the tree (ADR 0020). Linux signal numbers.
  */
 internal class ProcessGroup(
-    id: Long,
+    private val id: Long,
+    /** kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). */
+    private val kill: (pid: Int, signal: Int) -> Int = LibC.INSTANCE::kill,
 ) {
     /** kill(2) addresses a whole group through the negated group id. */
     private val target = -id.toInt()
 
-    /** SIGCONT first so a stopped tree can act on SIGTERM; SIGKILL if it outlives the grace period. */
+    /**
+     * SIGCONT first so a stopped tree can act on SIGTERM; SIGKILL if it outlives the grace period.
+     * The wait after SIGKILL is bounded by the grace period too: members that cannot die or be reaped
+     * (zombies without a reaping init, uninterruptible sleep) must not hang the caller (ADR 0020).
+     */
     suspend fun terminate(gracePeriod: Duration) {
         signal(SIGCONT)
         signal(SIGTERM)
+        if (awaitEmpty(gracePeriod)) return
+        signal(SIGKILL)
         if (!awaitEmpty(gracePeriod)) {
-            signal(SIGKILL)
-            awaitEmpty(Duration.INFINITE)
+            logger.warn(
+                "Process group {} still has members {} after SIGKILL (unreaped zombies or uninterruptible sleep); not waiting longer",
+                id,
+                gracePeriod,
+            )
         }
     }
 
@@ -41,13 +54,15 @@ internal class ProcessGroup(
         } ?: false
 
     private fun signal(signal: Int) {
-        LibC.INSTANCE.kill(target, signal)
+        kill(target, signal)
     }
 
     /** Signal 0 checks existence only: kill(2) succeeds while any process of the group exists. */
-    private fun hasMembers(): Boolean = LibC.INSTANCE.kill(target, 0) == 0
+    private fun hasMembers(): Boolean = kill(target, 0) == 0
 
     private companion object {
+        val logger: Logger = LoggerFactory.getLogger(ProcessGroup::class.java)
+
         const val SIGKILL = 9
         const val SIGTERM = 15
         const val SIGCONT = 18
