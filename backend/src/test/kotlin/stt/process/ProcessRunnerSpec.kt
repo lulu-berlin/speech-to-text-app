@@ -21,6 +21,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import stt.Integration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -257,10 +259,12 @@ class ProcessRunnerSpec :
         }
 
         given("a command with output still buffered when the run is cancelled") {
-            `when`("the run is cancelled after the first line") {
-                then("buffered lines are not delivered to the callback") {
+            `when`("the run is cancelled while the first line is being delivered") {
+                then("no further line reaches the callback") {
                     val delivered = mutableListOf<String>()
                     val firstLine = CompletableDeferred<Unit>()
+                    // Holds the first callback until the cancel has been issued, so every later line is after it.
+                    val cancelIssued = CountDownLatch(1)
                     var thrown: Throwable? = null
                     val job =
                         launch {
@@ -270,6 +274,7 @@ class ProcessRunnerSpec :
                                     onStdoutLine = { line ->
                                         delivered.add(line)
                                         firstLine.complete(Unit)
+                                        cancelIssued.await(10, TimeUnit.SECONDS)
                                     },
                                 )
                             } catch (e: CancellationException) {
@@ -280,14 +285,17 @@ class ProcessRunnerSpec :
                     try {
                         withTimeout(10.seconds) {
                             firstLine.await()
-                            job.cancelAndJoin()
+                            job.cancel()
+                            cancelIssued.countDown()
+                            job.join()
                         }
                     } finally {
+                        cancelIssued.countDown()
                         job.cancelAndJoin()
                     }
 
                     thrown.shouldBeInstanceOf<CancellationException>()
-                    delivered.size.shouldBeLessThan(20000)
+                    delivered.shouldBe(listOf("1"))
                 }
             }
         }
