@@ -47,6 +47,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Pausing and resuming the queue toggles the paused flag
 - [ ] Pausing an already paused queue and resuming an already running queue are no-ops
 - [ ] A `QUEUED` task cannot transition to `RUNNING` while another task is `RUNNING`; once no task is `RUNNING`, the transition is accepted (discovered)
+- [ ] Reordering a paused queue keeps it paused (discovered)
 
 ## Acceptance criteria
 
@@ -59,3 +60,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-06: consultation decisions approved: a `PAUSED` task keeps its queue position and stays reorderable (the engine skips it); terminal statuses are final, with no re-queue/retry transition; deleting history entries belongs to item 12. Test list of 9 items approved with the spec. No new ADR: these are local queue semantics, recorded here and in the Proposal.
 - 2026-10-06 (during cycle 1): `PAUSED` → `RUNNING` removed from the transition table. Resuming a paused task always returns it to the queue (`PAUSED` → `QUEUED`); the engine is the only component that moves a task to `RUNNING`, so a resumed task may wait behind higher-priority tasks instead of jumping straight to running. Recorded in the Proposal; no new ADR (local queue semantics).
 - 2026-10-06 (during cycle 1): at most one task may be `RUNNING` at a time (concurrency = 1, matching item 11's single-worker proposal). `QUEUED → RUNNING` is rejected while any other task is `RUNNING` — the only transition gated by whole-queue state; the queue aggregate (task statuses + paused flag) enforces it. Added test item 10 `(discovered)`. Recorded in the Proposal; no new ADR (local queue semantics).
+- 2026-10-06 (after cycle 8): added test item 11 `(discovered)`: reordering a paused queue keeps it paused (`reorder` dropped the flag). Done before item 9.
