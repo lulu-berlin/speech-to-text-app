@@ -106,7 +106,7 @@ class Database private constructor(
                         .migrate()
                 } catch (e: Exception) {
                     connection.close()
-                    throw IllegalStateException(MIGRATION_FAILED_ERROR.format(dataDir, e), e)
+                    throw dataDirFailure(MIGRATION_FAILED_ERROR, dataDir, e)
                 }
                 Database(connection, url, tmpDir, transactionLock)
             }
@@ -132,7 +132,7 @@ class Database private constructor(
                 Files.list(tmpDir).use { stale -> stale.forEach(Files::delete) }
                 DriverManager.getConnection(url)
             } catch (e: Exception) {
-                throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e), e)
+                throw dataDirFailure(DATA_DIR_UNUSABLE_ERROR, dataDir, e)
             }
 
         /**
@@ -154,9 +154,16 @@ class Database private constructor(
                 connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
             } catch (e: Exception) {
                 connection.close()
-                throw IllegalStateException(WAL_UNAVAILABLE_ERROR.format(dataDir, e), e)
+                throw dataDirFailure(WAL_UNAVAILABLE_ERROR, dataDir, e)
             }
         }
+
+        /** A startup failure naming STT_DATA_DIR: [template] gets [dataDir] and [cause]; [cause] is kept. */
+        private fun dataDirFailure(
+            template: String,
+            dataDir: Path,
+            cause: Exception,
+        ) = IllegalStateException(template.format(dataDir, cause), cause)
     }
 
     override fun close() {
