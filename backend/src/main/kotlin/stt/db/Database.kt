@@ -29,6 +29,8 @@ import org.jetbrains.exposed.v1.jdbc.Database as ExposedDatabase
 class Database private constructor(
     internal val connection: Connection,
     url: String,
+    /** `$STT_DATA_DIR/tmp`: upload spool files (ADR 0018) live here until their write transaction ends. */
+    internal val tmpDir: Path,
     // One connection carries one transaction at a time: a concurrent commit or rollback
     // would otherwise also commit or roll back the other caller's work. Not reentrant:
     // a transaction body must not call writeTransaction() again. Injectable so a test can observe it.
@@ -36,8 +38,7 @@ class Database private constructor(
 ) : AutoCloseable {
     // Exposed closes the connection at the end of every transaction; it gets a
     // view whose close() is a no-op so the owned connection (and its pragmas) lives on.
-    // No retries: a transaction body may consume a one-shot stream (audio upload), and a
-    // retry after e.g. a UNIQUE violation would re-run it on a drained stream.
+    // No retries: a constraint violation (e.g. a duplicate sha256) is final, not transient.
     private val writer =
         ExposedDatabase.connect(
             { nonClosing(connection) },
@@ -86,7 +87,8 @@ class Database private constructor(
         ): Database =
             withContext(Dispatchers.IO) {
                 val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
-                val connection = openConnection(dataDir, url)
+                val tmpDir = dataDir.resolve("tmp")
+                val connection = openConnection(dataDir, tmpDir, url)
                 try {
                     Flyway
                         .configure()
@@ -97,17 +99,18 @@ class Database private constructor(
                     connection.close()
                     throw e
                 }
-                Database(connection, url, transactionLock)
+                Database(connection, url, tmpDir, transactionLock)
             }
 
-        /** Creates [dataDir] when missing, connects to [url], then applies the pragmas in ADR 0017 order. */
+        /** Creates [dataDir] and [tmpDir] when missing, connects to [url], then applies the pragmas in ADR 0017 order. */
         private fun openConnection(
             dataDir: Path,
+            tmpDir: Path,
             url: String,
         ): Connection {
             val connection =
                 try {
-                    Files.createDirectories(dataDir)
+                    Files.createDirectories(tmpDir)
                     DriverManager.getConnection(url)
                 } catch (e: Exception) {
                     throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e), e)

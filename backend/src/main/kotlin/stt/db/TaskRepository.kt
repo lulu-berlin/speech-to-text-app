@@ -15,17 +15,20 @@ class TaskRepository(
     suspend fun insert(task: Task): Long = db.writeTransaction { insertTaskRow(task) }
 
     /**
-     * Saves [task] and streams [audio] into its pages and metadata in one transaction,
-     * so audio content that already exists (UNIQUE sha256) rejects the whole creation.
+     * Saves [task] with [audio]: the audio is spooled to a temp file first (no lock held while
+     * it is read), then the task, its audio metadata, and its pages are written in one short
+     * transaction, so audio content that already exists (UNIQUE sha256) rejects the whole creation.
      */
     suspend fun createWithAudio(
         task: Task,
         audio: InputStream,
     ): Long =
-        db.writeTransaction {
-            val taskId = insertTaskRow(task)
-            writeAudioRows(taskId, audio)
-            taskId
+        db.withSpooledAudio(audio) { spooled ->
+            db.writeTransaction {
+                val taskId = insertTaskRow(task)
+                writeAudioRows(taskId, spooled)
+                taskId
+            }
         }
 
     suspend fun find(id: Long): StoredTask? =
