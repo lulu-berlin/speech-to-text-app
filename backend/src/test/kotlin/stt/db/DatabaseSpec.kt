@@ -11,6 +11,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
 import java.sql.DriverManager
 import java.util.ArrayList
@@ -93,9 +94,7 @@ class DatabaseSpec :
                         Files.createDirectory(dbIsADirectory.resolve("stt.db"))
 
                         for (dataDir in listOf(regularFile, dbIsADirectory)) {
-                            val error = shouldThrowAny { Database.open(dataDir) }
-                            error.message.shouldContain("STT_DATA_DIR")
-                            error.message.shouldContain(dataDir.toString())
+                            shouldFailOpeningNaming(dataDir)
                         }
                     }
                 }
@@ -113,9 +112,7 @@ class DatabaseSpec :
                         }
                         Files.setPosixFilePermissions(dbFile, PosixFilePermissions.fromString("r--r--r--"))
 
-                        val error = shouldThrowAny { Database.open(dataDir) }
-                        error.message.shouldContain("STT_DATA_DIR")
-                        error.message.shouldContain(dataDir.toString())
+                        shouldFailOpeningNaming(dataDir)
                     }
                 }
             }
@@ -130,9 +127,7 @@ class DatabaseSpec :
                             execute(db, "UPDATE flyway_schema_history SET checksum = checksum + 1 WHERE version = '1'")
                         }
 
-                        val error = shouldThrowAny { Database.open(dataDir) }
-                        error.message.shouldContain("STT_DATA_DIR")
-                        error.message.shouldContain(dataDir.toString())
+                        shouldFailOpeningNaming(dataDir)
                     }
                 }
             }
@@ -253,6 +248,13 @@ private fun tableNames(db: Database): List<String> =
     }
 
 private fun migratedCount(db: Database): Int = singleValue(db, "SELECT count(*) FROM flyway_schema_history").toInt()
+
+/** Opening the database at [dataDir] fails with an error naming STT_DATA_DIR and the path. */
+private suspend fun shouldFailOpeningNaming(dataDir: Path) {
+    val error = shouldThrowAny { Database.open(dataDir) }
+    error.message.shouldContain("STT_DATA_DIR")
+    error.message.shouldContain(dataDir.toString())
+}
 
 private fun pragma(
     db: Database,
