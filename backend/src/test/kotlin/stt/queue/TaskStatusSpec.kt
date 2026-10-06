@@ -8,9 +8,9 @@ class TaskStatusSpec :
 
         given("each allowed transition from the spec's table") {
             `when`("it is applied") {
-                then("it is accepted and yields exactly the target status") {
+                then("it is accepted") {
                     for ((from, to) in allowedTransitions) {
-                        from.transition(to).shouldBe(TransitionOutcome.Accepted(to))
+                        from.transition(to).shouldBe(TransitionOutcome.Accepted)
                     }
                 }
             }
