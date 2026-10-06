@@ -1,6 +1,5 @@
 package stt.process
 
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -46,7 +45,9 @@ class ProcessRunner internal constructor(
                 ensureActive()
                 val exitCode = awaitExit(process)
                 ProcessResult(exitCode, stdout.await(), stderr.await())
-            } catch (e: CancellationException) {
+            } catch (e: Throwable) {
+                // Any failure, not only cancellation: a callback that throws after the direct child
+                // exited surfaces from await() and must still kill the surviving tree (ADR 0020).
                 stdout.cancel()
                 stderr.cancel()
                 withContext(NonCancellable) {
