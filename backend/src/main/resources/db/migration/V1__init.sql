@@ -23,10 +23,11 @@ CREATE TABLE tasks (
 );
 
 -- Audio metadata, one row per task; the payload lives in audio_parts (ADR 0018).
+-- Unique sha256: at most one task per audio content (same bytes = duplicate, rejected).
 CREATE TABLE audio (
     task_id    INTEGER PRIMARY KEY REFERENCES tasks (id) ON DELETE CASCADE,
     size_bytes INTEGER NOT NULL,
-    sha256     TEXT    NOT NULL
+    sha256     TEXT    NOT NULL UNIQUE
 );
 
 -- Audio payload as fixed 1 MiB pages (ADR 0018): constant-memory writes/reads.

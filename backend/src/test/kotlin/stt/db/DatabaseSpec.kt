@@ -1,5 +1,6 @@
 package stt.db
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -11,6 +12,25 @@ import java.util.ArrayList
 
 class DatabaseSpec :
     BehaviorSpec({
+
+        given("an audio row for an existing task") {
+            `when`("inserting another audio row with the same sha256 for a second task") {
+                then("the insert is rejected by the database (at most one task per audio content)") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        Database.open(dataDir).use { db ->
+                            insertTask(db, 1)
+                            insertAudio(db, taskId = 1, sha256 = "aaaabbbbccccdddd", sizeBytes = 3)
+
+                            insertTask(db, 2)
+                            shouldThrow<java.sql.SQLException> {
+                                insertAudio(db, taskId = 2, sha256 = "aaaabbbbccccdddd", sizeBytes = 3)
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         given("an empty data directory") {
             `when`("opening the database for the first time") {
@@ -84,3 +104,27 @@ private fun rowCount(
             rows.getInt(1)
         }
     }
+
+private fun insertTask(
+    db: Database,
+    id: Int,
+) = db.connection
+    .prepareStatement(
+        "INSERT INTO tasks (id, original_filename, content_type, status, speakers_mode, created_at) " +
+            "VALUES (?, 'a.wav', 'audio/wav', 'QUEUED', 'auto', 1)",
+    ).use { st ->
+        st.setInt(1, id)
+        st.executeUpdate()
+    }
+
+private fun insertAudio(
+    db: Database,
+    taskId: Int,
+    sha256: String,
+    sizeBytes: Int,
+) = db.connection.prepareStatement("INSERT INTO audio (task_id, size_bytes, sha256) VALUES (?, ?, ?)").use { st ->
+    st.setInt(1, taskId)
+    st.setInt(2, sizeBytes)
+    st.setString(3, sha256)
+    st.executeUpdate()
+}
