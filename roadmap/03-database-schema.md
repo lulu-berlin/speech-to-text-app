@@ -87,7 +87,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] A task creation whose upload source stalls does not block other writes; when the source then fails, no task, pages, metadata, or temp file remain (discovered)
 - [x] A duplicate upload is rejected and leaves no temp file (discovered)
 - [x] Stale files in `$STT_DATA_DIR/tmp` are removed when the database opens (discovered)
-- [ ] Opening fails naming `STT_DATA_DIR` when WAL cannot be enabled (discovered)
+- [x] Opening fails naming `STT_DATA_DIR` when WAL cannot be enabled (discovered)
 - [ ] Stopping the application closes the Database provided by DI (discovered)
 - [ ] The packaged app started with `STT_DATA_DIR` unset or empty exits non-zero with a one-line message naming `STT_DATA_DIR`; with it set, it starts and serves `/api/health` (discovered; manual, user-verified: red on the current build, green after `nix build .`)
 
@@ -106,3 +106,4 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - 2026-10-06: decision 6 wording amended (user): `dependencies {}` auto-installs DI instead of an explicit `install(DI)` (which would conflict with test overrides registered first), plus `require` so the database opens at boot (ADR 0017). Intent unchanged.
 - 2026-10-06: user verified `nix build .` green inside the worktree (with the branch's `backend/deps.json`): the new-dependency acceptance criterion is met.
 - 2026-10-06: review round 1, changes requested: `segments` gets `UNIQUE (task_id, chunk_idx, seq)` in `V1__init.sql`; the packaged wrapper fails fast without `STT_DATA_DIR`; connection redesign (one writer behind the lock, a fresh read-only connection per read) and spooled uploads with temp-file cleanup (ADRs 0017/0018 amended); duplicates rejected by inserting the `audio` row before any page; migrations run with foreign keys deliberately off (ADR 0017); open fails naming `STT_DATA_DIR` when WAL cannot be enabled, plus an untested defensive `journal_mode` result check; `Database.connection` KDoc corrected (test-only by convention); test robustness: lock spy for the interleaving test (item 70 setup changed), spool-lag assertion for write-side constant memory, DI-close test, override Database closed. Nine discovered test items added. Approved as presented.
+- 2026-10-06 (review round 1, stale-temp-file checkpoint): a non-empty directory inside `$STT_DATA_DIR/tmp` makes opening fail with an error naming `STT_DATA_DIR` (only files are removed; the app never creates directories there). Accepted by the user as fail-fast behavior (ADR 0017); no test item added.

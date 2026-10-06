@@ -82,6 +82,8 @@ class Database private constructor(
     companion object {
         private const val DATA_DIR_UNUSABLE_ERROR =
             "STT_DATA_DIR \"%s\" cannot be created or opened as the data directory: %s"
+        private const val WAL_UNAVAILABLE_ERROR =
+            "STT_DATA_DIR \"%s\": stt.db cannot be opened in WAL journal mode with foreign keys on: %s"
 
         suspend fun open(dataDir: Path): Database = open(dataDir, Mutex())
 
@@ -109,7 +111,8 @@ class Database private constructor(
 
         /**
          * Creates [dataDir] and [tmpDir] when missing, removes the spool files a crashed upload left
-         * in [tmpDir], connects to [url], then applies the pragmas in ADR 0017 order.
+         * in [tmpDir], connects to [url], then applies the pragmas in ADR 0017 order. A pragma that
+         * fails, or a journal mode other than `wal`, closes the connection and fails naming STT_DATA_DIR.
          */
         private fun openConnection(
             dataDir: Path,
@@ -124,8 +127,19 @@ class Database private constructor(
                 } catch (e: Exception) {
                     throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e), e)
                 }
-            connection.createStatement().use { st -> st.execute("PRAGMA journal_mode = WAL") }
-            connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
+            try {
+                val journalMode =
+                    connection.createStatement().use { st ->
+                        st.executeQuery("PRAGMA journal_mode = WAL").use { rows -> if (rows.next()) rows.getString(1) else null }
+                    }
+                // Defensive (ADR 0017): SQLite reports the unchanged mode instead of failing only for
+                // in-memory databases or a VFS without shared memory, neither reachable with this file URL.
+                check(journalMode == "wal") { "journal_mode is \"$journalMode\", not wal" }
+                connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
+            } catch (e: Exception) {
+                connection.close()
+                throw IllegalStateException(WAL_UNAVAILABLE_ERROR.format(dataDir, e), e)
+            }
             return connection
         }
     }
