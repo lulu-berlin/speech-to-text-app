@@ -87,17 +87,21 @@ class Database private constructor(
         private const val MIGRATION_FAILED_ERROR =
             "STT_DATA_DIR \"%s\": migrating stt.db failed: %s"
 
+        /** `journal_size_limit` on the writer (ADR 0017): the WAL shrinks back to at most this after a large upload. */
+        private const val JOURNAL_SIZE_LIMIT_BYTES = 64L * 1024 * 1024
+
         suspend fun open(dataDir: Path): Database = open(dataDir, Mutex())
 
-        /** [open] with the transaction lock supplied by the caller (tests observe it). */
+        /** [open] with the transaction lock supplied by the caller (tests observe it) and a test-sized WAL limit. */
         internal suspend fun open(
             dataDir: Path,
             transactionLock: Mutex,
+            journalSizeLimit: Long = JOURNAL_SIZE_LIMIT_BYTES,
         ): Database =
             withContext(Dispatchers.IO) {
                 val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
                 val tmpDir = dataDir.resolve("tmp")
-                val connection = openConnection(dataDir, tmpDir, url)
+                val connection = openConnection(dataDir, tmpDir, url, journalSizeLimit)
                 try {
                     Flyway
                         .configure()
@@ -116,7 +120,8 @@ class Database private constructor(
             dataDir: Path,
             tmpDir: Path,
             url: String,
-        ): Connection = connectInDataDir(dataDir, tmpDir, url).also { applyPragmas(it, dataDir) }
+            journalSizeLimit: Long,
+        ): Connection = connectInDataDir(dataDir, tmpDir, url).also { applyPragmas(it, dataDir, journalSizeLimit) }
 
         /**
          * Creates [dataDir] and [tmpDir] when missing, removes the spool files a crashed upload left
@@ -136,12 +141,13 @@ class Database private constructor(
             }
 
         /**
-         * WAL journal mode, then foreign keys on. A pragma that fails, or a journal mode other
-         * than `wal`, closes [connection] and fails naming STT_DATA_DIR.
+         * WAL journal mode, then foreign keys on, then the WAL size limit. A pragma that fails, or a
+         * journal mode other than `wal`, closes [connection] and fails naming STT_DATA_DIR.
          */
         private fun applyPragmas(
             connection: Connection,
             dataDir: Path,
+            journalSizeLimit: Long,
         ) {
             try {
                 val journalMode =
@@ -152,6 +158,9 @@ class Database private constructor(
                 // in-memory databases or a VFS without shared memory, neither reachable with this file URL.
                 check(journalMode == "wal") { "journal_mode is \"$journalMode\", not wal" }
                 connection.createStatement().use { st -> st.execute("PRAGMA foreign_keys = ON") }
+                // SQLite reuses the WAL file instead of shrinking it; the limit applies when the WAL is reset,
+                // i.e. when the first write after a completed checkpoint commits.
+                connection.createStatement().use { st -> st.execute("PRAGMA journal_size_limit = $journalSizeLimit") }
             } catch (e: Exception) {
                 connection.close()
                 throw dataDirFailure(WAL_UNAVAILABLE_ERROR, dataDir, e)
