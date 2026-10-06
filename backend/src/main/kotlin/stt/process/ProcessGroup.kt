@@ -5,14 +5,17 @@ package stt.process
  * kill(2) with the negated id reaches every process in the tree (ADR 0020). Linux signal numbers.
  */
 internal class ProcessGroup(
-    private val id: Long,
+    id: Long,
 ) {
+    /** kill(2) addresses a whole group through the negated group id. */
+    private val target = -id.toInt()
+
     fun signal(signal: Int) {
-        LibC.INSTANCE.kill(-id.toInt(), signal)
+        LibC.INSTANCE.kill(target, signal)
     }
 
     /** Signal 0 checks existence only: kill(2) succeeds while any process of the group exists. */
-    fun hasMembers(): Boolean = LibC.INSTANCE.kill(-id.toInt(), 0) == 0
+    fun hasMembers(): Boolean = LibC.INSTANCE.kill(target, 0) == 0
 
     companion object {
         const val SIGKILL = 9
