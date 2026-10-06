@@ -20,6 +20,8 @@ Define the pure Kotlin rules for task status transitions, queue reordering and t
   - `PAUSED` → `QUEUED` (resume: the task re-enters the queue; the engine starts it only when it is picked, so it may wait behind higher-priority tasks), `CANCELED`
   - Everything else is illegal and returns a typed error (no exception for expected rejections).
 - At most one task is `RUNNING` at a time: `QUEUED → RUNNING` is accepted only while no other task is `RUNNING`. This is the only transition whose legality depends on the whole-queue state; every other transition is decided per task. The queue aggregate (task statuses + paused flag) enforces it (confirmed 2026-10-06).
+- The queue applies a status change to one of its tasks by id and returns either the updated queue or a typed rejection naming why (an illegal per-task transition, or another task already `RUNNING`) (decided 2026-10-06).
+- A task that reaches a terminal status leaves the queue aggregate, which holds only pending (non-terminal) work. The task is not deleted: its row, segments and outputs stay in the database for history (items 12/15) (decided 2026-10-06).
 - Terminal statuses: `COMPLETED`, `FAILED`, `CANCELED`.
 - A `PAUSED` task keeps its queue position and can be reordered while paused; the engine (item 11) skips it when it picks the next task (consultation 2026-10-06).
 - Terminal statuses are final: no transition re-queues a `COMPLETED`, `FAILED` or `CANCELED` task. A retry needs its own feature, because re-uploading the same audio is rejected by the `UNIQUE` `sha256` (ADR 0018) and a retry would have to reuse the existing task (consultation 2026-10-06).
@@ -48,6 +50,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Pausing an already paused queue and resuming an already running queue are no-ops
 - [ ] A `QUEUED` task cannot transition to `RUNNING` while another task is `RUNNING`; once no task is `RUNNING`, the transition is accepted (discovered)
 - [x] Reordering a paused queue keeps it paused (discovered)
+- [ ] A task that reaches a terminal status leaves the queue (discovered)
 
 ## Acceptance criteria
 
@@ -61,3 +64,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-06 (during cycle 1): `PAUSED` → `RUNNING` removed from the transition table. Resuming a paused task always returns it to the queue (`PAUSED` → `QUEUED`); the engine is the only component that moves a task to `RUNNING`, so a resumed task may wait behind higher-priority tasks instead of jumping straight to running. Recorded in the Proposal; no new ADR (local queue semantics).
 - 2026-10-06 (during cycle 1): at most one task may be `RUNNING` at a time (concurrency = 1, matching item 11's single-worker proposal). `QUEUED → RUNNING` is rejected while any other task is `RUNNING` — the only transition gated by whole-queue state; the queue aggregate (task statuses + paused flag) enforces it. Added test item 10 `(discovered)`. Recorded in the Proposal; no new ADR (local queue semantics).
 - 2026-10-06 (after cycle 8): added test item 11 `(discovered)`: reordering a paused queue keeps it paused (`reorder` dropped the flag). Done before item 9.
+- 2026-10-06 (after cycle 9): the queue applies a status change by task id and returns the updated queue or a typed rejection (illegal transition / another task running). A task reaching a terminal status leaves the queue aggregate but stays in the database for history. Added test item 12 `(discovered)`. Recorded in the Proposal; no new ADR (local queue semantics).
