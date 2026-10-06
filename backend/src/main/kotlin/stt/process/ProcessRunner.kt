@@ -11,7 +11,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -24,10 +23,14 @@ class ProcessRunner internal constructor(
     constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, ProcessBuilder::start)
 
     /**
-     * Guards [currentGroup] and [paused], so registering a group and applying a pending pause is one
-     * step relative to pause()/resume(): a resume() can never be overtaken by a stale SIGSTOP.
+     * Guards the per-run state ([inFlight], [currentGroup], [paused]). Registering a group and applying
+     * a pending pause is one step relative to pause()/resume(), so a resume() can never be overtaken by
+     * a stale SIGSTOP; ending a run clears the pause and releases the run in one step.
      */
-    private val signalLock = Any()
+    private val runLock = Any()
+
+    /** Single-flight guard (ADR 0020): claimed when a run starts, released only by that run when it ends. */
+    private var inFlight = false
 
     /**
      * The group of the single in-flight run. set when spawning finishes, cleared when the run does;
@@ -38,23 +41,23 @@ class ProcessRunner internal constructor(
     /** Per-run pause flag (ADR 0020): a pause() before the group exists is applied right after spawn. */
     private var paused = false
 
-    /** Single-flight guard (ADR 0020): claimed when a run starts, released only by that run when it ends. */
-    private val inFlight = AtomicBoolean(false)
-
     suspend fun run(
         command: List<String>,
         onStdoutLine: (String) -> Unit = {},
         onStderrLine: (String) -> Unit = {},
     ): ProcessResult {
-        check(inFlight.compareAndSet(false, true)) { "A run is already in flight: ProcessRunner is single-flight" }
+        synchronized(runLock) {
+            check(!inFlight) { "A run is already in flight: ProcessRunner is single-flight" }
+            inFlight = true
+        }
         try {
             return runExclusively(command, onStdoutLine, onStderrLine)
         } finally {
             // Together under the lock: a pause() racing the end of this run cannot re-arm the flag
             // after it was cleared, so a leftover pause never freezes the next run (ADR 0020).
-            synchronized(signalLock) {
+            synchronized(runLock) {
                 paused = false
-                inFlight.set(false)
+                inFlight = false
             }
         }
     }
@@ -68,7 +71,7 @@ class ProcessRunner internal constructor(
         return coroutineScope {
             val process = spawn(listOf("setsid", executable) + command.drop(1))
             val group = ProcessGroup(process.pid())
-            synchronized(signalLock) {
+            synchronized(runLock) {
                 currentGroup = group
                 if (paused) group.pause()
             }
@@ -91,15 +94,15 @@ class ProcessRunner internal constructor(
                 }
                 throw e
             } finally {
-                synchronized(signalLock) { currentGroup = null }
+                synchronized(runLock) { currentGroup = null }
             }
         }
     }
 
     /** Freezes the current run (SIGSTOP the whole tree), also when it is still spawning. No-op while no run is in flight. */
     fun pause() {
-        synchronized(signalLock) {
-            if (!inFlight.get()) return
+        synchronized(runLock) {
+            if (!inFlight) return
             paused = true
             currentGroup?.pause()
         }
@@ -107,7 +110,7 @@ class ProcessRunner internal constructor(
 
     /** Unfreezes the current run (SIGCONT the whole tree). No-op while no run is in flight. */
     fun resume() {
-        synchronized(signalLock) {
+        synchronized(runLock) {
             paused = false
             currentGroup?.resume()
         }
