@@ -80,4 +80,13 @@ class TaskQueueSpec :
                 }
             }
         }
+
+        given("a queue of three queued tasks") {
+            `when`("reordered with a list that repeats one id instead of naming every task once") {
+                then("the reorder is rejected") {
+                    val queue = queuedQueue(1L, 2L, 3L)
+                    queue.reorder(listOf(1L, 2L, 2L)).shouldBe(ReorderOutcome.Rejected)
+                }
+            }
+        }
     })
