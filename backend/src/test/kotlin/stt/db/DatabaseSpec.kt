@@ -9,6 +9,8 @@ import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -120,20 +122,7 @@ class DatabaseSpec :
                         Database.open(tempdir("stt-db").toPath(), lock).use { db ->
                             coroutineScope {
                                 val tasks = TaskRepository(db)
-                                val held = CountDownLatch(1)
-                                val release = CountDownLatch(1)
-                                val holder =
-                                    async {
-                                        runCatching {
-                                            db.writeTransaction {
-                                                insertTaskRow(queuedTask("held.wav", createdAt = 1L))
-                                                held.countDown()
-                                                release.await(10, TimeUnit.SECONDS)
-                                                throw IOException("held transaction failed")
-                                            }
-                                        }
-                                    }
-                                withContext(Dispatchers.IO) { held.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+                                val heldWrite = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 1L))
 
                                 val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
                                 val insert = async { tasks.insert(concurrent) }
@@ -141,9 +130,12 @@ class DatabaseSpec :
                                 // owns the lock: from here on it waits. Without the lock this times out and fails.
                                 withContext(Dispatchers.Default) { withTimeout(10_000) { lock.lockCalls.first { it == 2 } } }
                                 insert.isCompleted.shouldBeFalse()
-                                release.countDown()
+                                heldWrite.release()
 
-                                holder.await().isFailure.shouldBeTrue()
+                                heldWrite.outcome
+                                    .await()
+                                    .isFailure
+                                    .shouldBeTrue()
                                 tasks.list().shouldBe(listOf(StoredTask(insert.await(), concurrent)))
                             }
                         }
@@ -160,20 +152,7 @@ class DatabaseSpec :
                             val tasks = TaskRepository(db)
                             val stored = queuedTask("stored.wav", createdAt = 1L)
                             val id = tasks.createWithAudio(stored, "abc".byteInputStream())
-                            val held = CountDownLatch(1)
-                            val release = CountDownLatch(1)
-                            val holder =
-                                async {
-                                    runCatching {
-                                        db.writeTransaction {
-                                            insertTaskRow(queuedTask("uncommitted.wav", createdAt = 2L))
-                                            held.countDown()
-                                            release.await(10, TimeUnit.SECONDS)
-                                            throw IOException("held transaction failed")
-                                        }
-                                    }
-                                }
-                            withContext(Dispatchers.IO) { held.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+                            val heldWrite = holdWriteTransaction(db, queuedTask("uncommitted.wav", createdAt = 2L))
 
                             try {
                                 // Real time: a read that waits for the writer never finishes inside the bound.
@@ -196,9 +175,12 @@ class DatabaseSpec :
                                     }
                                 }
                             } finally {
-                                release.countDown()
+                                heldWrite.release()
                             }
-                            holder.await().isFailure.shouldBeTrue()
+                            heldWrite.outcome
+                                .await()
+                                .isFailure
+                                .shouldBeTrue()
                         }
                     }
                 }
@@ -355,6 +337,36 @@ private fun insertAudio(
     st.setInt(2, sizeBytes)
     st.setString(3, sha256)
     st.executeUpdate()
+}
+
+/** A write transaction held open on the writer connection; once released it fails, so it rolls back. */
+private class HeldWrite(
+    private val releaseLatch: CountDownLatch,
+    val outcome: Deferred<Result<Unit>>,
+) {
+    fun release() = releaseLatch.countDown()
+}
+
+/** Starts a write transaction that inserts [task] and stays open until released; returns once it is open. */
+private suspend fun CoroutineScope.holdWriteTransaction(
+    db: Database,
+    task: Task,
+): HeldWrite {
+    val held = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val outcome =
+        async {
+            runCatching {
+                db.writeTransaction {
+                    insertTaskRow(task)
+                    held.countDown()
+                    release.await(10, TimeUnit.SECONDS)
+                    throw IOException("held transaction failed")
+                }
+            }
+        }
+    withContext(Dispatchers.IO) { held.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+    return HeldWrite(release, outcome)
 }
 
 /** A [Mutex] that counts its lock() calls, so a test can see a caller start waiting for it. */
