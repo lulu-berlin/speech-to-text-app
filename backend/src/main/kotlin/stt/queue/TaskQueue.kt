@@ -20,7 +20,7 @@ data class TaskQueue(
         val currentIds = entries.map { it.first }.toSet()
         return if (ids.toSet() == currentIds) {
             val byId = entries.toMap()
-            ReorderOutcome.Accepted(TaskQueue(ids.map { id -> id to byId.getValue(id) }))
+            ReorderOutcome.Accepted(copy(entries = ids.map { id -> id to byId.getValue(id) }))
         } else {
             ReorderOutcome.Rejected
         }
