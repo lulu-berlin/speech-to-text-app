@@ -2,6 +2,7 @@ package stt.db
 
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -9,6 +10,8 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.HexFormat
+
+private const val PAGE_SIZE = 1_048_576
 
 /** Audio payload as fixed-size pages (ADR 0018): at most one page is in memory at a time. */
 class AudioRepository(
@@ -22,31 +25,7 @@ class AudioRepository(
         taskId: Long,
         source: InputStream,
     ) {
-        db.transaction {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val page = ByteArray(PAGE_SIZE)
-            var sizeBytes = 0L
-            var partNo = 0
-            while (true) {
-                val n = source.readNBytes(page, 0, PAGE_SIZE)
-                if (n == 0) break
-                digest.update(page, 0, n)
-                // The insert executes before the next read, so a full page buffer is reused safely.
-                val bytes = if (n == PAGE_SIZE) page else page.copyOf(n)
-                AudioPartsTable.insert {
-                    it[AudioPartsTable.taskId] = taskId
-                    it[AudioPartsTable.partNo] = partNo
-                    it[part] = ExposedBlob(bytes)
-                }
-                sizeBytes += n
-                partNo++
-            }
-            AudioTable.insert {
-                it[AudioTable.taskId] = taskId
-                it[AudioTable.sizeBytes] = sizeBytes
-                it[sha256] = HexFormat.of().formatHex(digest.digest())
-            }
-        }
+        db.transaction { writeAudioRows(taskId, source) }
     }
 
     suspend fun metadata(taskId: Long): AudioMetadata? =
@@ -71,8 +50,37 @@ class AudioRepository(
                 .forEach { row -> target.write(row[AudioPartsTable.part].bytes) }
         }
     }
+}
 
-    private companion object {
-        const val PAGE_SIZE = 1_048_576
+/**
+ * Inside the current transaction: streams [source] into `audio_parts` pages, then inserts the
+ * `audio` row with the size and sha256 computed on the way. [source] is not closed.
+ */
+internal fun JdbcTransaction.writeAudioRows(
+    taskId: Long,
+    source: InputStream,
+) {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val page = ByteArray(PAGE_SIZE)
+    var sizeBytes = 0L
+    var partNo = 0
+    while (true) {
+        val n = source.readNBytes(page, 0, PAGE_SIZE)
+        if (n == 0) break
+        digest.update(page, 0, n)
+        // The insert executes before the next read, so a full page buffer is reused safely.
+        val bytes = if (n == PAGE_SIZE) page else page.copyOf(n)
+        AudioPartsTable.insert {
+            it[AudioPartsTable.taskId] = taskId
+            it[AudioPartsTable.partNo] = partNo
+            it[part] = ExposedBlob(bytes)
+        }
+        sizeBytes += n
+        partNo++
+    }
+    AudioTable.insert {
+        it[AudioTable.taskId] = taskId
+        it[AudioTable.sizeBytes] = sizeBytes
+        it[sha256] = HexFormat.of().formatHex(digest.digest())
     }
 }
