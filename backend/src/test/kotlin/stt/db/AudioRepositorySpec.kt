@@ -6,6 +6,7 @@ import io.kotest.matchers.shouldBe
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
+import java.util.HexFormat
 
 private const val MIB = 1_048_576
 
@@ -82,7 +83,7 @@ private class DigestingOutputStream : OutputStream() {
         largestWrite = maxOf(largestWrite, len)
     }
 
-    fun sha256Hex(): String = digest.digest().toHex()
+    fun sha256Hex(): String = HexFormat.of().formatHex(digest.digest())
 }
 
 private fun sha256Hex(input: InputStream): String {
@@ -93,10 +94,8 @@ private fun sha256Hex(input: InputStream): String {
         if (n < 0) break
         digest.update(buffer, 0, n)
     }
-    return digest.digest().toHex()
+    return HexFormat.of().formatHex(digest.digest())
 }
-
-private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
 private fun partLengths(
     db: Database,
