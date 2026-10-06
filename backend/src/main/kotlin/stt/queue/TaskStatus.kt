@@ -10,9 +10,12 @@ enum class TaskStatus {
     CANCELED,
     ;
 
-    /** `COMPLETED`, `FAILED` and `CANCELED` are final; a task in one of them has left the queue. */
+    /**
+     * A status with no allowed targets is final (`COMPLETED`, `FAILED`, `CANCELED`);
+     * a task in one of them has left the queue.
+     */
     val isTerminal: Boolean
-        get() = this == COMPLETED || this == FAILED || this == CANCELED
+        get() = allowedTargets[this].isNullOrEmpty()
 
     /**
      * Applies the transition `this` → [to] per the spec's per-task table
@@ -26,7 +29,7 @@ enum class TaskStatus {
     }
 
     companion object {
-        /** Spec's allowed targets per source; terminal sources have none. */
+        /** Spec's allowed targets per source; a source without targets is terminal. */
         private val allowedTargets: Map<TaskStatus, Set<TaskStatus>> =
             mapOf(
                 QUEUED to setOf(RUNNING, PAUSED, CANCELED),
