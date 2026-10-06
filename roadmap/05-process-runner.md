@@ -47,6 +47,9 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [ ] `pause()`/`resume()` on an already-exited process are no-ops
 - [ ] A final line without a trailing newline is still delivered
 - [ ] Output larger than the pipe buffer (long `seq`) completes without deadlock
+- [ ] (discovered) Lines still buffered when `run` is cancelled are not delivered to the callbacks
+- [ ] (discovered) A callback that throws makes `run` fail with that exception and kills the process tree
+- [ ] (discovered) Cancelling returns promptly even when a descendant has left the process group and still holds the output pipes
 
 ## Acceptance criteria
 
@@ -60,3 +63,4 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 ## Approval log
 
 - 2026-10-06: Spec approved. All open questions answered in-session (see above); test list approved with 11 items (seed 8 + exited-no-op, unterminated final line, pipe-overrun; stdout callback streaming folded into item 1). Decisions recorded in ADRs 0020–0021.
+- 2026-10-06: Three discovered scenarios (dropped buffered lines on cancel, throwing callback, escaped pipe holder) confirmed by the user at the item-4 checkpoint and appended to the test list.
