@@ -109,24 +109,38 @@ class Database private constructor(
                 Database(connection, url, tmpDir, transactionLock)
             }
 
-        /**
-         * Creates [dataDir] and [tmpDir] when missing, removes the spool files a crashed upload left
-         * in [tmpDir], connects to [url], then applies the pragmas in ADR 0017 order. A pragma that
-         * fails, or a journal mode other than `wal`, closes the connection and fails naming STT_DATA_DIR.
-         */
+        /** Connects inside the prepared data directory, then applies the pragmas in ADR 0017 order. */
         private fun openConnection(
             dataDir: Path,
             tmpDir: Path,
             url: String,
-        ): Connection {
-            val connection =
-                try {
-                    Files.createDirectories(tmpDir)
-                    Files.list(tmpDir).use { stale -> stale.forEach(Files::delete) }
-                    DriverManager.getConnection(url)
-                } catch (e: Exception) {
-                    throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e), e)
-                }
+        ): Connection = connectInDataDir(dataDir, tmpDir, url).also { applyPragmas(it, dataDir) }
+
+        /**
+         * Creates [dataDir] and [tmpDir] when missing, removes the spool files a crashed upload left
+         * in [tmpDir], and connects to [url]; any failure names STT_DATA_DIR.
+         */
+        private fun connectInDataDir(
+            dataDir: Path,
+            tmpDir: Path,
+            url: String,
+        ): Connection =
+            try {
+                Files.createDirectories(tmpDir)
+                Files.list(tmpDir).use { stale -> stale.forEach(Files::delete) }
+                DriverManager.getConnection(url)
+            } catch (e: Exception) {
+                throw IllegalStateException(DATA_DIR_UNUSABLE_ERROR.format(dataDir, e), e)
+            }
+
+        /**
+         * WAL journal mode, then foreign keys on. A pragma that fails, or a journal mode other
+         * than `wal`, closes [connection] and fails naming STT_DATA_DIR.
+         */
+        private fun applyPragmas(
+            connection: Connection,
+            dataDir: Path,
+        ) {
             try {
                 val journalMode =
                     connection.createStatement().use { st ->
@@ -140,7 +154,6 @@ class Database private constructor(
                 connection.close()
                 throw IllegalStateException(WAL_UNAVAILABLE_ERROR.format(dataDir, e), e)
             }
-            return connection
         }
     }
 
