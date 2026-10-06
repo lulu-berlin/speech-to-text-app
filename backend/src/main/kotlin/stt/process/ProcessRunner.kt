@@ -12,7 +12,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -25,10 +24,19 @@ class ProcessRunner internal constructor(
     constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, ProcessBuilder::start)
 
     /**
+     * Guards [currentGroup] and [paused], so registering a group and applying a pending pause is one
+     * step relative to pause()/resume(): a resume() can never be overtaken by a stale SIGSTOP.
+     */
+    private val signalLock = Any()
+
+    /**
      * The group of the single in-flight run. set when spawning finishes, cleared when the run does;
      * lets the non-suspending pause()/resume() reach the current run without blocking.
      */
-    private val currentGroup = AtomicReference<ProcessGroup?>(null)
+    private var currentGroup: ProcessGroup? = null
+
+    /** Per-run pause flag (ADR 0020): a pause() before the group exists is applied right after spawn. */
+    private var paused = false
 
     /** Single-flight guard (ADR 0020): claimed when a run starts, released only by that run when it ends. */
     private val inFlight = AtomicBoolean(false)
@@ -55,7 +63,10 @@ class ProcessRunner internal constructor(
         return coroutineScope {
             val process = spawn(listOf("setsid", executable) + command.drop(1))
             val group = ProcessGroup(process.pid())
-            currentGroup.set(group)
+            synchronized(signalLock) {
+                currentGroup = group
+                if (paused) group.pause()
+            }
             val stdout = async(Dispatchers.IO) { readLines(process.inputStream, process, onStdoutLine) }
             val stderr = async(Dispatchers.IO) { readLines(process.errorStream, process, onStderrLine) }
             try {
@@ -75,19 +86,26 @@ class ProcessRunner internal constructor(
                 }
                 throw e
             } finally {
-                currentGroup.set(null)
+                synchronized(signalLock) { currentGroup = null }
             }
         }
     }
 
-    /** Freezes the current run (SIGSTOP the whole tree). No-op while no run is in flight. */
+    /** Freezes the current run (SIGSTOP the whole tree), also when it is still spawning. No-op while no run is in flight. */
     fun pause() {
-        currentGroup.get()?.pause()
+        synchronized(signalLock) {
+            if (!inFlight.get()) return
+            paused = true
+            currentGroup?.pause()
+        }
     }
 
     /** Unfreezes the current run (SIGCONT the whole tree). No-op while no run is in flight. */
     fun resume() {
-        currentGroup.get()?.resume()
+        synchronized(signalLock) {
+            paused = false
+            currentGroup?.resume()
+        }
     }
 
     /**

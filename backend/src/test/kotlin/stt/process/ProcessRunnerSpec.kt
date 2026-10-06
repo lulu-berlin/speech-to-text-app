@@ -471,6 +471,44 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a pause() issued while the process is being spawned") {
+            `when`("the run starts") {
+                then("the process produces no output until resume(), then starts from its first line") {
+                    lateinit var runner: ProcessRunner
+                    val spawned = CompletableDeferred<Unit>()
+                    runner =
+                        ProcessRunner(2.seconds) { builder ->
+                            runner.pause()
+                            builder.start().also { spawned.complete(Unit) }
+                        }
+                    val delivered = mutableListOf<String>()
+                    val firstLine = CompletableDeferred<String>()
+                    val job =
+                        launch {
+                            runner.run(
+                                // The 0.5 s head start keeps output from racing the SIGSTOP right after spawn.
+                                listOf("sh", "-c", "sleep 0.5; i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done"),
+                                onStdoutLine = { line ->
+                                    underLock(delivered) { delivered.add(line) }
+                                    firstLine.complete(line)
+                                },
+                            )
+                        }
+                    try {
+                        withTimeout(10.seconds) { spawned.await() }
+                        delay(1.seconds)
+                        underLock(delivered) { delivered.toList() }.shouldBeEmpty()
+
+                        runner.resume()
+
+                        withTimeout(10.seconds) { firstLine.await() }.shouldBe("1")
+                    } finally {
+                        job.cancelAndJoin()
+                    }
+                }
+            }
+        }
     })
 
 /** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
