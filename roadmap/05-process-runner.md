@@ -1,6 +1,6 @@
 # 05 — Process runner
 
-Status: in-progress
+Status: in-review
 Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done)
 
 ## Goal
@@ -86,3 +86,5 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - 2026-10-06: Three discovered scenarios (dropped buffered lines on cancel, throwing callback, escaped pipe holder) confirmed by the user at the item-4 checkpoint and appended to the test list.
 - 2026-10-06: review round 1, changes requested: spawn-window cancel leak, final output lost at exit, single-flight enforcement with a per-run pause flag (cleared when `run` ends), unbounded wait after SIGKILL (bounded by the grace period + WARN), throwing callback after child exit skips the kill, stdin left open (now `/dev/null`), ADR/code mismatches (0020: `start()` IOExceptions not wrapped → ADR amended; pause/resume guard → ADR amended; per-line cancel check → code fixed, item 12 reopened with an exact bound; 0021: `kotest.tags=!Integration` → ADR amended). Test approaches: internal spawn seam, unit test of the drain loop, fake `kill(2)` backend. Low-priority refactors (geometric carry buffer, pause-test `threshold` race, `currentCoroutineContext().ensureActive()`) to be offered at refactor checkpoints; `\r` as line terminator noted in item 06 Open questions. 9 items (8 new, item 12 reopened) approved by the user.
 - 2026-10-06: discovered scenario (a line longer than the read chunk is delivered intact) confirmed by the user at the final-output checkpoint, as a safety net before the geometric carry-buffer refactor.
+- 2026-10-06: review round 1 test approach for the throw-after-exit item approved by the user: the callback waits for the shell's exit and then a 500 ms margin before throwing (no observable event marks `run` passing its exit wait). The test passes deterministically once fixed; the margin only makes the red reliable.
+- 2026-10-06: `nix build .` verified by the user in the worktree (review round 1, HEAD 96d5334). All 23 test-list items ticked; `gradle check` (unit 14/14) and `gradle integrationTest` (20/20) green.
