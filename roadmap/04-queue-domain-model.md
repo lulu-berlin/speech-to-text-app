@@ -1,6 +1,6 @@
 # 04 — Queue domain model
 
-Status: draft
+Status: spec-approved
 Depends on: [03](../docs/specs/database-schema.md) (done)
 
 ## Goal
@@ -12,7 +12,7 @@ Define the pure Kotlin rules for task status transitions, queue reordering and t
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): Kotlin backend.
 - [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): pausing a running task suspends it in place rather than discarding progress.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-06)
 
 - Pure Kotlin state machine for task status (no DB, no coroutines). Allowed transitions:
   - `QUEUED` → `RUNNING`, `PAUSED`, `CANCELED`
@@ -20,26 +20,31 @@ Define the pure Kotlin rules for task status transitions, queue reordering and t
   - `PAUSED` → `QUEUED` (resume of a task that was waiting), `RUNNING` (resume of the running task), `CANCELED`
   - Everything else is illegal and returns a typed error (no exception for expected rejections).
 - Terminal statuses: `COMPLETED`, `FAILED`, `CANCELED`.
+- A `PAUSED` task keeps its queue position and can be reordered while paused; the engine (item 11) skips it when it picks the next task (consultation 2026-10-06).
+- Terminal statuses are final: no transition re-queues a `COMPLETED`, `FAILED` or `CANCELED` task. A retry needs its own feature, because re-uploading the same audio is rejected by the `UNIQUE` `sha256` (ADR 0018) and a retry would have to reuse the existing task (consultation 2026-10-06).
+- Deleting a history entry is out of scope here: item 12 exposes the existing `TaskRepository.delete`, which the schema cascade already backs (consultation 2026-10-06).
 - Reorder = the full ordered list of ids of all non-terminal tasks; rejected if the id set differs from the current non-terminal set (missing, extra or duplicate ids).
 - Queue paused flag modeled as part of the queue state (pausing an already paused queue is a no-op).
 
-## Open questions for the user
+## Open questions (answered 2026-10-06)
 
-- May a `PAUSED` task keep its queue position (and be reordered) while paused?
-- May `COMPLETED` / `FAILED` / `CANCELED` tasks be re-queued (retry)?
-- Is deleting history entries in scope (here or in item 12)?
+- May a `PAUSED` task keep its queue position (and be reordered) while paused? → **Yes**: it keeps its slot and stays reorderable; the engine skips it.
+- May `COMPLETED` / `FAILED` / `CANCELED` tasks be re-queued (retry)? → **No**: terminal is final; a retry is a future feature of its own.
+- Is deleting history entries in scope (here or in item 12)? → **Item 12**; the domain model defines no deletion semantics.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] Each allowed transition is accepted (table-driven)
-- [ ] Every transition not in the allowed table is rejected, including any transition out of a terminal status (table-driven over all status pairs)
+- [ ] Every transition not in the allowed table is rejected, including any transition out of a terminal status (so a retry of a `COMPLETED`, `FAILED` or `CANCELED` task is rejected) (table-driven over all status pairs)
+- [ ] A `PAUSED` task keeps its queue position and can be reordered while paused
 - [ ] Reordering with exactly the current non-terminal ids applies the new order
 - [ ] Reordering with a missing id is rejected
 - [ ] Reordering with an unknown or terminal-task id is rejected
 - [ ] Reordering with a duplicated id is rejected
 - [ ] Pausing and resuming the queue toggles the paused flag
+- [ ] Pausing an already paused queue and resuming an already running queue are no-ops
 
 ## Acceptance criteria
 
@@ -49,4 +54,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Approval log
 
-_Empty — add dated lines (YYYY-MM-DD: what was approved) on approval._
+- 2026-10-06: consultation decisions approved: a `PAUSED` task keeps its queue position and stays reorderable (the engine skips it); terminal statuses are final, with no re-queue/retry transition; deleting history entries belongs to item 12. Test list of 9 items approved with the spec. No new ADR: these are local queue semantics, recorded here and in the Proposal.
