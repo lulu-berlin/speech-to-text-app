@@ -29,6 +29,11 @@ in
 
     # Frontend package manager (ADR 0012)
     pkgs.pnpm
+
+    # Process runner (roadmap item 05, ADR 0020): `setsid` puts every spawned
+    # command in its own process group so SIGSTOP/SIGCONT/TERM/KILL reach the
+    # whole tree (negative pid), not just the direct child.
+    pkgs.util-linux
   ];
 
   # https://devenv.sh/languages/
