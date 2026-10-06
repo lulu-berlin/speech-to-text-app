@@ -7,7 +7,7 @@ Roadmap item 05 introduces the first tests that run real processes (`sh`, `sleep
 
 ## Decision
 - Process-based specs are tagged with a Kotest `Tag("Integration")`.
-- `gradle test` — and therefore `gradle check` — excludes the tag (`kotest.tags.exclude=Integration`): the default verification command stays a fast unit run that spawns no real processes.
+- `gradle test` — and therefore `gradle check` — excludes the tag (`kotest.tags=!Integration`): the default verification command stays a fast unit run that spawns no real processes.
 - A dedicated task `gradle integrationTest` (verification group) includes only the tag (`kotest.tags=Integration`).
 - Integration tests are deterministic: no fixed sleeps used as synchronization; bounded waits and timeouts; every test cleans up its processes (including on failure); the suite leaves no process behind.
 - The exact commands are pinned in AGENTS.md § Testing / § Commands.
