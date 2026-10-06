@@ -1,10 +1,19 @@
 package stt.process
 
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import stt.Integration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 class ProcessRunnerSpec :
     BehaviorSpec({
@@ -63,4 +72,48 @@ class ProcessRunnerSpec :
                 }
             }
         }
+
+        given("a running shell whose background child is sleep 100") {
+            `when`("the coroutine running it is cancelled") {
+                then("run throws CancellationException promptly, and only after the whole tree is dead") {
+                    val pids = CompletableDeferred<List<Long>>()
+                    var thrown: Throwable? = null
+                    var aliveWhenRunThrew: List<Long>? = null
+
+                    try {
+                        withTimeout(10.seconds) {
+                            val job =
+                                launch {
+                                    try {
+                                        ProcessRunner(gracePeriod = 300.milliseconds).run(
+                                            listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
+                                            onStdoutLine = { line -> pids.complete(line.split(" ").map(String::toLong)) },
+                                        )
+                                    } catch (e: CancellationException) {
+                                        thrown = e
+                                        aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
+                                        throw e
+                                    }
+                                }
+                            pids.await()
+                            val cancelledAt = TimeSource.Monotonic.markNow()
+                            job.cancelAndJoin()
+                            cancelledAt.elapsedNow().shouldBeLessThan(2.seconds)
+                        }
+                    } finally {
+                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
+                    }
+
+                    thrown.shouldBeInstanceOf<CancellationException>()
+                    aliveWhenRunThrew.shouldBe(emptyList())
+                    pids.getCompleted().filter(::isAlive).shouldBeEmpty()
+                }
+            }
+        }
     })
+
+private fun isAlive(pid: Long): Boolean = ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)
+
+private fun killForcibly(pid: Long) {
+    ProcessHandle.of(pid).ifPresent { it.destroyForcibly() }
+}
