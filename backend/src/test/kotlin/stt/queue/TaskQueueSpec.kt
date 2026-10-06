@@ -71,4 +71,13 @@ class TaskQueueSpec :
                 }
             }
         }
+
+        given("a queue of three queued tasks") {
+            `when`("reordered with a list that adds an id not in the queue (unknown or an already finished task)") {
+                then("the reorder is rejected") {
+                    val queue = queuedQueue(1L, 2L, 3L)
+                    queue.reorder(listOf(1L, 2L, 3L, 9L)).shouldBe(ReorderOutcome.Rejected)
+                }
+            }
+        }
     })
