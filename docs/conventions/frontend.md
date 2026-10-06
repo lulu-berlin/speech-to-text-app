@@ -1,6 +1,6 @@
 # Frontend conventions
 
-Approved 2026-10-05 in [roadmap item 02](../roadmap/02-repo-skeleton-and-conventions.md) (now spec-approved). Every frontend item follows these rules; deviations need a new ADR.
+Approved 2026-10-05 in roadmap item 02 (spec: [docs/specs/repo-skeleton-and-conventions.md](../specs/repo-skeleton-and-conventions.md)). Every frontend item follows these rules; deviations need a new ADR.
 
 ## Layout
 

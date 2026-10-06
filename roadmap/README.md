@@ -16,7 +16,7 @@ Pending work, one file per item. Every item is specified, given a test list, and
 
 ```mermaid
 graph TD
-  01[01 dev environment ✓]:::done --> 02[02 repo skeleton and conventions]
+  01[01 dev environment ✓]:::done --> 02[02 repo skeleton and conventions ✓]:::done
   02 --> 03[03 database schema]
   03 --> 04[04 queue domain model]
   02 --> 05[05 process runner]
@@ -45,7 +45,7 @@ graph TD
 | Item | Status | Depends on |
 | ---- | ------ | ---------- |
 | [01 — Dev environment](../docs/specs/dev-environment.md) | done | — |
-| [02 — Repo skeleton and conventions](02-repo-skeleton-and-conventions.md) | draft | 01 |
+| [02 — Repo skeleton and conventions](../docs/specs/repo-skeleton-and-conventions.md) | done | 01 |
 | [03 — Database schema](03-database-schema.md) | draft | 02 |
 | [04 — Queue domain model](04-queue-domain-model.md) | draft | 03 |
 | [05 — Process runner](05-process-runner.md) | draft | 02 |
