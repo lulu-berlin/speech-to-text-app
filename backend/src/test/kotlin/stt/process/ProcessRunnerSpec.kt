@@ -436,6 +436,45 @@ class ProcessRunnerSpec :
             }
         }
 
+        given("a run whose caller is cancelled before the process group exists") {
+            `when`("setsid creates the group only after the cancel") {
+                then("run throws CancellationException and the spawned process is already dead") {
+                    lateinit var job: Job
+                    val spawned = CompletableDeferred<Process>()
+                    val runner =
+                        ProcessRunner(300.milliseconds) { builder ->
+                            delayGroupCreation(builder).start().also { process ->
+                                spawned.complete(process)
+                                job.cancel()
+                            }
+                        }
+                    var thrown: Throwable? = null
+                    var aliveWhenRunThrew: Boolean? = null
+                    try {
+                        withTimeout(10.seconds) {
+                            job =
+                                launch(start = CoroutineStart.LAZY) {
+                                    try {
+                                        runner.run(listOf("sleep", "100"))
+                                    } catch (e: CancellationException) {
+                                        thrown = e
+                                        aliveWhenRunThrew = isAlive(spawned.getCompleted().pid())
+                                        throw e
+                                    }
+                                }
+                            job.start()
+                            job.join()
+                        }
+                    } finally {
+                        if (spawned.isCompleted) killForcibly(spawned.getCompleted().pid())
+                    }
+
+                    thrown.shouldBeInstanceOf<CancellationException>()
+                    aliveWhenRunThrew.shouldBe(false)
+                }
+            }
+        }
+
         given("a runner with a counting loop in flight") {
             `when`("a second run is started on the same runner") {
                 then("the second run fails fast with IllegalStateException and the first run stays pausable") {
