@@ -24,6 +24,10 @@ import org.jetbrains.exposed.v1.jdbc.Database as ExposedDatabase
  */
 class Database private constructor(
     internal val connection: Connection,
+    // One connection carries one transaction at a time: a concurrent commit or rollback
+    // would otherwise also commit or roll back the other caller's work. Not reentrant:
+    // a transaction body must not call transaction() again. Injectable so a test can observe it.
+    private val transactionLock: Mutex,
 ) : AutoCloseable {
     // Exposed closes the connection at the end of every transaction; it gets a
     // view whose close() is a no-op so the owned connection (and its pragmas) lives on.
@@ -34,11 +38,6 @@ class Database private constructor(
             { nonClosing(connection) },
             databaseConfig = DatabaseConfig { defaultMaxAttempts = 1 },
         )
-
-    // One connection carries one transaction at a time: a concurrent commit or rollback
-    // would otherwise also commit or roll back the other caller's work. Not reentrant:
-    // a transaction body must not call transaction() again.
-    private val transactionLock = Mutex()
 
     /**
      * Runs [block] as one Exposed transaction on the owned connection, on Dispatchers.IO;
@@ -55,7 +54,13 @@ class Database private constructor(
         private const val DATA_DIR_UNUSABLE_ERROR =
             "STT_DATA_DIR \"%s\" cannot be created or opened as the data directory: %s"
 
-        suspend fun open(dataDir: Path): Database =
+        suspend fun open(dataDir: Path): Database = open(dataDir, Mutex())
+
+        /** [open] with the transaction lock supplied by the caller (tests observe it). */
+        internal suspend fun open(
+            dataDir: Path,
+            transactionLock: Mutex,
+        ): Database =
             withContext(Dispatchers.IO) {
                 val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
                 val connection = openConnection(dataDir, url)
@@ -69,7 +74,7 @@ class Database private constructor(
                     connection.close()
                     throw e
                 }
-                Database(connection)
+                Database(connection, transactionLock)
             }
 
         /** Creates [dataDir] when missing, connects to [url], then applies the pragmas in ADR 0017 order. */

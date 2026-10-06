@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
+import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
@@ -11,11 +12,14 @@ import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withTimeout
 import java.io.IOException
-import java.io.InputStream
 import java.nio.file.Files
 import java.util.ArrayList
 import java.util.concurrent.CountDownLatch
@@ -90,35 +94,40 @@ class DatabaseSpec :
             }
         }
 
-        given("a task creation whose audio source stalls inside its transaction, then fails") {
-            `when`("another task is inserted while that transaction is open") {
-                then("the failed creation leaves nothing behind and only the other task is kept") {
-                    withDatabase { db ->
-                        coroutineScope {
-                            val tasks = TaskRepository(db)
-                            val stalled = CountDownLatch(1)
-                            val release = CountDownLatch(1)
-                            val creation =
-                                async {
-                                    runCatching {
-                                        tasks.createWithAudio(
-                                            queuedTask("failing.wav", createdAt = 1L),
-                                            StallingFailingSource(stalled, release),
-                                        )
+        given("a write transaction held open on the writer connection, which then fails") {
+            `when`("another write starts while it is open") {
+                then("the other write waits for the lock; the failed transaction leaves nothing and only the other task is kept") {
+                    runTest {
+                        val lock = CountingMutex()
+                        Database.open(tempdir("stt-db").toPath(), lock).use { db ->
+                            coroutineScope {
+                                val tasks = TaskRepository(db)
+                                val held = CountDownLatch(1)
+                                val release = CountDownLatch(1)
+                                val holder =
+                                    async {
+                                        runCatching {
+                                            db.transaction {
+                                                insertTaskRow(queuedTask("held.wav", createdAt = 1L))
+                                                held.countDown()
+                                                release.await(10, TimeUnit.SECONDS)
+                                                throw IOException("held transaction failed")
+                                            }
+                                        }
                                     }
-                                }
-                            withContext(Dispatchers.IO) { stalled.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+                                withContext(Dispatchers.IO) { held.await(10, TimeUnit.SECONDS).shouldBeTrue() }
 
-                            val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
-                            val insert = async { tasks.insert(concurrent) }
-                            // Real time (runTest's virtual clock would skip it): the insert finishes now unless held back.
-                            withContext(Dispatchers.Default) { withTimeoutOrNull(500) { insert.join() } }
-                            release.countDown()
+                                val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
+                                val insert = async { tasks.insert(concurrent) }
+                                // The second lock() call can only come from the insert, while the held transaction
+                                // owns the lock: from here on it waits. Without the lock this times out and fails.
+                                withContext(Dispatchers.Default) { withTimeout(10_000) { lock.lockCalls.first { it == 2 } } }
+                                insert.isCompleted.shouldBeFalse()
+                                release.countDown()
 
-                            creation.await().isFailure.shouldBeTrue()
-                            tasks.list().shouldBe(listOf(StoredTask(insert.await(), concurrent)))
-                            rowCount(db, "audio_parts").shouldBe(0)
-                            rowCount(db, "audio").shouldBe(0)
+                                holder.await().isFailure.shouldBeTrue()
+                                tasks.list().shouldBe(listOf(StoredTask(insert.await(), concurrent)))
+                            }
                         }
                     }
                 }
@@ -271,14 +280,14 @@ private fun insertAudio(
     st.executeUpdate()
 }
 
-/** An audio source that signals [stalled] on its first read, waits for [release], then fails. */
-private class StallingFailingSource(
-    private val stalled: CountDownLatch,
-    private val release: CountDownLatch,
-) : InputStream() {
-    override fun read(): Int {
-        stalled.countDown()
-        release.await(10, TimeUnit.SECONDS)
-        throw IOException("audio source failed")
+/** A [Mutex] that counts its lock() calls, so a test can see a caller start waiting for it. */
+private class CountingMutex(
+    private val delegate: Mutex = Mutex(),
+) : Mutex by delegate {
+    val lockCalls = MutableStateFlow(0)
+
+    override suspend fun lock(owner: Any?) {
+        lockCalls.update { it + 1 }
+        delegate.lock(owner)
     }
 }
