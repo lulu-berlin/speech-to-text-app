@@ -33,4 +33,14 @@ class QueueStateRepositorySpec :
                 }
             }
         }
+
+        given("a freshly opened database") {
+            `when`("reading the queue state before it was ever written") {
+                then("the queue is not paused") {
+                    withDatabase { db ->
+                        QueueStateRepository(db).isPaused().shouldBeFalse()
+                    }
+                }
+            }
+        }
     })
