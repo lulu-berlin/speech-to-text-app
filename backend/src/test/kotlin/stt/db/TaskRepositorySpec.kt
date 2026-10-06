@@ -30,25 +30,7 @@ class TaskRepositorySpec :
                                 startedAt = 1_700_000_001_000L,
                                 finishedAt = 1_700_000_002_000L,
                             )
-                        val sparse =
-                            Task(
-                                originalFilename = "memo.wav",
-                                contentType = "audio/wav",
-                                durationMs = null,
-                                status = TaskStatus.QUEUED,
-                                phase = null,
-                                queuePosition = null,
-                                language = "en",
-                                speakersMode = SpeakersMode.AUTO,
-                                speakersCount = null,
-                                maxSpeakers = 8,
-                                model = "large-v3-turbo-q5_0",
-                                progress = 0.0,
-                                error = null,
-                                createdAt = 1_700_000_003_000L,
-                                startedAt = null,
-                                finishedAt = null,
-                            )
+                        val sparse = queuedTask("memo.wav", createdAt = 1_700_000_003_000L)
 
                         val fullId = tasks.insert(full)
                         val sparseId = tasks.insert(sparse)
