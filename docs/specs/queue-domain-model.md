@@ -1,16 +1,17 @@
-# 04 — Queue domain model
+# Queue domain model
 
-Status: in-review
-Depends on: [03](../docs/specs/database-schema.md) (done)
+Status: done (roadmap item 04, merged 2026-10-06)
+Depends on: [03 — database schema](database-schema.md)
 
 ## Goal
 
 Define the pure Kotlin rules for task status transitions, queue reordering and the queue paused flag, independent of I/O, so the engine (item 11) and API (item 12) share one source of truth.
 
-## Already decided
+## Decisions
 
-- [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): Kotlin backend.
-- [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): pausing a running task suspends it in place rather than discarding progress.
+- [ADR 0001 — Stack and monorepo](../decisions/0001-stack-and-monorepo.md): Kotlin backend.
+- [ADR 0004 — Chunked transcription, SIGSTOP pause](../decisions/0004-chunked-transcription-sigstop-pause.md): pausing a running task suspends it in place rather than discarding progress.
+- Decided in this item: [ADR 0023 — Persistence may import feature-owned value types](../decisions/0023-persistence-may-import-feature-value-types.md) (`TaskStatus` moved from `stt/db` to `stt/queue`).
 
 ## Proposal (approved 2026-10-06)
 
@@ -74,3 +75,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-06 (after cycle 9): added test item 13 `(discovered)`: a status change for a task id that is not in the queue is rejected with its own typed reason.
 - 2026-10-06 (after cycle 12): added test item 14 `(discovered)`: `FAILED` and `CANCELED` remove a task from the queue just like `COMPLETED` (item 12 only exercised `COMPLETED`).
 - 2026-10-06: review round 1, changes requested: (1) `reorder` accepted a list repeating an id while still naming every task (item 7's test only covered a repeat that displaced an id); (2) an invalid queue could be constructed directly, so a validating factory replaces the public constructor (data class with `@ConsistentCopyVisibility`, so `copy` cannot bypass it); (3) a rejected reorder now names a typed reason. Precedences agreed: reorder duplicate > unknown > missing; factory duplicate > terminal > multiple running. Added test items 15–17 `(discovered)`, done in that order so item 15 is red on the pre-review code. Recorded in the Proposal; no new ADR (local queue semantics).
+- 2026-10-06 (review round 2): no new findings. Reviewer re-ran `gradle check --rerun-tasks` (62/62) and re-ran the round-1 `kotlinc` probe: `reorder([1,1,2,3])` → `Rejected(DuplicateIds([1]))`, `of` with two `RUNNING` tasks → `Rejected(MultipleRunning([1, 2]))`; calling the constructor or `copy` from outside the class fails to compile (both private). User approved the diff. Branch rebased onto `main` (`4a59e8d`, no conflicts; `gradle check` 62/62 on the rebased head); no `nix build .` requested (no build or dependency change; pure in-memory tests). Fast-forward merged into `main` (head `c44e265`).

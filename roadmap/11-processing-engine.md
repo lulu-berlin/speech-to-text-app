@@ -1,7 +1,7 @@
 # 11 — Processing engine
 
 Status: draft
-Depends on: [04](04-queue-domain-model.md), [05](../docs/specs/process-runner.md) (done), [07](07-whisper-transcription.md), [09](09-diarization.md)
+Depends on: [04](../docs/specs/queue-domain-model.md) (done), [05](../docs/specs/process-runner.md) (done), [07](07-whisper-transcription.md), [09](09-diarization.md)
 
 ## Goal
 
