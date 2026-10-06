@@ -24,6 +24,16 @@ internal class ProcessGroup(
         }
     }
 
+    /** SIGSTOP the whole tree: a running transcription freezes its output (ADR 0004). */
+    internal fun pause() {
+        signal(SIGSTOP)
+    }
+
+    /** SIGCONT the whole tree; harmless when the group is not stopped. */
+    internal fun resume() {
+        signal(SIGCONT)
+    }
+
     private suspend fun awaitEmpty(timeout: Duration): Boolean =
         withTimeoutOrNull(timeout) {
             while (hasMembers()) delay(POLL_INTERVAL)
@@ -41,5 +51,6 @@ internal class ProcessGroup(
         const val SIGKILL = 9
         const val SIGTERM = 15
         const val SIGCONT = 18
+        const val SIGSTOP = 19
     }
 }

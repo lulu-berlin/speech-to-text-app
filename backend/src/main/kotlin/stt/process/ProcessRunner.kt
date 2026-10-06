@@ -9,6 +9,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -16,6 +17,12 @@ import kotlin.time.Duration.Companion.seconds
 class ProcessRunner(
     private val gracePeriod: Duration = 2.seconds,
 ) {
+    /**
+     * The group of the single in-flight run. set when spawning finishes, cleared when the run does;
+     * lets the non-suspending pause()/resume() reach the current run without blocking.
+     */
+    private val currentGroup = AtomicReference<ProcessGroup?>(null)
+
     suspend fun run(
         command: List<String>,
         onStdoutLine: (String) -> Unit = {},
@@ -24,6 +31,7 @@ class ProcessRunner(
         coroutineScope {
             val process = withContext(Dispatchers.IO) { ProcessBuilder(listOf("setsid") + command).start() }
             val group = ProcessGroup(process.pid())
+            currentGroup.set(group)
             try {
                 val stdout = async(Dispatchers.IO) { readLines(process.inputStream, onStdoutLine) }
                 val stderr = async(Dispatchers.IO) { readLines(process.errorStream, onStderrLine) }
@@ -32,8 +40,20 @@ class ProcessRunner(
             } catch (e: CancellationException) {
                 withContext(NonCancellable) { group.terminate(gracePeriod) }
                 throw e
+            } finally {
+                currentGroup.set(null)
             }
         }
+
+    /** Freezes the current run (SIGSTOP the whole tree). No-op while no run is in flight. */
+    fun pause() {
+        currentGroup.get()?.pause()
+    }
+
+    /** Unfreezes the current run (SIGCONT the whole tree). No-op while no run is in flight. */
+    fun resume() {
+        currentGroup.get()?.resume()
+    }
 
     private fun readLines(
         stream: InputStream,
