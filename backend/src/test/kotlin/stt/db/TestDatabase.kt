@@ -18,10 +18,16 @@ internal fun TestConfiguration.withDatabase(block: suspend (Database) -> Unit) =
 internal fun rowCount(
     db: Database,
     table: String,
-): Int =
+): Int = singleValue(db, "SELECT count(*) FROM \"$table\"").toInt()
+
+/** The first column of the first row [sql] returns, read over the raw connection. */
+internal fun singleValue(
+    db: Database,
+    sql: String,
+): String =
     db.connection.createStatement().use { statement ->
-        statement.executeQuery("SELECT count(*) FROM \"$table\"").use { rows ->
+        statement.executeQuery(sql).use { rows ->
             rows.next().shouldBeTrue()
-            rows.getInt(1)
+            rows.getString(1)
         }
     }
