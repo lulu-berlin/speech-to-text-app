@@ -1,6 +1,6 @@
 # 0018 — Audio payload stored as paged BLOBs
 
-Status: accepted · Date: 2026-10-06 · Amended: 2026-10-06 (item 03 review round 1)
+Status: accepted · Date: 2026-10-06 · Amended: 2026-10-06 (item 03 review rounds 1 and 2)
 
 ## Context
 ADR 0005 stores uploaded audio in SQLite and requires that uploads and reads *stream* the BLOB — never load it fully into memory — so large files can be piped to temp files for ffmpeg/whisper-cli. The stack (ADR 0006) uses Exposed over the xerial `sqlite-jdbc` driver. A capability probe of `sqlite-jdbc` 3.49.1.0 (run 2026-10-06 in the agent sandbox) shows the driver cannot stream single-row BLOBs:
@@ -26,5 +26,5 @@ A single-row `data BLOB` therefore violates ADR 0005 for multi-GB uploads. This 
 - The schema deviates from the draft single-`data`-BLOB row; recorded here so the deviation is explainable at review.
 - `sha256` uniqueness (added 2026-10-06) makes duplicates a database-level guarantee, exposed to the API layer as a constraint rejection; the queue/HTTP mapping (409 vs reuse) is decided in item 12. Retrying a failed/canceled task will require an explicit feature (task reuse or deletion) because re-uploading the same bytes is a duplicate.
 - Kept audio grows the database; deleting audio is an out-of-scope future feature (explicit user action, not a completion side effect).
-- An upload temporarily needs about twice its size on disk (spool file + pages) and is written twice (amended in review round 1); this is the price of never holding the write lock while waiting on a client.
+- An upload's peak disk use is about three times its size (spool file + WAL + pages in `stt.db`), and its bytes are written three times (spool, WAL, checkpoint) (amended in review rounds 1 and 2); this is the price of never holding the write lock while waiting on a client. After the next checkpoint and write the WAL shrinks back to at most `journal_size_limit` (64 MiB, ADR 0017).
 - The "blob streaming" behavior is locked by a test: a >1-page payload round-trips byte-for-byte through streams with independently derived `size_bytes`/`sha256`.
