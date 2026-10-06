@@ -130,7 +130,7 @@ class DatabaseSpec :
                                 val insert = async { tasks.insert(concurrent) }
                                 // The second lock() call can only come from the insert, while the held transaction
                                 // owns the lock: from here on it waits. Without the lock this times out and fails.
-                                withContext(Dispatchers.Default) { withTimeout(10_000) { lock.lockCalls.first { it == 2 } } }
+                                withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { lock.lockCalls.first { it == 2 } } }
                                 insert.isCompleted.shouldBeFalse()
                                 heldWrite.release()
 
@@ -159,7 +159,7 @@ class DatabaseSpec :
                             try {
                                 // Real time: a read that waits for the writer never finishes inside the bound.
                                 withContext(Dispatchers.Default) {
-                                    withTimeout(10_000) {
+                                    withTimeout(PROBE_TIMEOUT_MS) {
                                         tasks.list().shouldBe(listOf(StoredTask(id, stored)))
                                         tasks.find(id).shouldBe(StoredTask(id, stored))
                                         ChunkRepository(db).findByTask(id).shouldBe(emptyList())
@@ -199,13 +199,13 @@ class DatabaseSpec :
                             val id = tasks.createWithAudio(stored, "abc".byteInputStream())
                             val target = StallingTarget()
                             val copy = async { AudioRepository(db).copyTo(id, target) }
-                            withContext(Dispatchers.IO) { target.stalled.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+                            withContext(Dispatchers.IO) { target.stalled.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
 
                             val other = queuedTask("other.wav", createdAt = 2L)
                             val otherId =
                                 try {
                                     // Real time: an insert that waits for the copy never finishes inside the bound.
-                                    withContext(Dispatchers.Default) { withTimeout(10_000) { tasks.insert(other) } }
+                                    withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { tasks.insert(other) } }
                                 } finally {
                                     target.release.countDown()
                                 }
@@ -291,6 +291,13 @@ class DatabaseSpec :
             }
         }
     })
+
+// Real-time bounds for the concurrency tests. A probe waits for something that must happen;
+// a stall (held write, stalled target) blocks until the test releases it. The stall's safety
+// bound must outlast every probe: otherwise a stall that gives up first would let a probe
+// finish behind it, and a broken lock or a read routed through the writer would pass.
+private const val PROBE_TIMEOUT_MS = 10_000L
+private const val STALL_SAFETY_TIMEOUT_MS = 30_000L
 
 private val expectedTables =
     listOf(
@@ -392,19 +399,16 @@ private suspend fun CoroutineScope.holdWriteTransaction(
                 db.writeTransaction {
                     insertTaskRow(task)
                     held.countDown()
-                    release.await(10, TimeUnit.SECONDS)
+                    release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                     throw IOException("held transaction failed")
                 }
             }
         }
-    withContext(Dispatchers.IO) { held.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+    withContext(Dispatchers.IO) { held.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
     return HeldWrite(release, outcome)
 }
 
-/**
- * A copy target that keeps what it receives, signals [stalled] on its first write, and blocks until [release].
- * Its 30 s safety bound outlasts the tests' 10 s probes, so a probe can never finish because the stall gave up.
- */
+/** A copy target that keeps what it receives, signals [stalled] on its first write, and blocks until [release]. */
 private class StallingTarget : OutputStream() {
     val stalled = CountDownLatch(1)
     val release = CountDownLatch(1)
@@ -419,7 +423,7 @@ private class StallingTarget : OutputStream() {
     ) {
         received.write(b, off, len)
         stalled.countDown()
-        release.await(30, TimeUnit.SECONDS)
+        release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
     }
 
     fun bytes(): ByteArray = received.toByteArray()
