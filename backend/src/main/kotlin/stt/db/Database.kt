@@ -8,6 +8,7 @@ import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.v1.core.DatabaseConfig
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.sqlite.SQLiteConfig
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import java.nio.file.Files
@@ -21,9 +22,13 @@ import org.jetbrains.exposed.v1.jdbc.Database as ExposedDatabase
  * `$STT_DATA_DIR/stt.db`, WAL mode, foreign keys on, Flyway migrations applied
  * on every open. The data directory is created when missing; failures name
  * STT_DATA_DIR. All JDBC work runs on Dispatchers.IO (AGENTS.md).
+ *
+ * One writer connection carries the write transactions, one at a time; every read
+ * transaction opens its own read-only connection, which WAL lets run alongside the writer.
  */
 class Database private constructor(
     internal val connection: Connection,
+    url: String,
     // One connection carries one transaction at a time: a concurrent commit or rollback
     // would otherwise also commit or roll back the other caller's work. Not reentrant:
     // a transaction body must not call transaction() again. Injectable so a test can observe it.
@@ -33,21 +38,39 @@ class Database private constructor(
     // view whose close() is a no-op so the owned connection (and its pragmas) lives on.
     // No retries: a transaction body may consume a one-shot stream (audio upload), and a
     // retry after e.g. a UNIQUE violation would re-run it on a drained stream.
-    private val exposed =
+    private val writer =
         ExposedDatabase.connect(
             { nonClosing(connection) },
             databaseConfig = DatabaseConfig { defaultMaxAttempts = 1 },
         )
 
+    // A fresh read-only connection per read transaction; Exposed closes it when the
+    // transaction ends. No retries either: a read body may write to a one-shot target stream.
+    private val readers =
+        ExposedDatabase.connect(
+            { DriverManager.getConnection(url, SQLiteConfig().apply { setReadOnly(true) }.toProperties()) },
+            databaseConfig =
+                DatabaseConfig {
+                    defaultMaxAttempts = 1
+                    defaultReadOnly = true
+                },
+        )
+
     /**
-     * Runs [block] as one Exposed transaction on the owned connection, on Dispatchers.IO;
+     * Runs [block] as one write transaction on the writer connection, on Dispatchers.IO;
      * concurrent callers wait their turn (suspending, not blocking a thread).
      */
     internal suspend fun <T> transaction(block: JdbcTransaction.() -> T): T =
         transactionLock.withLock {
             withContext(Dispatchers.IO) {
-                transaction(exposed) { block() }
+                transaction(writer) { block() }
             }
+        }
+
+    /** Runs [block] as one read transaction on its own read-only connection, on Dispatchers.IO; never waits for writes. */
+    internal suspend fun <T> readTransaction(block: JdbcTransaction.() -> T): T =
+        withContext(Dispatchers.IO) {
+            transaction(readers) { block() }
         }
 
     companion object {
@@ -74,7 +97,7 @@ class Database private constructor(
                     connection.close()
                     throw e
                 }
-                Database(connection, transactionLock)
+                Database(connection, url, transactionLock)
             }
 
         /** Creates [dataDir] when missing, connects to [url], then applies the pragmas in ADR 0017 order. */

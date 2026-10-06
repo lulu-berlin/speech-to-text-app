@@ -17,7 +17,7 @@ class QueueStateRepository(
 
     /** False until the queue was first paused: a fresh database has no `queue_state` row yet. */
     suspend fun isPaused(): Boolean =
-        db.transaction {
+        db.readTransaction {
             QueueStateTable.selectAll().singleOrNull()?.get(QueueStateTable.paused) ?: false
         }
 }

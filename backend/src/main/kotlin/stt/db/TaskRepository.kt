@@ -29,7 +29,7 @@ class TaskRepository(
         }
 
     suspend fun find(id: Long): StoredTask? =
-        db.transaction {
+        db.readTransaction {
             TasksTable
                 .selectAll()
                 .where { TasksTable.id eq id }
@@ -39,7 +39,7 @@ class TaskRepository(
 
     /** All tasks in creation (id) order; reads only `tasks`, never audio. */
     suspend fun list(): List<StoredTask> =
-        db.transaction {
+        db.readTransaction {
             TasksTable
                 .selectAll()
                 .orderBy(TasksTable.id)

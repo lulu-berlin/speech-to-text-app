@@ -24,7 +24,7 @@ class ChunkRepository(
 
     /** The task's chunks in `idx` order. */
     suspend fun findByTask(taskId: Long): List<Chunk> =
-        db.transaction {
+        db.readTransaction {
             ChunksTable
                 .selectAll()
                 .where { ChunksTable.taskId eq taskId }

@@ -152,6 +152,59 @@ class DatabaseSpec :
             }
         }
 
+        given("a stored task with audio, and a write transaction held open on the writer connection") {
+            `when`("every repository read runs while the write is open") {
+                then("each read completes and sees only the committed state") {
+                    withDatabase { db ->
+                        coroutineScope {
+                            val tasks = TaskRepository(db)
+                            val stored = queuedTask("stored.wav", createdAt = 1L)
+                            val id = tasks.createWithAudio(stored, "abc".byteInputStream())
+                            val held = CountDownLatch(1)
+                            val release = CountDownLatch(1)
+                            val holder =
+                                async {
+                                    runCatching {
+                                        db.transaction {
+                                            insertTaskRow(queuedTask("uncommitted.wav", createdAt = 2L))
+                                            held.countDown()
+                                            release.await(10, TimeUnit.SECONDS)
+                                            throw IOException("held transaction failed")
+                                        }
+                                    }
+                                }
+                            withContext(Dispatchers.IO) { held.await(10, TimeUnit.SECONDS).shouldBeTrue() }
+
+                            try {
+                                // Real time: a read that waits for the writer never finishes inside the bound.
+                                withContext(Dispatchers.Default) {
+                                    withTimeout(10_000) {
+                                        tasks.list().shouldBe(listOf(StoredTask(id, stored)))
+                                        tasks.find(id).shouldBe(StoredTask(id, stored))
+                                        ChunkRepository(db).findByTask(id).shouldBe(emptyList())
+                                        SegmentRepository(db).findByTask(id).shouldBe(emptyList())
+                                        // sha256("abc"): the FIPS 180-2 test vector.
+                                        AudioRepository(db)
+                                            .metadata(id)
+                                            .shouldBe(
+                                                AudioMetadata(
+                                                    sizeBytes = 3L,
+                                                    sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                                                ),
+                                            )
+                                        QueueStateRepository(db).isPaused().shouldBeFalse()
+                                    }
+                                }
+                            } finally {
+                                release.countDown()
+                            }
+                            holder.await().isFailure.shouldBeTrue()
+                        }
+                    }
+                }
+            }
+        }
+
         given("a database opened, closed, and opened again") {
             `when`("reading the journal mode and the foreign-key setting on each connection") {
                 then("every connection is in WAL mode with foreign keys on") {
