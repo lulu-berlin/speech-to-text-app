@@ -6,6 +6,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.InputStream
@@ -36,8 +37,8 @@ class ProcessRunner(
             val process = withContext(Dispatchers.IO) { ProcessBuilder(listOf("setsid", executable) + command.drop(1)).start() }
             val group = ProcessGroup(process.pid())
             currentGroup.set(group)
-            val stdout = async(Dispatchers.IO) { readLines(process.inputStream, onStdoutLine) }
-            val stderr = async(Dispatchers.IO) { readLines(process.errorStream, onStderrLine) }
+            val stdout = async(Dispatchers.IO) { readLines(process.inputStream, process, onStdoutLine) }
+            val stderr = async(Dispatchers.IO) { readLines(process.errorStream, process, onStderrLine) }
             try {
                 val exitCode = awaitExit(process)
                 ProcessResult(exitCode, stdout.await(), stderr.await())
@@ -89,21 +90,58 @@ class ProcessRunner(
 
     /**
      * Reads [stream] line by line and delivers each to [onLine]. The coroutineScope is the
-     * receiver for the per-line ensureActive(): without it the cancellation check has no
+     * receiver for the per-iteration ensureActive(): without it the cancellation check has no
      * CoroutineContext to observe.
+     *
+     * Reads only when the pipe reports bytes available, so a blocked pipe (a descendant that left
+     * the process group and holds it open) never blocks the drain: the loop exits when the direct
+     * [process] is dead and nothing is buffered, and cancellation lands at the poll checkpoints.
      */
     private suspend fun readLines(
         stream: InputStream,
+        process: Process,
         onLine: (String) -> Unit,
     ): List<String> =
         coroutineScope {
-            stream.bufferedReader().useLines { lines ->
-                lines
-                    .onEach { line ->
-                        ensureActive()
-                        onLine(line)
-                    }.toList()
+            val lines = mutableListOf<String>()
+            val chunk = ByteArray(READ_CHUNK_SIZE)
+            var carry = ByteArray(READ_CHUNK_SIZE)
+            var carryLen = 0
+            while (true) {
+                ensureActive()
+                if (stream.available() > 0) {
+                    val n = stream.read(chunk)
+                    if (n < 0) break
+                    if (carryLen + n > carry.size) carry = carry.copyOf(carryLen + n + READ_CHUNK_SIZE)
+                    System.arraycopy(chunk, 0, carry, carryLen, n)
+                    carryLen += n
+                    var start = 0
+                    var consumed = 0
+                    for (i in 0 until carryLen) {
+                        if (carry[i] == LINE_FEED) {
+                            val line = String(carry, start, i - start, Charsets.UTF_8)
+                            lines.add(line)
+                            onLine(line)
+                            start = i + 1
+                            consumed = start
+                        }
+                    }
+                    if (consumed > 0) {
+                        System.arraycopy(carry, consumed, carry, 0, carryLen - consumed)
+                        carryLen -= consumed
+                    }
+                } else if (!process.isAlive()) {
+                    break
+                } else {
+                    delay(POLL_INTERVAL)
+                }
             }
+            if (carryLen > 0) {
+                val line = String(carry, 0, carryLen, Charsets.UTF_8)
+                lines.add(line)
+                onLine(line)
+            }
+            lines
         }
 
     /** A blocking waitFor cannot be cancelled, so the wait is sliced to observe cancellation. */
@@ -118,3 +156,9 @@ class ProcessRunner(
 
 /** Interval at which blocking waits (exit, group emptiness) re-check their condition and cancellation. */
 internal val POLL_INTERVAL = 50.milliseconds
+
+/** Drain chunk size; also the initial carry buffer size. */
+private const val READ_CHUNK_SIZE = 8192
+
+/** Byte value of the line terminator. */
+private const val LINE_FEED = '\n'.code.toByte()

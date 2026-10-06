@@ -49,7 +49,7 @@ A small, coroutine-native way to run external tools (ffmpeg, whisper-cli) from t
 - [x] Output larger than the pipe buffer (long `seq`) completes without deadlock
 - [x] (discovered) Lines still buffered when `run` is cancelled are not delivered to the callbacks
 - [x] (discovered) A callback that throws makes `run` fail with that exception and kills the process tree
-- [ ] (discovered) Cancelling returns promptly even when a descendant has left the process group and still holds the output pipes
+- [x] (discovered) Cancelling returns promptly even when a descendant has left the process group and still holds the output pipes
 
 ## Acceptance criteria
 
