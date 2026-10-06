@@ -135,6 +135,8 @@ class ProcessRunner internal constructor(
                     var consumed = 0
                     for (i in 0 until carryLen) {
                         if (carry[i] == LINE_FEED) {
+                            // Per line, not per chunk: no line reaches a callback after a cancel (ADR 0020).
+                            ensureActive()
                             val line = String(carry, start, i - start, Charsets.UTF_8)
                             lines.add(line)
                             onLine(line)
@@ -153,6 +155,7 @@ class ProcessRunner internal constructor(
                 }
             }
             if (carryLen > 0) {
+                ensureActive()
                 val line = String(carry, 0, carryLen, Charsets.UTF_8)
                 lines.add(line)
                 onLine(line)
