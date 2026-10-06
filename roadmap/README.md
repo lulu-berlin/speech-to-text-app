@@ -37,6 +37,7 @@ graph TD
   02 --> 16[16 Nix flake package]
   14 --> 16
   15 --> 16
+  13 --> 17[17 branding: stenographer animation]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -60,3 +61,4 @@ graph TD
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13 |
 | [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13 |
 | [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
+| [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
