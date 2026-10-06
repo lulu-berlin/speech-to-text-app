@@ -3,6 +3,7 @@ package stt.db
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import java.io.InputStream
@@ -35,6 +36,11 @@ class TaskRepository(
                 .singleOrNull()
                 ?.toTask()
         }
+
+    /** Deletes the task; its audio, pages, chunks, and segments go with it (ON DELETE CASCADE). */
+    suspend fun delete(id: Long) {
+        db.transaction { TasksTable.deleteWhere { TasksTable.id eq id } }
+    }
 }
 
 /** Inserts the `tasks` row inside the current transaction and returns its generated id. */
