@@ -47,7 +47,7 @@ data class TaskQueue(
     /** Applies [ids] as the new order of all non-terminal tasks; statuses travel with their ids. */
     fun reorder(ids: List<Long>): ReorderOutcome {
         val currentIds = entries.map { it.id }.toSet()
-        return if (ids.toSet() == currentIds) {
+        return if (ids.size == currentIds.size && ids.toSet() == currentIds) {
             val byId = entries.associateBy { it.id }
             ReorderOutcome.Accepted(copy(entries = ids.map { id -> byId.getValue(id) }))
         } else {
