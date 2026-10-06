@@ -164,24 +164,12 @@ private fun tableNames(db: Database): List<String> =
         }
     }
 
-private fun migratedCount(db: Database): Int =
-    db.connection.createStatement().use { statement ->
-        statement.executeQuery("SELECT count(*) FROM flyway_schema_history").use { rows ->
-            rows.next().shouldBeTrue()
-            rows.getInt(1)
-        }
-    }
+private fun migratedCount(db: Database): Int = singleValue(db, "SELECT count(*) FROM flyway_schema_history").toInt()
 
 private fun pragma(
     db: Database,
     name: String,
-): String =
-    db.connection.createStatement().use { statement ->
-        statement.executeQuery("PRAGMA $name").use { rows ->
-            rows.next().shouldBeTrue()
-            rows.getString(1)
-        }
-    }
+): String = singleValue(db, "PRAGMA $name")
 
 private fun insertTask(
     db: Database,
