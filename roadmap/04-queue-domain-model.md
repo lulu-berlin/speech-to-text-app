@@ -52,6 +52,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Reordering a paused queue keeps it paused (discovered)
 - [x] A task that reaches a terminal status leaves the queue (discovered)
 - [ ] Changing the status of a task that is not in the queue is rejected (discovered)
+- [ ] A task that fails or is canceled also leaves the queue (discovered)
 
 ## Acceptance criteria
 
@@ -67,3 +68,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-06 (after cycle 8): added test item 11 `(discovered)`: reordering a paused queue keeps it paused (`reorder` dropped the flag). Done before item 9.
 - 2026-10-06 (after cycle 9): the queue applies a status change by task id and returns the updated queue or a typed rejection (illegal transition / another task running). A task reaching a terminal status leaves the queue aggregate but stays in the database for history. Added test item 12 `(discovered)`. Recorded in the Proposal; no new ADR (local queue semantics).
 - 2026-10-06 (after cycle 9): added test item 13 `(discovered)`: a status change for a task id that is not in the queue is rejected with its own typed reason.
+- 2026-10-06 (after cycle 12): added test item 14 `(discovered)`: `FAILED` and `CANCELED` remove a task from the queue just like `COMPLETED` (item 12 only exercised `COMPLETED`).
