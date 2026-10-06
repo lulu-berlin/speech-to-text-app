@@ -87,7 +87,7 @@ class ProcessRunnerSpec :
                                     try {
                                         ProcessRunner(gracePeriod = 300.milliseconds).run(
                                             listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
-                                            onStdoutLine = { line -> pids.complete(line.split(" ").map(String::toLong)) },
+                                            onStdoutLine = { line -> pids.complete(parsePids(line)) },
                                         )
                                     } catch (e: CancellationException) {
                                         thrown = e
@@ -111,6 +111,9 @@ class ProcessRunnerSpec :
             }
         }
     })
+
+/** Parses a line of space-separated pids, as printed by `echo $$ $!`. */
+private fun parsePids(line: String): List<Long> = line.split(" ").map(String::toLong)
 
 private fun isAlive(pid: Long): Boolean = ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)
 
