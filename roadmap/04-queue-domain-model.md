@@ -1,6 +1,6 @@
 # 04 — Queue domain model
 
-Status: spec-approved
+Status: in-progress
 Depends on: [03](../docs/specs/database-schema.md) (done)
 
 ## Goal
