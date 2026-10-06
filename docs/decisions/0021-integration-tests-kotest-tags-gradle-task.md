@@ -15,4 +15,4 @@ Roadmap item 05 introduces the first tests that run real processes (`sh`, `sleep
 ## Consequences
 - `gradle check` alone is not the full test run; both tasks are documented so CI or a pre-merge run can invoke them.
 - Integration runs need the dev tooling from `devenv.nix` (util-linux for `setsid`, coreutils/bash for the counters and `sleep`).
-- The Gradle wiring (`kotest.tags`/`kotest.tags.exclude` system properties on the respective Test tasks) was verified empirically before pinning.
+- The Gradle wiring (the `kotest.tags` expression — `!Integration` on `test`, `Integration` on `integrationTest` — as system properties on the respective Test tasks) was verified empirically before pinning.
