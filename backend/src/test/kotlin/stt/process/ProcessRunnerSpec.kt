@@ -328,6 +328,41 @@ class ProcessRunnerSpec :
             }
         }
 
+        given("a callback that throws after the direct child has exited") {
+            `when`("a descendant still runs in the process group") {
+                then("run fails with that exception and the descendant is already dead") {
+                    val pids = CompletableDeferred<List<Long>>()
+                    var thrown: IllegalStateException? = null
+                    var aliveWhenRunThrew: List<Long>? = null
+                    try {
+                        withTimeout(10.seconds) {
+                            try {
+                                ProcessRunner(gracePeriod = 300.milliseconds).run(
+                                    listOf("sh", "-c", "sleep 100 & echo \$\$ \$!"),
+                                    onStdoutLine = { line ->
+                                        val shell = parsePids(line).also(pids::complete).first()
+                                        ProcessHandle.of(shell).ifPresent { it.onExit().get(5, TimeUnit.SECONDS) }
+                                        // run sees the exit within milliseconds, but no observable event marks
+                                        // it having moved past the exit wait; the margin covers that step.
+                                        Thread.sleep(500)
+                                        throw IllegalStateException("boom")
+                                    },
+                                )
+                            } catch (e: IllegalStateException) {
+                                thrown = e
+                                aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
+                            }
+                        }
+                    } finally {
+                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
+                    }
+
+                    thrown?.message.shouldBe("boom")
+                    aliveWhenRunThrew.shouldBe(emptyList())
+                }
+            }
+        }
+
         given("a descendant that left the process group and still holds the output pipes") {
             `when`("the run is cancelled") {
                 then("run returns promptly with CancellationException") {
