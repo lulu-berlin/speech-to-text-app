@@ -33,6 +33,7 @@ Turn an uploaded audio file into (a) mono 16 kHz PCM for speaker embeddings and 
 - Duration source: decoded sample count or ffprobe?
 - ~~Persisting into `chunks` needs the table from item 03: add 03 as a dependency, or leave persistence to item 11?~~ Resolved by [ADR 0019](../docs/decisions/0019-schema-ownership-and-evolution.md): item 03 owns the `chunks` table and `ChunkRepository`; 03 is now in `Depends on`. Still open: does this item persist the plan itself, or hand it to item 11?
 - Temp directory location (under `$STT_DATA_DIR/tmp/<task-id>` proposed) and when it is deleted (after completion / cancel). Constraint from item 03 ([spec](../docs/specs/database-schema.md), ADR 0017): `$STT_DATA_DIR/tmp` holds upload spool files; `Database.open` deletes every file directly in it and fails startup (naming `STT_DATA_DIR`) when it finds a non-empty directory there. A per-task directory under `tmp/` left behind by a crash would therefore stop the app from starting: use another location (e.g. `$STT_DATA_DIR/work/<task-id>`) or change item 03's cleanup through a migration-style follow-up.
+- Should the process runner (item 05, ADR 0020) treat `\r` as a line terminator? It splits on `\n` only; ffmpeg's progress output (`-stats`) rewrites one line with `\r`, which then arrives as one ever-growing line, and only when ffmpeg finally writes `\n` or exits. Options: split on `\r` too in the runner, pass `-nostats` to ffmpeg, or leave as is.
 
 ## Test list (written with the user; Canon TDD step 1)
 
