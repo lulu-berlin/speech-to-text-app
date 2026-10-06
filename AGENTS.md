@@ -16,17 +16,15 @@ A web app that transcribes uploaded audio files with speaker diarization. Backen
 - **All async/concurrent work uses Kotlin coroutines**: structured concurrency, an application-level `CoroutineScope` with `SupervisorJob`; blocking I/O (JDBC, subprocesses, file I/O) only inside `withContext(Dispatchers.IO)`; no raw `Thread`, `ExecutorService`, or `CompletableFuture` in app code.
 - **Code is formatted**: Kotlin with ktlint, TypeScript/TSX with prettier; the standard check commands (`gradle check`, `pnpm test`) fail on format violations, so formatted code is required before any merge ([ADR 0015](docs/decisions/0015-code-formatting-ktlint-prettier.md)).
 - **Dependencies come only from `devenv.nix` (dev) and `flake.nix` (packaging)**; never install tools ad hoc. An agent that needs a new development tool adds it to `devenv.nix` itself, commits it as its own change, and tells the user to re-enter the shell; Nix-level results are verified by the user ([ADR 0010](docs/decisions/0010-development-toolchain.md)).
-- **Clean, readable code following `docs/conventions/`** (created and approved in roadmap item [02](roadmap/02-repo-skeleton-and-conventions.md)). Until then, ask before choosing structure or naming.
+- **Clean, readable code following [docs/conventions/backend.md](docs/conventions/backend.md) and [docs/conventions/frontend.md](docs/conventions/frontend.md)** (approved in roadmap item 02, see [docs/specs/repo-skeleton-and-conventions.md](docs/specs/repo-skeleton-and-conventions.md)). Deviations need a new ADR.
 
 ## Repository layout
 
-Planned until roadmap item 02 lands; today only `AGENTS.md`, the devenv files, `nix/models.nix`, `docs/decisions/`, `docs/specs/`, `docs/oracle/`, `roadmap/`, and `workspaces/` exist.
-
 ```
-AGENTS.md  devenv.nix  flake.nix (item 02/16)
-backend/   Gradle (Kotlin DSL) Ktor app
-frontend/  Vite + React + TS + styled-components
-nix/       shared Nix expressions (models, packages)
+AGENTS.md  devenv.nix  flake.nix  .editorconfig  .prettierrc
+backend/   Gradle (Kotlin DSL) Ktor app; backend/deps.json = Nix lockfile for Gradle deps
+frontend/  Vite + React + TS + styled-components (pnpm)
+nix/       shared Nix expressions (models; more in item 16)
 docs/decisions/  docs/specs/  docs/conventions/  docs/oracle/transcribe.py (reference oracle)
 roadmap/   pending work, one file per item
 workspaces/  git worktrees (ignored)

@@ -1,6 +1,6 @@
 # Backend conventions
 
-Approved 2026-10-05 in [roadmap item 02](../roadmap/02-repo-skeleton-and-conventions.md) (now spec-approved). Every backend item follows these rules; deviations need a new ADR.
+Approved 2026-10-05 in roadmap item 02 (spec: [docs/specs/repo-skeleton-and-conventions.md](../specs/repo-skeleton-and-conventions.md)). Every backend item follows these rules; deviations need a new ADR.
 
 ## Package structure
 

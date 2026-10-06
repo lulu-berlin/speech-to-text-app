@@ -1,7 +1,7 @@
 # 03 — Database schema
 
 Status: draft
-Depends on: [02](02-repo-skeleton-and-conventions.md)
+Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done)
 
 ## Goal
 
@@ -11,6 +11,7 @@ Define the SQLite schema for tasks, uploaded audio, chunks, transcript segments 
 
 - [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): chunk plan and per-chunk segments are persisted so tasks resume from the last finished chunk.
 - [ADR 0005 — Audio as SQLite BLOB](../docs/decisions/0005-audio-as-sqlite-blob.md): uploaded audio lives in the DB and is streamed to temp files.
+- [ADR 0013 — Feature packages with Ktor DI](../docs/decisions/0013-backend-feature-packages-kotlin-di.md): this item is the first to wire the Ktor DI plugin (`ktor-server-di`); the database connection is the first registered service (decided in item 02).
 - [ADR 0006 — Exposed, Flyway, Kotest](../docs/decisions/0006-exposed-flyway-kotest.md): Exposed DSL, Flyway versioned SQL migrations, Kotest.
 - [ADR 0008 — Default whisper model](../docs/decisions/0008-default-whisper-model.md): default value for `tasks.model`.
 

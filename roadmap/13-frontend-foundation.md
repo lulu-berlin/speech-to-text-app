@@ -1,7 +1,7 @@
 # 13 — Frontend foundation
 
 Status: draft
-Depends on: [02](02-repo-skeleton-and-conventions.md), [12](12-http-api-and-sse.md)
+Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [12](12-http-api-and-sse.md)
 
 ## Goal
 Provide the shared frontend building blocks that the Queue (item 14) and History (item 15) views build on: a typed API client, a live-update hook over SSE, theming, the app shell, and test infrastructure for mocking the API.

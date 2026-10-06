@@ -1,7 +1,7 @@
 # 05 — Process runner
 
 Status: draft
-Depends on: [02](02-repo-skeleton-and-conventions.md)
+Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done)
 
 ## Goal
 
