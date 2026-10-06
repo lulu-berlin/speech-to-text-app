@@ -1,6 +1,6 @@
 # 06 — Audio decoding and chunking
 
-Status: spec-approved
+Status: in-progress
 Depends on: [03](../docs/specs/database-schema.md) (done), [05](../docs/specs/process-runner.md) (done)
 
 ## Goal
