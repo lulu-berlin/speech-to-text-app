@@ -6,9 +6,11 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
 import java.util.ArrayList
@@ -219,6 +222,42 @@ class DatabaseSpec :
             }
         }
 
+        given("a task creation whose upload source delivers some bytes, then stalls, then fails") {
+            `when`("another task is inserted while the source is stalled") {
+                then("the insert completes; the failed creation leaves no task, pages, metadata, or temp file") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        Database.open(dataDir).use { db ->
+                            coroutineScope {
+                                val tasks = TaskRepository(db)
+                                val source = StallingFailingSource()
+                                val creation =
+                                    async { runCatching { tasks.createWithAudio(queuedTask("failing.wav", createdAt = 1L), source) } }
+                                withContext(Dispatchers.IO) {
+                                    source.stalled.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue()
+                                }
+
+                                val other = queuedTask("other.wav", createdAt = 2L)
+                                val otherId =
+                                    try {
+                                        // Real time: an insert that waits for the upload never finishes inside the bound.
+                                        withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { tasks.insert(other) } }
+                                    } finally {
+                                        source.release.countDown()
+                                    }
+
+                                creation.await().exceptionOrNull().shouldBeInstanceOf<IOException>()
+                                tasks.list().shouldBe(listOf(StoredTask(otherId, other)))
+                                rowCount(db, "audio_parts").shouldBe(0)
+                                rowCount(db, "audio").shouldBe(0)
+                                Files.list(dataDir.resolve("tmp")).use { it.toList() }.shouldBeEmpty()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         given("a database opened, closed, and opened again") {
             `when`("reading the journal mode and the foreign-key setting on each connection") {
                 then("every connection is in WAL mode with foreign keys on") {
@@ -406,6 +445,30 @@ private suspend fun CoroutineScope.holdWriteTransaction(
         }
     withContext(Dispatchers.IO) { held.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
     return HeldWrite(release, outcome)
+}
+
+/** An upload source that delivers "abc", then signals [stalled] on its next read, blocks until [release], and fails. */
+private class StallingFailingSource : InputStream() {
+    val stalled = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    private var delivered = false
+
+    override fun read(): Int = throw UnsupportedOperationException("read in windows")
+
+    override fun read(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ): Int {
+        if (!delivered) {
+            delivered = true
+            "abc".toByteArray().copyInto(b, off)
+            return 3
+        }
+        stalled.countDown()
+        release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        throw IOException("audio source failed")
+    }
 }
 
 /** A copy target that keeps what it receives, signals [stalled] on its first write, and blocks until [release]. */

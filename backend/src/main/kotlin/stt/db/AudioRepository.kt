@@ -1,5 +1,8 @@
 package stt.db
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
@@ -8,6 +11,8 @@ import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -18,14 +23,15 @@ class AudioRepository(
     private val db: Database,
 ) {
     /**
-     * Streams [source] into `audio_parts` pages and records its size and sha256 in `audio`,
-     * all in one transaction. The source is read on Dispatchers.IO and not closed.
+     * Spools [source] to a temp file (size and sha256 computed on the way), then writes its
+     * `audio` row and `audio_parts` pages in one short transaction. [source] is read on
+     * Dispatchers.IO and not closed.
      */
     suspend fun write(
         taskId: Long,
         source: InputStream,
     ) {
-        db.writeTransaction { writeAudioRows(taskId, source) }
+        db.withSpooledAudio(source) { audio -> db.writeTransaction { writeAudioRows(taskId, audio) } }
     }
 
     suspend fun metadata(taskId: Long): AudioMetadata? =
@@ -52,35 +58,77 @@ class AudioRepository(
     }
 }
 
+/** An upload copied to a temp file under `$STT_DATA_DIR/tmp`, with its size and sha256. */
+internal class SpooledAudio(
+    val file: Path,
+    val sizeBytes: Long,
+    val sha256: String,
+)
+
 /**
- * Inside the current transaction: streams [source] into `audio_parts` pages, then inserts the
- * `audio` row with the size and sha256 computed on the way. [source] is not closed.
+ * Copies [source] to a temp file under [Database.tmpDir] in page-sized windows, computing its size
+ * and sha256 on the way, runs [block] with it, and deletes the file afterwards, whether [block]
+ * or the copy succeeded or failed. No database lock is held while the source is read.
  */
-internal fun JdbcTransaction.writeAudioRows(
-    taskId: Long,
+internal suspend fun <T> Database.withSpooledAudio(
     source: InputStream,
-) {
+    block: suspend (SpooledAudio) -> T,
+): T {
+    val file = withContext(Dispatchers.IO) { Files.createTempFile(tmpDir, "upload-", ".part") }
+    try {
+        val audio = withContext(Dispatchers.IO) { spool(source, file) }
+        return block(audio)
+    } finally {
+        withContext(NonCancellable + Dispatchers.IO) { Files.deleteIfExists(file) }
+    }
+}
+
+private fun spool(
+    source: InputStream,
+    file: Path,
+): SpooledAudio {
     val digest = MessageDigest.getInstance("SHA-256")
     val page = ByteArray(PAGE_SIZE)
     var sizeBytes = 0L
-    var partNo = 0
-    while (true) {
-        val n = source.readNBytes(page, 0, PAGE_SIZE)
-        if (n == 0) break
-        digest.update(page, 0, n)
-        // The insert executes before the next read, so a full page buffer is reused safely.
-        val bytes = if (n == PAGE_SIZE) page else page.copyOf(n)
-        AudioPartsTable.insert {
-            it[AudioPartsTable.taskId] = taskId
-            it[AudioPartsTable.partNo] = partNo
-            it[part] = ExposedBlob(bytes)
+    Files.newOutputStream(file).use { out ->
+        while (true) {
+            val n = source.readNBytes(page, 0, PAGE_SIZE)
+            if (n == 0) break
+            digest.update(page, 0, n)
+            out.write(page, 0, n)
+            sizeBytes += n
         }
-        sizeBytes += n
-        partNo++
     }
+    return SpooledAudio(file, sizeBytes, HexFormat.of().formatHex(digest.digest()))
+}
+
+/**
+ * Inside the current transaction: inserts the `audio` row first, so a duplicate sha256 is
+ * rejected (UNIQUE) before any page is written, then one `audio_parts` row per page of [audio]'s file.
+ */
+internal fun JdbcTransaction.writeAudioRows(
+    taskId: Long,
+    audio: SpooledAudio,
+) {
     AudioTable.insert {
         it[AudioTable.taskId] = taskId
-        it[AudioTable.sizeBytes] = sizeBytes
-        it[sha256] = HexFormat.of().formatHex(digest.digest())
+        it[sizeBytes] = audio.sizeBytes
+        it[sha256] = audio.sha256
+    }
+    val page = ByteArray(PAGE_SIZE)
+    var partNo = 0
+    Files.newInputStream(audio.file).use { input ->
+        while (true) {
+            val n = input.readNBytes(page, 0, PAGE_SIZE)
+            if (n == 0) break
+            // The insert executes before the next read, so a full page buffer is reused safely.
+            val bytes = if (n == PAGE_SIZE) page else page.copyOf(n)
+            AudioPartsTable.insert {
+                it[AudioPartsTable.taskId] = taskId
+                it[AudioPartsTable.partNo] = partNo
+                it[part] = ExposedBlob(bytes)
+            }
+            partNo++
+        }
     }
 }
