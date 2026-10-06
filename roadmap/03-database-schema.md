@@ -61,7 +61,7 @@ Approved 2026-10-06. Behaviors only; discovered scenarios are appended as `(disc
 - [x] Deleting a task cascades to its audio, audio pages, chunks, and segments
 - [x] Audio larger than one page is written from and read back to streams without holding the whole payload in memory, byte-for-byte identical, and its stored `size_bytes`/`sha256` match independently derived values
 - [x] Listing tasks does not read audio data
-- [ ] The queue paused flag round-trips and only one `queue_state` row can exist
+- [x] The queue paused flag round-trips and only one `queue_state` row can exist
 - [ ] `STT_DATA_DIR` unset or empty → config load fails with an error naming `STT_DATA_DIR`
 - [ ] Opening the database creates the data directory when missing and creates `stt.db`
 - [ ] The application module registers the Database via Ktor DI; an application loads with it and a `testApplication` may override the provider before services load
