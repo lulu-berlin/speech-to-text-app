@@ -1,7 +1,7 @@
 # 04 — Queue domain model
 
 Status: draft
-Depends on: [03](03-database-schema.md)
+Depends on: [03](../docs/specs/database-schema.md) (done)
 
 ## Goal
 
