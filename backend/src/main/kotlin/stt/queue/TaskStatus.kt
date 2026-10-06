@@ -25,7 +25,7 @@ enum class TaskStatus {
      */
     fun transition(to: TaskStatus): TransitionOutcome {
         val allowed = allowedTargets[this].orEmpty()
-        return if (to in allowed) TransitionOutcome.Accepted(to) else TransitionOutcome.Rejected(this, to)
+        return if (to in allowed) TransitionOutcome.Accepted else TransitionOutcome.Rejected(this, to)
     }
 
     companion object {
