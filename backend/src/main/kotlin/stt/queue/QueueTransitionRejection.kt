@@ -10,4 +10,9 @@ sealed interface QueueTransitionRejection {
 
     /** `QUEUED → RUNNING` while another task is already `RUNNING` (at most one running task). */
     data object AnotherTaskRunning : QueueTransitionRejection
+
+    /** No task with [id] is in the queue (never queued, or already finished). */
+    data class UnknownTask(
+        val id: Long,
+    ) : QueueTransitionRejection
 }

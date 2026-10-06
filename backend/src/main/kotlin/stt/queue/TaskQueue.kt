@@ -24,7 +24,9 @@ data class TaskQueue(
         id: Long,
         to: TaskStatus,
     ): QueueTransitionOutcome {
-        val from = entries.first { it.id == id }.status
+        val from =
+            entries.firstOrNull { it.id == id }?.status
+                ?: return QueueTransitionOutcome.Rejected(QueueTransitionRejection.UnknownTask(id))
         if (from.transition(to) is TransitionOutcome.Rejected) {
             return QueueTransitionOutcome.Rejected(QueueTransitionRejection.IllegalTransition(from, to))
         }
