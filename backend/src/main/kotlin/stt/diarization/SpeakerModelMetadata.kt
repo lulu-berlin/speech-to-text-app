@@ -17,18 +17,18 @@ internal data class SpeakerModelMetadata(
         /** Parses [custom] and rejects values the front-end does not support, naming the key and the value. */
         fun parse(custom: Map<String, String>): SpeakerModelMetadata {
             val outputDim = requireInt(custom, "output_dim")
-            val sampleRate = custom.getValue("sample_rate").toInt()
+            val sampleRate = requireInt(custom, "sample_rate")
             require(sampleRate == SUPPORTED_SAMPLE_RATE) {
                 "Speaker model metadata sample_rate must be $SUPPORTED_SAMPLE_RATE, got \"$sampleRate\""
             }
-            val featureNormalizeType = custom.getValue("feature_normalize_type")
+            val featureNormalizeType = requireValue(custom, "feature_normalize_type")
             require(featureNormalizeType == SUPPORTED_FEATURE_NORMALIZE_TYPE) {
                 "Speaker model metadata feature_normalize_type must be \"$SUPPORTED_FEATURE_NORMALIZE_TYPE\", got \"$featureNormalizeType\""
             }
             return SpeakerModelMetadata(
                 outputDim = outputDim,
                 sampleRate = sampleRate,
-                normalizeSamples = custom.getValue("normalize_samples").toInt() != 0,
+                normalizeSamples = requireInt(custom, "normalize_samples") != 0,
                 featureNormalizeType = featureNormalizeType,
             )
         }
@@ -37,8 +37,13 @@ internal data class SpeakerModelMetadata(
             custom: Map<String, String>,
             key: String,
         ): Int {
-            val raw = requireNotNull(custom[key]) { "Speaker model metadata $key is missing" }
+            val raw = requireValue(custom, key)
             return requireNotNull(raw.toIntOrNull()) { "Speaker model metadata $key must be an integer, got \"$raw\"" }
         }
+
+        private fun requireValue(
+            custom: Map<String, String>,
+            key: String,
+        ): String = requireNotNull(custom[key]) { "Speaker model metadata $key is missing" }
     }
 }

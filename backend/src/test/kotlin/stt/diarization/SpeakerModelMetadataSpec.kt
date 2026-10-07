@@ -43,4 +43,23 @@ class SpeakerModelMetadataSpec :
                 }
             }
         }
+        given("model metadata with a missing or non-integer key") {
+            `when`("it is parsed") {
+                then("it is rejected with an error naming the key and the value") {
+                    val cases =
+                        listOf(
+                            speakerModelMetadata("sample_rate:") to listOf("sample_rate", "missing"),
+                            speakerModelMetadata("sample_rate=x") to listOf("sample_rate", "x"),
+                            speakerModelMetadata("normalize_samples:") to listOf("normalize_samples", "missing"),
+                            speakerModelMetadata("normalize_samples=x") to listOf("normalize_samples", "x"),
+                            speakerModelMetadata("feature_normalize_type:") to listOf("feature_normalize_type", "missing"),
+                        )
+
+                    cases.forEach { (custom, expectedInMessage) ->
+                        val error = shouldThrow<IllegalArgumentException> { SpeakerModelMetadata.parse(custom) }
+                        expectedInMessage.forEach { error.message.shouldContain(it) }
+                    }
+                }
+            }
+        }
     })
