@@ -27,24 +27,33 @@ internal class Embeddings(
     /**
      * One embedding per [segments] segment, in segment order. Empty [pcm] yields every embedding all zeros
      * (oracle `embed_windows` with `total <= 0`), without touching the session.
+     *
+     * [gate] (ADR 0004) is checked before every window: while it is paused the embedding suspends between
+     * windows, and a cancellation of this coroutine lands at the same boundary. [onWindowDone] reports
+     * `(windows done, total windows)` after each window.
      */
     suspend fun embed(
         pcm: FloatArray,
         segments: List<Segment>,
+        gate: PauseGate? = null,
+        onWindowDone: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): Array<FloatArray> {
         if (pcm.isEmpty()) {
             return Array(segments.size) { FloatArray(model.metadata.outputDim) }
         }
-        return withContext(Dispatchers.Default) {
-            segments
-                .map { segment ->
-                    val window = embeddingWindow(pcm, segment.startMs, segment.endMs)
-                    val samples = if (model.metadata.normalizeSamples) FloatArray(window.size) { window[it] * 32768f } else window
-                    val features = fbank(samples)
-                    subtractGlobalMean(features)
-                    l2Normalize(infer(features))
-                }.toTypedArray()
+        val embeddings = ArrayList<FloatArray>(segments.size)
+        withContext(Dispatchers.Default) {
+            segments.forEachIndexed { index, segment ->
+                gate?.checkpoint()
+                val window = embeddingWindow(pcm, segment.startMs, segment.endMs)
+                val samples = if (model.metadata.normalizeSamples) FloatArray(window.size) { window[it] * 32768f } else window
+                val features = fbank(samples)
+                subtractGlobalMean(features)
+                embeddings.add(l2Normalize(infer(features)))
+                onWindowDone(index + 1, segments.size)
+            }
         }
+        return embeddings.toTypedArray()
     }
 
     /** Runs the session on `features` shaped `[1, T, [MEL_BINS]]` and returns the raw output tensor. */
