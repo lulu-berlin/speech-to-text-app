@@ -22,7 +22,7 @@ class AudioRepository(
 /** Inside the current transaction: inserts [taskId]'s `audio` row; a duplicate sha256 is rejected here (UNIQUE). */
 internal fun JdbcTransaction.insertAudioRow(
     taskId: Long,
-    audio: SpooledAudio,
+    audio: SpooledUpload,
 ) {
     AudioTable.insert {
         it[AudioTable.taskId] = taskId
