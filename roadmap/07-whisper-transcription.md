@@ -50,7 +50,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 
 - [x] JSON with a `transcription` array yields segments with millisecond offsets and text
 - [x] JSON with a legacy `segments` array (seconds) yields the same segments in milliseconds
-- [ ] JSON with neither key, or an empty array, yields no segments
+- [x] JSON with neither key, or an empty array, yields no segments
 - [ ] Missing `offsets` fields default to 0 and missing `text` to an empty string
 - [ ] Segment times are shifted by the chunk start offset
 - [ ] A `-pp` progress line is parsed into a chunk fraction; unrelated stderr lines are ignored
