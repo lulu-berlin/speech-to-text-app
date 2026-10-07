@@ -1,6 +1,6 @@
 # 18 — Audio storage: originals in the work directory, chunks as FLAC
 
-Status: in-review
+Status: in-progress
 Depends on: [03](../docs/specs/database-schema.md) (done)
 
 ## Goal
