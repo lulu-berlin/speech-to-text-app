@@ -9,6 +9,7 @@ import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest
+import stt.audio.PlannedChunk
 import stt.queue.TaskStatus
 import java.io.IOException
 import java.nio.file.Files
@@ -141,7 +142,7 @@ class TaskRepositorySpec :
                             tasks.createFromUpload(queuedTask("doomed.wav", createdAt = 1L), "doomed".byteInputStream())
                         val keptId = tasks.createFromUpload(queuedTask("kept.wav", createdAt = 2L), "kept".byteInputStream())
                         for (taskId in listOf(doomedId, keptId)) {
-                            chunks.insertAll(taskId, listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.DONE)))
+                            chunks.storePlan(taskId, exportedChunks(dataDir, "task-$taskId", PlannedChunk(0L, 1_000L)))
                             segments.insertAll(
                                 taskId,
                                 listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "x", speaker = null)),
