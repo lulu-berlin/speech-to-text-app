@@ -257,7 +257,7 @@ class DatabaseSpec :
 
                         Database.open(dataDir).close()
 
-                        Files.list(tmpDir).use { it.toList() }.shouldBeEmpty()
+                        entries(tmpDir).shouldBeEmpty()
                         Files.readString(dataDir.resolve("keep.txt")).shouldBe("not a temp file")
                     }
                 }

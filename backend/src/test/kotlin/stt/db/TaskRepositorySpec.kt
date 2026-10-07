@@ -73,7 +73,7 @@ class TaskRepositorySpec :
                             tasks.find(taskId).shouldBe(StoredTask(taskId, task))
                             val original = dataDir.resolve("work").resolve(taskId.toString()).resolve("source")
                             Files.readAllBytes(original).shouldBe(GeneratedBytes(size).readAllBytes())
-                            Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
+                            entries(db.tmpDir).shouldBeEmpty()
                             // 2 × 1 048 576 + 12 345 = 2 109 497 bytes; the digest is the test's own, over a fresh stream.
                             AudioRepository(db)
                                 .metadata(taskId)
@@ -101,12 +101,8 @@ class TaskRepositorySpec :
                         rowCount(db, "tasks").shouldBe(1)
                         rowCount(db, "audio").shouldBe(1)
                         tasks.find(firstId).shouldBe(StoredTask(firstId, first))
-                        Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
-                        Files
-                            .list(
-                                dataDir.resolve("work"),
-                            ).use { it.toList() }
-                            .shouldBe(listOf(dataDir.resolve("work").resolve(firstId.toString())))
+                        entries(db.tmpDir).shouldBeEmpty()
+                        entries(dataDir.resolve("work")).shouldBe(listOf(dataDir.resolve("work").resolve(firstId.toString())))
                     }
                 }
             }
@@ -127,9 +123,8 @@ class TaskRepositorySpec :
 
                         rowCount(db, "tasks").shouldBe(0)
                         rowCount(db, "audio").shouldBe(0)
-                        Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
-                        val work = dataDir.resolve("work")
-                        (if (Files.exists(work)) Files.list(work).use { it.toList() } else emptyList()).shouldBeEmpty()
+                        entries(db.tmpDir).shouldBeEmpty()
+                        entries(dataDir.resolve("work")).shouldBeEmpty()
                     }
                 }
             }

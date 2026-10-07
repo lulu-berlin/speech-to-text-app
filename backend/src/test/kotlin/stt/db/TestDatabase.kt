@@ -4,6 +4,7 @@ import io.kotest.core.TestConfiguration
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import kotlinx.coroutines.test.runTest
+import java.nio.file.Files
 import java.nio.file.Path
 
 /** The per-test data directory a [withDatabase] block runs in. */
@@ -25,6 +26,9 @@ internal fun taskRepository(
     db: Database,
     dataDir: Path,
 ) = TaskRepository(db, TaskWorkDirectories(dataDir))
+
+/** The entries of [dir], in no particular order; none when [dir] does not exist. */
+internal fun entries(dir: Path): List<Path> = if (Files.exists(dir)) Files.list(dir).use { it.toList() } else emptyList()
 
 /** Number of rows in [table], read over the raw connection. */
 internal fun rowCount(

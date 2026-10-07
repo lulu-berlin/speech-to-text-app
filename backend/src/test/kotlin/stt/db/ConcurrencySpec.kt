@@ -23,7 +23,6 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -167,7 +166,7 @@ class ConcurrencySpec :
                                 tasks.list().shouldBe(listOf(StoredTask(otherId, other)))
                                 rowCount(db, "audio_parts").shouldBe(0)
                                 rowCount(db, "audio").shouldBe(0)
-                                Files.list(dataDir.resolve("tmp")).use { it.toList() }.shouldBeEmpty()
+                                entries(dataDir.resolve("tmp")).shouldBeEmpty()
                             }
                         }
                     }
