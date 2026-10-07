@@ -99,4 +99,28 @@ class FbankSpec :
                 }
             }
         }
+
+        given("features of 3 frames and 2 columns") {
+            `when`("global-mean normalization is applied") {
+                then("every feature column averages to zero") {
+                    // Column means: (1 + 3 + 5) / 3 = 3 and (2 + 6 + 10) / 3 = 6.
+                    val features =
+                        arrayOf(
+                            floatArrayOf(1f, 2f),
+                            floatArrayOf(3f, 6f),
+                            floatArrayOf(5f, 10f),
+                        )
+
+                    subtractGlobalMean(features)
+
+                    features.map { it.toList() }.shouldBe(
+                        listOf(
+                            listOf(-2f, -4f),
+                            listOf(0f, 0f),
+                            listOf(2f, 4f),
+                        ),
+                    )
+                }
+            }
+        }
     })
