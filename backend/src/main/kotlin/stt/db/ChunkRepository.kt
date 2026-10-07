@@ -1,10 +1,15 @@
 package stt.db
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import stt.audio.ExportedChunk
+import java.io.OutputStream
 import java.nio.file.Files
 
 class ChunkRepository(
@@ -35,6 +40,28 @@ class ChunkRepository(
                 }
             }
         }
+    }
+
+    /**
+     * Writes chunk [idx]'s FLAC of task [taskId] to [target] (one BLOB, read on its own read-only
+     * connection, which is closed before [target] is written); [target] is not closed.
+     * Throws [NoSuchElementException] when the chunk has no stored FLAC.
+     */
+    suspend fun copyFlacTo(
+        taskId: Long,
+        idx: Int,
+        target: OutputStream,
+    ) {
+        val flac =
+            db.readTransaction {
+                ChunkAudioTable
+                    .select(ChunkAudioTable.flac)
+                    .where { (ChunkAudioTable.taskId eq taskId) and (ChunkAudioTable.idx eq idx) }
+                    .singleOrNull()
+                    ?.get(ChunkAudioTable.flac)
+                    ?.bytes
+            } ?: throw NoSuchElementException("no stored FLAC for chunk $idx of task $taskId")
+        withContext(Dispatchers.IO) { target.write(flac) }
     }
 
     /** The task's chunks in `idx` order. */
