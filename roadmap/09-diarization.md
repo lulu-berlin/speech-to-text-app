@@ -12,13 +12,14 @@ Assign a speaker index to every transcript segment of a task in pure Kotlin, rep
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): clustering (UPGMA + largest-gap speaker count), short-segment rescue, and turn merging are ported 1:1; the oracle's 0.35 n == 2 threshold is re-tuned for CAM++.
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): `docs/oracle/transcribe.py` is read, never run.
 - [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): in-JVM phases pause cooperatively via a pause gate.
+- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): the whole-file PCM is always rebuilt from the task's stored 16-bit FLAC chunks (item 11), so speaker labels do not depend on restarts; the n == 2 threshold is tuned on PCM built the same way.
 
 ## Proposal (pending approval)
 
 1:1 Kotlin ports of the oracle functions below, as pure functions over an embedding matrix (rows L2-normalized, from item 08) plus the per-task orchestration of `diarize_and_write` minus the file writing (item 10 renders outputs).
 
 - **Orchestration (oracle `diarize_and_write`).**
-  - Input: all segments of the task in transcript order (across chunks), `speakers_mode`/`speakers_count`, `max_speakers`; the decoded PCM of the whole file (item 06 port of `decode_pcm`).
+  - Input: all segments of the task in transcript order (across chunks), `speakers_mode`/`speakers_count`, `max_speakers`; the whole-file PCM, rebuilt by item 11 from the task's stored FLAC chunks (ADR 0024; 16-bit-quantized, unlike the oracle's float32 decode of the original).
   - Clustered set `idxs` = segments with `end - start >= 0.5 s` (`SHORT_SEGMENT_SECONDS`); if that set is empty, all segments are clustered.
   - Embeddings are computed for **all** segments (item 08 `embed_windows` port), because short segments need their own embedding for the rescue step.
   - `k` = `null` for `auto`, else the fixed count; `cluster_segments(embs[idxs], k, max_speakers)`; unclustered segments start at label 0; then `_rescue_short_segments`; then `_print_speaker_summary` on the clustered rows with their final labels.

@@ -4,22 +4,23 @@ Status: draft
 Depends on: [13](13-frontend-foundation.md)
 
 ## Goal
-Let the user browse past transcriptions: see finished tasks, read a transcript with speakers and timestamps, download it in every format, and listen to the original audio.
+Let the user browse past transcriptions: see finished tasks, read a transcript with speakers and timestamps, download it in every format, and listen to the task's audio.
 
 ## Already decided
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
-- [ADR 0005 — Audio as SQLite BLOB](../docs/decisions/0005-audio-as-sqlite-blob.md): audio is served from the database via `GET /api/tasks/{id}/audio`.
+- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks — 16 kHz mono, not the original upload; a task canceled or failed before chunking has no audio (404).
 
 ## Proposal (pending approval)
 - History list of finished tasks (status COMPLETED, FAILED, CANCELED) with filename, status, date, duration; FAILED tasks show their error message.
 - Detail view for a completed task showing speaker turns with timestamps (from `GET /api/tasks/{id}/transcript?format=json`); speakers-off transcripts shown without labels.
 - Download buttons per format: txt, srt, vtt, json (`GET /api/tasks/{id}/transcript?format=...`).
-- Audio player (`<audio>`) sourced from `GET /api/tasks/{id}/audio`.
+- Audio player (`<audio>`) sourced from `GET /api/tasks/{id}/audio` (`audio/flac`, 16 kHz mono).
 - The list updates live when a task finishes (via `useEvents`).
 
 ## Open questions for the user
 - Search/filter in the history list (by filename, date, status)?
 - Click-to-seek: clicking a segment/turn seeks the audio player to its start time?
+- A task without audio (canceled or failed before chunking; the audio endpoint answers 404): hide the player, or show a "no audio" note?
 
 ## Test list (written with the user; Canon TDD step 1)
 Seed — to be refined and approved with the user before any test is written:
@@ -29,6 +30,7 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] A speakers-off transcript is shown without speaker labels
 - [ ] Each download button links to the transcript in its format
 - [ ] The audio player points at the task's audio endpoint
+- [ ] A task without stored audio (audio endpoint 404) shows no broken player
 - [ ] A task finishing while the history view is open appears in the list
 - [ ] A missing task (404) shows a not-found message
 

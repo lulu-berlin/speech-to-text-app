@@ -12,10 +12,11 @@ Transcribe each planned chunk with one whisper-cli run, turn its JSON output int
 - [ADR 0004 — Chunked transcription with SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): one whisper-cli run per chunk; segments persisted per chunk; previous chunk's trailing text passed via `--prompt`.
 - [ADR 0008 — Default whisper model](../docs/decisions/0008-default-whisper-model.md): `large-v3-turbo-q5_0`, provided via `STT_WHISPER_MODEL`.
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): command construction and JSON parsing are ported from `docs/oracle/transcribe.py`.
+- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): chunks are stored as FLAC (16-bit, 16 kHz mono); item 11 writes each chunk's FLAC from the database to a file for whisper-cli, which reads FLAC (`whisper-cli --help` 1.9.2: `supported audio formats: flac, mp3, ogg, wav`).
 
 ## Proposal (pending approval)
 
-- **Command per chunk:** `whisper-cli -m $STT_WHISPER_MODEL -f chunk.wav -l <lang> -t <threads> <device args> -oj -of <prefix> -pp [--prompt <prev tail>]`, run through the item 05 runner (cancellable, pausable with `SIGSTOP`/`SIGCONT`). As in oracle `transcribe_one`, `-t` is only passed when a thread count is configured (`STT_THREADS`); otherwise whisper-cli's default applies. `-oj` writes `<prefix>.json`; `-pp` prints progress to stderr. All flags verified against `whisper-cli --help` (1.9.2): `-oj`, `-of FNAME`, `-pp`, `--prompt PROMPT` (max n_text_ctx/2 tokens), `-ng/--no-gpu`, `-dev/--device N`.
+- **Command per chunk:** `whisper-cli -m $STT_WHISPER_MODEL -f <chunk>.flac -l <lang> -t <threads> <device args> -oj -of <prefix> -pp [--prompt <prev tail>]`, run through the item 05 runner (cancellable, pausable with `SIGSTOP`/`SIGCONT`). As in oracle `transcribe_one`, `-t` is only passed when a thread count is configured (`STT_THREADS`); otherwise whisper-cli's default applies. `-oj` writes `<prefix>.json`; `-pp` prints progress to stderr. All flags verified against `whisper-cli --help` (1.9.2): `-oj`, `-of FNAME`, `-pp`, `--prompt PROMPT` (max n_text_ctx/2 tokens), `-ng/--no-gpu`, `-dev/--device N`.
 - **Port oracle `device_args`** (`docs/oracle/transcribe.py`), input parsed like oracle `parse_device` from `STT_DEVICE`:
   - `auto` → no flag (whisper-cli picks the first GPU);
   - `cpu` → `--no-gpu`;
@@ -39,7 +40,7 @@ Transcribe each planned chunk with one whisper-cli run, turn its JSON output int
 - Fixture model for integration tests: `ggml-tiny.en` fetched via `nix/models.nix` (proposed)?
 - Fixture speech clip: source and license (must be redistributable in the repo, or fetched by hash)?
 - ~~Persisting segments and chunk status needs item 03's tables: add 03 as a dependency?~~ Resolved by [ADR 0019](../docs/decisions/0019-schema-ownership-and-evolution.md): item 03 owns `chunks`/`segments` and their repositories; 03 is now in `Depends on`. Note for the one-transaction persistence in the Proposal: item 03's repositories each run their own transaction (`ChunkRepository.insertAll`, `SegmentRepository.insertAll`) and offer no "mark chunk DONE + insert its segments" operation yet; this item adds it.
-- Should whisper-cli's output JSON and the chunk WAV be deleted right after the chunk is persisted?
+- Should whisper-cli's output JSON and the chunk FLAC file (written from the database for this run) be deleted right after the chunk is persisted?
 
 ## Test list (written with the user; Canon TDD step 1)
 

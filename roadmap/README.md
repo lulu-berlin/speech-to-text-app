@@ -31,6 +31,8 @@ graph TD
   05 --> 11
   07 --> 11
   09 --> 11
+  03 --> 18[18 audio storage]
+  18 --> 11
   11 --> 12[12 HTTP API and SSE]
   02 --> 13[13 frontend foundation]
   12 --> 13
@@ -57,10 +59,11 @@ graph TD
 | [08 — Speaker embeddings](08-speaker-embeddings.md) | draft | 06 |
 | [09 — Diarization](09-diarization.md) | draft | 08 |
 | [10 — Output formats](10-output-formats.md) | draft | 09 |
-| [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09 |
+| [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18 |
 | [12 — HTTP API and SSE](12-http-api-and-sse.md) | draft | 11 |
 | [13 — Frontend foundation](13-frontend-foundation.md) | draft | 02, 12 |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13 |
 | [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13 |
 | [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
+| [18 — Audio storage: originals in the work directory, chunks as FLAC](18-audio-storage.md) | draft | 03 |
