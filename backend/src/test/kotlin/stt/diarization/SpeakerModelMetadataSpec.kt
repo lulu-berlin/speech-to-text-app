@@ -13,6 +13,16 @@ private val SUPPORTED =
         "feature_normalize_type" to "global-mean",
     )
 
+/**
+ * [SUPPORTED] with one deviation, written as "key=value" to replace a value or as "key:" to drop the key.
+ */
+private fun speakerModelMetadata(deviation: String): Map<String, String> =
+    if (deviation.endsWith(":")) {
+        SUPPORTED - deviation.removeSuffix(":")
+    } else {
+        SUPPORTED + (deviation.substringBefore("=") to deviation.substringAfter("="))
+    }
+
 class SpeakerModelMetadataSpec :
     BehaviorSpec({
         given("model metadata with an unsupported value") {
@@ -20,10 +30,10 @@ class SpeakerModelMetadataSpec :
                 then("it is rejected with an error naming the key and the value") {
                     val cases =
                         listOf(
-                            SUPPORTED + ("sample_rate" to "8000") to listOf("sample_rate", "8000"),
-                            SUPPORTED + ("feature_normalize_type" to "none") to listOf("feature_normalize_type", "none"),
-                            SUPPORTED - "output_dim" to listOf("output_dim", "missing"),
-                            SUPPORTED + ("output_dim" to "abc") to listOf("output_dim", "abc"),
+                            speakerModelMetadata("sample_rate=8000") to listOf("sample_rate", "8000"),
+                            speakerModelMetadata("feature_normalize_type=none") to listOf("feature_normalize_type", "none"),
+                            speakerModelMetadata("output_dim:") to listOf("output_dim", "missing"),
+                            speakerModelMetadata("output_dim=abc") to listOf("output_dim", "abc"),
                         )
 
                     cases.forEach { (custom, expectedInMessage) ->
