@@ -50,4 +50,27 @@ class FbankSpec :
                 }
             }
         }
+
+        given("the mel filterbank for 80 bins between 20 Hz and 7600 Hz at FFT size 512") {
+            `when`("it is computed") {
+                then("each triangle's first and last non-zero FFT bin match hand-computed positions") {
+                    // Kaldi MelBanks: mel(f) = 1127 ln(1 + f / 700); FFT bin i sits at 31.25 * i Hz (16000 / 512);
+                    // triangle b spans the open interval (mel_low + b * delta, mel_low + (b + 2) * delta).
+                    //   mel_low = mel(20) = 31.749, mel_high = mel(7600) = 2786.99, delta = (mel_high - mel_low) / 81 = 34.015
+                    // b = 0:  (20.0 Hz, 64.80 Hz)      -> FFT bins 0.64 .. 2.07   -> first 1,   last 2
+                    // b = 40: (1707.97 Hz, 1857.80 Hz) -> FFT bins 54.66 .. 59.45 -> first 55,  last 59
+                    // b = 79: (7113.80 Hz, 7600 Hz)    -> FFT bins 227.6 .. 243.2 -> first 228, last 243
+                    val banks = melFilterbank()
+
+                    banks.size.shouldBe(80)
+                    banks.forEach { weights -> weights.size.shouldBe(257) }
+                    val edges =
+                        listOf(0, 40, 79).associateWith { bin ->
+                            banks[bin].indexOfFirst { it > 0f } to
+                                banks[bin].indexOfLast { it > 0f }
+                        }
+                    edges.shouldBe(mapOf(0 to (1 to 2), 40 to (55 to 59), 79 to (228 to 243)))
+                }
+            }
+        }
     })
