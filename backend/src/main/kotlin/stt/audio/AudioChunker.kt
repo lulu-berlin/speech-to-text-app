@@ -31,7 +31,8 @@ class AudioChunker(
         return ChunkedAudio(durationMs, chunks)
     }
 
-    private suspend fun detectSilences(
+    /** Runs `silencedetect` over [source]; internal as a test seam (a failing run cannot be provoked through [chunk]). */
+    internal suspend fun detectSilences(
         source: Path,
         durationMs: Long,
     ): List<Silence> {
@@ -48,37 +49,44 @@ class AudioChunker(
                         "-",
                     ),
             )
+        if (result.exitCode != 0) {
+            throw AudioDecodeException("ffmpeg failed to detect silences in $source: ${result.stderr.joinToString("\n").trim()}")
+        }
         return parseSilences(result.stderr, durationMs)
     }
 
-    /** Cuts [chunk] sample-exactly from the decoded [pcm] into a 16-bit FLAC [file]. */
-    private suspend fun export(
+    /** Cuts [chunk] sample-exactly from the decoded [pcm] into a 16-bit FLAC [file]; internal as a test seam. */
+    internal suspend fun export(
         pcm: Path,
         chunk: PlannedChunk,
         file: Path,
     ) {
-        runner.run(
-            FFMPEG +
-                listOf(
-                    "-y",
-                    "-loglevel",
-                    "error",
-                    "-f",
-                    "f32le",
-                    "-ar",
-                    SAMPLE_RATE.toString(),
-                    "-ac",
-                    "1",
-                    "-i",
-                    pcm.toString(),
-                    "-af",
-                    "atrim=start_sample=${chunk.startMs * SAMPLES_PER_MS}:end_sample=${chunk.endMs * SAMPLES_PER_MS}",
-                    "-c:a",
-                    "flac",
-                    "-sample_fmt",
-                    "s16",
-                    file.toString(),
-                ),
-        )
+        val result =
+            runner.run(
+                FFMPEG +
+                    listOf(
+                        "-y",
+                        "-loglevel",
+                        "error",
+                        "-f",
+                        "f32le",
+                        "-ar",
+                        SAMPLE_RATE.toString(),
+                        "-ac",
+                        "1",
+                        "-i",
+                        pcm.toString(),
+                        "-af",
+                        "atrim=start_sample=${chunk.startMs * SAMPLES_PER_MS}:end_sample=${chunk.endMs * SAMPLES_PER_MS}",
+                        "-c:a",
+                        "flac",
+                        "-sample_fmt",
+                        "s16",
+                        file.toString(),
+                    ),
+            )
+        if (result.exitCode != 0) {
+            throw AudioDecodeException("ffmpeg failed to export $file: ${result.stderr.joinToString("\n").trim()}")
+        }
     }
 }

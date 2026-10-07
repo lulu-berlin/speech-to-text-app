@@ -56,7 +56,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Integration: an ffmpeg-generated tone+silence fixture is split at the expected silence midpoints and the exported chunk FLACs (16-bit, 16 kHz mono) have the planned lengths
 - [x] A silence at or before the current chunk start is never chosen (discovered)
 - [x] Integration: chunking again in a work directory left by an interrupted run overwrites the old PCM and chunk files (discovered)
-- [ ] Integration: a failed `silencedetect` or chunk-export run fails chunking with ffmpeg's error message (discovered)
+- [x] Integration: a failed `silencedetect` or chunk-export run fails chunking with ffmpeg's error message (discovered)
 
 ## Acceptance criteria
 

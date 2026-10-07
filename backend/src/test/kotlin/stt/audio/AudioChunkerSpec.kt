@@ -1,8 +1,10 @@
 package stt.audio
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.withTimeout
 import stt.Integration
 import stt.process.ProcessRunner
@@ -67,6 +69,30 @@ class AudioChunkerSpec :
                     val chunk = chunked.chunks.single()
                     streamInfo(chunk.file).shouldBe(FLAC_16_BIT_16K_MONO)
                     sampleCount(chunk.file, workDir).shouldBe(48_000L)
+                }
+            }
+        }
+
+        given("a silencedetect run and a chunk-export run whose input files are missing") {
+            `when`("each is run") {
+                then("each fails chunking with ffmpeg's error message") {
+                    val workDir = tempdir("stt-audio").toPath()
+                    val source = workDir.resolve("missing.wav")
+                    val pcm = workDir.resolve("audio.f32")
+                    val file = workDir.resolve("chunk-0.flac")
+                    val chunker = AudioChunker(ProcessRunner())
+
+                    val detectError =
+                        shouldThrow<AudioDecodeException> { withTimeout(30.seconds) { chunker.detectSilences(source, 1_000) } }
+                    val exportError =
+                        shouldThrow<AudioDecodeException> {
+                            withTimeout(30.seconds) { chunker.export(pcm, PlannedChunk(startMs = 0, endMs = 1_000), file) }
+                        }
+
+                    detectError.message.shouldContain("ffmpeg failed to detect silences in $source")
+                    detectError.message.shouldContain("No such file or directory") // ffmpeg's stderr
+                    exportError.message.shouldContain("ffmpeg failed to export $file")
+                    exportError.message.shouldContain("No such file or directory") // ffmpeg's stderr
                 }
             }
         }
