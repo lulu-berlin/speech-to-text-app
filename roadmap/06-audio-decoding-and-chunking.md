@@ -54,6 +54,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Integration: decoding a file ffmpeg cannot read fails with ffmpeg's error message
 - [ ] Integration: decoding a file with no audio fails with "no audio decoded"
 - [ ] Integration: an ffmpeg-generated tone+silence fixture is split at the expected silence midpoints and the exported chunk WAVs have the planned lengths
+- [ ] A silence at or before the current chunk start is never chosen (discovered)
 
 ## Acceptance criteria
 
@@ -67,3 +68,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 
 - 2026-10-06: consultation decisions approved: chunk target 5 min / cap 6 min, `silencedetect` `noise=-30dB`, `d=0.5`, as constants; a trailing chunk under 30 s merges into the previous one only within the cap; duration from the decoded sample count; item 11 persists the plan, reuses it on resume, and owns the work directory's lifecycle; work directory `$STT_DATA_DIR/work/<task-id>`; ffmpeg writes the PCM to a file (the runner stays line-oriented); every ffmpeg run passes `-nostats` (the runner keeps splitting on `\n` only). Test list of 11 items approved with the spec. No new ADR: item-local processing decisions, recorded here; the cross-item ones (persistence and work directory in item 11) are also noted in item 11's draft.
 - 2026-10-06: chunk WAV sample format decided: 16-bit PCM (`pcm_s16le`), whisper.cpp's documented whisper-cli input (README v1.9.2: "currently runs only with 16-bit WAV files"), over float32 WAV (accepted by v1.9.2's miniaudio loader in code, but undocumented).
+- 2026-10-06: discovered test item confirmed: a silence at or before the current chunk start is never chosen (otherwise the planner can cut a chunk that ends where it starts and never terminates).
