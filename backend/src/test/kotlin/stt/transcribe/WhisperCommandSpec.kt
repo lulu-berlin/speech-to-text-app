@@ -18,7 +18,8 @@ class WhisperCommandSpec :
                     val prefix = Path.of("/work/chunk-2")
 
                     val configured = Config.fromEnv(env("STT_THREADS" to "4", "STT_DEVICE" to "cpu"))
-                    whisperCommand(model, chunk, "en", configured.threads, configured.device, prefix, prompt = " ask what you can do")
+                    val configuredSettings = WhisperSettings(model, "en", configured.threads, configured.device)
+                    whisperCommand(configuredSettings, chunk, prefix, prompt = " ask what you can do")
                         .shouldBe(
                             listOf(
                                 "whisper-cli",
@@ -41,7 +42,7 @@ class WhisperCommandSpec :
                         )
 
                     val defaults = Config.fromEnv(env())
-                    whisperCommand(model, chunk, "en", defaults.threads, defaults.device, prefix, prompt = null)
+                    whisperCommand(WhisperSettings(model, "en", defaults.threads, defaults.device), chunk, prefix, prompt = null)
                         .shouldBe(
                             listOf(
                                 "whisper-cli",

@@ -49,11 +49,8 @@ class ChunkTranscriberSpec :
                         shouldThrow<TranscriptionException> {
                             withTimeout(30.seconds) {
                                 transcriber.transcribe(
-                                    model = Path.of("/models/ggml-tiny.en.bin"),
+                                    WhisperSettings(Path.of("/models/ggml-tiny.en.bin"), "en", threads = null, Device.Cpu),
                                     audio = workDir.resolve("chunk-2.flac"),
-                                    language = "en",
-                                    threads = null,
-                                    device = Device.Cpu,
                                     outputPrefix = workDir.resolve("chunk-2"),
                                     prompt = null,
                                 )
