@@ -44,7 +44,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A `chunk_audio` row for a chunk that does not exist is rejected (foreign key)
 - [x] Reading the chunk plan does not read chunk audio
 - [x] A chunk-FLAC read completes while a write transaction is held open (discovered; replaces item 03's `copyTo` stall test)
-- [ ] An upload whose original cannot be moved into the work directory leaves no task and no audio row, and re-uploading the same bytes afterwards succeeds (discovered, review round 1)
+- [x] An upload whose original cannot be moved into the work directory leaves no task and no audio row, and re-uploading the same bytes afterwards succeeds (discovered, review round 1)
 
 ## Acceptance criteria
 

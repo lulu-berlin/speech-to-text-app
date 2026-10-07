@@ -3,6 +3,8 @@ package stt.db
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
+import io.kotest.matchers.booleans.shouldBeFalse
+import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.longs.shouldBeLessThan
 import io.kotest.matchers.longs.shouldBeLessThanOrEqual
@@ -12,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import stt.audio.PlannedChunk
 import stt.queue.TaskStatus
 import java.io.IOException
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.SQLException
@@ -179,6 +182,53 @@ class TaskRepositorySpec :
                         }
 
                         tasks.list().shouldBe(listOf(StoredTask(firstId, first), StoredTask(secondId, second)))
+                    }
+                }
+            }
+        }
+
+        given("a data directory whose work/ is a file, so no task's work directory can be created") {
+            `when`("an upload's original cannot be moved into its work directory") {
+                then(
+                    "the task and its audio row are deleted, no work directory or spool remains, and re-uploading the same bytes succeeds",
+                ) {
+                    withDatabase { db ->
+                        val tasks = taskRepository(db, dataDir)
+                        val blockingFile = dataDir.resolve("work")
+                        Files.writeString(blockingFile, "blocks the work directory")
+                        val bytes = "same bytes".toByteArray()
+
+                        shouldThrow<FileSystemException> {
+                            tasks.createFromUpload(
+                                queuedTask("blocked.wav", createdAt = 1L),
+                                bytes.inputStream(),
+                            )
+                        }
+
+                        rowCount(db, "tasks").shouldBe(0)
+                        rowCount(db, "audio").shouldBe(0)
+                        entries(db.tmpDir).shouldBeEmpty()
+                        Files.isRegularFile(blockingFile).shouldBeTrue()
+                        // The blocking file is untouched: no task's work directory was created or removed.
+                        Files.exists(dataDir.resolve("work").resolve("1")).shouldBeFalse()
+
+                        Files.delete(blockingFile)
+                        val id = tasks.createFromUpload(queuedTask("blocked.wav", createdAt = 1L), bytes.inputStream())
+                        tasks.find(id).shouldBe(StoredTask(id, queuedTask("blocked.wav", createdAt = 1L)))
+                        Files
+                            .readAllBytes(
+                                dataDir.resolve("work").resolve(id.toString()).resolve("source"),
+                            ).toList()
+                            .shouldBe(bytes.toList())
+                        // sha256("same bytes") is the test's own, over the same input.
+                        AudioRepository(db)
+                            .metadata(id)
+                            .shouldBe(
+                                AudioMetadata(
+                                    sizeBytes = bytes.size.toLong(),
+                                    sha256 = sha256Hex(bytes.inputStream()),
+                                ),
+                            )
                     }
                 }
             }
