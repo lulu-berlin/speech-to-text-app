@@ -9,8 +9,8 @@ import java.nio.file.Path
  * `STT_DATA_DIR` is required: unset or empty fails fast (ADR 0017); it has no default.
  * `STT_DEVICE` (`auto`, `cpu`, `gpu`, or a GPU index >= 0) defaults to `auto` when unset; any other value,
  * empty included, fails fast.
- * `STT_THREADS` (an integer >= 1) is unset by default, leaving whisper-cli's own default; any other value,
- * empty included, fails fast.
+ * `STT_THREADS` (an integer >= 1) is unset by default, leaving whisper-cli's and ONNX Runtime's own defaults
+ * (it sets whisper-cli `-t` and the speaker model's intra-op threads); any other value, empty included, fails fast.
  * `STT_SPEAKER_MODEL` (the CAM++ ONNX model, ADR 0003) is required: unset or empty fails fast.
  */
 class Config(
