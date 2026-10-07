@@ -4,13 +4,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.insert
-import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import java.io.InputStream
-import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -18,22 +15,10 @@ import java.util.HexFormat
 
 private const val PAGE_SIZE = 1_048_576
 
-/** Audio payload as fixed-size pages (ADR 0018): at most one page is in memory at a time. */
+/** An upload's audio metadata (ADR 0024: the upload's bytes are not stored in the database). */
 class AudioRepository(
     private val db: Database,
 ) {
-    /**
-     * Spools [source] to a temp file (size and sha256 computed on the way), then writes its
-     * `audio` row and `audio_parts` pages in one short transaction. [source] is read on
-     * Dispatchers.IO and not closed.
-     */
-    suspend fun write(
-        taskId: Long,
-        source: InputStream,
-    ) {
-        db.withSpooledAudio(source) { audio -> db.writeTransaction { writeAudioRows(taskId, audio) } }
-    }
-
     suspend fun metadata(taskId: Long): AudioMetadata? =
         db.readTransaction {
             AudioTable
@@ -42,20 +27,6 @@ class AudioRepository(
                 .singleOrNull()
                 ?.let { row -> AudioMetadata(row[AudioTable.sizeBytes], row[AudioTable.sha256]) }
         }
-
-    /** Writes the task's payload to [target] page by page, in `part_no` order; [target] is not closed. */
-    suspend fun copyTo(
-        taskId: Long,
-        target: OutputStream,
-    ) {
-        db.readTransaction {
-            AudioPartsTable
-                .select(AudioPartsTable.part)
-                .where { AudioPartsTable.taskId eq taskId }
-                .orderBy(AudioPartsTable.partNo)
-                .forEach { row -> target.write(row[AudioPartsTable.part].bytes) }
-        }
-    }
 }
 
 /** An upload copied to a temp file under `$STT_DATA_DIR/tmp`, with its size and sha256. */
@@ -108,30 +79,6 @@ internal fun JdbcTransaction.insertAudioRow(
         it[AudioTable.taskId] = taskId
         it[sizeBytes] = audio.sizeBytes
         it[sha256] = audio.sha256
-    }
-}
-
-/**
- * Inside the current transaction: inserts the `audio` row first, so a duplicate sha256 is
- * rejected (UNIQUE) before any page is written, then one `audio_parts` row per page of [audio]'s file.
- */
-internal fun JdbcTransaction.writeAudioRows(
-    taskId: Long,
-    audio: SpooledAudio,
-) {
-    insertAudioRow(taskId, audio)
-    var partNo = 0
-    Files.newInputStream(audio.file).use { input ->
-        input.forEachPage { page, n ->
-            // The insert executes before the next read, so a full page buffer is reused safely.
-            val bytes = if (n == PAGE_SIZE) page else page.copyOf(n)
-            AudioPartsTable.insert {
-                it[AudioPartsTable.taskId] = taskId
-                it[AudioPartsTable.partNo] = partNo
-                it[part] = ExposedBlob(bytes)
-            }
-            partNo++
-        }
     }
 }
 

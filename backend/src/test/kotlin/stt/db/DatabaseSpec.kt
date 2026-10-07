@@ -7,12 +7,14 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
+import org.flywaydb.core.Flyway
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
@@ -58,13 +60,13 @@ class DatabaseSpec :
 
         given("an empty data directory") {
             `when`("opening the database for the first time") {
-                then("stt.db is created, V1 applies, and a reopen applies nothing and preserves rows") {
+                then("stt.db is created, V1 and V2 apply, and a reopen applies nothing and preserves rows") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
 
                         Database.open(dataDir).use { first ->
                             tableNames(first).shouldContainAll(expectedTables)
-                            migratedCount(first).shouldBe(1)
+                            migratedCount(first).shouldBe(2)
                             first.connection
                                 .createStatement()
                                 .use { st ->
@@ -80,7 +82,37 @@ class DatabaseSpec :
 
                         Database.open(dataDir).use { second ->
                             rowCount(second, "tasks").shouldBe(1)
-                            migratedCount(second).shouldBe(1)
+                            migratedCount(second).shouldBe(2)
+                        }
+                    }
+                }
+            }
+        }
+
+        given("a database migrated to V1 only, holding a task with its audio row, a chunk, and an audio page") {
+            `when`("the database is opened") {
+                then("V2 applies: audio_parts is gone, chunk_audio exists, and the task, its audio row and its chunk are kept") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
+                        Flyway
+                            .configure()
+                            .dataSource(url, null, null)
+                            .target("1")
+                            .load()
+                            .migrate()
+                        DriverManager.getConnection(url).use { connection ->
+                            connection.createStatement().use { st -> v1Rows.forEach { sql -> st.executeUpdate(sql) } }
+                        }
+
+                        Database.open(dataDir).use { db ->
+                            tableNames(db).shouldNotContain("audio_parts")
+                            tableNames(db).shouldContainAll("chunk_audio")
+                            taskRepository(db, dataDir).find(1L).shouldBe(StoredTask(1L, queuedTask("kept.wav", createdAt = 1L)))
+                            AudioRepository(db).metadata(1L).shouldBe(AudioMetadata(sizeBytes = 3L, sha256 = "aa"))
+                            ChunkRepository(db)
+                                .findByTask(1L)
+                                .shouldBe(listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.PENDING)))
                         }
                     }
                 }
@@ -190,7 +222,7 @@ class DatabaseSpec :
         }
 
         given("no task with id 42") {
-            `when`("inserting a chunks, segments, audio, and audio_parts row for task 42") {
+            `when`("inserting a chunks, segments, and audio row for task 42") {
                 then("each insert is rejected; the same rows are accepted once task 42 exists") {
                     withDatabase { db ->
                         for (sql in task42RowInserts) {
@@ -201,7 +233,7 @@ class DatabaseSpec :
                         for (sql in task42RowInserts) {
                             execute(db, sql)
                         }
-                        for (table in listOf("chunks", "segments", "audio", "audio_parts")) {
+                        for (table in listOf("chunks", "segments", "audio")) {
                             rowCount(db, table).shouldBe(1)
                         }
                     }
@@ -265,11 +297,21 @@ class DatabaseSpec :
         }
     })
 
+/** A task, its audio row, a chunk, and an audio page, as a database at V1 holds them. */
+private val v1Rows =
+    listOf(
+        "INSERT INTO tasks (id, original_filename, content_type, status, speakers_mode, created_at) " +
+            "VALUES (1, 'kept.wav', 'audio/wav', 'QUEUED', 'auto', 1)",
+        "INSERT INTO audio (task_id, size_bytes, sha256) VALUES (1, 3, 'aa')",
+        "INSERT INTO chunks (task_id, idx, start_ms, end_ms, status) VALUES (1, 0, 0, 1000, 'PENDING')",
+        "INSERT INTO audio_parts (task_id, part_no, part) VALUES (1, 0, x'616263')",
+    )
+
 private val expectedTables =
     listOf(
         "tasks",
         "audio",
-        "audio_parts",
+        "chunk_audio",
         "chunks",
         "segments",
         "queue_state",
@@ -306,7 +348,6 @@ private val task42RowInserts =
         "INSERT INTO chunks (task_id, idx, start_ms, end_ms, status) VALUES (42, 0, 0, 1000, 'PENDING')",
         "INSERT INTO segments (task_id, chunk_idx, seq, start_ms, end_ms, text) VALUES (42, 0, 0, 0, 900, 'x')",
         "INSERT INTO audio (task_id, size_bytes, sha256) VALUES (42, 1, 'aa')",
-        "INSERT INTO audio_parts (task_id, part_no, part) VALUES (42, 0, x'00')",
     )
 
 private fun execute(

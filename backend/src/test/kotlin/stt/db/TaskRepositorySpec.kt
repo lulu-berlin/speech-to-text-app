@@ -161,18 +161,18 @@ class TaskRepositorySpec :
             }
         }
 
-        given("two tasks with audio, one of them two pages long, and the audio page table made unreadable") {
+        given("two tasks created from uploads, and the chunk audio table made unreadable") {
             `when`("listing tasks") {
-                then("both tasks come back in creation order without touching audio pages") {
+                then("both tasks come back in creation order without reading chunk audio") {
                     withDatabase { db ->
                         val tasks = taskRepository(db, dataDir)
                         val first = queuedTask("first.wav", createdAt = 1L)
                         val second = queuedTask("second.wav", createdAt = 2L)
-                        val firstId = tasks.createFromUpload(first, ByteArray(1_048_577) { 7 }.inputStream())
-                        val secondId = tasks.createFromUpload(second, "short".byteInputStream())
-                        // Any read of audio pages now fails with "no such table".
+                        val firstId = tasks.createFromUpload(first, "first".byteInputStream())
+                        val secondId = tasks.createFromUpload(second, "second".byteInputStream())
+                        // Any read of chunk audio now fails with "no such table".
                         db.connection.createStatement().use { st ->
-                            st.execute("ALTER TABLE audio_parts RENAME TO audio_parts_hidden")
+                            st.execute("ALTER TABLE chunk_audio RENAME TO chunk_audio_hidden")
                         }
 
                         tasks.list().shouldBe(listOf(StoredTask(firstId, first), StoredTask(secondId, second)))
