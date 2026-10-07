@@ -1,6 +1,7 @@
 package stt.diarization
 
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.floats.plusOrMinus
 import io.kotest.matchers.shouldBe
 import kotlin.math.PI
 import kotlin.math.sin
@@ -27,6 +28,25 @@ class FbankSpec :
                         features.size.shouldBe(frameCount)
                         features.forEach { frame -> frame.size.shouldBe(80) }
                     }
+                }
+            }
+        }
+
+        given("the povey window of length 400") {
+            `when`("it is computed") {
+                then("it matches hand-computed values at its start, center and end") {
+                    // Kaldi povey: (0.5 - 0.5 cos(2 pi n / (N - 1)))^0.85 = sin(pi n / 399)^1.7, since 0.5 - 0.5 cos x = sin^2(x / 2).
+                    // n = 1:         sin(pi / 399)^1.7 = 0.0078739^1.7 = 0.00026515
+                    // n = 199, 200:  sin(pi * 199 / 399)^1.7 = cos(pi / 798)^1.7 = 0.99998683 (peak lies at n = 199.5)
+                    val window = poveyWindow(400)
+
+                    window.size.shouldBe(400)
+                    window[0].shouldBe(0f)
+                    window[1].shouldBe(0.00026515f.plusOrMinus(1e-8f))
+                    window[199].shouldBe(0.99998683f.plusOrMinus(1e-6f))
+                    window[200].shouldBe(0.99998683f.plusOrMinus(1e-6f))
+                    window[398].shouldBe(0.00026515f.plusOrMinus(1e-8f))
+                    window[399].shouldBe(0f.plusOrMinus(1e-12f))
                 }
             }
         }
