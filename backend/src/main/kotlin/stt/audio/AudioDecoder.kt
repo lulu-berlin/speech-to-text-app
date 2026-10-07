@@ -21,22 +21,20 @@ class AudioDecoder(
     ): Long {
         val result =
             runner.run(
-                listOf(
-                    "ffmpeg",
-                    "-hide_banner",
-                    "-nostats",
-                    "-loglevel",
-                    "error",
-                    "-i",
-                    source.toString(),
-                    "-f",
-                    "f32le",
-                    "-ac",
-                    "1",
-                    "-ar",
-                    SAMPLE_RATE.toString(),
-                    pcm.toString(),
-                ),
+                FFMPEG +
+                    listOf(
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        source.toString(),
+                        "-f",
+                        "f32le",
+                        "-ac",
+                        "1",
+                        "-ar",
+                        SAMPLE_RATE.toString(),
+                        pcm.toString(),
+                    ),
             )
         if (result.exitCode != 0) {
             throw AudioDecodeException("ffmpeg failed to decode $source: ${result.stderr.joinToString("\n").trim()}")
