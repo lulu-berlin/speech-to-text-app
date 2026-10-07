@@ -55,6 +55,8 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Integration: decoding a file with no audio fails with "no audio decoded"
 - [x] Integration: an ffmpeg-generated tone+silence fixture is split at the expected silence midpoints and the exported chunk FLACs (16-bit, 16 kHz mono) have the planned lengths
 - [x] A silence at or before the current chunk start is never chosen (discovered)
+- [ ] Integration: chunking again in a work directory left by an interrupted run overwrites the old PCM and chunk files (discovered)
+- [ ] Integration: a failed `silencedetect` or chunk-export run fails chunking with ffmpeg's error message (discovered)
 
 ## Acceptance criteria
 
@@ -70,3 +72,4 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-06: chunk WAV sample format decided: 16-bit PCM (`pcm_s16le`), whisper.cpp's documented whisper-cli input (README v1.9.2: "currently runs only with 16-bit WAV files"), over float32 WAV (accepted by v1.9.2's miniaudio loader in code, but undocumented).
 - 2026-10-06: discovered test item confirmed: a silence at or before the current chunk start is never chosen (otherwise the planner can cut a chunk that ends where it starts and never terminates).
 - 2026-10-07: ADR 0024 replaces the 2026-10-06 `pcm_s16le` WAV chunk format with FLAC (16-bit, 16 kHz mono); the ADR 0005 line is replaced by ADR 0024; scope updated: the original reaches `work/<task-id>/source` at upload (item 18), and item 11 stores the plan with the chunk FLACs and deletes the original; the Goal and the `decode_pcm` bullet no longer name the decoded PCM as the speaker-embedding input (diarization rebuilds its PCM from the stored chunks, ADR 0024 decision 5).
+- 2026-10-07: discovered test items confirmed: (A) chunking again in a work directory left by an interrupted run overwrites the old PCM and chunk files: without `-y`, ffmpeg 9.0.1 with stdin `/dev/null` prints "Not overwriting - exiting" and exits 0, so a truncated file from a crash during CHUNKING would be kept silently (ADR 0024 reruns CHUNKING when no plan is stored); (B) a failed `silencedetect` or chunk-export run fails chunking with ffmpeg's error message instead of silently falling back to target cuts or leaving a missing file; tested through a small internal seam on the export.
