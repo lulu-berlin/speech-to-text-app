@@ -33,27 +33,24 @@ class Config(
             val dataDir = env["STT_DATA_DIR"]
             require(!dataDir.isNullOrEmpty()) { DATA_DIR_MISSING_ERROR }
             val rawPort = env["STT_PORT"]
-            val port = if (rawPort == null) 8080 else parsePort(rawPort)
+            val port = if (rawPort == null) 8080 else parseIntIn(rawPort, 1..65535, PORT_LIMIT_ERROR)
             return Config(
                 dataDir = Path.of(dataDir),
                 port = port,
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
                 device = env["STT_DEVICE"]?.let { parseDevice(it) } ?: Device.Auto,
-                threads = env["STT_THREADS"]?.let { parseThreads(it) },
+                threads = env["STT_THREADS"]?.let { parseIntIn(it, 1..Int.MAX_VALUE, THREADS_ERROR) },
             )
         }
 
-        private fun parsePort(raw: String): Int {
+        /** [raw] as an integer within [range]; otherwise fails fast with [error] formatted with [raw]. */
+        private fun parseIntIn(
+            raw: String,
+            range: IntRange,
+            error: String,
+        ): Int {
             val value = raw.toIntOrNull()
-            if (value == null || value !in 1..65535) {
-                throw IllegalArgumentException(PORT_LIMIT_ERROR.format(raw))
-            }
-            return value
-        }
-
-        private fun parseThreads(raw: String): Int {
-            val value = raw.toIntOrNull()
-            if (value == null || value < 1) throw IllegalArgumentException(THREADS_ERROR.format(raw))
+            if (value == null || value !in range) throw IllegalArgumentException(error.format(raw))
             return value
         }
 
@@ -72,9 +69,7 @@ class Config(
                 }
 
                 else -> {
-                    val index = raw.toIntOrNull()
-                    if (index == null || index < 0) throw IllegalArgumentException(DEVICE_ERROR.format(raw))
-                    Device.Gpu(index)
+                    Device.Gpu(parseIntIn(raw, 0..Int.MAX_VALUE, DEVICE_ERROR))
                 }
             }
     }
