@@ -24,8 +24,8 @@ internal fun embeddingWindow(
     endMs: Long,
 ): FloatArray {
     val total = pcm.size
-    var t0 = (startMs * 16).toInt()
-    var t1 = (endMs * 16).toInt()
+    var t0 = msToSamples(startMs)
+    var t1 = msToSamples(endMs)
     if (t1 <= t0 || t0 >= total) { // (near-)past the end of the audio: use the tail
         t0 = maxOf(0, total - SHORT_WINDOW_SAMPLES)
         t1 = total
@@ -46,3 +46,6 @@ internal fun embeddingWindow(
     }
     return pcm.copyOfRange(t0, t0 + dur)
 }
+
+/** Whole milliseconds to samples at 16 kHz: `int(seconds * 16000)` = `ms * 16` exactly. */
+private fun msToSamples(ms: Long): Int = (ms * 16).toInt()
