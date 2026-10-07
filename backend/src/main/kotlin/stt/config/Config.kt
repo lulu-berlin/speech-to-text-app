@@ -11,9 +11,11 @@ import java.nio.file.Path
  * empty included, fails fast.
  * `STT_THREADS` (an integer >= 1) is unset by default, leaving whisper-cli's own default; any other value,
  * empty included, fails fast.
+ * `STT_SPEAKER_MODEL` (the CAM++ ONNX model, ADR 0003) is required: unset or empty fails fast.
  */
 class Config(
     val dataDir: Path,
+    val speakerModel: Path,
     val port: Int = 8080,
     val staticDir: Path? = null,
     val device: Device = Device.Auto,
@@ -28,14 +30,19 @@ class Config(
             "STT_DEVICE must be auto, cpu, gpu, or a GPU index >= 0, got \"%s\""
         private const val THREADS_ERROR =
             "STT_THREADS must be an integer >= 1, got \"%s\""
+        private const val SPEAKER_MODEL_MISSING_ERROR =
+            "STT_SPEAKER_MODEL must be set to the CAM++ speaker-embedding ONNX model file"
 
         fun fromEnv(env: Map<String, String> = System.getenv()): Config {
             val dataDir = env["STT_DATA_DIR"]
             require(!dataDir.isNullOrEmpty()) { DATA_DIR_MISSING_ERROR }
+            val speakerModel = env["STT_SPEAKER_MODEL"]
+            require(!speakerModel.isNullOrEmpty()) { SPEAKER_MODEL_MISSING_ERROR }
             val rawPort = env["STT_PORT"]
             val port = if (rawPort == null) 8080 else parseIntIn(rawPort, 1..65535, PORT_LIMIT_ERROR)
             return Config(
                 dataDir = Path.of(dataDir),
+                speakerModel = Path.of(speakerModel),
                 port = port,
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
                 device = env["STT_DEVICE"]?.let { parseDevice(it) } ?: Device.Auto,
