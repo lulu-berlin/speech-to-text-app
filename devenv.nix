@@ -5,6 +5,7 @@
 
 let
   models = import ./nix/models.nix { inherit pkgs; };
+  testFixtures = import ./nix/test-fixtures.nix { inherit pkgs; };
 in
 {
   # https://devenv.sh/packages/
@@ -48,6 +49,10 @@ in
   # Models for the app and integration tests (pinned in nix/models.nix)
   env.STT_WHISPER_MODEL = "${models.whisper}";
   env.STT_SPEAKER_MODEL = "${models.speaker}";
+
+  # Integration-test fixtures of roadmap item 07 (test-only, TEST_ prefix: STT_* is read only by Config)
+  env.TEST_WHISPER_TINY_EN_MODEL = "${models.whisperTinyEn}";
+  env.TEST_JFK_WAV = "${testFixtures.jfkWav}";
 
   # https://devenv.sh/tests/
   # `devenv test`: test list of roadmap item 01 (dev environment).
