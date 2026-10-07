@@ -22,4 +22,15 @@ class TaskProgressSpec :
                 }
             }
         }
+
+        given("a chunk of zero total duration, running at half") {
+            `when`("task progress is computed") {
+                then("it reports 0, not NaN") {
+                    // A decoded clip of 1–15 samples is 0 ms long (AudioDecoder rejects only 0 samples).
+                    val chunks = listOf(Chunk(idx = 0, startMs = 0, endMs = 0, status = ChunkStatus.PENDING))
+
+                    taskProgress(chunks, runningIdx = 0, runningFraction = 0.5).shouldBe(0.0)
+                }
+            }
+        }
     })

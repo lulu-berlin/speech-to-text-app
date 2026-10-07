@@ -64,7 +64,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A chunk's segments and its `DONE` status are stored together or not at all
 - [x] After the chunk is persisted, its FLAC file and whisper-cli's JSON are deleted
 - [ ] Integration: `jfk.wav` transcribed with `ggml-tiny.en` yields non-empty text with increasing timestamps
-- [ ] Chunks with zero total duration report progress 0, not NaN (discovered)
+- [x] Chunks with zero total duration report progress 0, not NaN (discovered)
 - [ ] While whisper-cli runs, each `-pp` progress line is reported as the chunk fraction (discovered)
 - [x] Completing a chunk that is not in the plan fails and stores nothing (discovered)
 

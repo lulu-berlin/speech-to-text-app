@@ -13,6 +13,7 @@ fun taskProgress(
     runningFraction: Double,
 ): Double {
     val totalMs = chunks.sumOf { it.durationMs() }
+    if (totalMs == 0L) return 0.0 // a decoded clip of 1–15 samples is 0 ms long (AudioDecoder rejects only 0 samples)
     val doneMs =
         chunks.sumOf { chunk ->
             when {
