@@ -14,17 +14,7 @@ class SegmentRepository(
         taskId: Long,
         segments: List<Segment>,
     ) {
-        db.writeTransaction {
-            SegmentsTable.batchInsert(segments, shouldReturnGeneratedValues = false) { segment ->
-                this[SegmentsTable.taskId] = taskId
-                this[SegmentsTable.chunkIdx] = segment.chunkIdx
-                this[SegmentsTable.seq] = segment.seq
-                this[SegmentsTable.startMs] = segment.startMs
-                this[SegmentsTable.endMs] = segment.endMs
-                this[SegmentsTable.text] = segment.text
-                this[SegmentsTable.speaker] = segment.speaker
-            }
-        }
+        db.writeTransaction { insertSegments(taskId, segments) }
     }
 
     /**
@@ -40,15 +30,23 @@ class SegmentRepository(
             ChunksTable.update({ (ChunksTable.taskId eq taskId) and (ChunksTable.idx eq chunkIdx) }) {
                 it[status] = ChunkStatus.DONE
             }
-            SegmentsTable.batchInsert(segments, shouldReturnGeneratedValues = false) { segment ->
-                this[SegmentsTable.taskId] = taskId
-                this[SegmentsTable.chunkIdx] = segment.chunkIdx
-                this[SegmentsTable.seq] = segment.seq
-                this[SegmentsTable.startMs] = segment.startMs
-                this[SegmentsTable.endMs] = segment.endMs
-                this[SegmentsTable.text] = segment.text
-                this[SegmentsTable.speaker] = segment.speaker
-            }
+            insertSegments(taskId, segments)
+        }
+    }
+
+    /** Inserts [segments] of the task; runs inside the caller's write transaction. */
+    private fun insertSegments(
+        taskId: Long,
+        segments: List<Segment>,
+    ) {
+        SegmentsTable.batchInsert(segments, shouldReturnGeneratedValues = false) { segment ->
+            this[SegmentsTable.taskId] = taskId
+            this[SegmentsTable.chunkIdx] = segment.chunkIdx
+            this[SegmentsTable.seq] = segment.seq
+            this[SegmentsTable.startMs] = segment.startMs
+            this[SegmentsTable.endMs] = segment.endMs
+            this[SegmentsTable.text] = segment.text
+            this[SegmentsTable.speaker] = segment.speaker
         }
     }
 
