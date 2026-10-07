@@ -10,7 +10,7 @@ class ChunkRepositorySpec :
             `when`("reading the task's chunks back") {
                 then("they come back in idx order, only for that task") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val chunks = ChunkRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))

@@ -21,7 +21,7 @@ class TaskRepositorySpec :
             `when`("both are saved through the repository and read back by id") {
                 then("each reads back with identical fields") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val full =
                             Task(
                                 originalFilename = "interview.m4a",
@@ -89,7 +89,7 @@ class TaskRepositorySpec :
             `when`("a second task is created with the same audio bytes under another filename") {
                 then("creation fails and leaves no task or metadata behind") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val first = queuedTask("take1.wav", createdAt = 1L)
                         val firstId = tasks.createFromUpload(first, "same bytes".byteInputStream())
 
@@ -109,7 +109,7 @@ class TaskRepositorySpec :
             `when`("the duplicate is rejected") {
                 then("no upload temp file is left in the data directory's tmp/") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         tasks.createFromUpload(queuedTask("take1.wav", createdAt = 1L), "same bytes".byteInputStream())
 
                         shouldThrow<SQLException> {
@@ -126,7 +126,7 @@ class TaskRepositorySpec :
             `when`("the first task is deleted") {
                 then("its audio, chunks, and segments are gone; the second task's rows remain") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
                         val doomedId =
@@ -157,7 +157,7 @@ class TaskRepositorySpec :
             `when`("listing tasks") {
                 then("both tasks come back in creation order without touching audio pages") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val first = queuedTask("first.wav", createdAt = 1L)
                         val second = queuedTask("second.wav", createdAt = 2L)
                         val firstId = tasks.createFromUpload(first, ByteArray(1_048_577) { 7 }.inputStream())
