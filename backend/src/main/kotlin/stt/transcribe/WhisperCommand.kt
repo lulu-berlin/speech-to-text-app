@@ -16,9 +16,10 @@ fun whisperCommand(
     device: Device,
     outputPrefix: Path,
     prompt: String?,
+    executable: String = "whisper-cli",
 ): List<String> =
     buildList {
-        addAll(listOf("whisper-cli", "-m", model.toString(), "-f", audio.toString(), "-l", language))
+        addAll(listOf(executable, "-m", model.toString(), "-f", audio.toString(), "-l", language))
         if (threads != null) addAll(listOf("-t", threads.toString()))
         addAll(deviceArgs(device))
         addAll(listOf("-oj", "-of", outputPrefix.toString(), "-pp"))
