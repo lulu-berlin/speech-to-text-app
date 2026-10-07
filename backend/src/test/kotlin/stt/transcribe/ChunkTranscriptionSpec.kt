@@ -22,9 +22,9 @@ class ChunkTranscriptionSpec :
     BehaviorSpec({
         tags(Integration)
 
-        given("chunk 1 of a task, starting at 30 000 ms, with its FLAC file in the work directory") {
-            `when`("it is transcribed by a whisper-cli that writes one segment at 0–7 940 ms") {
-                then("after the chunk is persisted, its FLAC file and whisper-cli's JSON are deleted") {
+        given("a whisper-cli that writes one segment at 0–7 940 ms while printing -pp progress lines") {
+            `when`("chunk 1 of the task is transcribed") {
+                then("each -pp progress line is reported as the chunk fraction, then the chunk is persisted and its files deleted") {
                     val workDir = tempdir("stt-transcribe").toPath()
                     Database.open(tempdir("stt-db").toPath()).use { db ->
                         val chunks = ChunkRepository(db)
@@ -37,11 +37,23 @@ class ChunkTranscriptionSpec :
                         val prefix = workDir.resolve("chunk-1")
                         val json = workDir.resolve("chunk-1.json")
                         val output = """{"transcription": [{"offsets": {"from": 0, "to": 7940}, "text": " And so my fellow Americans"}]}"""
-                        val whisperCli = fakeWhisperCli(workDir, emptyList(), exitCode = 0, writes = json to output)
+                        // Lines as printed by whisper-cli 1.9.2 (-pp), the percentage padded to width 3.
+                        val stderr =
+                            listOf(
+                                "system_info: n_threads = 4 / 8 | WHISPER : COREML = 0 | OPENVINO = 0",
+                                "whisper_print_progress_callback: progress =  27%",
+                                "output_json: saving output to '$json'",
+                                "whisper_print_progress_callback: progress = 100%",
+                            )
+                        val whisperCli = fakeWhisperCli(workDir, stderr, exitCode = 0, writes = json to output)
                         val transcription = ChunkTranscription(ChunkTranscriber(ProcessRunner(), whisperCli.toString()), segments)
 
-                        withTimeout(30.seconds) { transcription.transcribe(taskId, chunk, TEST_SETTINGS, flac, prefix, prompt = null) }
+                        val reported = mutableListOf<Double>()
+                        withTimeout(30.seconds) {
+                            transcription.transcribe(taskId, chunk, TEST_SETTINGS, flac, prefix, prompt = null) { reported += it }
+                        }
 
+                        reported.shouldBe(listOf(0.27, 1.0))
                         Files.exists(flac).shouldBeFalse()
                         Files.exists(json).shouldBeFalse()
                         chunks
