@@ -12,6 +12,7 @@ import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
 import stt.config.Config
 import stt.db.Database
+import stt.db.TaskWorkDirectories
 import java.io.File
 
 /**
@@ -25,6 +26,7 @@ fun Application.sttApp(config: Config) {
     install(ContentNegotiation) { json() }
     dependencies {
         provide<Database> { Database.open(config.dataDir) }
+        provide<TaskWorkDirectories> { TaskWorkDirectories(config.dataDir) }
         require(DependencyKey<Database>())
     }
     healthRoutes()
