@@ -60,6 +60,7 @@ class AudioChunker(
         runner.run(
             FFMPEG +
                 listOf(
+                    "-y",
                     "-loglevel",
                     "error",
                     "-f",

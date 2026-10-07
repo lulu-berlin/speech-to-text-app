@@ -47,6 +47,30 @@ class AudioChunkerSpec :
                 }
             }
         }
+
+        given("a work directory left by an interrupted run: a PCM cut off after 1 s and a truncated chunk-0.flac") {
+            `when`("a 3 s, 44.1 kHz tone is chunked there again") {
+                then("the old PCM and chunk files are overwritten") {
+                    val workDir = tempdir("stt-audio").toPath()
+                    val source = workDir.resolve("source.wav")
+                    generate(source, "sine=frequency=440:sample_rate=44100:duration=3")
+                    Files.write(workDir.resolve("audio.f32"), ByteArray(64_000)) // 1 s × 16 000 samples × 4 bytes
+                    Files.writeString(workDir.resolve("chunk-0.flac"), "truncated")
+
+                    val chunked = withTimeout(60.seconds) { AudioChunker(ProcessRunner()).chunk(source, workDir) }
+
+                    // 3 s × 16 000 = 48 000 samples: 3 000 ms, 192 000 bytes of float32, one chunk (shorter than the target).
+                    chunked.durationMs.shouldBe(3_000L)
+                    Files.size(workDir.resolve("audio.f32")).shouldBe(192_000L)
+                    chunked.chunks.map { it.planned }.shouldBe(listOf(PlannedChunk(startMs = 0, endMs = 3_000)))
+                    val chunk = chunked.chunks.single()
+                    streamInfo(chunk.file).shouldBe(
+                        mapOf("codec_name" to "flac", "sample_fmt" to "s16", "sample_rate" to "16000", "channels" to "1"),
+                    )
+                    sampleCount(chunk.file, workDir).shouldBe(48_000L)
+                }
+            }
+        }
     })
 
 /** The audio stream's codec, sample format, sample rate and channel count as reported by ffprobe. */
