@@ -49,9 +49,7 @@ class AudioChunker(
                         "-",
                     ),
             )
-        if (result.exitCode != 0) {
-            throw AudioDecodeException("ffmpeg failed to detect silences in $source: ${result.stderr.joinToString("\n").trim()}")
-        }
+        result.requireSuccess("detect silences in $source")
         return parseSilences(result.stderr, durationMs)
     }
 
@@ -85,8 +83,6 @@ class AudioChunker(
                         file.toString(),
                     ),
             )
-        if (result.exitCode != 0) {
-            throw AudioDecodeException("ffmpeg failed to export $file: ${result.stderr.joinToString("\n").trim()}")
-        }
+        result.requireSuccess("export $file")
     }
 }

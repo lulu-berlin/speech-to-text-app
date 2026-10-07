@@ -32,9 +32,7 @@ class AudioDecoder(
                         pcm.toString(),
                     ),
             )
-        if (result.exitCode != 0) {
-            throw AudioDecodeException("ffmpeg failed to decode $source: ${result.stderr.joinToString("\n").trim()}")
-        }
+        result.requireSuccess("decode $source")
         val sampleCount = withContext(Dispatchers.IO) { Files.size(pcm) } / BYTES_PER_SAMPLE
         if (sampleCount == 0L) throw AudioDecodeException("no audio decoded from $source")
         return sampleCount / SAMPLES_PER_MS
