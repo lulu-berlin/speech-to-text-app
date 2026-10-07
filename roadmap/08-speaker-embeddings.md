@@ -1,6 +1,6 @@
 # 08 — Speaker embeddings
 
-Status: spec-approved
+Status: in-progress
 Depends on: [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
