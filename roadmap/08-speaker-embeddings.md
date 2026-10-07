@@ -1,7 +1,7 @@
 # 08 — Speaker embeddings
 
 Status: draft
-Depends on: [06](06-audio-decoding-and-chunking.md)
+Depends on: [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
 

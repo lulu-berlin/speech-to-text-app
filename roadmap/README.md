@@ -20,7 +20,7 @@ graph TD
   02 --> 03[03 database schema ✓]:::done
   03 --> 04[04 queue domain model ✓]:::done
   02 --> 05[05 process runner ✓]:::done
-  05 --> 06[06 audio decoding and chunking]
+  05 --> 06[06 audio decoding and chunking ✓]:::done
   03 --> 06
   06 --> 07[07 whisper transcription]
   03 --> 07
@@ -54,7 +54,7 @@ graph TD
 | [03 — Database schema](../docs/specs/database-schema.md) | done | 02 |
 | [04 — Queue domain model](../docs/specs/queue-domain-model.md) | done | 03 |
 | [05 — Process runner](../docs/specs/process-runner.md) | done | 02 |
-| [06 — Audio decoding and chunking](06-audio-decoding-and-chunking.md) | spec-approved | 03, 05 |
+| [06 — Audio decoding and chunking](../docs/specs/audio-decoding-and-chunking.md) | done | 03, 05 |
 | [07 — Whisper transcription](07-whisper-transcription.md) | draft | 03, 06 |
 | [08 — Speaker embeddings](08-speaker-embeddings.md) | draft | 06 |
 | [09 — Diarization](09-diarization.md) | draft | 08 |

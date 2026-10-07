@@ -1,7 +1,7 @@
 # 07 — Whisper transcription
 
 Status: draft
-Depends on: [03](../docs/specs/database-schema.md) (done), [06](06-audio-decoding-and-chunking.md)
+Depends on: [03](../docs/specs/database-schema.md) (done), [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
 
