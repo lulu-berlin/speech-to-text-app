@@ -21,3 +21,6 @@ fun whisperCommand(
         addAll(listOf("-oj", "-of", outputPrefix.toString(), "-pp"))
         if (prompt != null) addAll(listOf("--prompt", prompt))
     }
+
+/** The file whisper-cli writes for `-oj -of [outputPrefix]`. */
+fun jsonOutput(outputPrefix: Path): Path = Path.of("$outputPrefix.json")

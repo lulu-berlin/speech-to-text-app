@@ -29,7 +29,7 @@ class ChunkTranscription(
         segments.completeChunk(taskId, chunk.idx, chunkSegments(chunk.idx, chunk.startMs, whisperSegments))
         withContext(Dispatchers.IO) {
             Files.delete(audio)
-            Files.delete(Path.of("$outputPrefix.json"))
+            Files.delete(jsonOutput(outputPrefix))
         }
     }
 }

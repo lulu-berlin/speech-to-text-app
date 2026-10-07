@@ -32,7 +32,7 @@ class ChunkTranscriber internal constructor(
         if (result.exitCode != 0) {
             throw TranscriptionException("whisper-cli failed on $audio (exit ${result.exitCode}):\n$stderr")
         }
-        val json = Path.of("$outputPrefix.json")
+        val json = jsonOutput(outputPrefix)
         val output =
             withContext(Dispatchers.IO) { if (Files.exists(json)) Files.readString(json) else null }
                 ?: throw TranscriptionException("whisper-cli JSON output $json is missing after transcribing $audio:\n$stderr")
