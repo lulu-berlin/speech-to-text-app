@@ -49,7 +49,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A silence beyond the cap is never chosen; the cut falls back to the target
 - [x] Planned chunks are contiguous, non-overlapping, and end exactly at the file duration
 - [x] A trailing chunk shorter than 30 s is merged into the previous chunk when the merged chunk stays within the cap; otherwise it stays a separate chunk
-- [ ] `silencedetect` stderr lines are parsed into silence intervals (including a trailing silence without `silence_end`)
+- [x] `silencedetect` stderr lines are parsed into silence intervals (including a trailing silence without `silence_end`)
 - [ ] Integration: decoding writes mono 16 kHz float32 samples to the PCM file, and the duration is the sample count / 16 ms, matching the source's known length
 - [ ] Integration: decoding a file ffmpeg cannot read fails with ffmpeg's error message
 - [ ] Integration: decoding a file with no audio fails with "no audio decoded"
