@@ -49,7 +49,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Silence and a pure tone produce the expected relative fbank energies (tone bin dominates)
 - [x] Global-mean normalization makes every feature column average to zero
 - [x] The ONNX Runtime native library loads from the JVM inside the devenv shell (moved from item 01)
-- [ ] Integration: loading the model at `$STT_SPEAKER_MODEL` reads its metadata (`output_dim` 512, `sample_rate` 16000, `normalize_samples` true, `feature_normalize_type` global-mean)
+- [x] Integration: loading the model at `$STT_SPEAKER_MODEL` reads its metadata (`output_dim` 512, `sample_rate` 16000, `normalize_samples` true, `feature_normalize_type` global-mean)
 - [ ] Unsupported model metadata (`sample_rate` other than 16000, `feature_normalize_type` other than global-mean, `output_dim` missing or not an integer) is rejected with an error naming the key and the value
 - [ ] The session uses `STT_THREADS` intra-op threads when it is set, and ONNX Runtime's default otherwise
 - [ ] A segment shorter than 2 s becomes a centered, zero-padded 2 s window
