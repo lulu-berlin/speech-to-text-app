@@ -42,7 +42,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A stored chunk FLAC reads back byte-identical
 - [ ] Deleting a task removes its chunk audio (cascade through `chunks`)
 - [ ] A `chunk_audio` row for a chunk that does not exist is rejected (foreign key)
-- [ ] Reading the chunk plan does not read chunk audio
+- [x] Reading the chunk plan does not read chunk audio
 - [x] A chunk-FLAC read completes while a write transaction is held open (discovered; replaces item 03's `copyTo` stall test)
 
 ## Acceptance criteria

@@ -99,6 +99,28 @@ class ChunkRepositorySpec :
                 }
             }
         }
+
+        given("a task with a stored plan, and the chunk audio table made unreadable") {
+            `when`("reading the task's chunk plan") {
+                then("the plan comes back in idx order without reading chunk audio") {
+                    withDatabase { db ->
+                        val chunks = ChunkRepository(db)
+                        val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
+                        chunks.storePlan(taskId, threeChunkPlan.zip(writeThreeFlacs(dataDir), ::ExportedChunk))
+                        // Any read of chunk audio now fails with "no such table".
+                        db.writeTransaction { exec("ALTER TABLE chunk_audio RENAME TO chunk_audio_hidden") }
+
+                        chunks.findByTask(taskId).shouldBe(
+                            listOf(
+                                Chunk(idx = 0, startMs = 0L, endMs = 300_000L, status = ChunkStatus.PENDING),
+                                Chunk(idx = 1, startMs = 300_000L, endMs = 600_000L, status = ChunkStatus.PENDING),
+                                Chunk(idx = 2, startMs = 600_000L, endMs = 615_500L, status = ChunkStatus.PENDING),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
     })
 
 /** Stand-in FLACs of 3, 70 000 and 1 bytes, one per chunk of [threeChunkPlan]. */
