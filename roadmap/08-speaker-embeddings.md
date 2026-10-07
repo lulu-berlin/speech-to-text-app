@@ -62,7 +62,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Integration: on the LibriSpeech fixture clips, same-speaker cosine similarity is higher than different-speaker cosine
 - [ ] (discovered) Fbank values of a fixed, reproducible test signal match a Kaldi reference (kaldi-native-fbank or torchaudio `compliance.kaldi.fbank` with the ADR 0003 options), reference values supplied by the user
 - [x] (discovered) Loading configuration fails with an error naming `STT_SPEAKER_MODEL` when it is unset or empty; when set, its path is part of the configuration
-- [ ] (discovered) Model metadata with `sample_rate` or `normalize_samples` missing or not an integer is rejected with an error naming the key and the value
+- [x] (discovered) Model metadata with `sample_rate` or `normalize_samples` missing or not an integer, or `feature_normalize_type` missing, is rejected with an error naming the key and the value
 
 ## Acceptance criteria
 
@@ -79,4 +79,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07: discovered test item confirmed: fbank values are compared with a Kaldi reference (items 1–4 check shape, window, mel edges and relative energies only, so a value-level deviation such as a constant scale would go unnoticed); the reference values are produced by the user outside the repository (no Python in the app, build or tests, ADR 0002) and committed as literals in the test.
 - 2026-10-07: test item "Model metadata is read …; unsupported values are rejected" split into an `Integration` item (reading the real model's metadata) and a unit item (rejecting unsupported metadata), one behavior per test. `STT_SPEAKER_MODEL` becomes a required `Config` value (unset fails fast at startup, like `STT_DATA_DIR`); `Integration` tests obtain the model path through `Config.fromEnv`.
 - 2026-10-07: discovered test item confirmed: loading configuration fails naming `STT_SPEAKER_MODEL` when it is unset or empty, and carries its path when set (presence only; a wrong path fails when the session is created). Done before the `Integration` metadata item, which reads the path through `Config`.
-- 2026-10-07: discovered test item confirmed: `sample_rate` and `normalize_samples` missing or not an integer are rejected like `output_dim` (sherpa-onnx requires all four metadata keys).
+- 2026-10-07: discovered test item confirmed: `sample_rate` and `normalize_samples` missing or not an integer are rejected like `output_dim` (sherpa-onnx requires all four metadata keys); widened to also reject a missing `feature_normalize_type`.
