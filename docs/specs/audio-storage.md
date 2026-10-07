@@ -1,18 +1,19 @@
-# 18 — Audio storage: originals in the work directory, chunks as FLAC
+# Audio storage: originals in the work directory, chunks as FLAC
 
-Status: in-review
-Depends on: [03](../docs/specs/database-schema.md) (done)
+Status: done (roadmap item 18, merged 2026-10-07)
+Depends on: [03 — database schema](database-schema.md)
 
 ## Goal
 
 Move the audio storage to ADR 0024: the original upload is no longer stored in the database but kept in the task's work directory until chunking, and the chunk FLACs are stored in the database. This item owns the `V2` migration and the repository changes; the engine (item 11) uses them.
 
-## Already decided
+## Decisions
 
-- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): the whole design; supersedes ADRs 0005 and 0018.
-- [ADR 0019 — Schema ownership and evolution](../docs/decisions/0019-schema-ownership-and-evolution.md): `V1__init.sql` is never edited; the change arrives as a new versioned migration.
-- [ADR 0017 — Database location and connection contract](../docs/decisions/0017-database-location-and-connection-contract.md): `$STT_DATA_DIR` layout, upload spools in `tmp/`, one writer behind a lock, fresh read-only connections for reads.
-- [Item 03 spec](../docs/specs/database-schema.md): the current schema, repositories and their tests.
+- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): the whole design; supersedes ADRs 0005 and 0018. This item implements it.
+- [ADR 0019 — Schema ownership and evolution](../decisions/0019-schema-ownership-and-evolution.md): `V1__init.sql` is never edited; the change arrives as a new versioned migration.
+- [ADR 0017 — Database location and connection contract](../decisions/0017-database-location-and-connection-contract.md): `$STT_DATA_DIR` layout, upload spools in `tmp/`, one writer behind a lock, fresh read-only connections for reads.
+- [Item 03 spec](database-schema.md): the current schema, repositories and their tests.
+- Amended in this item: [ADR 0023 — Persistence may import feature-owned value types](../decisions/0023-persistence-may-import-feature-value-types.md) (persistence may consume a feature's processing-result type when reading it inside one transaction keeps a multi-row write atomic and memory-bounded).
 
 ## Proposal (approved 2026-10-07)
 
@@ -63,3 +64,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07 (review round 1): ADR 0023 amended as decided (processing-result types like `ExportedChunk` may cross into `stt/db` when reading one file at a time inside the single transaction keeps the multi-row write atomic and memory-bounded), with the wording in the ADR.
 - 2026-10-07 (review round 2): the rollback after a failed move now runs under `withContext(NonCancellable)`: both `db.writeTransaction` and `deleteWorkDir` are cancellation checkpoints, so a canceled caller would skip the rollback and leave a committed task without its original (a normal situation once item 12 exists — client disconnect). A cleanup-transaction failure is suppressed onto the original exception (`addSuppressed`). Defensive change; no test: reaching the canceled path needs a seam between the commit and a failing move, which the user chose not to add.
 - 2026-10-07 (review round 2): the round-1 red was reproduced in an uncommitted mutation that removed the rollback's `db.writeTransaction { TasksTable.deleteWhere { … } }` line: `TaskRepositorySpec.Then: the task and its audio row are deleted, no work directory or spool remains, and re-uploading the same bytes succeeds FAILED` with `AssertionFailedError: expected:<0> but was:<1>` on the task row count. The mutation was restored before the fix.
+- 2026-10-07 (review round 3): no new findings. Reviewer re-ran `gradle check` (76/76) and `gradle integrationTest` (29/29), and verified the round-2 rollback empirically in a scratch copy: a cancelled caller's `db.writeTransaction` does not run its block, while the same call inside `withContext(NonCancellable)` does. User approved the diff and chose to merge without the packaged-app `nix build .` check (no build files or dependencies changed; the Nix build runs the unit tests already green here). Fast-forward merged into `main` (head `ccdb8b3`).
