@@ -53,7 +53,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] JSON with neither key, or an empty array, yields no segments
 - [x] Missing `offsets` fields default to 0 and missing `text` to an empty string
 - [x] Segment times are shifted by the chunk start offset
-- [ ] A `-pp` progress line is parsed into a chunk fraction; unrelated stderr lines are ignored
+- [x] A `-pp` progress line is parsed into a chunk fraction; unrelated stderr lines are ignored
 - [ ] Task progress is weighted by chunk duration across finished and running chunks
 - [ ] Device `auto` adds no flag, `cpu` adds `--no-gpu`, `gpu` adds `--device 0`, `3` adds `--device 3`; invalid values are rejected
 - [ ] The command includes `-t` only when threads are configured and `--prompt` only when a previous tail exists
