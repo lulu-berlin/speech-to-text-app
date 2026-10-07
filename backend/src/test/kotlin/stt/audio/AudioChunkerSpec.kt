@@ -10,6 +10,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
 
+/** ffprobe's view of a chunk FLAC as ADR 0024 requires it: FLAC, 16-bit, 16 kHz, mono. */
+private val FLAC_16_BIT_16K_MONO = mapOf("codec_name" to "flac", "sample_fmt" to "s16", "sample_rate" to "16000", "channels" to "1")
+
 class AudioChunkerSpec :
     BehaviorSpec({
         tags(Integration)
@@ -38,9 +41,7 @@ class AudioChunkerSpec :
                         ),
                     )
                     for (chunk in chunked.chunks) {
-                        streamInfo(chunk.file).shouldBe(
-                            mapOf("codec_name" to "flac", "sample_fmt" to "s16", "sample_rate" to "16000", "channels" to "1"),
-                        )
+                        streamInfo(chunk.file).shouldBe(FLAC_16_BIT_16K_MONO)
                     }
                     // Planned length × 16 samples per ms: 290 s, 310 s and 60 s at 16 000 samples/s.
                     chunked.chunks.map { sampleCount(it.file, workDir) }.shouldBe(listOf(4_640_000L, 4_960_000L, 960_000L))
@@ -64,9 +65,7 @@ class AudioChunkerSpec :
                     Files.size(workDir.resolve("audio.f32")).shouldBe(192_000L)
                     chunked.chunks.map { it.planned }.shouldBe(listOf(PlannedChunk(startMs = 0, endMs = 3_000)))
                     val chunk = chunked.chunks.single()
-                    streamInfo(chunk.file).shouldBe(
-                        mapOf("codec_name" to "flac", "sample_fmt" to "s16", "sample_rate" to "16000", "channels" to "1"),
-                    )
+                    streamInfo(chunk.file).shouldBe(FLAC_16_BIT_16K_MONO)
                     sampleCount(chunk.file, workDir).shouldBe(48_000L)
                 }
             }
