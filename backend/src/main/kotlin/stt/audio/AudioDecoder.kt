@@ -18,6 +18,7 @@ class AudioDecoder(
             runner.run(
                 FFMPEG +
                     listOf(
+                        "-y",
                         "-loglevel",
                         "error",
                         "-i",
