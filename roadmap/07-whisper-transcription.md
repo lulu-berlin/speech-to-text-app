@@ -56,7 +56,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A `-pp` progress line is parsed into a chunk fraction; unrelated stderr lines are ignored
 - [x] Task progress is weighted by chunk duration across finished and running chunks
 - [x] Device `auto` adds no flag, `cpu` adds `--no-gpu`, `gpu` adds `--device 0`, `3` adds `--device 3`; invalid values are rejected
-- [ ] The command includes `-t` only when threads are configured and `--prompt` only when a previous tail exists
+- [x] The command includes `-t` only when threads are configured and `--prompt` only when a previous tail exists
 - [ ] The prompt is the previous chunk's last ~200 characters, cut at a word boundary; on resume it is rebuilt from the stored segments
 - [ ] A non-zero whisper-cli exit fails the chunk with the exit code
 - [ ] Missing or malformed JSON output fails the chunk with a clear message
@@ -79,3 +79,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07 (workspace session): integration fixtures are exported as test-only `TEST_WHISPER_TINY_EN_MODEL` and `TEST_JFK_WAV` (`TEST_` prefix, since `STT_*` is read only by `Config`), read in one test helper; an unset variable fails the integration test, naming it. `ggml-tiny.en` is `whisperTinyEn` in `nix/models.nix`; `jfk.wav` is pinned to whisper.cpp tag v1.9.2 in `nix/test-fixtures.nix`. The `-pp` line format captured from whisper-cli 1.9.2 is `whisper_print_progress_callback: progress = %3d%` (e.g. `progress =  27%`).
 - 2026-10-07 (cycle 5): `seq` numbers a chunk's segments from 0 in whisper-cli output order (user decision).
 - 2026-10-07 (cycle 7 checkpoint): discovered scenario "Chunks with zero total duration report progress 0, not NaN" confirmed by the user (a decoded clip of 1–15 samples is 0 ms long). Device decisions for the next cycle: unset `STT_DEVICE` defaults to `auto` (oracle default); an empty `STT_DEVICE` is invalid (fail fast like any set-but-invalid value).
+- 2026-10-07 (cycle 8 checkpoint, user decisions): `STT_THREADS` is parsed in `Config` (unset → no `-t`; an integer >= 1 → used; empty, 0, negative or non-integer → fails fast naming the variable and value); item 08 also reads `STT_THREADS`, so the second branch to merge reconciles `Config.kt`. The command takes the model path as a parameter; reading `STT_WHISPER_MODEL` into `Config` is left to the item that wires the engine (11). The executable is the bare `whisper-cli`, resolved on `PATH` by the item 05 runner (as item 06 does with `ffmpeg`); `STT_WHISPER_CLI` is left to item 16.
