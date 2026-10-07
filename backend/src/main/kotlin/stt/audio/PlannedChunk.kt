@@ -4,4 +4,6 @@ package stt.audio
 data class PlannedChunk(
     val startMs: Long,
     val endMs: Long,
-)
+) {
+    val lengthMs: Long get() = endMs - startMs
+}
