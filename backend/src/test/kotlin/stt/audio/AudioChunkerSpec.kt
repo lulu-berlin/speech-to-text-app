@@ -96,6 +96,34 @@ class AudioChunkerSpec :
                 }
             }
         }
+
+        given("11 min plus 7 samples of 16 kHz pink noise (no silences; the sample count is not a multiple of 16)") {
+            `when`("it is chunked") {
+                then("the exported chunks' samples, joined in order, equal the decoded PCM as 16-bit, up to the last whole millisecond") {
+                    val workDir = tempdir("stt-audio").toPath()
+                    val source = workDir.resolve("source.wav")
+                    val fixtureSamples = 11 * 60 * 16_000 + 7 // 10 560 007
+                    generate(
+                        source,
+                        "anoisesrc=sample_rate=16000:color=pink:amplitude=0.5:seed=1:duration=661",
+                        "-af",
+                        "atrim=end_sample=$fixtureSamples",
+                    )
+
+                    val chunked = withTimeout(120.seconds) { AudioChunker(ProcessRunner()).chunk(source, workDir) }
+
+                    val pcm = workDir.resolve("audio.f32")
+                    Files.size(pcm).shouldBe(fixtureSamples * 4L) // the fixture really ends 7 samples past a whole millisecond
+                    // Expected: the decoded PCM converted to s16 by ffmpeg, cut to the last whole millisecond:
+                    // 660 000 ms × 16 samples × 2 bytes = 21 120 000 bytes.
+                    val decoded = toS16(pcm, workDir, "-f", "f32le", "-ar", "16000", "-ac", "1")
+                    val expected = decoded.copyOf(660_000 * 16 * 2)
+                    val joined = chunked.chunks.map { toS16(it.file, workDir) }.reduce { acc, bytes -> acc + bytes }
+                    joined.size.shouldBe(expected.size)
+                    firstDifference(joined, expected).shouldBe(-1)
+                }
+            }
+        }
     })
 
 /** The audio stream's codec, sample format, sample rate and channel count as reported by ffprobe. */
@@ -130,3 +158,24 @@ private suspend fun sampleCount(
     check(result.exitCode == 0) { "ffmpeg failed: ${result.stderr}" }
     return Files.size(raw) / 2
 }
+
+/** The samples of [input] as raw little-endian 16-bit mono, converted by ffmpeg; [inputOptions] describe a raw input. */
+private suspend fun toS16(
+    input: Path,
+    scratchDir: Path,
+    vararg inputOptions: String,
+): ByteArray {
+    val raw = scratchDir.resolve("${input.fileName}.s16")
+    val command =
+        listOf("ffmpeg", "-hide_banner", "-nostats", "-loglevel", "error", "-y") + inputOptions +
+            listOf("-i", input.toString(), "-f", "s16le", "-ac", "1", raw.toString())
+    val result = withTimeout(30.seconds) { ProcessRunner().run(command) }
+    check(result.exitCode == 0) { "ffmpeg failed: ${result.stderr}" }
+    return Files.readAllBytes(raw)
+}
+
+/** The index of the first byte at which [a] and [b] differ, or -1 when they are equal. */
+private fun firstDifference(
+    a: ByteArray,
+    b: ByteArray,
+): Int = (0 until minOf(a.size, b.size)).firstOrNull { a[it] != b[it] } ?: if (a.size == b.size) -1 else minOf(a.size, b.size)
