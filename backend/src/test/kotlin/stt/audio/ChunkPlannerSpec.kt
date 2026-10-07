@@ -1,6 +1,7 @@
 package stt.audio
 
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 
 private val TARGET_MS = minutes(5)
@@ -131,6 +132,28 @@ class ChunkPlannerSpec :
                             PlannedChunk(startMs = seconds(350), endMs = seconds(370)), // 20 s tail; merged 370 s > cap 360 s
                         ),
                     )
+                }
+            }
+        }
+
+        given("a file of uneven length with silences, fallback cuts and a tail") {
+            `when`("the chunks are planned") {
+                then("the chunks are contiguous, non-overlapping, and end exactly at the file duration") {
+                    val durationMs = 1_234_567L
+                    val silences =
+                        listOf(
+                            Silence(startMs = seconds(100), endMs = seconds(101)),
+                            Silence(startMs = seconds(290), endMs = seconds(295)),
+                            Silence(startMs = seconds(610), endMs = seconds(612)),
+                            Silence(startMs = seconds(1180), endMs = seconds(1182)),
+                        )
+
+                    val chunks = planChunks(durationMs, silences, TARGET_MS, CAP_MS)
+
+                    chunks.first().startMs.shouldBe(0L)
+                    chunks.drop(1).map { it.startMs }.shouldBe(chunks.dropLast(1).map { it.endMs })
+                    chunks.forEach { it.lengthMs.shouldBeGreaterThan(0L) }
+                    chunks.last().endMs.shouldBe(durationMs)
                 }
             }
         }
