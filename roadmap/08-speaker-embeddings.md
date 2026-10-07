@@ -53,7 +53,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Unsupported model metadata (`sample_rate` other than 16000, `feature_normalize_type` other than global-mean, `output_dim` missing or not an integer) is rejected with an error naming the key and the value
 - [x] The session uses `STT_THREADS` intra-op threads when it is set, and ONNX Runtime's default otherwise
 - [x] A segment shorter than 2 s becomes a centered, zero-padded 2 s window
-- [ ] A segment longer than 20 s becomes the centered 20 s slice
+- [x] A segment longer than 20 s becomes the centered 20 s slice
 - [ ] A segment past the end of the audio uses the last 2 s (or the whole audio if shorter)
 - [ ] Empty audio yields all-zero embeddings for every segment
 - [ ] Embeddings have unit length; a zero vector stays zero

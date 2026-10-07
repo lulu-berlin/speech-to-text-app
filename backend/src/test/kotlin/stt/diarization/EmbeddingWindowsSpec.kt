@@ -25,4 +25,30 @@ class EmbeddingWindowsSpec :
                 }
             }
         }
+        given("a 30 s PCM and segments longer than 20 s") {
+            `when`("building the embedding window") {
+                then("each becomes the centered 20 s slice") {
+                    val pcm = FloatArray(480_000) { i -> i.toFloat() } // pcm[i] = i
+
+                    // Whole file [0, 30 s]: t0 = 0, t1 = 480000, mid = 240000,
+                    // st = max(0, 240000 - 160000) = 80000, en = min(480000, 400000) = 400000.
+                    val whole = embeddingWindow(pcm, startMs = 0, endMs = 30_000)
+                    whole.size.shouldBe(320_000)
+                    whole[0].shouldBe(80_000f)
+                    whole[319_999].shouldBe(399_999f)
+
+                    // Segment [0, 25 s]: mid = 200000, st = 40000, en = min(400000, 360000) = 360000.
+                    val partial = embeddingWindow(pcm, startMs = 0, endMs = 25_000)
+                    partial.size.shouldBe(320_000)
+                    partial[0].shouldBe(40_000f)
+                    partial[319_999].shouldBe(359_999f)
+
+                    // Exactly 20 s is NOT capped: it stays a plain slice.
+                    val boundary = embeddingWindow(pcm, startMs = 0, endMs = 20_000)
+                    boundary.size.shouldBe(320_000)
+                    boundary[0].shouldBe(0f)
+                    boundary[319_999].shouldBe(319_999f)
+                }
+            }
+        }
     })
