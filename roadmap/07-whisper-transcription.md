@@ -61,7 +61,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] On resume, the prompt is rebuilt from the previous chunk's stored segments
 - [x] A non-zero whisper-cli exit fails the chunk with the exit code
 - [x] Missing or malformed JSON output fails the chunk with a clear message
-- [ ] A chunk's segments and its `DONE` status are stored together or not at all
+- [x] A chunk's segments and its `DONE` status are stored together or not at all
 - [ ] After the chunk is persisted, its FLAC file and whisper-cli's JSON are deleted
 - [ ] Integration: `jfk.wav` transcribed with `ggml-tiny.en` yields non-empty text with increasing timestamps
 - [ ] Chunks with zero total duration report progress 0, not NaN (discovered)
