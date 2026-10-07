@@ -2,6 +2,9 @@ package stt.audio
 
 import kotlin.math.abs
 
+/** A trailing chunk shorter than this is merged into the previous chunk. */
+private const val SHORT_TAIL_MS = 30_000L
+
 /** Plans contiguous chunks covering a file of [durationMs], cut at [silences] near [targetMs] and never longer than [capMs]. */
 fun planChunks(
     durationMs: Long,
@@ -15,6 +18,10 @@ fun planChunks(
             val endMs = if (durationMs - startMs <= targetMs) durationMs else nextCutMs(startMs, silences, targetMs, capMs)
             add(PlannedChunk(startMs, endMs))
             startMs = endMs
+        }
+        if (size > 1 && last().let { it.endMs - it.startMs } < SHORT_TAIL_MS) {
+            val tail = removeAt(lastIndex)
+            set(lastIndex, PlannedChunk(last().startMs, tail.endMs))
         }
     }
 
