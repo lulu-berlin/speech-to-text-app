@@ -28,7 +28,7 @@ class AudioDecoderSpec :
                     generate(source, "sine=frequency=440:sample_rate=44100:duration=2.5", "-ac", "2")
                     val pcm = workDir.resolve("audio.f32")
 
-                    val durationMs = withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
+                    val durationMs = decode(source, pcm)
 
                     // 2.5 s × 16 000 samples/s = 40 000 samples; × 4 bytes (float32, one channel) = 160 000 bytes.
                     Files.size(pcm).shouldBe(160_000L)
@@ -44,12 +44,8 @@ class AudioDecoderSpec :
                 then("decoding fails with ffmpeg's error message") {
                     val workDir = tempdir("stt-audio").toPath()
                     val source = Files.writeString(workDir.resolve("source.wav"), "not audio")
-                    val pcm = workDir.resolve("audio.f32")
 
-                    val error =
-                        shouldThrow<AudioDecodeException> {
-                            withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
-                        }
+                    val error = shouldThrow<AudioDecodeException> { decode(source) }
 
                     error.message.shouldContain("ffmpeg failed to decode $source") // the oracle's wording
                     error.message.shouldContain("Invalid data found when processing input") // ffmpeg's stderr
@@ -63,18 +59,20 @@ class AudioDecoderSpec :
                     val workDir = tempdir("stt-audio").toPath()
                     val source = workDir.resolve("source.wav")
                     generate(source, "anullsrc=r=44100:cl=stereo", "-t", "0")
-                    val pcm = workDir.resolve("audio.f32")
 
-                    val error =
-                        shouldThrow<AudioDecodeException> {
-                            withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
-                        }
+                    val error = shouldThrow<AudioDecodeException> { decode(source) }
 
                     error.message.shouldContain("no audio decoded from $source") // the oracle's wording
                 }
             }
         }
     })
+
+/** Decodes [source] with a fresh runner into [pcm] (beside the source by default), within a timeout. */
+private suspend fun decode(
+    source: Path,
+    pcm: Path = source.resolveSibling("audio.f32"),
+): Long = withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
 
 /** Generates a fixture file at [target] from the lavfi source [lavfi] with ffmpeg, plus [outputOptions]. */
 private suspend fun generate(
