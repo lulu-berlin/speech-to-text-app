@@ -44,7 +44,7 @@ Compute one L2-normalized speaker embedding per transcribed segment, in Kotlin, 
 Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Items that load the real CAM++ model are tagged `Integration` (ADR 0021).
 
 - [x] Fbank of N samples yields `(N + 80) / 160` frames of 80 values (snip_edges false)
-- [ ] The povey window of length 400 matches hand-computed values at its start, center and end
+- [x] The povey window of length 400 matches hand-computed values at its start, center and end
 - [ ] Mel filterbank edges for 80 bins between 20 Hz and 7600 Hz at FFT size 512 match hand-computed bin positions
 - [ ] Silence and a pure tone produce the expected relative fbank energies (tone bin dominates)
 - [ ] Global-mean normalization makes every feature column average to zero
