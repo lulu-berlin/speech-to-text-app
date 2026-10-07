@@ -8,7 +8,7 @@ import java.nio.file.Path
 
 /** The CAM++ speaker-embedding model (ADR 0003): one ONNX Runtime session on the CPU and the model's [metadata]. */
 internal class SpeakerModel private constructor(
-    private val session: OrtSession,
+    internal val session: OrtSession,
     val metadata: SpeakerModelMetadata,
 ) : AutoCloseable {
     override fun close() = session.close()

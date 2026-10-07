@@ -55,7 +55,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A segment shorter than 2 s becomes a centered, zero-padded 2 s window
 - [x] A segment longer than 20 s becomes the centered 20 s slice
 - [x] A segment past the end of the audio uses the last 2 s (or the whole audio if shorter)
-- [ ] Empty audio yields all-zero embeddings for every segment
+- [x] Empty audio yields all-zero embeddings for every segment
 - [ ] Embeddings have unit length; a zero vector stays zero
 - [ ] Embeddings are returned in segment order
 - [ ] Pausing stops embedding between windows and resuming continues with the next window
