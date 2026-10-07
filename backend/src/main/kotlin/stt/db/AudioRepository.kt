@@ -67,8 +67,8 @@ internal class SpooledAudio(
 
 /**
  * Copies [source] to a temp file under [Database.tmpDir] in page-sized windows, computing its size
- * and sha256 on the way, runs [block] with it, and deletes the file afterwards, whether [block]
- * or the copy succeeded or failed. No database lock is held while the source is read.
+ * and sha256 on the way, runs [block] with it, and deletes the file afterwards unless [block] moved
+ * it away, whether [block] or the copy succeeded or failed. No database lock is held while the source is read.
  */
 internal suspend fun <T> Database.withSpooledAudio(
     source: InputStream,
@@ -99,11 +99,8 @@ private fun spool(
     return SpooledAudio(file, sizeBytes, HexFormat.of().formatHex(digest.digest()))
 }
 
-/**
- * Inside the current transaction: inserts the `audio` row first, so a duplicate sha256 is
- * rejected (UNIQUE) before any page is written, then one `audio_parts` row per page of [audio]'s file.
- */
-internal fun JdbcTransaction.writeAudioRows(
+/** Inside the current transaction: inserts [taskId]'s `audio` row; a duplicate sha256 is rejected here (UNIQUE). */
+internal fun JdbcTransaction.insertAudioRow(
     taskId: Long,
     audio: SpooledAudio,
 ) {
@@ -112,6 +109,17 @@ internal fun JdbcTransaction.writeAudioRows(
         it[sizeBytes] = audio.sizeBytes
         it[sha256] = audio.sha256
     }
+}
+
+/**
+ * Inside the current transaction: inserts the `audio` row first, so a duplicate sha256 is
+ * rejected (UNIQUE) before any page is written, then one `audio_parts` row per page of [audio]'s file.
+ */
+internal fun JdbcTransaction.writeAudioRows(
+    taskId: Long,
+    audio: SpooledAudio,
+) {
+    insertAudioRow(taskId, audio)
     var partNo = 0
     Files.newInputStream(audio.file).use { input ->
         input.forEachPage { page, n ->

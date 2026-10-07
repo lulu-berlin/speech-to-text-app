@@ -38,7 +38,7 @@ class ConcurrencySpec :
                         val lock = CountingMutex()
                         Database.open(tempdir("stt-db").toPath(), lock).use { db ->
                             coroutineScope {
-                                val tasks = TaskRepository(db)
+                                val tasks = taskRepository(db)
                                 val heldWrite = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 1L))
 
                                 val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
@@ -68,9 +68,9 @@ class ConcurrencySpec :
                 then("each read completes and sees only the committed state") {
                     withDatabase { db ->
                         coroutineScope {
-                            val tasks = TaskRepository(db)
+                            val tasks = taskRepository(db)
                             val stored = queuedTask("stored.wav", createdAt = 1L)
-                            val id = tasks.createWithAudio(stored, "abc".byteInputStream())
+                            val id = tasks.createFromUpload(stored, "abc".byteInputStream())
                             val heldWrite = holdWriteTransaction(db, queuedTask("uncommitted.wav", createdAt = 2L))
 
                             try {
@@ -111,9 +111,11 @@ class ConcurrencySpec :
                 then("the insert completes; once released, the copy delivers the full audio") {
                     withDatabase { db ->
                         coroutineScope {
-                            val tasks = TaskRepository(db)
+                            val tasks = taskRepository(db)
                             val stored = queuedTask("stored.wav", createdAt = 1L)
-                            val id = tasks.createWithAudio(stored, "abc".byteInputStream())
+                            // copyTo reads the pages AudioRepository.write stores; uploads no longer store any (ADR 0024).
+                            val id = tasks.insert(stored)
+                            AudioRepository(db).write(id, "abc".byteInputStream())
                             val target = StallingTarget()
                             val copy = async { AudioRepository(db).copyTo(id, target) }
                             withContext(Dispatchers.IO) { target.stalled.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
@@ -143,10 +145,10 @@ class ConcurrencySpec :
                         val dataDir = tempdir("stt-db").toPath()
                         Database.open(dataDir).use { db ->
                             coroutineScope {
-                                val tasks = TaskRepository(db)
+                                val tasks = taskRepository(db)
                                 val source = StallingFailingSource()
                                 val creation =
-                                    async { runCatching { tasks.createWithAudio(queuedTask("failing.wav", createdAt = 1L), source) } }
+                                    async { runCatching { tasks.createFromUpload(queuedTask("failing.wav", createdAt = 1L), source) } }
                                 withContext(Dispatchers.IO) {
                                     source.stalled.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue()
                                 }

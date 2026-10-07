@@ -1,0 +1,71 @@
+package stt.db
+
+import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.HexFormat
+
+internal const val MIB = 1_048_576
+
+/** Deterministic, non-repeating-per-page bytes generated on the fly; never materialized as a whole. */
+internal class GeneratedBytes(
+    private val size: Long,
+) : InputStream() {
+    private var position = 0L
+
+    private fun byteAt(i: Long): Int = ((i xor (i ushr 8) xor (i ushr 17)) * 131 and 0xFF).toInt()
+
+    override fun read(): Int = if (position >= size) -1 else byteAt(position++)
+
+    override fun read(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ): Int {
+        if (position >= size) return -1
+        val n = minOf(len.toLong(), size - position).toInt()
+        for (k in 0 until n) b[off + k] = byteAt(position++).toByte()
+        return n
+    }
+}
+
+/**
+ * Wraps [source] and records, on every read, how many bytes it has delivered that are not yet
+ * in the spool files under [tmpDir]: the bytes the writer holds in memory at that moment.
+ */
+internal class SpoolWatchingSource(
+    private val source: InputStream,
+    private val tmpDir: Path,
+) : InputStream() {
+    private var delivered = 0L
+    var largestUnspooled = 0L
+        private set
+
+    private fun watch() {
+        val spooled = Files.list(tmpDir).use { files -> files.mapToLong { Files.size(it) }.sum() }
+        largestUnspooled = maxOf(largestUnspooled, delivered - spooled)
+    }
+
+    override fun read(): Int = throw UnsupportedOperationException("read in windows")
+
+    override fun read(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ): Int {
+        watch()
+        return source.read(b, off, len).also { n -> if (n > 0) delivered += n }
+    }
+}
+
+internal fun sha256Hex(input: InputStream): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(64 * 1024)
+    while (true) {
+        val n = input.read(buffer)
+        if (n < 0) break
+        digest.update(buffer, 0, n)
+    }
+    return HexFormat.of().formatHex(digest.digest())
+}
