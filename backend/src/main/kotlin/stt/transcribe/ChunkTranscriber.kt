@@ -16,8 +16,9 @@ class ChunkTranscriber internal constructor(
 
     /**
      * Runs whisper-cli over [audio] and returns its segments, offsets relative to [audio].
-     * A non-zero exit fails with [TranscriptionException] carrying the exit code and the full stderr:
-     * whisper-cli prints its error anywhere in stderr (before ~70 usage lines on a bad argument).
+     * Fails with [TranscriptionException] carrying the full stderr on a non-zero exit (with the exit code),
+     * a missing JSON output, or a malformed one: whisper-cli prints its error anywhere in stderr (before ~70
+     * usage lines on a bad argument) and exits 0 on unreadable audio without writing JSON.
      */
     suspend fun transcribe(
         settings: WhisperSettings,
@@ -27,12 +28,19 @@ class ChunkTranscriber internal constructor(
     ): List<WhisperSegment> {
         val command = whisperCommand(settings, audio, outputPrefix, prompt, executable)
         val result = runner.run(command)
+        val stderr = result.stderr.joinToString("\n")
         if (result.exitCode != 0) {
-            throw TranscriptionException(
-                "whisper-cli failed on $audio (exit ${result.exitCode}):\n${result.stderr.joinToString("\n")}",
-            )
+            throw TranscriptionException("whisper-cli failed on $audio (exit ${result.exitCode}):\n$stderr")
         }
         val json = Path.of("$outputPrefix.json")
-        return parseSegments(withContext(Dispatchers.IO) { Files.readString(json) })
+        val output =
+            withContext(Dispatchers.IO) { if (Files.exists(json)) Files.readString(json) else null }
+                ?: throw TranscriptionException("whisper-cli JSON output $json is missing after transcribing $audio:\n$stderr")
+        try {
+            return parseSegments(output)
+        } catch (e: IllegalArgumentException) {
+            // kotlinx.serialization's parse errors and a non-object top level are both IllegalArgumentException.
+            throw TranscriptionException("whisper-cli JSON output $json is malformed (${e.message}):\n$stderr")
+        }
     }
 }

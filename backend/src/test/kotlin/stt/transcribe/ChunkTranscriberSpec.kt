@@ -62,19 +62,61 @@ class ChunkTranscriberSpec :
                 }
             }
         }
+
+        given("a whisper-cli that exits 0 but writes no JSON, and one that writes malformed JSON") {
+            `when`("a chunk is transcribed") {
+                then("the chunk fails with a clear message naming the JSON file, with the full stderr") {
+                    val workDir = tempdir("stt-transcribe").toPath()
+                    val prefix = workDir.resolve("chunk-2")
+                    val json = workDir.resolve("chunk-2.json")
+
+                    suspend fun transcribe(whisperCli: Path) =
+                        shouldThrow<TranscriptionException> {
+                            withTimeout(30.seconds) {
+                                ChunkTranscriber(ProcessRunner(), whisperCli.toString())
+                                    .transcribe(TEST_SETTINGS, workDir.resolve("chunk-2.flac"), prefix, prompt = null)
+                            }
+                        }
+
+                    // whisper-cli 1.9.2 on a file that is not audio: exit 0, no JSON, the reason only in stderr.
+                    val unreadable =
+                        listOf(
+                            "[SWR @ 0x5e9c1d128000] Failed to set option",
+                            "error: failed to allocate swr context",
+                            "read_audio_data: failed to ffmpeg decode",
+                            "error: failed to read audio file 'chunk-2.flac'",
+                        )
+                    val missing = transcribe(fakeWhisperCli(workDir, unreadable, exitCode = 0))
+                    missing.message.shouldContain("missing")
+                    missing.message.shouldContain(json.toString())
+                    missing.message.shouldContain(unreadable.joinToString("\n"))
+
+                    val saving = listOf("output_json: saving output to '$json'")
+                    val malformed = transcribe(fakeWhisperCli(workDir, saving, exitCode = 0, writes = json to "{not json"))
+                    malformed.message.shouldContain("malformed")
+                    malformed.message.shouldContain(json.toString())
+                    malformed.message.shouldContain(saving.joinToString("\n"))
+                }
+            }
+        }
     })
 
+private val TEST_SETTINGS = WhisperSettings(Path.of("/models/ggml-tiny.en.bin"), "en", threads = null, Device.Cpu)
+
 /**
- * An executable script standing in for whisper-cli: prints [stderr] to stderr, then exits with [exitCode].
+ * An executable script standing in for whisper-cli: prints [stderr] to stderr, writes [writes] (file to content)
+ * if given, then exits with [exitCode].
  * The shebang names `sh` from PATH: neither `/bin/sh` nor `/usr/bin/env` exists in every environment (Nix).
  */
 private fun fakeWhisperCli(
     dir: Path,
     stderr: List<String>,
     exitCode: Int,
+    writes: Pair<Path, String>? = null,
 ): Path {
     val script = dir.resolve("whisper-cli")
-    Files.writeString(script, "#!${shell()}\ncat >&2 <<'EOF'\n${stderr.joinToString("\n")}\nEOF\nexit $exitCode\n")
+    val write = writes?.let { (file, content) -> "cat > '$file' <<'EOF'\n$content\nEOF\n" } ?: ""
+    Files.writeString(script, "#!${shell()}\ncat >&2 <<'EOF'\n${stderr.joinToString("\n")}\nEOF\n${write}exit $exitCode\n")
     Files.setPosixFilePermissions(script, PosixFilePermissions.fromString("rwx------"))
     return script
 }
