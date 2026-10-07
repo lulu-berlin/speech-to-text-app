@@ -155,7 +155,9 @@ class DatabaseSpec :
         }
 
         given("a database whose WAL size limit is 16 KiB (four 4 KiB SQLite pages)") {
-            `when`("a 1 MiB + 1 byte audio write grows the WAL, a PASSIVE checkpoint completes, and a one-page write follows") {
+            `when`(
+                "a task whose error is 1 MiB + 1 character long grows the WAL, a PASSIVE checkpoint completes, and a one-page write follows",
+            ) {
                 then("the WAL file shrinks back to at most the limit") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
@@ -163,11 +165,8 @@ class DatabaseSpec :
                         val payloadSize = 1_048_577
                         val wal = dataDir.resolve("stt.db-wal")
                         Database.open(dataDir, Mutex(), journalSizeLimit = limit).use { db ->
-                            TaskRepository(db).createWithAudio(
-                                queuedTask("large.wav", createdAt = 1L),
-                                ByteArray(payloadSize) { 3 }.inputStream(),
-                            )
-                            // Every payload byte is in a WAL frame until a checkpoint copies it into stt.db.
+                            taskRepository(db).insert(queuedTask("large.wav", createdAt = 1L).copy(error = "x".repeat(payloadSize)))
+                            // Every byte of the row is in a WAL frame until a checkpoint copies it into stt.db.
                             Files.size(wal).shouldBeGreaterThanOrEqual(payloadSize.toLong())
 
                             db.connection.createStatement().use { st ->

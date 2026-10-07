@@ -34,7 +34,7 @@ class Database private constructor(
      */
     internal val connection: Connection,
     url: String,
-    /** `$STT_DATA_DIR/tmp`: upload spool files (ADR 0018) live here until their write transaction ends. */
+    /** `$STT_DATA_DIR/tmp`: upload spool files live here until they are moved into a task's work directory after their commit, or deleted (ADR 0024). */
     internal val tmpDir: Path,
     // One connection carries one transaction at a time: a concurrent commit or rollback
     // would otherwise also commit or roll back the other caller's work. Not reentrant:

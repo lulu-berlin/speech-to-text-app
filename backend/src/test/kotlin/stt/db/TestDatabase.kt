@@ -14,6 +14,9 @@ internal fun TestConfiguration.withDatabase(block: suspend (Database) -> Unit) =
         }
     }
 
+/** A [TaskRepository] whose work directories lie in [db]'s data directory, the parent of its tmp/ (ADR 0017). */
+internal fun taskRepository(db: Database) = TaskRepository(db, TaskWorkDirectories(db.tmpDir.parent))
+
 /** Number of rows in [table], read over the raw connection. */
 internal fun rowCount(
     db: Database,

@@ -2,11 +2,16 @@ package stt.db
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.longs.shouldBeLessThan
+import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.test.runTest
 import stt.queue.TaskStatus
 import java.nio.file.Files
+import java.nio.file.Path
 import java.sql.SQLException
 
 class TaskRepositorySpec :
@@ -16,7 +21,7 @@ class TaskRepositorySpec :
             `when`("both are saved through the repository and read back by id") {
                 then("each reads back with identical fields") {
                     withDatabase { db ->
-                        val tasks = TaskRepository(db)
+                        val tasks = taskRepository(db)
                         val full =
                             Task(
                                 originalFilename = "interview.m4a",
@@ -48,21 +53,52 @@ class TaskRepositorySpec :
             }
         }
 
+        given("an upload of two full 1 MiB pages plus 12345 bytes") {
+            `when`("a task is created from it") {
+                then(
+                    "no audio bytes are stored in the database, the original is byte-identical at work/<task-id>/source with no spool left, and size_bytes/sha256 match the upload",
+                ) {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        Database.open(dataDir).use { db ->
+                            val size = 2L * MIB + 12_345
+                            val tasks = TaskRepository(db, TaskWorkDirectories(dataDir))
+                            val task = queuedTask("long.wav", createdAt = 1L)
+                            val upload = SpoolWatchingSource(GeneratedBytes(size), db.tmpDir)
+
+                            val taskId = tasks.createFromUpload(task, upload)
+
+                            upload.largestUnspooled.shouldBeLessThanOrEqual(MIB.toLong())
+                            tasks.find(taskId).shouldBe(StoredTask(taskId, task))
+                            val original = dataDir.resolve("work").resolve(taskId.toString()).resolve("source")
+                            Files.readAllBytes(original).shouldBe(GeneratedBytes(size).readAllBytes())
+                            Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
+                            // 2 × 1 048 576 + 12 345 = 2 109 497 bytes; the digest is the test's own, over a fresh stream.
+                            AudioRepository(db)
+                                .metadata(taskId)
+                                .shouldBe(AudioMetadata(sizeBytes = 2_109_497L, sha256 = sha256Hex(GeneratedBytes(size))))
+                            // Together the database files are smaller than the upload: no table holds a copy of it.
+                            databaseFilesSize(dataDir).shouldBeLessThan(size)
+                        }
+                    }
+                }
+            }
+        }
+
         given("a task created with some audio") {
             `when`("a second task is created with the same audio bytes under another filename") {
-                then("creation fails and leaves no task, pages, or metadata behind") {
+                then("creation fails and leaves no task or metadata behind") {
                     withDatabase { db ->
-                        val tasks = TaskRepository(db)
+                        val tasks = taskRepository(db)
                         val first = queuedTask("take1.wav", createdAt = 1L)
-                        val firstId = tasks.createWithAudio(first, "same bytes".byteInputStream())
+                        val firstId = tasks.createFromUpload(first, "same bytes".byteInputStream())
 
                         shouldThrow<SQLException> {
-                            tasks.createWithAudio(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
+                            tasks.createFromUpload(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
                         }
 
                         rowCount(db, "tasks").shouldBe(1)
                         rowCount(db, "audio").shouldBe(1)
-                        rowCount(db, "audio_parts").shouldBe(1)
                         tasks.find(firstId).shouldBe(StoredTask(firstId, first))
                     }
                 }
@@ -73,11 +109,11 @@ class TaskRepositorySpec :
             `when`("the duplicate is rejected") {
                 then("no upload temp file is left in the data directory's tmp/") {
                     withDatabase { db ->
-                        val tasks = TaskRepository(db)
-                        tasks.createWithAudio(queuedTask("take1.wav", createdAt = 1L), "same bytes".byteInputStream())
+                        val tasks = taskRepository(db)
+                        tasks.createFromUpload(queuedTask("take1.wav", createdAt = 1L), "same bytes".byteInputStream())
 
                         shouldThrow<SQLException> {
-                            tasks.createWithAudio(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
+                            tasks.createFromUpload(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
                         }
 
                         Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
@@ -86,16 +122,16 @@ class TaskRepositorySpec :
             }
         }
 
-        given("two tasks, each with audio, chunks, and segments; the first with two audio pages") {
+        given("two tasks, each with audio, chunks, and segments") {
             `when`("the first task is deleted") {
-                then("its audio, audio pages, chunks, and segments are gone; the second task's rows remain") {
+                then("its audio, chunks, and segments are gone; the second task's rows remain") {
                     withDatabase { db ->
-                        val tasks = TaskRepository(db)
+                        val tasks = taskRepository(db)
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
                         val doomedId =
-                            tasks.createWithAudio(queuedTask("doomed.wav", createdAt = 1L), ByteArray(1_048_577) { 1 }.inputStream())
-                        val keptId = tasks.createWithAudio(queuedTask("kept.wav", createdAt = 2L), "kept".byteInputStream())
+                            tasks.createFromUpload(queuedTask("doomed.wav", createdAt = 1L), "doomed".byteInputStream())
+                        val keptId = tasks.createFromUpload(queuedTask("kept.wav", createdAt = 2L), "kept".byteInputStream())
                         for (taskId in listOf(doomedId, keptId)) {
                             chunks.insertAll(taskId, listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.DONE)))
                             segments.insertAll(
@@ -109,7 +145,6 @@ class TaskRepositorySpec :
                         tasks.find(doomedId).shouldBeNull()
                         rowCount(db, "tasks").shouldBe(1)
                         rowCount(db, "audio").shouldBe(1)
-                        rowCount(db, "audio_parts").shouldBe(1)
                         rowCount(db, "chunks").shouldBe(1)
                         rowCount(db, "segments").shouldBe(1)
                         tasks.find(keptId).shouldBe(StoredTask(keptId, queuedTask("kept.wav", createdAt = 2L)))
@@ -122,11 +157,11 @@ class TaskRepositorySpec :
             `when`("listing tasks") {
                 then("both tasks come back in creation order without touching audio pages") {
                     withDatabase { db ->
-                        val tasks = TaskRepository(db)
+                        val tasks = taskRepository(db)
                         val first = queuedTask("first.wav", createdAt = 1L)
                         val second = queuedTask("second.wav", createdAt = 2L)
-                        val firstId = tasks.createWithAudio(first, ByteArray(1_048_577) { 7 }.inputStream())
-                        val secondId = tasks.createWithAudio(second, "short".byteInputStream())
+                        val firstId = tasks.createFromUpload(first, ByteArray(1_048_577) { 7 }.inputStream())
+                        val secondId = tasks.createFromUpload(second, "short".byteInputStream())
                         // Any read of audio pages now fails with "no such table".
                         db.connection.createStatement().use { st ->
                             st.execute("ALTER TABLE audio_parts RENAME TO audio_parts_hidden")
@@ -138,3 +173,7 @@ class TaskRepositorySpec :
             }
         }
     })
+
+/** Bytes in `stt.db` plus its WAL: everything the database has written to disk. */
+private fun databaseFilesSize(dataDir: Path): Long =
+    listOf("stt.db", "stt.db-wal").sumOf { name -> dataDir.resolve(name).let { if (Files.exists(it)) Files.size(it) else 0L } }
