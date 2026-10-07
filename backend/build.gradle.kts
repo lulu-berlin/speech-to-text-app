@@ -29,6 +29,7 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.nc.sqlite)
     implementation(libs.sqlite.jdbc)
+    implementation(libs.onnxruntime)
 
     testImplementation(libs.ktor.server.test.host.jvm)
     testImplementation(libs.kotest.runner.junit5)
