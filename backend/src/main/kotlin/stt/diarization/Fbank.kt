@@ -85,6 +85,19 @@ private fun dot(
 }
 
 /**
+ * Global-mean normalization (CAM++ metadata `feature_normalize_type = "global-mean"`): subtracts each column's mean
+ * over all frames from that column, in place, as sherpa-onnx's speaker-embedding extractor and 3D-Speaker's `FBank`
+ * (`feat - feat.mean(0)`) do. Means are accumulated in double.
+ */
+internal fun subtractGlobalMean(features: Array<FloatArray>) {
+    if (features.isEmpty()) return
+    val means = DoubleArray(features[0].size)
+    for (frame in features) for (column in means.indices) means[column] += frame[column].toDouble()
+    for (column in means.indices) means[column] /= features.size
+    for (frame in features) for (column in means.indices) frame[column] = (frame[column] - means[column]).toFloat()
+}
+
+/**
  * Kaldi "povey" window of [length] samples: `(0.5 - 0.5 * cos(2 * pi * n / (length - 1)))^0.85`,
  * from Kaldi `FeatureWindowFunction` (feature-window.cc) / kaldi-native-fbank `FeatureWindowFunction`
  * (feature-window.cc), computed in double and stored as float.
