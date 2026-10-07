@@ -150,14 +150,7 @@ private suspend fun streamInfo(file: Path): Map<String, String> {
 private suspend fun sampleCount(
     file: Path,
     scratchDir: Path,
-): Long {
-    val raw = scratchDir.resolve("${file.fileName}.s16")
-    val command =
-        listOf("ffmpeg", "-hide_banner", "-nostats", "-loglevel", "error", "-i", file.toString(), "-f", "s16le", "-ac", "1", raw.toString())
-    val result = withTimeout(30.seconds) { ProcessRunner().run(command) }
-    check(result.exitCode == 0) { "ffmpeg failed: ${result.stderr}" }
-    return Files.size(raw) / 2
-}
+): Long = toS16(file, scratchDir).size / 2L
 
 /** The samples of [input] as raw little-endian 16-bit mono, converted by ffmpeg; [inputOptions] describe a raw input. */
 private suspend fun toS16(
