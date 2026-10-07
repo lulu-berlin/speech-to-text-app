@@ -55,8 +55,8 @@ graph TD
 | [04 — Queue domain model](../docs/specs/queue-domain-model.md) | done | 03 |
 | [05 — Process runner](../docs/specs/process-runner.md) | done | 02 |
 | [06 — Audio decoding and chunking](../docs/specs/audio-decoding-and-chunking.md) | done | 03, 05 |
-| [07 — Whisper transcription](07-whisper-transcription.md) | draft | 03, 06 |
-| [08 — Speaker embeddings](08-speaker-embeddings.md) | draft | 06 |
+| [07 — Whisper transcription](07-whisper-transcription.md) | spec-approved | 03, 06 |
+| [08 — Speaker embeddings](08-speaker-embeddings.md) | spec-approved | 06 |
 | [09 — Diarization](09-diarization.md) | draft | 08 |
 | [10 — Output formats](10-output-formats.md) | draft | 09 |
 | [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18 |
@@ -66,4 +66,4 @@ graph TD
 | [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13 |
 | [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
-| [18 — Audio storage: originals in the work directory, chunks as FLAC](18-audio-storage.md) | draft | 03 |
+| [18 — Audio storage: originals in the work directory, chunks as FLAC](18-audio-storage.md) | spec-approved | 03 |
