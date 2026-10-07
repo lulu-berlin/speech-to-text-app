@@ -74,19 +74,6 @@ private suspend fun decode(
     pcm: Path = source.resolveSibling("audio.f32"),
 ): Long = withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
 
-/** Generates a fixture file at [target] from the lavfi source [lavfi] with ffmpeg, plus [outputOptions]. */
-private suspend fun generate(
-    target: Path,
-    lavfi: String,
-    vararg outputOptions: String,
-) {
-    val command =
-        listOf("ffmpeg", "-hide_banner", "-nostats", "-loglevel", "error", "-f", "lavfi", "-i", lavfi) +
-            outputOptions + target.toString()
-    val result = withTimeout(30.seconds) { ProcessRunner().run(command) }
-    check(result.exitCode == 0) { "fixture generation failed: ${result.stderr}" }
-}
-
 private fun peak(pcm: Path): Double {
     val samples = ByteBuffer.wrap(Files.readAllBytes(pcm)).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
     return (0 until samples.limit()).maxOf { abs(samples[it].toDouble()) }
