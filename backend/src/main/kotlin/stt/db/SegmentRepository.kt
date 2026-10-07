@@ -20,6 +20,7 @@ class SegmentRepository(
     /**
      * Marks chunk [chunkIdx] of the task `DONE` and stores its [segments] in one transaction (ADR 0004 resume):
      * both or neither, so a chunk interrupted or failed before this point is re-run with no segments left behind.
+     * A chunk that is not in the task's plan fails and stores nothing.
      */
     suspend fun completeChunk(
         taskId: Long,
@@ -27,9 +28,11 @@ class SegmentRepository(
         segments: List<Segment>,
     ) {
         db.writeTransaction {
-            ChunksTable.update({ (ChunksTable.taskId eq taskId) and (ChunksTable.idx eq chunkIdx) }) {
-                it[status] = ChunkStatus.DONE
-            }
+            val marked =
+                ChunksTable.update({ (ChunksTable.taskId eq taskId) and (ChunksTable.idx eq chunkIdx) }) {
+                    it[status] = ChunkStatus.DONE
+                }
+            check(marked == 1) { "Chunk $chunkIdx of task $taskId is not in the task's plan" }
             insertSegments(taskId, segments)
         }
     }

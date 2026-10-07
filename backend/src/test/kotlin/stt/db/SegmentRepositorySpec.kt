@@ -113,4 +113,24 @@ class SegmentRepositorySpec :
                 }
             }
         }
+
+        given("a task whose plan has only chunk 0") {
+            `when`("chunk 5 is completed") {
+                then("completing a chunk that is not in the plan fails and stores nothing") {
+                    withDatabase { db ->
+                        val chunks = ChunkRepository(db)
+                        val segments = SegmentRepository(db)
+                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
+                        val plan = listOf(Chunk(idx = 0, startMs = 0L, endMs = 30_000L, status = ChunkStatus.PENDING))
+                        chunks.insertAll(taskId, plan)
+
+                        val orphan = Segment(chunkIdx = 5, seq = 0, startMs = 150_000L, endMs = 152_000L, text = " Lost.", speaker = null)
+                        shouldThrowAny { segments.completeChunk(taskId, chunkIdx = 5, listOf(orphan)) }
+
+                        segments.findByTask(taskId).shouldBe(emptyList())
+                        chunks.findByTask(taskId).shouldBe(plan)
+                    }
+                }
+            }
+        }
     })
