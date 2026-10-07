@@ -10,6 +10,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.test.runTest
 import stt.queue.TaskStatus
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.SQLException
@@ -106,6 +107,29 @@ class TaskRepositorySpec :
                                 dataDir.resolve("work"),
                             ).use { it.toList() }
                             .shouldBe(listOf(dataDir.resolve("work").resolve(firstId.toString())))
+                    }
+                }
+            }
+        }
+
+        given("an upload whose source delivers one full 1 MiB page and then fails") {
+            `when`("a task is created from it") {
+                then("creation fails with the source's error and leaves no task, no metadata, no spool file and no work directory") {
+                    withDatabase { db ->
+                        val tasks = taskRepository(db, dataDir)
+
+                        shouldThrow<IOException> {
+                            tasks.createFromUpload(
+                                queuedTask("broken.wav", createdAt = 1L),
+                                FailingAfter(MIB.toLong()),
+                            )
+                        }
+
+                        rowCount(db, "tasks").shouldBe(0)
+                        rowCount(db, "audio").shouldBe(0)
+                        Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
+                        val work = dataDir.resolve("work")
+                        (if (Files.exists(work)) Files.list(work).use { it.toList() } else emptyList()).shouldBeEmpty()
                     }
                 }
             }
