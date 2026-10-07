@@ -67,4 +67,22 @@ class ChunkPlannerSpec :
                 }
             }
         }
+
+        given("a silence beyond the cap") {
+            `when`("the chunks are planned") {
+                then("it is never chosen; the cut falls back to the target") {
+                    val durationMs = seconds(590)
+                    val silences = listOf(Silence(startMs = seconds(362), endMs = seconds(364))) // midpoint 363 s > cap 360 s
+
+                    val chunks = planChunks(durationMs, silences, TARGET_MS, CAP_MS)
+
+                    chunks.shouldBe(
+                        listOf(
+                            PlannedChunk(startMs = 0, endMs = seconds(300)),
+                            PlannedChunk(startMs = seconds(300), endMs = seconds(590)),
+                        ),
+                    )
+                }
+            }
+        }
     })

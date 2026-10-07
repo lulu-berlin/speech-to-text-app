@@ -46,7 +46,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A file shorter than the target length becomes exactly one chunk covering the whole file
 - [x] Audio with no silences is cut every target length (no silence within the cap)
 - [x] With many silences, each cut lands at the midpoint of the silence nearest the target
-- [ ] A silence beyond the cap is never chosen; the cut falls back to the target
+- [x] A silence beyond the cap is never chosen; the cut falls back to the target
 - [ ] Planned chunks are contiguous, non-overlapping, and end exactly at the file duration
 - [ ] A trailing chunk shorter than 30 s is merged into the previous chunk when the merged chunk stays within the cap; otherwise it stays a separate chunk
 - [ ] `silencedetect` stderr lines are parsed into silence intervals (including a trailing silence without `silence_end`)

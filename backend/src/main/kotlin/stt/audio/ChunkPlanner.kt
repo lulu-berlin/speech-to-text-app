@@ -17,7 +17,10 @@ fun planChunks(
                     durationMs
                 } else {
                     val targetEndMs = startMs + targetMs
-                    silences.map { (it.startMs + it.endMs) / 2 }.minByOrNull { abs(it - targetEndMs) } ?: targetEndMs
+                    silences
+                        .map { (it.startMs + it.endMs) / 2 }
+                        .filter { it <= startMs + capMs }
+                        .minByOrNull { abs(it - targetEndMs) } ?: targetEndMs
                 }
             add(PlannedChunk(startMs, endMs))
             startMs = endMs
