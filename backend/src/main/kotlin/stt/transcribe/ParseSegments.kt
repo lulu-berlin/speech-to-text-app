@@ -23,12 +23,13 @@ fun parseSegments(json: String): List<WhisperSegment> {
     return transcription.jsonArray.map { parseTranscriptionSegment(it.jsonObject) }
 }
 
+/** Oracle defaults: missing `offsets`, `from` or `to` → 0; missing `text` → empty string. */
 private fun parseTranscriptionSegment(segment: JsonObject): WhisperSegment {
-    val offsets = segment.getValue("offsets").jsonObject
+    val offsets = segment["offsets"]?.jsonObject
     return WhisperSegment(
-        startMs = offsets.getValue("from").jsonPrimitive.long,
-        endMs = offsets.getValue("to").jsonPrimitive.long,
-        text = segment.getValue("text").jsonPrimitive.content,
+        startMs = offsets?.get("from")?.jsonPrimitive?.long ?: 0,
+        endMs = offsets?.get("to")?.jsonPrimitive?.long ?: 0,
+        text = segment["text"]?.jsonPrimitive?.content ?: "",
     )
 }
 

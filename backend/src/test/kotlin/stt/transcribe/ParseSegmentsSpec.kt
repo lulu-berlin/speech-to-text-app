@@ -87,4 +87,29 @@ class ParseSegmentsSpec :
                 }
             }
         }
+
+        given("transcription entries with missing offsets fields or missing text") {
+            `when`("they are parsed") {
+                then("missing offsets fields default to 0 and missing text to an empty string") {
+                    val json =
+                        """
+                        {
+                          "transcription": [
+                            {"text": " no offsets"},
+                            {"offsets": {"to": 500}},
+                            {"offsets": {"from": 300}, "text": " no end"}
+                          ]
+                        }
+                        """.trimIndent()
+
+                    parseSegments(json).shouldBe(
+                        listOf(
+                            WhisperSegment(startMs = 0, endMs = 0, text = " no offsets"),
+                            WhisperSegment(startMs = 0, endMs = 500, text = ""),
+                            WhisperSegment(startMs = 300, endMs = 0, text = " no end"),
+                        ),
+                    )
+                }
+            }
+        }
     })
