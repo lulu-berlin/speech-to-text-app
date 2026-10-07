@@ -31,7 +31,7 @@ class TaskRepository(
         task: Task,
         upload: InputStream,
     ): Long =
-        db.withSpooledAudio(upload) { spooled ->
+        db.withSpooledUpload(upload) { spooled ->
             val taskId =
                 db.writeTransaction {
                     insertTaskRow(task).also { taskId -> insertAudioRow(taskId, spooled) }
