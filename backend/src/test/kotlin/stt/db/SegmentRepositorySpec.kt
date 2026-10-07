@@ -1,5 +1,6 @@
 package stt.db
 
+import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 
@@ -70,6 +71,44 @@ class SegmentRepositorySpec :
                                 Segment(chunkIdx = 1, seq = 1, startMs = 40_000L, endMs = 50_000L, text = "D", speaker = null),
                             ),
                         )
+                    }
+                }
+            }
+        }
+
+        given("a task with a PENDING chunk 1") {
+            `when`("the chunk is completed with its segments, once validly and once with a segment the database rejects") {
+                then("a chunk's segments and its DONE status are stored together or not at all") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        val chunks = ChunkRepository(db)
+                        val segments = SegmentRepository(db)
+                        val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
+                        val failingTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
+                        val plan =
+                            listOf(
+                                Chunk(idx = 0, startMs = 0L, endMs = 30_000L, status = ChunkStatus.DONE),
+                                Chunk(idx = 1, startMs = 30_000L, endMs = 60_000L, status = ChunkStatus.PENDING),
+                            )
+                        chunks.insertAll(taskId, plan)
+                        chunks.insertAll(failingTaskId, plan)
+
+                        val transcribed =
+                            listOf(
+                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 37_940L, text = " So.", speaker = null),
+                                Segment(chunkIdx = 1, seq = 1, startMs = 37_940L, endMs = 40_760L, text = " Bye.", speaker = null),
+                            )
+                        segments.completeChunk(taskId, chunkIdx = 1, transcribed)
+
+                        chunks.findByTask(taskId).map { it.status }.shouldBe(listOf(ChunkStatus.DONE, ChunkStatus.DONE))
+                        segments.findByTask(taskId).shouldBe(transcribed)
+
+                        // start_ms = -1 violates CHECK (start_ms >= 0), so the second insert fails after the status update.
+                        val rejected = listOf(transcribed[0], transcribed[1].copy(startMs = -1L))
+                        shouldThrowAny { segments.completeChunk(failingTaskId, chunkIdx = 1, rejected) }
+
+                        chunks.findByTask(failingTaskId).map { it.status }.shouldBe(listOf(ChunkStatus.DONE, ChunkStatus.PENDING))
+                        segments.findByTask(failingTaskId).shouldBe(emptyList())
                     }
                 }
             }
