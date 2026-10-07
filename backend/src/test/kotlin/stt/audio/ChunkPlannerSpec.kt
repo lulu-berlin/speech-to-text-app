@@ -85,4 +85,23 @@ class ChunkPlannerSpec :
                 }
             }
         }
+
+        given("a silence at or before the current chunk start") {
+            `when`("the chunks are planned") {
+                then("it is never chosen") {
+                    val durationMs = seconds(660)
+                    val silences = listOf(Silence(startMs = seconds(290), endMs = seconds(292))) // midpoint 291 s: the first cut
+
+                    val chunks = planChunks(durationMs, silences, TARGET_MS, CAP_MS)
+
+                    chunks.shouldBe(
+                        listOf(
+                            PlannedChunk(startMs = 0, endMs = seconds(291)),
+                            PlannedChunk(startMs = seconds(291), endMs = seconds(591)), // 291 + 300: no silence after 291 s
+                            PlannedChunk(startMs = seconds(591), endMs = seconds(660)),
+                        ),
+                    )
+                }
+            }
+        }
     })

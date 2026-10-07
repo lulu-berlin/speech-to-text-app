@@ -54,7 +54,7 @@ Approved 2026-10-06 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Integration: decoding a file ffmpeg cannot read fails with ffmpeg's error message
 - [ ] Integration: decoding a file with no audio fails with "no audio decoded"
 - [ ] Integration: an ffmpeg-generated tone+silence fixture is split at the expected silence midpoints and the exported chunk WAVs have the planned lengths
-- [ ] A silence at or before the current chunk start is never chosen (discovered)
+- [x] A silence at or before the current chunk start is never chosen (discovered)
 
 ## Acceptance criteria
 
