@@ -62,10 +62,11 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A non-zero whisper-cli exit fails the chunk with the exit code
 - [x] Missing or malformed JSON output fails the chunk with a clear message
 - [x] A chunk's segments and its `DONE` status are stored together or not at all
-- [ ] After the chunk is persisted, its FLAC file and whisper-cli's JSON are deleted
+- [x] After the chunk is persisted, its FLAC file and whisper-cli's JSON are deleted
 - [ ] Integration: `jfk.wav` transcribed with `ggml-tiny.en` yields non-empty text with increasing timestamps
 - [ ] Chunks with zero total duration report progress 0, not NaN (discovered)
 - [ ] While whisper-cli runs, each `-pp` progress line is reported as the chunk fraction (discovered)
+- [ ] Completing a chunk that is not in the plan fails and stores nothing (discovered)
 
 ## Acceptance criteria
 
@@ -86,3 +87,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07 (cycle 10a checkpoint, user decision): on resume the previous chunk's segments are taken from `SegmentRepository.findByTask` (all of the task's segments, read once per resume); no by-chunk query is added to `stt/db`, keeping clear of item 18's `stt/db` changes.
 - 2026-10-07 (cycle 10b checkpoint, user decision; changes the Proposal's "stderr tail"): a failing chunk's error carries the exit code and the **full** stderr. Measured with whisper-cli 1.9.2: a missing input file exits 2 with the error on lines 2–3 of 77 (the rest is usage text); a file that is not audio exits **0**, writes no JSON, and prints its error on lines 42–45 of 55. A tail would lose the cause. whisper-cli is replaced in tests by a script (test seam: the executable path), tagged `Integration` because it spawns a real process (ADR 0021).
 - 2026-10-07 (cycle 11 checkpoint): discovered scenario "While whisper-cli runs, each `-pp` progress line is reported as the chunk fraction" confirmed by the user (the parsers existed, but nothing fed whisper-cli's stderr to them). The JSON-output failures (missing, malformed) also carry the full stderr: whisper-cli exits 0 on unreadable audio and explains why only in stderr (agent recommendation, applied with the user's confirmation of the next test).
+- 2026-10-07 (cycle 13 checkpoint): discovered scenario "Completing a chunk that is not in the plan fails and stores nothing" confirmed by the user (an update matching no chunk row changes 0 rows without error, so the segments would be stored as orphans).
