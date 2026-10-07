@@ -165,7 +165,10 @@ class DatabaseSpec :
                         val payloadSize = 1_048_577
                         val wal = dataDir.resolve("stt.db-wal")
                         Database.open(dataDir, Mutex(), journalSizeLimit = limit).use { db ->
-                            taskRepository(db).insert(queuedTask("large.wav", createdAt = 1L).copy(error = "x".repeat(payloadSize)))
+                            taskRepository(
+                                db,
+                                dataDir,
+                            ).insert(queuedTask("large.wav", createdAt = 1L).copy(error = "x".repeat(payloadSize)))
                             // Every byte of the row is in a WAL frame until a checkpoint copies it into stt.db.
                             Files.size(wal).shouldBeGreaterThanOrEqual(payloadSize.toLong())
 

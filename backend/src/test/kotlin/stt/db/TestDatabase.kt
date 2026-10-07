@@ -4,18 +4,27 @@ import io.kotest.core.TestConfiguration
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import kotlinx.coroutines.test.runTest
+import java.nio.file.Path
 
-/** Runs [block] against a freshly opened database in a per-test temp directory. */
-internal fun TestConfiguration.withDatabase(block: suspend (Database) -> Unit) =
+/** The per-test data directory a [withDatabase] block runs in. */
+internal class TestDataDir(
+    val dataDir: Path,
+)
+
+/** Runs [block] against a freshly opened database in a per-test temp directory, which [block] gets as [TestDataDir]. */
+internal fun TestConfiguration.withDatabase(block: suspend TestDataDir.(Database) -> Unit) =
     runTest {
         val dataDir = tempdir("stt-db").toPath()
         Database.open(dataDir).use { db ->
-            block(db)
+            TestDataDir(dataDir).block(db)
         }
     }
 
-/** A [TaskRepository] whose work directories lie in [db]'s data directory, the parent of its tmp/ (ADR 0017). */
-internal fun taskRepository(db: Database) = TaskRepository(db, TaskWorkDirectories(db.tmpDir.parent))
+/** A [TaskRepository] for [db] whose work directories lie in [db]'s data directory [dataDir]. */
+internal fun taskRepository(
+    db: Database,
+    dataDir: Path,
+) = TaskRepository(db, TaskWorkDirectories(dataDir))
 
 /** Number of rows in [table], read over the raw connection. */
 internal fun rowCount(

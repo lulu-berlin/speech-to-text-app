@@ -10,7 +10,7 @@ class SegmentRepositorySpec :
             `when`("reading the task's segments back") {
                 then("they come back in seq order, only for that task") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
@@ -46,7 +46,7 @@ class SegmentRepositorySpec :
             `when`("reading the task's segments back") {
                 then("they come back in (chunk_idx, seq) order") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
 

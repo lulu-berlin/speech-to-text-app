@@ -36,9 +36,10 @@ class ConcurrencySpec :
                 then("the other write waits for the lock; the failed transaction leaves nothing and only the other task is kept") {
                     runTest {
                         val lock = CountingMutex()
-                        Database.open(tempdir("stt-db").toPath(), lock).use { db ->
+                        val dataDir = tempdir("stt-db").toPath()
+                        Database.open(dataDir, lock).use { db ->
                             coroutineScope {
-                                val tasks = taskRepository(db)
+                                val tasks = taskRepository(db, dataDir)
                                 val heldWrite = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 1L))
 
                                 val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
@@ -68,7 +69,7 @@ class ConcurrencySpec :
                 then("each read completes and sees only the committed state") {
                     withDatabase { db ->
                         coroutineScope {
-                            val tasks = taskRepository(db)
+                            val tasks = taskRepository(db, dataDir)
                             val stored = queuedTask("stored.wav", createdAt = 1L)
                             val id = tasks.createFromUpload(stored, "abc".byteInputStream())
                             val heldWrite = holdWriteTransaction(db, queuedTask("uncommitted.wav", createdAt = 2L))
@@ -111,7 +112,7 @@ class ConcurrencySpec :
                 then("the insert completes; once released, the copy delivers the full audio") {
                     withDatabase { db ->
                         coroutineScope {
-                            val tasks = taskRepository(db)
+                            val tasks = taskRepository(db, dataDir)
                             val stored = queuedTask("stored.wav", createdAt = 1L)
                             // copyTo reads the pages AudioRepository.write stores; uploads no longer store any (ADR 0024).
                             val id = tasks.insert(stored)
@@ -145,7 +146,7 @@ class ConcurrencySpec :
                         val dataDir = tempdir("stt-db").toPath()
                         Database.open(dataDir).use { db ->
                             coroutineScope {
-                                val tasks = taskRepository(db)
+                                val tasks = taskRepository(db, dataDir)
                                 val source = StallingFailingSource()
                                 val creation =
                                     async { runCatching { tasks.createFromUpload(queuedTask("failing.wav", createdAt = 1L), source) } }

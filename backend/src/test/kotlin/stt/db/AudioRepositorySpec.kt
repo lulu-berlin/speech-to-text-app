@@ -21,7 +21,7 @@ class AudioRepositorySpec :
                 ) {
                     withDatabase { db ->
                         val size = 2 * MIB + 12_345
-                        val taskId = taskRepository(db).insert(queuedTask("long.wav", createdAt = 1L))
+                        val taskId = taskRepository(db, dataDir).insert(queuedTask("long.wav", createdAt = 1L))
                         val audio = AudioRepository(db)
 
                         val source = SpoolWatchingSource(GeneratedBytes(size.toLong()), db.tmpDir)
@@ -46,7 +46,7 @@ class AudioRepositorySpec :
             `when`("it is written for a task") {
                 then("the write fails with the source's error and leaves no pages or metadata") {
                     withDatabase { db ->
-                        val taskId = taskRepository(db).insert(queuedTask("broken.wav", createdAt = 1L))
+                        val taskId = taskRepository(db, dataDir).insert(queuedTask("broken.wav", createdAt = 1L))
 
                         shouldThrow<IOException> { AudioRepository(db).write(taskId, FailingAfter(MIB.toLong())) }
 
