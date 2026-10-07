@@ -46,7 +46,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Fbank of N samples yields `(N + 80) / 160` frames of 80 values (snip_edges false)
 - [x] The povey window of length 400 matches hand-computed values at its start, center and end
 - [x] Mel filterbank edges for 80 bins between 20 Hz and 7600 Hz at FFT size 512 match hand-computed bin positions
-- [ ] Silence and a pure tone produce the expected relative fbank energies (tone bin dominates)
+- [x] Silence and a pure tone produce the expected relative fbank energies (tone bin dominates)
 - [ ] Global-mean normalization makes every feature column average to zero
 - [ ] The ONNX Runtime native library loads from the JVM inside the devenv shell (moved from item 01)
 - [ ] Model metadata is read (`output_dim` 512, `sample_rate` 16000, `feature_normalize_type` global-mean); unsupported values are rejected

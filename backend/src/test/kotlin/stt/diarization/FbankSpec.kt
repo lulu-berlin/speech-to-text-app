@@ -2,11 +2,15 @@ package stt.diarization
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.floats.plusOrMinus
+import io.kotest.matchers.floats.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import kotlin.math.PI
 import kotlin.math.sin
 
-private fun tone(sampleCount: Int): FloatArray = FloatArray(sampleCount) { n -> 0.5f * sin(2 * PI * 440 * n / 16_000).toFloat() }
+private fun tone(
+    sampleCount: Int,
+    frequency: Double = 440.0,
+): FloatArray = FloatArray(sampleCount) { n -> 0.5f * sin(2 * PI * frequency * n / 16_000).toFloat() }
 
 class FbankSpec :
     BehaviorSpec({
@@ -70,6 +74,28 @@ class FbankSpec :
                                 banks[bin].indexOfLast { it > 0f }
                         }
                     edges.shouldBe(mapOf(0 to (1 to 2), 40 to (55 to 59), 79 to (228 to 243)))
+                }
+            }
+        }
+
+        given("one second of silence and one second of a pure tone at the peak of mel triangle 40") {
+            `when`("the fbank features are computed") {
+                then("silence sits at Kaldi's log floor and the tone's mel bin dominates every frame") {
+                    // Kaldi floors mel energies at FLT_EPSILON before the log (dither 0, so silence has zero power):
+                    // ln(2^-23) = -23 ln 2 = -15.942385.
+                    val silence = fbank(FloatArray(16_000))
+
+                    silence.forEach { frame -> frame.forEach { it.shouldBe((-15.942385f).plusOrMinus(1e-5f)) } }
+
+                    // 1781.25 Hz = FFT bin 57 (57 * 31.25 Hz), nearly on triangle 40's peak mel_low + 41 * delta = 1781.76 Hz;
+                    // triangle 39 ends there and triangle 41 starts there. Estimated log energy of bin 40 ~ ln(2000) ~ 7.6:
+                    // peak |X| ~ 0.25 * sum(povey) * |1 - 0.97 e^(-jw)| = 0.25 * 212.7 * 0.676 ~ 36, plus leakage into bins 56, 58.
+                    val toneFeatures = fbank(tone(16_000, frequency = 1781.25))
+
+                    toneFeatures.forEach { frame ->
+                        frame.indices.maxBy { frame[it] }.shouldBe(40)
+                        frame[40].shouldBeGreaterThan(0f)
+                    }
                 }
             }
         }
