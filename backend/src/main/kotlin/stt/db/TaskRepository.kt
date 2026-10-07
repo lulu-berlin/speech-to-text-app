@@ -24,8 +24,13 @@ class TaskRepository(
      * Saves [task] for an [upload] (ADR 0024): the upload is spooled to a temp file first (no lock
      * held while it is read), then the task and its audio metadata are written in one short
      * transaction, so audio content that already exists (UNIQUE sha256) rejects the whole creation.
-     * After the commit the spool file is moved to the task's original ([TaskWorkDirectories.source]);
-     * no audio bytes go into the database. [upload] is read on Dispatchers.IO and not closed.
+     * After the commit the spool file is moved to the task's original ([TaskWorkDirectories.source]),
+     * so the task's `audio` row outlives the original; no audio bytes go into the database.
+     * [upload] is read on Dispatchers.IO and not closed.
+     *
+     * If creating the work directory or moving the spool fails after the commit, the task is deleted
+     * again — its `audio` row goes with it, so a retry with the same bytes is not rejected as a
+     * duplicate — the work directory is removed best-effort, and the original exception is rethrown.
      */
     suspend fun createFromUpload(
         task: Task,
@@ -37,9 +42,23 @@ class TaskRepository(
                     insertTaskRow(task).also { taskId -> insertAudioRow(taskId, spooled) }
                 }
             // Committed: the task's original must reach its work directory even if the caller is canceled now.
-            withContext(NonCancellable + Dispatchers.IO) {
-                Files.createDirectories(workDirectories.workDir(taskId))
-                Files.move(spooled.file, workDirectories.source(taskId), StandardCopyOption.ATOMIC_MOVE)
+            try {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    Files.createDirectories(workDirectories.workDir(taskId))
+                    Files.move(spooled.file, workDirectories.source(taskId), StandardCopyOption.ATOMIC_MOVE)
+                }
+            } catch (e: Exception) {
+                // The task row is committed by now; undo it so the rejected upload leaves nothing behind.
+                db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq taskId } }
+                try {
+                    withContext(Dispatchers.IO) {
+                        Files.list(workDirectories.workDir(taskId)).use { files -> files.forEach(Files::delete) }
+                        Files.delete(workDirectories.workDir(taskId))
+                    }
+                } catch (_: Exception) {
+                    // Best effort only; the caller reports the original move failure either way.
+                }
+                throw e
             }
             taskId
         }
