@@ -46,9 +46,14 @@ class TaskRepository(
             try {
                 moveToOriginal(taskId, spooled.file)
             } catch (e: Exception) {
-                // The task row is committed by now; undo it so the rejected upload leaves nothing behind.
-                db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq taskId } }
-                deleteWorkDir(taskId)
+                // The task row is committed by now; undo it, even for a canceled caller, so a rejected
+                // upload leaves nothing behind: NonCancellable for the same reason the move uses it.
+                withContext(NonCancellable) {
+                    runCatching {
+                        db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq taskId } }
+                        deleteWorkDir(taskId)
+                    }.onFailure { e.addSuppressed(it) }
+                }
                 throw e
             }
             taskId
