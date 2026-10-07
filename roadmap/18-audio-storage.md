@@ -39,7 +39,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A duplicate upload is rejected and leaves no task, no spool file and no work directory
 - [x] An upload whose source fails midway leaves no task, no spool file and no work directory
 - [x] Storing a plan with its chunk FLACs writes the plan and every FLAC in one transaction; a failure midway leaves neither
-- [ ] A stored chunk FLAC reads back byte-identical
+- [x] A stored chunk FLAC reads back byte-identical
 - [ ] Deleting a task removes its chunk audio (cascade through `chunks`)
 - [ ] A `chunk_audio` row for a chunk that does not exist is rejected (foreign key)
 - [ ] Reading the chunk plan does not read chunk audio
