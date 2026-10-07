@@ -241,6 +241,27 @@ class DatabaseSpec :
             }
         }
 
+        given("no chunk with id 42 and idx 0") {
+            `when`("inserting a chunk_audio row for it") {
+                then("it is rejected; the same row is accepted once that chunk exists") {
+                    withDatabase { db ->
+                        val chunkAudioInsert = "INSERT INTO chunk_audio (task_id, idx, flac) VALUES (42, 0, x'00')"
+
+                        shouldThrow<java.sql.SQLException> { db.writeTransaction { exec(chunkAudioInsert) } }
+
+                        insertTask(db, 42)
+                        db.writeTransaction {
+                            exec(
+                                "INSERT INTO chunks (task_id, idx, start_ms, end_ms, status) VALUES (42, 0, 0, 1000, 'PENDING')",
+                            )
+                        }
+                        db.writeTransaction { exec(chunkAudioInsert) }
+                        rowCount(db, "chunk_audio").shouldBe(1)
+                    }
+                }
+            }
+        }
+
         given("task rows with an invalid status, an invalid phase, or an upper-case speakers_mode") {
             `when`("inserting them") {
                 then("each is rejected; the same row with valid values is accepted") {
