@@ -6,6 +6,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import stt.config.Config
 import stt.config.TEST_DATA_DIR
+import stt.config.TEST_SPEAKER_MODEL
 import java.nio.file.Path
 
 class WhisperCommandSpec :
@@ -70,4 +71,5 @@ class WhisperCommandSpec :
         }
     })
 
-private fun env(vararg vars: Pair<String, String>) = mapOf("STT_DATA_DIR" to TEST_DATA_DIR, *vars)
+private fun env(vararg vars: Pair<String, String>) =
+    mapOf("STT_DATA_DIR" to TEST_DATA_DIR, "STT_SPEAKER_MODEL" to TEST_SPEAKER_MODEL, *vars)

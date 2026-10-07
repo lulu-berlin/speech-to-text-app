@@ -6,6 +6,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import stt.config.Config
 import stt.config.TEST_DATA_DIR
+import stt.config.TEST_SPEAKER_MODEL
 
 class DeviceArgsSpec :
     BehaviorSpec({
@@ -21,14 +22,14 @@ class DeviceArgsSpec :
                             "3" to listOf("--device", "3"),
                         )
                     for ((raw, flags) in expected) {
-                        deviceArgs(Config.fromEnv(env(raw)).device).shouldBe(flags)
+                        deviceArgs(Config.fromEnv(env("STT_DEVICE" to raw)).device).shouldBe(flags)
                     }
                     // Unset: the oracle's default, auto.
-                    deviceArgs(Config.fromEnv(mapOf("STT_DATA_DIR" to TEST_DATA_DIR)).device).shouldBe(emptyList())
+                    deviceArgs(Config.fromEnv(env()).device).shouldBe(emptyList())
 
                     // Oracle parse_device rejects non-integers and negative indexes; empty is set-but-invalid.
                     for (bad in listOf("tpu", "-1", "1.5", "")) {
-                        val error = shouldThrow<IllegalArgumentException> { Config.fromEnv(env(bad)) }
+                        val error = shouldThrow<IllegalArgumentException> { Config.fromEnv(env("STT_DEVICE" to bad)) }
                         error.message.shouldContain("STT_DEVICE")
                         error.message.shouldContain("\"$bad\"")
                     }
@@ -37,4 +38,5 @@ class DeviceArgsSpec :
         }
     })
 
-private fun env(device: String) = mapOf("STT_DATA_DIR" to TEST_DATA_DIR, "STT_DEVICE" to device)
+private fun env(vararg vars: Pair<String, String>) =
+    mapOf("STT_DATA_DIR" to TEST_DATA_DIR, "STT_SPEAKER_MODEL" to TEST_SPEAKER_MODEL, *vars)

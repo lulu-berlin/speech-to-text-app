@@ -61,7 +61,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Pausing stops embedding between windows and resuming continues with the next window
 - [ ] Integration: on the LibriSpeech fixture clips, same-speaker cosine similarity is higher than different-speaker cosine
 - [ ] (discovered) Fbank values of a fixed, reproducible test signal match a Kaldi reference (kaldi-native-fbank or torchaudio `compliance.kaldi.fbank` with the ADR 0003 options), reference values supplied by the user
-- [ ] (discovered) Loading configuration fails with an error naming `STT_SPEAKER_MODEL` when it is unset or empty; when set, its path is part of the configuration
+- [x] (discovered) Loading configuration fails with an error naming `STT_SPEAKER_MODEL` when it is unset or empty; when set, its path is part of the configuration
 
 ## Acceptance criteria
 

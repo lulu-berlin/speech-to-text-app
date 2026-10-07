@@ -9,8 +9,10 @@ import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
 import stt.config.Config
+import stt.config.TEST_SPEAKER_MODEL
 import stt.db.Database
 import java.nio.file.Files
+import java.nio.file.Path
 
 class DatabaseDependencySpec :
     BehaviorSpec({
@@ -21,7 +23,7 @@ class DatabaseDependencySpec :
                     val dataDir = tempdir("stt-data").toPath()
                     val dbFile = dataDir.resolve("stt.db")
                     testApplication {
-                        application { sttApp(Config(dataDir = dataDir)) }
+                        application { sttApp(Config(dataDir = dataDir, speakerModel = Path.of(TEST_SPEAKER_MODEL))) }
                         startApplication()
                         Files.exists(dbFile).shouldBeTrue()
                         val db = application.dependencies.resolve<Database>()
@@ -35,7 +37,7 @@ class DatabaseDependencySpec :
                         testApplication {
                             application {
                                 dependencies.provide<Database> { override }
-                                sttApp(Config(dataDir = moduleDataDir))
+                                sttApp(Config(dataDir = moduleDataDir, speakerModel = Path.of(TEST_SPEAKER_MODEL)))
                             }
                             startApplication()
                             application.dependencies.resolve<Database>().shouldBeSameInstanceAs(override)
@@ -51,7 +53,7 @@ class DatabaseDependencySpec :
                 then("the Database provided by DI is closed") {
                     lateinit var db: Database
                     testApplication {
-                        application { sttApp(Config(dataDir = tempdir("stt-data").toPath())) }
+                        application { sttApp(Config(dataDir = tempdir("stt-data").toPath(), speakerModel = Path.of(TEST_SPEAKER_MODEL))) }
                         startApplication()
                         db = application.dependencies.resolve<Database>()
                         db.connection.isClosed.shouldBeFalse()
