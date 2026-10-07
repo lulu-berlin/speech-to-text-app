@@ -66,7 +66,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Integration: `jfk.wav` transcribed with `ggml-tiny.en` yields non-empty text with increasing timestamps
 - [ ] Chunks with zero total duration report progress 0, not NaN (discovered)
 - [ ] While whisper-cli runs, each `-pp` progress line is reported as the chunk fraction (discovered)
-- [ ] Completing a chunk that is not in the plan fails and stores nothing (discovered)
+- [x] Completing a chunk that is not in the plan fails and stores nothing (discovered)
 
 ## Acceptance criteria
 
