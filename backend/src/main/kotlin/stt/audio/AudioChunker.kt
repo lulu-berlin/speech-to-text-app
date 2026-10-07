@@ -37,18 +37,16 @@ class AudioChunker(
     ): List<Silence> {
         val result =
             runner.run(
-                listOf(
-                    "ffmpeg",
-                    "-hide_banner",
-                    "-nostats",
-                    "-i",
-                    source.toString(),
-                    "-af",
-                    "silencedetect=noise=$SILENCE_NOISE:d=$SILENCE_MIN_SECONDS",
-                    "-f",
-                    "null",
-                    "-",
-                ),
+                FFMPEG +
+                    listOf(
+                        "-i",
+                        source.toString(),
+                        "-af",
+                        "silencedetect=noise=$SILENCE_NOISE:d=$SILENCE_MIN_SECONDS",
+                        "-f",
+                        "null",
+                        "-",
+                    ),
             )
         return parseSilences(result.stderr, durationMs)
     }
@@ -60,28 +58,26 @@ class AudioChunker(
         file: Path,
     ) {
         runner.run(
-            listOf(
-                "ffmpeg",
-                "-hide_banner",
-                "-nostats",
-                "-loglevel",
-                "error",
-                "-f",
-                "f32le",
-                "-ar",
-                SAMPLE_RATE.toString(),
-                "-ac",
-                "1",
-                "-i",
-                pcm.toString(),
-                "-af",
-                "atrim=start_sample=${chunk.startMs * SAMPLES_PER_MS}:end_sample=${chunk.endMs * SAMPLES_PER_MS}",
-                "-c:a",
-                "flac",
-                "-sample_fmt",
-                "s16",
-                file.toString(),
-            ),
+            FFMPEG +
+                listOf(
+                    "-loglevel",
+                    "error",
+                    "-f",
+                    "f32le",
+                    "-ar",
+                    SAMPLE_RATE.toString(),
+                    "-ac",
+                    "1",
+                    "-i",
+                    pcm.toString(),
+                    "-af",
+                    "atrim=start_sample=${chunk.startMs * SAMPLES_PER_MS}:end_sample=${chunk.endMs * SAMPLES_PER_MS}",
+                    "-c:a",
+                    "flac",
+                    "-sample_fmt",
+                    "s16",
+                    file.toString(),
+                ),
         )
     }
 }
