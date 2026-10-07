@@ -9,12 +9,15 @@ import java.nio.file.Path
  * `STT_DATA_DIR` is required: unset or empty fails fast (ADR 0017); it has no default.
  * `STT_DEVICE` (`auto`, `cpu`, `gpu`, or a GPU index >= 0) defaults to `auto` when unset; any other value,
  * empty included, fails fast.
+ * `STT_THREADS` (an integer >= 1) is unset by default, leaving whisper-cli's own default; any other value,
+ * empty included, fails fast.
  */
 class Config(
     val dataDir: Path,
     val port: Int = 8080,
     val staticDir: Path? = null,
     val device: Device = Device.Auto,
+    val threads: Int? = null,
 ) {
     companion object {
         private const val PORT_LIMIT_ERROR =
@@ -23,6 +26,8 @@ class Config(
             "STT_DATA_DIR must be set to the data directory (it holds stt.db)"
         private const val DEVICE_ERROR =
             "STT_DEVICE must be auto, cpu, gpu, or a GPU index >= 0, got \"%s\""
+        private const val THREADS_ERROR =
+            "STT_THREADS must be an integer >= 1, got \"%s\""
 
         fun fromEnv(env: Map<String, String> = System.getenv()): Config {
             val dataDir = env["STT_DATA_DIR"]
@@ -34,6 +39,7 @@ class Config(
                 port = port,
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
                 device = env["STT_DEVICE"]?.let { parseDevice(it) } ?: Device.Auto,
+                threads = env["STT_THREADS"]?.let { parseThreads(it) },
             )
         }
 
@@ -42,6 +48,12 @@ class Config(
             if (value == null || value !in 1..65535) {
                 throw IllegalArgumentException(PORT_LIMIT_ERROR.format(raw))
             }
+            return value
+        }
+
+        private fun parseThreads(raw: String): Int {
+            val value = raw.toIntOrNull()
+            if (value == null || value < 1) throw IllegalArgumentException(THREADS_ERROR.format(raw))
             return value
         }
 
