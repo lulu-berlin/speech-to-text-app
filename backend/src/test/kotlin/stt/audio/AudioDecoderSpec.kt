@@ -1,9 +1,11 @@
 package stt.audio
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.doubles.shouldBeBetween
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.withTimeout
 import stt.Integration
 import stt.process.ProcessRunner
@@ -33,6 +35,24 @@ class AudioDecoderSpec :
                     durationMs.shouldBe(2_500L) // 40 000 samples / 16 samples per ms
                     // lavfi sine has amplitude 1/8: read as little-endian float32, the peak is ≈ 0.125.
                     peak(pcm).shouldBeBetween(0.12, 0.13, 0.0)
+                }
+            }
+        }
+
+        given("a file ffmpeg cannot read") {
+            `when`("it is decoded") {
+                then("decoding fails with ffmpeg's error message") {
+                    val workDir = tempdir("stt-audio").toPath()
+                    val source = Files.writeString(workDir.resolve("source.wav"), "not audio")
+                    val pcm = workDir.resolve("audio.f32")
+
+                    val error =
+                        shouldThrow<AudioDecodeException> {
+                            withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
+                        }
+
+                    error.message.shouldContain("ffmpeg failed to decode $source") // the oracle's wording
+                    error.message.shouldContain("Invalid data found when processing input") // ffmpeg's stderr
                 }
             }
         }
