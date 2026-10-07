@@ -19,14 +19,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.io.OutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** The writer lock, read connections, and upload spooling under concurrent use (ADR 0017, ADR 0018). */
+/** The writer lock, read connections, and upload spooling under concurrent use (ADR 0017, ADR 0024). */
 class ConcurrencySpec :
     BehaviorSpec({
 
@@ -106,41 +104,9 @@ class ConcurrencySpec :
             }
         }
 
-        given("a stored task with audio whose copyTo is stalled on its target") {
-            `when`("another task is inserted while the copy is stalled") {
-                then("the insert completes; once released, the copy delivers the full audio") {
-                    withDatabase { db ->
-                        coroutineScope {
-                            val tasks = taskRepository(db, dataDir)
-                            val stored = queuedTask("stored.wav", createdAt = 1L)
-                            // copyTo reads the pages AudioRepository.write stores; uploads no longer store any (ADR 0024).
-                            val id = tasks.insert(stored)
-                            AudioRepository(db).write(id, "abc".byteInputStream())
-                            val target = StallingTarget()
-                            val copy = async { AudioRepository(db).copyTo(id, target) }
-                            withContext(Dispatchers.IO) { target.stalled.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
-
-                            val other = queuedTask("other.wav", createdAt = 2L)
-                            val otherId =
-                                try {
-                                    // Real time: an insert that waits for the copy never finishes inside the bound.
-                                    withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { tasks.insert(other) } }
-                                } finally {
-                                    target.release.countDown()
-                                }
-
-                            copy.await()
-                            target.bytes().decodeToString().shouldBe("abc")
-                            tasks.list().shouldBe(listOf(StoredTask(id, stored), StoredTask(otherId, other)))
-                        }
-                    }
-                }
-            }
-        }
-
         given("a task creation whose upload source delivers some bytes, then stalls, then fails") {
             `when`("another task is inserted while the source is stalled") {
-                then("the insert completes; the failed creation leaves no task, pages, metadata, or temp file") {
+                then("the insert completes; the failed creation leaves no task, metadata, or temp file") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
                         Database.open(dataDir).use { db ->
@@ -164,7 +130,6 @@ class ConcurrencySpec :
 
                                 creation.await().exceptionOrNull().shouldBeInstanceOf<IOException>()
                                 tasks.list().shouldBe(listOf(StoredTask(otherId, other)))
-                                rowCount(db, "audio_parts").shouldBe(0)
                                 rowCount(db, "audio").shouldBe(0)
                                 entries(dataDir.resolve("tmp")).shouldBeEmpty()
                             }
@@ -176,7 +141,7 @@ class ConcurrencySpec :
     })
 
 // Real-time bounds for the concurrency tests. A probe waits for something that must happen;
-// a stall (held write, stalled target) blocks until the test releases it. The stall's safety
+// a stall (held write, stalled source) blocks until the test releases it. The stall's safety
 // bound must outlast every probe: otherwise a stall that gives up first would let a probe
 // finish behind it, and a broken lock or a read routed through the writer would pass.
 private const val PROBE_TIMEOUT_MS = 10_000L
@@ -234,27 +199,6 @@ private class StallingFailingSource : InputStream() {
         release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         throw IOException("audio source failed")
     }
-}
-
-/** A copy target that keeps what it receives, signals [stalled] on its first write, and blocks until [release]. */
-private class StallingTarget : OutputStream() {
-    val stalled = CountDownLatch(1)
-    val release = CountDownLatch(1)
-    private val received = ByteArrayOutputStream()
-
-    override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
-
-    override fun write(
-        b: ByteArray,
-        off: Int,
-        len: Int,
-    ) {
-        received.write(b, off, len)
-        stalled.countDown()
-        release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-    }
-
-    fun bytes(): ByteArray = received.toByteArray()
 }
 
 /** A [Mutex] that counts its lock() calls, so a test can see a caller start waiting for it. */

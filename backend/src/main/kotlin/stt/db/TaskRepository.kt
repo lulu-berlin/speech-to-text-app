@@ -62,7 +62,7 @@ class TaskRepository(
                 .map { it.toStoredTask() }
         }
 
-    /** Deletes the task; its audio, pages, chunks, and segments go with it (ON DELETE CASCADE). */
+    /** Deletes the task; its audio metadata, chunks with their chunk audio, and segments go with it (ON DELETE CASCADE). */
     suspend fun delete(id: Long) {
         db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq id } }
     }
