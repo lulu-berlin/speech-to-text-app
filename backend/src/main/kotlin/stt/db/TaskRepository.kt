@@ -11,6 +11,7 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import java.io.InputStream
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 class TaskRepository(
@@ -43,25 +44,46 @@ class TaskRepository(
                 }
             // Committed: the task's original must reach its work directory even if the caller is canceled now.
             try {
-                withContext(NonCancellable + Dispatchers.IO) {
-                    Files.createDirectories(workDirectories.workDir(taskId))
-                    Files.move(spooled.file, workDirectories.source(taskId), StandardCopyOption.ATOMIC_MOVE)
-                }
+                moveToOriginal(taskId, spooled.file)
             } catch (e: Exception) {
                 // The task row is committed by now; undo it so the rejected upload leaves nothing behind.
                 db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq taskId } }
-                try {
-                    withContext(Dispatchers.IO) {
-                        Files.list(workDirectories.workDir(taskId)).use { files -> files.forEach(Files::delete) }
-                        Files.delete(workDirectories.workDir(taskId))
-                    }
-                } catch (_: Exception) {
-                    // Best effort only; the caller reports the original move failure either way.
-                }
+                deleteWorkDir(taskId)
                 throw e
             }
             taskId
         }
+
+    /**
+     * Creates the task's work directory and moves the committed upload's spool file into it as the
+     * original. Runs under NonCancellable on Dispatchers.IO, so a canceled caller still gets its original,
+     * and the whole move is on one filesystem (same data directory), so the rename is atomic.
+     */
+    private suspend fun moveToOriginal(
+        taskId: Long,
+        spool: Path,
+    ) {
+        withContext(NonCancellable + Dispatchers.IO) {
+            Files.createDirectories(workDirectories.workDir(taskId))
+            Files.move(spool, workDirectories.source(taskId), StandardCopyOption.ATOMIC_MOVE)
+        }
+    }
+
+    /**
+     * Removes a task's work directory and everything in it, best-effort: a failure is reported by the
+     * caller's normal error path, never here. After the upload cleanup the database rows are already gone,
+     * so a leftover directory cannot block a retry's `audio` row; item 11's engine cleanup is the backstop.
+     */
+    private suspend fun deleteWorkDir(taskId: Long) {
+        try {
+            withContext(Dispatchers.IO) {
+                Files.list(workDirectories.workDir(taskId)).use { files -> files.forEach(Files::delete) }
+                Files.delete(workDirectories.workDir(taskId))
+            }
+        } catch (_: Exception) {
+            // Best effort only.
+        }
+    }
 
     suspend fun find(id: Long): StoredTask? =
         db.readTransaction {
