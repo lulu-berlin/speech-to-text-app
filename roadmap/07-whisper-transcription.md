@@ -1,6 +1,6 @@
 # 07 — Whisper transcription
 
-Status: spec-approved
+Status: in-progress
 Depends on: [03](../docs/specs/database-schema.md) (done), [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
