@@ -85,9 +85,9 @@ class TaskRepositorySpec :
             }
         }
 
-        given("a task created with some audio") {
-            `when`("a second task is created with the same audio bytes under another filename") {
-                then("creation fails and leaves no task or metadata behind") {
+        given("a task created from an upload") {
+            `when`("a second task is created from an upload of the same bytes under another filename") {
+                then("creation fails and leaves no task, no metadata, no spool file and no work directory behind") {
                     withDatabase { db ->
                         val tasks = taskRepository(db, dataDir)
                         val first = queuedTask("take1.wav", createdAt = 1L)
@@ -100,23 +100,12 @@ class TaskRepositorySpec :
                         rowCount(db, "tasks").shouldBe(1)
                         rowCount(db, "audio").shouldBe(1)
                         tasks.find(firstId).shouldBe(StoredTask(firstId, first))
-                    }
-                }
-            }
-        }
-
-        given("a task created with some audio, and a duplicate upload of the same bytes") {
-            `when`("the duplicate is rejected") {
-                then("no upload temp file is left in the data directory's tmp/") {
-                    withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
-                        tasks.createFromUpload(queuedTask("take1.wav", createdAt = 1L), "same bytes".byteInputStream())
-
-                        shouldThrow<SQLException> {
-                            tasks.createFromUpload(queuedTask("take2.wav", createdAt = 2L), "same bytes".byteInputStream())
-                        }
-
                         Files.list(db.tmpDir).use { it.toList() }.shouldBeEmpty()
+                        Files
+                            .list(
+                                dataDir.resolve("work"),
+                            ).use { it.toList() }
+                            .shouldBe(listOf(dataDir.resolve("work").resolve(firstId.toString())))
                     }
                 }
             }

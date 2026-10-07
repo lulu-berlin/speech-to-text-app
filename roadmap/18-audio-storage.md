@@ -36,7 +36,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] `V2` applies to a database at `V1`: `audio_parts` is gone, `chunk_audio` exists, and existing tasks, `audio` rows and chunks are kept
 - [x] The work directory of task `n` is `$STT_DATA_DIR/work/n`, and its original is `$STT_DATA_DIR/work/n/source`
 - [x] Creating a task from an upload stores no audio bytes in the database and leaves the original byte-identical at `work/<task-id>/source`, with `size_bytes`/`sha256` derived independently
-- [ ] A duplicate upload is rejected and leaves no task, no spool file and no work directory
+- [x] A duplicate upload is rejected and leaves no task, no spool file and no work directory
 - [ ] An upload whose source fails midway leaves no task, no spool file and no work directory
 - [ ] Storing a plan with its chunk FLACs writes the plan and every FLAC in one transaction; a failure midway leaves neither
 - [ ] A stored chunk FLAC reads back byte-identical
