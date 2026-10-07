@@ -54,7 +54,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The session uses `STT_THREADS` intra-op threads when it is set, and ONNX Runtime's default otherwise
 - [x] A segment shorter than 2 s becomes a centered, zero-padded 2 s window
 - [x] A segment longer than 20 s becomes the centered 20 s slice
-- [ ] A segment past the end of the audio uses the last 2 s (or the whole audio if shorter)
+- [x] A segment past the end of the audio uses the last 2 s (or the whole audio if shorter)
 - [ ] Empty audio yields all-zero embeddings for every segment
 - [ ] Embeddings have unit length; a zero vector stays zero
 - [ ] Embeddings are returned in segment order

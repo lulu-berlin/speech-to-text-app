@@ -51,4 +51,39 @@ class EmbeddingWindowsSpec :
                 }
             }
         }
+        given("a PCM and segments past its end") {
+            `when`("building the embedding window") {
+                then("they use the last 2 s; a file shorter than 2 s is centered inside a 2 s window") {
+                    val pcm = FloatArray(48_000) { i -> i.toFloat() } // 3 s
+
+                    // Segment past the end (t0 >= total): tail = pcm[16000, 48000).
+                    val pastEnd = embeddingWindow(pcm, startMs = 3500, endMs = 4000)
+                    pastEnd.size.shouldBe(32_000)
+                    pastEnd[0].shouldBe(16_000f)
+                    pastEnd[31_999].shouldBe(47_999f)
+
+                    // Segment whose end precedes its start (t1 <= t0): the same tail.
+                    val reversed = embeddingWindow(pcm, startMs = 1500, endMs = 1000)
+                    reversed.size.shouldBe(32_000)
+                    reversed[0].shouldBe(16_000f)
+                    reversed[31_999].shouldBe(47_999f)
+
+                    // File shorter than 2 s: the whole audio, centered (offset (32000 - 16000) / 2 = 8000).
+                    val shortPcm = FloatArray(16_000) { i -> i.toFloat() }
+                    val shortPastEnd = embeddingWindow(shortPcm, startMs = 2000, endMs = 2500)
+                    shortPastEnd.size.shouldBe(32_000)
+                    shortPastEnd[0].shouldBe(0f)
+                    shortPastEnd[7_999].shouldBe(0f)
+                    shortPastEnd[8_000].shouldBe(0f)
+                    shortPastEnd[23_999].shouldBe(15_999f)
+                    shortPastEnd[24_000].shouldBe(0f)
+
+                    // Ending exactly at the file end is not past-the-end: the short segment, centered.
+                    val atEnd = embeddingWindow(pcm, startMs = 2500, endMs = 3000)
+                    atEnd.size.shouldBe(32_000)
+                    atEnd[12_000].shouldBe(40_000f)
+                    atEnd[19_999].shouldBe(47_999f)
+                }
+            }
+        }
     })
