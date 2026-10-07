@@ -4,12 +4,15 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.floats.plusOrMinus
 import io.kotest.matchers.floats.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
 import stt.Integration
 import stt.config.Config
 import stt.config.TEST_DATA_DIR
 import stt.db.Segment
 import kotlin.math.PI
 import kotlin.math.sin
+import kotlin.time.Duration.Companion.milliseconds
 
 class EmbeddingsSpec :
     BehaviorSpec({
@@ -67,6 +70,35 @@ class EmbeddingsSpec :
                             .map { embeddings[0][it] * embeddings[1][it] }
                             .sum()
                             .shouldBeLessThan(0.9999f)
+                    }
+                }
+            }
+        }
+        given("the real model, two segments, and a pause gate") {
+            `when`("pausing after the first window") {
+                then("embedding suspends between windows and resumes with the next window") {
+                    // ADR 0004: in-JVM phases pause cooperatively through a pause gate checked between windows.
+                    val path = Config.fromEnv(System.getenv() + ("STT_DATA_DIR" to TEST_DATA_DIR)).speakerModel
+                    val pcm = FloatArray(64_000) { i -> (0.05 * sin(2 * PI * 440 * i / 16_000)).toFloat() }
+                    SpeakerModel.load(path).use { model ->
+                        val embedder = Embeddings(model)
+                        val gate = PauseGate()
+                        lateinit var embeddings: Array<FloatArray>
+                        val job =
+                            async {
+                                embeddings =
+                                    embedder.embed(pcm, listOf(segment(0, 1200), segment(30_000, 31_200)), gate) { done, _ ->
+                                        if (done == 1) gate.pause()
+                                    }
+                            }
+
+                        val finishedWhilePaused = withTimeoutOrNull(500.milliseconds) { job.await() }
+                        finishedWhilePaused.shouldBe(null) // still suspended at the checkpoint between the windows
+
+                        gate.resume()
+                        job.await()
+
+                        embeddings.size.shouldBe(2)
                     }
                 }
             }
