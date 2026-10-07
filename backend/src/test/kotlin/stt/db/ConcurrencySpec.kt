@@ -19,8 +19,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import stt.audio.ExportedChunk
+import stt.audio.PlannedChunk
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -61,14 +65,17 @@ class ConcurrencySpec :
             }
         }
 
-        given("a stored task with audio, and a write transaction held open on the writer connection") {
+        given("a stored task with audio and a stored one-chunk plan, and a write transaction held open on the writer connection") {
             `when`("every repository read runs while the write is open") {
                 then("each read completes and sees only the committed state") {
                     withDatabase { db ->
                         coroutineScope {
                             val tasks = taskRepository(db, dataDir)
+                            val chunks = ChunkRepository(db)
                             val stored = queuedTask("stored.wav", createdAt = 1L)
                             val id = tasks.createFromUpload(stored, "abc".byteInputStream())
+                            val flacFile = Files.write(dataDir.resolve("chunk-0.flac"), "flac".toByteArray())
+                            chunks.storePlan(id, listOf(ExportedChunk(PlannedChunk(0L, 1_000L), flacFile)))
                             val heldWrite = holdWriteTransaction(db, queuedTask("uncommitted.wav", createdAt = 2L))
 
                             try {
@@ -77,7 +84,12 @@ class ConcurrencySpec :
                                     withTimeout(PROBE_TIMEOUT_MS) {
                                         tasks.list().shouldBe(listOf(StoredTask(id, stored)))
                                         tasks.find(id).shouldBe(StoredTask(id, stored))
-                                        ChunkRepository(db).findByTask(id).shouldBe(emptyList())
+                                        chunks
+                                            .findByTask(id)
+                                            .shouldBe(listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.PENDING)))
+                                        val flac = ByteArrayOutputStream()
+                                        chunks.copyFlacTo(id, 0, flac)
+                                        flac.toString(Charsets.UTF_8).shouldBe("flac")
                                         SegmentRepository(db).findByTask(id).shouldBe(emptyList())
                                         // sha256("abc"): the FIPS 180-2 test vector.
                                         AudioRepository(db)
