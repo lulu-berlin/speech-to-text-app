@@ -9,6 +9,7 @@ import stt.audio.PlannedChunk
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
+import java.nio.file.Path
 
 class ChunkRepositorySpec :
     BehaviorSpec({
@@ -56,12 +57,14 @@ class ChunkRepositorySpec :
                         val chunks = ChunkRepository(db)
                         val storedId = tasks.insert(queuedTask("stored.wav", createdAt = 1L))
                         val failingId = tasks.insert(queuedTask("failing.wav", createdAt = 2L))
-                        val flacs = listOf(byteArrayOf(1, 2, 3), ByteArray(70_000) { (it % 251).toByte() }, byteArrayOf(9))
-                        val files = flacs.mapIndexed { i, bytes -> Files.write(dataDir.resolve("chunk-$i.flac"), bytes) }
-                        val plan = listOf(PlannedChunk(0L, 300_000L), PlannedChunk(300_000L, 600_000L), PlannedChunk(600_000L, 615_500L))
+                        val files = writeThreeFlacs(dataDir)
 
-                        chunks.storePlan(storedId, plan.zip(files, ::ExportedChunk))
-                        val withMissingFile = plan.zip(listOf(files[0], dataDir.resolve("missing.flac"), files[2]), ::ExportedChunk)
+                        chunks.storePlan(storedId, threeChunkPlan.zip(files, ::ExportedChunk))
+                        val withMissingFile =
+                            threeChunkPlan.zip(
+                                listOf(files[0], dataDir.resolve("missing.flac"), files[2]),
+                                ::ExportedChunk,
+                            )
                         shouldThrow<NoSuchFileException> { chunks.storePlan(failingId, withMissingFile) }
 
                         chunks.findByTask(storedId).shouldBe(
@@ -71,7 +74,7 @@ class ChunkRepositorySpec :
                                 Chunk(idx = 2, startMs = 600_000L, endMs = 615_500L, status = ChunkStatus.PENDING),
                             ),
                         )
-                        chunkAudio(db, storedId).shouldBe(listOf(0 to flacs[0].toList(), 1 to flacs[1].toList(), 2 to flacs[2].toList()))
+                        chunkAudio(db, storedId).shouldBe(threeFlacs.mapIndexed { idx, bytes -> idx to bytes.toList() })
                         chunks.findByTask(failingId).shouldBeEmpty()
                         chunkAudio(db, failingId).shouldBeEmpty()
                     }
@@ -85,21 +88,27 @@ class ChunkRepositorySpec :
                     withDatabase { db ->
                         val chunks = ChunkRepository(db)
                         val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
-                        val flacs = listOf(byteArrayOf(1, 2, 3), ByteArray(70_000) { (it % 251).toByte() }, byteArrayOf(9))
-                        val files = flacs.mapIndexed { i, bytes -> Files.write(dataDir.resolve("chunk-$i.flac"), bytes) }
-                        val plan = listOf(PlannedChunk(0L, 300_000L), PlannedChunk(300_000L, 600_000L), PlannedChunk(600_000L, 615_500L))
-                        chunks.storePlan(taskId, plan.zip(files, ::ExportedChunk))
+                        chunks.storePlan(taskId, threeChunkPlan.zip(writeThreeFlacs(dataDir), ::ExportedChunk))
 
-                        for (idx in flacs.indices) {
+                        for (idx in threeFlacs.indices) {
                             val target = ByteArrayOutputStream()
                             chunks.copyFlacTo(taskId, idx, target)
-                            target.toByteArray().toList().shouldBe(flacs[idx].toList())
+                            target.toByteArray().toList().shouldBe(threeFlacs[idx].toList())
                         }
                     }
                 }
             }
         }
     })
+
+/** Stand-in FLACs of 3, 70 000 and 1 bytes, one per chunk of [threeChunkPlan]. */
+private val threeFlacs = listOf(byteArrayOf(1, 2, 3), ByteArray(70_000) { (it % 251).toByte() }, byteArrayOf(9))
+
+private val threeChunkPlan = listOf(PlannedChunk(0L, 300_000L), PlannedChunk(300_000L, 600_000L), PlannedChunk(600_000L, 615_500L))
+
+/** Writes [threeFlacs] to `chunk-<idx>.flac` under [dir]; returns the files in idx order. */
+private fun writeThreeFlacs(dir: Path): List<Path> =
+    threeFlacs.mapIndexed { idx, bytes -> Files.write(dir.resolve("chunk-$idx.flac"), bytes) }
 
 /** The task's `chunk_audio` rows as (idx, FLAC bytes) in idx order, read over the raw connection. */
 private fun chunkAudio(
