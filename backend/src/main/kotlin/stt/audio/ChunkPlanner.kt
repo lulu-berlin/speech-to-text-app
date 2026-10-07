@@ -19,7 +19,7 @@ fun planChunks(
             add(PlannedChunk(startMs, endMs))
             startMs = endMs
         }
-        if (size > 1 && last().let { it.endMs - it.startMs } < SHORT_TAIL_MS) {
+        if (size > 1 && last().let { it.endMs - it.startMs } < SHORT_TAIL_MS && durationMs - this[lastIndex - 1].startMs <= capMs) {
             val tail = removeAt(lastIndex)
             set(lastIndex, PlannedChunk(last().startMs, tail.endMs))
         }

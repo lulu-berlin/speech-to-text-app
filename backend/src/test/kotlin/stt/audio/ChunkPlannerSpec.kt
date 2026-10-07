@@ -116,4 +116,22 @@ class ChunkPlannerSpec :
                 }
             }
         }
+
+        given("a trailing chunk shorter than 30 s whose merge with the previous chunk would exceed the cap") {
+            `when`("the chunks are planned") {
+                then("it stays a separate chunk") {
+                    val durationMs = seconds(370)
+                    val silences = listOf(Silence(startMs = seconds(349), endMs = seconds(351))) // midpoint 350 s: the first cut
+
+                    val chunks = planChunks(durationMs, silences, TARGET_MS, CAP_MS)
+
+                    chunks.shouldBe(
+                        listOf(
+                            PlannedChunk(startMs = 0, endMs = seconds(350)),
+                            PlannedChunk(startMs = seconds(350), endMs = seconds(370)), // 20 s tail; merged 370 s > cap 360 s
+                        ),
+                    )
+                }
+            }
+        }
     })
