@@ -77,4 +77,14 @@ class ParseSegmentsSpec :
                 }
             }
         }
+
+        given("whisper-cli JSON with neither a transcription nor a segments key, or with an empty array") {
+            `when`("it is parsed") {
+                then("it yields no segments") {
+                    for (json in listOf("""{"result": {"language": "en"}}""", """{"transcription": []}""", """{"segments": []}""")) {
+                        parseSegments(json).shouldBe(emptyList())
+                    }
+                }
+            }
+        }
     })

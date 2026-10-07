@@ -19,7 +19,8 @@ fun parseSegments(json: String): List<WhisperSegment> {
     val root = Json.parseToJsonElement(json).jsonObject
     val legacy = root["segments"]
     if (legacy != null) return legacy.jsonArray.map { parseLegacySegment(it.jsonObject) }
-    return root.getValue("transcription").jsonArray.map { parseTranscriptionSegment(it.jsonObject) }
+    val transcription = root["transcription"] ?: return emptyList()
+    return transcription.jsonArray.map { parseTranscriptionSegment(it.jsonObject) }
 }
 
 private fun parseTranscriptionSegment(segment: JsonObject): WhisperSegment {
