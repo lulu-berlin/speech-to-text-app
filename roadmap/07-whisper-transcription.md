@@ -52,7 +52,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] JSON with a legacy `segments` array (seconds) yields the same segments in milliseconds
 - [x] JSON with neither key, or an empty array, yields no segments
 - [x] Missing `offsets` fields default to 0 and missing `text` to an empty string
-- [ ] Segment times are shifted by the chunk start offset
+- [x] Segment times are shifted by the chunk start offset
 - [ ] A `-pp` progress line is parsed into a chunk fraction; unrelated stderr lines are ignored
 - [ ] Task progress is weighted by chunk duration across finished and running chunks
 - [ ] Device `auto` adds no flag, `cpu` adds `--no-gpu`, `gpu` adds `--device 0`, `3` adds `--device 3`; invalid values are rejected
@@ -75,3 +75,5 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 
 - 2026-10-07: consultation decisions approved: prompt = the previous chunk's last ~200 characters, cut at a word boundary; integration tests use `ggml-tiny.en` and whisper.cpp's `samples/jfk.wav` (public domain), both fetched by hash through Nix; the chunk FLAC and whisper-cli's JSON are deleted right after the chunk's transaction commits. Test list of 15 items approved with the spec. No new ADR: item-local decisions, recorded here.
+- 2026-10-07 (workspace session): integration fixtures are exported as test-only `TEST_WHISPER_TINY_EN_MODEL` and `TEST_JFK_WAV` (`TEST_` prefix, since `STT_*` is read only by `Config`), read in one test helper; an unset variable fails the integration test, naming it. `ggml-tiny.en` is `whisperTinyEn` in `nix/models.nix`; `jfk.wav` is pinned to whisper.cpp tag v1.9.2 in `nix/test-fixtures.nix`. The `-pp` line format captured from whisper-cli 1.9.2 is `whisper_print_progress_callback: progress = %3d%` (e.g. `progress =  27%`).
+- 2026-10-07 (cycle 5): `seq` numbers a chunk's segments from 0 in whisper-cli output order (user decision).
