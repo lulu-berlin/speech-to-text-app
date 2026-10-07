@@ -48,7 +48,7 @@ Transcribe each planned chunk with one whisper-cli run, turn its JSON output int
 
 Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Items that run real whisper-cli are tagged `Integration` (ADR 0021).
 
-- [ ] JSON with a `transcription` array yields segments with millisecond offsets and text
+- [x] JSON with a `transcription` array yields segments with millisecond offsets and text
 - [ ] JSON with a legacy `segments` array (seconds) yields the same segments in milliseconds
 - [ ] JSON with neither key, or an empty array, yields no segments
 - [ ] Missing `offsets` fields default to 0 and missing `text` to an empty string
