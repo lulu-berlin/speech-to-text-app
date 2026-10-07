@@ -1,6 +1,6 @@
 # 0005 — Uploaded audio stored as SQLite BLOB
 
-Status: accepted · Date: 2026-10-05
+Status: superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) · Date: 2026-10-05
 
 ## Context
 Uploaded audio must be kept for processing (including resume after restart, ADR 0004) and for history playback. It can live either in the database or as files in a data directory referenced from the database.

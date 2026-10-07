@@ -1,6 +1,6 @@
 # 0018 — Audio payload stored as paged BLOBs
 
-Status: accepted · Date: 2026-10-06 · Amended: 2026-10-06 (item 03 review rounds 1 and 2)
+Status: superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) · Date: 2026-10-06 · Amended: 2026-10-06 (item 03 review rounds 1 and 2)
 
 ## Context
 ADR 0005 stores uploaded audio in SQLite and requires that uploads and reads *stream* the BLOB — never load it fully into memory — so large files can be piped to temp files for ffmpeg/whisper-cli. The stack (ADR 0006) uses Exposed over the xerial `sqlite-jdbc` driver. A capability probe of `sqlite-jdbc` 3.49.1.0 (run 2026-10-06 in the agent sandbox) shows the driver cannot stream single-row BLOBs:

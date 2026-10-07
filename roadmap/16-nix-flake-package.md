@@ -10,7 +10,7 @@ Deliver the app as a Nix flake derivation that runs backend, database, frontend,
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): the Nix flake package is the deliverable.
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): the package contains no Python runtime for the app.
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): speaker model asset and hash.
-- [ADR 0005 — Audio as SQLite BLOB](../docs/decisions/0005-audio-as-sqlite-blob.md): SQLite is the only data store.
+- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): SQLite (embedded) holds the chunk audio and all metadata; originals of tasks not yet chunked live in `$STT_DATA_DIR/work/`, so the whole data directory is the backup unit.
 - [ADR 0008 — Default whisper model](../docs/decisions/0008-default-whisper-model.md): whisper model asset and hash.
 - [ADR 0012 — pnpm](../docs/decisions/0012-frontend-dependency-management-pnpm.md): frontend built with `fetchPnpmDeps` + `pnpmConfigHook`/`pnpmBuildHook`.
 - [ADR 0014 — Build tooling](../docs/decisions/0014-build-tooling-gradle-catalog-no-wrapper.md) and [ADR 0016 — App wrapper in item 02](../docs/decisions/0016-flake-scope-correction-app-wrapper.md): backend built with `gradle.fetchDeps` + `backend/deps.json`; the wrapper's static root holds only the frontend.

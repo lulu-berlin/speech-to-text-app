@@ -10,7 +10,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0002 | [No Python in the app; transcribe.py is a reference oracle only](0002-no-python-oracle-only.md) | accepted | 2026-10-05 |
 | 0003 | [Diarization in Kotlin with CAM++ via ONNX Runtime](0003-kotlin-diarization-campplus-onnx.md) | accepted | 2026-10-05 |
 | 0004 | [Chunked transcription with SIGSTOP/SIGCONT pause](0004-chunked-transcription-sigstop-pause.md) | accepted | 2026-10-05 |
-| 0005 | [Uploaded audio stored as SQLite BLOB](0005-audio-as-sqlite-blob.md)                    | accepted | 2026-10-05 |
+| 0005 | [Uploaded audio stored as SQLite BLOB](0005-audio-as-sqlite-blob.md)                    | superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) | 2026-10-05 |
 | 0006 | [Exposed, Flyway, and Kotest](0006-exposed-flyway-kotest.md)                            | accepted | 2026-10-05 |
 | 0007 | [Server-Sent Events for live updates](0007-sse-live-updates.md)                          | accepted | 2026-10-05 |
 | 0008 | [Default whisper model](0008-default-whisper-model.md)                                  | accepted | 2026-10-05 |
@@ -23,9 +23,10 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0015 | [Code formatting: ktlint and prettier](0015-code-formatting-ktlint-prettier.md)          | accepted | 2026-10-05 |
 | 0016 | [Flake scope correction: app wrapper in item 02](0016-flake-scope-correction-app-wrapper.md) | accepted | 2026-10-05 |
 | 0017 | [Database location, data directory, and connection contract](0017-database-location-and-connection-contract.md) | accepted | 2026-10-06 |
-| 0018 | [Audio payload stored as paged BLOBs](0018-audio-payload-paged-blobs.md) | accepted | 2026-10-06 |
+| 0018 | [Audio payload stored as paged BLOBs](0018-audio-payload-paged-blobs.md) | superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) | 2026-10-06 |
 | 0019 | [Schema ownership: one schema in item 03, migrations after](0019-schema-ownership-and-evolution.md) | accepted | 2026-10-06 |
 | 0020 | [Process runner: JNA signals, process groups, cancellation](0020-process-runner-jna-signals-process-groups.md) | accepted | 2026-10-06 |
 | 0021 | [Integration tests: Kotest tags and `gradle integrationTest`](0021-integration-tests-kotest-tags-gradle-task.md) | accepted | 2026-10-06 |
 | 0022 | [Kotlin compiler runs inside the Gradle daemon](0022-kotlin-compiler-in-process.md)      | accepted | 2026-10-06 |
 | 0023 | [Persistence may import feature-owned value types](0023-persistence-may-import-feature-value-types.md) | accepted | 2026-10-06 |
+| 0024 | [Audio storage: original kept only until chunking, chunks stored as FLAC](0024-audio-storage-original-until-chunking-flac-chunks.md) | accepted | 2026-10-07 |

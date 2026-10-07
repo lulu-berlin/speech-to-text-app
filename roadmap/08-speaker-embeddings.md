@@ -12,13 +12,14 @@ Compute one L2-normalized speaker embedding per transcribed segment, in Kotlin, 
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): model, sha256, front-end parameters, metadata keys, input shape `[1, T, 80]`, 512-d output.
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): windowing ported from oracle `embed_windows`; segments < 0.5 s are excluded from clustering (item 09) but still embedded.
 - [ADR 0004 — Chunked transcription with SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): in-JVM phases pause cooperatively via a pause gate between embedding windows.
+- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): the whole-file PCM is always rebuilt from the task's stored 16-bit FLAC chunks (item 11), with or without a restart.
 
 ## Proposal (pending approval)
 
 - **Kaldi fbank in Kotlin** with the ADR 0003 parameters: 16 kHz, 80 mel bins, 25 ms frame (400 samples) / 10 ms shift (160 samples), povey window (`(0.5 − 0.5·cos(2πn/(N−1)))^0.85`), dither 0, remove DC offset per frame, pre-emphasis 0.97, low_freq 20 Hz, high_freq −400 (i.e. Nyquist − 400 = 7600 Hz), `snip_edges = false` (frame count `(samples + 80) / 160`, edges padded as Kaldi does), `round_to_power_of_two = true` (FFT size 512), power spectrum → mel filterbank → log with Kaldi's epsilon floor. Own FFT implementation (no equivalent in the dependencies). Exact formulas are taken from Kaldi / kaldi-native-fbank and cited in the code.
 - **Normalization:** per-utterance mean subtraction over frames (`feature_normalize_type = "global-mean"`).
 - **ONNX Runtime session** (`com.microsoft.onnxruntime:onnxruntime`, CPU) loaded once from `$STT_SPEAKER_MODEL` and reused for all tasks (the oracle's `load_embedder` likewise loads once and reuses). At load, read `output_dim`, `sample_rate`, `normalize_samples`, `feature_normalize_type` from the model metadata and fail fast if they don't match what the front-end supports (sample rate 16000, normalize type `global-mean`). Input/output tensor names are read from the session, not hard-coded. `normalize_samples` decides whether samples are fed as floats in [−1, 1] or scaled to the int16 range; the exact handling is confirmed against sherpa-onnx's speaker-embedding extractor.
-- **Port oracle `embed_windows` windowing** (`docs/oracle/transcribe.py`), operating on the item 06 PCM (mono 16 kHz float32). Every segment is embedded, including segments < 0.5 s (oracle `diarize_and_write` embeds all of them because `_rescue_short_segments` needs their vectors). Per segment, with `sr = 16000`, `short = 2 s = 32000` samples, `cap = 20 s = 320000` samples, `total` = PCM length:
+- **Port oracle `embed_windows` windowing** (`docs/oracle/transcribe.py`), operating on the task's whole-file PCM (mono 16 kHz float32), which item 11 rebuilds from the stored 16-bit FLAC chunks (ADR 0024): the sample values are 16-bit-quantized, unlike the oracle's float32 decode of the original. Every segment is embedded, including segments < 0.5 s (oracle `diarize_and_write` embeds all of them because `_rescue_short_segments` needs their vectors). Per segment, with `sr = 16000`, `short = 2 s = 32000` samples, `cap = 20 s = 320000` samples, `total` = PCM length:
   - empty PCM (`total <= 0`) → every embedding is all zeros;
   - `t0 = start · sr`, `t1 = end · sr` (truncated to integers; from stored ms this is exactly `ms · 16`);
   - past-end / empty segment (`t1 <= t0` or `t0 >= total`) → tail window: `t0 = max(0, total − short)`, `t1 = total`;
@@ -35,6 +36,7 @@ Compute one L2-normalized speaker embedding per transcribed segment, in Kotlin, 
 - Fixture clips for same/different-speaker tests: sherpa-onnx release WAVs (`fangjun-sr-1.wav` etc.) — license to confirm; committed to the repo or fetched by hash?
 - Keep the oracle's 2 s zero-padding unchanged for CAM++ (zero samples hit the log floor of the fbank and shift the global mean), or re-evaluate it during the item 09 threshold tuning?
 - Should the ONNX session use more than one intra-op thread (tie to `STT_THREADS`)?
+- Does the 16-bit quantization of the rebuilt PCM (ADR 0024) change the embeddings enough to matter? Proposed: compare embeddings of the fixture clips from the rebuilt PCM against an f32 decode of the same source, as part of item 09's threshold tuning.
 
 ## Test list (written with the user; Canon TDD step 1)
 
