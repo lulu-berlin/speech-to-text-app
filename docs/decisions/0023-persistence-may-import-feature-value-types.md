@@ -1,6 +1,6 @@
 # 0023 — Persistence may import feature-owned value types
 
-Status: accepted · Date: 2026-10-06
+Status: accepted · Date: 2026-10-06 · Amended: 2026-10-07 (item 18)
 
 ## Context
 Roadmap item 04 introduces the `stt/queue` domain feature: a pure Kotlin state machine for task status, independent of I/O. The status type `TaskStatus` (`QUEUED`, `RUNNING`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELED`) was first created in item 03 inside `stt/db`, where Exposed persists it into `tasks.status`. Item 04 needs exactly this type as the state machine's input, and the domain must not import `stt/db` (persistence would make it impure). The backend conventions ([backend.md](../conventions/backend.md), ADR 0013) say a feature owns its types and forbid cross-feature imports except through explicit interfaces — leaving unclear whether the persistence feature may depend on a value type owned by another feature.
@@ -9,6 +9,7 @@ Roadmap item 04 introduces the `stt/queue` domain feature: a pure Kotlin state m
 - `TaskStatus` moves to `stt/queue` — the feature whose semantics it models (queue lifecycle state). `stt/db` imports it from there for the `tasks.status` column.
 - The persistence feature (`stt/db`) **may import value types (enums and data classes persisted verbatim) from the feature that owns them**. This is a read-only dependency on a type definition, not behavioral coupling, and does not violate the "explicit interfaces" rule.
 - The reverse direction stays forbidden: `stt/queue` and all other features must never import `stt/db`.
+- The persistence feature may also consume another feature's processing-result type when reading it inside one transaction keeps a multi-row write both atomic and memory-bounded. Item 18 is the first case: `ChunkRepository.storePlan` takes `stt.audio.ExportedChunk`, which names the exported chunk file, and the repository reads one file at a time inside the single write that stores the plan with its chunk audio. The reverse direction stays forbidden, and only the data a feature produces for persistence may cross — not its behaviour.
 
 ## Consequences
 - One `TaskStatus` shared by the queue state machine and the database; no mapping layer duplicates the enum.
