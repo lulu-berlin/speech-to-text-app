@@ -148,6 +148,7 @@ class TaskRepositorySpec :
                                 listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "x", speaker = null)),
                             )
                         }
+                        rowCount(db, "chunk_audio").shouldBe(2)
 
                         tasks.delete(doomedId)
 
@@ -155,6 +156,7 @@ class TaskRepositorySpec :
                         rowCount(db, "tasks").shouldBe(1)
                         rowCount(db, "audio").shouldBe(1)
                         rowCount(db, "chunks").shouldBe(1)
+                        rowCount(db, "chunk_audio").shouldBe(1)
                         rowCount(db, "segments").shouldBe(1)
                         tasks.find(keptId).shouldBe(StoredTask(keptId, queuedTask("kept.wav", createdAt = 2L)))
                     }
