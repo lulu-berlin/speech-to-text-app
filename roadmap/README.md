@@ -42,6 +42,7 @@ graph TD
   14 --> 16
   15 --> 16
   13 --> 17[17 branding: stenographer animation]
+  16 --> 19[19 Docker image and compose]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -67,3 +68,4 @@ graph TD
 | [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](18-audio-storage.md) | spec-approved | 03 |
+| [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
