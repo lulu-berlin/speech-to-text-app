@@ -31,7 +31,7 @@ graph TD
   05 --> 11
   07 --> 11
   09 --> 11
-  03 --> 18[18 audio storage]
+  03 --> 18[18 audio storage ✓]:::done
   18 --> 11
   11 --> 12[12 HTTP API and SSE]
   02 --> 13[13 frontend foundation]
@@ -67,5 +67,5 @@ graph TD
 | [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13 |
 | [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
-| [18 — Audio storage: originals in the work directory, chunks as FLAC](18-audio-storage.md) | spec-approved | 03 |
+| [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
