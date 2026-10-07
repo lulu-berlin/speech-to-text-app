@@ -1,5 +1,7 @@
 package stt.db
 
+import stt.audio.ExportedChunk
+import stt.audio.PlannedChunk
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
@@ -85,3 +87,16 @@ internal fun sha256Hex(input: InputStream): String {
     }
     return HexFormat.of().formatHex(digest.digest())
 }
+
+/** [plan] exported as one small stand-in FLAC file per chunk, `<name>-<idx>.flac` under [dir]. */
+internal fun exportedChunks(
+    dir: Path,
+    name: String,
+    vararg plan: PlannedChunk,
+): List<ExportedChunk> =
+    plan.mapIndexed {
+        idx,
+        chunk,
+        ->
+        ExportedChunk(chunk, Files.write(dir.resolve("$name-$idx.flac"), byteArrayOf(idx.toByte())))
+    }
