@@ -58,7 +58,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Device `auto` adds no flag, `cpu` adds `--no-gpu`, `gpu` adds `--device 0`, `3` adds `--device 3`; invalid values are rejected
 - [x] The command includes `-t` only when threads are configured and `--prompt` only when a previous tail exists
 - [x] The prompt is the previous chunk's last ~200 characters, cut at a word boundary
-- [ ] On resume, the prompt is rebuilt from the previous chunk's stored segments
+- [x] On resume, the prompt is rebuilt from the previous chunk's stored segments
 - [ ] A non-zero whisper-cli exit fails the chunk with the exit code
 - [ ] Missing or malformed JSON output fails the chunk with a clear message
 - [ ] A chunk's segments and its `DONE` status are stored together or not at all
@@ -82,3 +82,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07 (cycle 7 checkpoint): discovered scenario "Chunks with zero total duration report progress 0, not NaN" confirmed by the user (a decoded clip of 1–15 samples is 0 ms long). Device decisions for the next cycle: unset `STT_DEVICE` defaults to `auto` (oracle default); an empty `STT_DEVICE` is invalid (fail fast like any set-but-invalid value).
 - 2026-10-07 (cycle 8 checkpoint, user decisions): `STT_THREADS` is parsed in `Config` (unset → no `-t`; an integer >= 1 → used; empty, 0, negative or non-integer → fails fast naming the variable and value); item 08 also reads `STT_THREADS`, so the second branch to merge reconciles `Config.kt`. The command takes the model path as a parameter; reading `STT_WHISPER_MODEL` into `Config` is left to the item that wires the engine (11). The executable is the bare `whisper-cli`, resolved on `PATH` by the item 05 runner (as item 06 does with `ffmpeg`); `STT_WHISPER_CLI` is left to item 16.
 - 2026-10-07 (cycle 9 checkpoint, user decisions): the prompt item is split into "cut at a word boundary" and "rebuilt on resume from the stored segments" (one test each). Prompt rule: the previous chunk's segment texts joined and trimmed; at most 200 characters are kept whole; longer text keeps its last 200 characters, and if the cut falls inside a word that partial word is dropped up to the next space, then trimmed. A previous chunk without text (no segments) gives no `--prompt`; earlier chunks are not consulted.
+- 2026-10-07 (cycle 10a checkpoint, user decision): on resume the previous chunk's segments are taken from `SegmentRepository.findByTask` (all of the task's segments, read once per resume); no by-chunk query is added to `stt/db`, keeping clear of item 18's `stt/db` changes.
