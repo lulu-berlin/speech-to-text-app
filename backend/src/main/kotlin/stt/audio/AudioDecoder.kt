@@ -7,9 +7,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /** Decoded PCM: little-endian float32, one channel, 16 kHz (ported from the oracle's `decode_pcm`). */
-private const val SAMPLE_RATE = 16_000
+internal const val SAMPLE_RATE = 16_000
 private const val BYTES_PER_SAMPLE = 4
-private const val SAMPLES_PER_MS = SAMPLE_RATE / 1000
+internal const val SAMPLES_PER_MS = SAMPLE_RATE / 1000
 
 class AudioDecoder(
     private val runner: ProcessRunner,
