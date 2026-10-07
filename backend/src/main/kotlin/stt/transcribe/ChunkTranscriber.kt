@@ -25,9 +25,10 @@ class ChunkTranscriber internal constructor(
         audio: Path,
         outputPrefix: Path,
         prompt: String?,
+        onProgress: (Double) -> Unit = {},
     ): List<WhisperSegment> {
         val command = whisperCommand(settings, audio, outputPrefix, prompt, executable)
-        val result = runner.run(command)
+        val result = runner.run(command, onStderrLine = { line -> parseProgress(line)?.let(onProgress) })
         val stderr = result.stderr.joinToString("\n")
         if (result.exitCode != 0) {
             throw TranscriptionException("whisper-cli failed on $audio (exit ${result.exitCode}):\n$stderr")

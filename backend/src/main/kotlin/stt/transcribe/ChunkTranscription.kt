@@ -24,8 +24,9 @@ class ChunkTranscription(
         audio: Path,
         outputPrefix: Path,
         prompt: String?,
+        onProgress: (Double) -> Unit = {},
     ) {
-        val whisperSegments = transcriber.transcribe(settings, audio, outputPrefix, prompt)
+        val whisperSegments = transcriber.transcribe(settings, audio, outputPrefix, prompt, onProgress)
         segments.completeChunk(taskId, chunk.idx, chunkSegments(chunk.idx, chunk.startMs, whisperSegments))
         withContext(Dispatchers.IO) {
             Files.delete(audio)
