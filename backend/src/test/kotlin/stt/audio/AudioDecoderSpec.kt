@@ -56,6 +56,24 @@ class AudioDecoderSpec :
                 }
             }
         }
+
+        given("a file with no audio: a 0 s WAV, which ffmpeg decodes successfully to zero samples") {
+            `when`("it is decoded") {
+                then("decoding fails with \"no audio decoded\"") {
+                    val workDir = tempdir("stt-audio").toPath()
+                    val source = workDir.resolve("source.wav")
+                    generate(source, "anullsrc=r=44100:cl=stereo", "-t", "0")
+                    val pcm = workDir.resolve("audio.f32")
+
+                    val error =
+                        shouldThrow<AudioDecodeException> {
+                            withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
+                        }
+
+                    error.message.shouldContain("no audio decoded from $source") // the oracle's wording
+                }
+            }
+        }
     })
 
 /** Generates a fixture file at [target] from the lavfi source [lavfi] with ffmpeg, plus [outputOptions]. */
