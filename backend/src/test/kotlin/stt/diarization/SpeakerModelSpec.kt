@@ -30,4 +30,28 @@ class SpeakerModelSpec :
                 }
             }
         }
+        given("the CAM++ model at \$STT_SPEAKER_MODEL, with STT_THREADS set to 4 or unset") {
+            `when`("loading the model") {
+                then("the session loads with the configured intra-op threads; without STT_THREADS it uses ONNX Runtime's default") {
+                    // SessionOptions has no read-back for the thread count in onnxruntime 1.30.0 (probed: javap shows
+                    // setIntraOpNumThreads only), so the observable contract is a real session that accepts the
+                    // configured options: both loads below must succeed.
+                    val env = System.getenv() + ("STT_DATA_DIR" to TEST_DATA_DIR)
+                    listOf(true, false).forEach { withThreads ->
+                        val config = Config.fromEnv(if (withThreads) env + ("STT_THREADS" to "4") else env)
+
+                        SpeakerModel.load(config.speakerModel, config.threads).use { model ->
+                            model.metadata.shouldBe(
+                                SpeakerModelMetadata(
+                                    outputDim = 512,
+                                    sampleRate = 16_000,
+                                    normalizeSamples = true,
+                                    featureNormalizeType = "global-mean",
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
     })
