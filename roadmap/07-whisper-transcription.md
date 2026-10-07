@@ -1,6 +1,6 @@
 # 07 — Whisper transcription
 
-Status: in-progress
+Status: in-review
 Depends on: [03](../docs/specs/database-schema.md) (done), [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
@@ -63,7 +63,7 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Missing or malformed JSON output fails the chunk with a clear message
 - [x] A chunk's segments and its `DONE` status are stored together or not at all
 - [x] After the chunk is persisted, its FLAC file and whisper-cli's JSON are deleted
-- [ ] Integration: `jfk.wav` transcribed with `ggml-tiny.en` yields non-empty text with increasing timestamps
+- [x] Integration: `jfk.wav` transcribed with `ggml-tiny.en` yields non-empty text with increasing timestamps
 - [x] Chunks with zero total duration report progress 0, not NaN (discovered)
 - [x] While whisper-cli runs, each `-pp` progress line is reported as the chunk fraction (discovered)
 - [x] Completing a chunk that is not in the plan fails and stores nothing (discovered)
@@ -88,3 +88,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07 (cycle 10b checkpoint, user decision; changes the Proposal's "stderr tail"): a failing chunk's error carries the exit code and the **full** stderr. Measured with whisper-cli 1.9.2: a missing input file exits 2 with the error on lines 2–3 of 77 (the rest is usage text); a file that is not audio exits **0**, writes no JSON, and prints its error on lines 42–45 of 55. A tail would lose the cause. whisper-cli is replaced in tests by a script (test seam: the executable path), tagged `Integration` because it spawns a real process (ADR 0021).
 - 2026-10-07 (cycle 11 checkpoint): discovered scenario "While whisper-cli runs, each `-pp` progress line is reported as the chunk fraction" confirmed by the user (the parsers existed, but nothing fed whisper-cli's stderr to them). The JSON-output failures (missing, malformed) also carry the full stderr: whisper-cli exits 0 on unreadable audio and explains why only in stderr (agent recommendation, applied with the user's confirmation of the next test).
 - 2026-10-07 (cycle 13 checkpoint): discovered scenario "Completing a chunk that is not in the plan fails and stores nothing" confirmed by the user (an update matching no chunk row changes 0 rows without error, so the segments would be stored as orphans).
+- 2026-10-07 (session 3): item 15 greened. The user restarted inside the worktree shell; devenv exported `TEST_WHISPER_TINY_EN_MODEL` (= /nix/store/…-ggml-tiny.en.bin, 77 704 715 bytes) and `TEST_JFK_WAV` (= /nix/store/…-jfk.wav, 352 078 bytes), so the `9be3b46` Nix fixtures are verified. `gradle integrationTest` from `backend/` ran `JfkIntegrationSpec` for real: BUILD SUCCESSFUL, 1 test, 0 skipped, 0 failures, 1.135 s (CPU, 11 s clip).
