@@ -52,15 +52,10 @@
           bwrapFlags = ''--bind "$PWD" "$PWD"'';
         };
 
-        # Small heaps + in-process Kotlin compilation: the sandbox OOM-killed the Gradle
-        # daemon (~512m heap + Kotlin daemon + ktlint at once). gradleFlags cannot
-        # carry spaces (nixpkgs documented limitation) - the jvmargs go into
-        # gradleFlagsArray instead, after the setup hook has initialized it.
+        # In-process Kotlin compilation (ADR 0022) and Gradle's default JVM memory
+        # settings, -Xmx512m -XX:MaxMetaspaceSize=384m (ADR 0025: the former
+        # 384m/256m cap ran out of metaspace in :compileKotlin).
         gradleFlags = [ "-Pkotlin.compiler.execution.strategy=in-process" ];
-
-        postConfigure = ''
-          gradleFlagsArray+=("-Dorg.gradle.jvmargs=-Xmx384m -XX:MaxMetaspaceSize=256m")
-        '';
 
         # The Nix check runs `gradle check` (ktlintCheck + tests, ADR 0015): nixpkgs'
         # gradle setup hook defaults gradleCheckTask to `test` (verified in the pinned
