@@ -28,6 +28,21 @@ class PromptTailSpec :
                 }
             }
         }
+
+        given("previous-chunk text whose cut falls in a word followed by a tab or a newline") {
+            `when`("the prompt is built from it") {
+                then("the partial word is dropped up to that whitespace character, keeping the next whole word") {
+                    // 19 words of 9 letters joined by single spaces: 19 × 9 + 18 = 189 characters.
+                    val words = List(19) { "abcdefghi" }.joinToString(" ")
+
+                    // "the inauguration\t" + words = 4 + 12 + 1 + 189 = 206 characters; the last 200 start at index 6,
+                    // inside "inauguration" ("auguration"); only that partial word and the tab go, all 19 words stay.
+                    promptTail(segments(" the inauguration", "\t$words")).shouldBe(words)
+                    // The same with a newline after the partial word.
+                    promptTail(segments(" the inauguration", "\n$words")).shouldBe(words)
+                }
+            }
+        }
     })
 
 private fun segments(vararg texts: String): List<Segment> =
