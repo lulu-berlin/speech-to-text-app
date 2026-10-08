@@ -102,13 +102,7 @@ class ChunkTranscriptionSpec :
                         val json = workDir.resolve("chunk-1.json")
                         val output = """{"transcription": [{"offsets": {"from": 0, "to": 7940}, "text": " And so my fellow Americans"}]}"""
                         val whisperCli =
-                            fakeWhisperCli(
-                                workDir,
-                                listOf("output_json: saving output to '$json'"),
-                                exitCode = 0,
-                                writes =
-                                    json to output,
-                            )
+                            fakeWhisperCli(workDir, listOf("output_json: saving output to '$json'"), exitCode = 0, writes = json to output)
                         val transcription = ChunkTranscription(ChunkTranscriber(ProcessRunner(), whisperCli.toString()), segments)
 
                         withCapturedWarnings(ChunkTranscription::class.java.name) { events ->
