@@ -54,6 +54,9 @@ in
   env.TEST_WHISPER_TINY_EN_MODEL = "${models.whisperTinyEn}";
   env.TEST_JFK_WAV = "${testFixtures.jfkWav}";
 
+  # Integration-test fixtures of roadmap item 08: LibriSpeech test-clean clips (CC BY 4.0, docs/attributions.md)
+  env.TEST_LIBRISPEECH_CLIPS = "${testFixtures.librispeechClips}";
+
   # https://devenv.sh/tests/
   # `devenv test`: test list of roadmap item 01 (dev environment).
   # Expected hashes are written out here on purpose, independent of nix/models.nix.
