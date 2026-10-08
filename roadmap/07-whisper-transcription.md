@@ -1,6 +1,6 @@
 # 07 — Whisper transcription
 
-Status: in-review
+Status: in-progress
 Depends on: [03](../docs/specs/database-schema.md) (done), [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
@@ -92,3 +92,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07 (session 3): item 15 greened. The user restarted inside the worktree shell; devenv exported `TEST_WHISPER_TINY_EN_MODEL` (= /nix/store/…-ggml-tiny.en.bin, 77 704 715 bytes) and `TEST_JFK_WAV` (= /nix/store/…-jfk.wav, 352 078 bytes), so the `9be3b46` Nix fixtures are verified. `gradle integrationTest` from `backend/` ran `JfkIntegrationSpec` for real: BUILD SUCCESSFUL, 1 test, 0 skipped, 0 failures, 1.135 s (CPU, 11 s clip).
 - 2026-10-08 (review round 1): item reopened (`Status: in-progress`). Discovered scenario "A chunk whose FLAC or JSON cannot be deleted is still stored DONE with its segments, and the failure is logged" confirmed by the user; it came from review round 1 (the deletes run after the commit, so a failing delete must not turn a stored chunk into an error).
 - 2026-10-08 (review round 1 cycle): red seen with the `ChunkTranscription.kt` change set aside — `gradle integrationTest --tests 'stt.transcribe.ChunkTranscriptionSpec'`: 2 tests, 1 failed, `java.nio.file.DirectoryNotEmptyException at UnixFileSystemProvider.java:289` escaping the transcription. Green with the best-effort delete (one WARN naming the file and the exception); `gradle check` (85 unit tests) and full `gradle integrationTest` (34 run, incl. `JfkIntegrationSpec`) green.
+- 2026-10-08 (review round 2): item reopened; findings: (1) a legacy `segments` entry missing `start`, `end` or `text` escapes as `NoSuchElementException` instead of failing the chunk as malformed JSON with the full stderr; (2) `JfkIntegrationSpec` comment says "item-15 fixtures" (test-list item, not roadmap item 15) and the missing-variable message points to the worktree shell; (3) `promptTail` checks the cut with `isWhitespace()` but drops the partial word only up to a space, so a tab or newline drops one extra word; (4) AGENTS.md § Commands does not document `STT_DEVICE` and `STT_THREADS`.
