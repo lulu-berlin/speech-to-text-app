@@ -30,3 +30,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0022 | [Kotlin compiler runs inside the Gradle daemon](0022-kotlin-compiler-in-process.md)      | accepted | 2026-10-06 |
 | 0023 | [Persistence may import feature-owned value types](0023-persistence-may-import-feature-value-types.md) | accepted | 2026-10-06 |
 | 0024 | [Audio storage: original kept only until chunking, chunks stored as FLAC](0024-audio-storage-original-until-chunking-flac-chunks.md) | accepted | 2026-10-07 |
+| 0025 | [Nix build uses Gradle's default JVM memory settings](0025-nix-build-gradle-default-jvm-memory.md) | accepted | 2026-10-08 |
