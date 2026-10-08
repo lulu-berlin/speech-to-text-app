@@ -4,8 +4,8 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import stt.db.Segment
 import stt.db.SegmentRepository
-import stt.db.TaskRepository
 import stt.db.queuedTask
+import stt.db.taskRepository
 import stt.db.withDatabase
 
 class ResumePromptSpec :
@@ -15,7 +15,7 @@ class ResumePromptSpec :
                 then("the prompt is rebuilt from the previous chunk's stored segments") {
                     withDatabase { db ->
                         val segments = SegmentRepository(db)
-                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
+                        val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
                         segments.insertAll(
                             taskId,
                             listOf(

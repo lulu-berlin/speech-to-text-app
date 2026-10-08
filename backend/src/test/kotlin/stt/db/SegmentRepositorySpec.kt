@@ -3,6 +3,7 @@ package stt.db
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
+import stt.audio.PlannedChunk
 
 class SegmentRepositorySpec :
     BehaviorSpec({
@@ -80,18 +81,18 @@ class SegmentRepositorySpec :
             `when`("the chunk is completed with its segments, once validly and once with a segment the database rejects") {
                 then("a chunk's segments and its DONE status are stored together or not at all") {
                     withDatabase { db ->
-                        val tasks = TaskRepository(db)
+                        val tasks = taskRepository(db, dataDir)
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val failingTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
-                        val plan =
-                            listOf(
-                                Chunk(idx = 0, startMs = 0L, endMs = 30_000L, status = ChunkStatus.DONE),
-                                Chunk(idx = 1, startMs = 30_000L, endMs = 60_000L, status = ChunkStatus.PENDING),
-                            )
-                        chunks.insertAll(taskId, plan)
-                        chunks.insertAll(failingTaskId, plan)
+                        chunks.storePlan(taskId, exportedChunks(dataDir, "talk", PlannedChunk(0L, 30_000L), PlannedChunk(30_000L, 60_000L)))
+                        chunks.storePlan(
+                            failingTaskId,
+                            exportedChunks(dataDir, "other", PlannedChunk(0L, 30_000L), PlannedChunk(30_000L, 60_000L)),
+                        )
+                        // Chunk 0 was transcribed earlier; raw SQL in a committed write transaction stands in for that.
+                        db.writeTransaction { exec("UPDATE chunks SET status = 'DONE' WHERE idx = 0") }
 
                         val transcribed =
                             listOf(
@@ -120,9 +121,9 @@ class SegmentRepositorySpec :
                     withDatabase { db ->
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
-                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
+                        val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
+                        chunks.storePlan(taskId, exportedChunks(dataDir, "talk", PlannedChunk(0L, 30_000L)))
                         val plan = listOf(Chunk(idx = 0, startMs = 0L, endMs = 30_000L, status = ChunkStatus.PENDING))
-                        chunks.insertAll(taskId, plan)
 
                         val orphan = Segment(chunkIdx = 5, seq = 0, startMs = 150_000L, endMs = 152_000L, text = " Lost.", speaker = null)
                         shouldThrowAny { segments.completeChunk(taskId, chunkIdx = 5, listOf(orphan)) }
