@@ -83,22 +83,19 @@ class EmbeddingsSpec :
                     SpeakerModel.load(path).use { model ->
                         val embedder = Embeddings(model)
                         val gate = PauseGate()
-                        lateinit var embeddings: Array<FloatArray>
                         val job =
                             async {
-                                embeddings =
-                                    embedder.embed(pcm, listOf(segment(0, 1200), segment(30_000, 31_200)), gate) { done, _ ->
-                                        if (done == 1) gate.pause()
-                                    }
+                                embedder.embed(pcm, listOf(segment(0, 1200), segment(30_000, 31_200)), gate) { done, _ ->
+                                    if (done == 1) gate.pause()
+                                }
                             }
 
                         val finishedWhilePaused = withTimeoutOrNull(500.milliseconds) { job.await() }
                         finishedWhilePaused.shouldBe(null) // still suspended at the checkpoint between the windows
 
                         gate.resume()
-                        job.await()
 
-                        embeddings.size.shouldBe(2)
+                        job.await().size.shouldBe(2)
                     }
                 }
             }
