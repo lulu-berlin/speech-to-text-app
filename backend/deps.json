@@ -235,6 +235,10 @@
    "module": "sha256-lJLcf2NgJt8ulCkim52Ae1d00uZBUQ2Qv4Kb0qyzthU=",
    "pom": "sha256-BlK5t9Y0kro8J8ZIkANIZRxbKFdEAph7j+KqBUlqkaQ="
   },
+  "com/microsoft/onnxruntime#onnxruntime/1.30.0": {
+   "jar": "sha256-V9jO328Mj9bVDtZcF7+ZOfVaRRL0ofPnMgI9JY8mKsY=",
+   "pom": "sha256-0JE8AVvnkpGr2Yvmo8EkLrPS2XwsDC9VeNaxyZ0sE1o="
+  },
   "com/pinterest/ktlint#ktlint-cli-reporter-baseline/1.8.0": {
    "jar": "sha256-vhFgfZzrzBRWq2zLJXhITA9jwCiK0P/yeIE9clG49u0=",
    "module": "sha256-wW/e1cjsy1jCku0buTAuHyQ+YVfrZMBiCyq6Yi5RiSo=",
@@ -855,10 +859,6 @@
   "net/java/dev/jna#jna/5.14.0": {
    "jar": "sha256-NO0eHyf6iWvKUNvE6ZzzcylnzsOHp6DV40hsCWc/6MY=",
    "pom": "sha256-4E4llRUB3yWtx7Hc22xTNzyUiXuE0+FJISknY+4Hrj0="
-  },
-  "net/java/dev/jna#jna/5.9.0": {
-   "jar": "sha256-6vzHgLRFQ008Wuf6L7ZmXeGnVg1TfSxAio6AzRTScWE=",
-   "pom": "sha256-a8i4RZFQtZ6VmPPa2a0kWh7yFQ0IJYEBcYTrFj5ZKCk="
   },
   "net/thauvin/erik/urlencoder#urlencoder-lib-jvm/1.6.0": {
    "jar": "sha256-jQ/SrrSNGdxJxWPrwA8nSUfkX3FsEHU1wS6tY97NaI0=",
