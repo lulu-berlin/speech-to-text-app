@@ -22,6 +22,16 @@ import stt.withCapturedWarnings
 import java.nio.file.Files
 import kotlin.time.Duration.Companion.seconds
 
+/** Chunk 1 of a task's plan, covering 30–60 s of the source. */
+private val CHUNK_1 = Chunk(idx = 1, startMs = 30_000L, endMs = 60_000L, status = ChunkStatus.PENDING)
+
+/** whisper-cli JSON with one segment at 0–7 940 ms of the chunk. */
+private const val ONE_SEGMENT_JSON = """{"transcription": [{"offsets": {"from": 0, "to": 7940}, "text": " And so my fellow Americans"}]}"""
+
+/** [ONE_SEGMENT_JSON]'s segment as stored for [CHUNK_1]: 30 000 + 0 and 30 000 + 7 940 ms. */
+private val CHUNK_1_SEGMENT =
+    Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 37_940L, text = " And so my fellow Americans", speaker = null)
+
 class ChunkTranscriptionSpec :
     BehaviorSpec({
         tags(Integration)
@@ -33,14 +43,11 @@ class ChunkTranscriptionSpec :
                     Database.open(tempdir("stt-db").toPath()).use { db ->
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
-                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
-                        val chunk = Chunk(idx = 1, startMs = 30_000L, endMs = 60_000L, status = ChunkStatus.PENDING)
-                        chunks.insertAll(taskId, listOf(chunk))
+                        val taskId = insertTaskPlanningChunk1(db)
 
                         val flac = Files.writeString(workDir.resolve("chunk-1.flac"), "placeholder: the stand-in never reads it")
                         val prefix = workDir.resolve("chunk-1")
                         val json = workDir.resolve("chunk-1.json")
-                        val output = """{"transcription": [{"offsets": {"from": 0, "to": 7940}, "text": " And so my fellow Americans"}]}"""
                         // Lines as printed by whisper-cli 1.9.2 (-pp), the percentage padded to width 3.
                         val stderr =
                             listOf(
@@ -49,12 +56,12 @@ class ChunkTranscriptionSpec :
                                 "output_json: saving output to '$json'",
                                 "whisper_print_progress_callback: progress = 100%",
                             )
-                        val whisperCli = fakeWhisperCli(workDir, stderr, exitCode = 0, writes = json to output)
+                        val whisperCli = fakeWhisperCli(workDir, stderr, exitCode = 0, writes = json to ONE_SEGMENT_JSON)
                         val transcription = ChunkTranscription(ChunkTranscriber(ProcessRunner(), whisperCli.toString()), segments)
 
                         val reported = mutableListOf<Double>()
                         withTimeout(30.seconds) {
-                            transcription.transcribe(taskId, chunk, TEST_SETTINGS, flac, prefix, prompt = null) { reported += it }
+                            transcription.transcribe(taskId, CHUNK_1, TEST_SETTINGS, flac, prefix, prompt = null) { reported += it }
                         }
 
                         reported.shouldBe(listOf(0.27, 1.0))
@@ -65,19 +72,7 @@ class ChunkTranscriptionSpec :
                             .single()
                             .status
                             .shouldBe(ChunkStatus.DONE)
-                        // 30 000 + 0 and 30 000 + 7 940.
-                        segments.findByTask(taskId).shouldBe(
-                            listOf(
-                                Segment(
-                                    chunkIdx = 1,
-                                    seq = 0,
-                                    startMs = 30_000L,
-                                    endMs = 37_940L,
-                                    text = " And so my fellow Americans",
-                                    speaker = null,
-                                ),
-                            ),
-                        )
+                        segments.findByTask(taskId).shouldBe(listOf(CHUNK_1_SEGMENT))
                     }
                 }
             }
@@ -90,9 +85,7 @@ class ChunkTranscriptionSpec :
                     Database.open(tempdir("stt-db").toPath()).use { db ->
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
-                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
-                        val chunk = Chunk(idx = 1, startMs = 30_000L, endMs = 60_000L, status = ChunkStatus.PENDING)
-                        chunks.insertAll(taskId, listOf(chunk))
+                        val taskId = insertTaskPlanningChunk1(db)
 
                         // A non-empty directory: Files.delete throws DirectoryNotEmptyException even when the tests run as root,
                         // unlike permission errors, which root bypasses.
@@ -100,14 +93,13 @@ class ChunkTranscriptionSpec :
                         Files.createDirectories(flacDir.resolve("inner"))
                         val prefix = workDir.resolve("chunk-1")
                         val json = workDir.resolve("chunk-1.json")
-                        val output = """{"transcription": [{"offsets": {"from": 0, "to": 7940}, "text": " And so my fellow Americans"}]}"""
-                        val whisperCli =
-                            fakeWhisperCli(workDir, listOf("output_json: saving output to '$json'"), exitCode = 0, writes = json to output)
+                        val stderr = listOf("output_json: saving output to '$json'")
+                        val whisperCli = fakeWhisperCli(workDir, stderr, exitCode = 0, writes = json to ONE_SEGMENT_JSON)
                         val transcription = ChunkTranscription(ChunkTranscriber(ProcessRunner(), whisperCli.toString()), segments)
 
                         withCapturedWarnings(ChunkTranscription::class.java.name) { events ->
                             withTimeout(30.seconds) {
-                                transcription.transcribe(taskId, chunk, TEST_SETTINGS, flacDir, prefix, prompt = null)
+                                transcription.transcribe(taskId, CHUNK_1, TEST_SETTINGS, flacDir, prefix, prompt = null)
                             }
 
                             chunks
@@ -115,18 +107,7 @@ class ChunkTranscriptionSpec :
                                 .single()
                                 .status
                                 .shouldBe(ChunkStatus.DONE)
-                            segments.findByTask(taskId).shouldBe(
-                                listOf(
-                                    Segment(
-                                        chunkIdx = 1,
-                                        seq = 0,
-                                        startMs = 30_000L,
-                                        endMs = 37_940L,
-                                        text = " And so my fellow Americans",
-                                        speaker = null,
-                                    ),
-                                ),
-                            )
+                            segments.findByTask(taskId).shouldBe(listOf(CHUNK_1_SEGMENT))
                             // The JSON was deletable and is gone; the FLAC directory stays as a leftover.
                             Files.exists(json).shouldBeFalse()
                             Files.exists(flacDir).shouldBeTrue()
@@ -140,3 +121,10 @@ class ChunkTranscriptionSpec :
             }
         }
     })
+
+/** Inserts a queued task whose plan is [CHUNK_1]; returns the task id. */
+private suspend fun insertTaskPlanningChunk1(db: Database): Long {
+    val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
+    ChunkRepository(db).insertAll(taskId, listOf(CHUNK_1))
+    return taskId
+}
