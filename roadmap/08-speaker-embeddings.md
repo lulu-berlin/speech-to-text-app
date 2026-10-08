@@ -70,7 +70,6 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - Windowing tests cover every branch of oracle `embed_windows` listed above.
 - Tagged `Integration` test with the real CAM++ model (`$STT_SPEAKER_MODEL`, sha256 from ADR 0003) shows same-speaker cosine > different-speaker cosine on the LibriSpeech fixture clips.
 - `backend/deps.json` regenerated for ONNX Runtime and `nix build .` green, verified by the user.
-- The ONNX session is created once per application run.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
@@ -81,3 +80,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-07: discovered test item confirmed: loading configuration fails naming `STT_SPEAKER_MODEL` when it is unset or empty, and carries its path when set (presence only; a wrong path fails when the session is created). Done before the `Integration` metadata item, which reads the path through `Config`.
 - 2026-10-07: discovered test item confirmed: `sample_rate` and `normalize_samples` missing or not an integer are rejected like `output_dim` (sherpa-onnx requires all four metadata keys); widened to also reject a missing `feature_normalize_type`.
 - 2026-10-08: Kaldi reference for the discovered fbank item supplied by the user: kaldi-native-fbank (the front-end sherpa-onnx uses for this CAM++ export) with the ADR 0003 options, run outside the repository on 1600 integer samples `floor(8000 sin(2π·440n/16000) + 4000 sin(2π·3000n/16000) + 0.5)` (checksums: sum 0, sum of absolute values 8674848); frames 0, 5 and 9 (all 80 bins) committed as literals, tolerance 1e-3. The test passed on its first run (the front-end from items 1–4 already matched); its ability to fail was checked with two uncommitted mutations of `fbank` (power × 1.01 → frame 0 bin 0 off by ln 1.01; edge clamping instead of reflection → frame 0 bin 0 off by 1.37).
+- 2026-10-08: acceptance criterion "The ONNX session is created once per application run" moved to item 11: nothing in item 08 creates the application-wide `SpeakerModel`; the engine (item 11) is where it is wired. Item 08 keeps one session per `Embeddings` instance, reused for every window and call.
