@@ -69,6 +69,7 @@ Seed — to be refined and approved with the user before any test is written:
 - Engine tests run under `runTest` with fake runner/transcriber/diarizer cover ordering, reorder mid-run, pause/resume, cancel, restart recovery, and the failure path.
 - No `Thread`, `ExecutorService`, `CompletableFuture`, or polling loop in the engine; blocking calls only inside `withContext(Dispatchers.IO)`.
 - A tagged `Integration` test runs one short fixture clip end-to-end through real ffmpeg + whisper-cli + diarization to COMPLETED with segments stored.
+- The CAM++ ONNX session (`SpeakerModel`, item 08) is created once per application run and reused for every task (moved from item 08, 2026-10-08).
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
