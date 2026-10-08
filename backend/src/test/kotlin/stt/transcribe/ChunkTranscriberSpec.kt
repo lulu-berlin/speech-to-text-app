@@ -99,4 +99,35 @@ class ChunkTranscriberSpec :
                 }
             }
         }
+
+        given("a whisper-cli that writes legacy `segments` JSON whose entry lacks `start`, `end` or `text`") {
+            `when`("a chunk is transcribed") {
+                then("the chunk fails as malformed JSON naming the file, with the full stderr") {
+                    val workDir = tempdir("stt-transcribe").toPath()
+                    val prefix = workDir.resolve("chunk-2")
+                    val json = workDir.resolve("chunk-2.json")
+                    val saving = listOf("output_json: saving output to '$json'")
+                    val lackingOneKey =
+                        listOf(
+                            """{"segments": [{"end": 7.94, "text": " And so my fellow Americans"}]}""",
+                            """{"segments": [{"start": 0.0, "text": " And so my fellow Americans"}]}""",
+                            """{"segments": [{"start": 0.0, "end": 7.94}]}""",
+                        )
+
+                    for (output in lackingOneKey) {
+                        val whisperCli = fakeWhisperCli(workDir, saving, exitCode = 0, writes = json to output)
+                        val error =
+                            shouldThrow<TranscriptionException> {
+                                withTimeout(30.seconds) {
+                                    ChunkTranscriber(ProcessRunner(), whisperCli.toString())
+                                        .transcribe(TEST_SETTINGS, workDir.resolve("chunk-2.flac"), prefix, prompt = null)
+                                }
+                            }
+                        error.message.shouldContain("malformed")
+                        error.message.shouldContain(json.toString())
+                        error.message.shouldContain(saving.joinToString("\n"))
+                    }
+                }
+            }
+        }
     })

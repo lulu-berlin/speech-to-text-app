@@ -40,7 +40,7 @@ class ChunkTranscriber internal constructor(
         try {
             return parseSegments(output)
         } catch (e: IllegalArgumentException) {
-            // kotlinx.serialization's parse errors and a non-object top level are both IllegalArgumentException.
+            // parseSegments reports malformed output (parse errors, wrong shapes, missing legacy keys) as IllegalArgumentException.
             throw TranscriptionException("whisper-cli JSON output $json is malformed (${e.message}):\n$stderr")
         }
     }
