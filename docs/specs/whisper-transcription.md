@@ -1,7 +1,7 @@
-# 07 — Whisper transcription
+# Whisper transcription
 
-Status: in-review
-Depends on: [03](../docs/specs/database-schema.md) (done), [06](../docs/specs/audio-decoding-and-chunking.md) (done)
+Status: done (roadmap item 07, merged 2026-10-08)
+Depends on: [03 — database schema](database-schema.md), [06 — audio decoding and chunking](audio-decoding-and-chunking.md)
 
 ## Goal
 
@@ -9,10 +9,10 @@ Transcribe each planned chunk with one whisper-cli run, turn its JSON output int
 
 ## Already decided
 
-- [ADR 0004 — Chunked transcription with SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): one whisper-cli run per chunk; segments persisted per chunk; previous chunk's trailing text passed via `--prompt`.
-- [ADR 0008 — Default whisper model](../docs/decisions/0008-default-whisper-model.md): `large-v3-turbo-q5_0`, provided via `STT_WHISPER_MODEL`.
-- [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): command construction and JSON parsing are ported from `docs/oracle/transcribe.py`.
-- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): chunks are stored as FLAC (16-bit, 16 kHz mono); item 11 writes each chunk's FLAC from the database to a file for whisper-cli, which reads FLAC (`whisper-cli --help` 1.9.2: `supported audio formats: flac, mp3, ogg, wav`).
+- [ADR 0004 — Chunked transcription with SIGSTOP pause](../decisions/0004-chunked-transcription-sigstop-pause.md): one whisper-cli run per chunk; segments persisted per chunk; previous chunk's trailing text passed via `--prompt`.
+- [ADR 0008 — Default whisper model](../decisions/0008-default-whisper-model.md): `large-v3-turbo-q5_0`, provided via `STT_WHISPER_MODEL`.
+- [ADR 0002 — No Python, oracle only](../decisions/0002-no-python-oracle-only.md): command construction and JSON parsing are ported from `docs/oracle/transcribe.py`.
+- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): chunks are stored as FLAC (16-bit, 16 kHz mono); item 11 writes each chunk's FLAC from the database to a file for whisper-cli, which reads FLAC (`whisper-cli --help` 1.9.2: `supported audio formats: flac, mp3, ogg, wav`).
 
 ## Proposal (approved 2026-10-07)
 
@@ -41,7 +41,7 @@ Transcribe each planned chunk with one whisper-cli run, turn its JSON output int
 - Prompt tail length? → **The last ~200 characters of the previous chunk's text, cut at a word boundary.**
 - Fixture model for integration tests? → **`ggml-tiny.en`, fetched by hash via `nix/models.nix`.**
 - Fixture speech clip? → **whisper.cpp's `samples/jfk.wav`, fetched by hash** (public domain).
-- ~~Persisting segments and chunk status needs item 03's tables: add 03 as a dependency?~~ Resolved by [ADR 0019](../docs/decisions/0019-schema-ownership-and-evolution.md): item 03 owns `chunks`/`segments` and their repositories; 03 is now in `Depends on`. Note for the one-transaction persistence in the Proposal: item 03's repositories each run their own transaction (`ChunkRepository.insertAll`, `SegmentRepository.insertAll`) and offer no "mark chunk DONE + insert its segments" operation yet; this item adds it.
+- ~~Persisting segments and chunk status needs item 03's tables: add 03 as a dependency?~~ Resolved by [ADR 0019](../decisions/0019-schema-ownership-and-evolution.md): item 03 owns `chunks`/`segments` and their repositories; 03 is now in `Depends on`. Note for the one-transaction persistence in the Proposal: item 03's repositories each run their own transaction (`ChunkRepository.insertAll`, `SegmentRepository.insertAll`) and offer no "mark chunk DONE + insert its segments" operation yet; this item adds it.
 - Delete whisper-cli's output JSON and the chunk FLAC right after the chunk is persisted? → **Yes, right after the transaction commits.**
 
 ## Test list (written with the user; Canon TDD step 1)
@@ -100,3 +100,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-08 (review round 2, after cycle 1): refactor approved and done: `ChunkTranscriberSpec` shares one `transcribeFailing` helper between the missing/malformed and legacy-key tests.
 - 2026-10-08 (review round 2 cycle 2, finding 3): red — `gradle test --tests 'stt.transcribe.PromptTailSpec'`: 2 tests, 1 failed at `PromptTailSpec.kt:40` (tab case): the prompt was 179 characters (18 words) instead of the 189 (19 words) derived by hand, one whole word too many dropped. Green: the partial word is dropped up to the first whitespace character; `gradle check` (91 unit tests) and full `gradle integrationTest` (35 run, incl. `JfkIntegrationSpec`) green.
 - 2026-10-08 (review round 2, after cycle 2, user approvals): refactor done: `PromptTailSpec` shares one `NINETEEN_WORDS` fixture. Finding 2 wording approved and committed as a refactor: the fixture comment says "item 07", and an unset variable fails with "Integration test needs <name> set: enter the devenv shell that exports it, or pass it explicitly (see workspaces/README.md § Environment for workspace agents)" (seen with both variables unset: `JfkIntegrationSpec` failed naming `TEST_WHISPER_TINY_EN_MODEL`). Finding 4 wording approved: AGENTS.md § Commands documents `STT_DEVICE` and `STT_THREADS` on the `gradle run` line; item 08 resolves its own edit of that line when it rebases.
+- 2026-10-08 (review round 3): no new findings. Reviewer re-ran `gradle check --rerun-tasks` (91/91) and `gradle integrationTest --rerun` (35/35, incl. `JfkIntegrationSpec` with the `TEST_*` fixtures passed explicitly from the root sandbox). User approved the diff. No Gradle dependencies changed; the Nix fixtures (`nix/models.nix` `whisperTinyEn`, `nix/test-fixtures.nix`) were verified by the user in session 3. Fast-forward merged into `main` (head `2306170`).

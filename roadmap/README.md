@@ -22,7 +22,7 @@ graph TD
   02 --> 05[05 process runner ✓]:::done
   05 --> 06[06 audio decoding and chunking ✓]:::done
   03 --> 06
-  06 --> 07[07 whisper transcription]
+  06 --> 07[07 whisper transcription ✓]:::done
   03 --> 07
   06 --> 08[08 speaker embeddings]
   08 --> 09[09 diarization]
@@ -56,7 +56,7 @@ graph TD
 | [04 — Queue domain model](../docs/specs/queue-domain-model.md) | done | 03 |
 | [05 — Process runner](../docs/specs/process-runner.md) | done | 02 |
 | [06 — Audio decoding and chunking](../docs/specs/audio-decoding-and-chunking.md) | done | 03, 05 |
-| [07 — Whisper transcription](07-whisper-transcription.md) | spec-approved | 03, 06 |
+| [07 — Whisper transcription](../docs/specs/whisper-transcription.md) | done | 03, 06 |
 | [08 — Speaker embeddings](08-speaker-embeddings.md) | spec-approved | 06 |
 | [09 — Diarization](09-diarization.md) | draft | 08 |
 | [10 — Output formats](10-output-formats.md) | draft | 09 |
