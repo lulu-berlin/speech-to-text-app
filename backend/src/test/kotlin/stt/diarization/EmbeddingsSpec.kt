@@ -1,17 +1,28 @@
 package stt.diarization
 
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.floats.plusOrMinus
+import io.kotest.matchers.floats.shouldBeGreaterThan
 import io.kotest.matchers.floats.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import stt.Integration
+import stt.audio.AudioDecoder
 import stt.config.realSpeakerModelPath
 import stt.db.Segment
+import stt.process.ProcessRunner
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class EmbeddingsSpec :
     BehaviorSpec({
@@ -96,9 +107,63 @@ class EmbeddingsSpec :
                 }
             }
         }
+        given("three LibriSpeech test-clean clips: two of speaker 1089 from different chapters, one of speaker 1188") {
+            `when`("each whole clip is embedded") {
+                then("the two clips of speaker 1089 are more similar to each other than either is to the clip of speaker 1188") {
+                    // Spec (item 08 acceptance): same-speaker cosine > different-speaker cosine. Embeddings are
+                    // L2-normalized, so the cosine is the dot product. Clips: docs/attributions.md (CC BY 4.0).
+                    val clips = librispeechClips()
+                    val workDir = tempdir("librispeech").toPath()
+                    SpeakerModel.load(realSpeakerModelPath()).use { model ->
+                        val embedder = Embeddings(model)
+                        val (speakerA1, speakerA2, speakerB) =
+                            listOf("1089-134686-0002", "1089-134691-0023", "1188-133604-0025").map { id ->
+                                val pcm = decodePcm(clips.resolve("$id.flac"), workDir.resolve("$id.f32"))
+                                embedder.embed(pcm, listOf(segment(0, pcm.size / 16L)))[0]
+                            }
+
+                        val same = dot(speakerA1, speakerA2)
+                        val different = listOf(dot(speakerA1, speakerB), dot(speakerA2, speakerB))
+
+                        withClue("same-speaker cosine $same, different-speaker cosines $different") {
+                            different.forEach { same.shouldBeGreaterThan(it) }
+                        }
+                    }
+                }
+            }
+        }
     })
 
 private fun segment(
     startMs: Long,
     endMs: Long,
 ): Segment = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speaker = null)
+
+private fun dot(
+    a: FloatArray,
+    b: FloatArray,
+): Float = a.indices.map { a[it] * b[it] }.sum()
+
+/** Decodes [source] with the app's decoder (mono 16 kHz float32, as item 11 feeds the embedder) into [pcm] and reads it. */
+private suspend fun decodePcm(
+    source: Path,
+    pcm: Path,
+): FloatArray {
+    withTimeout(30.seconds) { AudioDecoder(ProcessRunner()).decode(source, pcm) }
+    val floats = ByteBuffer.wrap(Files.readAllBytes(pcm)).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
+    return FloatArray(floats.remaining()) { floats.get(it) }
+}
+
+/**
+ * The item 08 LibriSpeech clips directory (`<utterance-id>.flac`), exported by `devenv.nix` from `nix/test-fixtures.nix`.
+ * A missing variable fails the test naming it, so the failure says how to fix the environment.
+ */
+private fun librispeechClips(): Path {
+    val value =
+        System.getenv("TEST_LIBRISPEECH_CLIPS")
+            ?: throw IllegalStateException(
+                "Integration test needs TEST_LIBRISPEECH_CLIPS set: enter the devenv shell that exports it, or pass it " +
+                    "explicitly (see workspaces/README.md § Environment for workspace agents)",
+            )
+    return Path.of(value)
+}
