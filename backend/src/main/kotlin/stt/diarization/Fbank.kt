@@ -32,7 +32,7 @@ private val FFT = Fft(FFT_SIZE)
  * - per frame: subtract the mean, pre-emphasize `x[i] -= 0.97 * x[i - 1]` (and `x[0] -= 0.97 * x[0]`), multiply by the
  *   povey window, FFT, power spectrum `|X[k]|^2` for `k = 0 .. FFT_SIZE / 2`, mel filterbank, floor at [LOG_FLOOR], log.
  */
-fun fbank(samples: FloatArray): Array<FloatArray> {
+internal fun fbank(samples: FloatArray): Array<FloatArray> {
     val frameCount = (samples.size + FRAME_SHIFT / 2) / FRAME_SHIFT
     val re = FloatArray(FFT_SIZE)
     val im = FloatArray(FFT_SIZE)
