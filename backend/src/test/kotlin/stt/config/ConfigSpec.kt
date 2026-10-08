@@ -6,16 +6,13 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import java.nio.file.Path
 
-/** The variables every configuration needs; each scenario adds or removes the one it is about. */
-private val REQUIRED_ENV = mapOf("STT_DATA_DIR" to TEST_DATA_DIR, "STT_SPEAKER_MODEL" to TEST_SPEAKER_MODEL)
-
 class ConfigSpec :
     BehaviorSpec({
 
         given("an environment without STT_PORT") {
             `when`("loading configuration") {
                 then("the port defaults to 8080") {
-                    Config.fromEnv(REQUIRED_ENV).port.shouldBe(8080)
+                    Config.fromEnv(TEST_REQUIRED_ENV).port.shouldBe(8080)
                 }
             }
         }
@@ -25,7 +22,7 @@ class ConfigSpec :
                 then("it fails with an error naming STT_PORT and the bad value") {
                     val error =
                         shouldThrow<IllegalArgumentException> {
-                            Config.fromEnv(REQUIRED_ENV + ("STT_PORT" to "abc"))
+                            Config.fromEnv(TEST_REQUIRED_ENV + ("STT_PORT" to "abc"))
                         }
                     error.message.shouldContain("STT_PORT")
                     error.message.shouldContain("abc")
@@ -39,13 +36,13 @@ class ConfigSpec :
                     for (bad in listOf("0", "70000")) {
                         val error =
                             shouldThrow<IllegalArgumentException> {
-                                Config.fromEnv(REQUIRED_ENV + ("STT_PORT" to bad))
+                                Config.fromEnv(TEST_REQUIRED_ENV + ("STT_PORT" to bad))
                             }
                         error.message.shouldContain("STT_PORT")
                         error.message.shouldContain(bad)
                     }
                     for (good in listOf("1", "65535")) {
-                        Config.fromEnv(REQUIRED_ENV + ("STT_PORT" to good)).port.shouldBe(good.toInt())
+                        Config.fromEnv(TEST_REQUIRED_ENV + ("STT_PORT" to good)).port.shouldBe(good.toInt())
                     }
                 }
             }
@@ -54,7 +51,7 @@ class ConfigSpec :
         given("an environment with STT_DATA_DIR unset or empty") {
             `when`("loading configuration") {
                 then("it fails with an error naming STT_DATA_DIR") {
-                    for (env in listOf(REQUIRED_ENV - "STT_DATA_DIR", REQUIRED_ENV + ("STT_DATA_DIR" to ""))) {
+                    for (env in listOf(TEST_REQUIRED_ENV - "STT_DATA_DIR", TEST_REQUIRED_ENV + ("STT_DATA_DIR" to ""))) {
                         val error =
                             shouldThrow<IllegalArgumentException> {
                                 Config.fromEnv(env)
@@ -68,7 +65,7 @@ class ConfigSpec :
         given("an environment with STT_SPEAKER_MODEL unset, empty, or set") {
             `when`("loading configuration") {
                 then("unset or empty fails with an error naming STT_SPEAKER_MODEL; a set path is part of the configuration") {
-                    for (env in listOf(REQUIRED_ENV - "STT_SPEAKER_MODEL", REQUIRED_ENV + ("STT_SPEAKER_MODEL" to ""))) {
+                    for (env in listOf(TEST_REQUIRED_ENV - "STT_SPEAKER_MODEL", TEST_REQUIRED_ENV + ("STT_SPEAKER_MODEL" to ""))) {
                         val error =
                             shouldThrow<IllegalArgumentException> {
                                 Config.fromEnv(env)
@@ -76,7 +73,7 @@ class ConfigSpec :
                         error.message.shouldContain("STT_SPEAKER_MODEL")
                     }
                     Config
-                        .fromEnv(REQUIRED_ENV + ("STT_SPEAKER_MODEL" to "/models/campplus.onnx"))
+                        .fromEnv(TEST_REQUIRED_ENV + ("STT_SPEAKER_MODEL" to "/models/campplus.onnx"))
                         .speakerModel
                         .shouldBe(Path.of("/models/campplus.onnx"))
                 }
