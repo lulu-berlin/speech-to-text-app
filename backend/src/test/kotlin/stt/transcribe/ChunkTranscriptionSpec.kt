@@ -9,17 +9,20 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.withTimeout
 import stt.Integration
+import stt.audio.PlannedChunk
 import stt.db.Chunk
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.Database
 import stt.db.Segment
 import stt.db.SegmentRepository
-import stt.db.TaskRepository
+import stt.db.exportedChunks
 import stt.db.queuedTask
+import stt.db.taskRepository
 import stt.process.ProcessRunner
 import stt.withCapturedWarnings
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
 
 /** Chunk 1 of a task's plan, covering 30–60 s of the source. */
@@ -40,10 +43,11 @@ class ChunkTranscriptionSpec :
             `when`("chunk 1 of the task is transcribed") {
                 then("each -pp progress line is reported as the chunk fraction, then the chunk is persisted and its files deleted") {
                     val workDir = tempdir("stt-transcribe").toPath()
-                    Database.open(tempdir("stt-db").toPath()).use { db ->
+                    val dataDir = tempdir("stt-db").toPath()
+                    Database.open(dataDir).use { db ->
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
-                        val taskId = insertTaskPlanningChunk1(db)
+                        val taskId = insertTaskPlanningChunk1(db, dataDir)
 
                         val flac = Files.writeString(workDir.resolve("chunk-1.flac"), "placeholder: the stand-in never reads it")
                         val prefix = workDir.resolve("chunk-1")
@@ -67,11 +71,7 @@ class ChunkTranscriptionSpec :
                         reported.shouldBe(listOf(0.27, 1.0))
                         Files.exists(flac).shouldBeFalse()
                         Files.exists(json).shouldBeFalse()
-                        chunks
-                            .findByTask(taskId)
-                            .single()
-                            .status
-                            .shouldBe(ChunkStatus.DONE)
+                        chunks.findByTask(taskId).map { it.status }.shouldBe(listOf(ChunkStatus.PENDING, ChunkStatus.DONE))
                         segments.findByTask(taskId).shouldBe(listOf(CHUNK_1_SEGMENT))
                     }
                 }
@@ -82,10 +82,11 @@ class ChunkTranscriptionSpec :
             `when`("chunk 1 of the task is transcribed") {
                 then("the chunk is stored DONE with its segments despite the failed delete, and the failure is logged as a warning") {
                     val workDir = tempdir("stt-transcribe").toPath()
-                    Database.open(tempdir("stt-db").toPath()).use { db ->
+                    val dataDir = tempdir("stt-db").toPath()
+                    Database.open(dataDir).use { db ->
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
-                        val taskId = insertTaskPlanningChunk1(db)
+                        val taskId = insertTaskPlanningChunk1(db, dataDir)
 
                         // A non-empty directory: Files.delete throws DirectoryNotEmptyException even when the tests run as root,
                         // unlike permission errors, which root bypasses.
@@ -102,11 +103,7 @@ class ChunkTranscriptionSpec :
                                 transcription.transcribe(taskId, CHUNK_1, TEST_SETTINGS, flacDir, prefix, prompt = null)
                             }
 
-                            chunks
-                                .findByTask(taskId)
-                                .single()
-                                .status
-                                .shouldBe(ChunkStatus.DONE)
+                            chunks.findByTask(taskId).map { it.status }.shouldBe(listOf(ChunkStatus.PENDING, ChunkStatus.DONE))
                             segments.findByTask(taskId).shouldBe(listOf(CHUNK_1_SEGMENT))
                             // The JSON was deletable and is gone; the FLAC directory stays as a leftover.
                             Files.exists(json).shouldBeFalse()
@@ -122,9 +119,13 @@ class ChunkTranscriptionSpec :
         }
     })
 
-/** Inserts a queued task whose plan is [CHUNK_1]; returns the task id. */
-private suspend fun insertTaskPlanningChunk1(db: Database): Long {
-    val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
-    ChunkRepository(db).insertAll(taskId, listOf(CHUNK_1))
+/** Inserts a queued task with a stored plan of chunk 0 (0–30 s) and [CHUNK_1], both PENDING; returns the task id. */
+private suspend fun insertTaskPlanningChunk1(
+    db: Database,
+    dataDir: Path,
+): Long {
+    val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
+    val plan = exportedChunks(dataDir, "talk", PlannedChunk(0L, 30_000L), PlannedChunk(CHUNK_1.startMs, CHUNK_1.endMs))
+    ChunkRepository(db).storePlan(taskId, plan)
     return taskId
 }
