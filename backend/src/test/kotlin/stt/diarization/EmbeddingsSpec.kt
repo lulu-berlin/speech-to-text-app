@@ -7,8 +7,7 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import stt.Integration
-import stt.config.Config
-import stt.config.TEST_DATA_DIR
+import stt.config.realSpeakerModelPath
 import stt.db.Segment
 import kotlin.math.PI
 import kotlin.math.sin
@@ -22,8 +21,7 @@ class EmbeddingsSpec :
             `when`("embedding") {
                 then("every segment gets an all-zero embedding of the model's output dim, in segment order") {
                     // Oracle embed_windows: total <= 0 -> np.zeros((len(segments), 192)).
-                    val path = Config.fromEnv(System.getenv() + ("STT_DATA_DIR" to TEST_DATA_DIR)).speakerModel
-                    SpeakerModel.load(path).use { model ->
+                    SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val segments = listOf(segment(0, 100), segment(4000, 4500), segment(9000, 10_000))
 
                         val embeddings = Embeddings(model).embed(FloatArray(0), segments)
@@ -42,7 +40,6 @@ class EmbeddingsSpec :
                 then("each position in the result holds the embedding of the matching segment, in order") {
                     // Ported windows stay in segment order: a length-sorting batching (as in oracle embed_windows)
                     // would reorder these three segments, whose window lengths differ (1200 ms, 1800 ms, 1200 ms).
-                    val path = Config.fromEnv(System.getenv() + ("STT_DATA_DIR" to TEST_DATA_DIR)).speakerModel
                     val pcm = FloatArray(192_000) // 12 s
                     val tone = { frequency: Double, fromMs: Long, toMs: Long ->
                         for (i in (fromMs * 16) until (toMs * 16)) pcm[i.toInt()] = (0.05 * sin(2 * PI * frequency * i / 16_000)).toFloat()
@@ -51,7 +48,7 @@ class EmbeddingsSpec :
                     tone(3000.0, 3000, 4800)
                     tone(440.0, 10_000, 11_200)
 
-                    SpeakerModel.load(path).use { model ->
+                    SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
                         val segments = listOf(segment(0, 1200), segment(3000, 4800), segment(10_000, 11_200))
 
@@ -78,9 +75,8 @@ class EmbeddingsSpec :
             `when`("pausing after the first window") {
                 then("embedding suspends between windows and resumes with the next window") {
                     // ADR 0004: in-JVM phases pause cooperatively through a pause gate checked between windows.
-                    val path = Config.fromEnv(System.getenv() + ("STT_DATA_DIR" to TEST_DATA_DIR)).speakerModel
                     val pcm = FloatArray(64_000) { i -> (0.05 * sin(2 * PI * 440 * i / 16_000)).toFloat() }
-                    SpeakerModel.load(path).use { model ->
+                    SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
                         val gate = PauseGate()
                         val job =
