@@ -2,6 +2,7 @@ package stt.transcribe
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -13,7 +14,7 @@ import kotlin.math.roundToLong
  * Parses whisper-cli `-oj` output into segments (port of oracle `parse_segments`).
  * whisper.cpp >= 1.7 writes a `transcription` array whose `offsets` are milliseconds; older versions
  * write a `segments` array with `start`/`end` in seconds (rounded to the millisecond here), which
- * takes precedence when present.
+ * takes precedence when present. Malformed output throws [IllegalArgumentException].
  */
 fun parseSegments(json: String): List<WhisperSegment> {
     val root = Json.parseToJsonElement(json).jsonObject
@@ -33,11 +34,15 @@ private fun parseTranscriptionSegment(segment: JsonObject): WhisperSegment {
     )
 }
 
+/** No defaults, unlike [parseTranscriptionSegment]: the oracle passes legacy entries through and fails later on a missing key. */
 private fun parseLegacySegment(segment: JsonObject): WhisperSegment =
     WhisperSegment(
-        startMs = secondsToMs(segment.getValue("start").jsonPrimitive.double),
-        endMs = secondsToMs(segment.getValue("end").jsonPrimitive.double),
-        text = segment.getValue("text").jsonPrimitive.content,
+        startMs = secondsToMs(segment.legacyField("start").double),
+        endMs = secondsToMs(segment.legacyField("end").double),
+        text = segment.legacyField("text").content,
     )
+
+private fun JsonObject.legacyField(key: String): JsonPrimitive =
+    requireNotNull(this[key]) { "a legacy segments entry lacks \"$key\"" }.jsonPrimitive
 
 private fun secondsToMs(seconds: Double): Long = (seconds * 1000).roundToLong()
