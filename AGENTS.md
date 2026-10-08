@@ -69,7 +69,7 @@ Backend (Gradle 8.14 via devenv, no wrapper — ADR 0014):
 - `gradle test` — unit tests only.
 - `gradle integrationTest` — Integration-tagged tests only (real processes; needs `setsid` from util-linux — ADR 0020/0021).
 - `gradle ktlintFormat` — auto-format Kotlin sources.
-- `gradle run` — start the server. `STT_DATA_DIR` is required (data directory holding `stt.db`, created when missing; startup fails without it — ADR 0017), e.g. `STT_DATA_DIR=/tmp/stt gradle run`. Port `STT_PORT`, default 8080; set `STT_STATIC_DIR` to a built frontend to serve the UI.
+- `gradle run` — start the server. `STT_DATA_DIR` is required (data directory holding `stt.db`, created when missing; startup fails without it — ADR 0017), e.g. `STT_DATA_DIR=/tmp/stt gradle run`. Port `STT_PORT`, default 8080; set `STT_STATIC_DIR` to a built frontend to serve the UI. Whisper: `STT_DEVICE` = `auto` (default) | `cpu` | `gpu` | a GPU index >= 0; `STT_THREADS` = an integer >= 1, unset leaves whisper-cli's default; an invalid value of either stops startup.
 
 Frontend (pnpm — ADR 0012):
 
