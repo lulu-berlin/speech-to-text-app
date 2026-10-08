@@ -45,8 +45,7 @@ class ChunkTranscription(
             Files.delete(file)
         } catch (e: IOException) {
             logger.warn(
-                "Could not delete transcription work file {} (at {}); it will be removed with the work directory at a terminal task status: {}",
-                file.fileName,
+                "Could not delete work file {}; it is removed with the work directory at a terminal task status: {}",
                 file,
                 e.toString(),
             )
