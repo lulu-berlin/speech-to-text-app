@@ -67,16 +67,7 @@ class ChunkTranscriberSpec :
             `when`("a chunk is transcribed") {
                 then("the chunk fails with a clear message naming the JSON file, with the full stderr") {
                     val workDir = tempdir("stt-transcribe").toPath()
-                    val prefix = workDir.resolve("chunk-2")
                     val json = workDir.resolve("chunk-2.json")
-
-                    suspend fun transcribe(whisperCli: Path) =
-                        shouldThrow<TranscriptionException> {
-                            withTimeout(30.seconds) {
-                                ChunkTranscriber(ProcessRunner(), whisperCli.toString())
-                                    .transcribe(TEST_SETTINGS, workDir.resolve("chunk-2.flac"), prefix, prompt = null)
-                            }
-                        }
 
                     // whisper-cli 1.9.2 on a file that is not audio: exit 0, no JSON, the reason only in stderr.
                     val unreadable =
@@ -86,13 +77,13 @@ class ChunkTranscriberSpec :
                             "read_audio_data: failed to ffmpeg decode",
                             "error: failed to read audio file 'chunk-2.flac'",
                         )
-                    val missing = transcribe(fakeWhisperCli(workDir, unreadable, exitCode = 0))
+                    val missing = transcribeFailing(fakeWhisperCli(workDir, unreadable, exitCode = 0), workDir)
                     missing.message.shouldContain("missing")
                     missing.message.shouldContain(json.toString())
                     missing.message.shouldContain(unreadable.joinToString("\n"))
 
                     val saving = listOf("output_json: saving output to '$json'")
-                    val malformed = transcribe(fakeWhisperCli(workDir, saving, exitCode = 0, writes = json to "{not json"))
+                    val malformed = transcribeFailing(fakeWhisperCli(workDir, saving, exitCode = 0, writes = json to "{not json"), workDir)
                     malformed.message.shouldContain("malformed")
                     malformed.message.shouldContain(json.toString())
                     malformed.message.shouldContain(saving.joinToString("\n"))
@@ -104,7 +95,6 @@ class ChunkTranscriberSpec :
             `when`("a chunk is transcribed") {
                 then("the chunk fails as malformed JSON naming the file, with the full stderr") {
                     val workDir = tempdir("stt-transcribe").toPath()
-                    val prefix = workDir.resolve("chunk-2")
                     val json = workDir.resolve("chunk-2.json")
                     val saving = listOf("output_json: saving output to '$json'")
                     val lackingOneKey =
@@ -116,13 +106,7 @@ class ChunkTranscriberSpec :
 
                     for (output in lackingOneKey) {
                         val whisperCli = fakeWhisperCli(workDir, saving, exitCode = 0, writes = json to output)
-                        val error =
-                            shouldThrow<TranscriptionException> {
-                                withTimeout(30.seconds) {
-                                    ChunkTranscriber(ProcessRunner(), whisperCli.toString())
-                                        .transcribe(TEST_SETTINGS, workDir.resolve("chunk-2.flac"), prefix, prompt = null)
-                                }
-                            }
+                        val error = transcribeFailing(whisperCli, workDir)
                         error.message.shouldContain("malformed")
                         error.message.shouldContain(json.toString())
                         error.message.shouldContain(saving.joinToString("\n"))
@@ -131,3 +115,15 @@ class ChunkTranscriberSpec :
             }
         }
     })
+
+/** Transcribes `chunk-2.flac` in [workDir] with [whisperCli] and returns the [TranscriptionException] it must fail with. */
+private suspend fun transcribeFailing(
+    whisperCli: Path,
+    workDir: Path,
+): TranscriptionException =
+    shouldThrow<TranscriptionException> {
+        withTimeout(30.seconds) {
+            ChunkTranscriber(ProcessRunner(), whisperCli.toString())
+                .transcribe(TEST_SETTINGS, workDir.resolve("chunk-2.flac"), workDir.resolve("chunk-2"), prompt = null)
+        }
+    }
