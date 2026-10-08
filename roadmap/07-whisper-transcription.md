@@ -1,6 +1,6 @@
 # 07 — Whisper transcription
 
-Status: in-progress
+Status: in-review
 Depends on: [03](../docs/specs/database-schema.md) (done), [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
@@ -99,3 +99,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-08 (review round 2 cycle 1, finding 1): red — `gradle integrationTest --tests 'stt.transcribe.ChunkTranscriberSpec'`: 3 tests, 1 failed, "Expected exception stt.transcribe.TranscriptionException but a NoSuchElementException was thrown instead". Green: a missing legacy key throws `IllegalArgumentException` ("a legacy segments entry lacks \"<key>\""), which `ChunkTranscriber` already reports as malformed JSON with the full stderr; `gradle check` (90 unit tests) and full `gradle integrationTest` (35 run, incl. `JfkIntegrationSpec`) green.
 - 2026-10-08 (review round 2, after cycle 1): refactor approved and done: `ChunkTranscriberSpec` shares one `transcribeFailing` helper between the missing/malformed and legacy-key tests.
 - 2026-10-08 (review round 2 cycle 2, finding 3): red — `gradle test --tests 'stt.transcribe.PromptTailSpec'`: 2 tests, 1 failed at `PromptTailSpec.kt:40` (tab case): the prompt was 179 characters (18 words) instead of the 189 (19 words) derived by hand, one whole word too many dropped. Green: the partial word is dropped up to the first whitespace character; `gradle check` (91 unit tests) and full `gradle integrationTest` (35 run, incl. `JfkIntegrationSpec`) green.
+- 2026-10-08 (review round 2, after cycle 2, user approvals): refactor done: `PromptTailSpec` shares one `NINETEEN_WORDS` fixture. Finding 2 wording approved and committed as a refactor: the fixture comment says "item 07", and an unset variable fails with "Integration test needs <name> set: enter the devenv shell that exports it, or pass it explicitly (see workspaces/README.md § Environment for workspace agents)" (seen with both variables unset: `JfkIntegrationSpec` failed naming `TEST_WHISPER_TINY_EN_MODEL`). Finding 4 wording approved: AGENTS.md § Commands documents `STT_DEVICE` and `STT_THREADS` on the `gradle run` line; item 08 resolves its own edit of that line when it rebases.
