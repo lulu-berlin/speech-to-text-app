@@ -11,60 +11,60 @@ import kotlin.math.sqrt
 internal const val SHORT_SEGMENT_MS = 500L
 
 /**
- * Speaker label (0-based) per segment of a task, in segment order (oracle `diarize_and_write`, minus the embedding
- * and the file writing). [embeddings] holds one L2-normalized row per segment; [k] = `null` is auto mode.
+ * The `speakerId` (0-based) of every segment of a task, in segment order (oracle `diarize_and_write`, minus the
+ * embedding and the file writing). [embeddings] holds one L2-normalized row per segment; [k] = `null` is auto mode.
  *
  * Only segments of at least [SHORT_SEGMENT_MS] are clustered, or all of them when none is that long; the others start
- * at label 0 and are then rescued to the nearest speaker (see [rescueShortSegments]).
+ * at speakerId 0 and are then rescued to the nearest speaker (see [rescueShortSegments]).
  */
-internal fun speakerLabels(
+internal fun speakerIds(
     segments: List<Segment>,
     embeddings: Array<FloatArray>,
     k: Int?,
     maxSpeakers: Int,
 ): List<Int> {
     val clustered = segments.indices.filter { segments[it].isLong() }.ifEmpty { segments.indices.toList() }
-    val labels = clusterSegments(Array(clustered.size) { embeddings[clustered[it]] }, k, maxSpeakers)
-    val speakers = IntArray(segments.size)
-    clustered.forEachIndexed { pos, row -> speakers[row] = labels[pos] }
-    rescueShortSegments(segments, speakers, embeddings)
-    return speakers.asList()
+    val clusteredSpeakerIds = clusterSegments(Array(clustered.size) { embeddings[clustered[it]] }, k, maxSpeakers)
+    val speakerIds = IntArray(segments.size)
+    clustered.forEachIndexed { pos, row -> speakerIds[row] = clusteredSpeakerIds[pos] }
+    rescueShortSegments(segments, speakerIds, embeddings)
+    return speakerIds.asList()
 }
 
 /**
  * Gives every segment shorter than [SHORT_SEGMENT_MS] the speaker whose centroid ([speakerCentroids] of the long
  * segments) is nearest to its own embedding, any speaker, not only its neighbours in time (oracle
  * `_rescue_short_segments`): the highest dot product among the non-zero centroids (the first on ties). Without long
- * segments, or without a non-zero centroid, labels stay as they are.
+ * segments, or without a non-zero centroid, speakerIds stay as they are.
  */
 private fun rescueShortSegments(
     segments: List<Segment>,
-    speakers: IntArray,
+    speakerIds: IntArray,
     embeddings: Array<FloatArray>,
 ) {
     val long = segments.indices.filter { segments[it].isLong() }
     if (long.isEmpty()) return
-    val centroids = speakerCentroids(long, speakers, embeddings)
+    val centroids = speakerCentroids(long, speakerIds, embeddings)
     val nonZero = centroids.indices.filter { c -> centroids[c].any { it != 0.0 } }
     if (nonZero.isEmpty()) return
     for (row in segments.indices) {
         if (segments[row].isLong()) continue
-        speakers[row] = nonZero.maxBy { c -> dot(embeddings[row], centroids[c]) }
+        speakerIds[row] = nonZero.maxBy { c -> dot(embeddings[row], centroids[c]) }
     }
 }
 
 /**
- * One centroid per speaker `0..max(speakers)`: the L2-normalized sum, in double, of the embeddings of the [rows]
- * labelled with that speaker; zero when there is none or the sum is zero.
+ * One centroid per speaker `0..max(speakerIds)`: the L2-normalized sum, in double, of the embeddings of the [rows]
+ * with that speakerId; zero when there is none or the sum is zero.
  */
 private fun speakerCentroids(
     rows: List<Int>,
-    speakers: IntArray,
+    speakerIds: IntArray,
     embeddings: Array<FloatArray>,
 ): Array<DoubleArray> {
-    val centroids = Array(speakers.max() + 1) { DoubleArray(embeddings[0].size) }
+    val centroids = Array(speakerIds.max() + 1) { DoubleArray(embeddings[0].size) }
     for (row in rows) {
-        val centroid = centroids[speakers[row]]
+        val centroid = centroids[speakerIds[row]]
         for (d in centroid.indices) centroid[d] += embeddings[row][d].toDouble()
     }
     for (centroid in centroids) {

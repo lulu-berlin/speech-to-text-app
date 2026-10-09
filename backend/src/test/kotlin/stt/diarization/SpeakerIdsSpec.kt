@@ -6,7 +6,7 @@ import io.kotest.matchers.shouldBe
 import stt.db.Segment
 import kotlin.math.sqrt
 
-class SpeakerLabelsSpec :
+class SpeakerIdsSpec :
     BehaviorSpec({
         given("a 499 ms segment and a 500 ms segment, each with a voice of its own, among two long-segment speakers") {
             `when`("the speakers are labelled in auto mode") {
@@ -37,7 +37,7 @@ class SpeakerLabelsSpec :
                     // clustered and keeps 0 (every centroid is orthogonal to it, so no centroid is nearer than the first).
                     // Clustering row 0 as well would give four speakers, [0, 1, 1, 2, 3, 3]; leaving row 3 out would give
                     // two, [0, 0, 0, 0, 1, 1].
-                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 0, 1, 2, 2))
+                    speakerIds(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 0, 1, 2, 2))
                 }
             }
         }
@@ -61,7 +61,7 @@ class SpeakerLabelsSpec :
                     // and 0.8 · 0.990 ≈ 0.792 with B, so it gets B = 1 (it would stay 0 without the rescue).
                     val embeddings = arrayOf(voiceA, floatArrayOf(0.6f, 0f, 0.8f, 0f), voiceA2, voiceB, voiceB2)
 
-                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 1, 0, 1, 1))
+                    speakerIds(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 1, 0, 1, 1))
                 }
             }
         }
@@ -81,7 +81,7 @@ class SpeakerLabelsSpec :
                         )
                     val embeddings = arrayOf(voiceA, voiceA2, voiceB, voiceB2)
 
-                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1))
+                    speakerIds(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1))
                 }
             }
         }
@@ -100,7 +100,7 @@ class SpeakerLabelsSpec :
                         )
                     val embeddings = Array(segments.size) { FloatArray(4) }
 
-                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1))
+                    speakerIds(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1))
                 }
             }
         }
@@ -136,7 +136,7 @@ class SpeakerLabelsSpec :
                             floatArrayOf(0f, 0f, 0f, 0f, 0.8f, 0.6f),
                         )
 
-                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1, 1, 2, 2))
+                    speakerIds(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1, 1, 2, 2))
                 }
             }
         }
