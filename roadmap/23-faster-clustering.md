@@ -1,6 +1,6 @@
 # 23 — Faster speaker clustering
 
-Status: draft
+Status: spec-approved
 Depends on: [09](../docs/specs/diarization.md) (done)
 
 ## Goal
@@ -14,7 +14,7 @@ Make speaker clustering fast and light enough for long recordings without changi
 - [ADR 0027](../docs/decisions/0027-auto-speaker-count-allows-one-speaker.md), [ADR 0032](../docs/decisions/0032-speaker-distance-threshold-for-campplus.md): the speaker-count rules and the threshold apply to the merge heights. They are unchanged by this item.
 - The distance stays `1 − a·b` computed in double on L2-normalized embeddings (item 09), whatever computes it.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Algorithm: nearest-neighbor chain** for average linkage (decided 2026-10-09):
   - finds the same merges at the same heights as the current search, because average linkage is reducible;
@@ -44,7 +44,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] The new merges equal item 09's hand-computed merge heights for the 4-point matrix
 - [ ] On inputs without equal distances, the labels equal the current clustering's for auto and fixed `k`
@@ -64,3 +64,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 - 2026-10-09: item created at the user's request (item 10/11 consultation): optimize clustering now, in parallel with item 11, and measure the accuracy impact.
 - 2026-10-09: consultation answers approved: switch only on identical labels apart from exact height ties (agreement recorded); the current `O(n³)` implementation moves into the test sources as a differential reference; a different tie order is accepted and documented; the measurement covers 1000/3000/5000 segments and all three variants; memory is cut to `O(n)` by computing distances on demand, with the time cost measured. Test list not yet approved.
+- 2026-10-09: test list (7 items) approved by the user; status `spec-approved`.
