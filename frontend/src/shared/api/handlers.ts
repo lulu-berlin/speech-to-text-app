@@ -14,7 +14,7 @@ import {
   queue as queueFixture,
   turns as turnsFixture,
   turnsSpeakersOff as turnsSpeakersOffFixture,
-  errorNotFound as errorFixture,
+  error as errorFixture,
   taskTransitions,
 } from './fixtures';
 
@@ -55,6 +55,10 @@ function taskById(id: number): Task | undefined {
 }
 
 export const handlers = [
+  // Upload: POST /api/tasks -> 201 Task (task.queued.json). The 409 duplicate-audio path
+  // (error.duplicate-audio.json) is exercised by a per-test override in client.test.ts.
+  http.post('/api/tasks', () => HttpResponse.json(taskQueuedFixture, { status: 201 })),
+
   // List tasks: GET /api/tasks (task-list.json).
   http.get('/api/tasks', () => HttpResponse.json(taskListFixture)),
 
