@@ -1,9 +1,11 @@
 package stt.diarization
 
+import ch.qos.logback.classic.Level
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import stt.db.Segment
+import stt.withCapturedLogs
 import kotlin.math.sqrt
 
 class SpeakerIdsSpec :
@@ -137,6 +139,61 @@ class SpeakerIdsSpec :
                         )
 
                     speakerIds(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1, 1, 2, 2))
+                }
+            }
+        }
+
+        given("speakers A (two long segments and a short one), B (two long segments) and C (one long segment)") {
+            `when`("the speakers are labelled in auto mode, once with the real summary and once with a failing one") {
+                then(
+                    "the summary logs each speaker's within-cosine and the cluster-to-cluster cosines; a failing summary is logged, not thrown",
+                ) {
+                    // Long rows A, A2, B, B2, C: dots A·A2 = 0.8, B·B2 = 0.96, A2·B2 = 0.6 · 0.28 = 0.168, all others 0.
+                    // Merges B pair at 0.04, A pair at 0.2, A-B at (1 + 1 + 1 + 0.832) / 4 = 0.958, then C at 1; gaps
+                    // 0.16, 0.758, 0.042, so k = 5 - (1 + 1) = 3: A = 0, B = 1, C = 2. The short row equals A and is
+                    // rescued to A, but the summary covers only the clustered rows.
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+                    val segments =
+                        listOf(
+                            segment(startMs = 0, endMs = 2_000), // A
+                            segment(startMs = 2_000, endMs = 2_300), // short, A
+                            segment(startMs = 2_300, endMs = 4_300), // A2
+                            segment(startMs = 4_300, endMs = 6_300), // B
+                            segment(startMs = 6_300, endMs = 8_300), // B2
+                            segment(startMs = 8_300, endMs = 10_300), // C
+                        )
+                    val embeddings =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f),
+                            floatArrayOf(1f, 0f, 0f, 0f),
+                            floatArrayOf(0.8f, 0.6f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f),
+                            floatArrayOf(0f, 0.28f, 0.96f, 0f),
+                            floatArrayOf(0f, 0f, 0f, 1f),
+                        )
+                    val expectedSpeakerIds = listOf(0, 0, 0, 1, 1, 2)
+
+                    // Within-cosine: mean off-diagonal dot, 1.0 for a single member. Cross: mean of all A-B dots
+                    // = 0.168 / 4 = 0.042; A-C and B-C are 0.
+                    withCapturedLogs("stt.diarization.SpeakerSummary", Level.INFO) { events ->
+                        speakerIds(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(expectedSpeakerIds)
+
+                        events.map { it.level to it.formattedMessage }.shouldBe(
+                            listOf(
+                                Level.INFO to "speaker 1: 2 segments, within-cos 0.800",
+                                Level.INFO to "speaker 2: 2 segments, within-cos 0.960",
+                                Level.INFO to "speaker 3: 1 segments, within-cos 1.000",
+                                Level.INFO to "cluster-to-cluster cosine: 1-2 0.042  1-3 0.000  2-3 0.000",
+                            ),
+                        )
+                    }
+
+                    withCapturedLogs("stt.diarization.SpeakerSummary") { events ->
+                        speakerIds(segments, embeddings, k = null, maxSpeakers = 8, summary = { _, _ -> error("boom") })
+                            .shouldBe(expectedSpeakerIds)
+
+                        events.map { it.level to it.throwableProxy?.message }.shouldBe(listOf(Level.WARN to "boom"))
+                    }
                 }
             }
         }
