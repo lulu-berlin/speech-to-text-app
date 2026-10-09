@@ -46,7 +46,7 @@ Expose the queue and the transcription history over a REST API for all commands 
   - The joined file is built once into `$STT_DATA_DIR/tmp/<task-id>.flac`: written under a temporary name and renamed, one build per task at a time.
   - It is served with HTTP Range support, so the browser can seek and item 15 can offer click-to-seek.
   - The cache is removed when the task is deleted, and at startup (`tmp/` is emptied when the database opens).
-  - A task without stored chunks (not chunked yet, or canceled or failed before chunking) → `404`.
+  - A task without stored chunks (not chunked yet, or canceled or failed before chunking) → `404`. The Task's `hasAudio` field tells the client in advance.
 - **Events.** `GET /api/events`, an SSE stream of the engine's `SharedFlow<Event>` (item 11).
   - On every connect the first event is `snapshot` (all tasks + queue); live events follow.
   - `task-updated` carries the full task, so applying any event twice is harmless and the client needs no refetch after reconnecting.
@@ -73,6 +73,7 @@ The JSON shapes the frontend builds against.
     - `maxSpeakers` (number)
     - `durationMs` (number, or null before chunking)
     - `sizeBytes` (number)
+    - `hasAudio` (boolean): whether the task has stored chunk FLACs, i.e. whether `GET /api/tasks/{id}/audio` serves audio (added 2026-10-09, item 15 consultation)
     - `transcriptionProgress` (0–1)
     - `diarizationStage` (`EMBEDDING|CLUSTERING|null`)
     - `diarizationProgress` (0–1, or null)
@@ -86,6 +87,7 @@ The JSON shapes the frontend builds against.
     - FAILED and CANCELED tasks keep the phase they stopped in, so the UI can say e.g. "failed while transcribing at 12:34" (with `transcribedUntilMs`);
     - null for QUEUED tasks (also after a retry or a restart) and COMPLETED tasks.
   - `transcribedUntilMs` is computed from the stored segments (no new column). Segments are committed per chunk (ADR 0004), so a retry resumes at the first chunk not DONE, which starts at or after this time. At most one chunk is redone.
+  - `hasAudio` is computed from the stored chunk audio (no new column). It is false until chunking has stored the chunk FLACs, and stays false for a task cancelled or failed before that; it becomes true in the same transaction that stores the chunks (item 18), so `task-updated` reports it.
 - **Task list** (`GET /api/tasks`): `{ "tasks": [Task] }`. Pending tasks come first, in queue order, then finished tasks, newest `finishedAt` first.
 - **Queue:** `{ "paused": boolean, "taskIds": [number] }` (pending tasks in queue order).
 - **Responses by route:**
@@ -157,7 +159,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] The turns endpoint returns the task's speakers with their stored names and item 09's turns (by `speakerId`) with their segments for a COMPLETED task; with speakers `off`, no speakers and one turn per segment with `speakerId` null; 409 `not-completed` for any other status
 - [ ] (added 2026-10-09, from the phase/trim decisions) Turn and segment texts in `/turns` are trimmed, and a turn's text is its segments' trimmed texts joined with single spaces
 - [ ] (added 2026-10-09, from the phase/trim decisions) A FAILED or CANCELED task keeps the phase it stopped in, and `transcribedUntilMs` is the end of its last stored segment (null without segments); QUEUED and COMPLETED tasks have no phase
-- [ ] Audio download returns one FLAC (`audio/flac`) joining the task's stored chunks in order; a task without stored chunks returns 404
+- [ ] Audio download returns one FLAC (`audio/flac`) joining the task's stored chunks in order; a task without stored chunks returns 404, and its `hasAudio` is false (true once chunks are stored) (hasAudio added 2026-10-09)
 - [ ] A Range request for the audio returns 206 with the requested bytes of the joined FLAC
 - [ ] An SSE client first receives a `snapshot`, then `task-updated`, `task-progress`, `queue-updated` and `task-deleted` events as the engine emits them
 - [ ] Every response and event payload has the structure of its `docs/api/` example
@@ -182,3 +184,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: contract extended in the item 13 consultation: `docs/api/task-transitions.json` (transitions and commands), shared by the frontend state machine and a backend check (item 11).
 - 2026-10-09: contract changed in the item 10/11 consultation: Task and `task-progress` gain `diarizationStage` (`EMBEDDING`, `CLUSTERING`, null), and `diarizationProgress` becomes the progress within that stage (replacing "1 while clustering"); `docs/api/` examples updated in the same commit (new `task.diarizing.json`; `task-progress.json` shows the clustering stage). Item 13 picks this up on its next rebase.
 - 2026-10-09: item 14 consultation: the upload `language` defaults to `auto` (whisper-cli's own default is `en`, and so is the oracle's `-l`), and the accepted codes are the contract file `docs/api/languages.json`, extracted from whisper.cpp 1.9.2's C API (procedure in `docs/api/README.md`), shared by the upload form and this item's validation.
+- 2026-10-09: contract changed in the item 15 consultation: Task gains `hasAudio` (boolean, computed from the stored chunk audio), so the History views hide the player for tasks without audio instead of failing on `404`; every Task example in `docs/api/` updated in the same commit.
