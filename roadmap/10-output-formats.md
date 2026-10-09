@@ -5,14 +5,15 @@ Depends on: [09](../docs/specs/diarization.md) (done)
 
 ## Goal
 
-Render a task's stored segments (and speaker labels) as txt, srt, vtt, and json, byte-for-byte identical to what the oracle's `write_diarized_outputs` writes for the same segments and speakers (`docs/oracle/transcribe.py`), except for the deliberate deviations of ADR 0030 (trimmed json segment text) and ADR 0034 (speaker labels are the stored names).
+Render a task's stored segments (and speaker labels) as txt, srt and vtt, byte-for-byte identical to what the oracle's `write_diarized_outputs` writes for the same segments and speakers (`docs/oracle/transcribe.py`), except for the deliberate deviation of ADR 0034 (speaker labels are the stored names). The oracle's json output is not ported (ADR 0035).
 
 ## Already decided
 
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): output formats are part of the oracle behavior to port.
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): speaker labels and turn merging come from item 09.
-- [ADR 0030 — Segment text is trimmed in every output](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md) (2026-10-09): json `segments[].text` is trimmed too, a deliberate deviation from the oracle; everything else stays a byte-for-byte port.
-- [ADR 0034 — Speaker labels in downloads are the stored speaker names](../docs/decisions/0034-speaker-labels-are-stored-names.md) (2026-10-09): txt/srt/vtt print `Speaker.speaker` (`Speaker 1` until renamed), txt headers included (`[Speaker 1]`, not the oracle's `[speaker 1]`); json keeps the 0-based number.
+- [ADR 0030 — Segment text is trimmed in every output](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md) (2026-10-09): every output trims segment text; its json download point is dropped with the json download (ADR 0035).
+- [ADR 0034 — Speaker labels in downloads are the stored speaker names](../docs/decisions/0034-speaker-labels-are-stored-names.md) (2026-10-09): txt/srt/vtt print `Speaker.speaker` (`Speaker 1` until renamed), txt headers included (`[Speaker 1]`, not the oracle's `[speaker 1]`).
+- [ADR 0035 — No json transcript download](../docs/decisions/0035-no-json-download.md) (2026-10-09): the downloads are txt, srt and vtt; the oracle's schema-less json is not ported (YAGNI).
 
 ## Proposal (approved 2026-10-09)
 
@@ -32,25 +33,18 @@ Diarized formats (port of oracle `write_diarized_outputs`). Labels are the task'
 - **srt** — one cue per speaker turn, numbered from 1: `{i}\n{start} --> {end}\n{name}: {turn text}\n\n` (every cue, including the last, ends with a blank line).
 - **vtt** — header `WEBVTT\n\n`, then per turn `{start} --> {end}\n{name}: {turn text}\n\n` (no cue numbers).
 - **Timestamps** — oracle `fmt_srt` = `HH:MM:SS,mmm`, `fmt_vtt` = `HH:MM:SS.mmm`, computed as `ms = int(round(t * 1000))` then `divmod` by 3 600 000 / 60 000 / 1000; hours are zero-padded to two digits and never wrap (100 h → `100:00:00,000`). Because the app stores integer milliseconds, the renderer formats the stored value directly, which equals the oracle's result for any time that came from whisper-cli's millisecond offsets. (Python `round` is half-to-even; only relevant where seconds are converted to ms, i.e. item 07's legacy-JSON path.)
-- **json** — Python `json.dump(..., ensure_ascii=False, indent=2)` output, no trailing newline:
-  - top level keys in order `text`, `speakers`, `segments`;
-  - `text` = every segment's text trimmed, joined with single spaces, trimmed;
-  - `speakers` = number of distinct speaker labels;
-  - `segments[]` = per segment, keys in order `start`, `end`, `text`, `speaker`. The oracle copies `id`/`seek` only from whisper's legacy `segments` JSON; whisper-cli 1.9.2 writes the `transcription` shape, from which the oracle builds no `id`/`seek`, so they are omitted (decided 2026-10-09). `start`/`end` are in seconds (`ms / 1000.0`), printed like Python `repr(float)` (`0.0`, `1.5`, `12.34`); `text` is trimmed (ADR 0030; the oracle keeps it untrimmed); `speaker` is the 0-based index (not +1);
-  - formatting: two-space indentation, `": "` between key and value, `,` at line ends, empty list printed as `[]`, non-ASCII characters written as-is, string escapes as Python's encoder emits them (`\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t`, other characters below U+0020 as `\u00XX`).
-- **No speech** (task with zero segments; oracle `transcribe_one`): json = `{"text": "", "segments": []}` followed by `\n` (compact, no `speakers` key); txt, srt, vtt = empty (0 bytes, vtt without header). The same with speakers on or off (decided 2026-10-09).
-- **Speakers off** (decided 2026-10-09). The oracle delegates these to whisper-cli's native writers, so there is no oracle code to port. The app uses the diarized shapes without labels, with trimmed text (ADR 0030), not whisper-cli's own output, which keeps the leading spaces and writes whisper's raw JSON:
+- **No speech** (task with zero segments; oracle `transcribe_one`): txt, srt, vtt = empty (0 bytes, vtt without header). The same with speakers on or off (decided 2026-10-09).
+- **Speakers off** (decided 2026-10-09). The oracle delegates these to whisper-cli's native writers, so there is no oracle code to port. The app uses the diarized shapes without labels, with trimmed text (ADR 0030), not whisper-cli's own output, which keeps the leading spaces:
   - txt: one trimmed segment text per line, no speaker lines, ending with a single `\n`;
   - srt: one numbered cue per segment, `{i}\n{start} --> {end}\n{text}\n\n`;
   - vtt: `WEBVTT\n\n`, then one cue per segment, `{start} --> {end}\n{text}\n\n`;
-  - json: top-level keys `text`, `segments`; per segment `start`, `end`, `text`; no `speakers`, no `speaker`; the same formatting rules as the diarized json.
 - **Download file names** (decided 2026-10-09): `<original filename stem>.<format>`, like the oracle's output prefix (`interview.mp3` → `interview.srt`). This item provides the name; item 12 sends it in `Content-Disposition`.
 
 ## Open questions (answered 2026-10-09)
 
 - Speakers-off formats? → **The draft**: the diarized shapes without labels, trimmed; not whisper-cli's native output.
 - No-speech output with speakers off? → **Same as the diarized no-speech output.**
-- `id`/`seek` in the downloaded json? → **Omitted.** The oracle itself prints none with whisper-cli 1.9.2's JSON.
+- `id`/`seek` in the downloaded json? → **Omitted.** (Moot since ADR 0035: there is no json download.)
 - Download file names? → **`<original stem>.<format>`.**
 - Speaker labels? → **The stored speaker names** (`Speaker N` until renamed), in txt, srt and vtt (ADR 0034, 2026-10-09; first answered "the oracle's labels from the speakerId, item 22 decides", changed by the user the same day).
 
@@ -64,12 +58,12 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] srt uses a comma and vtt a dot before milliseconds
 - [x] Timestamps roll over correctly at minutes and hours (3 600 000 ms → `01:00:00,000`) and hours above 99 are not wrapped
 - [x] Timestamps from milliseconds equal the oracle's `round(t * 1000)` result (e.g. 1 234 ms → `00:00:01,234`)
-- [x] json has `text`, `speakers`, `segments` in that order, 2-space indentation, no trailing newline, seconds as Python-style floats, trimmed segment text (ADR 0030), 0-based speaker
-- [x] (added 2026-10-09) json `text` is the plain join of every trimmed segment text, so a blank segment leaves two adjacent spaces
-- [x] json keeps non-ASCII text unescaped and escapes quotes, backslashes, and control characters like Python
-- [x] `speakers` counts distinct labels, not the highest label
-- [x] A task with no segments renders `{"text": "", "segments": []}\n` as json and empty txt/srt/vtt
-- [x] Speakers off: txt is one trimmed segment per line, srt and vtt have one cue per segment without a speaker prefix, and json has `text` and `segments` (start, end, text) without `speakers`/`speaker`
+- [x] ~~json has `text`, `speakers`, `segments` in that order, 2-space indentation, no trailing newline, seconds as Python-style floats, trimmed segment text (ADR 0030), 0-based speaker~~ (dropped 2026-10-09, ADR 0035: no json download)
+- [x] ~~(added 2026-10-09) json `text` is the plain join of every trimmed segment text, so a blank segment leaves two adjacent spaces~~ (dropped 2026-10-09, ADR 0035)
+- [x] ~~json keeps non-ASCII text unescaped and escapes quotes, backslashes, and control characters like Python~~ (dropped 2026-10-09, ADR 0035)
+- [x] ~~`speakers` counts distinct labels, not the highest label~~ (dropped 2026-10-09, ADR 0035)
+- [x] A task with no segments renders empty txt/srt/vtt (json part dropped 2026-10-09, ADR 0035)
+- [x] Speakers off: txt is one trimmed segment per line and srt and vtt have one cue per segment without a speaker prefix (json part dropped 2026-10-09, ADR 0035)
 - [x] Speakers off with no segments renders the same no-speech output as speakers on
 - [ ] Labels are the stored speaker names (initially `Speaker N`): a renamed speaker's name appears in txt (`[Alice]`) and in srt/vtt cues (`Alice: …`) (reworded 2026-10-09 for ADR 0034; was "Labels come from the speakerId, not from the stored speaker name")
 - [ ] The download file name is the original file's stem plus the format's extension
@@ -78,7 +72,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 ## Acceptance criteria
 
 - Golden-string tests per format and mode pass; the golden strings are derived by hand from the oracle's code (not copied from the Kotlin output).
-- For a given segment list and speaker list, each diarized format is byte-identical to what `write_diarized_outputs` would write, except for ADR 0030 (trimmed json segment text) and ADR 0034 (stored names as labels; `[Speaker N]` in txt) (verified by hand derivation, since the oracle is never executed).
+- For a given segment list and speaker list, each diarized format is byte-identical to what `write_diarized_outputs` would write, except for ADR 0034 (stored names as labels; `[Speaker N]` in txt) (verified by hand derivation, since the oracle is never executed).
 - Renderers are pure functions with no DB or file I/O.
 - All test-list items ticked and green; user approved the diff.
 
@@ -109,3 +103,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: discovered scenario confirmed by the user at the cycle 12 checkpoint, option (b): with speakers off, srt and vtt skip blank segments instead of writing a cue with an empty text line (the agent had recommended keeping the empty cue for consistency with txt and the oracle's diarized blanks). Test-list wording updated; its own cycle follows.
 - 2026-10-09 (cycle 13, test-list item 12, speakers off without segments): green on arrival (each renderer's zero-segment case runs before any speakers branch); red recorded against a temporary, uncommitted mutation of `renderJson`'s guard to `segments.isEmpty() && speakers != null`: `gradle test --tests 'stt.outputs.NoSpeechSpec'`, the new scenario failed ("Contents did not match exactly", the actual output being the indented document `{\n  "text": "", …`). New scenario in `NoSpeechSpec`: with no segments and `null` speakers, txt/srt/vtt are `""` and json is `{"text": "", "segments": []}\n`, the same bytes as cycle 11's speakers-on scenario (decided 2026-10-09). No production change. `gradle check` green (143 unit tests); no Integration-tagged code touched.
 - 2026-10-09: spec change decided by the user after cycle 13 ([ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md)): speaker labels are the stored speaker names everywhere a label appears — txt `[{name}]`, srt/vtt `{name}: {text}` — so `"Speaker N"` is a placeholder and a rename (item 22) shows in the downloads; txt uses the stored capitalisation (`[Speaker 1]`), no special case for the oracle's `[speaker 1]` ("this is over-complicating it"); json keeps the 0-based `speaker` number. ADR number 0034 because main already has 0033. Updated: Goal, Already decided, the labels paragraph, the txt/srt/vtt bullets, the speakers-off txt bullet, the open-question answer, test-list items 1 (header wording) and 13 (now "labels are the stored names"), the acceptance criterion. Cycle 1's expected txt changes from `[speaker N]` to `[Speaker N]`; that and the stored-name labels go through item 13's red/green cycle. For the main-tree agent at merge: item 22's "Downloads" bullet and open question are settled by ADR 0034, and the ADR index row for 0033 (main) sits between 0032 and 0034.
+- 2026-10-09: json download dropped by the user ("Drop it. YAGNI."; [ADR 0035](../docs/decisions/0035-no-json-download.md)): the oracle's json has no published schema, nothing in the app consumes it, it would carry speaker numbers while every other output shows names (ADR 0034), and item 12's `/turns` already serves structured data. Removed in one commit, not a TDD cycle (behavior removed, not added): `RenderJson.kt` and `RenderJsonSpec` (4 scenarios) deleted, the json assertions of `NoSpeechSpec` and `SpeakersOffSpec` removed and their scenario names reworded; no other assertion changed. `gradle check` green (139 unit tests = 143 − 4). Spec: Goal, Already decided (ADR 0030 json point dropped, ADR 0034 json clause removed, ADR 0035 added), the json bullet, the json parts of "No speech" and "Speakers off", the `id`/`seek` answer (moot), the acceptance criterion; test-list items 7, the added `text` item, 8 and 9 struck through as dropped, items 10 and 11 lose their json parts. ADR 0002's and ADR 0030's status lines and index rows note the dropped json parts; ADR 0034's json bullet removed. For the main-tree agent at merge: item 12's `format=txt|srt|vtt|json` becomes `txt|srt|vtt`, item 15's download buttons lose json, item 22's "json download keeps the 0-based `speaker` number" bullet no longer applies, and `docs/specs/database-schema.md` mentions txt/srt/vtt/json in passing.

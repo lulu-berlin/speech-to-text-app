@@ -1,6 +1,6 @@
 # 0002 — No Python in the app; transcribe.py is a reference oracle only
 
-Status: accepted · Date: 2026-10-05
+Status: accepted (json output port dropped by [0035](0035-no-json-download.md)) · Date: 2026-10-05
 
 ## Context
 An existing Python CLI, [`transcribe.py`](../oracle/transcribe.py), already transcribes audio with whisper-cli and adds speaker diarization (speechbrain ECAPA-TDNN embeddings plus agglomerative clustering). Its behavior is the target for the app, but embedding a Python runtime (PyTorch, speechbrain, numpy) would add a second language, a large dependency closure, and a second packaging story to a Kotlin/TypeScript app (ADR 0001).

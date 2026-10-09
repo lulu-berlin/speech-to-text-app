@@ -1,6 +1,6 @@
 # 0030 — Segment text is trimmed in every output
 
-Status: accepted · Date: 2026-10-09
+Status: accepted (json download point dropped by [0035](0035-no-json-download.md)) · Date: 2026-10-09
 
 ## Context
 whisper-cli writes each segment's text with a leading space. Item 07 stores it unchanged ([whisper-transcription spec](../specs/whisper-transcription.md): trimming happens when outputs are rendered). The oracle (`docs/oracle/transcribe.py`, ADR 0002) trims the text for txt, srt, vtt and the json `text` field, but copies each segment's untrimmed text into the json `segments[].text`. Item 10 planned to port that byte for byte.

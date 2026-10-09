@@ -7,7 +7,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | #    | Title                                                                                   | Status   | Date       |
 | ---- | --------------------------------------------------------------------------------------- | -------- | ---------- |
 | 0001 | [Stack and monorepo layout](0001-stack-and-monorepo.md)                                 | accepted | 2026-10-05 |
-| 0002 | [No Python in the app; transcribe.py is a reference oracle only](0002-no-python-oracle-only.md) | accepted | 2026-10-05 |
+| 0002 | [No Python in the app; transcribe.py is a reference oracle only](0002-no-python-oracle-only.md) | accepted, json output dropped by [0035](0035-no-json-download.md) | 2026-10-05 |
 | 0003 | [Diarization in Kotlin with CAM++ via ONNX Runtime](0003-kotlin-diarization-campplus-onnx.md) | accepted, auto speaker-count rule amended by [0027](0027-auto-speaker-count-allows-one-speaker.md) | 2026-10-05 |
 | 0004 | [Chunked transcription with SIGSTOP/SIGCONT pause](0004-chunked-transcription-sigstop-pause.md) | accepted | 2026-10-05 |
 | 0005 | [Uploaded audio stored as SQLite BLOB](0005-audio-as-sqlite-blob.md)                    | superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) | 2026-10-05 |
@@ -35,8 +35,9 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0027 | [Automatic speaker count allows one speaker](0027-auto-speaker-count-allows-one-speaker.md) | accepted | 2026-10-09 |
 | 0028 | [Speakers table; segments reference their speaker by `speaker_id`](0028-speakers-table-and-segment-speaker-id.md) | accepted | 2026-10-09 |
 | 0029 | [Contract-first frontend with shared API examples](0029-contract-first-frontend-shared-api-examples.md) | accepted | 2026-10-09 |
-| 0030 | [Segment text is trimmed in every output](0030-trimmed-segment-text-in-all-outputs.md) | accepted | 2026-10-09 |
+| 0030 | [Segment text is trimmed in every output](0030-trimmed-segment-text-in-all-outputs.md) | accepted, json download point dropped by [0035](0035-no-json-download.md) | 2026-10-09 |
 | 0031 | [Frontend routing with react-router, state with XState](0031-frontend-routing-react-router-state-xstate.md) | accepted | 2026-10-09 |
 | 0032 | [Speaker-distance threshold 0.5448 for CAM++](0032-speaker-distance-threshold-for-campplus.md) | accepted | 2026-10-09 |
 | 0033 | [Design system: tokens, Radix primitives, IBM Plex Sans](0033-design-system-tokens-radix-plex.md) | accepted | 2026-10-09 |
 | 0034 | [Speaker labels in downloads are the stored speaker names](0034-speaker-labels-are-stored-names.md) | accepted | 2026-10-09 |
+| 0035 | [No json transcript download](0035-no-json-download.md) | accepted | 2026-10-09 |
