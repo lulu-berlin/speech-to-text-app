@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:mock": "vite --open /mock.html",
+    "dev:mock": "vite --mode mock --open",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run && prettier --check . ../.prettierrc",
