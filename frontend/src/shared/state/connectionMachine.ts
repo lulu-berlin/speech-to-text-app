@@ -17,6 +17,7 @@ export const connectionMachine = setup({
     events: {} as StreamEvent,
   },
   actors: {
+    // The stream actor reconnects on its own when EventSource gives up (client.ts).
     eventStream: fromCallback<StreamEvent>(({ sendBack }) => subscribeToEvents(sendBack)),
   },
 }).createMachine({
@@ -35,8 +36,13 @@ export const connectionMachine = setup({
     },
   },
   states: {
-    connecting: {},
-    reconnecting: {},
+    connecting: {
+      on: { disconnected: 'reconnecting' },
+    },
+    reconnecting: {
+      // A snapshot from the actor's own reconnect lands through the root transition.
+      on: { disconnected: 'reconnecting' },
+    },
     live: {
       on: {
         disconnected: 'reconnecting',
