@@ -86,7 +86,7 @@ class EmbeddingsSpec :
             `when`("pausing after the first window") {
                 then("embedding suspends between windows and resumes with the next window") {
                     // ADR 0004: in-JVM phases pause cooperatively through a pause gate checked between windows.
-                    val pcm = FloatArray(64_000) { i -> (0.05 * sin(2 * PI * 440 * i / 16_000)).toFloat() }
+                    val pcm = tone440(64_000)
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
                         val gate = PauseGate()
@@ -113,7 +113,7 @@ class EmbeddingsSpec :
                     // Spec: pause gate and cancellation are checked between windows (ADR 0004); inference blocks, so a cancel
                     // must land at the next window boundary instead of after the last window. Cancelling inside the
                     // window-1 callback makes "the next boundary" exact: no race with window 2's inference.
-                    val pcm = FloatArray(64_000) { i -> (0.05 * sin(2 * PI * 440 * i / 16_000)).toFloat() }
+                    val pcm = tone440(64_000)
                     val segments = listOf(segment(0, 1200), segment(1200, 2400), segment(2400, 3600))
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
@@ -191,6 +191,9 @@ private fun segment(
 
 /** The segment covering all of [pcm], in whole milliseconds. */
 private fun wholeClip(pcm: FloatArray): Segment = segment(0, pcm.size / 16L)
+
+/** [sampleCount] samples of a quiet (amplitude 0.05) 440 Hz tone at 16 kHz. */
+private fun tone440(sampleCount: Int): FloatArray = FloatArray(sampleCount) { i -> (0.05 * sin(2 * PI * 440 * i / 16_000)).toFloat() }
 
 private fun dot(
     a: FloatArray,
