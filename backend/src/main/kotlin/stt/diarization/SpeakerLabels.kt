@@ -14,8 +14,8 @@ internal const val SHORT_SEGMENT_MS = 500L
  * Speaker label (0-based) per segment of a task, in segment order (oracle `diarize_and_write`, minus the embedding
  * and the file writing). [embeddings] holds one L2-normalized row per segment; [k] = `null` is auto mode.
  *
- * Only segments of at least [SHORT_SEGMENT_MS] are clustered; the others start at label 0 and are then rescued to the
- * nearest speaker (see [rescueShortSegments]).
+ * Only segments of at least [SHORT_SEGMENT_MS] are clustered, or all of them when none is that long; the others start
+ * at label 0 and are then rescued to the nearest speaker (see [rescueShortSegments]).
  */
 internal fun speakerLabels(
     segments: List<Segment>,
@@ -23,7 +23,7 @@ internal fun speakerLabels(
     k: Int?,
     maxSpeakers: Int,
 ): List<Int> {
-    val clustered = segments.indices.filter { segments[it].isLong() }
+    val clustered = segments.indices.filter { segments[it].isLong() }.ifEmpty { segments.indices.toList() }
     val labels = clusterSegments(Array(clustered.size) { embeddings[clustered[it]] }, k, maxSpeakers)
     val speakers = IntArray(segments.size)
     clustered.forEachIndexed { pos, row -> speakers[row] = labels[pos] }
