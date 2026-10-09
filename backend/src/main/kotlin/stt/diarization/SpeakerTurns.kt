@@ -20,6 +20,7 @@ internal fun speakerTurns(
         var end = start + 1
         while (end < segments.size && segments[end].speakerId == speakerId) end++
         val run = segments.subList(start, end)
+        val trimmed = run.map { it.text.trim() }
         turns.add(
             SpeakerTurn(
                 speakerId = speakerId,
@@ -27,9 +28,9 @@ internal fun speakerTurns(
                 startMs = run.first().startMs,
                 endMs = run.last().endMs,
                 // The oracle appends each trimmed text as f"{acc} {text}".strip(): the non-blank trimmed texts joined
-                // with single spaces.
-                text = run.map { it.text.trim() }.filter { it.isNotEmpty() }.joinToString(" "),
-                segments = run.map { TurnSegment(startMs = it.startMs, endMs = it.endMs, text = it.text.trim()) },
+                // with single spaces. The kept segments carry the trimmed texts too (ADR 0030).
+                text = trimmed.filter { it.isNotEmpty() }.joinToString(" "),
+                segments = run.zip(trimmed) { segment, text -> TurnSegment(segment.startMs, segment.endMs, text) },
             ),
         )
         start = end
