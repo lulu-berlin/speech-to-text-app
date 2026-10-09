@@ -23,7 +23,7 @@ class RenderJsonSpec :
                     // text = " ".join(seg["text"].strip() for seg in segments).strip() = "Hello there. again. Fine.";
                     // start/end are ms / 1000.0 printed like Python repr(float) (0.0, 1.5, 3.25, 4.0);
                     // speaker is the 0-based index; every segments[].text is trimmed (ADR 0030).
-                    renderJson(segments, speakers1And2) shouldBe
+                    renderJson(segments, speakers(0, 1)) shouldBe
                         """
                         {
                           "text": "Hello there. again. Fine.",
