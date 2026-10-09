@@ -130,36 +130,36 @@ internal suspend fun finishedAtOf(
         ?.finishedAt
 
 /**
- * The tasks the engine starts while [window] of real time passes, returning early as soon as a second one
- * starts. "Nothing happened" cannot be awaited, so the test pumps the worker itself: [runCurrent] runs it
- * on the test dispatcher, and each short real delay lets the file and database I/O in between finish.
+ * Pumps the test dispatcher until [done] holds or [window] of real time has passed. A claim that something
+ * has *not* happened cannot be awaited, so the test drives the worker itself: [runCurrent] runs it on the
+ * test dispatcher, and each short real delay lets the file and database I/O in between finish.
  */
+internal suspend fun TestScope.pumpUntil(
+    window: Duration,
+    done: () -> Boolean,
+) {
+    val deadline = System.nanoTime() + window.inWholeNanoseconds
+    runCurrent()
+    while (System.nanoTime() < deadline && !done()) {
+        withContext(Dispatchers.Default) { delay(2.milliseconds) }
+        runCurrent()
+    }
+}
+
+/** The tasks the engine has started after [window] of real time, returning early once a second one starts. */
 internal suspend fun TestScope.tasksStartedWithin(
     fixture: EngineFixture,
     window: Duration,
 ): List<Long> {
-    val deadline = System.nanoTime() + window.inWholeNanoseconds
-    runCurrent()
-    while (System.nanoTime() < deadline && fixture.chunker.workDirs.size <= 1) {
-        withContext(Dispatchers.Default) { delay(2.milliseconds) }
-        runCurrent()
-    }
+    pumpUntil(window) { fixture.chunker.workDirs.size > 1 }
     return fixture.chunker.workDirs.map(::taskIdOf)
 }
 
-/**
- * Whether [deferred] completes while [window] of real time passes, returning early once it does. Like
- * [tasksStartedWithin], "it did not finish" cannot be awaited, so the test pumps the dispatcher itself.
- */
+/** Whether [deferred] completes while [window] of real time passes, returning early once it does. */
 internal suspend fun TestScope.completesWithin(
     deferred: Deferred<*>,
     window: Duration,
 ): Boolean {
-    val deadline = System.nanoTime() + window.inWholeNanoseconds
-    runCurrent()
-    while (System.nanoTime() < deadline && !deferred.isCompleted) {
-        withContext(Dispatchers.Default) { delay(2.milliseconds) }
-        runCurrent()
-    }
+    pumpUntil(window) { deferred.isCompleted }
     return deferred.isCompleted
 }
