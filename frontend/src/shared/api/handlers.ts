@@ -14,22 +14,6 @@ import {
   taskTransitions,
 } from './fixtures';
 
-import type { Task, TaskStatus } from './types';
-
-function applyId(task: Task, id: number): Task {
-  return { ...task, id };
-}
-
-// The 200 task responses of the command endpoints are the example whose status matches
-// the transition table's requested `to` status, with the URL's id.
-function statusFixtureByTo(to: TaskStatus): Task {
-  const task = taskExamples.find((example) => example.status === to);
-  if (task === undefined) {
-    throw new Error(`no docs/api/ Task example with status ${to}`);
-  }
-  return task;
-}
-
 export const handlers = [
   // Upload: POST /api/tasks -> 201 Task (task.queued.json). The 409 duplicate-audio path
   // (error.duplicate-audio.json) is exercised by a per-test override in client.test.ts.
@@ -47,23 +31,17 @@ export const handlers = [
     return HttpResponse.json(task);
   }),
 
-  // Task commands: POST /api/tasks/{id}/pause|resume|cancel|retry -> 200 Task.
-  http.post('/api/tasks/:id/pause', ({ params }) => {
-    const id = Number(params.id);
-    return HttpResponse.json(applyId(statusFixtureByTo('PAUSED'), id), { status: 200 });
-  }),
-  http.post('/api/tasks/:id/resume', ({ params }) => {
-    const id = Number(params.id);
-    return HttpResponse.json(applyId(statusFixtureByTo('QUEUED'), id), { status: 200 });
-  }),
-  http.post('/api/tasks/:id/cancel', ({ params }) => {
-    const id = Number(params.id);
-    return HttpResponse.json(applyId(statusFixtureByTo('CANCELED'), id), { status: 200 });
-  }),
-  http.post('/api/tasks/:id/retry', ({ params }) => {
-    const id = Number(params.id);
-    return HttpResponse.json(applyId(statusFixtureByTo('QUEUED'), id), { status: 200 });
-  }),
+  // Task commands: POST /api/tasks/{id}/<command> -> 200 Task. Each response is the Task
+  // example whose status is the command's `to` in task-transitions.json, with the URL's id.
+  ...Object.entries(taskTransitions.commands).map(([command, { to }]) =>
+    http.post(`/api/tasks/:id/${command}`, ({ params }) => {
+      const example = taskExamples.find((task) => task.status === to);
+      if (example === undefined) {
+        throw new Error(`no docs/api/ Task example with status ${to}`);
+      }
+      return HttpResponse.json({ ...example, id: Number(params.id) });
+    }),
+  ),
 
   // Delete: DELETE /api/tasks/{id} -> 204 no body.
   http.delete('/api/tasks/:id', () => new HttpResponse(null, { status: 204 })),
@@ -90,5 +68,3 @@ export const handlers = [
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
   // The SSE stream lives in events.ts (getEventsHandler), constructed only on connect.
 ];
-
-export const getTaskTransitions = taskTransitions;
