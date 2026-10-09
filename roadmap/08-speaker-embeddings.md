@@ -1,6 +1,6 @@
 # 08 — Speaker embeddings
 
-Status: in-progress
+Status: in-review
 Depends on: [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
@@ -83,3 +83,4 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-08: acceptance criterion "The ONNX session is created once per application run" moved to item 11: nothing in item 08 creates the application-wide `SpeakerModel`; the engine (item 11) is where it is wired. Item 08 keeps one session per `Embeddings` instance, reused for every window and call.
 - 2026-10-08: acceptance criterion "`backend/deps.json` regenerated for ONNX Runtime and `nix build .` green" verified by the user: `deps.json` regenerated (adds onnxruntime 1.30.0, drops the unused jna 5.9.0); `nix build .` first failed in `:compileKotlin` with a metaspace OOM that `main` had as well, fixed by [ADR 0025](../docs/decisions/0025-nix-build-gradle-default-jvm-memory.md) (Gradle's default JVM memory in the Nix build); after the rebase onto `main` with item 07, `nix build .` is green (backend check + install, app wrapper).
 - 2026-10-08: LibriSpeech fixtures: test-clean is only distributed as one 346 MB archive (openslr md5 32fa31d27d2e1cad72775fee3f4849a9 matched), so `nix/test-fixtures.nix` fetches it by sha256 and extracts three unmodified utterances into one directory (`TEST_LIBRISPEECH_CLIPS`): `1089-134686-0002` (6.6 s) and `1089-134691-0023` (7.7 s), speaker 1089 from two chapters, and `1188-133604-0025` (7.5 s), speaker 1188, both male, so the different-speaker pair is not separated by sex alone; all between 2 s and 20 s, so each window is the whole clip. Attribution: `docs/attributions.md`. Result with the real model: same-speaker cosine 0.801, different-speaker cosines 0.240 and 0.188. The test's red run was the missing fixture (the embedder already existed); it fails when speaker information is destroyed (all-zero features: 0.9997 vs 0.9999), and still passes with reversed mel bins (0.678 vs 0.649 / 0.640) or without mean subtraction (0.818 vs 0.485 / 0.402): it checks the ordering only, value-level front-end defects are covered by the fbank items.
+- 2026-10-09: the Nix-built fixture directory (`/nix/store/7k0vbq8f…-librispeech-test-clean-clips`, from the user's devenv shell) holds exactly the three clips, byte-identical (sha256) to the ones the test was first run on; `gradle check` and `gradle integrationTest` green against it. All test-list items ticked; set to in-review.
