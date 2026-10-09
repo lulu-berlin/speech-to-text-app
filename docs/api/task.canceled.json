@@ -1,0 +1,19 @@
+{
+  "id": 5,
+  "filename": "lecture.m4a",
+  "status": "CANCELED",
+  "phase": "TRANSCRIBING",
+  "language": "de",
+  "speakersMode": "auto",
+  "speakersCount": null,
+  "maxSpeakers": 8,
+  "durationMs": 3600000,
+  "sizeBytes": 57671680,
+  "transcriptionProgress": 0.42,
+  "diarizationProgress": 0.0,
+  "error": null,
+  "transcribedUntilMs": 1196480,
+  "createdAt": 1791537660000,
+  "startedAt": 1791537661000,
+  "finishedAt": 1791537680000
+}
