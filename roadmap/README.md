@@ -90,5 +90,5 @@ graph TD
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |
 | [22 — Rename a task's speakers](22-speaker-rename.md) | draft | 09, 12, 15 |
 | [23 — Faster speaker clustering](23-faster-clustering.md) | draft | 09 |
-| [24 — Design system: tokens and primitives](24-visual-design.md) | draft | 13 |
+| [24 — Design system: tokens and primitives](24-visual-design.md) | spec-approved | 13 |
 | [25 — Visual polish pass](25-visual-polish.md) | draft | 24, 14, 15 |
