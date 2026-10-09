@@ -1,6 +1,6 @@
 # 25 — Visual polish pass
 
-Status: draft
+Status: spec-approved
 Depends on: [24](24-visual-design.md), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md)
 
 ## Goal
@@ -15,7 +15,7 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
 - Item 13 decided the direction: calm, document-like, light and dark.
 - Item 17 (the stenographer animation) supplies the logo/mascot; it depends on item 24 so it uses the same palette.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Reference (decided 2026-10-09): document/editor-like** (Notion, Bear, iA Writer): quiet surfaces, one accent, generous whitespace, text-first, minimal chrome.
 - Go view by view (shell, Queue, History, transcript, error/not-found) and apply the design system:
@@ -48,7 +48,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] The shell and each view render on the token background/text and use the primitives, with no literal colors or sizes
 - [ ] The layout is usable at a phone width and a desktop width (no horizontal overflow, controls reachable)
@@ -73,3 +73,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 - 2026-10-09: item drafted from the user's answers: the visual pass is separate from the design system (item 24), and comes after items 14 and 15 have built the views.
 - 2026-10-09: consultation answers approved: reference is document/editor-like; empty states carry one line of guidance plus the primary action; comfortable queue rows; the phase is a text label; the transcript is a centred reading column; History is cards; progress bars show a percentage / stage label. Test list not yet approved.
+- 2026-10-09: test list (10 items) approved by the user; status `spec-approved`.
