@@ -9,7 +9,7 @@ import stt.http.sttApp
 
 private val bootLogger: Logger = LoggerFactory.getLogger("stt.Main")
 
-fun main(args: Array<String>) {
+fun main() {
     val config = Config.fromEnv()
     warnIfStaticDirUnset(config, bootLogger)
     embeddedServer(Netty, port = config.port) {
