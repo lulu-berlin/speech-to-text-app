@@ -1,6 +1,6 @@
 # 10 — Output formats
 
-Status: spec-approved
+Status: in-progress
 Depends on: [09](../docs/specs/diarization.md) (done)
 
 ## Goal
