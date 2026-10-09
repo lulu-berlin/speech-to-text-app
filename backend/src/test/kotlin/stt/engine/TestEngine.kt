@@ -12,6 +12,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.withContext
+import stt.audio.ExportedChunk
+import stt.audio.PlannedChunk
 import stt.config.testConfig
 import stt.db.ChunkRepository
 import stt.db.Database
@@ -37,6 +39,7 @@ internal class EngineFixture(
     val transcriber: FakeTranscriber,
     val processControl: FakeProcessControl,
     val diarizer: FakeDiarizer,
+    val pcmDecoder: FakePcmDecoder,
     val engine: ProcessingEngine,
     /** The ids of the tasks that reach COMPLETED, in order. */
     val completed: ReceiveChannel<Long>,
@@ -61,6 +64,7 @@ internal fun TestScope.engineUnderTest(
     val transcriber = FakeTranscriber()
     val processControl = FakeProcessControl()
     val diarizer = FakeDiarizer()
+    val pcmDecoder = FakePcmDecoder()
     val engine =
         ProcessingEngine(
             scope = backgroundScope,
@@ -74,6 +78,7 @@ internal fun TestScope.engineUnderTest(
             transcriber = transcriber,
             processControl = processControl,
             diarizer = diarizer,
+            pcmDecoder = pcmDecoder,
         )
     val completed = Channel<Long>(Channel.UNLIMITED)
     val failed = Channel<Long>(Channel.UNLIMITED)
@@ -95,7 +100,19 @@ internal fun TestScope.engineUnderTest(
             }
         }
     }
-    return EngineFixture(workDirectories, tasks, chunker, transcriber, processControl, diarizer, engine, completed, failed, progress)
+    return EngineFixture(
+        workDirectories,
+        tasks,
+        chunker,
+        transcriber,
+        processControl,
+        diarizer,
+        pcmDecoder,
+        engine,
+        completed,
+        failed,
+        progress,
+    )
 }
 
 /** Inserts a QUEUED task at [queuePosition] with an original in its work directory, as an upload does (ADR 0024). */
@@ -194,3 +211,17 @@ internal fun <T> drain(channel: ReceiveChannel<T>): List<T> =
             next = channel.tryReceive()
         }
     }
+
+/** Writes [chunkCount] FLAC files for a task's plan, as a previous run would have left them. */
+internal suspend fun exportedPlan(
+    fixture: EngineFixture,
+    task: Long,
+    chunkCount: Int,
+): List<ExportedChunk> {
+    val workDir = fixture.workDirectories.workDir(task)
+    return (0 until chunkCount).map { idx ->
+        val file = workDir.resolve("chunk-$idx.flac")
+        Files.writeString(file, "fake flac")
+        ExportedChunk(PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L), file)
+    }
+}

@@ -21,13 +21,18 @@ internal class FakeDiarizer : Diarizer {
     var passedGate = false
         private set
 
+    /** The whole-file PCM of every call, in order. */
+    val pcms = mutableListOf<FloatArray>()
+
     override suspend fun diarize(
         task: StoredTask,
         gate: PauseGate,
+        pcm: FloatArray,
         onStage: (DiarizationStage) -> Unit,
         onProgress: (Double) -> Unit,
     ) {
         diarized.add(task.id)
+        pcms.add(pcm)
         entered.send(task.id)
         hold?.await()
         onStage(DiarizationStage.EMBEDDING)

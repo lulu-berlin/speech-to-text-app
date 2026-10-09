@@ -26,8 +26,7 @@ class ProcessingEngineRestartSpec :
                         // The crash state: a stored two-chunk plan, chunk 0 DONE with its segments, the original
                         // already deleted, and the task left RUNNING (ADR 0004).
                         val chunks = ChunkRepository(db)
-                        val plan = crashPlan(fixture, task)
-                        chunks.storePlan(task, plan)
+                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
                         SegmentRepository(db).completeChunk(
                             task,
                             chunkIdx = 0,
@@ -51,16 +50,3 @@ class ProcessingEngineRestartSpec :
             }
         }
     })
-
-/** The two-chunk plan the crash left behind, with a FLAC file written for each chunk. */
-private suspend fun crashPlan(
-    fixture: EngineFixture,
-    task: Long,
-): List<ExportedChunk> {
-    val workDir = fixture.workDirectories.workDir(task)
-    return (0 until 2).map { idx ->
-        val file = workDir.resolve("chunk-$idx.flac")
-        Files.writeString(file, "fake flac")
-        ExportedChunk(PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L), file)
-    }
-}
