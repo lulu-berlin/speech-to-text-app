@@ -202,11 +202,3 @@ private val KALDI_NATIVE_FBANK_REFERENCE: Map<Int, FloatArray> =
                 """,
             ),
     )
-
-/** Whitespace-separated decimal values, as printed by the reference run. */
-private fun floats(text: String): FloatArray =
-    text
-        .trim()
-        .split(Regex("\\s+"))
-        .map { it.toFloat() }
-        .toFloatArray()
