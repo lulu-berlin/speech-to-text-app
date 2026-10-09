@@ -94,9 +94,16 @@ class ProcessingEngine internal constructor(
     private val runningLock = Mutex()
     private var running: Running? = null
 
-    /** Starts the single worker coroutine; it runs until [scope] is cancelled. */
+    /**
+     * Starts the single worker coroutine; it runs until [scope] is cancelled. Before it picks anything up,
+     * tasks whose crash left them RUNNING are queued again (ADR 0004), so the worker resumes them from
+     * their stored plans instead of leaving them stuck.
+     */
     fun start() {
-        scope.launch { workerLoop() }
+        scope.launch {
+            tasks.recoverRunning()
+            workerLoop()
+        }
     }
 
     /**
@@ -272,7 +279,10 @@ class ProcessingEngine internal constructor(
         tasks.setPhase(id, TaskPhase.CHUNKING)
         publish(id)
         val source = workDirectories.source(id)
-        // The original is the only copy of the audio until the plan is committed (ADR 0024).
+        // A stored plan means a previous run chunked this task: reuse the stored chunks and leave whatever
+        // is in the work directory alone (ADR 0004). Only first-time chunking needs the original, which is
+        // the only copy of the audio until the plan is committed (ADR 0024).
+        if (chunks.findByTask(id).isNotEmpty()) return
         check(withContext(Dispatchers.IO) { Files.exists(source) }) {
             "the task's original audio is missing at $source"
         }
