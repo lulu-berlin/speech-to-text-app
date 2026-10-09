@@ -12,8 +12,8 @@ internal suspend fun generate(
     vararg outputOptions: String,
 ) {
     val command =
-        listOf("ffmpeg", "-hide_banner", "-nostats", "-loglevel", "error", "-f", "lavfi", "-i", lavfi) +
+        FFMPEG + listOf("-loglevel", "error", "-f", "lavfi", "-i", lavfi) +
             outputOptions + target.toString()
     val result = withTimeout(30.seconds) { ProcessRunner().run(command) }
-    check(result.exitCode == 0) { "fixture generation failed: ${result.stderr}" }
+    result.expectSuccess("generate fixture $target")
 }

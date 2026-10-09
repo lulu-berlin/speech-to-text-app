@@ -160,10 +160,10 @@ private suspend fun toS16(
 ): ByteArray {
     val raw = scratchDir.resolve("${input.fileName}.s16")
     val command =
-        listOf("ffmpeg", "-hide_banner", "-nostats", "-loglevel", "error", "-y") + inputOptions +
+        FFMPEG + listOf("-loglevel", "error", "-y") + inputOptions +
             listOf("-i", input.toString(), "-f", "s16le", "-ac", "1", raw.toString())
     val result = withTimeout(30.seconds) { ProcessRunner().run(command) }
-    check(result.exitCode == 0) { "ffmpeg failed: ${result.stderr}" }
+    result.expectSuccess("convert $input to raw s16le")
     return Files.readAllBytes(raw)
 }
 
