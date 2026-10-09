@@ -1,6 +1,6 @@
 # 13 — Frontend foundation
 
-Status: spec-approved
+Status: in-progress
 Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [12](12-http-api-and-sse.md) (spec-approved only: its contract, not its implementation)
 
 ## Goal
