@@ -230,6 +230,22 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("random L2-normalized matrices without exact distance ties") {
+            `when`("the labels are compared with the naive reference, auto and fixed counts") {
+                then("they match") {
+                    for ((seed, n) in listOf(11L to 4, 12L to 9, 13L to 20, 14L to 36)) {
+                        val embeddings = randomNormalizedMatrix(seed, n)
+                        for (k in listOf(null, 2, 3, 7)) {
+                            withClue("seed $seed, n $n, k $k") {
+                                clusterSegments(embeddings, k = k, maxSpeakers = 8)
+                                    .shouldBe(naiveClusterSegments(embeddings, k = k, maxSpeakers = 8))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     })
 
 /**
