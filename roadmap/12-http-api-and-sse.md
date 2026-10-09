@@ -21,7 +21,7 @@ Expose the queue and the transcription history over a REST API for all commands 
 - **Upload.**
   - `POST /api/tasks`, multipart, with these fields:
     - `file`;
-    - `language` (default `en`), validated against the language codes whisper-cli accepts, plus `auto`; anything else → `400 invalid-language`;
+    - `language` (default `auto`, changed from `en` in the item 14 consultation, 2026-10-09), validated against [`docs/api/languages.json`](../docs/api/languages.json) (the codes whisper-cli 1.9.2 accepts, extracted from whisper.cpp's C API, plus `auto`); anything else → `400 invalid-language`;
     - `speakers` = `auto|off|<n>`, where `1 <= n <= 20`;
     - `maxSpeakers` (default 8, `1 <= maxSpeakers <= 20`).
   - Only files whose extension is on the allow-list are accepted. The extension is checked case-insensitively, and the content type is ignored, because browsers often send generic types. The allow-list: `mp3 wav flac ogg oga opus m4a aac wma aif aiff amr webm mp4 m4v mov mkv mka 3gp`. Video files are accepted because ffmpeg extracts their audio track.
@@ -116,6 +116,7 @@ The JSON shapes the frontend builds against.
   | `500` | `internal` |
 - **Mock additions from item 13** (added 2026-10-09): the frontend workspace added [`docs/api/task.paused.json`](../docs/api/task.paused.json) and [`docs/api/task.canceled.json`](../docs/api/task.canceled.json), because no example had those statuses, and it recorded where its mocks must deviate from this contract. That list is the "Mock additions to settle with item 12" section of [the frontend foundation spec](../docs/specs/frontend-foundation.md); this item's route tests adopt the two examples and settle each deviation (item 21 verifies the rest end to end).
 - **Task transition table** (added 2026-10-09, item 13 consultation): [`docs/api/task-transitions.json`](../docs/api/task-transitions.json) lists the allowed status transitions and, for each command endpoint, the statuses it accepts. The frontend reads it to offer only allowed commands; the backend checks that its `TaskStatus` table equals it (item 11). A command outside the table still answers `409 illegal-transition`.
+- **Languages** (added 2026-10-09, item 14 consultation): [`docs/api/languages.json`](../docs/api/languages.json) lists the language codes and names the upload accepts (whisper-cli 1.9.2's table plus `auto`) and the default, `auto`. The upload form's select reads it, and this item validates `language` against it.
 
 ## Open questions (answered 2026-10-09)
 
@@ -140,7 +141,7 @@ The JSON shapes the frontend builds against.
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] Uploading a file creates a QUEUED task at the end of the queue, records its `size_bytes`/`sha256`, and keeps the original in the task's work directory (no audio bytes in the database)
-- [ ] Uploading without a file, with an extension outside the allow-list, with a language whisper-cli does not know, or with an invalid `speakers` or `maxSpeakers` value (outside 1–20), is rejected with 400 and the matching error code
+- [ ] Uploading without a file, with an extension outside the allow-list, with a language not in `docs/api/languages.json`, or with an invalid `speakers` or `maxSpeakers` value (outside 1–20), is rejected with 400 and the matching error code; an upload without `language` gets `auto`
 - [ ] Uploading the same bytes again is rejected with 409 `duplicate-audio` naming the existing task's id
 - [ ] Listing tasks returns pending tasks in queue order, then finished tasks newest first, without audio data
 - [ ] Requesting an unknown task returns 404 with an error body
@@ -180,3 +181,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: last details decided: FAILED and CANCELED tasks keep their `phase`; new Task field `transcribedUntilMs` (end of the last stored segment), resume stays per chunk (segment-level resume rejected); segment text trimmed everywhere it leaves the backend, including the json download ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)). Test list (19 items) approved by the user; two items added from these decisions. Status `spec-approved`.
 - 2026-10-09: contract extended in the item 13 consultation: `docs/api/task-transitions.json` (transitions and commands), shared by the frontend state machine and a backend check (item 11).
 - 2026-10-09: contract changed in the item 10/11 consultation: Task and `task-progress` gain `diarizationStage` (`EMBEDDING`, `CLUSTERING`, null), and `diarizationProgress` becomes the progress within that stage (replacing "1 while clustering"); `docs/api/` examples updated in the same commit (new `task.diarizing.json`; `task-progress.json` shows the clustering stage). Item 13 picks this up on its next rebase.
+- 2026-10-09: item 14 consultation: the upload `language` defaults to `auto` (whisper-cli's own default is `en`, and so is the oracle's `-l`), and the accepted codes are the contract file `docs/api/languages.json`, extracted from whisper.cpp 1.9.2's C API (procedure in `docs/api/README.md`), shared by the upload form and this item's validation.

@@ -26,8 +26,9 @@ Let the user browse past transcriptions: see finished tasks, read a transcript w
 ## Open questions for the user
 - Search/filter in the history list (by filename, date, status)?
 - Click-to-seek: clicking a segment/turn seeks the audio player to its start time? (Possible now: `/audio` supports Range.)
-- Delete button in History, with confirmation? (Coordinated with item 14's question.)
 - A task without audio (canceled or failed before chunking; the audio endpoint answers 404): hide the player, or show a "no audio" note?
+
+Decided in the item 14 consultation (2026-10-09): **delete is offered in History too, always with confirmation** (`DELETE /api/tasks/{id}`, through item 24's ConfirmDialog); it frees the file's `sha256`, so the same file can be uploaded again.
 
 ## Test list (written with the user; Canon TDD step 1)
 Seed — to be refined and approved with the user before any test is written:
