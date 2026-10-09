@@ -96,4 +96,39 @@ class RenderJsonSpec :
                 }
             }
         }
+        given("a segment whose text contains quotes, a backslash, control characters and non-ASCII") {
+            `when`("it is rendered as json") {
+                then("non-ASCII stays unescaped and quotes, backslashes and control characters are escaped like Python") {
+                    val segments =
+                        listOf(
+                            segment(
+                                speakerId = 0,
+                                startMs = 0,
+                                endMs = 1_000,
+                                text = " A \"quoted\" back\\slash\nnewline\ttab\u0001ctrl ü 日 ",
+                            ),
+                        )
+
+                    // Python json with ensure_ascii=False (encode_basestring): ESCAPE_DCT maps '"' -> \" and '\' -> \\
+                    // and \b \f \n \r \t to their short escapes; every other character below U+0020 becomes
+                    // \u00xx (lower-case hex); everything else, including non-ASCII, is written as-is.
+                    // The trimmed text is: A "quoted" back\slash<LF>newline<TAB>tab<U+0001>ctrl ü 日
+                    renderJson(segments) shouldBe
+                        """
+                        {
+                          "text": "A \"quoted\" back\\slash\nnewline\ttab\u0001ctrl ü 日",
+                          "speakers": 1,
+                          "segments": [
+                            {
+                              "start": 0.0,
+                              "end": 1.0,
+                              "text": "A \"quoted\" back\\slash\nnewline\ttab\u0001ctrl ü 日",
+                              "speaker": 0
+                            }
+                          ]
+                        }
+                        """.trimIndent()
+                }
+            }
+        }
     })
