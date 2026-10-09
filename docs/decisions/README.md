@@ -37,3 +37,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0029 | [Contract-first frontend with shared API examples](0029-contract-first-frontend-shared-api-examples.md) | accepted | 2026-10-09 |
 | 0030 | [Segment text is trimmed in every output](0030-trimmed-segment-text-in-all-outputs.md) | accepted | 2026-10-09 |
 | 0031 | [Frontend routing with react-router, state with XState](0031-frontend-routing-react-router-state-xstate.md) | accepted | 2026-10-09 |
+| 0032 | [Speaker-distance threshold 0.5448 for CAM++](0032-speaker-distance-threshold-for-campplus.md) | accepted | 2026-10-09 |
