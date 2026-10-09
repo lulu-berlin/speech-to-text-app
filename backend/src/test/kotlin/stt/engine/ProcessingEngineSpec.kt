@@ -10,13 +10,9 @@ import kotlinx.coroutines.test.runCurrent
 import stt.config.testConfig
 import stt.db.ChunkRepository
 import stt.db.SegmentRepository
-import stt.db.SpeakersMode
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
-import stt.db.queuedTask
 import stt.queue.TaskStatus
-import java.nio.file.Files
-import java.nio.file.Path
 
 class ProcessingEngineSpec :
     BehaviorSpec({
@@ -26,8 +22,8 @@ class ProcessingEngineSpec :
                     withEngineDatabase { dataDir, db ->
                         val workDirectories = TaskWorkDirectories(dataDir.dataDir)
                         val tasks = TaskRepository(db, workDirectories)
-                        val first = enqueue(tasks, workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueue(tasks, workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        val first = enqueueTask(tasks, workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(tasks, workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
 
                         val chunker = FakeChunker()
                         val transcriber = FakeTranscriber()
@@ -67,24 +63,3 @@ class ProcessingEngineSpec :
             }
         }
     })
-
-/** The id of the task a work path belongs to: `<dataDir>/work/<id>[/…]` (ADR 0024). */
-private fun taskIdOf(workPath: Path): Long = workPath.fileName.toString().toLong()
-
-/** Inserts a QUEUED task at [queuePosition] with an original in its work directory, as an upload does (ADR 0024). */
-private suspend fun enqueue(
-    tasks: TaskRepository,
-    workDirectories: TaskWorkDirectories,
-    filename: String,
-    queuePosition: Int,
-    createdAt: Long,
-): Long {
-    val id =
-        tasks.insert(
-            queuedTask(filename, createdAt).copy(queuePosition = queuePosition, speakersMode = SpeakersMode.OFF),
-        )
-    val source = workDirectories.source(id)
-    Files.createDirectories(source.parent)
-    Files.writeString(source, "fake source audio")
-    return id
-}
