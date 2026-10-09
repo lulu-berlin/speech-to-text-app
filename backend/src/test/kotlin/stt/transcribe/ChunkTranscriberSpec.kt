@@ -124,6 +124,12 @@ private suspend fun transcribeFailing(
     shouldThrow<TranscriptionException> {
         withTimeout(30.seconds) {
             ChunkTranscriber(ProcessRunner(), whisperCli.toString())
-                .transcribe(TEST_SETTINGS, workDir.resolve("chunk-2.flac"), workDir.resolve("chunk-2"), prompt = null)
+                .transcribe(
+                    TEST_SETTINGS,
+                    workDir.resolve("chunk-2.flac"),
+                    workDir.resolve("chunk-2"),
+                    prompt = null,
+                    onProgress = {},
+                )
         }
     }

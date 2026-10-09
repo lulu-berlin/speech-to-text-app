@@ -12,7 +12,7 @@ import java.nio.file.Path
 
 /** One planned chunk end to end (ADR 0004): transcribe, persist atomically, then clean up its files. */
 class ChunkTranscription(
-    private val transcriber: ChunkTranscriber,
+    private val transcriber: Transcriber,
     private val segments: SegmentRepository,
 ) {
     /**

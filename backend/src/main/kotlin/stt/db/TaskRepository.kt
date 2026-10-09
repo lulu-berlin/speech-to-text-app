@@ -4,11 +4,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.update
+import stt.queue.TaskStatus
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -107,6 +110,71 @@ class TaskRepository(
                 .orderBy(TasksTable.id)
                 .map { it.toStoredTask() }
         }
+
+    /**
+     * The QUEUED task with the lowest `queue_position` (ties broken by id), or null when none is queued.
+     * The engine asks this before every task, so a stale in-memory order cannot start one out of turn.
+     */
+    suspend fun nextQueued(): StoredTask? =
+        db.readTransaction {
+            TasksTable
+                .selectAll()
+                .where { TasksTable.status eq TaskStatus.QUEUED }
+                .orderBy(TasksTable.queuePosition to SortOrder.ASC_NULLS_LAST, TasksTable.id to SortOrder.ASC)
+                .limit(1)
+                .singleOrNull()
+                ?.toStoredTask()
+        }
+
+    /** Marks the task RUNNING and records when it started. */
+    suspend fun setRunning(
+        id: Long,
+        startedAt: Long,
+    ) {
+        db.writeTransaction {
+            TasksTable.update({ TasksTable.id eq id }) {
+                it[TasksTable.status] = TaskStatus.RUNNING
+                it[TasksTable.startedAt] = startedAt
+            }
+        }
+    }
+
+    /**
+     * Sets the task's phase; null clears it. Per item 12's contract the phase is kept on FAILED and
+     * CANCELED (the phase the task stopped in) and cleared when a task becomes QUEUED or COMPLETED.
+     */
+    suspend fun setPhase(
+        id: Long,
+        phase: TaskPhase?,
+    ) {
+        db.writeTransaction {
+            TasksTable.update({ TasksTable.id eq id }) { it[TasksTable.phase] = phase }
+        }
+    }
+
+    /** Stores the task's decoded duration, known once the source has been chunked. */
+    suspend fun setDurationMs(
+        id: Long,
+        durationMs: Long,
+    ) {
+        db.writeTransaction {
+            TasksTable.update({ TasksTable.id eq id }) { it[TasksTable.durationMs] = durationMs }
+        }
+    }
+
+    /** Marks the task COMPLETED, clears its phase and records when it finished. */
+    suspend fun setCompleted(
+        id: Long,
+        finishedAt: Long,
+    ) {
+        db.writeTransaction {
+            TasksTable.update({ TasksTable.id eq id }) {
+                it[TasksTable.status] = TaskStatus.COMPLETED
+                it[TasksTable.phase] = null
+                it[TasksTable.finishedAt] = finishedAt
+            }
+        }
+    }
 
     /** Deletes the task; its audio metadata, chunks with their chunk audio, and segments go with it (ON DELETE CASCADE). */
     suspend fun delete(id: Long) {
