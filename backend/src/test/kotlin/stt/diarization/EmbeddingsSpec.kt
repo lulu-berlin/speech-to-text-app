@@ -15,6 +15,7 @@ import stt.audio.AudioDecoder
 import stt.config.realSpeakerModelPath
 import stt.db.Segment
 import stt.process.ProcessRunner
+import stt.requireTestEnv
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
@@ -154,16 +155,5 @@ private suspend fun decodePcm(
     return FloatArray(floats.remaining()) { floats.get(it) }
 }
 
-/**
- * The item 08 LibriSpeech clips directory (`<utterance-id>.flac`), exported by `devenv.nix` from `nix/test-fixtures.nix`.
- * A missing variable fails the test naming it, so the failure says how to fix the environment.
- */
-private fun librispeechClips(): Path {
-    val value =
-        System.getenv("TEST_LIBRISPEECH_CLIPS")
-            ?: throw IllegalStateException(
-                "Integration test needs TEST_LIBRISPEECH_CLIPS set: enter the devenv shell that exports it, or pass it " +
-                    "explicitly (see workspaces/README.md § Environment for workspace agents)",
-            )
-    return Path.of(value)
-}
+/** The item 08 LibriSpeech clips directory (`<utterance-id>.flac`), exported by `devenv.nix` from `nix/test-fixtures.nix`. */
+private fun librispeechClips(): Path = requireTestEnv("TEST_LIBRISPEECH_CLIPS")
