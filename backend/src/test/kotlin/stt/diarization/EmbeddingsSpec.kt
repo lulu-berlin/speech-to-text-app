@@ -108,15 +108,10 @@ class EmbeddingsSpec :
                 then("the two clips of speaker 1089 are more similar to each other than either is to the clip of speaker 1188") {
                     // Spec (item 08 acceptance): same-speaker cosine > different-speaker cosine. Embeddings are
                     // L2-normalized, so the cosine is the dot product. Clips: docs/attributions.md (CC BY 4.0, ADR 0026).
-                    val clips = librispeechClips()
-                    val workDir = tempdir("librispeech").toPath()
+                    val pcms = decodeLibrispeech(tempdir("librispeech").toPath())
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
-                        val (speakerA1, speakerA2, speakerB) =
-                            listOf("1089-134686-0002", "1089-134691-0023", "1188-133604-0025").map { id ->
-                                val pcm = decodePcm(clips.resolve("$id.flac"), workDir.resolve("$id.f32"))
-                                embedder.embed(pcm, listOf(segment(0, pcm.size / 16L)))[0]
-                            }
+                        val (speakerA1, speakerA2, speakerB) = pcms.values.map { pcm -> embedder.embed(pcm, listOf(wholeClip(pcm)))[0] }
 
                         val same = dot(speakerA1, speakerA2)
                         val different = listOf(dot(speakerA1, speakerB), dot(speakerA2, speakerB))
@@ -134,15 +129,10 @@ class EmbeddingsSpec :
                     // Review round 1, finding 1: CAM++ (normalize_samples = 1) takes samples in [-1, 1] unscaled, as
                     // sherpa-onnx does. A wrong scale shifts every log-mel value of frames with sound but leaves the
                     // zero padding at the log floor, so global-mean normalization hides it only for unpadded windows.
-                    val clips = librispeechClips()
-                    val workDir = tempdir("librispeech").toPath()
+                    val pcms = decodeLibrispeech(tempdir("librispeech").toPath())
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
-                        val pcms =
-                            listOf("1089-134686-0002", "1089-134691-0023", "1188-133604-0025").associateWith { id ->
-                                decodePcm(clips.resolve("$id.flac"), workDir.resolve("$id.f32"))
-                            }
-                        val whole = pcms.mapValues { (_, pcm) -> embedder.embed(pcm, listOf(segment(0, pcm.size / 16L)))[0] }
+                        val whole = pcms.mapValues { (_, pcm) -> embedder.embed(pcm, listOf(wholeClip(pcm)))[0] }
                         val excerpts = pcms.mapValues { (_, pcm) -> embedder.embed(pcm, listOf(segment(2000, 2600)))[0] }
 
                         val speaker = { id: String -> id.substringBefore('-') }
@@ -164,6 +154,9 @@ private fun segment(
     endMs: Long,
 ): Segment = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speaker = null)
 
+/** The segment covering all of [pcm], in whole milliseconds. */
+private fun wholeClip(pcm: FloatArray): Segment = segment(0, pcm.size / 16L)
+
 private fun dot(
     a: FloatArray,
     b: FloatArray,
@@ -179,6 +172,15 @@ private suspend fun decodePcm(
     return FloatArray(floats.remaining()) { floats.get(it) }
 }
 
-/** The committed LibriSpeech clips (`<utterance-id>.flac`, `src/test/resources/librispeech`, ADR 0026) on the test classpath. */
-private fun librispeechClips(): Path =
-    Path.of(checkNotNull(Embeddings::class.java.getResource("/librispeech")) { "librispeech/ missing from the test classpath" }.toURI())
+/** The committed LibriSpeech utterances (docs/attributions.md): two of speaker 1089 from different chapters, one of speaker 1188. */
+private val LIBRISPEECH_IDS = listOf("1089-134686-0002", "1089-134691-0023", "1188-133604-0025")
+
+/**
+ * The committed LibriSpeech clips (`src/test/resources/librispeech`, ADR 0026, read from the test classpath), each decoded
+ * with the app's decoder into [workDir], by utterance id in [LIBRISPEECH_IDS] order.
+ */
+private suspend fun decodeLibrispeech(workDir: Path): Map<String, FloatArray> {
+    val resource = checkNotNull(Embeddings::class.java.getResource("/librispeech")) { "librispeech/ missing from the test classpath" }
+    val clips = Path.of(resource.toURI())
+    return LIBRISPEECH_IDS.associateWith { id -> decodePcm(clips.resolve("$id.flac"), workDir.resolve("$id.f32")) }
+}
