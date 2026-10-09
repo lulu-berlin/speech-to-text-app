@@ -19,8 +19,8 @@ internal fun clusterSegments(
     val n = embeddings.size
     if (n <= 1) return List(n) { 0 }
     if (n > 2 || k != null) TODO("three or more segments and fixed counts: next test-list items")
-    val height = cosineDistance(embeddings[0], embeddings[1])
-    return if (height < SPEAKER_DISTANCE_THRESHOLD) listOf(0, 0) else listOf(0, 1)
+    val lastHeight = upgmaMerges(embeddings).last().height
+    return if (lastHeight < SPEAKER_DISTANCE_THRESHOLD) listOf(0, 0) else listOf(0, 1)
 }
 
 /**
