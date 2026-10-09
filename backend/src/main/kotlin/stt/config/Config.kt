@@ -13,7 +13,7 @@ import java.nio.file.Path
  * (it sets whisper-cli `-t` and the speaker model's intra-op threads); any other value, empty included, fails fast.
  * `STT_SPEAKER_MODEL` (the CAM++ ONNX model, ADR 0003) is required: unset or empty fails fast.
  */
-class Config(
+data class Config(
     val dataDir: Path,
     val speakerModel: Path,
     val port: Int = 8080,
