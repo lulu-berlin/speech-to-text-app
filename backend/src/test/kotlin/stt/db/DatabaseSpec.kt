@@ -94,16 +94,7 @@ class DatabaseSpec :
                 then("V2 applies: audio_parts is gone, chunk_audio exists, and the task, its audio row and its chunk are kept") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
-                        val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
-                        Flyway
-                            .configure()
-                            .dataSource(url, null, null)
-                            .target("1")
-                            .load()
-                            .migrate()
-                        DriverManager.getConnection(url).use { connection ->
-                            connection.createStatement().use { st -> v1Rows.forEach { sql -> st.executeUpdate(sql) } }
-                        }
+                        migrateTo(dataDir, version = "1", v1Rows)
 
                         Database.open(dataDir).use { db ->
                             tableNames(db).shouldNotContain("audio_parts")
@@ -124,16 +115,7 @@ class DatabaseSpec :
                 then("V3 applies: both segments are kept with no speaker id, and the task has no speakers") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
-                        val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
-                        Flyway
-                            .configure()
-                            .dataSource(url, null, null)
-                            .target("2")
-                            .load()
-                            .migrate()
-                        DriverManager.getConnection(url).use { connection ->
-                            connection.createStatement().use { st -> v2Rows.forEach { sql -> st.executeUpdate(sql) } }
-                        }
+                        migrateTo(dataDir, version = "2", v2Rows)
 
                         Database.open(dataDir).use { db ->
                             val segments = SegmentRepository(db)
@@ -367,6 +349,24 @@ private val v2Rows =
         "INSERT INTO segments (task_id, chunk_idx, seq, start_ms, end_ms, text, speaker) VALUES (1, 0, 0, 0, 900, 'Hello.', 'SPEAKER_00')",
         "INSERT INTO segments (task_id, chunk_idx, seq, start_ms, end_ms, text, speaker) VALUES (1, 1, 0, 30000, 31000, 'Bye.', NULL)",
     )
+
+/** Creates `stt.db` in [dataDir] migrated only up to [version], then runs [rows] on it over a raw connection. */
+private fun migrateTo(
+    dataDir: Path,
+    version: String,
+    rows: List<String>,
+) {
+    val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
+    Flyway
+        .configure()
+        .dataSource(url, null, null)
+        .target(version)
+        .load()
+        .migrate()
+    DriverManager.getConnection(url).use { connection ->
+        connection.createStatement().use { st -> rows.forEach { sql -> st.executeUpdate(sql) } }
+    }
+}
 
 private val expectedTables =
     listOf(
