@@ -18,3 +18,22 @@ export { default as turnsSpeakersOff } from '../../../../docs/api/turns.speakers
 export { default as error } from '../../../../docs/api/error.json';
 export { default as errorDuplicateAudio } from '../../../../docs/api/error.duplicate-audio.json';
 export { default as taskTransitions } from '../../../../docs/api/task-transitions.json';
+
+import type { Task } from './types';
+import taskQueuedExample from '../../../../docs/api/task.queued.json';
+import taskRunningExample from '../../../../docs/api/task.running.json';
+import taskPausedExample from '../../../../docs/api/task.paused.json';
+import taskCompletedExample from '../../../../docs/api/task.completed.json';
+import taskFailedExample from '../../../../docs/api/task.failed.json';
+import taskCanceledExample from '../../../../docs/api/task.canceled.json';
+
+// Every Task example, one per status. JSON imports type `status` as string, so they are
+// narrowed to Task once here.
+export const taskExamples = [
+  taskQueuedExample,
+  taskRunningExample,
+  taskPausedExample,
+  taskCompletedExample,
+  taskFailedExample,
+  taskCanceledExample,
+] as Task[];
