@@ -6,7 +6,7 @@ import kotlin.math.abs
 private const val SHORT_TAIL_MS = 30_000L
 
 /** Plans contiguous chunks covering a file of [durationMs], cut at [silences] near [targetMs] and never longer than [capMs]. */
-fun planChunks(
+internal fun planChunks(
     durationMs: Long,
     silences: List<Silence>,
     targetMs: Long,

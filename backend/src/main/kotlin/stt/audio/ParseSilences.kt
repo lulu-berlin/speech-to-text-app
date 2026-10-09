@@ -9,7 +9,7 @@ private val SILENCE_END = Regex("""silence_end: (\S+)""")
  * Parses ffmpeg `silencedetect` [stderr] lines into silences, rounded to the millisecond; other lines are ignored.
  * A trailing `silence_start` without `silence_end` ends at [durationMs].
  */
-fun parseSilences(
+internal fun parseSilences(
     stderr: List<String>,
     durationMs: Long,
 ): List<Silence> {

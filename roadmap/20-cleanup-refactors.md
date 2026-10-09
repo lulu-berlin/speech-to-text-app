@@ -36,7 +36,7 @@ Except for test-list item 1 (a TDD cycle) and the pnpm pin (a devenv change), ev
   - (a) The pause-freeze check (pause, delay 500 ms, assert at most one line arrived meanwhile) appears twice, at `:147-152` and `:447-451`. Change: one private helper.
   - (b) The safety-net cleanup `if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)` in `finally` appears three times (`:340`, `:375`, `:571`). Change: one helper that runs a block and force-kills the reported pids afterwards.
   - Not merged: where each test captures `aliveWhenRunThrew` (after the throw, inside the catch, or in the cancel handler), because that point differs per scenario.
-- **R4. `parseSilences` becomes `internal`** (`audio/ParseSilences.kt:12`), like every other declaration in `stt.audio`.
+- **R4. `parseSilences` and `planChunks` become `internal`** (`audio/ParseSilences.kt:12`, `audio/ChunkPlanner.kt:9`): the pure helpers of `AudioChunker` are module-internal, like `FFMPEG` and `expectSuccess` in `audio/Ffmpeg.kt` (corrected 2026-10-09: the original reason, "like every other declaration in `stt.audio`", was wrong).
 - **R5. Prettier file list in one place.**
   - The `test` and `format` scripts in `frontend/package.json:10-11` repeat `src index.html vite.config.ts package.json tsconfig.json ../.prettierrc`.
   - Change (decided 2026-10-09):
@@ -89,3 +89,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: test-list item 1 done (`TaskQueueSpec`, user-confirmed). Green on arrival; red recorded against a temporary, uncommitted mutation making `TaskQueue.transition` skip the per-task check: `expected:<Rejected(reason=IllegalTransition(from=QUEUED, to=COMPLETED))> but was:<Accepted(queue=TaskQueue(entries=[QueueEntry(id=2, status=PAUSED)], paused=false))>`; mutation reverted.
 - 2026-10-09 (discovered, confirmed by the user before R1): R1 splits the parsing part out of the mixed `DeviceArgsSpec`/`WhisperCommandSpec` scenarios into two new `ConfigSpec` scenarios (`STT_DEVICE`, `STT_THREADS`), so the backend count rises by two more; test-list item 2 amended accordingly.
 - 2026-10-09: R2 approved with one change by the user: `ProcessResult.requireSuccess` is renamed to `expectSuccess` (production function and its three callers), as its own `Refactor:` commit before R2.
+- 2026-10-09 (discovered before R4, user chose option 1): R4's reason was wrong; `stt.audio` also has public declarations (`planChunks`, `AudioChunker`, `AudioDecoder`, the data classes). R4 widened to `planChunks`, the other pure helper called only by `AudioChunker`; reason corrected in the R4 bullet.
