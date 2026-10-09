@@ -1,0 +1,16 @@
+{
+  "transitions": {
+    "QUEUED": ["RUNNING", "PAUSED", "CANCELED"],
+    "RUNNING": ["PAUSED", "COMPLETED", "FAILED", "CANCELED"],
+    "PAUSED": ["QUEUED", "CANCELED"],
+    "COMPLETED": [],
+    "FAILED": ["QUEUED"],
+    "CANCELED": ["QUEUED"]
+  },
+  "commands": {
+    "pause": { "from": ["QUEUED", "RUNNING"], "to": "PAUSED" },
+    "resume": { "from": ["PAUSED"], "to": "QUEUED" },
+    "cancel": { "from": ["QUEUED", "RUNNING", "PAUSED"], "to": "CANCELED" },
+    "retry": { "from": ["FAILED", "CANCELED"], "to": "QUEUED" }
+  }
+}

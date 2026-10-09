@@ -35,3 +35,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0027 | [Automatic speaker count allows one speaker](0027-auto-speaker-count-allows-one-speaker.md) | accepted | 2026-10-09 |
 | 0029 | [Contract-first frontend with shared API examples](0029-contract-first-frontend-shared-api-examples.md) | accepted | 2026-10-09 |
 | 0030 | [Segment text is trimmed in every output](0030-trimmed-segment-text-in-all-outputs.md) | accepted | 2026-10-09 |
+| 0031 | [Frontend routing with react-router, state with XState](0031-frontend-routing-react-router-state-xstate.md) | accepted | 2026-10-09 |

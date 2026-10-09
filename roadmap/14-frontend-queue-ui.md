@@ -14,8 +14,8 @@ Let the user upload many audio files and manage the work queue from the browser:
 
 ## Proposal (pending approval)
 - Drag-and-drop multi-file upload (plus a file picker) with per-upload options: language, speakers (`auto` / `off` / fixed count), max speakers; each file is sent as one `POST /api/tasks`.
-- Queue list showing each task's filename, status, phase (CHUNKING / TRANSCRIBING / DIARIZING) and two progress bars, updated live from `useEvents`: transcription, and diarization (hidden when `diarizationProgress` is null; at 100 % during `DIARIZING` it reads "clustering").
-- Per-task controls: pause, resume, cancel (`POST /api/tasks/{id}/pause|resume|cancel`), shown only when the transition is allowed for the task's status.
+- Queue list showing each task's filename, status, phase (CHUNKING / TRANSCRIBING / DIARIZING) and two progress bars, updated live from item 13's connection machine: transcription, and diarization (hidden when `diarizationProgress` is null; at 100 % during `DIARIZING` it reads "clustering").
+- Per-task controls: pause, resume, cancel (`POST /api/tasks/{id}/pause|resume|cancel`), shown only when `docs/api/task-transitions.json` allows the command for the task's status, and sent through item 13's command machine (ADR 0031).
 - Drag reorder of non-terminal tasks (`@dnd-kit` proposed) calling `PUT /api/queue/order` with the full ordered id list; on a rejected reorder (409) the list reverts to the server order.
 - Queue pause toggle (`POST /api/queue/pause|resume`) reflecting `GET /api/queue` state.
 
