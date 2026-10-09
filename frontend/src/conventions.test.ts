@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 // Frontend conventions: all design values live in the tokens, so no component holds a
-// literal color or size. `theme.ts` is where the values belong, so it may hold colors and
-// units — but no raw `px` (user decision 2026-10-09): lengths are `rem` so they follow the
-// reader's font size.
-const TOKENS = '/src/shared/theme/theme.ts';
+// literal color or size. The token modules (`theme.ts` and the palettes next to it) are
+// where the values belong, so they may hold colors and units — but no raw `px` anywhere
+// (user decision 2026-10-09): lengths are `rem` so they follow the reader's font size.
+const TOKENS = '/src/shared/theme/';
 
 // Every source file's text, keyed by its path from the project root.
 const sources = import.meta.glob<string>('/src/**/*.{ts,tsx}', {
@@ -33,13 +33,12 @@ function violations(): Violation[] {
   return Object.entries(sources)
     .filter(([file]) => !/\.test\.tsx?$/.test(file) && !file.startsWith('/src/test/'))
     .flatMap(([file, source]) => {
-      const rules: [string, RegExp][] =
-        file === TOKENS
-          ? [['raw px', PX]]
-          : [
-              ['literal color', COLOR],
-              ['literal length', LENGTH],
-            ];
+      const rules: [string, RegExp][] = file.startsWith(TOKENS)
+        ? [['raw px', PX]]
+        : [
+            ['literal color', COLOR],
+            ['literal length', LENGTH],
+          ];
       return source.split('\n').flatMap((text, index) =>
         rules.flatMap(([rule, pattern]) =>
           [...text.matchAll(pattern)].map((match) => ({
