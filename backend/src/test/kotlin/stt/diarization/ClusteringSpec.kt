@@ -62,4 +62,32 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("pairs at exactly the same distance") {
+            `when`("they are merged by UPGMA") {
+                then("the lower-index pair is merged first: the lower row, then the lower column") {
+                    // Every tie below is exact in float32: each tied dot product is the same single product 1 * c.
+                    val c = 0.8f
+                    val s = 0.6f
+                    // Disjoint pairs in different rows: 0-1 and 2-3 both at 1 - c; all cross distances are 1.
+                    val twoRows =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f),
+                            floatArrayOf(c, s, 0f, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f),
+                            floatArrayOf(0f, 0f, c, s),
+                        )
+                    // Two pairs in the same row: 0-1 and 0-2 both at 1 - c; 1-2 at 1 - c², which is larger.
+                    val oneRow =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f),
+                            floatArrayOf(c, s, 0f),
+                            floatArrayOf(c, 0f, s),
+                        )
+
+                    upgmaMerges(twoRows).map { it.i to it.j }.shouldBe(listOf(0 to 1, 2 to 3, 0 to 2))
+                    upgmaMerges(oneRow).map { it.i to it.j }.shouldBe(listOf(0 to 1, 0 to 2))
+                }
+            }
+        }
     })
