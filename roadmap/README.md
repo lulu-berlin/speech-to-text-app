@@ -52,6 +52,7 @@ graph TD
   09 --> 22[22 speaker rename]
   12 --> 22
   15 --> 22
+  09 --> 23[23 faster clustering]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -81,3 +82,4 @@ graph TD
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |
 | [22 — Rename a task's speakers](22-speaker-rename.md) | draft | 09, 12, 15 |
+| [23 — Faster speaker clustering](23-faster-clustering.md) | draft | 09 |

@@ -15,9 +15,9 @@ Render a task's stored segments (and speaker labels) as txt, srt, vtt, and json,
 
 ## Proposal (pending approval)
 
-Pure renderer functions `(segments, speakers?) -> String` (UTF-8), called on demand from the `segments` table (item 03 proposal: render on demand, nothing stored). Segment times are integer milliseconds in the DB; segment text is stored exactly as whisper-cli emitted it (leading space included), because item 07's prompt is built from it; every renderer trims it (ADR 0030).
+Pure renderer functions `(segments) -> String` (UTF-8), called on demand from the `segments` table (item 03 proposal: render on demand, nothing stored). Each stored segment carries its `speakerId` (item 09, ADR 0028): null for every segment of a speakers-off task. Segment times are integer milliseconds in the DB. Segment text is stored exactly as whisper-cli emitted it (leading space included), because item 07's prompt is built from it; every renderer trims it (ADR 0030).
 
-Diarized formats (port of oracle `write_diarized_outputs`, using `speaker_turns` from item 09):
+Diarized formats (port of oracle `write_diarized_outputs`). Labels always come from the 0-based `speakerId` as the oracle prints them, `Speaker N` / `[speaker N]` with N = speakerId + 1, never from the stored speaker name (decided 2026-10-09; item 22 revisits this when names become renamable). Turns are item 09's `speakerTurns`, whose consecutive segments share a `speakerId`; the renderer labels each turn from its `speakerId`, not from `SpeakerTurn.speaker`.
 
 - **txt** — segment-level, not turn-level. Whenever the speaker differs from the previous segment's: a blank line (except before the first block), then `[speaker N]` (lower-case, `N` = index + 1) on its own line. Every segment's trimmed text on its own line. File ends with a single `\n` after the last text line.
   ```
@@ -35,18 +35,23 @@ Diarized formats (port of oracle `write_diarized_outputs`, using `speaker_turns`
   - top level keys in order `text`, `speakers`, `segments`;
   - `text` = every segment's text trimmed, joined with single spaces, trimmed;
   - `speakers` = number of distinct speaker labels;
-  - `segments[]` = per segment, keys in order `start`, `end`, `text`, `speaker` (the oracle also copies `id`/`seek` before them when the legacy whisper JSON shape provides them; the app does not store them, so they are omitted); `start`/`end` in seconds (`ms / 1000.0`) printed like Python `repr(float)` (`0.0`, `1.5`, `12.34`); `text` trimmed (ADR 0030; the oracle keeps it untrimmed); `speaker` = 0-based index (not +1);
+  - `segments[]` = per segment, keys in order `start`, `end`, `text`, `speaker`. The oracle copies `id`/`seek` only from whisper's legacy `segments` JSON; whisper-cli 1.9.2 writes the `transcription` shape, from which the oracle builds no `id`/`seek`, so they are omitted (decided 2026-10-09). `start`/`end` are in seconds (`ms / 1000.0`), printed like Python `repr(float)` (`0.0`, `1.5`, `12.34`); `text` is trimmed (ADR 0030; the oracle keeps it untrimmed); `speaker` is the 0-based index (not +1);
   - formatting: two-space indentation, `": "` between key and value, `,` at line ends, empty list printed as `[]`, non-ASCII characters written as-is, string escapes as Python's encoder emits them (`\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t`, other characters below U+0020 as `\u00XX`).
-- **No speech** (task with zero segments; oracle `transcribe_one`): json = `{"text": "", "segments": []}` followed by `\n` (compact, no `speakers` key); txt, srt, vtt = empty (0 bytes, vtt without header).
-- **Speakers off** — variants without speaker labels (the oracle delegates these to whisper-cli's native `-otxt/-osrt/-ovtt/-oj` writers, so there is no oracle code to port). Draft: txt = one trimmed segment text per line; srt/vtt = one cue per segment with the trimmed text and no `Speaker N:` prefix; json = same shape as above without `speakers` and without per-segment `speaker`. Final shapes depend on the open question below.
+- **No speech** (task with zero segments; oracle `transcribe_one`): json = `{"text": "", "segments": []}` followed by `\n` (compact, no `speakers` key); txt, srt, vtt = empty (0 bytes, vtt without header). The same with speakers on or off (decided 2026-10-09).
+- **Speakers off** (decided 2026-10-09). The oracle delegates these to whisper-cli's native writers, so there is no oracle code to port. The app uses the diarized shapes without labels, with trimmed text (ADR 0030), not whisper-cli's own output, which keeps the leading spaces and writes whisper's raw JSON:
+  - txt: one trimmed segment text per line, no `[speaker N]` lines, ending with a single `\n`;
+  - srt: one numbered cue per segment, `{i}\n{start} --> {end}\n{text}\n\n`;
+  - vtt: `WEBVTT\n\n`, then one cue per segment, `{start} --> {end}\n{text}\n\n`;
+  - json: top-level keys `text`, `segments`; per segment `start`, `end`, `text`; no `speakers`, no `speaker`; the same formatting rules as the diarized json.
+- **Download file names** (decided 2026-10-09): `<original filename stem>.<format>`, like the oracle's output prefix (`interview.mp3` → `interview.srt`). This item provides the name; item 12 sends it in `Content-Disposition`.
 
-## Open questions for the user
+## Open questions (answered 2026-10-09)
 
-- Exact speakers-off formats: match whisper-cli 1.9.2's native writers byte-for-byte (captured as golden files from a real run), or use the draft above?
-- No-speech output with speakers off: same as the diarized no-speech output, or what whisper-cli writes for an empty transcript?
-- Should `id`/`seek` ever appear in json (they would require storing extra whisper fields)? Proposed: no.
-- Download file names: `<original filename stem>.<format>` like the oracle's output prefix?
-- Speaker names (ADR 0028, item 09): speakers are stored as `speakers(task_id, speaker_id, speaker)` with the name `"Speaker N"`, and a later feature will rename them. Should txt/srt/vtt print the stored name (identical output until a rename exists; txt's lower-case `[speaker N]` would then become `[<name>]`), or always the oracle's `Speaker N` / `[speaker N]` from the 0-based `speakerId`? json keeps the 0-based `speaker` number either way (oracle format).
+- Speakers-off formats? → **The draft**: the diarized shapes without labels, trimmed; not whisper-cli's native output.
+- No-speech output with speakers off? → **Same as the diarized no-speech output.**
+- `id`/`seek` in the downloaded json? → **Omitted.** The oracle itself prints none with whisper-cli 1.9.2's JSON.
+- Download file names? → **`<original stem>.<format>`.**
+- Speaker labels? → **The oracle's `Speaker N` / `[speaker N]` from the speakerId**; item 22 decides once names are renamable.
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -62,7 +67,10 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] json keeps non-ASCII text unescaped and escapes quotes, backslashes, and control characters like Python
 - [ ] `speakers` counts distinct labels, not the highest label
 - [ ] A task with no segments renders `{"text": "", "segments": []}\n` as json and empty txt/srt/vtt
-- [ ] Speakers-off variants contain no speaker labels (shape per the answered open question)
+- [ ] Speakers off: txt is one trimmed segment per line, srt and vtt have one cue per segment without a speaker prefix, and json has `text` and `segments` (start, end, text) without `speakers`/`speaker`
+- [ ] Speakers off with no segments renders the same no-speech output as speakers on
+- [ ] Labels come from the speakerId (`Speaker N`, `[speaker N]`), not from the stored speaker name
+- [ ] The download file name is the original file's stem plus the format's extension
 
 ## Acceptance criteria
 
@@ -74,3 +82,4 @@ Seed — to be refined and approved with the user before any test is written:
 ## Approval log
 
 - 2026-10-09: decision from the item 12 contract consultation ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)): json `segments[].text` is trimmed, like every other output; storage stays untrimmed for item 07's prompt. The rest of the item is still draft.
+- 2026-10-09: consultation answers approved: speakers-off formats = the draft (diarized shapes without labels, trimmed); speakers-off no-speech = the diarized no-speech output; `id`/`seek` omitted; download names `<original stem>.<format>`; labels from the speakerId as the oracle prints them, with item 22 revisiting them for renamed speakers. Test list not yet approved.

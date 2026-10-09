@@ -1,5 +1,6 @@
 {
-  "id": 5,
-  "transcriptionProgress": 0.43,
-  "diarizationProgress": 0.0
+  "id": 6,
+  "transcriptionProgress": 1.0,
+  "diarizationStage": "CLUSTERING",
+  "diarizationProgress": 0.37
 }

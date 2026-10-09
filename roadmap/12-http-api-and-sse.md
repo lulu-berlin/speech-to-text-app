@@ -74,12 +74,13 @@ The JSON shapes the frontend builds against.
     - `durationMs` (number, or null before chunking)
     - `sizeBytes` (number)
     - `transcriptionProgress` (0–1)
+    - `diarizationStage` (`EMBEDDING|CLUSTERING|null`)
     - `diarizationProgress` (0–1, or null)
     - `error` (string or null)
     - `transcribedUntilMs` (number, or null): the end of the task's last stored segment, on the `/audio` timeline; null while no segment is stored
     - `createdAt`, `startedAt`, `finishedAt` (epoch ms, or null)
-  - `diarizationProgress` is `null` when diarization does not apply: speakers `off`, or the task finished without segments. Otherwise it is 0 until diarization starts.
-  - While `phase = DIARIZING`, a value of 1 means clustering is running (item 11).
+  - `diarizationStage` is the running diarization stage: `EMBEDDING` (segments embedded) and then `CLUSTERING` (merges done). It is null outside the DIARIZING phase (added 2026-10-09, item 11 consultation).
+  - `diarizationProgress` is the progress within the current stage, so the diarization bar fills once per stage, labelled by stage. Before diarization starts it is 0; once the speakers are stored it is 1. It is `null` when diarization does not apply: speakers `off`, or the task finished without segments.
   - `phase`:
     - the phase the task is in while RUNNING or PAUSED;
     - FAILED and CANCELED tasks keep the phase they stopped in, so the UI can say e.g. "failed while transcribing at 12:34" (with `transcribedUntilMs`);
@@ -102,7 +103,7 @@ The JSON shapes the frontend builds against.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task
-  - `task-progress` → `{ "id", "transcriptionProgress", "diarizationProgress" }`
+  - `task-progress` → `{ "id", "transcriptionProgress", "diarizationStage", "diarizationProgress" }`
   - `queue-updated` → Queue
   - `task-deleted` → `{ "id" }`
 - **Error codes:**
@@ -177,3 +178,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: contract approved by the user as written (section "Contract"); example files created in `docs/api/` with the file-to-shape mapping and nullability convention in `docs/api/README.md`. The rest of the item (Proposal details, test list) is still to be approved before `spec-approved`.
 - 2026-10-09: last details decided: FAILED and CANCELED tasks keep their `phase`; new Task field `transcribedUntilMs` (end of the last stored segment), resume stays per chunk (segment-level resume rejected); segment text trimmed everywhere it leaves the backend, including the json download ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)). Test list (19 items) approved by the user; two items added from these decisions. Status `spec-approved`.
 - 2026-10-09: contract extended in the item 13 consultation: `docs/api/task-transitions.json` (transitions and commands), shared by the frontend state machine and a backend check (item 11).
+- 2026-10-09: contract changed in the item 10/11 consultation: Task and `task-progress` gain `diarizationStage` (`EMBEDDING`, `CLUSTERING`, null), and `diarizationProgress` becomes the progress within that stage (replacing "1 while clustering"); `docs/api/` examples updated in the same commit (new `task.diarizing.json`; `task-progress.json` shows the clustering stage). Item 13 picks this up on its next rebase.
