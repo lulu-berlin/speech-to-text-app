@@ -45,6 +45,7 @@ Diarized formats (port of oracle `write_diarized_outputs`, using `speaker_turns`
 - No-speech output with speakers off: same as the diarized no-speech output, or what whisper-cli writes for an empty transcript?
 - Should `id`/`seek` ever appear in json (they would require storing extra whisper fields)? Proposed: no.
 - Download file names: `<original filename stem>.<format>` like the oracle's output prefix?
+- Speaker names (ADR 0028, item 09): speakers are stored as `speakers(task_id, speaker_id, speaker)` with the name `"Speaker N"`, and a later feature will rename them. Should txt/srt/vtt print the stored name (identical output until a rename exists; txt's lower-case `[speaker N]` would then become `[<name>]`), or always the oracle's `Speaker N` / `[speaker N]` from the 0-based `speakerId`? json keeps the 0-based `speaker` number either way (oracle format).
 
 ## Test list (written with the user; Canon TDD step 1)
 

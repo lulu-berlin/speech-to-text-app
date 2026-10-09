@@ -34,8 +34,9 @@ graph TD
   03 --> 18[18 audio storage ✓]:::done
   18 --> 11
   11 --> 12[12 HTTP API and SSE]
+  10 --> 12
   02 --> 13[13 frontend foundation]
-  12 --> 13
+  12 -. spec only .-> 13
   13 --> 14[14 frontend queue UI]
   13 --> 15[15 frontend history UI]
   02 --> 16[16 Nix flake package]
@@ -44,6 +45,9 @@ graph TD
   13 --> 17[17 branding: stenographer animation]
   16 --> 19[19 Docker image and compose]
   20[20 cleanup refactors]
+  12 --> 21[21 frontend-backend end-to-end]
+  14 --> 21
+  15 --> 21
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -62,8 +66,8 @@ graph TD
 | [09 — Diarization](09-diarization.md) | spec-approved | 08 |
 | [10 — Output formats](10-output-formats.md) | draft | 09 |
 | [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18 |
-| [12 — HTTP API and SSE](12-http-api-and-sse.md) | draft | 11 |
-| [13 — Frontend foundation](13-frontend-foundation.md) | draft | 02, 12 |
+| [12 — HTTP API and SSE](12-http-api-and-sse.md) | draft | 10, 11 |
+| [13 — Frontend foundation](13-frontend-foundation.md) | draft | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13 |
 | [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13 |
 | [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
@@ -71,3 +75,4 @@ graph TD
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
 | [20 — Cleanup refactors](20-cleanup-refactors.md) | spec-approved | — |
+| [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |

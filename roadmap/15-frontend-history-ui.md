@@ -9,17 +9,19 @@ Let the user browse past transcriptions: see finished tasks, read a transcript w
 ## Already decided
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
 - [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks — 16 kHz mono, not the original upload; a task canceled or failed before chunking has no audio (404).
+- Item 12's contract (consultation 2026-10-09): the transcript view reads `GET /api/tasks/{id}/turns`, which returns the task's speakers (`speakerId`, stored name `speaker`) and item 09's turns referencing them by `speakerId` (ADR 0028; names become renamable later); `/audio` supports Range, so seeking and click-to-seek are possible; `DELETE /api/tasks/{id}` exists; a `task-deleted` event removes a task from the list.
 
 ## Proposal (pending approval)
 - History list of finished tasks (status COMPLETED, FAILED, CANCELED) with filename, status, date, duration; FAILED tasks show their error message.
-- Detail view for a completed task showing speaker turns with timestamps (from `GET /api/tasks/{id}/transcript?format=json`); speakers-off transcripts shown without labels.
+- Detail view for a completed task showing speaker turns with timestamps (from `GET /api/tasks/{id}/turns`); speakers-off transcripts shown without labels.
 - Download buttons per format: txt, srt, vtt, json (`GET /api/tasks/{id}/transcript?format=...`).
 - Audio player (`<audio>`) sourced from `GET /api/tasks/{id}/audio` (`audio/flac`, 16 kHz mono).
 - The list updates live when a task finishes (via `useEvents`).
 
 ## Open questions for the user
 - Search/filter in the history list (by filename, date, status)?
-- Click-to-seek: clicking a segment/turn seeks the audio player to its start time?
+- Click-to-seek: clicking a segment/turn seeks the audio player to its start time? (Possible now: `/audio` supports Range.)
+- Delete button in History, with confirmation? (Coordinated with item 14's question.)
 - A task without audio (canceled or failed before chunking; the audio endpoint answers 404): hide the player, or show a "no audio" note?
 
 ## Test list (written with the user; Canon TDD step 1)
@@ -36,7 +38,7 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Acceptance criteria
 - RTL tests pass against MSW handlers.
-- Against the running backend: a completed transcription appears in History, its turns are readable, every download produces the matching file, and the audio plays.
+- Checked against the running backend in item 21.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log

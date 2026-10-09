@@ -33,3 +33,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0025 | [Nix build uses Gradle's default JVM memory settings](0025-nix-build-gradle-default-jvm-memory.md) | accepted | 2026-10-08 |
 | 0026 | [No rule for where test fixtures live](0026-no-rule-for-test-fixture-location.md)          | accepted | 2026-10-09 |
 | 0027 | [Automatic speaker count allows one speaker](0027-auto-speaker-count-allows-one-speaker.md) | accepted | 2026-10-09 |
+| 0029 | [Contract-first frontend with shared API examples](0029-contract-first-frontend-shared-api-examples.md) | accepted | 2026-10-09 |
