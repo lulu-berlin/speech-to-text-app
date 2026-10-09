@@ -2,7 +2,9 @@ package stt.engine
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.withContext
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSegment
 import stt.transcribe.WhisperSettings
@@ -22,6 +24,15 @@ internal class FakeTranscriber : Transcriber {
     /** When set, every call waits for it before returning; a test clears it to let later calls run through. */
     var hold: CompletableDeferred<Unit>? = null
 
+    /**
+     * When set, a cancelled call does not die at once: it reports itself on [dyingStarted] and waits for
+     * this before it is recorded in [cancelled], like item 05's runner waiting out its SIGTERM grace period.
+     */
+    var death: CompletableDeferred<Unit>? = null
+
+    /** The audio file of every cancelled call that has started dying (see [death]). */
+    val dyingStarted = Channel<Path>(Channel.UNLIMITED)
+
     val probe = ConcurrencyProbe()
 
     override suspend fun transcribe(
@@ -37,6 +48,12 @@ internal class FakeTranscriber : Transcriber {
             try {
                 hold?.await()
             } catch (e: CancellationException) {
+                death?.let { pending ->
+                    withContext(NonCancellable) {
+                        dyingStarted.send(audio)
+                        pending.await()
+                    }
+                }
                 cancelled.add(audio)
                 throw e
             }
