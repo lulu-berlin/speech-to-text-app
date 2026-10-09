@@ -26,7 +26,7 @@ graph TD
   03 --> 07
   06 --> 08[08 speaker embeddings ✓]:::done
   08 --> 09[09 diarization ✓]:::done
-  09 --> 10[10 output formats]
+  09 --> 10[10 output formats ✓]:::done
   04 --> 11[11 processing engine]
   05 --> 11
   07 --> 11
@@ -76,7 +76,7 @@ graph TD
 | [07 — Whisper transcription](../docs/specs/whisper-transcription.md) | done | 03, 06 |
 | [08 — Speaker embeddings](../docs/specs/speaker-embeddings.md) | done | 06 |
 | [09 — Diarization](../docs/specs/diarization.md) | done | 08 |
-| [10 — Output formats](10-output-formats.md) | spec-approved | 09 |
+| [10 — Output formats](../docs/specs/output-formats.md) | done | 09 |
 | [11 — Processing engine](11-processing-engine.md) | spec-approved | 04, 05, 07, 09, 18, 20 |
 | [12 — HTTP API and SSE](12-http-api-and-sse.md) | spec-approved | 10, 11 |
 | [13 — Frontend foundation](../docs/specs/frontend-foundation.md) | done | 02, 12 (spec-approved only) |
