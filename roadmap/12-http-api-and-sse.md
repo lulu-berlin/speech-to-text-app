@@ -1,7 +1,7 @@
 # 12 — HTTP API and SSE
 
 Status: spec-approved
-Depends on: [10](10-output-formats.md), [11](11-processing-engine.md)
+Depends on: [10](../docs/specs/output-formats.md) (done), [11](11-processing-engine.md)
 
 ## Goal
 
