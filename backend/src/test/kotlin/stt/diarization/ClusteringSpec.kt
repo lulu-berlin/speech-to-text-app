@@ -55,7 +55,7 @@ class ClusteringSpec :
                     // counts once; the weighted WPGMA would give ((d(120°) + d(100°)) / 2 + d(70°)) / 2 ≈ 0.997).
                     val merges = upgmaMerges(arrayOf(unit(0.0), unit(20.0), unit(50.0), unit(120.0)))
 
-                    merges.map { it.i to it.j }.shouldBe(listOf(0 to 1, 0 to 2, 0 to 3))
+                    merges.pairs().shouldBe(listOf(0 to 1, 0 to 2, 0 to 3))
                     merges[0].height.shouldBe(distance(20.0).plusOrMinus(1e-6))
                     merges[1].height.shouldBe(((distance(50.0) + distance(30.0)) / 2).plusOrMinus(1e-6))
                     merges[2].height.shouldBe(((distance(120.0) + distance(100.0) + distance(70.0)) / 3).plusOrMinus(1e-6))
@@ -85,9 +85,12 @@ class ClusteringSpec :
                             floatArrayOf(c, 0f, s),
                         )
 
-                    upgmaMerges(twoRows).map { it.i to it.j }.shouldBe(listOf(0 to 1, 2 to 3, 0 to 2))
-                    upgmaMerges(oneRow).map { it.i to it.j }.shouldBe(listOf(0 to 1, 0 to 2))
+                    upgmaMerges(twoRows).pairs().shouldBe(listOf(0 to 1, 2 to 3, 0 to 2))
+                    upgmaMerges(oneRow).pairs().shouldBe(listOf(0 to 1, 0 to 2))
                 }
             }
         }
     })
+
+/** The merged `(i, j)` index pairs, in merge order. */
+private fun List<Merge>.pairs() = map { it.i to it.j }
