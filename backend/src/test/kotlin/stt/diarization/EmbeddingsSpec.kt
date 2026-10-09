@@ -216,7 +216,7 @@ class EmbeddingsSpec :
 private fun segment(
     startMs: Long,
     endMs: Long,
-): Segment = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speaker = null)
+): Segment = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speakerId = null)
 
 /** The segment covering all of [pcm], in whole milliseconds. */
 private fun wholeClip(pcm: FloatArray): Segment = segment(0, pcm.size / 16L)

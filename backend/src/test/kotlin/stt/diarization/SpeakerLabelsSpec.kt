@@ -152,4 +152,4 @@ private val voiceB2 = floatArrayOf(0f, 0f, 0.96f, 0.28f)
 private fun segment(
     startMs: Long,
     endMs: Long,
-) = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speaker = null)
+) = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speakerId = null)

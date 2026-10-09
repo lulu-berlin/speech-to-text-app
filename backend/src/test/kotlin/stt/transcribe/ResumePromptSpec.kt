@@ -25,7 +25,7 @@ class ResumePromptSpec :
                                     startMs = 0,
                                     endMs = 7_940,
                                     text = " And so my fellow Americans",
-                                    speaker = null,
+                                    speakerId = null,
                                 ),
                                 Segment(
                                     chunkIdx = 1,
@@ -33,7 +33,7 @@ class ResumePromptSpec :
                                     startMs = 300_000,
                                     endMs = 302_000,
                                     text = " ask what you can do",
-                                    speaker = null,
+                                    speakerId = null,
                                 ),
                                 Segment(
                                     chunkIdx = 1,
@@ -41,7 +41,7 @@ class ResumePromptSpec :
                                     startMs = 302_000,
                                     endMs = 304_000,
                                     text = " for your country.",
-                                    speaker = null,
+                                    speakerId = null,
                                 ),
                             ),
                         )
