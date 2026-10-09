@@ -5,31 +5,32 @@ Depends on: [09](../docs/specs/diarization.md) (done)
 
 ## Goal
 
-Render a task's stored segments (and speaker labels) as txt, srt, vtt, and json, byte-for-byte identical to what the oracle's `write_diarized_outputs` writes for the same segments and speakers (`docs/oracle/transcribe.py`).
+Render a task's stored segments (and speaker labels) as txt, srt, vtt, and json, byte-for-byte identical to what the oracle's `write_diarized_outputs` writes for the same segments and speakers (`docs/oracle/transcribe.py`), except for the deliberate deviations of ADR 0030 (trimmed json segment text) and ADR 0034 (speaker labels are the stored names).
 
 ## Already decided
 
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): output formats are part of the oracle behavior to port.
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): speaker labels and turn merging come from item 09.
 - [ADR 0030 — Segment text is trimmed in every output](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md) (2026-10-09): json `segments[].text` is trimmed too, a deliberate deviation from the oracle; everything else stays a byte-for-byte port.
+- [ADR 0034 — Speaker labels in downloads are the stored speaker names](../docs/decisions/0034-speaker-labels-are-stored-names.md) (2026-10-09): txt/srt/vtt print `Speaker.speaker` (`Speaker 1` until renamed), txt headers included (`[Speaker 1]`, not the oracle's `[speaker 1]`); json keeps the 0-based number.
 
 ## Proposal (approved 2026-10-09)
 
 Pure renderer functions `(segments) -> String` (UTF-8), called on demand from the `segments` table (item 03 proposal: render on demand, nothing stored). Each stored segment carries its `speakerId` (item 09, ADR 0028): null for every segment of a speakers-off task. Segment times are integer milliseconds in the DB. Segment text is stored exactly as whisper-cli emitted it (leading space included), because item 07's prompt is built from it; every renderer trims it (ADR 0030).
 
-Diarized formats (port of oracle `write_diarized_outputs`). Labels always come from the 0-based `speakerId` as the oracle prints them, `Speaker N` / `[speaker N]` with N = speakerId + 1, never from the stored speaker name (decided 2026-10-09; item 22 revisits this when names become renamable). Turns are item 09's `speakerTurns`, whose consecutive segments share a `speakerId`; the renderer labels each turn from its `speakerId`, not from `SpeakerTurn.speaker`.
+Diarized formats (port of oracle `write_diarized_outputs`). Labels are the task's stored speaker names (`Speaker.speaker`): `"Speaker N"` (N = speakerId + 1) as item 09 stores them, the real name once a speaker is renamed (item 22) (ADR 0034, decided 2026-10-09; replaces the earlier decision to print the oracle's labels from the speakerId). Turns are item 09's `speakerTurns`, whose consecutive segments share a `speakerId`; each turn is labelled with its `SpeakerTurn.speaker`. While no speaker is renamed, srt and vtt equal the oracle byte for byte; txt differs in the capital `S` of its block headers.
 
-- **txt** — segment-level, not turn-level. Whenever the speaker differs from the previous segment's: a blank line (except before the first block), then `[speaker N]` (lower-case, `N` = index + 1) on its own line. Every segment's trimmed text on its own line. File ends with a single `\n` after the last text line.
+- **txt** — segment-level, not turn-level. Whenever the speaker differs from the previous segment's: a blank line (except before the first block), then `[{name}]` (the stored name, e.g. `[Speaker 1]`) on its own line. Every segment's trimmed text on its own line. File ends with a single `\n` after the last text line.
   ```
-  [speaker 1]
+  [Speaker 1]
   Hello there.
   How are you?
 
-  [speaker 2]
+  [Speaker 2]
   Fine.
   ```
-- **srt** — one cue per speaker turn, numbered from 1: `{i}\n{start} --> {end}\n{Speaker N}: {turn text}\n\n` (every cue, including the last, ends with a blank line).
-- **vtt** — header `WEBVTT\n\n`, then per turn `{start} --> {end}\n{Speaker N}: {turn text}\n\n` (no cue numbers).
+- **srt** — one cue per speaker turn, numbered from 1: `{i}\n{start} --> {end}\n{name}: {turn text}\n\n` (every cue, including the last, ends with a blank line).
+- **vtt** — header `WEBVTT\n\n`, then per turn `{start} --> {end}\n{name}: {turn text}\n\n` (no cue numbers).
 - **Timestamps** — oracle `fmt_srt` = `HH:MM:SS,mmm`, `fmt_vtt` = `HH:MM:SS.mmm`, computed as `ms = int(round(t * 1000))` then `divmod` by 3 600 000 / 60 000 / 1000; hours are zero-padded to two digits and never wrap (100 h → `100:00:00,000`). Because the app stores integer milliseconds, the renderer formats the stored value directly, which equals the oracle's result for any time that came from whisper-cli's millisecond offsets. (Python `round` is half-to-even; only relevant where seconds are converted to ms, i.e. item 07's legacy-JSON path.)
 - **json** — Python `json.dump(..., ensure_ascii=False, indent=2)` output, no trailing newline:
   - top level keys in order `text`, `speakers`, `segments`;
@@ -39,7 +40,7 @@ Diarized formats (port of oracle `write_diarized_outputs`). Labels always come f
   - formatting: two-space indentation, `": "` between key and value, `,` at line ends, empty list printed as `[]`, non-ASCII characters written as-is, string escapes as Python's encoder emits them (`\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t`, other characters below U+0020 as `\u00XX`).
 - **No speech** (task with zero segments; oracle `transcribe_one`): json = `{"text": "", "segments": []}` followed by `\n` (compact, no `speakers` key); txt, srt, vtt = empty (0 bytes, vtt without header). The same with speakers on or off (decided 2026-10-09).
 - **Speakers off** (decided 2026-10-09). The oracle delegates these to whisper-cli's native writers, so there is no oracle code to port. The app uses the diarized shapes without labels, with trimmed text (ADR 0030), not whisper-cli's own output, which keeps the leading spaces and writes whisper's raw JSON:
-  - txt: one trimmed segment text per line, no `[speaker N]` lines, ending with a single `\n`;
+  - txt: one trimmed segment text per line, no speaker lines, ending with a single `\n`;
   - srt: one numbered cue per segment, `{i}\n{start} --> {end}\n{text}\n\n`;
   - vtt: `WEBVTT\n\n`, then one cue per segment, `{start} --> {end}\n{text}\n\n`;
   - json: top-level keys `text`, `segments`; per segment `start`, `end`, `text`; no `speakers`, no `speaker`; the same formatting rules as the diarized json.
@@ -51,13 +52,13 @@ Diarized formats (port of oracle `write_diarized_outputs`). Labels always come f
 - No-speech output with speakers off? → **Same as the diarized no-speech output.**
 - `id`/`seek` in the downloaded json? → **Omitted.** The oracle itself prints none with whisper-cli 1.9.2's JSON.
 - Download file names? → **`<original stem>.<format>`.**
-- Speaker labels? → **The oracle's `Speaker N` / `[speaker N]` from the speakerId**; item 22 decides once names are renamable.
+- Speaker labels? → **The stored speaker names** (`Speaker N` until renamed), in txt, srt and vtt (ADR 0034, 2026-10-09; first answered "the oracle's labels from the speakerId, item 22 decides", changed by the user the same day).
 
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [x] txt starts a `[speaker N]` block at every speaker change, separates blocks with one blank line, and prints one trimmed segment per line
+- [x] txt starts a `[{name}]` block at every speaker change, separates blocks with one blank line, and prints one trimmed segment per line (header reworded 2026-10-09 for ADR 0034: `[Speaker N]`, not `[speaker N]`)
 - [x] srt merges consecutive same-speaker segments into one numbered cue `Speaker N: text` with first start and last end
 - [x] vtt starts with `WEBVTT` and a blank line and contains the same turns without cue numbers
 - [x] srt uses a comma and vtt a dot before milliseconds
@@ -70,14 +71,14 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A task with no segments renders `{"text": "", "segments": []}\n` as json and empty txt/srt/vtt
 - [x] Speakers off: txt is one trimmed segment per line, srt and vtt have one cue per segment without a speaker prefix, and json has `text` and `segments` (start, end, text) without `speakers`/`speaker`
 - [x] Speakers off with no segments renders the same no-speech output as speakers on
-- [ ] Labels come from the speakerId (`Speaker N`, `[speaker N]`), not from the stored speaker name
+- [ ] Labels are the stored speaker names (initially `Speaker N`): a renamed speaker's name appears in txt (`[Alice]`) and in srt/vtt cues (`Alice: …`) (reworded 2026-10-09 for ADR 0034; was "Labels come from the speakerId, not from the stored speaker name")
 - [ ] The download file name is the original file's stem plus the format's extension
 - [ ] (discovered) Speakers off: srt and vtt skip blank segments (no cue for a segment whose trimmed text is empty; srt numbers the remaining cues from 1 without gaps)
 
 ## Acceptance criteria
 
 - Golden-string tests per format and mode pass; the golden strings are derived by hand from the oracle's code (not copied from the Kotlin output).
-- For a given segment list and speaker list, each diarized format is byte-identical to what `write_diarized_outputs` would write (verified by hand derivation, since the oracle is never executed).
+- For a given segment list and speaker list, each diarized format is byte-identical to what `write_diarized_outputs` would write, except for ADR 0030 (trimmed json segment text) and ADR 0034 (stored names as labels; `[Speaker N]` in txt) (verified by hand derivation, since the oracle is never executed).
 - Renderers are pure functions with no DB or file I/O.
 - All test-list items ticked and green; user approved the diff.
 
@@ -107,3 +108,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: refactor approved and done after cycle 12 (2 of 2): the outputs test fixture `speakers1And2` is removed; its four uses (`RenderTxtSpec`, `RenderSrtSpec`, `RenderVttSpec`, `RenderJsonSpec`) call the equal `speakers(0, 1)`. `SegmentRepositorySpec`'s own private `speakers1And2` (package `stt.db`) is untouched. `gradle check` green (142 unit tests).
 - 2026-10-09: discovered scenario confirmed by the user at the cycle 12 checkpoint, option (b): with speakers off, srt and vtt skip blank segments instead of writing a cue with an empty text line (the agent had recommended keeping the empty cue for consistency with txt and the oracle's diarized blanks). Test-list wording updated; its own cycle follows.
 - 2026-10-09 (cycle 13, test-list item 12, speakers off without segments): green on arrival (each renderer's zero-segment case runs before any speakers branch); red recorded against a temporary, uncommitted mutation of `renderJson`'s guard to `segments.isEmpty() && speakers != null`: `gradle test --tests 'stt.outputs.NoSpeechSpec'`, the new scenario failed ("Contents did not match exactly", the actual output being the indented document `{\n  "text": "", …`). New scenario in `NoSpeechSpec`: with no segments and `null` speakers, txt/srt/vtt are `""` and json is `{"text": "", "segments": []}\n`, the same bytes as cycle 11's speakers-on scenario (decided 2026-10-09). No production change. `gradle check` green (143 unit tests); no Integration-tagged code touched.
+- 2026-10-09: spec change decided by the user after cycle 13 ([ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md)): speaker labels are the stored speaker names everywhere a label appears — txt `[{name}]`, srt/vtt `{name}: {text}` — so `"Speaker N"` is a placeholder and a rename (item 22) shows in the downloads; txt uses the stored capitalisation (`[Speaker 1]`), no special case for the oracle's `[speaker 1]` ("this is over-complicating it"); json keeps the 0-based `speaker` number. ADR number 0034 because main already has 0033. Updated: Goal, Already decided, the labels paragraph, the txt/srt/vtt bullets, the speakers-off txt bullet, the open-question answer, test-list items 1 (header wording) and 13 (now "labels are the stored names"), the acceptance criterion. Cycle 1's expected txt changes from `[speaker N]` to `[Speaker N]`; that and the stored-name labels go through item 13's red/green cycle. For the main-tree agent at merge: item 22's "Downloads" bullet and open question are settled by ADR 0034, and the ADR index row for 0033 (main) sits between 0032 and 0034.
