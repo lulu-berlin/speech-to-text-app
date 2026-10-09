@@ -118,6 +118,16 @@ internal suspend fun phaseOf(
         ?.task
         ?.phase
 
+/** When a task finished, as stored; null while it has not. */
+internal suspend fun finishedAtOf(
+    fixture: EngineFixture,
+    task: Long,
+): Long? =
+    fixture.tasks
+        .find(task)
+        ?.task
+        ?.finishedAt
+
 /**
  * The tasks the engine starts while [window] of real time passes, returning early as soon as a second one
  * starts. "Nothing happened" cannot be awaited, so the test pumps the worker itself: [runCurrent] runs it

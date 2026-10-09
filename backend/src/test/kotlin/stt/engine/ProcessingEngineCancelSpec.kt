@@ -36,11 +36,7 @@ class ProcessingEngineCancelSpec :
                         // The first task's transcription was cancelled, so its process died with it.
                         fixture.transcriber.cancelled.map { taskIdOf(it.parent) } shouldBe listOf(first)
                         statusOf(fixture, first) shouldBe TaskStatus.CANCELED
-                        fixture.tasks
-                            .find(first)
-                            ?.task
-                            ?.finishedAt
-                            .shouldNotBeNull()
+                        finishedAtOf(fixture, first).shouldNotBeNull()
                         phaseOf(fixture, first) shouldBe TaskPhase.TRANSCRIBING
 
                         // ... and the worker moves on to the next queued task.
@@ -72,11 +68,7 @@ class ProcessingEngineCancelSpec :
 
                         fixture.engine.cancelTask(queued) shouldBe TaskCommandOutcome.Accepted
                         statusOf(fixture, queued) shouldBe TaskStatus.CANCELED
-                        fixture.tasks
-                            .find(queued)
-                            ?.task
-                            ?.finishedAt
-                            .shouldNotBeNull()
+                        finishedAtOf(fixture, queued).shouldNotBeNull()
 
                         // The running task finishes; the cancelled one behind it is never picked up.
                         fixture.transcriber.hold = null
