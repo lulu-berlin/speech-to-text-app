@@ -69,8 +69,8 @@ graph TD
 | [07 — Whisper transcription](../docs/specs/whisper-transcription.md) | done | 03, 06 |
 | [08 — Speaker embeddings](../docs/specs/speaker-embeddings.md) | done | 06 |
 | [09 — Diarization](../docs/specs/diarization.md) | done | 08 |
-| [10 — Output formats](10-output-formats.md) | draft | 09 |
-| [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18, 20 |
+| [10 — Output formats](10-output-formats.md) | spec-approved | 09 |
+| [11 — Processing engine](11-processing-engine.md) | spec-approved | 04, 05, 07, 09, 18, 20 |
 | [12 — HTTP API and SSE](12-http-api-and-sse.md) | spec-approved | 10, 11 |
 | [13 — Frontend foundation](13-frontend-foundation.md) | spec-approved | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13 |

@@ -1,6 +1,6 @@
 # 10 — Output formats
 
-Status: draft
+Status: spec-approved
 Depends on: [09](../docs/specs/diarization.md) (done)
 
 ## Goal
@@ -13,7 +13,7 @@ Render a task's stored segments (and speaker labels) as txt, srt, vtt, and json,
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): speaker labels and turn merging come from item 09.
 - [ADR 0030 — Segment text is trimmed in every output](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md) (2026-10-09): json `segments[].text` is trimmed too, a deliberate deviation from the oracle; everything else stays a byte-for-byte port.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 Pure renderer functions `(segments) -> String` (UTF-8), called on demand from the `segments` table (item 03 proposal: render on demand, nothing stored). Each stored segment carries its `speakerId` (item 09, ADR 0028): null for every segment of a speakers-off task. Segment times are integer milliseconds in the DB. Segment text is stored exactly as whisper-cli emitted it (leading space included), because item 07's prompt is built from it; every renderer trims it (ADR 0030).
 
@@ -55,7 +55,7 @@ Diarized formats (port of oracle `write_diarized_outputs`). Labels always come f
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] txt starts a `[speaker N]` block at every speaker change, separates blocks with one blank line, and prints one trimmed segment per line
 - [ ] srt merges consecutive same-speaker segments into one numbered cue `Speaker N: text` with first start and last end
@@ -83,3 +83,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 - 2026-10-09: decision from the item 12 contract consultation ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)): json `segments[].text` is trimmed, like every other output; storage stays untrimmed for item 07's prompt. The rest of the item is still draft.
 - 2026-10-09: consultation answers approved: speakers-off formats = the draft (diarized shapes without labels, trimmed); speakers-off no-speech = the diarized no-speech output; `id`/`seek` omitted; download names `<original stem>.<format>`; labels from the speakerId as the oracle prints them, with item 22 revisiting them for renamed speakers. Test list not yet approved.
+- 2026-10-09: test list (14 items) approved by the user; status `spec-approved`.
