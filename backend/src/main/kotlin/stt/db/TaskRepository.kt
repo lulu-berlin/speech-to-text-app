@@ -5,7 +5,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.statements.UpdateStatement
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -209,6 +211,23 @@ class TaskRepository(
         }
     }
 
+    /**
+     * Marks the task CANCELED and records when it finished, but only while its status still allows being
+     * cancelled (item 04's table: QUEUED, RUNNING, PAUSED). A task that finished in the meantime keeps its
+     * status, which is what makes a cancel racing a completion harmless. Returns whether the row was
+     * written; the phase the task stopped in stays (item 12's contract).
+     */
+    suspend fun cancelIfPossible(
+        id: Long,
+        finishedAt: Long,
+    ): Boolean =
+        db.writeTransaction {
+            TasksTable.update({ (TasksTable.id eq id) and (TasksTable.status inList cancellableFrom) }) {
+                it[TasksTable.status] = TaskStatus.CANCELED
+                it[TasksTable.finishedAt] = finishedAt
+            } > 0
+        }
+
     /** Deletes the task; its audio metadata, chunks with their chunk audio, and segments go with it (ON DELETE CASCADE). */
     suspend fun delete(id: Long) {
         db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq id } }
@@ -257,3 +276,6 @@ private fun ResultRow.toTask() =
         startedAt = this[TasksTable.startedAt],
         finishedAt = this[TasksTable.finishedAt],
     )
+
+/** The statuses a task can be cancelled from (item 04's table: QUEUED, RUNNING, PAUSED). */
+private val cancellableFrom = TaskStatus.entries.filter { it.canTransitionTo(TaskStatus.CANCELED) }

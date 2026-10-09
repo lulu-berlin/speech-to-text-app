@@ -2,12 +2,17 @@ package stt.engine
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import stt.audio.Chunker
 import stt.config.Config
@@ -61,6 +66,15 @@ class ProcessingEngine(
      * Conflated: a signal sent while the worker is busy is not lost, and an extra signal is harmless.
      */
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
+
+    /** The task whose phases are running and the job running them, so [cancelTask] can kill its process. */
+    private class Running(
+        val id: Long,
+        val job: Job,
+    )
+
+    private val runningLock = Mutex()
+    private var running: Running? = null
 
     /** Starts the single worker coroutine; it runs until [scope] is cancelled. */
     fun start() {
@@ -131,6 +145,31 @@ class ProcessingEngine(
     }
 
     /**
+     * Cancels a task: its phase job is cancelled, which kills the task's process (item 05), and the task
+     * becomes CANCELED with `finished_at` set; the phase it stopped in stays. It returns once the process
+     * is gone and the status is stored, so item 12's `DELETE` can cancel a pending task and then delete it.
+     * A cancel that races a completion loses: `cancelIfPossible` refuses a task that has finished.
+     */
+    suspend fun cancelTask(id: Long): TaskCommandOutcome {
+        val status = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
+        if (!status.canTransitionTo(TaskStatus.CANCELED)) {
+            return TaskCommandOutcome.Illegal(status, TaskStatus.CANCELED)
+        }
+        // NonCancellable: a cancel asked for explicitly must kill the process and store the status even
+        // when the caller itself is being cancelled (item 12's DELETE, or a shutting-down application).
+        withContext(NonCancellable) {
+            runningJob(id)?.cancelAndJoin()
+            if (tasks.cancelIfPossible(id, now())) publish(id)
+        }
+        val after = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
+        return if (after == TaskStatus.CANCELED) {
+            TaskCommandOutcome.Accepted
+        } else {
+            TaskCommandOutcome.Illegal(after, TaskStatus.CANCELED)
+        }
+    }
+
+    /**
      * The task to run next: nothing while the queue is paused, otherwise the QUEUED task with the
      * lowest `queue_position`.
      */
@@ -147,10 +186,27 @@ class ProcessingEngine(
             if (next == null) {
                 wakeups.receive()
             } else {
-                runTask(next)
+                runInJob(next)
             }
         }
     }
+
+    /**
+     * Runs [task]'s phases in a job of their own and waits for it. The job is what [cancelTask] cancels:
+     * cancelling the coroutine inside item 05's `run` is what kills the task's process (ADR 0020).
+     */
+    private suspend fun runInJob(task: StoredTask) {
+        val job = scope.launch { runTask(task) }
+        runningLock.withLock { running = Running(task.id, job) }
+        try {
+            job.join()
+        } finally {
+            runningLock.withLock { running = null }
+        }
+    }
+
+    /** The job running [id]'s phases, or null when that task is not the one being processed. */
+    private suspend fun runningJob(id: Long): Job? = runningLock.withLock { running?.takeIf { it.id == id }?.job }
 
     /** Runs one task through its phases, in order, and leaves it COMPLETED. */
     private suspend fun runTask(task: StoredTask) {
