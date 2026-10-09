@@ -1,16 +1,10 @@
 import { screen } from '@testing-library/react';
 import { X } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
-import { px, required } from '../../test/dom';
+import { asRgb, px, required } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { lightTheme } from '../theme/theme';
 import { Icon } from './Icon';
-
-// jsdom reports colours as rgb(), so a token is converted the same way (as in item 13).
-function asRgb(hex: string): string {
-  const value = Number.parseInt(hex.slice(1), 16);
-  return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
-}
 
 describe('the icon wrapper', () => {
   it('sizes and colours an icon from the tokens, and hides it when decorative', () => {

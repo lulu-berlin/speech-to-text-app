@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
+import { asRgb } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { App } from './App';
 
@@ -60,12 +61,6 @@ describe('the app root', () => {
         })),
       );
       return renderAt('/queue');
-    };
-
-    // Expected values are the tokens themselves (hex -> rgb, as jsdom reports them).
-    const asRgb = (hex: string) => {
-      const value = Number.parseInt(hex.slice(1), 16);
-      return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
     };
 
     const light = renderWith(false);
