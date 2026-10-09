@@ -1,6 +1,9 @@
 The FLAC files in this directory are unmodified utterances from the LibriSpeech ASR corpus, subset test-clean
-(https://www.openslr.org/12): 1089-134686-0002, 1089-134691-0023 (reader: Peter Bobbe), 1188-133604-0025
-(reader: Duncan Murrell). Attribution: docs/attributions.md.
+(https://www.openslr.org/12), three per reader: 1089-134686-0000, 1089-134686-0002, 1089-134691-0023 (reader:
+Peter Bobbe); 1188-133604-0000, 1188-133604-0001, 1188-133604-0025 (reader: Duncan Murrell); 260-123286-0000,
+260-123288-0001, 260-123440-0010 (reader: Brad Bush); 121-121726-0000, 121-123859-0003, 121-127105-0000 (reader:
+Nikolle Doolin); 237-126133-0001, 237-134493-0001, 237-134500-0000 (reader: rachelellen); 1221-135766-0004,
+1221-135766-0006, 1221-135767-0005 (reader: Dianne). Attribution: docs/attributions.md.
 
 LibriSpeech (c) 2014 by Vassil Panayotov
 
