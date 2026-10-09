@@ -131,4 +131,39 @@ class RenderJsonSpec :
                 }
             }
         }
+        given("segments of speakers 2 and 5") {
+            `when`("they are rendered as json") {
+                then("speakers counts the distinct labels, not the highest label plus one") {
+                    val segments =
+                        listOf(
+                            segment(speakerId = 2, startMs = 0, endMs = 1_000, text = "A"),
+                            segment(speakerId = 5, startMs = 1_000, endMs = 2_000, text = "B"),
+                        )
+
+                    // Oracle: "speakers": len(set(speakers)) = len({2, 5}) = 2 (a "highest label + 1" reading would
+                    // give 6); each segment keeps its stored 0-based speaker id.
+                    renderJson(segments) shouldBe
+                        """
+                        {
+                          "text": "A B",
+                          "speakers": 2,
+                          "segments": [
+                            {
+                              "start": 0.0,
+                              "end": 1.0,
+                              "text": "A",
+                              "speaker": 2
+                            },
+                            {
+                              "start": 1.0,
+                              "end": 2.0,
+                              "text": "B",
+                              "speaker": 5
+                            }
+                          ]
+                        }
+                        """.trimIndent()
+                }
+            }
+        }
     })
