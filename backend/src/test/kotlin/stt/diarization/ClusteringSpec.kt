@@ -92,22 +92,11 @@ class ClusteringSpec :
         given("three well-separated groups of two segments") {
             `when`("they are clustered in auto mode") {
                 then("they yield three speakers") {
-                    // Groups on orthogonal planes: every cross-group distance is exactly 1, above the threshold.
+                    // Every cross-group distance is exactly 1, above the threshold.
                     SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
-                    // Within-group distances 1 - c: 0.2, 0.4, 0.04. Merge heights in order: 0.04, 0.2, 0.4, 1, 1;
-                    // gaps 0.16, 0.2, 0.6, 0. The largest gap is gap 2, so k = n - (2 + 1) = 6 - 3 = 3: the cut leaves
-                    // the three within-group merges.
-                    val embeddings =
-                        arrayOf(
-                            floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f),
-                            floatArrayOf(0.8f, 0.6f, 0f, 0f, 0f, 0f),
-                            floatArrayOf(0f, 0f, 1f, 0f, 0f, 0f),
-                            floatArrayOf(0f, 0f, 0.6f, 0.8f, 0f, 0f),
-                            floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f),
-                            floatArrayOf(0f, 0f, 0f, 0f, 0.96f, 0.28f),
-                        )
-
-                    clusterSegments(embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1, 2, 2))
+                    // Merge heights in order: 0.04, 0.2, 0.4, 1, 1; gaps 0.16, 0.2, 0.6, 0. The largest gap is gap 2,
+                    // so k = n - (2 + 1) = 6 - 3 = 3: the cut leaves the three within-group merges.
+                    clusterSegments(threeOrthogonalPairs(), k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1, 2, 2))
                 }
             }
         }
@@ -177,18 +166,9 @@ class ClusteringSpec :
         given("three groups of two segments on orthogonal planes") {
             `when`("they are clustered with a fixed count and max_speakers 1") {
                 then("they yield exactly k speakers, k clamped to [1, n], ignoring max_speakers") {
-                    // Within-group distances 1 - c: 0.2, 0.4, 0.04; every cross-group distance is exactly 1. Merges in
-                    // order: (4, 5) at 0.04, (0, 1) at 0.2, (2, 3) at 0.4, then (0, 2) and (0, 4) at 1 (ties go to the
-                    // lower pair). A count k applies the first 6 - k merges.
-                    val embeddings =
-                        arrayOf(
-                            floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f),
-                            floatArrayOf(0.8f, 0.6f, 0f, 0f, 0f, 0f),
-                            floatArrayOf(0f, 0f, 1f, 0f, 0f, 0f),
-                            floatArrayOf(0f, 0f, 0.6f, 0.8f, 0f, 0f),
-                            floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f),
-                            floatArrayOf(0f, 0f, 0f, 0f, 0.96f, 0.28f),
-                        )
+                    // Merges in order: (4, 5) at 0.04, (0, 1) at 0.2, (2, 3) at 0.4, then (0, 2) and (0, 4) at 1 (ties
+                    // go to the lower pair). A count k applies the first 6 - k merges.
+                    val embeddings = threeOrthogonalPairs()
 
                     // k = 2: four merges leave {0, 1, 2, 3} and {4, 5}.
                     clusterSegments(embeddings, k = 2, maxSpeakers = 1).shouldBe(listOf(0, 0, 0, 0, 1, 1))
@@ -202,6 +182,20 @@ class ClusteringSpec :
             }
         }
     })
+
+/**
+ * Three groups of two unit vectors, each group on its own plane, so every cross-group distance is exactly 1. Within-group
+ * distances `1 - c`: 0.2 (rows 0-1), 0.4 (rows 2-3), 0.04 (rows 4-5).
+ */
+private fun threeOrthogonalPairs() =
+    arrayOf(
+        floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f),
+        floatArrayOf(0.8f, 0.6f, 0f, 0f, 0f, 0f),
+        floatArrayOf(0f, 0f, 1f, 0f, 0f, 0f),
+        floatArrayOf(0f, 0f, 0.6f, 0.8f, 0f, 0f),
+        floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f),
+        floatArrayOf(0f, 0f, 0f, 0f, 0.96f, 0.28f),
+    )
 
 /** The merged `(i, j)` index pairs, in merge order. */
 private fun List<Merge>.pairs() = map { it.i to it.j }
