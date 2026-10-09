@@ -1,5 +1,6 @@
 package stt.diarization
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
@@ -7,6 +8,9 @@ import io.kotest.matchers.floats.plusOrMinus
 import io.kotest.matchers.floats.shouldBeGreaterThan
 import io.kotest.matchers.floats.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -99,6 +103,37 @@ class EmbeddingsSpec :
                         gate.resume()
 
                         job.await().size.shouldBe(2)
+                    }
+                }
+            }
+        }
+        given("the real model and three segments, without and with a pause gate") {
+            `when`("the embedding coroutine is cancelled as window 1 finishes") {
+                then("it stops at the next window boundary: only window 1 is done and the job ends cancelled") {
+                    // Spec: pause gate and cancellation are checked between windows (ADR 0004); inference blocks, so a cancel
+                    // must land at the next window boundary instead of after the last window. Cancelling inside the
+                    // window-1 callback makes "the next boundary" exact: no race with window 2's inference.
+                    val pcm = FloatArray(64_000) { i -> (0.05 * sin(2 * PI * 440 * i / 16_000)).toFloat() }
+                    val segments = listOf(segment(0, 1200), segment(1200, 2400), segment(2400, 3600))
+                    SpeakerModel.load(realSpeakerModelPath()).use { model ->
+                        val embedder = Embeddings(model)
+                        for (gate in listOf(null, PauseGate())) {
+                            val windowsDone = mutableListOf<Int>()
+                            lateinit var job: Deferred<Array<FloatArray>>
+                            job =
+                                async(start = CoroutineStart.LAZY) {
+                                    embedder.embed(pcm, segments, gate) { done, _ ->
+                                        windowsDone.add(done)
+                                        if (done == 1) job.cancel()
+                                    }
+                                }
+                            job.start()
+
+                            withClue(if (gate == null) "without a pause gate" else "with a pause gate") {
+                                shouldThrow<CancellationException> { job.await() }
+                                windowsDone.shouldBe(listOf(1))
+                            }
+                        }
                     }
                 }
             }
