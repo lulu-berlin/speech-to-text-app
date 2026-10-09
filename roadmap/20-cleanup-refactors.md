@@ -1,6 +1,6 @@
 # 20 — Cleanup refactors: test placement, duplication, visibility, toolchain pin
 
-Status: draft
+Status: spec-approved
 Depends on: — (touches only merged code from items 02, 04, 05, 06, 07 and the dev environment; independent of 09 and 11)
 
 ## Goal
@@ -15,7 +15,7 @@ Remove the redundancies and inconsistencies found in the repository review of 20
 - [Item 04 spec](../docs/specs/queue-domain-model.md): illegal transitions are typed rejections, never exceptions.
 - Review decisions (user, 2026-10-09): every recommended finding is in scope, plus the cosmetic changes (`data class Config`, `fun main()` without `args`). A generic `QueueOutcome<R>` replacing `QueueCreationOutcome`/`QueueTransitionOutcome`/`ReorderOutcome` is **not** wanted.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 Except for test-list item 1 (a TDD cycle) and the pnpm pin (a devenv change), everything here is a refactor. Each one keeps all tests green and is approved and committed on its own (`Refactor: …`).
 
@@ -67,7 +67,7 @@ Except for test-list item 1 (a TDD cycle) and the pnpm pin (a devenv change), ev
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] A status change through the queue that the per-task table forbids (e.g. `QUEUED → COMPLETED`, `PAUSED → RUNNING`) is rejected as an illegal transition naming both statuses, and the queue is unchanged
 - [ ] Must not break: after every refactor, `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` are green, and the backend test count changes only by the new test above
@@ -75,7 +75,7 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Acceptance criteria
 
-- R1–R6 done, each as its own approved `Refactor:` commit. R7 done or dropped as decided.
+- R1–R7 done, each as its own approved `Refactor:` commit; the pnpm pin as its own `devenv.nix` commit.
 - No Config parsing scenario remains outside `ConfigSpec`, and none was lost in the move.
 - `devenv.nix` and `flake.nix` pin the same pnpm major, as recorded in amended ADR 0012.
 - All test-list items ticked and green; user approved the diff.
@@ -84,3 +84,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 - 2026-10-09: item created from the repository review; scope set by the user: all recommended findings plus the cosmetic changes; generic `QueueOutcome<R>` rejected. Spec and test list not yet approved.
 - 2026-10-09: decisions: R7 = option A (Boolean `canTransitionTo`, item 04 spec amended); R5 = `prettier . ../.prettierrc` + `.prettierignore`. Test list not yet approved.
+- 2026-10-09: spec and test list approved by the user (3 items); status `spec-approved`.
