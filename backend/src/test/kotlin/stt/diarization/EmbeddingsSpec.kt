@@ -325,11 +325,3 @@ private val SHERPA_ONNX_REFERENCE =
         6.44399405e-01 2.37489939e-01 -1.00950956e+00 2.26396561e+00 -1.11419272e+00 1.13536346e+00 -5.78561485e-01 -1.22274375e+00
         """,
     )
-
-/** Whitespace-separated decimal values, as printed by the reference run. */
-private fun floats(text: String): FloatArray =
-    text
-        .trim()
-        .split(Regex("\\s+"))
-        .map { it.toFloat() }
-        .toFloatArray()
