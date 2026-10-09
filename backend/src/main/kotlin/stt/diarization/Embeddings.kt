@@ -13,9 +13,10 @@ import kotlin.math.sqrt
  * window through the Kaldi fbank + global-mean front-end and one ONNX Runtime inference call per window.
  *
  * Ported from oracle `embed_windows` (docs/oracle/transcribe.py), minus the length-sorted batching, which is a
- * PyTorch memory workaround, not behavior. Window values are 16-bit-quantized PCM (ADR 0024); like sherpa-onnx's
- * speaker-embedding extractor, samples in `[-1, 1]` are scaled to the int16 range when the model metadata says
- * `normalize_samples`. The ONNX session is reused for every window; calls run on [Dispatchers.Default] (CPU-bound).
+ * PyTorch memory workaround, not behavior. Window values are 16-bit-quantized PCM in `[-1, 1]` (ADR 0024); like
+ * sherpa-onnx's feature extractor (`features.cc` `AcceptWaveform`), they go in unchanged when the model metadata
+ * says `normalize_samples` (all 3D-Speaker models, CAM++ included) and are scaled to the int16 range (× 32768)
+ * otherwise. The ONNX session is reused for every window; calls run on [Dispatchers.Default] (CPU-bound).
  */
 internal class Embeddings(
     private val model: SpeakerModel,
@@ -46,7 +47,7 @@ internal class Embeddings(
             segments.forEachIndexed { index, segment ->
                 gate?.checkpoint()
                 val window = embeddingWindow(pcm, segment.startMs, segment.endMs)
-                val samples = if (model.metadata.normalizeSamples) FloatArray(window.size) { window[it] * 32768f } else window
+                val samples = if (model.metadata.normalizeSamples) window else FloatArray(window.size) { window[it] * 32768f }
                 val features = fbank(samples)
                 subtractGlobalMean(features)
                 embeddings.add(l2Normalize(infer(features)))
