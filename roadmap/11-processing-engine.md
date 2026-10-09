@@ -38,6 +38,7 @@ Run the queue: take queued tasks one at a time in queue order and drive each thr
 - Pausing during `CHUNKING`: also `SIGSTOP` the ffmpeg process, or let chunking finish and pause before the first chunk?
 - What happens on startup to tasks that were PAUSED when the app stopped (their stopped process is gone): stay PAUSED and rerun the interrupted chunk on resume (proposed)?
 - Progress weighting: should diarization get its own share of the progress bar (e.g. a fixed fraction), or does progress reach 100 % at the end of transcription?
+- Clustering cost on long recordings (item 09 ports the oracle's `O(n²)`-memory, `O(n³)`-time UPGMA and records its measured time and memory at 1000 and 3000 segments): acceptable for the engine, or revisit it if performance becomes an issue (item 09 consultation, 2026-10-09)?
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -59,7 +60,7 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] A task whose plan is already stored but whose original was left behind (crash before its deletion) has the original deleted when it resumes
 - [ ] Startup cleanup keeps the work directories of pending tasks and removes those of terminal or deleted tasks
 - [ ] Diarization uses the PCM rebuilt from the stored chunks, with and without a restart
-- [ ] A task with `speakers = off` completes without the diarization phase
+- [ ] A task with `speakers = off` completes without the diarization phase, and its segments keep `speaker` NULL (moved from item 09, 2026-10-09)
 - [ ] A task with no speech segments completes without diarization
 - [ ] Every status, phase, and progress change is emitted as an event after it is persisted
 - [ ] The worker waits for work without polling (no wakeups while idle under virtual time)

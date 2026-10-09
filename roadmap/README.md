@@ -58,7 +58,7 @@ graph TD
 | [06 — Audio decoding and chunking](../docs/specs/audio-decoding-and-chunking.md) | done | 03, 05 |
 | [07 — Whisper transcription](../docs/specs/whisper-transcription.md) | done | 03, 06 |
 | [08 — Speaker embeddings](../docs/specs/speaker-embeddings.md) | done | 06 |
-| [09 — Diarization](09-diarization.md) | draft | 08 |
+| [09 — Diarization](09-diarization.md) | spec-approved | 08 |
 | [10 — Output formats](10-output-formats.md) | draft | 09 |
 | [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18 |
 | [12 — HTTP API and SSE](12-http-api-and-sse.md) | draft | 11 |

@@ -34,6 +34,7 @@ Expose the queue and the transcription history over a REST API for all commands 
 - Delete endpoint for history entries (`DELETE /api/tasks/{id}`) — in scope? If added: deleting a task also deletes its work directory `$STT_DATA_DIR/work/<task-id>` at once, which holds the original of a task not yet chunked (ADR 0024).
 - On connecting to `/api/events`, does the server send an initial snapshot, or does the client fetch `GET /api/tasks` + `GET /api/queue` after connecting?
 - The transcript endpoint uses item 10's renderers, which `Depends on` does not list yet (item 11 does not depend on 10): add [10](10-output-formats.md) to `Depends on`?
+- Upper bound for `maxSpeakers` and for a fixed speaker count `<n>` (moved from item 09, 2026-10-09; the oracle's default is `MAX_SPEAKERS = 8`; item 09's algorithm accepts any value >= 1)?
 
 ## Test list (written with the user; Canon TDD step 1)
 

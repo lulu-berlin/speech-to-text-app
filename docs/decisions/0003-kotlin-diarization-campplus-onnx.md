@@ -1,6 +1,6 @@
 # 0003 — Diarization in Kotlin with CAM++ via ONNX Runtime
 
-Status: accepted · Date: 2026-10-05
+Status: accepted, auto speaker-count rule amended by [0027](0027-auto-speaker-count-allows-one-speaker.md) · Date: 2026-10-05
 
 ## Context
 ADR 0002 excludes Python, so the oracle's speechbrain ECAPA-TDNN embedder (PyTorch) cannot be used. The JVM needs a speaker-embedding model it can run natively, plus the audio feature front-end that model expects. The oracle's clustering, rescue, and turn-merging logic is plain numeric code that can be ported directly.
