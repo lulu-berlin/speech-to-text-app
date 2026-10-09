@@ -1,6 +1,6 @@
 # 22 — Rename and merge a task's speakers
 
-Status: draft
+Status: spec-approved
 Depends on: [09](../docs/specs/diarization.md) (done), [10](../docs/specs/output-formats.md) (done), [12](12-http-api-and-sse.md), [15](15-frontend-history-ui.md)
 
 ## Goal
@@ -19,7 +19,7 @@ Let the user give a finished transcription's speakers real names ("Speaker 1" �
 - Item 12's contract: `GET /api/tasks/{id}/turns` returns `speakers` (`speakerId`, `speaker`) and turns that reference them by `speakerId`.
 - User decisions (2026-10-09): a name is trimmed, 1–40 characters, no control characters; two speakers of one task may **not** share a name; a "Reset name" action restores `"Speaker N"`; only COMPLETED tasks can be renamed or merged; **merging is part of this item** ([ADR 0028](../docs/decisions/0028-speakers-table-and-segment-speaker-id.md) made the speaker a table for exactly this); merging uses a **mapping, not a segment rewrite**; the transcript is edited through a **speakers panel**; a merge is confirmed in a dialog and can be undone with **"Reset all merges"**.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Storage — a merge mapping (decided 2026-10-09).** A new migration (ADR 0019) adds:
   - `speaker_merge(task_id → tasks ON DELETE CASCADE, merged_id INTEGER NOT NULL, into_id INTEGER NOT NULL, PRIMARY KEY (task_id, merged_id))`, one row per speaker folded into another. `into_id` is never itself a `merged_id` for the same task (the application keeps the mapping flat).
@@ -28,7 +28,7 @@ Let the user give a finished transcription's speakers real names ("Speaker 1" �
   - **The mapping is resolved in one place, at read time: `stt/db`'s diarized reads.** A repository operation returns a task's segments with each `speakerId` already resolved to its effective id, and the task's effective `speakers` (those not appearing as a `merged_id`). Everything downstream — item 09's `speakerTurns`, item 10's `renderTxt`/`cues`, item 12's `/turns`, the downloads — then needs no change and no new parameter.
     - This is the point to review first with the user: it is the smallest blast radius, but it means the read path, not the renderers, carries the merge.
 - **API** (extends item 12's contract and `docs/api/`):
-  - **Rename**: `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` → `200` with the task's effective speakers. `{ "speaker": null }` resets that speaker's name to `"Speaker N"`, so the default-name rule stays on the server.
+  - **Rename**: `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` → `200` with the task's effective speakers. `{ "speaker": null }` resets that speaker's name to `"Speaker N"` (confirmed 2026-10-09), so the default-name rule stays on the server.
   - **Merge**: `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }` → `200` with the task's effective speakers. `into` must be one of the group; the survivor keeps its id and name; every other member's `speaker_id` rows are folded into it by the mapping.
   - **Reset merges**: `DELETE /api/tasks/{id}/speakers/merges` → `200` with the task's effective speakers (all of them again).
   - Errors:
@@ -63,7 +63,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] Renaming a speaker updates one `speakers` row and nothing else (no segment changes, other speakers unchanged)
 - [ ] A name is trimmed; empty, longer than 40 characters, or containing a control character is rejected with 400 `invalid-speaker-name`
@@ -92,3 +92,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 - 2026-10-09: item drafted at the user's request; the feature was announced in item 09's consultation (ADR 0028).
 - 2026-10-09: consultation answers approved: names trimmed, 1–40 characters, no control characters; duplicate names rejected; a "Reset name" action restores `"Speaker N"`; COMPLETED tasks only; **merging included**, as a group merge `{ group, into }`; made reversible with a **mapping table and no segment rewrite**, resolved in one place at read time; undo is **"Reset all merges"**; editing through a **speakers panel**. Test list not yet approved.
+- 2026-10-09: test list (15 items) approved by the user; `{"speaker": null}` confirmed as the name reset; status `spec-approved`.
