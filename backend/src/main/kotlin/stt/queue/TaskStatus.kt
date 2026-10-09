@@ -11,27 +11,34 @@ enum class TaskStatus {
     ;
 
     /**
-     * A status with no allowed targets is final (`COMPLETED`, `FAILED`, `CANCELED`);
-     * a task in one of them has left the queue.
+     * A status whose tasks have left the queue (`COMPLETED`, `FAILED`, `CANCELED`). It is not
+     * "final": only `COMPLETED` is; `FAILED` and `CANCELED` re-enter the queue by retry
+     * (roadmap item 11, amending item 04), so it is named explicitly rather than derived
+     * from "has no allowed targets".
      */
     val isTerminal: Boolean
-        get() = allowedTargets[this].isNullOrEmpty()
+        get() = this in terminalStatuses
 
     /**
      * Whether the transition `this` → [to] is in the spec's per-task table
-     * (roadmap item 04, as amended 2026-10-06). The whole-queue guard on
+     * (roadmap item 04, as amended by item 11 for retry). The whole-queue guard on
      * `QUEUED → RUNNING` (at most one running task) lives on the queue aggregate,
      * not here.
      */
     fun canTransitionTo(to: TaskStatus): Boolean = to in allowedTargets[this].orEmpty()
 
     companion object {
-        /** Spec's allowed targets per source; a source without targets is terminal. */
+        /** Statuses that leave the queue; `FAILED` and `CANCELED` re-enter it only by retry. */
+        private val terminalStatuses = setOf(COMPLETED, FAILED, CANCELED)
+
+        /** Spec's allowed targets per source; a source absent here has no transition at all. */
         private val allowedTargets: Map<TaskStatus, Set<TaskStatus>> =
             mapOf(
                 QUEUED to setOf(RUNNING, PAUSED, CANCELED),
                 RUNNING to setOf(PAUSED, COMPLETED, FAILED, CANCELED),
                 PAUSED to setOf(QUEUED, CANCELED),
+                FAILED to setOf(QUEUED),
+                CANCELED to setOf(QUEUED),
             )
     }
 }

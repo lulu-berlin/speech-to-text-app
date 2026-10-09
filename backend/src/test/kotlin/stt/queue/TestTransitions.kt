@@ -9,8 +9,8 @@ import stt.queue.TaskStatus.RUNNING
 
 /**
  * The spec's per-task allowed transitions, hand-transcribed from the transition
- * table (roadmap item 04, as amended 2026-10-06). Shared by the acceptance and
- * rejection sweeps in TaskStatusSpec.
+ * table (roadmap item 04, as amended 2026-10-06, and by item 11 for retry).
+ * Shared by the acceptance and rejection sweeps in TaskStatusSpec.
  */
 internal val allowedTransitions: Set<Pair<TaskStatus, TaskStatus>> =
     setOf(
@@ -23,4 +23,6 @@ internal val allowedTransitions: Set<Pair<TaskStatus, TaskStatus>> =
         RUNNING to CANCELED,
         PAUSED to QUEUED,
         PAUSED to CANCELED,
+        FAILED to QUEUED,
+        CANCELED to QUEUED,
     )
