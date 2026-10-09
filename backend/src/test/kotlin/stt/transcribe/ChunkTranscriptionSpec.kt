@@ -20,7 +20,7 @@ import stt.db.exportedChunks
 import stt.db.queuedTask
 import stt.db.taskRepository
 import stt.process.ProcessRunner
-import stt.withCapturedWarnings
+import stt.withCapturedLogs
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
@@ -98,7 +98,7 @@ class ChunkTranscriptionSpec :
                         val whisperCli = fakeWhisperCli(workDir, stderr, exitCode = 0, writes = json to ONE_SEGMENT_JSON)
                         val transcription = ChunkTranscription(ChunkTranscriber(ProcessRunner(), whisperCli.toString()), segments)
 
-                        withCapturedWarnings(ChunkTranscription::class.java.name) { events ->
+                        withCapturedLogs(ChunkTranscription::class.java.name) { events ->
                             withTimeout(30.seconds) {
                                 transcription.transcribe(taskId, CHUNK_1, TEST_SETTINGS, flacDir, prefix, prompt = null)
                             }

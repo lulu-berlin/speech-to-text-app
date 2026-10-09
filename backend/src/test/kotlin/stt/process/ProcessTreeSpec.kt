@@ -10,7 +10,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import stt.withCapturedWarnings
+import stt.withCapturedLogs
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -25,7 +25,7 @@ class ProcessTreeSpec :
                             if (signal != 0) sent += signal
                             0
                         }
-                    withCapturedWarnings(ProcessTree::class.java.name) { events ->
+                    withCapturedLogs(ProcessTree::class.java.name) { events ->
                         runTest {
                             withTimeout(1.minutes) { group.terminate(2.seconds) }
                             // Grace period after SIGTERM, then at most one more after SIGKILL (ADR 0020).
