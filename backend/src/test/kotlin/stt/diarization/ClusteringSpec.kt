@@ -294,9 +294,8 @@ private fun randomNormalizedMatrix(
 }
 
 /**
- * Eight unit vectors as four pairs on orthogonal planes, all at distance 1 - 0.8; every cross distance is
- * exactly 1: four merges tie at 0.2 and three at 1, so the pair order at each tied height is free.
-
+ * Eight unit vectors as four pairs on orthogonal planes, all at distance   1 -   0.8; every cross distance is
+ * exactly 1: four merges tie at   0.2and three at   1, so the pair order at each tied height is free.
  */
 private fun tiedMatrix(): Array<FloatArray> {
     fun row(
