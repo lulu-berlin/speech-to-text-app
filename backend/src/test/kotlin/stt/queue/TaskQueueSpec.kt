@@ -163,6 +163,21 @@ class TaskQueueSpec :
             }
         }
 
+        given("a queue of QUEUED task 1 and PAUSED task 2, with no task running") {
+            `when`("task 1 is completed, or (separately) task 2 is started, which the per-task table forbids") {
+                then("each change is rejected as an illegal transition naming both statuses, and the queue is unchanged") {
+                    val queue = queueOf(QueueEntry(1L, QUEUED), QueueEntry(2L, PAUSED))
+                    queue.transition(1L, COMPLETED).shouldBe(
+                        QueueTransitionOutcome.Rejected(QueueTransitionRejection.IllegalTransition(QUEUED, COMPLETED)),
+                    )
+                    queue.transition(2L, RUNNING).shouldBe(
+                        QueueTransitionOutcome.Rejected(QueueTransitionRejection.IllegalTransition(PAUSED, RUNNING)),
+                    )
+                    queue.shouldBe(queueOf(QueueEntry(1L, QUEUED), QueueEntry(2L, PAUSED)))
+                }
+            }
+        }
+
         given("a queue where RUNNING task 1 is followed by QUEUED task 2, as before task 1 ends") {
             `when`("task 1 fails, or (separately) task 2 is canceled") {
                 then("each change is accepted and the failed or canceled task leaves the queue") {
