@@ -1,5 +1,13 @@
 import { ApiError } from './types';
-import type { ApiErrorBody, ServerEvent, Snapshot, Task, TaskList } from './types';
+import type {
+  ApiErrorBody,
+  Queue,
+  ServerEvent,
+  Snapshot,
+  Task,
+  TaskList,
+  TaskProgress,
+} from './types';
 
 const json = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
@@ -35,8 +43,13 @@ export async function uploadTask(file: File): Promise<Task> {
 // closes the stream.
 export function subscribeToEvents(onEvent: (event: ServerEvent) => void): () => void {
   const source = new EventSource('/api/events');
-  source.addEventListener('snapshot', (message) => {
-    onEvent({ type: 'snapshot', snapshot: JSON.parse(message.data) as Snapshot });
-  });
+  const listen = <T>(name: ServerEvent['type'], toEvent: (data: T) => ServerEvent) => {
+    source.addEventListener(name, (message) => onEvent(toEvent(JSON.parse(message.data) as T)));
+  };
+  listen<Snapshot>('snapshot', (snapshot) => ({ type: 'snapshot', snapshot }));
+  listen<Task>('task-updated', (task) => ({ type: 'task-updated', task }));
+  listen<TaskProgress>('task-progress', (progress) => ({ type: 'task-progress', progress }));
+  listen<Queue>('queue-updated', (queue) => ({ type: 'queue-updated', queue }));
+  listen<{ id: number }>('task-deleted', ({ id }) => ({ type: 'task-deleted', id }));
   return () => source.close();
 }
