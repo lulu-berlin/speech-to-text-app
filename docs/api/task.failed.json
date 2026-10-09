@@ -10,6 +10,7 @@
   "durationMs": 600000,
   "sizeBytes": 4718592,
   "transcriptionProgress": 0.5,
+  "diarizationStage": null,
   "diarizationProgress": null,
   "error": "whisper-cli exited with code 1 while transcribing chunk 1: failed to allocate memory",
   "transcribedUntilMs": 298650,

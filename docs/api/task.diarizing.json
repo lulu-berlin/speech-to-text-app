@@ -1,0 +1,20 @@
+{
+  "id": 6,
+  "filename": "panel.webm",
+  "status": "RUNNING",
+  "phase": "DIARIZING",
+  "language": "en",
+  "speakersMode": "auto",
+  "speakersCount": null,
+  "maxSpeakers": 8,
+  "durationMs": 2700000,
+  "sizeBytes": 41943040,
+  "transcriptionProgress": 1.0,
+  "diarizationStage": "CLUSTERING",
+  "diarizationProgress": 0.37,
+  "error": null,
+  "transcribedUntilMs": 2698120,
+  "createdAt": 1791537650000,
+  "startedAt": 1791537655000,
+  "finishedAt": null
+}
