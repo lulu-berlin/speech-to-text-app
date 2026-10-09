@@ -19,7 +19,7 @@ Let the user browse past transcriptions: find a finished task, read its transcri
 - **History list** of finished tasks (COMPLETED, FAILED, CANCELED), newest first, with filename, status, date and duration; FAILED tasks show their error. **A filename search box and a status filter** (all / completed / failed / canceled), both client-side over the task list the app already holds (decided 2026-10-09; no backend search). The list updates live: a task that finishes appears, a retried one leaves, a deleted one disappears.
 - **Transcript view** for a COMPLETED task (`/history/:taskId`):
   - speaker turns with timestamps from `/turns`; each speaker's name shown with **a subtle per-speaker tint** from a speaker palette (tokens added to item 24, light and dark, AA-checked; speaker N uses palette entry N mod palette size); speakers-off transcripts show no labels;
-  - download buttons per format: txt, srt, vtt, json (`GET /api/tasks/{id}/transcript?format=...`);
+  - download buttons for the three formats: txt, srt and vtt (`GET /api/tasks/{id}/transcript?format=...`); json was dropped ([ADR 0035](../docs/decisions/0035-no-json-download.md));
   - the audio player sourced from `/audio`, with a seek bar (item 24's Slider);
   - **playback highlight**: while the audio plays, the segment whose `[startMs, endMs)` contains the current time is highlighted inside its turn; nothing in a gap between segments; it follows seeking and pausing;
   - **click-to-seek**: clicking a segment (or a turn's timestamp) seeks the player to its start **and plays** (decided 2026-10-09);
@@ -70,3 +70,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 - 2026-10-09: consultation answers approved: client-side filename search and status filter; click-to-seek seeks and plays; follow mode until the user scrolls; new Task field `hasAudio` (item 12 contract and `docs/api/` updated); a status page for failed/canceled tasks; speakers shown with a per-speaker tint (a speaker palette added to item 24); delete in History, always confirmed (item 14 consultation). Test list not yet approved.
 - 2026-10-09: test list (15 items) approved by the user; status `spec-approved`.
+- 2026-10-09: item 10 consultation: the transcript downloads are txt, srt and vtt only ([ADR 0035](../docs/decisions/0035-no-json-download.md)); their speaker labels are the stored names ([ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md)), so a renamed speaker shows in the downloads without any work here.

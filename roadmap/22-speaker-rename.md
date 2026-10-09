@@ -35,7 +35,7 @@ Let the user give a finished transcription's speakers real names ("Speaker 1" â†
     | `409` | `not-completed` (task not COMPLETED) |
 - **Event.** `speakers-renamed` â†’ `{ "id", "speakers": [{ "speakerId", "speaker" }] }`, so open views update without a refetch. The engine's `SharedFlow<Event>` (item 11) carries it; the event is emitted after the rename is stored.
 - **UI** (History detail view, item 15): the speaker names are editable in place. Saving calls the endpoint; a rejected name shows the error and keeps the old name.
-- **Downloads.** Whether txt/srt/vtt print the stored name follows item 10's open question "Speaker names". The json download keeps the 0-based `speaker` number (oracle format).
+- **Downloads.** Settled by [ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md): txt/srt/vtt already print the stored name, so a rename changes the downloads with no work here, and there is no json download ([ADR 0035](../docs/decisions/0035-no-json-download.md)).
 
 ## Open questions for the user
 
