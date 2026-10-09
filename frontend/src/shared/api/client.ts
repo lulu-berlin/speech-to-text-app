@@ -1,3 +1,4 @@
+import { ApiError } from './types';
 import type { Task, TaskList } from './types';
 
 const json = async <T>(response: Response): Promise<T> => {
@@ -7,8 +8,9 @@ const json = async <T>(response: Response): Promise<T> => {
       message?: string;
       taskId?: number;
     } | null;
+    const code = body?.error ?? String(response.status);
     const message = body?.message ?? response.statusText;
-    throw new Error(`${response.status} ${message}`);
+    throw new ApiError(code, message, body?.taskId);
   }
   return (await response.json()) as T;
 };
@@ -16,4 +18,17 @@ const json = async <T>(response: Response): Promise<T> => {
 export async function listTasks(): Promise<TaskList> {
   const response = await fetch('/api/tasks');
   return json<TaskList>(response);
+}
+
+export async function getTask(id: number): Promise<Task> {
+  const response = await fetch(`/api/tasks/${id}`);
+  return json<Task>(response);
+}
+
+// Item 12 contract: POST /api/tasks, multipart with a `file` field.
+export async function uploadTask(file: File): Promise<Task> {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch('/api/tasks', { method: 'POST', body: form });
+  return json<Task>(response);
 }

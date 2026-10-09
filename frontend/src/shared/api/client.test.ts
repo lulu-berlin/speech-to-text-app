@@ -1,6 +1,9 @@
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { listTasks } from './client';
-import { taskList } from './fixtures';
+import { server } from '../../test/server';
+import { ApiError } from './types';
+import { getTask, listTasks, uploadTask } from './client';
+import { errorDuplicateAudio, taskList } from './fixtures';
 
 describe('the typed API client', () => {
   it('returns typed tasks for GET /api/tasks (from docs/api/task-list.json)', async () => {
@@ -22,5 +25,25 @@ describe('the typed API client', () => {
       first.status,
     );
     expect(typeof first.durationMs === 'number' || first.durationMs === null).toBe(true);
+  });
+
+  it('turns an error response into a typed error with code and message', async () => {
+    const error = await getTask(999).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    const apiError = error as ApiError;
+    expect(apiError.code).toBe('not-found');
+    expect(apiError.message).toBe('Task 42 does not exist');
+  });
+
+  it('carries the taskId on a duplicate-audio 409', async () => {
+    server.use(
+      http.post('/api/tasks', () => HttpResponse.json(errorDuplicateAudio, { status: 409 })),
+    );
+
+    const error = await uploadTask(new File(['x'], 'memo.wav')).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    const apiError = error as ApiError;
+    expect(apiError.code).toBe('duplicate-audio');
+    expect(apiError.taskId).toBe(3);
   });
 });

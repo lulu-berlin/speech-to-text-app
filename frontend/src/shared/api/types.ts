@@ -48,6 +48,15 @@ export interface ApiErrorBody {
   taskId?: number;
 }
 
-export interface GetTasksResult {
-  tasks: Task[];
+// A typed error carrying the contract's error code; the UI never sees a bare exception.
+// For duplicate-audio responses, taskId names the existing task.
+export class ApiError extends Error {
+  readonly code: string;
+  readonly taskId?: number;
+  constructor(code: string, message: string, taskId?: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.code = code;
+    this.taskId = taskId;
+  }
 }
