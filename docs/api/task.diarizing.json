@@ -9,6 +9,7 @@
   "maxSpeakers": 8,
   "durationMs": 2700000,
   "sizeBytes": 41943040,
+  "hasAudio": true,
   "transcriptionProgress": 1.0,
   "diarizationStage": "CLUSTERING",
   "diarizationProgress": 0.37,

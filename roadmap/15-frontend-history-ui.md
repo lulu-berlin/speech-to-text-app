@@ -4,50 +4,68 @@ Status: draft
 Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
 
 ## Goal
-Let the user browse past transcriptions: see finished tasks, read a transcript with speakers and timestamps, follow it during playback with the played segment highlighted, download it in every format, listen to the task's audio, and retry failed or cancelled tasks.
+Let the user browse past transcriptions: find a finished task, read its transcript with speakers and timestamps, follow it during playback with the played segment highlighted, jump around by clicking, download it in every format, listen to the task's audio, see why a task failed or was cancelled, and retry or delete it.
 
 ## Already decided
-- [Item 24 design system](24-visual-design.md): the History and transcript views are built with its tokens and primitives; item 25 does the final visual pass.
+- [Item 24 design system](24-visual-design.md) ([ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md)): the History and transcript views are built with its tokens and primitives (Card, StatusBadge, Button, ConfirmDialog, Slider for the seek bar, Page/Stack/Row, EmptyState, Skeleton); item 25 does the final visual pass (History as cards, the transcript as a centred reading column).
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
-- [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks — 16 kHz mono, not the original upload; a task canceled or failed before chunking has no audio (404).
-- Item 12's contract (consultation 2026-10-09): the transcript view reads `GET /api/tasks/{id}/turns`, which returns the task's speakers (`speakerId`, stored name `speaker`) and item 09's turns referencing them by `speakerId` (ADR 0028; names become renamable later); `/audio` supports Range, so seeking and click-to-seek are possible; `DELETE /api/tasks/{id}` exists; a `task-deleted` event removes a task from the list.
-- Playback with the played segment highlighted is part of this item (user, 2026-10-09). Item 12's contract puts segment times on the `/audio` timeline and keeps each turn's segments with their own `startMs`/`endMs`.
-- FAILED and CANCELED tasks can be retried (`POST /api/tasks/{id}/retry`, item 11); only COMPLETED tasks have a transcript (`/turns` and downloads answer `409 not-completed` otherwise).
+- [ADR 0024 — Audio storage](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks (16 kHz mono, not the original upload); a task cancelled or failed before chunking has none.
+- [ADR 0029](../docs/decisions/0029-contract-first-frontend-shared-api-examples.md), [ADR 0031](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md): built against item 12's contract with MSW mocks; routes `/history` and `/history/:taskId`; commands through item 13's command machine.
+- Item 12's contract: `GET /api/tasks/{id}/turns` returns the task's speakers (`speakerId`, stored name `speaker`) and item 09's turns referencing them by `speakerId` (ADR 0028); turn and segment times are on the `/audio` timeline; `/audio` supports Range; Task carries `phase`, `transcribedUntilMs`, `error` and `hasAudio`; `DELETE /api/tasks/{id}`; `task-deleted` removes a task; `/turns` and downloads answer `409 not-completed` unless COMPLETED.
+- FAILED and CANCELED tasks can be retried (`POST /api/tasks/{id}/retry`, item 11).
+- Decided in the item 14 consultation: **delete is offered in History too, always with confirmation**; it frees the file's `sha256`, so the same file can be uploaded again.
 
 ## Proposal (pending approval)
-- History list of finished tasks (status COMPLETED, FAILED, CANCELED) with filename, status, date, duration; FAILED tasks show their error message.
-- Detail view for a completed task showing speaker turns with timestamps (from `GET /api/tasks/{id}/turns`); speakers-off transcripts shown without labels.
-- Download buttons per format: txt, srt, vtt, json (`GET /api/tasks/{id}/transcript?format=...`).
-- Audio player (`<audio>`) sourced from `GET /api/tasks/{id}/audio` (`audio/flac`, 16 kHz mono).
-- Playback highlighting: while the audio plays, the segment whose `[startMs, endMs)` contains the player's current time is highlighted inside its turn. Nothing is highlighted in a gap between segments. The highlight follows seeking and pausing.
-- Retry button on FAILED and CANCELED tasks. After a retry the task leaves History and appears in the queue (item 14), via `task-updated`.
-- The list updates live when a task finishes (via `useEvents`).
+- **History list** of finished tasks (COMPLETED, FAILED, CANCELED), newest first, with filename, status, date and duration; FAILED tasks show their error. **A filename search box and a status filter** (all / completed / failed / canceled), both client-side over the task list the app already holds (decided 2026-10-09; no backend search). The list updates live: a task that finishes appears, a retried one leaves, a deleted one disappears.
+- **Transcript view** for a COMPLETED task (`/history/:taskId`):
+  - speaker turns with timestamps from `/turns`; each speaker's name shown with **a subtle per-speaker tint** from a speaker palette (tokens added to item 24, light and dark, AA-checked; speaker N uses palette entry N mod palette size); speakers-off transcripts show no labels;
+  - download buttons per format: txt, srt, vtt, json (`GET /api/tasks/{id}/transcript?format=...`);
+  - the audio player sourced from `/audio`, with a seek bar (item 24's Slider);
+  - **playback highlight**: while the audio plays, the segment whose `[startMs, endMs)` contains the current time is highlighted inside its turn; nothing in a gap between segments; it follows seeking and pausing;
+  - **click-to-seek**: clicking a segment (or a turn's timestamp) seeks the player to its start **and plays** (decided 2026-10-09);
+  - **follow mode**: the highlighted segment is kept in view while playing; scrolling by hand stops following and shows a "Back to playing position" button that resumes it (decided 2026-10-09).
+- **Status page for a FAILED or CANCELED task** (same route; decided 2026-10-09): what happened, e.g. "Failed while transcribing at 12:34" (from `phase` and `transcribedUntilMs`) or "Cancelled while chunking", the error message, **Retry** and **Delete**, and the audio player if `hasAudio`. No transcript.
+- **No audio**: when `hasAudio` is false the player is not rendered; a short note says the task has no audio because it ended before chunking.
+- **Retry** on FAILED and CANCELED tasks (in the list and on the status page); the retried task leaves History and appears in the queue (item 14) via `task-updated`.
+- **Delete** on every finished task (in the list and the detail view), always confirmed.
+- A missing or deleted task (`404`, or deleted while open) shows a not-found message.
+- Long transcripts: the highlight lookup is a binary search over the segments' start times on each player `timeupdate`, not a scan.
 
-## Open questions for the user
-- Search/filter in the history list (by filename, date, status)?
-- Click-to-seek: clicking a segment/turn seeks the audio player to its start time? (Possible now: `/audio` supports Range.)
-- A task without audio (canceled or failed before chunking; the audio endpoint answers 404): hide the player, or show a "no audio" note?
+## Open questions (answered 2026-10-09)
+- Search/filter? → **Filename search plus status filter, client-side.**
+- Click-to-seek? → **Seeks there and plays.**
+- Follow playback? → **Follow until the user scrolls**, with a "Back to playing position" button.
+- Task without audio? → **New Task field `hasAudio`** (item 12 contract change); the player is hidden with a note.
+- FAILED/CANCELED detail? → **A status page** with what happened, the error, Retry, Delete and the audio if stored.
+- Speakers? → **Name plus a per-speaker tint** (a speaker palette added to item 24's tokens).
 
-Decided in the item 14 consultation (2026-10-09): **delete is offered in History too, always with confirmation** (`DELETE /api/tasks/{id}`, through item 24's ConfirmDialog); it frees the file's `sha256`, so the same file can be uploaded again.
+## Remaining open questions
+None.
 
 ## Test list (written with the user; Canon TDD step 1)
 Seed — to be refined and approved with the user before any test is written:
-- [ ] The history list shows completed, failed, and canceled tasks and no active ones
-- [ ] A failed task shows its error message
-- [ ] Opening a completed task shows its speaker turns with timestamps
+- [ ] The history list shows completed, failed and canceled tasks, newest first, and no pending ones
+- [ ] The filename search and the status filter narrow the list
+- [ ] A failed task shows its error message in the list
+- [ ] Opening a completed task shows its speaker turns with timestamps and each speaker's name with its own tint
 - [ ] A speakers-off transcript is shown without speaker labels
 - [ ] Each download button links to the transcript in its format
-- [ ] The audio player points at the task's audio endpoint
+- [ ] The audio player points at the task's audio endpoint; with `hasAudio` false no player is rendered and a note explains why
 - [ ] While the audio plays, the segment containing the current time is highlighted; in a gap between segments none is; seeking moves the highlight
+- [ ] Clicking a segment seeks the player to its start and plays
+- [ ] While playing, the highlighted segment is kept in view; scrolling by hand stops following and "Back to playing position" resumes it
+- [ ] A failed or canceled task opens a status page with what happened (phase and `transcribedUntilMs`), the error, Retry and Delete, and no transcript
 - [ ] Retry is offered on failed and canceled tasks only and calls the retry endpoint; the retried task leaves the history list
-- [ ] A task without stored audio (audio endpoint 404) shows no broken player
+- [ ] Delete always asks for confirmation; confirming calls the delete endpoint and the task leaves the list
 - [ ] A task finishing while the history view is open appears in the list
 - [ ] A missing task (404) shows a not-found message
 
 ## Acceptance criteria
 - RTL tests pass against MSW handlers.
+- The speaker palette meets AA contrast in both themes.
+- `pnpm test` and `pnpm build` are green.
 - Checked against the running backend in item 21.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
-_Empty — add dated lines (YYYY-MM-DD: what was approved) on approval._
+- 2026-10-09: consultation answers approved: client-side filename search and status filter; click-to-seek seeks and plays; follow mode until the user scrolls; new Task field `hasAudio` (item 12 contract and `docs/api/` updated); a status page for failed/canceled tasks; speakers shown with a per-speaker tint (a speaker palette added to item 24); delete in History, always confirmed (item 14 consultation). Test list not yet approved.
