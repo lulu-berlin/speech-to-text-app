@@ -6,6 +6,7 @@ export { default as snapshot } from '../../../../docs/api/snapshot.json';
 export { default as taskList } from '../../../../docs/api/task-list.json';
 export { default as taskQueued } from '../../../../docs/api/task.queued.json';
 export { default as taskRunning } from '../../../../docs/api/task.running.json';
+export { default as taskDiarizing } from '../../../../docs/api/task.diarizing.json';
 export { default as taskCompleted } from '../../../../docs/api/task.completed.json';
 export { default as taskFailed } from '../../../../docs/api/task.failed.json';
 export { default as taskPaused } from '../../../../docs/api/task.paused.json';
@@ -22,6 +23,7 @@ export { default as taskTransitions } from '../../../../docs/api/task-transition
 import type { Task } from './types';
 import taskQueuedExample from '../../../../docs/api/task.queued.json';
 import taskRunningExample from '../../../../docs/api/task.running.json';
+import taskDiarizingExample from '../../../../docs/api/task.diarizing.json';
 import taskPausedExample from '../../../../docs/api/task.paused.json';
 import taskCompletedExample from '../../../../docs/api/task.completed.json';
 import taskFailedExample from '../../../../docs/api/task.failed.json';
@@ -32,6 +34,7 @@ import taskCanceledExample from '../../../../docs/api/task.canceled.json';
 export const taskExamples = [
   taskQueuedExample,
   taskRunningExample,
+  taskDiarizingExample,
   taskPausedExample,
   taskCompletedExample,
   taskFailedExample,

@@ -29,15 +29,18 @@ describe('the connection machine', () => {
   });
 
   it('applies task-updated, task-progress, queue-updated and task-deleted events', async () => {
-    // Mock addition: task-updated carries task.paused.json (id 7, QUEUED in the snapshot)
-    // and queue-updated carries queue.json with paused: true, because the stock examples
-    // equal what snapshot.json already holds, so applying them would change nothing.
+    // Mock additions: task-updated carries task.paused.json (id 7, QUEUED in the snapshot)
+    // and task.running.json with id 6 (the progress example's id, which no snapshot task
+    // has); queue-updated carries queue.json with paused: true. The stock examples equal
+    // what snapshot.json already holds, so applying them would change nothing.
     const pausedQueue = { ...queue, paused: true };
+    const runningAs6 = { ...taskRunning, id: 6 };
     server.use(
       http.get('/api/events', () =>
         eventStreamResponse([
           ['snapshot', snapshot],
           ['task-updated', taskPaused],
+          ['task-updated', runningAs6],
           ['task-progress', taskProgress],
           ['queue-updated', pausedQueue],
           ['task-deleted', taskDeleted],
@@ -55,16 +58,19 @@ describe('the connection machine', () => {
       { timeout: 2000 },
     );
 
-    // snapshot.json holds tasks 5 (RUNNING), 7 (QUEUED), 3 (COMPLETED), 4 (FAILED).
+    // snapshot.json holds tasks 5 (RUNNING), 7 (QUEUED), 3 (COMPLETED), 4 (FAILED). Task 5
+    // is untouched: the progress event names id 6, which the stream added just before.
     const [running, , completed] = snapshot.tasks;
     expect(updated.context.tasks).toEqual([
-      {
-        ...running,
-        transcriptionProgress: taskProgress.transcriptionProgress,
-        diarizationProgress: taskProgress.diarizationProgress,
-      },
+      running,
       taskPaused,
       completed,
+      {
+        ...runningAs6,
+        transcriptionProgress: taskProgress.transcriptionProgress,
+        diarizationStage: taskProgress.diarizationStage,
+        diarizationProgress: taskProgress.diarizationProgress,
+      },
     ]);
     expect(updated.context.queue).toEqual(pausedQueue);
     actor.stop();
