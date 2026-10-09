@@ -1,7 +1,7 @@
 # 09 — Diarization
 
 Status: draft
-Depends on: [08](08-speaker-embeddings.md)
+Depends on: [08](../docs/specs/speaker-embeddings.md) (done)
 
 ## Goal
 
