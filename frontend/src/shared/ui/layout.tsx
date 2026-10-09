@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
-import type { ThemeTokens } from '../theme/theme';
+import type { SpacingKey } from '../theme/theme';
 
 // Layout primitives: views compose their spacing from these instead of writing padding by
 // hand (frontend conventions). Gaps are named spacing tokens, so a caller cannot invent a
 // value; the transient prop keeps them off the DOM.
-type SpacingKey = keyof ThemeTokens['spacing'];
 
 const PageBase = styled.div`
   max-width: ${(props) => props.theme.sizes.pageMaxWidth};

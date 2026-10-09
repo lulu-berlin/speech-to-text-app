@@ -52,6 +52,9 @@ export interface ThemeTokens {
   };
 }
 
+// Named spacing tokens; components take these keys rather than inventing values.
+export type SpacingKey = keyof ThemeTokens['spacing'];
+
 // Everything except colors is the same in both sets; only the color roles differ.
 const baseTokens = {
   spacing: {
