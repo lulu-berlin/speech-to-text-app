@@ -45,10 +45,21 @@ Establish the app's visual language as code before the Queue and History views a
 - **This item does not restyle the views.** It delivers tokens, the typeface, layout and primitives with their tests; items 14 and 15 consume them and item 25 does the final visual pass.
 - **Decision to record**: the design system (tokens, Radix, `lucide-react`, IBM Plex Sans, the dark-mode override) is worth an ADR when this spec is approved.
 
-## Open questions for the user
+## Open questions (answered 2026-10-09)
 
-- Font weights and format: variable woff2 (one file, any weight) or three static files (400/500/600)? I propose the variable file if it is not larger; the workspace agent checks the sizes at the first checkpoint.
-- Should the dark-mode control be a labelled button (`Theme: Auto`) or an icon-only `IconButton` with a tooltip?
+- Icons? → **`lucide-react`.**
+- Radix primitives? → **Dialog, Tooltip, DropdownMenu, Switch, Slider** (all five).
+- `StatusBadge` states? → **Five semantic groups** (pending, active, done, problem, gone); the exact status stays as the badge text.
+- Tokens? → **A TypeScript object only.** `::backdrop` and focus rings are styled inside the styled components, so no literal values are needed.
+- Dark mode? → **OS-follow with a manual override**, cycled `auto → light → dark` and stored.
+- Layout primitives? → **`Page`, `Stack`, `Row` included.**
+- Typeface? → **IBM Plex Sans, self-hosted.**
+- Font weights and format? → **The variable woff2 if it is not larger than three static files (400/500/600);** the workspace agent compares the sizes at its first checkpoint and reports which it used.
+- Dark-mode control? → **An icon-only `IconButton` with a tooltip**, so the header stays compact.
+
+## Remaining open questions
+
+None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
