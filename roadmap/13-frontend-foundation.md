@@ -79,7 +79,8 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Dark tokens apply when the OS prefers dark, light tokens otherwise
 - [ ] The confirmation dialog runs the action on confirm and not on cancel or Escape
 - [ ] Components render with the theme available (themed values applied)
-- [ ] (discovered) A `task-updated` for a task the state does not hold yet (e.g. a new upload) adds it
+- [ ] (discovered, confirmed 2026-10-09) A `task-updated` for a task the state does not hold yet (e.g. a new upload) adds it
+- [ ] (discovered, confirmed 2026-10-09) When the server answers a reconnect with an HTTP error, so `EventSource` stops retrying, the connection machine reconnects by itself
 
 ## Acceptance criteria
 - Frontend tests (Vitest + React Testing Library + MSW) for the client, the machines, routing, the shell, theming and the dialog pass.
