@@ -3,6 +3,7 @@ import type {
   ApiErrorBody,
   Queue,
   ServerEvent,
+  StreamEvent,
   Snapshot,
   Task,
   TaskList,
@@ -39,9 +40,10 @@ export async function uploadTask(file: File): Promise<Task> {
   return json<Task>(response);
 }
 
-// Opens GET /api/events and passes each named event to onEvent. Returns a function that
-// closes the stream.
-export function subscribeToEvents(onEvent: (event: ServerEvent) => void): () => void {
+// Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when
+// the connection drops (EventSource then reconnects). Returns a function that closes the
+// stream.
+export function subscribeToEvents(onEvent: (event: StreamEvent) => void): () => void {
   const source = new EventSource('/api/events');
   const listen = <T>(name: ServerEvent['type'], toEvent: (data: T) => ServerEvent) => {
     source.addEventListener(name, (message) => onEvent(toEvent(JSON.parse(message.data) as T)));
@@ -51,5 +53,6 @@ export function subscribeToEvents(onEvent: (event: ServerEvent) => void): () => 
   listen<TaskProgress>('task-progress', (progress) => ({ type: 'task-progress', progress }));
   listen<Queue>('queue-updated', (queue) => ({ type: 'queue-updated', queue }));
   listen<{ id: number }>('task-deleted', ({ id }) => ({ type: 'task-deleted', id }));
+  source.addEventListener('error', () => onEvent({ type: 'disconnected' }));
   return () => source.close();
 }

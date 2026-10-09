@@ -16,16 +16,32 @@ import {
   taskTransitions,
 } from './fixtures';
 
-// A text/event-stream response that sends the given named events in order and stays open.
-// MSW's high-level sse() API only types unnamed "message" events, but the contract needs
-// named events (snapshot, task-updated, …), so the frames are written directly (the msw
-// docs' alternative SSE approach).
-export function eventStreamResponse(events: [name: string, data: unknown][]): Response {
+export interface EventStreamOptions {
+  // SSE `retry` field: the reconnect delay the client should use after a drop.
+  retryMs?: number;
+  // End the stream after the events, as when the connection drops.
+  end?: boolean;
+}
+
+// A text/event-stream response that sends the given named events in order, then stays open
+// unless `end` is set. MSW's high-level sse() API only types unnamed "message" events, but
+// the contract needs named events (snapshot, task-updated, …), so the frames are written
+// directly (the msw docs' alternative SSE approach).
+export function eventStreamResponse(
+  events: [name: string, data: unknown][],
+  { retryMs, end = false }: EventStreamOptions = {},
+): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      if (retryMs !== undefined) {
+        controller.enqueue(encoder.encode(`retry: ${retryMs}\n\n`));
+      }
       for (const [name, data] of events) {
         controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+      }
+      if (end) {
+        controller.close();
       }
     },
   });

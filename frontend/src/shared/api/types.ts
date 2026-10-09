@@ -68,6 +68,10 @@ export type ServerEvent =
   | { type: 'queue-updated'; queue: Queue }
   | { type: 'task-deleted'; id: number };
 
+// What the event stream reports: a server event, or `disconnected` when the connection
+// dropped and EventSource is reconnecting.
+export type StreamEvent = ServerEvent | { type: 'disconnected' };
+
 // Error body: { error, message } plus taskId for duplicate-audio only.
 export interface ApiErrorBody {
   error: string;

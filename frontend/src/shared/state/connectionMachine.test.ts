@@ -60,4 +60,45 @@ describe('the connection machine', () => {
     expect(updated.context.queue).toEqual(pausedQueue);
     actor.stop();
   });
+
+  it('goes to reconnecting when the stream drops, and the next snapshot replaces the state', async () => {
+    // Mock additions: the first connection sends a retry hint of 50 ms (so the test does not
+    // wait for EventSource's default reconnect delay) and then ends, which is a drop; the
+    // second connection's snapshot is snapshot.json without task 4, as if task 4 had been
+    // deleted while the client was disconnected.
+    const snapshotWithoutTask4 = {
+      ...snapshot,
+      tasks: snapshot.tasks.filter((task) => task.id !== 4),
+    };
+    let connections = 0;
+    server.use(
+      http.get('/api/events', () => {
+        connections += 1;
+        return connections === 1
+          ? eventStreamResponse([['snapshot', snapshot]], { retryMs: 50, end: true })
+          : eventStreamResponse([['snapshot', snapshotWithoutTask4]]);
+      }),
+    );
+    const actor = createActor(connectionMachine);
+    const visited: unknown[] = [];
+    actor.subscribe((state) => {
+      if (visited.at(-1) !== state.value) {
+        visited.push(state.value);
+      }
+    });
+    actor.start();
+
+    // No task-deleted event is sent, so task 4 disappears only if the second snapshot
+    // replaces the state.
+    const reconnected = await waitFor(
+      actor,
+      (state) => state.matches('live') && !state.context.tasks.some((task) => task.id === 4),
+      { timeout: 2000 },
+    );
+
+    expect(visited).toEqual(['connecting', 'live', 'reconnecting', 'live']);
+    expect(reconnected.context.tasks).toEqual(snapshotWithoutTask4.tasks);
+    expect(reconnected.context.queue).toEqual(snapshotWithoutTask4.queue);
+    actor.stop();
+  });
 });
