@@ -12,6 +12,12 @@ internal class FakeChunker : Chunker {
     /** The work directory of every call, in call order. */
     val workDirs = mutableListOf<Path>()
 
+    /**
+     * The task whose plan also names a second chunk whose FLAC was never written, so storing the plan fails
+     * part-way; null for every task. Lets a test see that a plan is stored all-or-nothing.
+     */
+    var unwritablePlanFor: Long? = null
+
     val probe = ConcurrencyProbe()
 
     override suspend fun chunk(
@@ -22,6 +28,15 @@ internal class FakeChunker : Chunker {
             workDirs.add(workDir)
             val file = workDir.resolve("chunk-0.flac")
             Files.writeString(file, "fake flac")
-            ChunkedAudio(durationMs = 1_000L, chunks = listOf(ExportedChunk(PlannedChunk(startMs = 0, endMs = 1_000), file)))
+            val chunks =
+                if (taskIdOf(workDir) == unwritablePlanFor) {
+                    listOf(
+                        ExportedChunk(PlannedChunk(startMs = 0, endMs = 1_000), file),
+                        ExportedChunk(PlannedChunk(startMs = 1_000, endMs = 2_000), workDir.resolve("chunk-1.flac")),
+                    )
+                } else {
+                    listOf(ExportedChunk(PlannedChunk(startMs = 0, endMs = 1_000), file))
+                }
+            ChunkedAudio(durationMs = chunks.last().planned.endMs, chunks = chunks)
         }
 }
