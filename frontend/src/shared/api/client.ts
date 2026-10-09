@@ -48,18 +48,42 @@ export async function runTaskCommand(id: number, command: string): Promise<Task>
 }
 
 // Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when
-// the connection drops (EventSource then reconnects). Returns a function that closes the
-// stream.
-export function subscribeToEvents(onEvent: (event: StreamEvent) => void): () => void {
-  const source = new EventSource('/api/events');
-  const listen = <T>(name: ServerEvent['type'], toEvent: (data: T) => ServerEvent) => {
-    source.addEventListener(name, (message) => onEvent(toEvent(JSON.parse(message.data) as T)));
+// the connection drops. EventSource retries a dropped connection by itself, but gives up
+// for good on an HTTP error, so this opens a new stream in that case. Returns a function
+// that closes the stream and cancels any pending reconnect.
+export function subscribeToEvents(
+  onEvent: (event: StreamEvent) => void,
+  reconnectMs = 1000,
+): () => void {
+  let source: EventSource | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false;
+
+  const open = () => {
+    const next = new EventSource('/api/events');
+    source = next;
+    const listen = <T>(name: ServerEvent['type'], toEvent: (data: T) => ServerEvent) => {
+      next.addEventListener(name, (message) => onEvent(toEvent(JSON.parse(message.data) as T)));
+    };
+    listen<Snapshot>('snapshot', (snapshot) => ({ type: 'snapshot', snapshot }));
+    listen<Task>('task-updated', (task) => ({ type: 'task-updated', task }));
+    listen<TaskProgress>('task-progress', (progress) => ({ type: 'task-progress', progress }));
+    listen<Queue>('queue-updated', (queue) => ({ type: 'queue-updated', queue }));
+    listen<{ id: number }>('task-deleted', ({ id }) => ({ type: 'task-deleted', id }));
+    next.addEventListener('error', () => {
+      const closed = next.readyState === EventSource.CLOSED;
+      onEvent({ type: 'disconnected', closed });
+      if (closed && !stopped) {
+        next.close();
+        reconnectTimer = setTimeout(open, reconnectMs);
+      }
+    });
   };
-  listen<Snapshot>('snapshot', (snapshot) => ({ type: 'snapshot', snapshot }));
-  listen<Task>('task-updated', (task) => ({ type: 'task-updated', task }));
-  listen<TaskProgress>('task-progress', (progress) => ({ type: 'task-progress', progress }));
-  listen<Queue>('queue-updated', (queue) => ({ type: 'queue-updated', queue }));
-  listen<{ id: number }>('task-deleted', ({ id }) => ({ type: 'task-deleted', id }));
-  source.addEventListener('error', () => onEvent({ type: 'disconnected' }));
-  return () => source.close();
+
+  open();
+  return () => {
+    stopped = true;
+    clearTimeout(reconnectTimer);
+    source?.close();
+  };
 }

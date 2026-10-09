@@ -1,9 +1,10 @@
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { createActor, waitFor } from 'xstate';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { eventStreamResponse } from '../api/handlers';
 import {
+  error as errorFixture,
   queue,
   snapshot,
   taskDeleted,
@@ -167,4 +168,25 @@ describe('the connection machine', () => {
     expect(updated.context.tasks).toEqual([...snapshot.tasks, added]);
     actor.stop();
   });
+
+  it('reconnects by itself when the server answers a connection with an HTTP error', async () => {
+    // Mock addition: the first connection is answered 500 with error.json, so EventSource
+    // stops retrying (its readyState becomes CLOSED); later connections get the snapshot.
+    let connections = 0;
+    server.use(
+      http.get('/api/events', () => {
+        connections += 1;
+        return connections === 1
+          ? HttpResponse.json(errorFixture, { status: 500 })
+          : eventStreamResponse([['snapshot', snapshot]]);
+      }),
+    );
+    const actor = createActor(connectionMachine).start();
+
+    const live = await waitFor(actor, (state) => state.matches('live'), { timeout: 5000 });
+
+    expect(connections).toBeGreaterThan(1);
+    expect(live.context.tasks).toEqual(snapshot.tasks);
+    actor.stop();
+  }, 10000);
 });
