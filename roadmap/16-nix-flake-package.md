@@ -17,7 +17,7 @@ Deliver the app as a Nix flake derivation that runs backend, database, frontend 
 - [ADR 0020 — Process runner](../docs/decisions/0020-process-runner-jna-signals-process-groups.md): the package ships `util-linux` for `setsid` (the runner's process groups).
 - **One shared nixpkgs pin** ([ADR 0036](../docs/decisions/0036-shared-nixpkgs-pin.md), 2026-10-09): the flake's locked nixpkgs input is the single pin; devenv uses the same input, so dev and build cannot drift.
 - **Linux only** (2026-10-09): the package targets Linux. macOS was "ideally" but needs a darwin output, a non-Vulkan whisper build and a `setsid` shim, all untestable here; it is recorded as a future draft item.
-- **Docker was decided and then aborted** (2026-10-09): item 19 explored a container image, then the user aborted it because the GPU requirement — "works with any kind of GPU, as if running directly on a Linux machine" — is not deliverable through a Linux container (Vulkan passthrough works on Linux hosts, NVIDIA needs the container toolkit, macOS has no passthrough, and whisper.cpp has no TPU backend). The flake package is the single delivery; nothing else ships on top of it. Its portable-build slot is now filled by [item 19](19-unix-build-recipe.md): a plain-tools recipe (documentation, not an image), which is the replacement the user chose.
+- **Docker was considered, briefly aborted, and reinstated** (2026-10-09): a first abort claimed the GPU requirement ("works with any kind of GPU, as if running directly on a Linux machine") was not deliverable through a Linux container; the user corrected that by pointing at `docker run --gpus all` ([Docker's GPU docs](https://docs.docker.com/engine/containers/gpu/)). Item 19 returns as the Docker image, built from this item's flake closure, with the GPU matrix decided there: NVIDIA `--gpus all` + the NVIDIA Container Toolkit (the closure's Vulkan whisper-cli uses the driver's Vulkan ICD), Intel/AMD via `/dev/dri`, CPU by default, macOS CPU-only (no passthrough from Linux containers), TPU out of scope (whisper.cpp has no backend). A plain-tools recipe that briefly replaced it was dropped when Docker returned.
 
 ## Proposal (approved 2026-10-09)
 
@@ -33,7 +33,7 @@ Item 16 extends the `default` package with:
 - **Shared pin (ADR 0036):** devenv takes the flake's locked nixpkgs input; the exact wiring is settled at the first checkpoint (devenv is itself a flake input of the repo).
 - SQLite is embedded via the JDBC driver; there is no separate DB service.
 
-**Not in scope:** a NixOS module or systemd service (2026-10-09), a darwin output (future item), and Docker (aborted).
+**Not in scope:** a NixOS module or systemd service (2026-10-09) and a darwin output (future item). Docker is a separate delivery on top of this item (item 19), not part of the package itself.
 
 ## Open questions (answered 2026-10-09)
 
@@ -41,8 +41,8 @@ Item 16 extends the `default` package with:
 - Target NixOS only, or also non-NixOS? → **Any Linux**; `nix run .` works outside NixOS (Vulkan if the driver is present). No NixOS module.
 - macOS? → **Out of scope here**; a future draft item covers a darwin output and a `setsid` shim.
 - Is a NixOS module / systemd service wanted? → **No.**
-- Docker? → **Aborted** (item 19 removed, reason above).
-- The GPU path? → The **native Vulkan build** on a Linux host; Docker's inability to deliver "any GPU as-if-direct" is why Docker was dropped.
+- Docker? → **Reinstated as item 19** (a Docker image built from this item's closure; the GPU matrix is decided in that item).
+- The GPU path? → The **native build is Vulkan** on a Linux host; the Docker image passes the host's GPUs through the same way (`--gpus all` for NVIDIA, `/dev/dri` for Intel/AMD) — see item 19.
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -69,3 +69,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 
 - 2026-10-09: consultation answers approved: one shared nixpkgs pin (ADR 0036); any Linux, no NixOS module; macOS out of scope (future draft item); Docker aborted (item 19 removed) because the GPU requirement cannot be delivered through a container. Test list not yet approved.
 - 2026-10-09: test list (8 items) approved by the user; status `spec-approved`.
+- 2026-10-09: Docker reinstated as item 19 after the user corrected the GPU claim (`docker run --gpus all`); a recipe that briefly replaced it was dropped. The GPU matrix lives in item 19.
