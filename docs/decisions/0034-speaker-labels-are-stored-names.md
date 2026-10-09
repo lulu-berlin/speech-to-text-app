@@ -11,9 +11,8 @@ The oracle (`docs/oracle/transcribe.py`, ADR 0002) labels speakers from their 0-
   - srt and vtt cue text `{name}: {turn text}`, e.g. `Speaker 1: Hello.` or `Alice: Hello.`.
 - No special case for the oracle's lower-case `[speaker N]`: txt always prints the name as stored, so the default header is `[Speaker 1]`.
 - Turns still merge by `speakerId` (item 09), so two speakers renamed alike stay separate turns.
-- The json download keeps the oracle's 0-based `speaker` number and no names.
 
 ## Consequences
 - While no speaker is renamed, srt and vtt stay byte-identical to the oracle; txt differs in one character per block header (`S` instead of `s`).
 - A rename (item 22) changes the downloads without touching any segment.
-- Item 22's "Downloads" bullet is settled by this ADR.
+- Item 22's "Downloads" bullet is settled by this ADR. There is no json download ([ADR 0035](0035-no-json-download.md)), so no download carries the 0-based number.

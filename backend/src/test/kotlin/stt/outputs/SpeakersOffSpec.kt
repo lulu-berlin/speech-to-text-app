@@ -8,7 +8,7 @@ class SpeakersOffSpec :
         given("a task with speakers off: segments without a speakerId and no speakers") {
             `when`("its outputs are rendered") {
                 then(
-                    "txt is one trimmed segment per line, srt and vtt have one cue per segment without a speaker prefix, and json has text and segments without speakers/speaker",
+                    "txt is one trimmed segment per line and srt and vtt have one cue per segment without a speaker prefix",
                 ) {
                     val segments =
                         listOf(
@@ -18,8 +18,7 @@ class SpeakersOffSpec :
                         )
 
                     // Spec "Speakers off" (no oracle code: the oracle delegates to whisper-cli's writers): the diarized
-                    // shapes without labels, trimmed text (ADR 0030), one cue per segment; json without "speakers"
-                    // and "speaker", same layout as the diarized json.
+                    // shapes without labels, trimmed text (ADR 0030), one cue per segment.
                     renderTxt(segments, null) shouldBe "Hello there.\nagain.\nFine.\n"
                     renderSrt(segments, null) shouldBe
                         "1\n00:00:00,000 --> 00:00:01,500\nHello there.\n\n" +
@@ -30,29 +29,6 @@ class SpeakersOffSpec :
                         "00:00:00.000 --> 00:00:01.500\nHello there.\n\n" +
                         "00:00:01.500 --> 00:00:03.250\nagain.\n\n" +
                         "00:00:03.250 --> 00:00:04.000\nFine.\n\n"
-                    renderJson(segments, null) shouldBe
-                        """
-                        {
-                          "text": "Hello there. again. Fine.",
-                          "segments": [
-                            {
-                              "start": 0.0,
-                              "end": 1.5,
-                              "text": "Hello there."
-                            },
-                            {
-                              "start": 1.5,
-                              "end": 3.25,
-                              "text": "again."
-                            },
-                            {
-                              "start": 3.25,
-                              "end": 4.0,
-                              "text": "Fine."
-                            }
-                          ]
-                        }
-                        """.trimIndent()
                 }
             }
         }
