@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { App } from './App';
 
 function renderAt(path: string) {
@@ -45,5 +46,42 @@ describe('the app root', () => {
 
     fireEvent.click(historyLink);
     expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
+  });
+
+  it('renders the components with the theme applied, following the OS preference', () => {
+    const renderWith = (prefersDark: boolean) => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({
+          matches: prefersDark,
+          media: '(prefers-color-scheme: dark)',
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      );
+      return renderAt('/queue');
+    };
+
+    // Expected values are the tokens themselves (hex -> rgb, as jsdom reports them).
+    const asRgb = (hex: string) => {
+      const value = Number.parseInt(hex.slice(1), 16);
+      return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
+    };
+
+    const light = renderWith(false);
+    const lightSurface = screen.getByRole('main');
+    expect(getComputedStyle(lightSurface).backgroundColor).toBe(
+      asRgb(lightTheme.colors.background),
+    );
+    expect(getComputedStyle(lightSurface).color).toBe(asRgb(lightTheme.colors.text));
+    light.unmount();
+
+    const dark = renderWith(true);
+    const darkSurface = screen.getByRole('main');
+    expect(getComputedStyle(darkSurface).backgroundColor).toBe(asRgb(darkTheme.colors.background));
+    expect(getComputedStyle(darkSurface).color).toBe(asRgb(darkTheme.colors.text));
+    dark.unmount();
+
+    vi.unstubAllGlobals();
   });
 });
