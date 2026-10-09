@@ -20,9 +20,16 @@ internal class FakeChunker : Chunker {
     /** When set, every call waits for it before returning; a test clears it to let later calls run through. */
     var hold: CompletableDeferred<Unit>? = null
 
+    /** The first call to wait on [hold]; earlier calls run through. */
+    var holdFrom: Int = 1
+
+    /** How many chunks every call plans. */
+    var chunkCount: Int = 1
+
     /**
-     * The task whose plan also names a second chunk whose FLAC was never written, so storing the plan fails
-     * part-way; null for every task. Lets a test see that a plan is stored all-or-nothing.
+     * The task whose plan also names one chunk more than [chunkCount], whose FLAC was never written, so
+     * storing the plan fails part-way; null for every task. Lets a test see that a plan is stored
+     * all-or-nothing.
      */
     var unwritablePlanFor: Long? = null
 
@@ -33,20 +40,24 @@ internal class FakeChunker : Chunker {
         workDir: Path,
     ): ChunkedAudio =
         probe.around {
+            val task = taskIdOf(workDir)
             workDirs.add(workDir)
-            val file = workDir.resolve("chunk-0.flac")
-            Files.writeString(file, "fake flac")
-            entered.send(workDir)
-            hold?.await()
-            val chunks =
-                if (taskIdOf(workDir) == unwritablePlanFor) {
-                    listOf(
-                        ExportedChunk(PlannedChunk(startMs = 0, endMs = 1_000), file),
-                        ExportedChunk(PlannedChunk(startMs = 1_000, endMs = 2_000), workDir.resolve("chunk-1.flac")),
-                    )
-                } else {
-                    listOf(ExportedChunk(PlannedChunk(startMs = 0, endMs = 1_000), file))
+            val planned =
+                (0 until chunkCount + if (task == unwritablePlanFor) 1 else 0).map { idx ->
+                    PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L)
                 }
-            ChunkedAudio(durationMs = chunks.last().planned.endMs, chunks = chunks)
+            val chunks =
+                planned.mapIndexed { idx, chunk ->
+                    val file = workDir.resolve("chunk-$idx.flac")
+                    if (task == unwritablePlanFor && idx == planned.lastIndex) {
+                        // Named by the plan, but never written, so storing the plan fails part-way.
+                        ExportedChunk(chunk, file)
+                    } else {
+                        ExportedChunk(chunk, Files.writeString(file, "fake flac"))
+                    }
+                }
+            entered.send(workDir)
+            if (workDirs.size >= holdFrom) hold?.await()
+            ChunkedAudio(durationMs = planned.last().endMs, chunks = chunks)
         }
 }

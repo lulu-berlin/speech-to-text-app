@@ -24,6 +24,12 @@ internal class FakeTranscriber : Transcriber {
     /** When set, every call waits for it before returning; a test clears it to let later calls run through. */
     var hold: CompletableDeferred<Unit>? = null
 
+    /** The first call to wait on [hold]; earlier calls run through. */
+    var holdFrom: Int = 1
+
+    /** The segments every call returns, offsets relative to the chunk's audio; none by default. */
+    var segments: List<WhisperSegment> = emptyList()
+
     /**
      * When set, a cancelled call does not die at once: it reports itself on [dyingStarted] and waits for
      * this before it is recorded in [cancelled], like item 05's runner waiting out its SIGTERM grace period.
@@ -49,7 +55,7 @@ internal class FakeTranscriber : Transcriber {
             audioFiles.add(audio)
             entered.send(audio)
             try {
-                hold?.await()
+                if (audioFiles.size >= holdFrom) hold?.await()
             } catch (e: CancellationException) {
                 death?.let { pending ->
                     withContext(NonCancellable) {
@@ -64,6 +70,6 @@ internal class FakeTranscriber : Transcriber {
                 failNext = null
                 throw failure
             }
-            emptyList()
+            segments
         }
 }
