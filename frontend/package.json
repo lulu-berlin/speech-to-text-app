@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "vite --open /mock.html",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run && prettier --check . ../.prettierrc",
@@ -32,5 +33,10 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
+  },
+  "msw": {
+    "workerDirectory": [
+      "mock"
+    ]
   }
 }
