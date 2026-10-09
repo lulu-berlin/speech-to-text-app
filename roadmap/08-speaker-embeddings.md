@@ -1,6 +1,6 @@
 # 08 — Speaker embeddings
 
-Status: in-progress
+Status: in-review
 Depends on: [06](../docs/specs/audio-decoding-and-chunking.md) (done)
 
 ## Goal
@@ -96,3 +96,5 @@ Approved 2026-10-07 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09 (review round 1): refactor approved and done after cycle 3: shared `tone440` signal for the pause and cancel tests.
 - 2026-10-09 (review round 1, cycle 1b): the reference is committed as a text block of the 512 values exactly as printed (one `floatArrayOf` argument per line would be 512 lines under ktlint's argument-list rule); the test first checks the user's input checksums (106 000 samples, segment sum −38 678, sum of absolute values 8 935 266). It passed on its first run, as expected after cycle 1a (measured cosine 1.0000001, i.e. identical up to float rounding). Ability to fail: with the × 32768 put back for `normalize_samples = true` (uncommitted mutation) it failed with "0.45896325 should be >= 0.999" (and cycle 1a's test failed again); code restored. `gradle check` (105 unit tests) and `gradle integrationTest` (44 run) green.
 - 2026-10-09 (review round 1): refactor approved and done after cycle 1b: one shared `floats(text)` reference-value parser (`ReferenceValues.kt`) for `FbankSpec` and `EmbeddingsSpec`.
+- 2026-10-09 (review round 1, finding 2): wrapper verified by the user: `nix build . && STT_DATA_DIR=$(mktemp -d) ./result/bin/speech-to-text-app` built and started with `STT_SPEAKER_MODEL` unset (Flyway applied migrations 1 and 2, "Responding at http://0.0.0.0:8080"), so the `--set-default STT_SPEAKER_MODEL` from `nix/models.nix` takes effect.
+- 2026-10-09 (review round 1): all findings fixed, all test-list items ticked; `gradle check --rerun-tasks` (105 unit tests) and `gradle integrationTest --rerun` (44 run, 0 failures; `EmbeddingsSpec` 7/7) green. Set to in-review.
