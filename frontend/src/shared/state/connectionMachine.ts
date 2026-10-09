@@ -4,6 +4,7 @@
 import { assign, fromCallback, setup } from 'xstate';
 import { subscribeToEvents } from '../api/client';
 import type { Queue, StreamEvent, Task } from '../api/types';
+import { isAllowedTransition } from './transitions';
 
 export interface ConnectionContext {
   tasks: Task[];
@@ -40,9 +41,22 @@ export const connectionMachine = setup({
       on: {
         disconnected: 'reconnecting',
         'task-updated': {
-          actions: assign({
-            tasks: ({ context, event }) =>
-              context.tasks.map((task) => (task.id === event.task.id ? event.task : task)),
+          actions: assign(({ context, event }) => {
+            const previous = context.tasks.find((task) => task.id === event.task.id);
+            // Server state is applied as received: an update outside the transition table is
+            // logged, not rejected, and the next snapshot repairs the gap (ADR 0031).
+            if (
+              previous !== undefined &&
+              !isAllowedTransition(previous.status, event.task.status)
+            ) {
+              console.warn(
+                `task-updated for task ${event.task.id} leaves the transition table: ` +
+                  `${previous.status} -> ${event.task.status}`,
+              );
+            }
+            return {
+              tasks: context.tasks.map((task) => (task.id === event.task.id ? event.task : task)),
+            };
           }),
         },
         'task-progress': {
