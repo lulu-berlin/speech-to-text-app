@@ -53,4 +53,47 @@ class RenderJsonSpec :
                 }
             }
         }
+        given("segments of one speaker whose texts include a blank one") {
+            `when`("they are rendered as json") {
+                then("text is the plain join of every trimmed text, so the blank segment leaves two adjacent spaces") {
+                    val segments =
+                        listOf(
+                            segment(speakerId = 0, startMs = 0, endMs = 1_000, text = " A "),
+                            segment(speakerId = 0, startMs = 1_000, endMs = 2_000, text = "  "),
+                            segment(speakerId = 0, startMs = 2_000, endMs = 3_000, text = " B "),
+                        )
+
+                    // Oracle: full_text = " ".join(seg["text"].strip() for seg in segments).strip() joins every
+                    // trimmed text, including a blank one: "A" + " " + "" + " " + "B" -> "A  B" (unlike speaker_turns,
+                    // whose f"{acc} {text}".strip() fold drops blanks).
+                    renderJson(segments) shouldBe
+                        """
+                        {
+                          "text": "A  B",
+                          "speakers": 1,
+                          "segments": [
+                            {
+                              "start": 0.0,
+                              "end": 1.0,
+                              "text": "A",
+                              "speaker": 0
+                            },
+                            {
+                              "start": 1.0,
+                              "end": 2.0,
+                              "text": "",
+                              "speaker": 0
+                            },
+                            {
+                              "start": 2.0,
+                              "end": 3.0,
+                              "text": "B",
+                              "speaker": 0
+                            }
+                          ]
+                        }
+                        """.trimIndent()
+                }
+            }
+        }
     })
