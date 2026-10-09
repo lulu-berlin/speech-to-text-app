@@ -2,7 +2,6 @@ package stt.outputs
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
-import stt.db.Segment
 import stt.db.Speaker
 
 class RenderSrtSpec :
@@ -28,10 +27,3 @@ class RenderSrtSpec :
             }
         }
     })
-
-private fun segment(
-    speakerId: Int,
-    startMs: Long,
-    endMs: Long,
-    text: String,
-) = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = text, speakerId = speakerId)
