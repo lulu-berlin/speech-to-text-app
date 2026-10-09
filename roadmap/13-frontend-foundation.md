@@ -69,7 +69,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The API client returns typed tasks for `GET /api/tasks` (served from `docs/api/task-list.json`)
 - [x] The API client turns an error response into a typed error with code and message, and `duplicate-audio` with its `taskId`
 - [x] The connection machine goes from connecting to live on the first `snapshot`, which replaces tasks and queue
-- [ ] `task-updated`, `task-progress`, `queue-updated` and `task-deleted` events update the state
+- [x] `task-updated`, `task-progress`, `queue-updated` and `task-deleted` events update the state
 - [ ] When the stream drops, the connection machine goes to reconnecting, and the next `snapshot` replaces the state
 - [ ] A task update that breaks the transition table is applied and logged
 - [ ] A command not allowed for the task's status (per `docs/api/task-transitions.json`) cannot be started and sends no request
@@ -79,6 +79,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Dark tokens apply when the OS prefers dark, light tokens otherwise
 - [ ] The confirmation dialog runs the action on confirm and not on cancel or Escape
 - [ ] Components render with the theme available (themed values applied)
+- [ ] (discovered) A `task-updated` for a task the state does not hold yet (e.g. a new upload) adds it
 
 ## Acceptance criteria
 - Frontend tests (Vitest + React Testing Library + MSW) for the client, the machines, routing, the shell, theming and the dialog pass.
@@ -93,6 +94,7 @@ The user allowed additions to the mocks (2026-10-09) if each states why, so it c
 - **Task command responses** (`POST /api/tasks/{id}/pause|resume|cancel|retry`): the Task example whose status is the command's `to` in `task-transitions.json`, with the URL's id. The examples hold one Task per status, not one per (task, command) pair, so other fields (filename, progress, `finishedAt`) belong to the example, not to the requested task. The backend returns the real task.
 - **`POST /api/queue/pause|resume`**: `queue.json` with `paused` set to `true`/`false`. `queue.json` has `paused: false`, and a pause response must show the paused queue.
 - **`PUT /api/queue/order`**: `queue.json` with the request's `taskIds`. The response is the queue in its new order; the mock does not check the set (the backend answers `409 reorder-mismatch`).
+- **Test stream for the live events** (`connectionMachine.test.ts`): after `snapshot.json`, `task-updated` carries `task.paused.json` (id 7, QUEUED in the snapshot) and `queue-updated` carries `queue.json` with `paused: true`. The stock examples (`task.completed.json` for id 3, `queue.json`) equal what `snapshot.json` already holds, so applying them would show no change. Only the test uses this stream; the default stream sends just the snapshot.
 
 Known differences from the contract, no example to serve:
 - `GET /api/tasks/{id}/turns` returns turns for any known task (by its `speakersMode`), not `409 not-completed` for a task that is not COMPLETED: `error.json`'s code is `not-found`, and there is no `not-completed` example.
@@ -108,3 +110,5 @@ Known differences from the contract, no example to serve:
 - 2026-10-09 (workspace, cycle 2): `Test: API client turns error responses into typed errors, duplicate-audio with taskId`. Red: `expected { id: 7, filename: 'memo.wav', … } to be an instance of ApiError` (the client threw plain errors / returned the 201 body). Green: `ApiError` (code, message, `taskId`), `getTask`, multipart `uploadTask`; the 404 comes from the default `GET /api/tasks/:id` handler (`error.json`), the 409 from a per-test override serving `error.duplicate-audio.json` (shared `src/test/server.ts`). 2 files / 4 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
 - 2026-10-09: cycle 2 refactors approved by the user (all five), each its own commit: one typed list of Task examples (`taskExamples`), `Task` types imported from `./types`, command handlers derived from `task-transitions.json`, the client's error body typed as `ApiErrorBody`, typed-error tests with `rejects` matchers. 2 files / 4 tests green after each.
 - 2026-10-09 (workspace, cycle 3): `Test: connection machine goes from connecting to live on the first snapshot`. Red: `Failed to resolve import "./connectionMachine"`. Green: `connectionMachine` (XState v5, `src/shared/state/`) invokes the client's new `subscribeToEvents` (the only place that opens `EventSource`) and assigns the snapshot's tasks and queue on entering `live`; the SSE handler is now a plain `http.get` in the default handlers (`events.ts`), no longer lazy; `Queue`, `Snapshot`, `ServerEvent` types. Expected values are `docs/api/snapshot.json`. 3 files / 5 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
+- 2026-10-09: cycle 3 refactor approved: `eventsHandler` moved from `events.ts` into `handlers.ts` (`events.ts` deleted). 3 files / 5 tests green.
+- 2026-10-09 (workspace, cycle 4): `Test: task-updated, task-progress, queue-updated and task-deleted events update the state`. A first run passed the wait too early (the empty initial state has no task 4), so the wait now requires `live`; then the honest red: `Error: Timeout of 2000 ms exceeded` (the machine ignored the four events). Green: `ServerEvent` covers all five events, the client's `subscribeToEvents` listens to each, the machine's `live` state replaces a task on `task-updated`, sets both progress fields on `task-progress`, replaces the queue on `queue-updated`, removes the task on `task-deleted`; `eventStreamResponse` in `handlers.ts` builds a stream from named events. Expected values derived from `snapshot.json`, `task.paused.json`, `task-progress.json`, `queue.json`, `task-deleted.json`. 3 files / 6 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean. Discovered: `task-updated` for an unknown task (pending confirmation).
