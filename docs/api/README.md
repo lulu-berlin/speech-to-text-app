@@ -28,3 +28,14 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 | Error (duplicate) | `error.duplicate-audio.json` | `409 duplicate-audio` of `POST /api/tasks` |
 
 Responses without a body (`204` of `DELETE /api/tasks/{id}`), the transcript downloads (item 10's formats) and `/audio` (FLAC) have no example here.
+
+## Task transition table
+
+`task-transitions.json` is contract data, not a response. It lists:
+- `transitions`: the allowed status transitions per status (item 04, amended by item 11 for retry);
+- `commands`: for each task command endpoint, the statuses it accepts and the status it requests.
+
+Delete is not a transition and works on any task.
+
+- The frontend's state machine reads this table, so the UI only offers commands the task's status allows (item 13).
+- A backend test checks that `TaskStatus` has exactly these transitions (item 11).

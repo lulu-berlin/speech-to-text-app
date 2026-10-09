@@ -53,7 +53,7 @@ Expose the queue and the transcription history over a REST API for all commands 
 - **Errors.** Body `{ "error": "<code>", "message": "..." }`, with `taskId` added for `duplicate-audio` only. No stack traces in responses.
 - JSON via kotlinx.serialization; route handlers stay thin and call the engine/repositories.
 
-## Contract (proposed 2026-10-09, for approval)
+## Contract (approved 2026-10-09)
 
 The JSON shapes the frontend builds against.
 
@@ -113,6 +113,7 @@ The JSON shapes the frontend builds against.
   | `404` | `not-found` (unknown task), `no-audio` (task without stored chunks) |
   | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns or transcript of a task that is not COMPLETED) |
   | `500` | `internal` |
+- **Task transition table** (added 2026-10-09, item 13 consultation): [`docs/api/task-transitions.json`](../docs/api/task-transitions.json) lists the allowed status transitions and, for each command endpoint, the statuses it accepts. The frontend reads it to offer only allowed commands; the backend checks that its `TaskStatus` table equals it (item 11). A command outside the table still answers `409 illegal-transition`.
 
 ## Open questions (answered 2026-10-09)
 
@@ -175,3 +176,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: cancel/failure decisions (item 11): `POST /api/tasks/{id}/retry` for FAILED and CANCELED tasks; transcript downloads, like `/turns`, only for COMPLETED tasks (`409 not-completed`); the contract states that segment times are on the `/audio` timeline, for item 15's playback highlighting. Remaining: approval of the contract as written.
 - 2026-10-09: contract approved by the user as written (section "Contract"); example files created in `docs/api/` with the file-to-shape mapping and nullability convention in `docs/api/README.md`. The rest of the item (Proposal details, test list) is still to be approved before `spec-approved`.
 - 2026-10-09: last details decided: FAILED and CANCELED tasks keep their `phase`; new Task field `transcribedUntilMs` (end of the last stored segment), resume stays per chunk (segment-level resume rejected); segment text trimmed everywhere it leaves the backend, including the json download ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)). Test list (19 items) approved by the user; two items added from these decisions. Status `spec-approved`.
+- 2026-10-09: contract extended in the item 13 consultation: `docs/api/task-transitions.json` (transitions and commands), shared by the frontend state machine and a backend check (item 11).

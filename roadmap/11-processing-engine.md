@@ -85,6 +85,7 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] Retrying a FAILED or CANCELED task queues it at the end, clears its error, skips its DONE chunks and reruns the interrupted chunk
 - [ ] Retrying a task that failed before chunking chunks it again from the kept original
 - [ ] A COMPLETED task cannot be retried
+- [ ] `TaskStatus`'s transitions, retry included, equal `docs/api/task-transitions.json`, and every command there maps to an allowed transition (item 12 contract, added 2026-10-09)
 - [ ] A failed or cancelled task keeps the phase it stopped in; it is cleared on retry, on restart recovery and on completion
 - [ ] Every status, phase, and progress change, and every deletion, is emitted as an event after it is persisted
 - [ ] The worker waits for work without polling (no wakeups while idle under virtual time)
@@ -104,3 +105,4 @@ Seed — to be refined and approved with the user before any test is written:
 - 2026-10-09: decisions on cancel and failure: cancel keeps a CANCELED entry; FAILED and CANCELED tasks can be retried (`→ QUEUED`, at the end of the queue, resuming from stored chunks like a restart; amends item 04's "terminal is final" for these two); an unchunked original is kept until the task is deleted or chunked; partial results of unfinished tasks are not viewable or downloadable (item 12).
 - 2026-10-09: order approved by the user: this item starts after item 20 merges, because retry changes the same `TaskStatus` transition code that item 20's R7 rewrites (`transition` → `canTransitionTo`).
 - 2026-10-09: phase rule from item 12's contract: kept on FAILED/CANCELED, cleared on QUEUED and COMPLETED.
+- 2026-10-09: item 13 consultation: the transition table is shared as `docs/api/task-transitions.json`; this item adds the backend check that `TaskStatus` matches it.
