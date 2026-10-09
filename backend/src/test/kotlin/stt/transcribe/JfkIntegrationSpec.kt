@@ -10,6 +10,7 @@ import kotlinx.coroutines.withTimeout
 import stt.Integration
 import stt.config.Device
 import stt.process.ProcessRunner
+import stt.requireTestEnv
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
 
@@ -54,19 +55,5 @@ class JfkIntegrationSpec :
 /**
  * The item 07 integration fixtures, read from the environment in exactly one place: the ggml-tiny.en model and
  * whisper.cpp's samples/jfk.wav, exported by `devenv.nix` (`nix/models.nix`, `nix/test-fixtures.nix`).
- * A missing variable fails the test naming it, so the failure says how to fix the environment.
  */
-internal fun transcriptFixtures(): Pair<Path, Path> {
-    fun requireEnv(name: String): Path {
-        val value = System.getenv(name)
-        return if (value == null) {
-            throw IllegalStateException(
-                "Integration test needs $name set: enter the devenv shell that exports it, or pass it explicitly " +
-                    "(see workspaces/README.md § Environment for workspace agents)",
-            )
-        } else {
-            Path.of(value)
-        }
-    }
-    return requireEnv("TEST_WHISPER_TINY_EN_MODEL") to requireEnv("TEST_JFK_WAV")
-}
+internal fun transcriptFixtures(): Pair<Path, Path> = requireTestEnv("TEST_WHISPER_TINY_EN_MODEL") to requireTestEnv("TEST_JFK_WAV")
