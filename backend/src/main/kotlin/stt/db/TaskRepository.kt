@@ -276,6 +276,20 @@ class TaskRepository(
             TasksTable.update({ (TasksTable.id eq id) and condition }) { body(it) } > 0
         }
 
+    /**
+     * Restart recovery (ADR 0004): marks every RUNNING task QUEUED again, keeping its `queue_position`,
+     * and clears its phase (item 12's contract: a queued task has no phase). A crash leaves the row RUNNING
+     * with its plan stored; the worker resumes it from the last DONE chunk. Returns how many rows were
+     * rewritten.
+     */
+    suspend fun recoverRunning(): Int =
+        db.writeTransaction {
+            TasksTable.update({ TasksTable.status eq TaskStatus.RUNNING }) {
+                it[TasksTable.status] = TaskStatus.QUEUED
+                it[TasksTable.phase] = null
+            }
+        }
+
     /** Deletes the task; its audio metadata, chunks with their chunk audio, and segments go with it (ON DELETE CASCADE). */
     suspend fun delete(id: Long) {
         db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq id } }
