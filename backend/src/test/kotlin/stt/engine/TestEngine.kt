@@ -1,18 +1,23 @@
 package stt.engine
 
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.withContext
 import stt.config.testConfig
 import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
+import stt.db.TaskPhase
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.db.TestDataDir
@@ -20,6 +25,8 @@ import stt.db.queuedTask
 import stt.queue.TaskStatus
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /** One engine and everything a spec drives around it (fake chunker and transcriber, repositories, events). */
 internal class EngineFixture(
@@ -90,3 +97,41 @@ internal suspend fun enqueueTask(
 
 /** The id of the task a work path belongs to: `<dataDir>/work/<id>[/…]` (ADR 0024). */
 internal fun taskIdOf(workPath: Path): Long = workPath.fileName.toString().toLong()
+
+/** The stored status of a task. */
+internal suspend fun statusOf(
+    fixture: EngineFixture,
+    task: Long,
+): TaskStatus? =
+    fixture.tasks
+        .find(task)
+        ?.task
+        ?.status
+
+/** The stored phase of a task. */
+internal suspend fun phaseOf(
+    fixture: EngineFixture,
+    task: Long,
+): TaskPhase? =
+    fixture.tasks
+        .find(task)
+        ?.task
+        ?.phase
+
+/**
+ * The tasks the engine starts while [window] of real time passes, returning early as soon as a second one
+ * starts. "Nothing happened" cannot be awaited, so the test pumps the worker itself: [runCurrent] runs it
+ * on the test dispatcher, and each short real delay lets the file and database I/O in between finish.
+ */
+internal suspend fun TestScope.tasksStartedWithin(
+    fixture: EngineFixture,
+    window: Duration,
+): List<Long> {
+    val deadline = System.nanoTime() + window.inWholeNanoseconds
+    runCurrent()
+    while (System.nanoTime() < deadline && fixture.chunker.workDirs.size <= 1) {
+        withContext(Dispatchers.Default) { delay(2.milliseconds) }
+        runCurrent()
+    }
+    return fixture.chunker.workDirs.map(::taskIdOf)
+}
