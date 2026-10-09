@@ -1,0 +1,259 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Animated stenographer typing on a steno machine">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#FFF6E9"/>
+      <stop offset="100%" stop-color="#FFDDE8"/>
+    </radialGradient>
+    <linearGradient id="machineFront" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4A5A75"/>
+      <stop offset="100%" stop-color="#323F55"/>
+    </linearGradient>
+    <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C98B5E"/>
+      <stop offset="100%" stop-color="#A86E45"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFEAA7" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#FFEAA7" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="circle">
+      <circle cx="200" cy="200" r="192"/>
+    </clipPath>
+  </defs>
+
+  <style>
+    .wave { opacity: 0; animation: wave 1.5s ease-out infinite; }
+    .wave:nth-child(2) { animation-delay: -1s; }
+    .wave:nth-child(3) { animation-delay: -0.5s; }
+    @keyframes wave { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+
+    .head { transform-box: view-box; transform-origin: 200px 168px; animation: bob 2.6s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+
+    .eye { transform-box: fill-box; transform-origin: center; animation: blink 4s infinite; }
+    @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+
+    /* Hands rest on the machine and drift slightly; the fingers do the typing */
+    .arm-l { animation: drift 2.8s ease-in-out infinite; }
+    .arm-r { animation: drift 3.2s ease-in-out infinite; animation-delay: -1.1s; }
+    @keyframes drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-1px, 1px); } }
+
+    .f, .thumb { transform-box: fill-box; transform-origin: 50% 0; animation: press 0.5s ease-in-out infinite; }
+    .arm-l .f1 { animation-duration: 0.48s; animation-delay: -0.10s; }
+    .arm-l .f2 { animation-duration: 0.62s; animation-delay: -0.37s; }
+    .arm-l .f3 { animation-duration: 0.44s; animation-delay: -0.21s; }
+    .arm-l .f4 { animation-duration: 0.56s; animation-delay: -0.49s; }
+    .arm-r .f1 { animation-duration: 0.52s; animation-delay: -0.31s; }
+    .arm-r .f2 { animation-duration: 0.46s; animation-delay: -0.04s; }
+    .arm-r .f3 { animation-duration: 0.60s; animation-delay: -0.43s; }
+    .arm-r .f4 { animation-duration: 0.50s; animation-delay: -0.18s; }
+    .thumb { animation-duration: 0.9s; }
+    .arm-r .thumb { animation-delay: -0.55s; }
+    @keyframes press {
+      0%, 100% { transform: translateY(0) scaleY(1); }
+      30%      { transform: translateY(-2px) scaleY(0.72); }
+      45%      { transform: translateY(1.5px) scaleY(1.06); }
+      55%      { transform: translateY(0) scaleY(1); }
+    }
+
+    .keys rect { fill: #F5F6FA; animation: flash 0.9s steps(1) infinite; }
+    .keys rect:nth-child(3n)   { animation-delay: -0.2s; }
+    .keys rect:nth-child(3n+1) { animation-delay: -0.55s; }
+    .keys rect:nth-child(4n)   { animation-delay: -0.7s; }
+    @keyframes flash { 0% { fill: #F5F6FA; } 15% { fill: #C9D3DC; } 30% { fill: #F5F6FA; } }
+
+    .word { opacity: 0; animation: rise 3s ease-out infinite; }
+    .word:nth-child(2) { animation-delay: 0.6s; }
+    .word:nth-child(3) { animation-delay: 1.2s; }
+    .word:nth-child(4) { animation-delay: 1.8s; }
+    .word:nth-child(5) { animation-delay: 2.4s; }
+    @keyframes rise {
+      0%   { transform: translate(0, 0); opacity: 0; }
+      15%  { opacity: 1; }
+      100% { transform: translate(58px, -104px); opacity: 0; }
+    }
+
+    .lamp-glow { animation: hum 3s ease-in-out infinite; }
+    @keyframes hum { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+
+    .spark { transform-box: fill-box; transform-origin: center; animation: twinkle 2.2s ease-in-out infinite; }
+    .spark:nth-child(2) { animation-delay: -0.7s; }
+    .spark:nth-child(3) { animation-delay: -1.4s; }
+    @keyframes twinkle { 0%, 100% { transform: scale(0.4); opacity: 0.4; } 50% { transform: scale(1); opacity: 1; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      .word, .wave { opacity: 1; }
+    }
+  </style>
+
+  <!-- Background -->
+  <circle cx="200" cy="200" r="192" fill="url(#bg)"/>
+  <g>
+    <circle class="spark" cx="342" cy="78" r="6" fill="#A29BFE"/>
+    <circle class="spark" cx="60" cy="200" r="5" fill="#FDCB6E"/>
+    <circle class="spark" cx="88" cy="70" r="4" fill="#55EFC4"/>
+  </g>
+
+  <!-- Sound waves arriving at the headphones -->
+  <g fill="none" stroke-linecap="round" stroke-width="4">
+    <path class="wave" d="M140 118 Q132 132 140 146" stroke="#6C5CE7"/>
+    <path class="wave" d="M128 108 Q116 132 128 156" stroke="#E84393"/>
+    <path class="wave" d="M116 98 Q100 132 116 166" stroke="#FDCB6E"/>
+  </g>
+
+  <!-- Chair -->
+  <rect x="128" y="182" width="144" height="140" rx="30" fill="#E17055"/>
+  <rect x="140" y="194" width="120" height="120" rx="22" fill="#F0846A"/>
+
+  <!-- Torso -->
+  <path d="M150 218 Q150 186 200 183 Q250 186 250 218 L258 322 L142 322 Z" fill="#00B894"/>
+  <path d="M186 184 L200 204 L214 184 Z" fill="#00A383"/>
+
+  <!-- Neck and head -->
+  <rect x="190" y="158" width="20" height="30" rx="6" fill="#D99470"/>
+  <g class="head">
+    <!-- Rounded, ear-length mop: reads neither short-cropped nor long -->
+    <g fill="#2D1B3D">
+      <path d="M162 128 Q158 76 200 74 Q242 76 238 128 Z"/>
+      <circle cx="163.3" cy="101.6" r="11"/>
+      <circle cx="167.1" cy="92.0" r="11"/>
+      <circle cx="173.1" cy="83.7" r="11"/>
+      <circle cx="181.0" cy="77.4" r="11"/>
+      <circle cx="190.2" cy="73.4" r="11"/>
+      <circle cx="200.0" cy="72.0" r="11"/>
+      <circle cx="209.8" cy="73.4" r="11"/>
+      <circle cx="219.0" cy="77.4" r="11"/>
+      <circle cx="226.9" cy="83.7" r="11"/>
+      <circle cx="232.9" cy="92.0" r="11"/>
+      <circle cx="236.7" cy="101.6" r="11"/>
+    </g>
+    <circle cx="200" cy="130" r="34" fill="#E8A87C"/>
+    <path d="M166 130 Q163 94 200 90 Q237 94 234 130 Q230 113 217 113 Q209 105 198 111 Q187 106 179 115 Q171 118 166 130 Z" fill="#2D1B3D"/>
+    <path d="M186 74 Q194 70 202 72" fill="none" stroke="#4A3560" stroke-width="2.5" stroke-linecap="round"/>
+    <ellipse class="eye" cx="188" cy="134" rx="3.5" ry="4.5" fill="#2D1B3D"/>
+    <ellipse class="eye" cx="212" cy="134" rx="3.5" ry="4.5" fill="#2D1B3D"/>
+    <circle cx="180" cy="146" r="4" fill="#FF7675" opacity="0.25"/>
+    <circle cx="220" cy="146" r="4" fill="#FF7675" opacity="0.25"/>
+    <path d="M192 149 Q200 156 208 149" fill="none" stroke="#2D1B3D" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M163 130 Q163 82 200 82 Q237 82 237 130" fill="none" stroke="#FDCB6E" stroke-width="6" stroke-linecap="round"/>
+    <rect x="156" y="119" width="14" height="26" rx="7" fill="#E84393"/>
+    <rect x="230" y="119" width="14" height="26" rx="7" fill="#E84393"/>
+  </g>
+
+  <!-- Transcribed words rising from the machine -->
+  <g>
+    <rect class="word" x="226" y="226" width="18" height="7" rx="3.5" fill="#6C5CE7"/>
+    <rect class="word" x="228" y="226" width="12" height="7" rx="3.5" fill="#E84393"/>
+    <rect class="word" x="224" y="226" width="22" height="7" rx="3.5" fill="#00B894"/>
+    <rect class="word" x="229" y="226" width="10" height="7" rx="3.5" fill="#FDCB6E"/>
+    <rect class="word" x="226" y="226" width="16" height="7" rx="3.5" fill="#0984E3"/>
+  </g>
+
+  <!-- Lamp light -->
+  <path class="lamp-glow" d="M282 214 L300 226 L312 290 L246 290 Z" fill="url(#glow)" clip-path="url(#circle)"/>
+
+  <!-- Desk -->
+  <g clip-path="url(#circle)">
+    <rect x="0" y="290" width="400" height="120" fill="url(#desk)"/>
+    <rect x="0" y="284" width="400" height="9" rx="2" fill="#DDA477"/>
+  </g>
+
+  <!-- Desk lamp -->
+  <ellipse cx="320" cy="289" rx="20" ry="5" fill="#9AA9B4"/>
+  <ellipse cx="320" cy="287" rx="16" ry="3.5" fill="#B2BEC3"/>
+  <path d="M320 286 L320 222 Q320 206 304 203" fill="none" stroke="#B2BEC3" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="304" cy="203" r="4" fill="#9AA9B4"/>
+  <path d="M298 194 L310 202 L300 226 L280 213 Z" fill="#FDCB6E" stroke="#FDCB6E" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M282 214 L300 226" stroke="#FFF6D6" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Steno machine on a short stand -->
+  <ellipse cx="200" cy="288" rx="24" ry="4.5" fill="#2D1B3D" opacity="0.15"/>
+  <rect x="195" y="268" width="10" height="19" rx="2" fill="#9AA9B4"/>
+  <ellipse cx="200" cy="287" rx="16" ry="3.5" fill="#B2BEC3"/>
+  <path d="M154 248 L246 248 L243 270 L157 270 Z" fill="url(#machineFront)"/>
+  <rect x="166" y="257" width="68" height="3" rx="1.5" fill="#55EFC4" opacity="0.8"/>
+  <path d="M161 230 L239 230 L246 248 L154 248 Z" fill="#5A6B85"/>
+  <g class="keys">
+    <rect x="164" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="173" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="182" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="191" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="202" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="211" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="220" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="229" y="234" width="7" height="4" rx="1.2"/>
+    <rect x="161" y="241" width="8" height="4" rx="1.2"/>
+    <rect x="171" y="241" width="8" height="4" rx="1.2"/>
+    <rect x="181" y="241" width="8" height="4" rx="1.2"/>
+    <rect x="191" y="241" width="8" height="4" rx="1.2"/>
+    <rect x="201" y="241" width="8" height="4" rx="1.2"/>
+    <rect x="211" y="241" width="8" height="4" rx="1.2"/>
+    <rect x="221" y="241" width="8" height="4" rx="1.2"/>
+    <rect x="231" y="241" width="8" height="4" rx="1.2"/>
+  </g>
+
+  <!-- Left arm: elbow out, hand draped over the machine -->
+  <g class="arm-l">
+    <path d="M160 206 Q136 228 150 243 Q164 248 176 228" fill="none" stroke="#00A383" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="rotate(9 173.8 229)"><g class="f f1">
+      <rect x="172" y="229.6" width="5" height="10.5" rx="2.5" fill="#CC8962"/>
+      <rect x="171.3" y="229" width="5" height="10.5" rx="2.5" fill="#E8A87C"/>
+      <ellipse cx="173.8" cy="236.3" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g transform="rotate(3 179.4 229)"><g class="f f2">
+      <rect x="177.3" y="229.6" width="5.6" height="13.5" rx="2.8" fill="#CC8962"/>
+      <rect x="176.6" y="229" width="5.6" height="13.5" rx="2.8" fill="#E8A87C"/>
+      <ellipse cx="179.4" cy="239.3" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g><g class="f f3">
+      <rect x="182.8" y="229.6" width="5.8" height="14.5" rx="2.9" fill="#CC8962"/>
+      <rect x="182.1" y="229" width="5.8" height="14.5" rx="2.9" fill="#E8A87C"/>
+      <ellipse cx="185" cy="240.3" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g transform="rotate(-3 190.6 229)"><g class="f f4">
+      <rect x="188.5" y="229.6" width="5.6" height="13" rx="2.8" fill="#CC8962"/>
+      <rect x="187.8" y="229" width="5.6" height="13" rx="2.8" fill="#E8A87C"/>
+      <ellipse cx="190.6" cy="238.8" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g transform="rotate(-16 191 228)"><g class="thumb">
+      <rect x="188.7" y="228.6" width="6" height="10" rx="3" fill="#CC8962"/>
+      <rect x="188" y="228" width="6" height="10" rx="3" fill="#E8A87C"/>
+      <path d="M193.6 233 Q194.4 235.4 193.4 237.2" fill="none" stroke="#F7D6C0" stroke-width="1.4" stroke-linecap="round"/>
+    </g></g>
+    <path d="M169 224 Q168 232 171 234 L193 234 Q196 232 195 224 Q182 216 169 224 Z" fill="#E8A87C"/>
+    <ellipse cx="180" cy="226" rx="7" ry="3" fill="#F2C1A0" opacity="0.6"/>
+  </g>
+
+  <!-- Right arm -->
+  <g class="arm-r">
+    <path d="M240 206 Q264 228 250 243 Q236 248 224 228" fill="none" stroke="#00A383" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="rotate(-9 226.2 229)"><g class="f f1">
+      <rect x="224.4" y="229.6" width="5" height="10.5" rx="2.5" fill="#CC8962"/>
+      <rect x="223.7" y="229" width="5" height="10.5" rx="2.5" fill="#E8A87C"/>
+      <ellipse cx="226.2" cy="236.3" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g transform="rotate(-3 220.6 229)"><g class="f f2">
+      <rect x="218.5" y="229.6" width="5.6" height="13.5" rx="2.8" fill="#CC8962"/>
+      <rect x="217.8" y="229" width="5.6" height="13.5" rx="2.8" fill="#E8A87C"/>
+      <ellipse cx="220.6" cy="239.3" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g><g class="f f3">
+      <rect x="212.8" y="229.6" width="5.8" height="14.5" rx="2.9" fill="#CC8962"/>
+      <rect x="212.1" y="229" width="5.8" height="14.5" rx="2.9" fill="#E8A87C"/>
+      <ellipse cx="215" cy="240.3" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g transform="rotate(3 209.4 229)"><g class="f f4">
+      <rect x="207.3" y="229.6" width="5.6" height="13" rx="2.8" fill="#CC8962"/>
+      <rect x="206.6" y="229" width="5.6" height="13" rx="2.8" fill="#E8A87C"/>
+      <ellipse cx="209.4" cy="238.8" rx="1.7" ry="2.1" fill="#F7D6C0"/>
+    </g></g>
+    <g transform="rotate(16 209 228)"><g class="thumb">
+      <rect x="206.7" y="228.6" width="6" height="10" rx="3" fill="#CC8962"/>
+      <rect x="206" y="228" width="6" height="10" rx="3" fill="#E8A87C"/>
+      <path d="M206.4 233 Q205.6 235.4 206.6 237.2" fill="none" stroke="#F7D6C0" stroke-width="1.4" stroke-linecap="round"/>
+    </g></g>
+    <path d="M205 224 Q204 232 207 234 L229 234 Q232 232 231 224 Q218 216 205 224 Z" fill="#E8A87C"/>
+    <ellipse cx="220" cy="226" rx="7" ry="3" fill="#F2C1A0" opacity="0.6"/>
+  </g>
+</svg>
