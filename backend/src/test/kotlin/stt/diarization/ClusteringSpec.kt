@@ -181,6 +181,28 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("speakers A, B, A, B in segment order, where the B pair merges first") {
+            `when`("they are clustered in auto mode or with a fixed count of 2") {
+                then("A, appearing first, is speaker 0 and B is speaker 1") {
+                    // A and B on orthogonal planes (cross distances exactly 1, above the threshold); A pair (rows 0, 2)
+                    // at 1 - 0.8 = 0.2, B pair (rows 1, 3) at 1 - 0.96 = 0.04. Merges: (1, 3) at 0.04, (0, 2) at 0.2,
+                    // (0, 1) at 1; gaps 0.16, 0.8, so auto k = 4 - (1 + 1) = 2, like the fixed count. The cut keeps the
+                    // B pair's merge first, but numbering follows segment order: row 0 (A) gets 0, row 1 (B) gets 1.
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+                    val embeddings =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f),
+                            floatArrayOf(0.8f, 0.6f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 0.96f, 0.28f),
+                        )
+
+                    clusterSegments(embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 1, 0, 1))
+                    clusterSegments(embeddings, k = 2, maxSpeakers = 8).shouldBe(listOf(0, 1, 0, 1))
+                }
+            }
+        }
     })
 
 /**
