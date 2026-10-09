@@ -23,6 +23,7 @@ import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
+import stt.db.SpeakersMode
 import stt.db.StoredTask
 import stt.db.TaskPhase
 import stt.db.TaskRepository
@@ -292,15 +293,15 @@ class ProcessingEngine(
     }
 
     /**
-     * DIARIZING: nothing to label when the task has no segments, so it is skipped (item 09 skips it too).
-     * Everything else is the [Diarizer]'s job: rebuilding the PCM from the stored chunks and assigning and
-     * storing the speakers.
+     * DIARIZING: skipped when the speakers are off (`speakers_mode = off` asks for no labels) and when the
+     * task has no segments (there is nothing to label; item 09 skips it then too). Everything else is the
+     * [Diarizer]'s job: rebuilding the PCM from the stored chunks and assigning and storing the speakers.
      */
     private suspend fun diarize(
         id: Long,
         task: StoredTask,
     ) {
-        if (segments.findByTask(id).isEmpty()) return
+        if (task.task.speakersMode == SpeakersMode.OFF || segments.findByTask(id).isEmpty()) return
         tasks.setPhase(id, TaskPhase.DIARIZING)
         publish(id)
         diarizer.diarize(task)
