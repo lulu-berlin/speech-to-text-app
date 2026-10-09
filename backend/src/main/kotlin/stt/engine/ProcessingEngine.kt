@@ -1,5 +1,6 @@
 package stt.engine
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -213,14 +214,25 @@ class ProcessingEngine(
     /** The job running [id]'s phases, or null when that task is not the one being processed. */
     private suspend fun runningJob(id: Long): Job? = runningLock.withLock { running?.takeIf { it.id == id }?.job }
 
-    /** Runs one task through its phases, in order, and leaves it COMPLETED. */
+    /**
+     * Runs one task through its phases, in order, and leaves it COMPLETED. Any failure other than a cancel
+     * (a non-zero exit, unreadable output, a missing file) leaves it FAILED with the failure's message, and
+     * the job ends normally, so the worker moves on to the next task.
+     */
     private suspend fun runTask(task: StoredTask) {
         val id = task.id
         // Refused when the task stopped being QUEUED after the worker picked it (a cancel won the race).
         if (!tasks.setRunningIfQueued(id, now())) return
         publish(id)
-        chunkAudio(id)
-        transcribeChunks(id, task)
+        try {
+            chunkAudio(id)
+            transcribeChunks(id, task)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (tasks.failIfRunning(id, e.message ?: e.toString(), now())) publish(id)
+            return
+        }
         tasks.setCompleted(id, now())
         publish(id)
     }
