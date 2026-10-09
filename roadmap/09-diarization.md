@@ -72,7 +72,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Two segments: a merge height below the threshold yields one speaker, at or above it two speakers (auto)
 - [x] UPGMA merge heights equal hand-computed average-linkage distances for a 4-point matrix
 - [x] On tied distances, the lower-index pair is merged first
-- [ ] Auto mode: three well-separated groups yield three speakers
+- [x] Auto mode: three well-separated groups yield three speakers
 - [ ] Auto mode looks for the largest gap only among the last `max_speakers` merges; a larger gap lower in the tree is ignored
 - [ ] Auto mode never returns more than `max_speakers` speakers
 - [ ] Auto mode: when even the last merge is below the threshold, one speaker (ADR 0027)
@@ -107,3 +107,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: refactor approved and done after cycle 3: `clusterSegments` takes the two-segment height from `upgmaMerges(...).last()` instead of its own distance call.
 - 2026-10-09 (cycle 4, tied distances): green on arrival (cycle 3's search keeps the first strict minimum); red recorded against a temporary, uncommitted mutation (`<=`, which keeps the last minimum): `gradle test --tests 'stt.diarization.ClusteringSpec'`, the disjoint-pairs case fails with "expected:<[(0, 1), (2, 3), (0, 2)]> but was:<[(2, 3), (0, 1), (0, 2)]>", and with that assertion skipped the same-row case fails with "expected:<[(0, 1), (0, 2)]> but was:<[(0, 2), (0, 1)]>". Ties are exact in float32 (each tied dot product is the single product 1 · 0.8). No production change; `gradle check` (109 unit tests) and `gradle integrationTest` (44 run) green.
 - 2026-10-09: refactor approved and done after cycle 4: `List<Merge>.pairs()` test helper in `ClusteringSpec` replaces three `map { it.i to it.j }`.
+- 2026-10-09 (cycle 5, three groups in auto mode): red — `gradle test --tests 'stt.diarization.ClusteringSpec'`: "kotlin.NotImplementedError: An operation is not implemented: three or more segments and fixed counts". Green: auto mode with `n >= 3` takes `k = n - (idx + 1)` at the first largest gap over all merge heights, then cuts the first `n - k` merges with union-find and numbers the roots by first appearance; the `max_speakers` window and clamp are left to items 6 and 7, the ADR 0027 rule for `n >= 3` to item 8. Fixture: three groups of two on orthogonal planes (cross distances exactly 1; within 0.2, 0.4, 0.04), expected `k` = 3 derived by hand from the heights. `gradle check` (110 unit tests) and `gradle integrationTest` (44 run) green.

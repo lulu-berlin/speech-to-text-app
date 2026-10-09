@@ -2,6 +2,7 @@ package stt.diarization
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.doubles.plusOrMinus
+import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import kotlin.math.cos
 import kotlin.math.sin
@@ -87,6 +88,29 @@ class ClusteringSpec :
 
                     upgmaMerges(twoRows).pairs().shouldBe(listOf(0 to 1, 2 to 3, 0 to 2))
                     upgmaMerges(oneRow).pairs().shouldBe(listOf(0 to 1, 0 to 2))
+                }
+            }
+        }
+
+        given("three well-separated groups of two segments") {
+            `when`("they are clustered in auto mode") {
+                then("they yield three speakers") {
+                    // Groups on orthogonal planes: every cross-group distance is exactly 1, above the threshold.
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+                    // Within-group distances 1 - c: 0.2, 0.4, 0.04. Merge heights in order: 0.04, 0.2, 0.4, 1, 1;
+                    // gaps 0.16, 0.2, 0.6, 0. The largest gap is gap 2, so k = n - (2 + 1) = 6 - 3 = 3: the cut leaves
+                    // the three within-group merges.
+                    val embeddings =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f),
+                            floatArrayOf(0.8f, 0.6f, 0f, 0f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 0.6f, 0.8f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f),
+                            floatArrayOf(0f, 0f, 0f, 0f, 0.96f, 0.28f),
+                        )
+
+                    clusterSegments(embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1, 2, 2))
                 }
             }
         }
