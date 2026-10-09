@@ -4,6 +4,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.batchInsert
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
 
@@ -49,7 +50,7 @@ class SegmentRepository(
             this[SegmentsTable.startMs] = segment.startMs
             this[SegmentsTable.endMs] = segment.endMs
             this[SegmentsTable.text] = segment.text
-            this[SegmentsTable.speaker] = segment.speaker
+            this[SegmentsTable.speakerId] = segment.speakerId
         }
     }
 
@@ -67,8 +68,48 @@ class SegmentRepository(
                         startMs = row[SegmentsTable.startMs],
                         endMs = row[SegmentsTable.endMs],
                         text = row[SegmentsTable.text],
-                        speaker = row[SegmentsTable.speaker],
+                        speakerId = row[SegmentsTable.speakerId],
                     )
                 }
+        }
+
+    /**
+     * Stores the speaker of every segment of the task in one transaction (item 09, ADR 0028): one [Speaker] per
+     * distinct id in [speakerIds], named "Speaker N" (N = speakerId + 1), and each segment's `speaker_id`, given in
+     * [findByTask] order. A count that differs from the task's segment count fails and stores nothing.
+     */
+    suspend fun storeSpeakers(
+        taskId: Long,
+        speakerIds: List<Int>,
+    ) {
+        db.writeTransaction {
+            val segmentIds =
+                SegmentsTable
+                    .select(SegmentsTable.id)
+                    .where { SegmentsTable.taskId eq taskId }
+                    .orderBy(SegmentsTable.chunkIdx to SortOrder.ASC, SegmentsTable.seq to SortOrder.ASC)
+                    .map { it[SegmentsTable.id] }
+            check(segmentIds.size == speakerIds.size) {
+                "Task $taskId has ${segmentIds.size} segments, but ${speakerIds.size} speaker ids were given"
+            }
+            SpeakersTable.batchInsert(speakerIds.distinct().sorted(), shouldReturnGeneratedValues = false) { speakerId ->
+                this[SpeakersTable.taskId] = taskId
+                this[SpeakersTable.speakerId] = speakerId
+                this[SpeakersTable.speaker] = "Speaker ${speakerId + 1}"
+            }
+            segmentIds.zip(speakerIds).forEach { (segmentId, speakerId) ->
+                SegmentsTable.update({ SegmentsTable.id eq segmentId }) { it[SegmentsTable.speakerId] = speakerId }
+            }
+        }
+    }
+
+    /** The task's speakers in `speaker_id` order. */
+    suspend fun findSpeakers(taskId: Long): List<Speaker> =
+        db.readTransaction {
+            SpeakersTable
+                .selectAll()
+                .where { SpeakersTable.taskId eq taskId }
+                .orderBy(SpeakersTable.speakerId to SortOrder.ASC)
+                .map { row -> Speaker(speakerId = row[SpeakersTable.speakerId], speaker = row[SpeakersTable.speaker]) }
         }
 }

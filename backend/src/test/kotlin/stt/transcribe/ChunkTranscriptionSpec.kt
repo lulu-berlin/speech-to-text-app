@@ -33,7 +33,7 @@ private const val ONE_SEGMENT_JSON = """{"transcription": [{"offsets": {"from": 
 
 /** [ONE_SEGMENT_JSON]'s segment as stored for [CHUNK_1]: 30 000 + 0 and 30 000 + 7 940 ms. */
 private val CHUNK_1_SEGMENT =
-    Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 37_940L, text = " And so my fellow Americans", speaker = null)
+    Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 37_940L, text = " And so my fellow Americans", speakerId = null)
 
 class ChunkTranscriptionSpec :
     BehaviorSpec({

@@ -23,7 +23,7 @@ class ChunkSegmentsSpec :
                                 startMs = 300_000, // 300 000 + 0
                                 endMs = 307_940, // 300 000 + 7 940
                                 text = " And so my fellow Americans",
-                                speaker = null,
+                                speakerId = null,
                             ),
                             Segment(
                                 chunkIdx = 2,
@@ -31,7 +31,7 @@ class ChunkSegmentsSpec :
                                 startMs = 307_940, // 300 000 + 7 940
                                 endMs = 310_760, // 300 000 + 10 760
                                 text = " ask what you can do",
-                                speaker = null,
+                                speakerId = null,
                             ),
                         ),
                     )

@@ -148,7 +148,7 @@ class TaskRepositorySpec :
                             chunks.storePlan(taskId, exportedChunks(dataDir, "task-$taskId", PlannedChunk(0L, 1_000L)))
                             segments.insertAll(
                                 taskId,
-                                listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "x", speaker = null)),
+                                listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "x", speakerId = null)),
                             )
                         }
                         rowCount(db, "chunk_audio").shouldBe(2)

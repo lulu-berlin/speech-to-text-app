@@ -18,6 +18,6 @@ fun chunkSegments(
             startMs = chunkStartMs + segment.startMs,
             endMs = chunkStartMs + segment.endMs,
             text = segment.text,
-            speaker = null,
+            speakerId = null,
         )
     }

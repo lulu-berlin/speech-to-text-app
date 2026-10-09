@@ -43,4 +43,4 @@ class PromptTailSpec :
     })
 
 private fun segments(vararg texts: String): List<Segment> =
-    texts.mapIndexed { seq, text -> Segment(chunkIdx = 0, seq = seq, startMs = 0, endMs = 0, text = text, speaker = null) }
+    texts.mapIndexed { seq, text -> Segment(chunkIdx = 0, seq = seq, startMs = 0, endMs = 0, text = text, speakerId = null) }
