@@ -50,7 +50,7 @@ graph TD
   15 --> 21
   22 --> 21
   25 --> 21
-  16 --> 19[19 unix build recipe]
+  16 --> 19[19 Docker image and compose]
   21 --> 16
   09 --> 22[22 speaker rename]
   12 --> 22
@@ -88,7 +88,7 @@ graph TD
 | [16 — Nix flake package](16-nix-flake-package.md) | spec-approved | 02, 14, 15, 17, 21 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | spec-approved | 13, 24 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
-| [19 — Generic Unix build recipe with minimal dependencies](19-unix-build-recipe.md) | spec-approved | 16 |
+| [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | spec-approved | 12, 13, 14, 15, 22, 25 |
 | [22 — Rename and merge a task's speakers](22-speaker-rename.md) | spec-approved | 09, 10, 12, 15 |
