@@ -15,7 +15,7 @@ class MainSpec :
         given("a configuration without STT_STATIC_DIR") {
             `when`("checking the boot warning") {
                 then("a warning naming STT_STATIC_DIR is logged, none when it is set") {
-                    withCapturedWarnings("stt.Main") { events ->
+                    withCapturedLogs("stt.Main") { events ->
                         warnIfStaticDirUnset(Config(dataDir = Path.of(TEST_DATA_DIR), speakerModel = Path.of(TEST_SPEAKER_MODEL)))
                         warnIfStaticDirUnset(
                             Config(
