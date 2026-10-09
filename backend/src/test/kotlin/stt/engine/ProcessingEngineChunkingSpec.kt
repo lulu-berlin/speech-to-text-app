@@ -2,13 +2,16 @@ package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.singleValue
 import stt.queue.TaskStatus
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
+import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineChunkingSpec :
     BehaviorSpec({
@@ -39,6 +42,30 @@ class ProcessingEngineChunkingSpec :
                         chunks.findByTask(good).map { it.status } shouldBe listOf(ChunkStatus.DONE)
                         chunks.copyFlacTo(good, 0, ByteArrayOutputStream())
                         Files.exists(fixture.workDirectories.source(good)) shouldBe false
+                    }
+                }
+            }
+        }
+
+        given("a queued task whose original audio is gone") {
+            `when`("the engine reaches its chunking phase") {
+                then("the task fails with an error naming the missing original") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "gone.wav", queuePosition = 0, createdAt = 1)
+                        val source = fixture.workDirectories.source(task)
+                        Files.delete(source)
+
+                        fixture.engine.start()
+                        pumpUntil(2.seconds) { statusOf(fixture, task) == TaskStatus.FAILED }
+
+                        statusOf(fixture, task) shouldBe TaskStatus.FAILED
+                        fixture.tasks
+                            .find(task)
+                            ?.task
+                            ?.error
+                            .shouldNotBeNull() shouldContain source.toString()
+                        fixture.chunker.workDirs.shouldBeEmpty()
                     }
                 }
             }

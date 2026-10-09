@@ -136,7 +136,7 @@ internal suspend fun finishedAtOf(
  */
 internal suspend fun TestScope.pumpUntil(
     window: Duration,
-    done: () -> Boolean,
+    done: suspend () -> Boolean,
 ) {
     val deadline = System.nanoTime() + window.inWholeNanoseconds
     runCurrent()

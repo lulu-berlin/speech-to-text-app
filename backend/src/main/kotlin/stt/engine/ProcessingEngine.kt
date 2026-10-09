@@ -246,6 +246,10 @@ class ProcessingEngine(
         tasks.setPhase(id, TaskPhase.CHUNKING)
         publish(id)
         val source = workDirectories.source(id)
+        // The original is the only copy of the audio until the plan is committed (ADR 0024).
+        check(withContext(Dispatchers.IO) { Files.exists(source) }) {
+            "the task's original audio is missing at $source"
+        }
         val chunked = chunker.chunk(source, workDirectories.workDir(id))
         tasks.setDurationMs(id, chunked.durationMs)
         chunks.storePlan(id, chunked.chunks)
