@@ -53,8 +53,20 @@ export interface Snapshot {
   queue: Queue;
 }
 
+// Item 12 contract: payload of the task-progress event (docs/api/task-progress*.json).
+export interface TaskProgress {
+  id: number;
+  transcriptionProgress: number;
+  diarizationProgress: number | null;
+}
+
 // Events of GET /api/events, by their SSE event name.
-export type ServerEvent = { type: 'snapshot'; snapshot: Snapshot };
+export type ServerEvent =
+  | { type: 'snapshot'; snapshot: Snapshot }
+  | { type: 'task-updated'; task: Task }
+  | { type: 'task-progress'; progress: TaskProgress }
+  | { type: 'queue-updated'; queue: Queue }
+  | { type: 'task-deleted'; id: number };
 
 // Error body: { error, message } plus taskId for duplicate-audio only.
 export interface ApiErrorBody {

@@ -16,11 +16,22 @@ import {
   taskTransitions,
 } from './fixtures';
 
-// One text/event-stream frame. MSW's high-level sse() API only types unnamed "message"
-// events, but the contract needs named events (snapshot, task-updated, …), so the stream
-// is written directly (the msw docs' alternative SSE approach).
-function encodeFrame(event: string, data: unknown): Uint8Array {
-  return new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+// A text/event-stream response that sends the given named events in order and stays open.
+// MSW's high-level sse() API only types unnamed "message" events, but the contract needs
+// named events (snapshot, task-updated, …), so the frames are written directly (the msw
+// docs' alternative SSE approach).
+export function eventStreamResponse(events: [name: string, data: unknown][]): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const [name, data] of events) {
+        controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+      }
+    },
+  });
+  return new HttpResponse(stream, {
+    headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+  });
 }
 
 export const handlers = [
@@ -83,15 +94,6 @@ export const handlers = [
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
 
   // Events: GET /api/events, the SSE stream. The first event of every connection is the
-  // snapshot; the stream then stays open.
-  http.get('/api/events', () => {
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encodeFrame('snapshot', snapshotFixture));
-      },
-    });
-    return new HttpResponse(stream, {
-      headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
-    });
-  }),
+  // snapshot.
+  http.get('/api/events', () => eventStreamResponse([['snapshot', snapshotFixture]])),
 ];
