@@ -84,6 +84,25 @@ class SpeakerLabelsSpec :
                 }
             }
         }
+
+        given("long and short segments whose embeddings are all zero, as for empty PCM") {
+            `when`("the speakers are labelled in auto mode") {
+                then("no centroid is non-zero, so the short segment keeps its label and labelling does not fail") {
+                    // Two long zero rows: dot 0, distance 1 at or above the threshold, so n = 2 gives two speakers.
+                    // Both centroids are zero, so the short row keeps its starting label 0.
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+                    val segments =
+                        listOf(
+                            segment(startMs = 0, endMs = 2_000),
+                            segment(startMs = 2_000, endMs = 2_300), // short
+                            segment(startMs = 2_300, endMs = 4_300),
+                        )
+                    val embeddings = Array(segments.size) { FloatArray(4) }
+
+                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1))
+                }
+            }
+        }
     })
 
 // Two voices on orthogonal planes, so every A-B distance is exactly 1: A on dims 0-1 (A-A2 at 1 - 0.8 = 0.2), B on
