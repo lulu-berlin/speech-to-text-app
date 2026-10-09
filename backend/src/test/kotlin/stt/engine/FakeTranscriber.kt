@@ -33,6 +33,9 @@ internal class FakeTranscriber : Transcriber {
     /** The audio file of every cancelled call that has started dying (see [death]). */
     val dyingStarted = Channel<Path>(Channel.UNLIMITED)
 
+    /** When set, the next call throws it instead of returning, like a failing whisper-cli run; then it is cleared. */
+    var failNext: Throwable? = null
+
     val probe = ConcurrencyProbe()
 
     override suspend fun transcribe(
@@ -56,6 +59,10 @@ internal class FakeTranscriber : Transcriber {
                 }
                 cancelled.add(audio)
                 throw e
+            }
+            failNext?.let { failure ->
+                failNext = null
+                throw failure
             }
             emptyList()
         }

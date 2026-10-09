@@ -233,6 +233,24 @@ class TaskRepository(
             } > 0
         }
 
+    /**
+     * Marks a RUNNING task FAILED with [error] and records when it finished. Only RUNNING can fail (item
+     * 04's table), so a failure that races a cancel cannot overwrite CANCELED. Returns whether the row was
+     * written; the phase the task stopped in stays (item 12's contract: "failed while transcribing").
+     */
+    suspend fun failIfRunning(
+        id: Long,
+        error: String,
+        finishedAt: Long,
+    ): Boolean =
+        db.writeTransaction {
+            TasksTable.update({ (TasksTable.id eq id) and (TasksTable.status eq TaskStatus.RUNNING) }) {
+                it[TasksTable.status] = TaskStatus.FAILED
+                it[TasksTable.error] = error
+                it[TasksTable.finishedAt] = finishedAt
+            } > 0
+        }
+
     /** Deletes the task; its audio metadata, chunks with their chunk audio, and segments go with it (ON DELETE CASCADE). */
     suspend fun delete(id: Long) {
         db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq id } }
