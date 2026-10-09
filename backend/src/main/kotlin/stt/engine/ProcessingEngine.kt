@@ -85,9 +85,20 @@ class ProcessingEngine(
         wake()
     }
 
+    /**
+     * The task to run next: nothing while the queue is paused, otherwise the QUEUED task with the
+     * lowest `queue_position`.
+     */
+    private suspend fun nextTask(): StoredTask? =
+        if (queueState.isPaused()) {
+            null
+        } else {
+            tasks.nextQueued()
+        }
+
     private suspend fun workerLoop() {
         while (true) {
-            val next = if (queueState.isPaused()) null else tasks.nextQueued()
+            val next = nextTask()
             if (next == null) {
                 wakeups.receive()
             } else {
