@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import styled from 'styled-components';
 import { Icon } from './Icon';
+import { interactiveStates } from './buttonStates';
 
 const IconButtonBase = styled.button`
   display: inline-flex;
@@ -23,17 +24,7 @@ const IconButtonBase = styled.button`
     background: ${(props) => props.theme.colors.buttonSecondaryActive};
   }
 
-  &:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 ${(props) => props.theme.borderWidths.ring}
-      ${(props) => props.theme.colors.focusRing};
-  }
-
-  &:disabled {
-    cursor: default;
-    background: ${(props) => props.theme.colors.surface};
-    color: ${(props) => props.theme.colors.textMuted};
-  }
+  ${interactiveStates}
 `;
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
