@@ -23,7 +23,7 @@ class RenderJsonSpec :
                     // text = " ".join(seg["text"].strip() for seg in segments).strip() = "Hello there. again. Fine.";
                     // start/end are ms / 1000.0 printed like Python repr(float) (0.0, 1.5, 3.25, 4.0);
                     // speaker is the 0-based index; every segments[].text is trimmed (ADR 0030).
-                    renderJson(segments) shouldBe
+                    renderJson(segments, speakers1And2) shouldBe
                         """
                         {
                           "text": "Hello there. again. Fine.",
@@ -66,7 +66,7 @@ class RenderJsonSpec :
                     // Oracle: full_text = " ".join(seg["text"].strip() for seg in segments).strip() joins every
                     // trimmed text, including a blank one: "A" + " " + "" + " " + "B" -> "A  B" (unlike speaker_turns,
                     // whose f"{acc} {text}".strip() fold drops blanks).
-                    renderJson(segments) shouldBe
+                    renderJson(segments, speakers(0)) shouldBe
                         """
                         {
                           "text": "A  B",
@@ -113,7 +113,7 @@ class RenderJsonSpec :
                     // and \b \f \n \r \t to their short escapes; every other character below U+0020 becomes
                     // \u00xx (lower-case hex); everything else, including non-ASCII, is written as-is.
                     // The trimmed text is: A "quoted" back\slash<LF>newline<TAB>tab<U+0001>ctrl ü 日
-                    renderJson(segments) shouldBe
+                    renderJson(segments, speakers(0)) shouldBe
                         """
                         {
                           "text": "A \"quoted\" back\\slash\nnewline\ttab\u0001ctrl ü 日",
@@ -142,7 +142,7 @@ class RenderJsonSpec :
 
                     // Oracle: "speakers": len(set(speakers)) = len({2, 5}) = 2 (a "highest label + 1" reading would
                     // give 6); each segment keeps its stored 0-based speaker id.
-                    renderJson(segments) shouldBe
+                    renderJson(segments, speakers(2, 5)) shouldBe
                         """
                         {
                           "text": "A B",

@@ -20,7 +20,7 @@ class RenderTxtSpec :
 
                     // Oracle `write_diarized_outputs`, txt: on a speaker change "\n" (except before the first block),
                     // then f"[speaker {spk + 1}]\n"; every segment f"{seg['text'].strip()}\n".
-                    renderTxt(segments) shouldBe
+                    renderTxt(segments, speakers1And2) shouldBe
                         "[speaker 1]\nHello there.\nHow are you?\n\n[speaker 2]\nFine.\n\n[speaker 1]\nBye.\n"
                 }
             }
