@@ -114,16 +114,13 @@ class ProcessingEngine(
      * a paused task can still say where it stopped. A QUEUED task only changes status (no process is in
      * flight); only a QUEUED or RUNNING task can be paused (item 04's table).
      */
-    suspend fun pauseTask(id: Long): TaskCommandOutcome {
-        val status = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
-        if (!status.canTransitionTo(TaskStatus.PAUSED)) {
-            return TaskCommandOutcome.Illegal(status, TaskStatus.PAUSED)
+    suspend fun pauseTask(id: Long): TaskCommandOutcome =
+        command(id, TaskStatus.PAUSED) {
+            tasks.setStatus(id, TaskStatus.PAUSED)
+            publish(id)
+            processControl.pause()
+            TaskCommandOutcome.Accepted
         }
-        tasks.setStatus(id, TaskStatus.PAUSED)
-        publish(id)
-        processControl.pause()
-        return TaskCommandOutcome.Accepted
-    }
 
     /**
      * Resumes a paused task at once: item 04's table has no `PAUSED → RUNNING`, so the task is written as
@@ -131,18 +128,15 @@ class ProcessingEngine(
      * task is ahead of it — its worker is still inside it. Neither write touches the phase: only the
      * queue-level QUEUED (retry, restart recovery) drops it, so a resume cannot lose a stopped task's phase.
      */
-    suspend fun resumeTask(id: Long): TaskCommandOutcome {
-        val status = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
-        if (!status.canTransitionTo(TaskStatus.QUEUED)) {
-            return TaskCommandOutcome.Illegal(status, TaskStatus.QUEUED)
+    suspend fun resumeTask(id: Long): TaskCommandOutcome =
+        command(id, TaskStatus.QUEUED) {
+            tasks.setStatus(id, TaskStatus.QUEUED)
+            publish(id)
+            tasks.setStatus(id, TaskStatus.RUNNING)
+            publish(id)
+            processControl.resume()
+            TaskCommandOutcome.Accepted
         }
-        tasks.setStatus(id, TaskStatus.QUEUED)
-        publish(id)
-        tasks.setStatus(id, TaskStatus.RUNNING)
-        publish(id)
-        processControl.resume()
-        return TaskCommandOutcome.Accepted
-    }
 
     /**
      * Cancels a task: its phase job is cancelled, which kills the task's process (item 05), and the task
@@ -150,23 +144,34 @@ class ProcessingEngine(
      * is gone and the status is stored, so item 12's `DELETE` can cancel a pending task and then delete it.
      * A cancel that races a completion loses: `cancelIfPossible` refuses a task that has finished.
      */
-    suspend fun cancelTask(id: Long): TaskCommandOutcome {
+    suspend fun cancelTask(id: Long): TaskCommandOutcome =
+        command(id, TaskStatus.CANCELED) {
+            // NonCancellable: a cancel asked for explicitly must kill the process and store the status even
+            // when the caller itself is being cancelled (item 12's DELETE, or a shutting-down application).
+            withContext(NonCancellable) {
+                runningJob(id)?.cancelAndJoin()
+                if (tasks.cancelIfPossible(id, now())) publish(id)
+            }
+            val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
+            if (after == TaskStatus.CANCELED) {
+                TaskCommandOutcome.Accepted
+            } else {
+                TaskCommandOutcome.Illegal(after, TaskStatus.CANCELED)
+            }
+        }
+
+    /**
+     * Runs [body] when task [id] exists and its status allows changing to [to] (item 04's table);
+     * otherwise reports [TaskCommandOutcome.Unknown] or [TaskCommandOutcome.Illegal] without doing anything.
+     */
+    private suspend fun command(
+        id: Long,
+        to: TaskStatus,
+        body: suspend () -> TaskCommandOutcome,
+    ): TaskCommandOutcome {
         val status = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
-        if (!status.canTransitionTo(TaskStatus.CANCELED)) {
-            return TaskCommandOutcome.Illegal(status, TaskStatus.CANCELED)
-        }
-        // NonCancellable: a cancel asked for explicitly must kill the process and store the status even
-        // when the caller itself is being cancelled (item 12's DELETE, or a shutting-down application).
-        withContext(NonCancellable) {
-            runningJob(id)?.cancelAndJoin()
-            if (tasks.cancelIfPossible(id, now())) publish(id)
-        }
-        val after = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
-        return if (after == TaskStatus.CANCELED) {
-            TaskCommandOutcome.Accepted
-        } else {
-            TaskCommandOutcome.Illegal(after, TaskStatus.CANCELED)
-        }
+        if (!status.canTransitionTo(to)) return TaskCommandOutcome.Illegal(status, to)
+        return body()
     }
 
     /**
