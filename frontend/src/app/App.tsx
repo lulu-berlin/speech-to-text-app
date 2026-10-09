@@ -37,7 +37,6 @@ const Shell = styled.div`
 `;
 
 const Main = styled.main`
-  padding: ${(props) => props.theme.spacing.lg};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 `;

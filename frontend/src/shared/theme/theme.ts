@@ -38,6 +38,7 @@ export interface ThemeTokens {
   };
   sizes: {
     viewportMinHeight: string;
+    pageMaxWidth: string;
   };
   radii: {
     dialog: string;
@@ -66,6 +67,7 @@ const baseTokens = {
   },
   sizes: {
     viewportMinHeight: '100vh',
+    pageMaxWidth: '48rem',
   },
   radii: {
     dialog: '0.5rem',
