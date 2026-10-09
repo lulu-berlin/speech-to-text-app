@@ -55,7 +55,8 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Queue rows show the status badge, both progress bars and the phase label, and stack on a narrow screen
 - [ ] History renders one card per finished task, and a FAILED card shows its error
 - [ ] The transcript is a centred column with a bounded measure, its header block, the player and downloads, and the turns with speaker labels and timestamps
-- [ ] Every view has a distinct empty, loading and error state; loading shows the stenographer; the Queue's empty state offers the upload action
+- [ ] Every view has a distinct empty, loading and error state; loading shows the stenographer
+- [ ] Screenshots at phone and desktop widths, light and dark, are captured for item 21's approval; the Queue's empty state offers the upload action
 - [ ] The transcription bar shows a percentage and the diarization bar its stage label
 - [ ] With reduced motion requested, no non-essential animation runs
 - [ ] Keyboard focus is visible in every view
@@ -63,7 +64,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 
 ## Acceptance criteria
 
-- The user approves the look in a real browser, light and dark, at phone and desktop widths.
+- The look is approved from the screenshots item 21 captures (light and dark, phone and desktop); the visual acceptance itself belongs to item 21 (2026-10-09).
 - Every view is consistent: the same spacing rhythm, type hierarchy and component usage throughout.
 - Contrast meets AA in both themes; keyboard focus visible everywhere.
 - `pnpm test` and `pnpm build` are green.
@@ -75,3 +76,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: consultation answers approved: reference is document/editor-like; empty states carry one line of guidance plus the primary action; comfortable queue rows; the phase is a text label; the transcript is a centred reading column; History is cards; progress bars show a percentage / stage label. Test list not yet approved.
 - 2026-10-09: test list (10 items) approved by the user; status `spec-approved`.
 - 2026-10-09: item 17 consultation: loading states show the stenographer (item 17 replaces item 24's `Spinner` and `Skeleton`); progress bars are unchanged. Recorded here so the pass does not build skeleton placeholders.
+- 2026-10-09: item 21 consultation: the browser acceptance (the user approving the look) moves to item 21, which runs the automated end-to-end suite and captures the screenshots; this item supplies the tests it can run without a browser.
