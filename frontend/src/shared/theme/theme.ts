@@ -51,6 +51,11 @@ export interface ThemeTokens {
   radii: {
     dialog: string;
     button: string;
+    card: string;
+  };
+  // Elevation, as a literal shadow value (theme.ts may hold such values).
+  shadows: {
+    card: string;
   };
   fontSizes: {
     title: string;
@@ -89,6 +94,7 @@ const baseTokens = {
   radii: {
     dialog: '0.5rem',
     button: '0.25rem',
+    card: '0.5rem',
   },
   fontSizes: {
     title: '1.5rem',
@@ -131,6 +137,9 @@ export const lightTheme: ThemeTokens = {
     },
     speakerTints: lightSpeakerTints,
   },
+  shadows: {
+    card: '0 0.0625rem 0.125rem rgba(16, 24, 40, 0.08)',
+  },
 };
 
 export const darkTheme: ThemeTokens = {
@@ -159,6 +168,9 @@ export const darkTheme: ThemeTokens = {
       gone: { background: '#22252a', text: '#9aa2ad' },
     },
     speakerTints: darkSpeakerTints,
+  },
+  shadows: {
+    card: '0 0.0625rem 0.25rem rgba(0, 0, 0, 0.4)',
   },
 };
 
