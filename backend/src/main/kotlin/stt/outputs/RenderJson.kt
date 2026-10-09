@@ -1,28 +1,34 @@
 package stt.outputs
 
 import stt.db.Segment
+import stt.db.Speaker
 
 /**
- * Renders a task's [segments] as json (oracle `write_diarized_outputs`): keys `text`, `speakers` (the number of
- * distinct speakerIds) and `segments`; per segment `start` and `end` in seconds, the trimmed `text` (ADR 0030) and the
- * 0-based `speaker`. Python's `json.dump(..., ensure_ascii=False, indent=2)` layout: two-space indentation, `": "`
- * between key and value and no trailing newline. Without segments, the compact no-speech document of `transcribe_one`.
+ * Renders a task's [segments] as json: keys `text` (the trimmed texts joined with single spaces) and `segments`, per
+ * segment `start` and `end` in seconds and the trimmed `text` (ADR 0030). With [speakers] (the task's stored speakers;
+ * oracle `write_diarized_outputs`) also `speakers` (the number of distinct speakerIds) after `text`, and the 0-based
+ * `speaker` per segment; with `null` [speakers] (speakers off) neither. Python's `json.dump(..., ensure_ascii=False,
+ * indent=2)` layout: two-space indentation, `": "` between key and value and no trailing newline. Without segments,
+ * the compact no-speech document of `transcribe_one`.
  */
-internal fun renderJson(segments: List<Segment>): String {
+internal fun renderJson(
+    segments: List<Segment>,
+    speakers: List<Speaker>?,
+): String {
     // Oracle `transcribe_one`, zero segments: the literal '{"text": "", "segments": []}\n' — compact, no "speakers".
     if (segments.isEmpty()) return "{\"text\": \"\", \"segments\": []}\n"
     return buildString {
         append("{\n")
         append("  \"text\": ${jsonString(segments.map { it.text.trim() }.joinToString(" ").trim())},\n")
-        append("  \"speakers\": ${segments.map(::speakerIdOf).distinct().size},\n")
+        if (speakers != null) append("  \"speakers\": ${segments.map(::speakerIdOf).distinct().size},\n")
         append("  \"segments\": [\n")
         segments.forEachIndexed { index, segment ->
             append("    {\n")
             append("      \"start\": ${seconds(segment.startMs)},\n")
             append("      \"end\": ${seconds(segment.endMs)},\n")
-            append("      \"text\": ${jsonString(segment.text.trim())},\n")
-            append("      \"speaker\": ${speakerIdOf(segment)}\n")
-            append("    }")
+            append("      \"text\": ${jsonString(segment.text.trim())}")
+            if (speakers != null) append(",\n      \"speaker\": ${speakerIdOf(segment)}")
+            append("\n    }")
             append(if (index == segments.lastIndex) "\n" else ",\n")
         }
         append("  ]\n}")

@@ -11,10 +11,10 @@ class NoSpeechSpec :
                     // Oracle `transcribe_one`, zero segments: json is the literal '{"text": "", "segments": []}\n'
                     // (compact, no "speakers" key, trailing newline) and the other formats are touched, i.e. 0 bytes
                     // (vtt without its header).
-                    renderTxt(emptyList()) shouldBe ""
+                    renderTxt(emptyList(), emptyList()) shouldBe ""
                     renderSrt(emptyList(), emptyList()) shouldBe ""
                     renderVtt(emptyList(), emptyList()) shouldBe ""
-                    renderJson(emptyList()) shouldBe "{\"text\": \"\", \"segments\": []}\n"
+                    renderJson(emptyList(), emptyList()) shouldBe "{\"text\": \"\", \"segments\": []}\n"
                 }
             }
         }
