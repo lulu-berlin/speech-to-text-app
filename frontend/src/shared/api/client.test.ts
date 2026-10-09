@@ -28,11 +28,12 @@ describe('the typed API client', () => {
   });
 
   it('turns an error response into a typed error with code and message', async () => {
-    const error = await getTask(999).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ApiError);
-    const apiError = error as ApiError;
-    expect(apiError.code).toBe('not-found');
-    expect(apiError.message).toBe('Task 42 does not exist');
+    const request = getTask(999);
+    await expect(request).rejects.toBeInstanceOf(ApiError);
+    await expect(request).rejects.toMatchObject({
+      code: 'not-found',
+      message: 'Task 42 does not exist',
+    });
   });
 
   it('carries the taskId on a duplicate-audio 409', async () => {
@@ -40,10 +41,8 @@ describe('the typed API client', () => {
       http.post('/api/tasks', () => HttpResponse.json(errorDuplicateAudio, { status: 409 })),
     );
 
-    const error = await uploadTask(new File(['x'], 'memo.wav')).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ApiError);
-    const apiError = error as ApiError;
-    expect(apiError.code).toBe('duplicate-audio');
-    expect(apiError.taskId).toBe(3);
+    const request = uploadTask(new File(['x'], 'memo.wav'));
+    await expect(request).rejects.toBeInstanceOf(ApiError);
+    await expect(request).rejects.toMatchObject({ code: 'duplicate-audio', taskId: 3 });
   });
 });
