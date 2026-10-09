@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.TestScope
 import stt.config.testConfig
 import stt.db.ChunkRepository
 import stt.db.Database
+import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.TaskRepository
@@ -51,6 +52,7 @@ internal fun TestScope.engineUnderTest(
             tasks = tasks,
             chunks = ChunkRepository(db),
             segments = SegmentRepository(db),
+            queueState = QueueStateRepository(db),
             workDirectories = workDirectories,
             chunker = chunker,
             transcriber = transcriber,

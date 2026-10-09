@@ -3,7 +3,14 @@ package stt.engine
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.withContext
 import stt.queue.TaskStatus
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 class ProcessingEngineSpec :
     BehaviorSpec({
@@ -65,4 +72,57 @@ class ProcessingEngineSpec :
                 }
             }
         }
+
+        given("a queue that is paused while a task runs") {
+            `when`("that task finishes") {
+                then("nothing new starts until the queue is resumed, and then the next queued task runs") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val tasks = fixture.tasks
+                        val first = enqueueTask(tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = release
+                        fixture.engine.start()
+
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe first
+                        fixture.engine.pauseQueue()
+                        fixture.transcriber.hold = null
+                        release.complete(Unit)
+
+                        // A queue pause does not interrupt the task that is already running ...
+                        fixture.completed.receive() shouldBe first
+                        // ... and it must not start another one, however long it is left alone.
+                        tasksStartedWithin(fixture, 200.milliseconds) shouldBe listOf(first)
+
+                        fixture.engine.resumeQueue()
+                        fixture.completed.receive() shouldBe second
+                        fixture.chunker.workDirs.map(::taskIdOf) shouldBe listOf(first, second)
+                    }
+                }
+            }
+        }
     })
+
+/**
+ * The tasks the engine starts while [window] of real time passes, returning early as soon as a second one
+ * starts. "Nothing happened" cannot be awaited, so the test pumps the worker itself: [runCurrent] runs it
+ * on the test dispatcher, and each short real delay lets the file and database I/O in between finish.
+ */
+private suspend fun TestScope.tasksStartedWithin(
+    fixture: EngineFixture,
+    window: Duration,
+): List<Long> {
+    val deadline = System.nanoTime() + window.inWholeNanoseconds
+    runCurrent()
+    while (System.nanoTime() < deadline && fixture.chunker.workDirs.size <= 1) {
+        withContext(Dispatchers.Default) { delay(2.milliseconds) }
+        runCurrent()
+    }
+    return fixture.chunker.workDirs.map(::taskIdOf)
+}

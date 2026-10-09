@@ -13,6 +13,7 @@ import stt.audio.Chunker
 import stt.config.Config
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
+import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
 import stt.db.StoredTask
 import stt.db.TaskPhase
@@ -39,6 +40,7 @@ class ProcessingEngine(
     private val tasks: TaskRepository,
     private val chunks: ChunkRepository,
     private val segments: SegmentRepository,
+    private val queueState: QueueStateRepository,
     private val workDirectories: TaskWorkDirectories,
     private val chunker: Chunker,
     private val transcriber: Transcriber,
@@ -72,9 +74,20 @@ class ProcessingEngine(
         wakeups.trySend(Unit)
     }
 
+    /** Pauses the queue: no further task starts until [resumeQueue]; a task already running is left to run. */
+    suspend fun pauseQueue() {
+        queueState.setPaused(true)
+    }
+
+    /** Resumes the queue and wakes the worker, which starts the next queued task. */
+    suspend fun resumeQueue() {
+        queueState.setPaused(false)
+        wake()
+    }
+
     private suspend fun workerLoop() {
         while (true) {
-            val next = tasks.nextQueued()
+            val next = if (queueState.isPaused()) null else tasks.nextQueued()
             if (next == null) {
                 wakeups.receive()
             } else {
