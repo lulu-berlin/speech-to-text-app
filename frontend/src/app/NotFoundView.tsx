@@ -1,5 +1,10 @@
+import { Page } from '../shared/ui/layout';
 import { PageHeading } from '../shared/ui/typography';
 
 export function NotFoundView() {
-  return <PageHeading>Not found</PageHeading>;
+  return (
+    <Page>
+      <PageHeading>Not found</PageHeading>
+    </Page>
+  );
 }
