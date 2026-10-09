@@ -56,5 +56,5 @@ src/main/kotlin/stt/      Main.kt (boot: config, coroutine scope, Ktor app)
 
 - Kotest `BehaviorSpec` (given/when/then); scenario wording matches the item's test list.
 - HTTP behavior: Ktor `testApplication`, assert status and body (kotlinx.serialization).
-- File fixtures: temp directories per test (Kotest `TempDirectory`), never fixtures committed to the repo.
+- File fixtures: files a test generates go to temp directories per test (Kotest `TempDirectory`). Where test fixtures come from is not ruled (ADR 0026).
 - Tests needing real ffmpeg, whisper-cli, or ONNX models are tagged `Integration` and run separately. Engine/queue coroutine logic uses `kotlinx-coroutines-test` (`runTest`, virtual time).
