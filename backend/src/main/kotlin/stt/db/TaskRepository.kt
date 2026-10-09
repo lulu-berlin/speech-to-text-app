@@ -3,6 +3,7 @@ package stt.db
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -178,11 +179,9 @@ class TaskRepository(
         id: Long,
         startedAt: Long,
     ): Boolean =
-        db.writeTransaction {
-            TasksTable.update({ (TasksTable.id eq id) and (TasksTable.status eq TaskStatus.QUEUED) }) {
-                it[TasksTable.status] = TaskStatus.RUNNING
-                it[TasksTable.startedAt] = startedAt
-            } > 0
+        updateTaskIf(id, TasksTable.status eq TaskStatus.QUEUED) {
+            it[TasksTable.status] = TaskStatus.RUNNING
+            it[TasksTable.startedAt] = startedAt
         }
 
     /**
@@ -226,11 +225,9 @@ class TaskRepository(
         id: Long,
         finishedAt: Long,
     ): Boolean =
-        db.writeTransaction {
-            TasksTable.update({ (TasksTable.id eq id) and (TasksTable.status inList cancellableFrom) }) {
-                it[TasksTable.status] = TaskStatus.CANCELED
-                it[TasksTable.finishedAt] = finishedAt
-            } > 0
+        updateTaskIf(id, TasksTable.status inList cancellableFrom) {
+            it[TasksTable.status] = TaskStatus.CANCELED
+            it[TasksTable.finishedAt] = finishedAt
         }
 
     /**
@@ -243,12 +240,20 @@ class TaskRepository(
         error: String,
         finishedAt: Long,
     ): Boolean =
+        updateTaskIf(id, TasksTable.status eq TaskStatus.RUNNING) {
+            it[TasksTable.status] = TaskStatus.FAILED
+            it[TasksTable.error] = error
+            it[TasksTable.finishedAt] = finishedAt
+        }
+
+    /** Writes [body] to task [id]'s row only while [condition] holds; returns whether the row was written. */
+    private suspend fun updateTaskIf(
+        id: Long,
+        condition: Op<Boolean>,
+        body: TasksTable.(UpdateStatement) -> Unit,
+    ): Boolean =
         db.writeTransaction {
-            TasksTable.update({ (TasksTable.id eq id) and (TasksTable.status eq TaskStatus.RUNNING) }) {
-                it[TasksTable.status] = TaskStatus.FAILED
-                it[TasksTable.error] = error
-                it[TasksTable.finishedAt] = finishedAt
-            } > 0
+            TasksTable.update({ (TasksTable.id eq id) and condition }) { body(it) } > 0
         }
 
     /** Deletes the task; its audio metadata, chunks with their chunk audio, and segments go with it (ON DELETE CASCADE). */
