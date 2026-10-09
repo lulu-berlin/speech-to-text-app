@@ -49,7 +49,7 @@ class AudioChunker(
                         "-",
                     ),
             )
-        result.requireSuccess("detect silences in $source")
+        result.expectSuccess("detect silences in $source")
         return parseSilences(result.stderr, durationMs)
     }
 
@@ -83,6 +83,6 @@ class AudioChunker(
                         file.toString(),
                     ),
             )
-        result.requireSuccess("export $file")
+        result.expectSuccess("export $file")
     }
 }

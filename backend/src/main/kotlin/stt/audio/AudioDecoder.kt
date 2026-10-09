@@ -32,7 +32,7 @@ class AudioDecoder(
                         pcm.toString(),
                     ),
             )
-        result.requireSuccess("decode $source")
+        result.expectSuccess("decode $source")
         val sampleCount = withContext(Dispatchers.IO) { Files.size(pcm) } / BYTES_PER_SAMPLE
         if (sampleCount == 0L) throw AudioDecodeException("no audio decoded from $source")
         return sampleCount / SAMPLES_PER_MS

@@ -31,7 +31,7 @@ Except for test-list item 1 (a TDD cycle) and the pnpm pin (a devenv change), ev
   - Coverage is unchanged: every scenario still exists exactly once.
 - **R2. Audio test helpers reuse `Ffmpeg.kt`.**
   - `audio/TestFixtures.kt:15-18` and `audio/AudioChunkerSpec.kt:163-166` spell out `"ffmpeg", "-hide_banner", "-nostats"` and check `exitCode` by hand.
-  - Change: use the existing `internal` `FFMPEG` prefix and `ProcessResult.requireSuccess(what)`.
+  - Change: use the existing `internal` `FFMPEG` prefix and `ProcessResult.requireSuccess(what)`, renamed to `expectSuccess` first in its own refactor (user, 2026-10-09).
 - **R3. `ProcessRunnerSpec` helpers.**
   - (a) The pause-freeze check (pause, delay 500 ms, assert at most one line arrived meanwhile) appears twice, at `:147-152` and `:447-451`. Change: one private helper.
   - (b) The safety-net cleanup `if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)` in `finally` appears three times (`:340`, `:375`, `:571`). Change: one helper that runs a block and force-kills the reported pids afterwards.
@@ -88,3 +88,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: baseline on `da7bd63` (reference for test-list item 2): `gradle check` green, 105 tests in 34 specs, 0 failed; `gradle integrationTest` green, 44 Integration tests run, 0 failed (149 reported, the 105 untagged ones skipped); `pnpm test` green, 1 test in 1 file, prettier clean; `pnpm build` green.
 - 2026-10-09: test-list item 1 done (`TaskQueueSpec`, user-confirmed). Green on arrival; red recorded against a temporary, uncommitted mutation making `TaskQueue.transition` skip the per-task check: `expected:<Rejected(reason=IllegalTransition(from=QUEUED, to=COMPLETED))> but was:<Accepted(queue=TaskQueue(entries=[QueueEntry(id=2, status=PAUSED)], paused=false))>`; mutation reverted.
 - 2026-10-09 (discovered, confirmed by the user before R1): R1 splits the parsing part out of the mixed `DeviceArgsSpec`/`WhisperCommandSpec` scenarios into two new `ConfigSpec` scenarios (`STT_DEVICE`, `STT_THREADS`), so the backend count rises by two more; test-list item 2 amended accordingly.
+- 2026-10-09: R2 approved with one change by the user: `ProcessResult.requireSuccess` is renamed to `expectSuccess` (production function and its three callers), as its own `Refactor:` commit before R2.

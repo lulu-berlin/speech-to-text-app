@@ -6,6 +6,6 @@ import stt.process.ProcessResult
 internal val FFMPEG = listOf("ffmpeg", "-hide_banner", "-nostats")
 
 /** Throws [AudioDecodeException] "ffmpeg failed to [what]: <stderr>" unless this ffmpeg run exited with 0. */
-internal fun ProcessResult.requireSuccess(what: String) {
+internal fun ProcessResult.expectSuccess(what: String) {
     if (exitCode != 0) throw AudioDecodeException("ffmpeg failed to $what: ${stderr.joinToString("\n").trim()}")
 }
