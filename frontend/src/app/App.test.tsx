@@ -84,4 +84,17 @@ describe('the app root', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('renders its text in IBM Plex Sans with the system stack as fallback', () => {
+    renderAt('/queue');
+
+    // jsdom does not resolve what a global style sheet puts on `body` (item 13 hit the same
+    // wall), so the assertion reads the app root element, where the font also lands.
+    const shell = screen.getByRole('main').parentElement as HTMLElement;
+    expect(getComputedStyle(shell).fontFamily).toBe(lightTheme.fontFamilies.sans);
+
+    // The self-hosted font comes first; the system stack is the fallback.
+    expect(lightTheme.fontFamilies.sans).toMatch(/^"IBM Plex Sans", system-ui, /);
+    expect(lightTheme.fontFamilies.sans.endsWith('sans-serif')).toBe(true);
+  });
 });

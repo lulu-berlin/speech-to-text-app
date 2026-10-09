@@ -46,6 +46,9 @@ export interface ThemeTokens {
   fontSizes: {
     title: string;
   };
+  fontFamilies: {
+    sans: string;
+  };
 }
 
 // Everything except colors is the same in both sets; only the color roles differ.
@@ -70,6 +73,10 @@ const baseTokens = {
   },
   fontSizes: {
     title: '1.5rem',
+  },
+  // The self-hosted font first, the system stack as fallback (the file is in ./fonts).
+  fontFamilies: {
+    sans: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
   },
 };
 
