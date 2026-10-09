@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { asRgb, px } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { lightTheme } from '../theme/theme';
-import { Card, Surface } from './Card';
+import { Card } from './Card';
+import { Surface } from './Surface';
 
 describe('the surface containers', () => {
   it('renders the surface and the card from the tokens', () => {
