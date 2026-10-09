@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import styled from 'styled-components';
 import type { ThemeTokens } from '../theme/theme';
 import { interactiveStates } from './buttonStates';
+import { Spinner } from './Spinner';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
@@ -30,6 +31,10 @@ const variantColors = (theme: ThemeTokens) => ({
 });
 
 const ButtonBase = styled.button<{ $variant: ButtonVariant }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: ${(props) => props.theme.spacing.sm};
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
   border: ${(props) => props.theme.borderWidths.thin} solid transparent;
   border-radius: ${(props) => props.theme.radii.button};
@@ -77,6 +82,7 @@ export function Button({
       aria-busy={loading || undefined}
       {...rest}
     >
+      {loading ? <Spinner size="sm" /> : null}
       {children}
     </ButtonBase>
   );
