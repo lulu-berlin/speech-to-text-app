@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { App } from './App';
@@ -33,5 +33,17 @@ describe('the app root', () => {
 
     renderAt('/no-such-page');
     expect(screen.getByRole('heading', { name: 'Not found' })).toBeInTheDocument();
+  });
+
+  it('switches between Queue and History from the header and shows whether the connection is live', async () => {
+    renderAt('/queue');
+
+    const historyLink = screen.getByRole('link', { name: 'History' });
+    expect(screen.getByRole('link', { name: 'Queue' })).toBeInTheDocument();
+    // The mocked stream sends the snapshot, so the indicator turns live.
+    expect(await screen.findByText('Live')).toBeInTheDocument();
+
+    fireEvent.click(historyLink);
+    expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
   });
 });
