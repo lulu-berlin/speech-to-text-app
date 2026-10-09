@@ -70,7 +70,7 @@ Except for test-list item 1 (a TDD cycle) and the pnpm pin (a devenv change), ev
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [x] A status change through the queue that the per-task table forbids (e.g. `QUEUED → COMPLETED`, `PAUSED → RUNNING`) is rejected as an illegal transition naming both statuses, and the queue is unchanged
-- [ ] Must not break: after every refactor, `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` are green, and the backend test count changes only by the new test above and by the two `ConfigSpec` scenarios R1 splits out of mixed scenarios (amended 2026-10-09, discovered)
+- [x] Must not break: after every refactor, `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` are green, and the backend test count changes only by the new test above and by the two `ConfigSpec` scenarios R1 splits out of mixed scenarios (amended 2026-10-09, discovered)
 - [ ] Must not break (user-verified): in the re-entered devenv shell `pnpm --version` reports 11.x and `pnpm install --frozen-lockfile` succeeds
 
 ## Acceptance criteria
@@ -91,3 +91,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: R2 approved with one change by the user: `ProcessResult.requireSuccess` is renamed to `expectSuccess` (production function and its three callers), as its own `Refactor:` commit before R2.
 - 2026-10-09 (discovered before R4, user chose option 1): R4's reason was wrong; `stt.audio` also has public declarations (`planChunks`, `AudioChunker`, `AudioDecoder`, the data classes). R4 widened to `planChunks`, the other pure helper called only by `AudioChunker`; reason corrected in the R4 bullet.
 - 2026-10-09: R1–R7 done, each approved by the user and committed on its own (plus the approved `expectSuccess` rename). pnpm pin committed (`devenv.nix` alone, then the ADR 0012 amendment); awaiting the user's check in the re-entered worktree shell (test-list item 3).
+- 2026-10-09: test-list item 2 done. Final runs on `519b9a1` with `--rerun-tasks`: `gradle check` green, 108 tests in 34 specs, 0 failed (baseline 105 + 1 from test-list item 1 + 2 from the R1 split); `gradle integrationTest` green, 44 Integration tests run, 0 failed (as baseline); `pnpm test` green, 1 test in 1 file, prettier clean over the R5 file set; `pnpm build` green. Every refactor commit was checked with all four commands before committing.
