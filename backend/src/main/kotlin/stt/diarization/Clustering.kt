@@ -18,9 +18,60 @@ internal fun clusterSegments(
 ): List<Int> {
     val n = embeddings.size
     if (n <= 1) return List(n) { 0 }
-    if (n > 2 || k != null) TODO("three or more segments and fixed counts: next test-list items")
-    val lastHeight = upgmaMerges(embeddings).last().height
-    return if (lastHeight < SPEAKER_DISTANCE_THRESHOLD) listOf(0, 0) else listOf(0, 1)
+    if (k != null) TODO("fixed counts: next test-list items")
+    val merges = upgmaMerges(embeddings)
+    val speakers =
+        when {
+            n == 2 -> if (merges.last().height < SPEAKER_DISTANCE_THRESHOLD) 1 else 2
+            else -> largestGapCount(merges)
+        }
+    if (speakers == 1) return List(n) { 0 }
+    return cutLabels(n, merges.take(n - speakers))
+}
+
+/**
+ * Speaker count at the largest gap between consecutive merge heights: a cut after merge `idx` (the first maximum of
+ * `heights[g + 1] - heights[g]`) leaves `n - (idx + 1)` clusters.
+ */
+private fun largestGapCount(merges: List<Merge>): Int {
+    var idx = 0
+    var largest = Double.NEGATIVE_INFINITY
+    for (g in 0 until merges.size - 1) {
+        val gap = merges[g + 1].height - merges[g].height
+        if (gap > largest) {
+            idx = g
+            largest = gap
+        }
+    }
+    val n = merges.size + 1
+    return n - (idx + 1)
+}
+
+/**
+ * Labels of [n] rows after applying [merges] with union-find; the roots are numbered in order of first appearance
+ * by row index, so the labels are `0 until (number of clusters)`.
+ */
+private fun cutLabels(
+    n: Int,
+    merges: List<Merge>,
+): List<Int> {
+    val parent = IntArray(n) { it }
+
+    fun find(x: Int): Int {
+        var node = x
+        while (parent[node] != node) {
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        }
+        return node
+    }
+    for (merge in merges) {
+        val rootI = find(merge.i)
+        val rootJ = find(merge.j)
+        if (rootI != rootJ) parent[rootJ] = rootI
+    }
+    val labelOfRoot = HashMap<Int, Int>()
+    return List(n) { row -> labelOfRoot.getOrPut(find(row)) { labelOfRoot.size } }
 }
 
 /**
