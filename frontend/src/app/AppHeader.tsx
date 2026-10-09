@@ -7,9 +7,10 @@ import { ConnectionContext } from './ConnectionContext';
 const Header = styled.header`
   display: flex;
   align-items: baseline;
-  gap: ${(props) => props.theme.spacing.unit * 3}px;
-  padding: ${(props) => props.theme.spacing.unit * 2}px ${(props) => props.theme.spacing.unit * 3}px;
-  border-bottom: 1px solid ${(props) => props.theme.colors.border};
+  gap: ${(props) => props.theme.spacing.lg};
+  padding: ${(props) => props.theme.spacing.md} ${(props) => props.theme.spacing.lg};
+  border-bottom: ${(props) => props.theme.borderWidths.thin} solid
+    ${(props) => props.theme.colors.border};
 `;
 
 const Title = styled.h1`
@@ -20,7 +21,7 @@ const Title = styled.h1`
 
 const Nav = styled.nav`
   display: flex;
-  gap: ${(props) => props.theme.spacing.unit}px;
+  gap: ${(props) => props.theme.spacing.sm};
 `;
 
 const NavItem = styled(NavLink)`

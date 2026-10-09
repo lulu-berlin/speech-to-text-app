@@ -19,8 +19,21 @@ export interface ThemeTokens {
     danger: string;
     status: Record<StatusGroup, { background: string; text: string }>;
   };
+  // Lengths are rem so they follow the reader's font size (no raw px outside the tokens;
+  // even here there is none — see src/conventions.test.ts).
   spacing: {
-    unit: number;
+    xs: string;
+    sm: string;
+    md: string;
+    lg: string;
+    xl: string;
+    xxl: string;
+  };
+  borderWidths: {
+    thin: string;
+  };
+  sizes: {
+    viewportMinHeight: string;
   };
   radii: {
     dialog: string;
@@ -34,11 +47,22 @@ export interface ThemeTokens {
 // Everything except colors is the same in both sets; only the color roles differ.
 const baseTokens = {
   spacing: {
-    unit: 8,
+    xs: '0.25rem',
+    sm: '0.5rem',
+    md: '1rem',
+    lg: '1.5rem',
+    xl: '2rem',
+    xxl: '3rem',
+  },
+  borderWidths: {
+    thin: '0.0625rem',
+  },
+  sizes: {
+    viewportMinHeight: '100vh',
   },
   radii: {
-    dialog: '8px',
-    button: '4px',
+    dialog: '0.5rem',
+    button: '0.25rem',
   },
   fontSizes: {
     title: '1.5rem',

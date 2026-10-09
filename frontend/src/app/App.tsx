@@ -20,13 +20,13 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 const Shell = styled.div`
-  min-height: 100vh;
+  min-height: ${(props) => props.theme.sizes.viewportMinHeight};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 `;
 
 const Main = styled.main`
-  padding: ${(props) => props.theme.spacing.unit * 3}px;
+  padding: ${(props) => props.theme.spacing.lg};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 `;
