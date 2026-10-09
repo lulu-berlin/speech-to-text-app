@@ -74,11 +74,7 @@ class EmbeddingsSpec :
                             }
                         }
                         // Sanity: the 3 kHz middle segment is not the same vector as the 440 Hz first one.
-                        embeddings[0]
-                            .indices
-                            .map { embeddings[0][it] * embeddings[1][it] }
-                            .sum()
-                            .shouldBeLessThan(0.9999f)
+                        dot(embeddings[0], embeddings[1]).shouldBeLessThan(0.9999f)
                     }
                 }
             }
