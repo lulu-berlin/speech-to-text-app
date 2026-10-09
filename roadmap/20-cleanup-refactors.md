@@ -1,6 +1,6 @@
 # 20 — Cleanup refactors: test placement, duplication, visibility, toolchain pin
 
-Status: spec-approved
+Status: in-progress
 Depends on: — (touches only merged code from items 02, 04, 05, 06, 07 and the dev environment; independent of 09 and 11)
 
 ## Goal
