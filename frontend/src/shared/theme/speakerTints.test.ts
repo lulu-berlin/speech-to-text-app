@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { contrast } from '../../test/wcag';
+import { AA_TEXT, contrast } from '../../test/wcag';
 import { darkTheme, lightTheme } from './theme';
 import type { ThemeTokens } from './theme';
 import { speakerTint } from './speakerPalette';
 
 // Item 12 allows up to 20 speakers, so the palette carries one tint per speaker index.
 const SPEAKERS = 20;
-// WCAG 2.x AA for normal text (1.4.3).
-const AA_TEXT = 4.5;
 
 // A speaker's name is shown in its tint (item 15), so every tint must be readable on every
 // surface it can sit on, in both themes.
