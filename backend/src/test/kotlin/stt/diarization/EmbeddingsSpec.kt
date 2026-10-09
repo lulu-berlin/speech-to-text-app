@@ -13,24 +13,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import stt.Integration
-import stt.audio.AudioDecoder
 import stt.config.realSpeakerModelPath
 import stt.db.Segment
-import stt.process.ProcessRunner
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 class EmbeddingsSpec :
     BehaviorSpec({
@@ -212,11 +204,6 @@ class EmbeddingsSpec :
             }
         }
     })
-
-private fun segment(
-    startMs: Long,
-    endMs: Long,
-): Segment = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speakerId = null)
 
 /** The segment covering all of [pcm], in whole milliseconds. */
 private fun wholeClip(pcm: FloatArray): Segment = segment(0, pcm.size / 16L)

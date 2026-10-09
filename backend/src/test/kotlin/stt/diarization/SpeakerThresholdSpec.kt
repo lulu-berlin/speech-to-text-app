@@ -6,7 +6,6 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.collections.shouldBeEmpty
 import stt.Integration
 import stt.config.realSpeakerModelPath
-import stt.db.Segment
 import java.nio.file.Files
 import java.util.Locale
 
@@ -60,8 +59,3 @@ private fun misclassifiedPairs(items: List<Pair<String, FloatArray>>): List<Stri
             if (wrong) "${items[a].first} vs ${items[b].first}: ${"%.4f".format(Locale.ROOT, distance)}" else null
         }
     }
-
-private fun segment(
-    startMs: Long,
-    endMs: Long,
-) = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speakerId = null)
