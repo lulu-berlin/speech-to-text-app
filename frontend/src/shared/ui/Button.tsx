@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import styled from 'styled-components';
 import type { ThemeTokens } from '../theme/theme';
+import { interactiveStates } from './buttonStates';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
@@ -46,16 +47,9 @@ const ButtonBase = styled.button<{ $variant: ButtonVariant }>`
     background: ${(props) => variantColors(props.theme).activeBackground[props.$variant]};
   }
 
-  &:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 ${(props) => props.theme.borderWidths.ring}
-      ${(props) => props.theme.colors.focusRing};
-  }
+  ${interactiveStates}
 
   &:disabled {
-    cursor: default;
-    background: ${(props) => props.theme.colors.surface};
-    color: ${(props) => props.theme.colors.textMuted};
     border-color: ${(props) => props.theme.colors.border};
   }
 `;
