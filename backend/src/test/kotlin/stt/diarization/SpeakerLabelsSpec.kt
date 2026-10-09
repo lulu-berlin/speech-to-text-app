@@ -71,6 +71,33 @@ class SpeakerLabelsSpec :
                 }
             }
         }
+
+        given("only segments shorter than 500 ms, two of speaker A and two of speaker B") {
+            `when`("the speakers are labelled in auto mode") {
+                then("all segments are clustered and the rescue leaves their labels unchanged") {
+                    // A pair at 1 - 0.8 = 0.2 on dims 0-1, B pair at 1 - 0.96 = 0.04 on dims 2-3, cross distances exactly 1:
+                    // heights 0.04, 0.2, 1, gaps 0.16, 0.8, so k = 4 - (1 + 1) = 2: A = 0, B = 1. Without the fallback
+                    // nothing is clustered and every label stays 0.
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+                    val segments =
+                        listOf(
+                            segment(startMs = 0, endMs = 300), // A
+                            segment(startMs = 300, endMs = 600), // A
+                            segment(startMs = 600, endMs = 900), // B
+                            segment(startMs = 900, endMs = 1_200), // B
+                        )
+                    val embeddings =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f),
+                            floatArrayOf(0.8f, 0.6f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f),
+                            floatArrayOf(0f, 0f, 0.96f, 0.28f),
+                        )
+
+                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1))
+                }
+            }
+        }
     })
 
 private fun segment(
