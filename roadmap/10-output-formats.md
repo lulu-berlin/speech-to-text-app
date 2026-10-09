@@ -57,7 +57,7 @@ Diarized formats (port of oracle `write_diarized_outputs`). Labels always come f
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] txt starts a `[speaker N]` block at every speaker change, separates blocks with one blank line, and prints one trimmed segment per line
+- [x] txt starts a `[speaker N]` block at every speaker change, separates blocks with one blank line, and prints one trimmed segment per line
 - [ ] srt merges consecutive same-speaker segments into one numbered cue `Speaker N: text` with first start and last end
 - [ ] vtt starts with `WEBVTT` and a blank line and contains the same turns without cue numbers
 - [ ] srt uses a comma and vtt a dot before milliseconds
@@ -84,3 +84,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: decision from the item 12 contract consultation ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)): json `segments[].text` is trimmed, like every other output; storage stays untrimmed for item 07's prompt. The rest of the item is still draft.
 - 2026-10-09: consultation answers approved: speakers-off formats = the draft (diarized shapes without labels, trimmed); speakers-off no-speech = the diarized no-speech output; `id`/`seek` omitted; download names `<original stem>.<format>`; labels from the speakerId as the oracle prints them, with item 22 revisiting them for renamed speakers. Test list not yet approved.
 - 2026-10-09: test list (14 items) approved by the user; status `spec-approved`.
+- 2026-10-09 (cycle 1, test-list item 1, txt speaker blocks): red — `gradle test --tests 'stt.outputs.TxtSpec'`: compilation failed, "Unresolved reference 'renderTxt'". Green: `renderTxt(segments)` (new `stt.outputs`, `Txt.kt`), a pure port of the oracle's txt branch: on a speakerId change a `\n` (except before the first block) and `[speaker {speakerId + 1}]\n`, then every segment's trimmed text and `\n`; a segment without a speakerId is rejected (speakers off is a later item). Fixture: speakerIds 0, 0, 1, 0 with texts `" Hello there."`, `"How are you? "`, `" Fine."`, `" Bye."`; golden string derived by hand from oracle lines 415–422: `"[speaker 1]\nHello there.\nHow are you?\n\n[speaker 2]\nFine.\n\n[speaker 1]\nBye.\n"` (the returning speaker 1 opens a new block). `gradle check` green (132 unit tests); no Integration-tagged code touched.
