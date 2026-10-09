@@ -173,6 +173,34 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("three groups of two segments on orthogonal planes") {
+            `when`("they are clustered with a fixed count and max_speakers 1") {
+                then("they yield exactly k speakers, k clamped to [1, n], ignoring max_speakers") {
+                    // Within-group distances 1 - c: 0.2, 0.4, 0.04; every cross-group distance is exactly 1. Merges in
+                    // order: (4, 5) at 0.04, (0, 1) at 0.2, (2, 3) at 0.4, then (0, 2) and (0, 4) at 1 (ties go to the
+                    // lower pair). A count k applies the first 6 - k merges.
+                    val embeddings =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f),
+                            floatArrayOf(0.8f, 0.6f, 0f, 0f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 0.6f, 0.8f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f),
+                            floatArrayOf(0f, 0f, 0f, 0f, 0.96f, 0.28f),
+                        )
+
+                    // k = 2: four merges leave {0, 1, 2, 3} and {4, 5}.
+                    clusterSegments(embeddings, k = 2, maxSpeakers = 1).shouldBe(listOf(0, 0, 0, 0, 1, 1))
+                    // k = 4: two merges leave {0, 1}, {2}, {3} and {4, 5}.
+                    clusterSegments(embeddings, k = 4, maxSpeakers = 1).shouldBe(listOf(0, 0, 1, 2, 3, 3))
+                    clusterSegments(embeddings, k = 1, maxSpeakers = 1).shouldBe(listOf(0, 0, 0, 0, 0, 0))
+                    // Clamped: k = 0 counts as 1, k = 10 as n = 6 (no merge applied).
+                    clusterSegments(embeddings, k = 0, maxSpeakers = 1).shouldBe(listOf(0, 0, 0, 0, 0, 0))
+                    clusterSegments(embeddings, k = 10, maxSpeakers = 1).shouldBe(listOf(0, 1, 2, 3, 4, 5))
+                }
+            }
+        }
     })
 
 /** The merged `(i, j)` index pairs, in merge order. */

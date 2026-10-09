@@ -9,7 +9,8 @@ internal const val SPEAKER_DISTANCE_THRESHOLD = 0.35
 /**
  * Speaker label (0-based) per row of [embeddings] (L2-normalized, one per clustered segment), by average-linkage
  * (UPGMA) agglomerative clustering on cosine distance. Ported from oracle `cluster_segments`
- * (docs/oracle/transcribe.py); [k] = `null` picks the count automatically (ADR 0027), otherwise it is the fixed count.
+ * (docs/oracle/transcribe.py); [k] = `null` picks the count automatically (ADR 0027), otherwise it is the fixed count,
+ * clamped to `[1, n]` and not limited by [maxSpeakers].
  */
 internal fun clusterSegments(
     embeddings: Array<FloatArray>,
@@ -18,10 +19,10 @@ internal fun clusterSegments(
 ): List<Int> {
     val n = embeddings.size
     if (n <= 1) return List(n) { 0 }
-    if (k != null) TODO("fixed counts: next test-list items")
     val merges = upgmaMerges(embeddings)
     val speakers =
         when {
+            k != null -> k.coerceIn(1, n)
             merges.last().height < SPEAKER_DISTANCE_THRESHOLD -> 1
             n == 2 -> 2
             else -> largestGapCount(merges, maxSpeakers)
