@@ -1,0 +1,58 @@
+import { NavLink } from 'react-router';
+import styled from 'styled-components';
+import { ConnectionContext } from './ConnectionContext';
+
+// The product name, navigation between the views, and the live connection indicator.
+// Item 17 adds the stenographer animation here.
+const Header = styled.header`
+  display: flex;
+  align-items: baseline;
+  gap: ${(props) => props.theme.spacing.unit * 3}px;
+  padding: ${(props) => props.theme.spacing.unit * 2}px ${(props) => props.theme.spacing.unit * 3}px;
+  border-bottom: 1px solid ${(props) => props.theme.colors.border};
+`;
+
+const Title = styled.h1`
+  margin: 0;
+  color: ${(props) => props.theme.colors.text};
+  font-size: ${(props) => props.theme.fontSizes.title};
+`;
+
+const Nav = styled.nav`
+  display: flex;
+  gap: ${(props) => props.theme.spacing.unit}px;
+`;
+
+const NavItem = styled(NavLink)`
+  color: ${(props) => props.theme.colors.accent};
+  text-decoration: none;
+
+  &.active {
+    text-decoration: underline;
+  }
+`;
+
+const Indicator = styled.span`
+  margin-left: auto;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const CONNECTION_LABEL = {
+  connecting: 'Connecting',
+  live: 'Live',
+  reconnecting: 'Reconnecting',
+} as const;
+
+export function AppHeader() {
+  const connection = ConnectionContext.useSelector((state) => state.value);
+  return (
+    <Header>
+      <Title>Speech-to-Text</Title>
+      <Nav>
+        <NavItem to="/queue">Queue</NavItem>
+        <NavItem to="/history">History</NavItem>
+      </Nav>
+      <Indicator>{CONNECTION_LABEL[connection]}</Indicator>
+    </Header>
+  );
+}
