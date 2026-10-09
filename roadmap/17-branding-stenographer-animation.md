@@ -1,6 +1,6 @@
 # 17 — Branding: stenographer animation
 
-Status: draft
+Status: spec-approved
 Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
 
 ## Goal
@@ -15,7 +15,7 @@ Give the frontend a recognizable brand: an animated stenographer, shown in the a
 - **The artwork exists** (user, 2026-10-09): `frontend/src/shared/brand/stenographer.svg`, committed with `PROVENANCE.md` beside it. It is a self-contained SVG (no scripts, no external references, no fonts) with nine CSS animations and a `prefers-reduced-motion` fallback; 13,786 bytes, 3,203 gzipped. It was created by the project author with Claude (Anthropic); the origin is recorded in `PROVENANCE.md`.
 - **What the artwork shows**: a seated stenographer at a steno machine under a lamp, hands typing with the keys flashing, a paper tape with words rising, on a circular warm background (cream to pink) with sparkles.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Inline as a React component**, `frontend/src/shared/brand/StenographerAnimation.tsx` (decided 2026-10-09):
   - a **styled wrapper** (`styled.svg`) whose template nests every one of the artwork's rules under `&`, with the nine animations declared with styled-components `keyframes`. Styled-components scopes the selectors automatically — including the `*` inside the reduced-motion block — so **no rule of the artwork's `<style>` can leak into the app**, which the file's generic class names (`.word`, `.head`, `.eye`, `.keys`, `.f`) would otherwise cause;
@@ -51,7 +51,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] The app shell header shows the stenographer next to the product name
 - [ ] An empty state shows the larger instance, and a loading region shows it in place of a spinner or skeleton
@@ -77,3 +77,4 @@ Seed — to be refined and approved with the user before any test is written:
 ## Approval log
 
 - 2026-10-09: consultation answers approved: the user supplied the artwork (`stenographer.svg`, now committed with `PROVENANCE.md`); it is inlined as a component via a styled wrapper with nested rules and `keyframes`, with its palette converted to tokens and unique `useId` ids per instance; it appears in the header, on the empty states and as the loading indicator, replacing the spinners and skeletons but not the progress bars; it types only while a task is running; the favicon and a still are derived from it; item 16 gains a dependency on this item. Test list not yet approved.
+- 2026-10-09: test list (10 items) approved by the user; status `spec-approved`.
