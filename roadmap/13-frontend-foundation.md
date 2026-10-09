@@ -1,6 +1,6 @@
 # 13 — Frontend foundation
 
-Status: in-progress
+Status: in-review
 Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [12](12-http-api-and-sse.md) (spec-approved only: its contract, not its implementation)
 
 ## Goal
@@ -80,7 +80,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The confirmation dialog runs the action on confirm and not on cancel or Escape
 - [x] Components render with the theme available (themed values applied)
 - [x] (discovered, confirmed 2026-10-09) A `task-updated` for a task the state does not hold yet (e.g. a new upload) adds it
-- [ ] (discovered, confirmed 2026-10-09) When the server answers a reconnect with an HTTP error, so `EventSource` stops retrying, the connection machine reconnects by itself
+- [x] (discovered, confirmed 2026-10-09) When the server answers a reconnect with an HTTP error, so `EventSource` stops retrying, the connection machine reconnects by itself
 - [x] (discovered, confirmed 2026-10-09) The app paints the theme's background and text on the page, so dark mode is readable (the tokens switch, but nothing applies `colors.background`)
 
 ## Acceptance criteria
@@ -101,6 +101,7 @@ The user allowed additions to the mocks (2026-10-09) if each states why, so it c
 - **Test stream for an illegal transition** (`connectionMachine.test.ts`): `task-updated` carries `task.running.json` with id 3. The example's own id is 5, which is already RUNNING in the snapshot, so no status change; id 3 (COMPLETED in the snapshot) makes RUNNING an illegal transition.
 - **Failed command** (`commandMachine.test.ts`): the cancel handler is overridden to answer `409` with `error.json`. `docs/api/` has no example for `409 illegal-transition` (or any `409` but `duplicate-audio`), so `error.json` stands in; its `error` code is `not-found`.
 - **New task through `task-updated`** (`connectionMachine.test.ts`): the event carries `task.queued.json` with id 99. No snapshot task has that id, which is how a new upload arrives (the snapshot's own examples hold ids 5, 7, 3, 4).
+- **Failed connection** (`connectionMachine.test.ts`): the first connection to `/api/events` is answered `500` with `error.json` (EventSource then gives up), later ones with the snapshot. The contract's `500 internal` code is what `error.json` carries.
 
 Known differences from the contract, no example to serve:
 - `GET /api/tasks/{id}/turns` returns turns for any known task (by its `speakersMode`), not `409 not-completed` for a task that is not COMPLETED: `error.json`'s code is `not-found`, and there is no `not-completed` example.
@@ -130,3 +131,4 @@ Known differences from the contract, no example to serve:
 - 2026-10-09 (workspace, cycle 12): `Test: the confirmation dialog runs the action on confirm and not on cancel or Escape`. Red (dialog ran the action on any close): `expected "vi.fn()" to not be called at all, but actually been called 1 times` (the cancel button). Green: `ConfirmDialog` (`src/shared/ui/`) is a native `<dialog>` opened/closed through `showModal`/`close`, styled with tokens; only `returnValue === 'confirm'` runs the action, so Cancel and Escape call `onCancel`. New `radii.dialog`/`radii.button` tokens and the `renderThemed` test helper (`src/test/render.tsx`). jsdom implements no `<dialog>` methods, so `src/test/setup.ts` shims `showModal`/`show`/`close`; verified in Chromium that Escape closes with `returnValue=""` and fires `close`. 6 files / 14 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
 - 2026-10-09 (workspace, cycle 13): `Test: components render with the themed values applied`. Red: `Unable to find an accessible element with the role "main"`. Green: `App` renders `GlobalStyle` (paints `body` from the tokens) and a themed shell (`Shell` + `Main`, `Main` being the `main` landmark), so the routed views sit on the token background/text; the test renders with `matchMedia` stubbed light and dark and asserts `getComputedStyle(main)` against the token values (jsdom resolves computed styles on elements but not on `body`). This also closes the discovered item: verified in Chromium with dark forced, `body` is `rgb(20, 22, 26)` with text `rgb(232, 232, 232)`, so the app is readable in dark mode. 6 files / 15 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
 - 2026-10-09 (workspace, C14 discovered): `Test: a task-updated for an unknown task adds it`. Red: `Error: Timeout of 2000 ms exceeded` (the update was dropped because the state had no such task). Green: `task-updated` appends the task when the state does not hold its id, and otherwise replaces it (checking the transition table as before). Mock addition: the event carries `task.queued.json` with id 99. 6 files / 16 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
+- 2026-10-09 (workspace, C15 discovered): `Test: the stream reconnects by itself when the server answers with an HTTP error`. Red: `Error: Timeout of 5000 ms exceeded` (the machine stayed in `reconnecting`; EventSource had given up for good). First attempt put the `invoke` in the `connecting` state, which broke the other tests (`Error: Timeout of 2000 ms exceeded`): leaving `connecting` stops its invoked actor, so the stream died at the first snapshot. Reverted: the stream stays a root-level invoke, and `subscribeToEvents` — the actor that owns the connection — opens a new stream when `readyState` is `CLOSED` (with a 1s delay), reporting `disconnected` with a `closed` flag either way. The machine keeps `connecting`/`live`/`reconnecting` as before. Mock addition: the first connection is answered `500` with `error.json`. 6 files / 17 tests, stable over two runs; `tsc --noEmit`, `vite build`, prettier `--check` clean.
