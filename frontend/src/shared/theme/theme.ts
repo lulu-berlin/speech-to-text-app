@@ -31,7 +31,22 @@ export interface ThemeTokens {
   };
 }
 
+// Everything except colors is the same in both sets; only the color roles differ.
+const baseTokens = {
+  spacing: {
+    unit: 8,
+  },
+  radii: {
+    dialog: '8px',
+    button: '4px',
+  },
+  fontSizes: {
+    title: '1.5rem',
+  },
+};
+
 export const lightTheme: ThemeTokens = {
+  ...baseTokens,
   colors: {
     background: '#ffffff',
     surface: '#f6f7f9',
@@ -51,19 +66,10 @@ export const lightTheme: ThemeTokens = {
       gone: { background: '#f3f3f3', text: '#5a616c' },
     },
   },
-  spacing: {
-    unit: 8,
-  },
-  radii: {
-    dialog: '8px',
-    button: '4px',
-  },
-  fontSizes: {
-    title: '1.5rem',
-  },
 };
 
 export const darkTheme: ThemeTokens = {
+  ...baseTokens,
   colors: {
     background: '#14161a',
     surface: '#1b1e23',
@@ -82,16 +88,6 @@ export const darkTheme: ThemeTokens = {
       problem: { background: '#3a1c1c', text: '#f28b82' },
       gone: { background: '#22252a', text: '#9aa2ad' },
     },
-  },
-  spacing: {
-    unit: 8,
-  },
-  radii: {
-    dialog: '8px',
-    button: '4px',
-  },
-  fontSizes: {
-    title: '1.5rem',
   },
 };
 
