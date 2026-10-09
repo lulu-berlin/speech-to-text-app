@@ -62,6 +62,16 @@ class ProcessingEngine(
         scope.launch { workerLoop() }
     }
 
+    /**
+     * Tells the worker that the queue may have changed — a new upload, a resume, a reorder, a queue
+     * resume — so it looks again instead of waiting. Callers do not need to be precise: the signal is
+     * conflated, so repeating it is free and a signal sent while the worker is busy survives until it
+     * next checks the queue.
+     */
+    fun wake() {
+        wakeups.trySend(Unit)
+    }
+
     private suspend fun workerLoop() {
         while (true) {
             val next = tasks.nextQueued()
