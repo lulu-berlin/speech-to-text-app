@@ -1,7 +1,7 @@
 # 24 — Design system: tokens and primitives
 
 Status: spec-approved
-Depends on: [13](13-frontend-foundation.md)
+Depends on: [13](../docs/specs/frontend-foundation.md) (done)
 
 ## Goal
 

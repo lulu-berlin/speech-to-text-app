@@ -114,6 +114,7 @@ The JSON shapes the frontend builds against.
   | `404` | `not-found` (unknown task), `no-audio` (task without stored chunks) |
   | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns or transcript of a task that is not COMPLETED) |
   | `500` | `internal` |
+- **Mock additions from item 13** (added 2026-10-09): the frontend workspace added [`docs/api/task.paused.json`](../docs/api/task.paused.json) and [`docs/api/task.canceled.json`](../docs/api/task.canceled.json), because no example had those statuses, and it recorded where its mocks must deviate from this contract. That list is the "Mock additions to settle with item 12" section of [the frontend foundation spec](../docs/specs/frontend-foundation.md); this item's route tests adopt the two examples and settle each deviation (item 21 verifies the rest end to end).
 - **Task transition table** (added 2026-10-09, item 13 consultation): [`docs/api/task-transitions.json`](../docs/api/task-transitions.json) lists the allowed status transitions and, for each command endpoint, the statuses it accepts. The frontend reads it to offer only allowed commands; the backend checks that its `TaskStatus` table equals it (item 11). A command outside the table still answers `409 illegal-transition`.
 
 ## Open questions (answered 2026-10-09)

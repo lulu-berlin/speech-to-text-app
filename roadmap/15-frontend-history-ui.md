@@ -1,7 +1,7 @@
 # 15 — Frontend history UI
 
 Status: draft
-Depends on: [13](13-frontend-foundation.md), [24](24-visual-design.md)
+Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
 
 ## Goal
 Let the user browse past transcriptions: see finished tasks, read a transcript with speakers and timestamps, follow it during playback with the played segment highlighted, download it in every format, listen to the task's audio, and retry failed or cancelled tasks.

@@ -1,7 +1,7 @@
 # 17 — Branding: stenographer typing animation
 
 Status: draft
-Depends on: [13](13-frontend-foundation.md), [24](24-visual-design.md)
+Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
 
 ## Goal
 

@@ -1,7 +1,7 @@
 # 21 — Frontend–backend end-to-end check
 
 Status: draft
-Depends on: [12](12-http-api-and-sse.md), [13](13-frontend-foundation.md), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md)
+Depends on: [12](12-http-api-and-sse.md), [13](../docs/specs/frontend-foundation.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md)
 
 ## Goal
 
