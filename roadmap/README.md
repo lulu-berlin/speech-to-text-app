@@ -84,7 +84,7 @@ graph TD
 | [13 — Frontend foundation](../docs/specs/frontend-foundation.md) | done | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | spec-approved | 13, 24 |
 | [15 — Frontend history UI](15-frontend-history-ui.md) | spec-approved | 13, 24 |
-| [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15, 17, 21 |
+| [16 — Nix flake package](16-nix-flake-package.md) | spec-approved | 02, 14, 15, 17, 21 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | spec-approved | 13, 24 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |

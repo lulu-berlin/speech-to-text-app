@@ -1,6 +1,6 @@
 # 16 — Nix flake package
 
-Status: draft
+Status: spec-approved
 Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md), [17](17-branding-stenographer-animation.md), [21](21-frontend-backend-end-to-end.md)
 
 ## Goal
@@ -19,7 +19,7 @@ Deliver the app as a Nix flake derivation that runs backend, database, frontend 
 - **Linux only** (2026-10-09): the package targets Linux. macOS was "ideally" but needs a darwin output, a non-Vulkan whisper build and a `setsid` shim, all untestable here; it is recorded as a future draft item.
 - **Docker was decided and then aborted** (2026-10-09): item 19 explored a container image, then the user aborted it because the GPU requirement — "works with any kind of GPU, as if running directly on a Linux machine" — is not deliverable through a Linux container (Vulkan passthrough works on Linux hosts, NVIDIA needs the container toolkit, macOS has no passthrough, and whisper.cpp has no TPU backend). The flake package is the single delivery; nothing else ships on top of it.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 Starting point (delivered by item 02): `flake.nix` builds `packages.x86_64-linux.{backend,frontend,default}`; `default` (`stt-app`) provides `bin/speech-to-text-app` (a `makeWrapper` around `java` with `CLASSPATH` + `STT_STATIC_DIR=$out/share/stt-app/static`); the Nix build runs `gradle check`; nixpkgs is pinned in `flake.lock`.
 
@@ -46,7 +46,7 @@ Item 16 extends the `default` package with:
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written. Nix-level items are user-verified (ADR 0010):
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Nix-level items are user-verified (ADR 0010):
 
 - [ ] `nix build .` produces `result/bin/stt-app`
 - [ ] Starting `stt-app` with no `STT_DATA_DIR` set creates the default data directory and the database in it
@@ -68,3 +68,4 @@ Seed — to be refined and approved with the user before any test is written. Ni
 ## Approval log
 
 - 2026-10-09: consultation answers approved: one shared nixpkgs pin (ADR 0036); any Linux, no NixOS module; macOS out of scope (future draft item); Docker aborted (item 19 removed) because the GPU requirement cannot be delivered through a container. Test list not yet approved.
+- 2026-10-09: test list (8 items) approved by the user; status `spec-approved`.
