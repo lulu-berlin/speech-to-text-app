@@ -1,0 +1,10 @@
+The FLAC files in this directory are unmodified utterances from the LibriSpeech ASR corpus, subset test-clean
+(https://www.openslr.org/12): 1089-134686-0002, 1089-134691-0023 (reader: Peter Bobbe), 1188-133604-0025
+(reader: Duncan Murrell). Attribution: docs/attributions.md.
+
+LibriSpeech (c) 2014 by Vassil Panayotov
+
+LibriSpeech ASR corpus is licensed under a
+Creative Commons Attribution 4.0 International License.
+
+See <http://creativecommons.org/licenses/by/4.0/>.

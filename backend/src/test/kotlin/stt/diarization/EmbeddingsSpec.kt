@@ -15,7 +15,6 @@ import stt.audio.AudioDecoder
 import stt.config.realSpeakerModelPath
 import stt.db.Segment
 import stt.process.ProcessRunner
-import stt.requireTestEnv
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
@@ -108,7 +107,7 @@ class EmbeddingsSpec :
             `when`("each whole clip is embedded") {
                 then("the two clips of speaker 1089 are more similar to each other than either is to the clip of speaker 1188") {
                     // Spec (item 08 acceptance): same-speaker cosine > different-speaker cosine. Embeddings are
-                    // L2-normalized, so the cosine is the dot product. Clips: docs/attributions.md (CC BY 4.0).
+                    // L2-normalized, so the cosine is the dot product. Clips: docs/attributions.md (CC BY 4.0, ADR 0026).
                     val clips = librispeechClips()
                     val workDir = tempdir("librispeech").toPath()
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
@@ -151,5 +150,6 @@ private suspend fun decodePcm(
     return FloatArray(floats.remaining()) { floats.get(it) }
 }
 
-/** The item 08 LibriSpeech clips directory (`<utterance-id>.flac`), exported by `devenv.nix` from `nix/test-fixtures.nix`. */
-private fun librispeechClips(): Path = requireTestEnv("TEST_LIBRISPEECH_CLIPS")
+/** The committed LibriSpeech clips (`<utterance-id>.flac`, `src/test/resources/librispeech`, ADR 0026) on the test classpath. */
+private fun librispeechClips(): Path =
+    Path.of(checkNotNull(Embeddings::class.java.getResource("/librispeech")) { "librispeech/ missing from the test classpath" }.toURI())
