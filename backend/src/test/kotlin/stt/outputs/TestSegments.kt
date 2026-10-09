@@ -1,6 +1,9 @@
 package stt.outputs
 
 import stt.db.Segment
+import stt.db.Speaker
+
+internal val speakers1And2 = listOf(Speaker(speakerId = 0, speaker = "Speaker 1"), Speaker(speakerId = 1, speaker = "Speaker 2"))
 
 internal fun segment(
     speakerId: Int,
