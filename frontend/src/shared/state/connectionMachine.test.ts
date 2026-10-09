@@ -9,6 +9,7 @@ import {
   taskDeleted,
   taskPaused,
   taskProgress,
+  taskQueued,
   taskRunning,
 } from '../api/fixtures';
 import { connectionMachine } from './connectionMachine';
@@ -141,5 +142,29 @@ describe('the connection machine', () => {
     expect(warn.mock.calls[0]?.[0]).toContain('COMPLETED');
     actor.stop();
     warn.mockRestore();
+  });
+
+  it('adds a task-updated for a task the state does not hold yet', async () => {
+    // Mock addition: task.queued.json with id 99, which no snapshot task has, as a new
+    // upload would arrive through task-updated.
+    const added = { ...taskQueued, id: 99 };
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          ['snapshot', snapshot],
+          ['task-updated', added],
+        ]),
+      ),
+    );
+    const actor = createActor(connectionMachine).start();
+
+    const updated = await waitFor(
+      actor,
+      (state) => state.matches('live') && state.context.tasks.some((task) => task.id === 99),
+      { timeout: 2000 },
+    );
+
+    expect(updated.context.tasks).toEqual([...snapshot.tasks, added]);
+    actor.stop();
   });
 });
