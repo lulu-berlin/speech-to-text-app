@@ -1,7 +1,7 @@
 # 10 — Output formats
 
 Status: draft
-Depends on: [09](09-diarization.md)
+Depends on: [09](../docs/specs/diarization.md) (done)
 
 ## Goal
 
