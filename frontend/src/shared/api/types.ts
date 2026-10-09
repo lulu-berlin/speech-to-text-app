@@ -41,6 +41,21 @@ export interface TaskList {
   tasks: Task[];
 }
 
+// Item 12 contract: Queue (docs/api/queue.json), pending task ids in queue order.
+export interface Queue {
+  paused: boolean;
+  taskIds: number[];
+}
+
+// Item 12 contract: the first event of every /api/events connection (docs/api/snapshot.json).
+export interface Snapshot {
+  tasks: Task[];
+  queue: Queue;
+}
+
+// Events of GET /api/events, by their SSE event name.
+export type ServerEvent = { type: 'snapshot'; snapshot: Snapshot };
+
 // Error body: { error, message } plus taskId for duplicate-audio only.
 export interface ApiErrorBody {
   error: string;

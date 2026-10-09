@@ -1,5 +1,5 @@
 import { ApiError } from './types';
-import type { ApiErrorBody, Task, TaskList } from './types';
+import type { ApiErrorBody, ServerEvent, Snapshot, Task, TaskList } from './types';
 
 const json = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
@@ -29,4 +29,14 @@ export async function uploadTask(file: File): Promise<Task> {
   form.append('file', file);
   const response = await fetch('/api/tasks', { method: 'POST', body: form });
   return json<Task>(response);
+}
+
+// Opens GET /api/events and passes each named event to onEvent. Returns a function that
+// closes the stream.
+export function subscribeToEvents(onEvent: (event: ServerEvent) => void): () => void {
+  const source = new EventSource('/api/events');
+  source.addEventListener('snapshot', (message) => {
+    onEvent({ type: 'snapshot', snapshot: JSON.parse(message.data) as Snapshot });
+  });
+  return () => source.close();
 }

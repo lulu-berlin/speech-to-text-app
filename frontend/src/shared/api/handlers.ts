@@ -3,6 +3,7 @@
 // directory and nothing else.
 
 import { http, HttpResponse } from 'msw';
+import { eventsHandler } from './events';
 import {
   taskList as taskListFixture,
   taskQueued as taskQueuedFixture,
@@ -66,5 +67,7 @@ export const handlers = [
   }),
 
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
-  // The SSE stream lives in events.ts (getEventsHandler), constructed only on connect.
+
+  // Events: GET /api/events, the SSE stream (events.ts).
+  eventsHandler,
 ];
