@@ -1,9 +1,16 @@
 import { http } from 'msw';
 import { createActor, waitFor } from 'xstate';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { eventStreamResponse } from '../api/handlers';
-import { queue, snapshot, taskDeleted, taskPaused, taskProgress } from '../api/fixtures';
+import {
+  queue,
+  snapshot,
+  taskDeleted,
+  taskPaused,
+  taskProgress,
+  taskRunning,
+} from '../api/fixtures';
 import { connectionMachine } from './connectionMachine';
 
 describe('the connection machine', () => {
@@ -100,5 +107,39 @@ describe('the connection machine', () => {
     expect(reconnected.context.tasks).toEqual(snapshotWithoutTask4.tasks);
     expect(reconnected.context.queue).toEqual(snapshotWithoutTask4.queue);
     actor.stop();
+  });
+
+  it('applies a task update that breaks the transition table and logs it', async () => {
+    // snapshot.json holds task 3 as COMPLETED; task-transitions.json gives COMPLETED no
+    // transitions, so RUNNING is not allowed from it.
+    // Mock addition: task.running.json with id 3, because the example's own id (5) is
+    // already RUNNING in the snapshot and would not be a status change.
+    const illegalUpdate = { ...taskRunning, id: 3 };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          ['snapshot', snapshot],
+          ['task-updated', illegalUpdate],
+        ]),
+      ),
+    );
+    const actor = createActor(connectionMachine).start();
+
+    const applied = await waitFor(
+      actor,
+      (state) =>
+        state.matches('live') &&
+        state.context.tasks.some((task) => task.id === 3 && task.status === 'RUNNING'),
+      { timeout: 2000 },
+    );
+
+    // Applied, not rejected: the COMPLETED task 3 is replaced by the RUNNING update.
+    const expected = snapshot.tasks.map((task) => (task.id === 3 ? illegalUpdate : task));
+    expect(applied.context.tasks).toEqual(expected);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('COMPLETED');
+    actor.stop();
+    warn.mockRestore();
   });
 });
