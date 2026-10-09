@@ -17,6 +17,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import stt.Integration
 import stt.config.realSpeakerModelPath
 import stt.db.Segment
+import stt.pause.PauseGate
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.roundToInt

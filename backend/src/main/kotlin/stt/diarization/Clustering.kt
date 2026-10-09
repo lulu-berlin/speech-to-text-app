@@ -2,6 +2,7 @@ package stt.diarization
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import stt.pause.PauseGate
 
 /**
  * Cosine distance below which the last (highest) merge means one speaker in auto mode (ADR 0027): 0.5448, measured

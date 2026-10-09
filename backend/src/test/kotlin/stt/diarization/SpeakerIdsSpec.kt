@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
+import stt.pause.PauseGate
 import stt.withCapturedLogs
 import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.milliseconds

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import stt.db.Segment
+import stt.pause.PauseGate
 import java.nio.FloatBuffer
 
 /**
