@@ -28,6 +28,7 @@ import stt.db.StoredTask
 import stt.db.TaskPhase
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
+import stt.pause.PauseGate
 import stt.process.ProcessControl
 import stt.queue.TaskStatus
 import stt.transcribe.ChunkTranscription
@@ -45,7 +46,7 @@ import java.nio.file.Path
  * is none, so being idle costs nothing. Every status and phase change is persisted before it is published
  * on [events], which the SSE endpoint (item 12) consumes.
  */
-class ProcessingEngine(
+class ProcessingEngine internal constructor(
     private val scope: CoroutineScope,
     private val config: Config,
     private val tasks: TaskRepository,
@@ -71,6 +72,13 @@ class ProcessingEngine(
      * Conflated: a signal sent while the worker is busy is not lost, and an extra signal is harmless.
      */
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * The in-JVM pause gate (ADR 0004): the DIARIZING phase checks it, and [pauseTask]/[pauseQueue]
+     * close it, so a paused task without an external process still stops at the next checkpoint.
+     * One gate suffices: the worker runs one task at a time.
+     */
+    private val pauseGate = PauseGate()
 
     /** The task whose phases are running and the job running them, so [cancelTask] can kill its process. */
     private class Running(
@@ -103,6 +111,7 @@ class ProcessingEngine(
     suspend fun pauseQueue() {
         queueState.setPaused(true)
         processControl.pause()
+        pauseGate.pause()
     }
 
     /**
@@ -111,6 +120,7 @@ class ProcessingEngine(
     suspend fun resumeQueue() {
         queueState.setPaused(false)
         processControl.resume()
+        pauseGate.resume()
         wake()
     }
 
@@ -124,6 +134,7 @@ class ProcessingEngine(
             tasks.setStatus(id, TaskStatus.PAUSED)
             publish(id)
             processControl.pause()
+            pauseGate.pause()
             TaskCommandOutcome.Accepted
         }
 
@@ -140,6 +151,7 @@ class ProcessingEngine(
             tasks.setStatus(id, TaskStatus.RUNNING)
             publish(id)
             processControl.resume()
+            pauseGate.resume()
             TaskCommandOutcome.Accepted
         }
 
@@ -304,7 +316,7 @@ class ProcessingEngine(
         if (task.task.speakersMode == SpeakersMode.OFF || segments.findByTask(id).isEmpty()) return
         tasks.setPhase(id, TaskPhase.DIARIZING)
         publish(id)
-        diarizer.diarize(task)
+        diarizer.diarize(task, pauseGate)
     }
 
     /**
