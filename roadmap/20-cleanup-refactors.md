@@ -85,3 +85,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: item created from the repository review; scope set by the user: all recommended findings plus the cosmetic changes; generic `QueueOutcome<R>` rejected. Spec and test list not yet approved.
 - 2026-10-09: decisions: R7 = option A (Boolean `canTransitionTo`, item 04 spec amended); R5 = `prettier . ../.prettierrc` + `.prettierignore`. Test list not yet approved.
 - 2026-10-09: spec and test list approved by the user (3 items); status `spec-approved`.
+- 2026-10-09: baseline on `da7bd63` (reference for test-list item 2): `gradle check` green, 105 tests in 34 specs, 0 failed; `gradle integrationTest` green, 44 Integration tests run, 0 failed (149 reported, the 105 untagged ones skipped); `pnpm test` green, 1 test in 1 file, prettier clean; `pnpm build` green.
