@@ -162,6 +162,23 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("three segments whose last merge is below the speaker threshold") {
+            `when`("they are clustered in auto mode") {
+                then("they yield one speaker (ADR 0027), although the largest-gap rule alone would split them") {
+                    fun unit(degrees: Double) = floatArrayOf(cos(Math.toRadians(degrees)).toFloat(), sin(Math.toRadians(degrees)).toFloat())
+
+                    fun distance(degrees: Double) = 1 - cos(Math.toRadians(degrees))
+                    // Unit vectors at 0°, 10° and 30°: merge 1 is {0} + {1} at d(10°) ≈ 0.015; merge 2 is {0, 1} + {2}
+                    // at (d(30°) + d(20°)) / 2 ≈ 0.097, the last and highest merge. The single gap would give
+                    // k = 3 - (0 + 1) = 2; below the threshold the count is 1.
+                    val lastHeight = (distance(30.0) + distance(20.0)) / 2
+                    lastHeight.shouldBeLessThan(SPEAKER_DISTANCE_THRESHOLD)
+
+                    clusterSegments(arrayOf(unit(0.0), unit(10.0), unit(30.0)), k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 0))
+                }
+            }
+        }
     })
 
 /** The merged `(i, j)` index pairs, in merge order. */

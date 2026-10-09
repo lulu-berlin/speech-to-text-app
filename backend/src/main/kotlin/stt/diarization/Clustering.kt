@@ -22,7 +22,8 @@ internal fun clusterSegments(
     val merges = upgmaMerges(embeddings)
     val speakers =
         when {
-            n == 2 -> if (merges.last().height < SPEAKER_DISTANCE_THRESHOLD) 1 else 2
+            merges.last().height < SPEAKER_DISTANCE_THRESHOLD -> 1
+            n == 2 -> 2
             else -> largestGapCount(merges, maxSpeakers)
         }
     if (speakers == 1) return List(n) { 0 }
