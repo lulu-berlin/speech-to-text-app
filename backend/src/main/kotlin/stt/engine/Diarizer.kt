@@ -1,5 +1,6 @@
 package stt.engine
 
+import stt.db.DiarizationStage
 import stt.db.StoredTask
 import stt.pause.PauseGate
 
@@ -14,5 +15,7 @@ internal interface Diarizer {
     suspend fun diarize(
         task: StoredTask,
         gate: PauseGate,
+        onStage: (DiarizationStage) -> Unit,
+        onProgress: (Double) -> Unit,
     )
 }

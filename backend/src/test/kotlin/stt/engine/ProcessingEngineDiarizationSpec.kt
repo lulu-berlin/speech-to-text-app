@@ -2,8 +2,11 @@ package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.ReceiveChannel
+import stt.db.DiarizationStage
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
@@ -118,4 +121,75 @@ class ProcessingEngineDiarizationSpec :
                 }
             }
         }
+
+        given("a task being diarized and one whose speakers are off") {
+            `when`("the diarizer reports its stages") {
+                then(
+                    "every report is persisted and published, the diarized task ends with no stage and progress 1, and the skipped task keeps null progress",
+                ) {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "task.wav",
+                                queuePosition = 0,
+                                createdAt = 1,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        val off =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "off.wav",
+                                queuePosition = 1,
+                                createdAt = 2,
+                                speakersMode = SpeakersMode.OFF,
+                            )
+                        fixture.transcriber.segmentsByTask =
+                            mapOf(task to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
+
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe task
+                        fixture.completed.receive() shouldBe off
+
+                        val reports = drain(fixture.progress)
+                        reports.map { it.id }.distinct() shouldBe listOf(task)
+                        reports.map { it.diarizationStage to it.diarizationProgress } shouldBe
+                            listOf(
+                                null to 0.0,
+                                DiarizationStage.EMBEDDING to 0.0,
+                                DiarizationStage.EMBEDDING to 0.5,
+                                DiarizationStage.EMBEDDING to 1.0,
+                                DiarizationStage.CLUSTERING to 0.0,
+                                DiarizationStage.CLUSTERING to 1.0,
+                                null to 1.0,
+                            )
+
+                        val finished =
+                            fixture.tasks
+                                .find(task)
+                                ?.task
+                                .shouldNotBeNull()
+                        finished.diarizationStage shouldBe null
+                        finished.diarizationProgress shouldBe 1.0
+                        fixture.tasks
+                            .find(off)
+                            ?.task
+                            ?.diarizationProgress shouldBe null
+                    }
+                }
+            }
+        }
     })
+
+/** Every element a channel currently holds, without waiting for more. */
+private fun <T> drain(channel: ReceiveChannel<T>): List<T> =
+    buildList {
+        var next = channel.tryReceive()
+        while (next.isSuccess) {
+            add(next.getOrThrow())
+            next = channel.tryReceive()
+        }
+    }

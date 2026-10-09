@@ -23,6 +23,8 @@ internal object TasksTable : Table("tasks") {
     val maxSpeakers = integer("max_speakers")
     val model = text("model")
     val progress = double("progress")
+    val diarizationStage = enumerationByName("diarization_stage", 16, DiarizationStage::class).nullable()
+    val diarizationProgress = double("diarization_progress").nullable()
     val error = text("error").nullable()
     val createdAt = long("created_at")
     val startedAt = long("started_at").nullable()

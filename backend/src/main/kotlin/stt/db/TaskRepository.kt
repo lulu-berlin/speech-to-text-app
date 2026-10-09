@@ -184,6 +184,18 @@ class TaskRepository(
             it[TasksTable.startedAt] = startedAt
         }
 
+    /** Stores the diarization stage and its progress within that stage (item 12's contract; both null clear them). */
+    suspend fun setDiarizationProgress(
+        id: Long,
+        stage: DiarizationStage?,
+        progress: Double?,
+    ) {
+        updateTask(id) {
+            it[TasksTable.diarizationStage] = stage
+            it[TasksTable.diarizationProgress] = progress
+        }
+    }
+
     /**
      * Sets the task's phase; null clears it. Per item 12's contract the phase is kept on FAILED and
      * CANCELED (the phase the task stopped in) and cleared when a task becomes QUEUED or COMPLETED.
@@ -277,6 +289,8 @@ internal fun JdbcTransaction.insertTaskRow(task: Task): Long =
         it[maxSpeakers] = task.maxSpeakers
         it[model] = task.model
         it[progress] = task.progress
+        it[diarizationStage] = task.diarizationStage
+        it[diarizationProgress] = task.diarizationProgress
         it[error] = task.error
         it[createdAt] = task.createdAt
         it[startedAt] = task.startedAt
@@ -299,6 +313,8 @@ private fun ResultRow.toTask() =
         maxSpeakers = this[TasksTable.maxSpeakers],
         model = this[TasksTable.model],
         progress = this[TasksTable.progress],
+        diarizationStage = this[TasksTable.diarizationStage],
+        diarizationProgress = this[TasksTable.diarizationProgress],
         error = this[TasksTable.error],
         createdAt = this[TasksTable.createdAt],
         startedAt = this[TasksTable.startedAt],
