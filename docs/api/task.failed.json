@@ -2,7 +2,7 @@
   "id": 4,
   "filename": "call.ogg",
   "status": "FAILED",
-  "phase": null,
+  "phase": "TRANSCRIBING",
   "language": "en",
   "speakersMode": "off",
   "speakersCount": null,
@@ -12,6 +12,7 @@
   "transcriptionProgress": 0.5,
   "diarizationProgress": null,
   "error": "whisper-cli exited with code 1 while transcribing chunk 1: failed to allocate memory",
+  "transcribedUntilMs": 298650,
   "createdAt": 1791536410000,
   "startedAt": 1791536420000,
   "finishedAt": 1791537000000

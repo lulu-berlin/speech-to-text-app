@@ -14,6 +14,7 @@
       "transcriptionProgress": 0.42,
       "diarizationProgress": 0.0,
       "error": null,
+      "transcribedUntilMs": 1196480,
       "createdAt": 1791537660000,
       "startedAt": 1791537661000,
       "finishedAt": null
@@ -32,6 +33,7 @@
       "transcriptionProgress": 0.0,
       "diarizationProgress": 0.0,
       "error": null,
+      "transcribedUntilMs": null,
       "createdAt": 1791538200000,
       "startedAt": null,
       "finishedAt": null
@@ -50,6 +52,7 @@
       "transcriptionProgress": 1.0,
       "diarizationProgress": 1.0,
       "error": null,
+      "transcribedUntilMs": 1184310,
       "createdAt": 1791536400000,
       "startedAt": 1791536472000,
       "finishedAt": 1791537645000
@@ -58,7 +61,7 @@
       "id": 4,
       "filename": "call.ogg",
       "status": "FAILED",
-      "phase": null,
+      "phase": "TRANSCRIBING",
       "language": "en",
       "speakersMode": "off",
       "speakersCount": null,
@@ -68,6 +71,7 @@
       "transcriptionProgress": 0.5,
       "diarizationProgress": null,
       "error": "whisper-cli exited with code 1 while transcribing chunk 1: failed to allocate memory",
+      "transcribedUntilMs": 298650,
       "createdAt": 1791536410000,
       "startedAt": 1791536420000,
       "finishedAt": 1791537000000

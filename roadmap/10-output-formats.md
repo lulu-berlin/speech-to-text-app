@@ -11,10 +11,11 @@ Render a task's stored segments (and speaker labels) as txt, srt, vtt, and json,
 
 - [ADR 0002 — No Python, oracle only](../docs/decisions/0002-no-python-oracle-only.md): output formats are part of the oracle behavior to port.
 - [ADR 0003 — Kotlin diarization with CAM++ ONNX](../docs/decisions/0003-kotlin-diarization-campplus-onnx.md): speaker labels and turn merging come from item 09.
+- [ADR 0030 — Segment text is trimmed in every output](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md) (2026-10-09): json `segments[].text` is trimmed too, a deliberate deviation from the oracle; everything else stays a byte-for-byte port.
 
 ## Proposal (pending approval)
 
-Pure renderer functions `(segments, speakers?) -> String` (UTF-8), called on demand from the `segments` table (item 03 proposal: render on demand, nothing stored). Segment times are integer milliseconds in the DB; segment text is stored exactly as whisper-cli emitted it (leading space included), because the json format keeps it untrimmed.
+Pure renderer functions `(segments, speakers?) -> String` (UTF-8), called on demand from the `segments` table (item 03 proposal: render on demand, nothing stored). Segment times are integer milliseconds in the DB; segment text is stored exactly as whisper-cli emitted it (leading space included), because item 07's prompt is built from it; every renderer trims it (ADR 0030).
 
 Diarized formats (port of oracle `write_diarized_outputs`, using `speaker_turns` from item 09):
 
@@ -34,7 +35,7 @@ Diarized formats (port of oracle `write_diarized_outputs`, using `speaker_turns`
   - top level keys in order `text`, `speakers`, `segments`;
   - `text` = every segment's text trimmed, joined with single spaces, trimmed;
   - `speakers` = number of distinct speaker labels;
-  - `segments[]` = per segment, keys in order `start`, `end`, `text`, `speaker` (the oracle also copies `id`/`seek` before them when the legacy whisper JSON shape provides them; the app does not store them, so they are omitted); `start`/`end` in seconds (`ms / 1000.0`) printed like Python `repr(float)` (`0.0`, `1.5`, `12.34`); `text` untrimmed; `speaker` = 0-based index (not +1);
+  - `segments[]` = per segment, keys in order `start`, `end`, `text`, `speaker` (the oracle also copies `id`/`seek` before them when the legacy whisper JSON shape provides them; the app does not store them, so they are omitted); `start`/`end` in seconds (`ms / 1000.0`) printed like Python `repr(float)` (`0.0`, `1.5`, `12.34`); `text` trimmed (ADR 0030; the oracle keeps it untrimmed); `speaker` = 0-based index (not +1);
   - formatting: two-space indentation, `": "` between key and value, `,` at line ends, empty list printed as `[]`, non-ASCII characters written as-is, string escapes as Python's encoder emits them (`\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t`, other characters below U+0020 as `\u00XX`).
 - **No speech** (task with zero segments; oracle `transcribe_one`): json = `{"text": "", "segments": []}` followed by `\n` (compact, no `speakers` key); txt, srt, vtt = empty (0 bytes, vtt without header).
 - **Speakers off** — variants without speaker labels (the oracle delegates these to whisper-cli's native `-otxt/-osrt/-ovtt/-oj` writers, so there is no oracle code to port). Draft: txt = one trimmed segment text per line; srt/vtt = one cue per segment with the trimmed text and no `Speaker N:` prefix; json = same shape as above without `speakers` and without per-segment `speaker`. Final shapes depend on the open question below.
@@ -57,7 +58,7 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] srt uses a comma and vtt a dot before milliseconds
 - [ ] Timestamps roll over correctly at minutes and hours (3 600 000 ms → `01:00:00,000`) and hours above 99 are not wrapped
 - [ ] Timestamps from milliseconds equal the oracle's `round(t * 1000)` result (e.g. 1 234 ms → `00:00:01,234`)
-- [ ] json has `text`, `speakers`, `segments` in that order, 2-space indentation, no trailing newline, seconds as Python-style floats, untrimmed segment text, 0-based speaker
+- [ ] json has `text`, `speakers`, `segments` in that order, 2-space indentation, no trailing newline, seconds as Python-style floats, trimmed segment text (ADR 0030), 0-based speaker
 - [ ] json keeps non-ASCII text unescaped and escapes quotes, backslashes, and control characters like Python
 - [ ] `speakers` counts distinct labels, not the highest label
 - [ ] A task with no segments renders `{"text": "", "segments": []}\n` as json and empty txt/srt/vtt
@@ -72,4 +73,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Approval log
 
-_Empty — add dated lines (YYYY-MM-DD: what was approved) on approval._
+- 2026-10-09: decision from the item 12 contract consultation ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)): json `segments[].text` is trimmed, like every other output; storage stays untrimmed for item 07's prompt. The rest of the item is still draft.

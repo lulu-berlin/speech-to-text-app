@@ -12,6 +12,7 @@
   "transcriptionProgress": 0.42,
   "diarizationProgress": 0.0,
   "error": null,
+  "transcribedUntilMs": 1196480,
   "createdAt": 1791537660000,
   "startedAt": 1791537661000,
   "finishedAt": null
