@@ -17,7 +17,7 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 
 | Shape | Files | Used by |
 | ----- | ----- | ------- |
-| Task | `task.queued.json`, `task.running.json`, `task.diarizing.json`, `task.completed.json`, `task.failed.json` | `GET /api/tasks/{id}`; `201` of `POST /api/tasks`; `200` of `POST /api/tasks/{id}/pause\|resume\|cancel\|retry`; event `task-updated` |
+| Task | `task.queued.json`, `task.running.json`, `task.diarizing.json`, `task.paused.json`, `task.completed.json`, `task.failed.json`, `task.canceled.json` | `GET /api/tasks/{id}`; `201` of `POST /api/tasks`; `200` of `POST /api/tasks/{id}/pause\|resume\|cancel\|retry`; event `task-updated` |
 | Task list | `task-list.json` | `GET /api/tasks` |
 | Queue | `queue.json` | `GET /api/queue`; `200` of `POST /api/queue/pause\|resume` and `PUT /api/queue/order`; event `queue-updated` |
 | Snapshot | `snapshot.json` | event `snapshot` (first event of every `/api/events` connection) |
