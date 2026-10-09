@@ -29,6 +29,7 @@ Run the queue: take queued tasks one at a time in queue order and drive each thr
 - **Failure.** Any exception other than cancellation (non-zero whisper-cli/ffmpeg exit, unparsable JSON, model load error) → status FAILED with a readable message in `error`, work directory deleted; the worker moves on to the next task.
 - **Restart recovery.** On startup, tasks found RUNNING become QUEUED at their existing `queue_position` and resume from the last `DONE` chunk (segments of an unfinished chunk were never committed, so that chunk is simply rerun). Work directories of pending tasks (QUEUED, RUNNING, PAUSED) are kept, because a task not yet chunked holds its only copy of the original there (ADR 0024); those of tasks that are no longer pending (terminal or deleted) are removed.
 - **Events.** Every state change is emitted on a `SharedFlow<Event>` (`TaskUpdated`, `TaskProgress`, `QueueUpdated`) consumed by the SSE endpoint (item 12). DB writes happen before the corresponding event is emitted.
+- **Pause gate placement** (added 2026-10-09 from the repository review). `PauseGate` (item 08) lives in `stt.diarization` but has no diarization dependency: it is a generic cooperative checkpoint (`pause`/`resume`/suspending `checkpoint`). The engine opens and closes it for the in-JVM phases (queue pause, task pause), which makes `stt.engine → stt.diarization.PauseGate` a cross-feature import ([backend conventions § Package structure](../docs/conventions/backend.md#package-structure): only through explicit interfaces). Visibility is not the issue (`internal` is module-wide). This item decides where it lives and moves it if needed (callers: `Embeddings.embed`, item 09's clustering).
 - **Testability.** The runner, transcriber, chunker, and diarizer are injected interfaces so engine tests run under `runTest` with fakes and virtual time.
 
 ## Open questions for the user
@@ -39,6 +40,7 @@ Run the queue: take queued tasks one at a time in queue order and drive each thr
 - What happens on startup to tasks that were PAUSED when the app stopped (their stopped process is gone): stay PAUSED and rerun the interrupted chunk on resume (proposed)?
 - Progress weighting: should diarization get its own share of the progress bar (e.g. a fixed fraction), or does progress reach 100 % at the end of transcription?
 - Clustering cost on long recordings (item 09 ports the oracle's `O(n²)`-memory, `O(n³)`-time UPGMA and records its measured time and memory at 1000 and 3000 segments): acceptable for the engine, or revisit it if performance becomes an issue (item 09 consultation, 2026-10-09)?
+- Where does `PauseGate` live? Options: (a) a small shared infrastructure package (e.g. `stt.pause`, like `db/` an infrastructure feature, ADR 0013), used by the engine and diarization; (b) the engine's package, with diarization taking the gate as a parameter (diarization then imports from the engine); (c) stays in `stt.diarization` and the engine imports it, an accepted exception recorded here.
 
 ## Test list (written with the user; Canon TDD step 1)
 

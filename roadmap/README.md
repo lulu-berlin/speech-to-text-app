@@ -43,6 +43,7 @@ graph TD
   15 --> 16
   13 --> 17[17 branding: stenographer animation]
   16 --> 19[19 Docker image and compose]
+  20[20 cleanup refactors]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -69,3 +70,4 @@ graph TD
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
+| [20 — Cleanup refactors](20-cleanup-refactors.md) | draft | — |
