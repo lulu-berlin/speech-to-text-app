@@ -10,6 +10,7 @@
   "durationMs": 1800000,
   "sizeBytes": 3145772,
   "transcriptionProgress": 0.35,
+  "diarizationStage": null,
   "diarizationProgress": 0.0,
   "error": null,
   "transcribedUntilMs": 612300,

@@ -74,6 +74,7 @@ export const connectionMachine = setup({
                   ? {
                       ...task,
                       transcriptionProgress: event.progress.transcriptionProgress,
+                      diarizationStage: event.progress.diarizationStage,
                       diarizationProgress: event.progress.diarizationProgress,
                     }
                   : task,

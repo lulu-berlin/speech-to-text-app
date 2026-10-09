@@ -14,6 +14,9 @@ export type TaskStatus = (typeof taskStatuses)[number];
 
 export type TaskPhase = 'CHUNKING' | 'TRANSCRIBING' | 'DIARIZING' | null;
 
+// The running diarization stage; null outside the DIARIZING phase (item 12 contract).
+export type DiarizationStage = 'EMBEDDING' | 'CLUSTERING' | null;
+
 export type SpeakerMode = 'auto' | 'off' | 'fixed';
 
 // Item 12 contract: Task (docs/api/task.*.json).
@@ -29,6 +32,7 @@ export interface Task {
   durationMs: number | null;
   sizeBytes: number;
   transcriptionProgress: number;
+  diarizationStage: DiarizationStage;
   diarizationProgress: number | null;
   error: string | null;
   transcribedUntilMs: number | null;
@@ -57,6 +61,7 @@ export interface Snapshot {
 export interface TaskProgress {
   id: number;
   transcriptionProgress: number;
+  diarizationStage: DiarizationStage;
   diarizationProgress: number | null;
 }
 
