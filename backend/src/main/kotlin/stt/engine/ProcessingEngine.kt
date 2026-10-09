@@ -102,10 +102,11 @@ class ProcessingEngine(
     private suspend fun chunkAudio(id: Long) {
         tasks.setPhase(id, TaskPhase.CHUNKING)
         publish(id)
-        val chunked = chunker.chunk(workDirectories.source(id), workDirectories.workDir(id))
+        val source = workDirectories.source(id)
+        val chunked = chunker.chunk(source, workDirectories.workDir(id))
         tasks.setDurationMs(id, chunked.durationMs)
         chunks.storePlan(id, chunked.chunks)
-        withContext(Dispatchers.IO) { Files.deleteIfExists(workDirectories.source(id)) }
+        withContext(Dispatchers.IO) { Files.deleteIfExists(source) }
     }
 
     /**
