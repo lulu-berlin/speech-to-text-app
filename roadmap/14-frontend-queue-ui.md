@@ -1,6 +1,6 @@
 # 14 — Frontend queue UI
 
-Status: draft
+Status: spec-approved
 Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
 
 ## Goal
@@ -15,7 +15,7 @@ Let the user upload many audio files and manage the work queue from the browser:
 - Item 12's contract: speaker inputs 1–20; uploads limited to the extension allow-list; `language` from [`docs/api/languages.json`](../docs/api/languages.json), default `auto`; `DELETE /api/tasks/{id}` works on any task (a pending one is cancelled first); a duplicate upload answers `409 duplicate-audio` with the existing `taskId`. Item 11: two progress bars, `transcriptionProgress` and `diarizationProgress`; the diarization bar runs once per `diarizationStage` (`EMBEDDING`, then `CLUSTERING`) and is hidden when `diarizationProgress` is null.
 - The queue shows pending tasks (QUEUED, RUNNING, PAUSED) in queue order; finished tasks are in History (item 15).
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 - **Upload** (decided 2026-10-09):
   - A drop area plus a file picker. One **options panel for the whole batch** above it: language (a searchable select over `docs/api/languages.json`, default `auto`), speakers (`auto` / `off` / fixed count 1–20), and max speakers (1–20, default 8) behind an "advanced" toggle. Every file dropped or picked uses the current settings.
   - Files upload **one at a time, in drop order**, each with its own **upload progress** (bytes sent). Item 13's client `uploadTask` is extended to send the options and to report progress, which needs `XMLHttpRequest` (fetch has no upload progress); it stays the only place that talks to `POST /api/tasks`.
@@ -43,7 +43,7 @@ Let the user upload many audio files and manage the work queue from the browser:
 None.
 
 ## Test list (written with the user; Canon TDD step 1)
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 - [ ] Dropping several files uploads them one at a time in drop order, each with the batch's current options
 - [ ] The language select offers the codes from `docs/api/languages.json` and defaults to `auto`; speakers and max speakers accept only 1–20
 - [ ] Each uploading file shows its upload progress
@@ -70,3 +70,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Approval log
 - 2026-10-09: consultation answers approved: `@dnd-kit` drag plus row-menu move actions; one batch options panel; language select over `docs/api/languages.json` (extracted from whisper.cpp 1.9.2's C API), default `auto` (item 12 contract changed accordingly); per-file upload progress, one file at a time (XMLHttpRequest in the client); cancel confirmation only for a running or started paused task; delete in the queue and in History, always confirmed; duplicate shown inline with a link to the existing task; a notice with a link when a task finishes. Test list not yet approved.
+- 2026-10-09: test list (17 items) approved by the user; status `spec-approved`.
