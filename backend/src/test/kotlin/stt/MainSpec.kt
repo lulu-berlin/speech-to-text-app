@@ -7,6 +7,7 @@ import io.kotest.matchers.string.shouldContain
 import stt.config.Config
 import stt.config.TEST_DATA_DIR
 import stt.config.TEST_SPEAKER_MODEL
+import stt.config.TEST_WHISPER_MODEL
 import java.nio.file.Path
 
 class MainSpec :
@@ -16,11 +17,18 @@ class MainSpec :
             `when`("checking the boot warning") {
                 then("a warning naming STT_STATIC_DIR is logged, none when it is set") {
                     withCapturedLogs("stt.Main") { events ->
-                        warnIfStaticDirUnset(Config(dataDir = Path.of(TEST_DATA_DIR), speakerModel = Path.of(TEST_SPEAKER_MODEL)))
                         warnIfStaticDirUnset(
                             Config(
                                 dataDir = Path.of(TEST_DATA_DIR),
                                 speakerModel = Path.of(TEST_SPEAKER_MODEL),
+                                whisperModel = Path.of(TEST_WHISPER_MODEL),
+                            ),
+                        )
+                        warnIfStaticDirUnset(
+                            Config(
+                                dataDir = Path.of(TEST_DATA_DIR),
+                                speakerModel = Path.of(TEST_SPEAKER_MODEL),
+                                whisperModel = Path.of(TEST_WHISPER_MODEL),
                                 staticDir = Path.of("/some/dir"),
                             ),
                         )

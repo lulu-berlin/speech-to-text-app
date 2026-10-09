@@ -80,6 +80,24 @@ class ConfigSpec :
             }
         }
 
+        given("an environment with STT_WHISPER_MODEL unset, empty, or set") {
+            `when`("loading configuration") {
+                then("unset or empty fails with an error naming STT_WHISPER_MODEL; a set path is part of the configuration") {
+                    for (env in listOf(TEST_REQUIRED_ENV - "STT_WHISPER_MODEL", TEST_REQUIRED_ENV + ("STT_WHISPER_MODEL" to ""))) {
+                        val error =
+                            shouldThrow<IllegalArgumentException> {
+                                Config.fromEnv(env)
+                            }
+                        error.message.shouldContain("STT_WHISPER_MODEL")
+                    }
+                    Config
+                        .fromEnv(TEST_REQUIRED_ENV + ("STT_WHISPER_MODEL" to "/models/ggml-large-v3-turbo-q5_0.bin"))
+                        .whisperModel
+                        .shouldBe(Path.of("/models/ggml-large-v3-turbo-q5_0.bin"))
+                }
+            }
+        }
+
         given("STT_DEVICE values") {
             `when`("configuration is loaded") {
                 then("auto, cpu, gpu and 3 load as Auto, Cpu, Gpu(0), Gpu(3); unset defaults to Auto; invalid values are rejected") {
