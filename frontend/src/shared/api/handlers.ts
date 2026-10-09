@@ -6,11 +6,7 @@ import { http, HttpResponse } from 'msw';
 import {
   taskList as taskListFixture,
   taskQueued as taskQueuedFixture,
-  taskRunning as taskRunningFixture,
-  taskCompleted as taskCompletedFixture,
-  taskFailed as taskFailedFixture,
-  taskPaused as taskPausedFixture,
-  taskCanceled as taskCanceledFixture,
+  taskExamples,
   queue as queueFixture,
   turns as turnsFixture,
   turnsSpeakersOff as turnsSpeakersOffFixture,
@@ -18,40 +14,20 @@ import {
   taskTransitions,
 } from './fixtures';
 
-import type { Task } from '../../shared/api/types';
-
-const TRANSITION_RESPONSE: Record<string, Task> = {
-  RUNNING: taskRunningFixture as Task,
-  PAUSED: taskPausedFixture as Task,
-  QUEUED: taskQueuedFixture as Task,
-  COMPLETED: taskCompletedFixture as Task,
-  CANCELED: taskCanceledFixture as Task,
-  FAILED: taskFailedFixture as Task,
-};
+import type { Task, TaskStatus } from '../../shared/api/types';
 
 function applyId(task: Task, id: number): Task {
   return { ...task, id };
 }
 
-// The 201/200 task responses of the command endpoints are the example whose status
-// matches the transition table's requested `to` status, with the URL's id.
-function statusFixtureByTo(to: string): Task {
-  const task = TRANSITION_RESPONSE[to];
+// The 200 task responses of the command endpoints are the example whose status matches
+// the transition table's requested `to` status, with the URL's id.
+function statusFixtureByTo(to: TaskStatus): Task {
+  const task = taskExamples.find((example) => example.status === to);
   if (task === undefined) {
-    throw new Error(`no fixture for requested transition status ${to}`);
+    throw new Error(`no docs/api/ Task example with status ${to}`);
   }
   return task;
-}
-
-function taskById(id: number): Task | undefined {
-  return [
-    taskQueuedFixture,
-    taskRunningFixture,
-    taskCompletedFixture,
-    taskFailedFixture,
-    taskPausedFixture,
-    taskCanceledFixture,
-  ].find((task) => (task as Task).id === id) as Task | undefined;
 }
 
 export const handlers = [
@@ -64,12 +40,11 @@ export const handlers = [
 
   // Single task: GET /api/tasks/{id}.
   http.get('/api/tasks/:id', ({ params }) => {
-    const id = Number(params.id);
-    const task = taskById(id);
+    const task = taskExamples.find((example) => example.id === Number(params.id));
     if (task === undefined) {
       return HttpResponse.json(errorFixture, { status: 404 });
     }
-    return HttpResponse.json(applyId(task, id));
+    return HttpResponse.json(task);
   }),
 
   // Task commands: POST /api/tasks/{id}/pause|resume|cancel|retry -> 200 Task.
@@ -104,8 +79,7 @@ export const handlers = [
 
   // Turns: GET /api/tasks/{id}/turns (turns.json; speakers off -> turns.speakers-off.json).
   http.get('/api/tasks/:id/turns', ({ params }) => {
-    const id = Number(params.id);
-    const task = taskById(id);
+    const task = taskExamples.find((example) => example.id === Number(params.id));
     if (task === undefined) {
       return HttpResponse.json(errorFixture, { status: 404 });
     }
