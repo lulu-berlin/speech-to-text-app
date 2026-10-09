@@ -46,7 +46,8 @@ class ProcessingEngineCleanupSpec :
                         val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
                         val workDir = fixture.workDirectories.workDir(task)
                         fixture.chunker.chunkCount = 2
-                        fixture.transcriber.segments = listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello "))
+                        fixture.transcriber.segmentsByTask =
+                            mapOf(task to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
                         // The first chunk's call runs through, so the second is the one the cancel lands in.
                         fixture.transcriber.hold = CompletableDeferred()
                         fixture.transcriber.holdFrom = 2
