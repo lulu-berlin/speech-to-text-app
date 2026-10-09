@@ -14,7 +14,7 @@ import {
   taskTransitions,
 } from './fixtures';
 
-import type { Task, TaskStatus } from '../../shared/api/types';
+import type { Task, TaskStatus } from './types';
 
 function applyId(task: Task, id: number): Task {
   return { ...task, id };
