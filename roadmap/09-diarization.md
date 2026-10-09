@@ -75,7 +75,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Auto mode: three well-separated groups yield three speakers
 - [x] Auto mode looks for the largest gap only among the last `max_speakers` merges; a larger gap lower in the tree is ignored
 - [x] Auto mode never returns more than `max_speakers` speakers
-- [ ] Auto mode: when even the last merge is below the threshold, one speaker (ADR 0027)
+- [x] Auto mode: when even the last merge is below the threshold, one speaker (ADR 0027)
 - [ ] Fixed `k` returns exactly `k` speakers, clamped to `[1, n]`; fixed `k = 1` returns all 0; `max_speakers` is ignored
 - [ ] Labels are numbered by first appearance in segment order
 - [ ] Segments shorter than 500 ms are not clustered and neither create nor take a speaker slot; a segment of exactly 500 ms is clustered
@@ -112,3 +112,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: refactor approved and done after cycle 6: `largestGapCount` names the window start `start`, separate from the result index `idx`.
 - 2026-10-09 (cycle 7, clamp to max_speakers): red — `gradle test --tests 'stt.diarization.ClusteringSpec'`: "expected:<[0, 0, 0]> but was:<[0, 0, 1]>". Green: the auto count is clamped to `[1, maxSpeakers]`. Fixture: 3 and 4 orthogonal unit vectors (every height 1, every gap 0, so the first gap of the window wins and the unclamped count is `maxSpeakers + 1`): `maxSpeakers = 1` → `[0, 0, 0]`, `maxSpeakers = 2` → `[0, 0, 0, 1]` (labels derived from the item 4 tie rule). `gradle check` (112 unit tests) and `gradle integrationTest` (44 run) green.
 - 2026-10-09: refactor approved and done after cycle 7: the `largestGapCount` KDoc states when the clamp applies (the first gap of a full window being the largest would leave `maxSpeakers + 1` clusters).
+- 2026-10-09 (cycle 8, one speaker below the threshold for n >= 3): red — `gradle test --tests 'stt.diarization.ClusteringSpec'`: "expected:<[0, 0, 0]> but was:<[0, 0, 1]>". Green: in auto mode a last merge height below `SPEAKER_DISTANCE_THRESHOLD` yields one speaker for every `n >= 2` (ADR 0027); otherwise `n == 2` gives two and `n >= 3` the largest-gap count. Fixture: unit vectors at 0°, 10°, 30°; merges {0} + {1} at d(10°) ≈ 0.015 and {0, 1} + {2} at (d(30°) + d(20°)) / 2 ≈ 0.097, guarded below the threshold in the test, so it stays valid for any tuned threshold above that height; the gap rule alone gives k = 2. `gradle check` (113 unit tests) and `gradle integrationTest` (44 run) green.
