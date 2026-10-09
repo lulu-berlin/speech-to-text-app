@@ -45,21 +45,18 @@ class ClusteringSpec :
         given("four unit vectors at 0°, 20°, 50° and 120°") {
             `when`("they are merged by UPGMA") {
                 then("each merge height is the mean distance over all member pairs of the two merged clusters") {
-                    fun unit(degrees: Double) = floatArrayOf(cos(Math.toRadians(degrees)).toFloat(), sin(Math.toRadians(degrees)).toFloat())
-
-                    fun distance(degrees: Double) = 1 - cos(Math.toRadians(degrees))
                     // Pairwise distances: 0-1 = d(20°) ≈ 0.060, 1-2 = d(30°) ≈ 0.134, 0-2 = d(50°) ≈ 0.357,
                     // 2-3 = d(70°) ≈ 0.658, 1-3 = d(100°) ≈ 1.174, 0-3 = d(120°) = 1.5.
                     // Merge 1: {0} + {1} at d(20°), the smallest distance.
                     // Merge 2: {0, 1} + {2} at (d(50°) + d(30°)) / 2 ≈ 0.246, below {0, 1}-{3} ≈ 1.337 and {2}-{3} ≈ 0.658.
                     // Merge 3: {0, 1, 2} + {3} at (d(120°) + d(100°) + d(70°)) / 3 ≈ 1.111 (unweighted: every segment
                     // counts once; the weighted WPGMA would give ((d(120°) + d(100°)) / 2 + d(70°)) / 2 ≈ 0.997).
-                    val merges = upgmaMerges(arrayOf(unit(0.0), unit(20.0), unit(50.0), unit(120.0)))
+                    val merges = upgmaMerges(arrayOf(unitAt(0.0), unitAt(20.0), unitAt(50.0), unitAt(120.0)))
 
                     merges.pairs().shouldBe(listOf(0 to 1, 0 to 2, 0 to 3))
-                    merges[0].height.shouldBe(distance(20.0).plusOrMinus(1e-6))
-                    merges[1].height.shouldBe(((distance(50.0) + distance(30.0)) / 2).plusOrMinus(1e-6))
-                    merges[2].height.shouldBe(((distance(120.0) + distance(100.0) + distance(70.0)) / 3).plusOrMinus(1e-6))
+                    merges[0].height.shouldBe(distanceAt(20.0).plusOrMinus(1e-6))
+                    merges[1].height.shouldBe(((distanceAt(50.0) + distanceAt(30.0)) / 2).plusOrMinus(1e-6))
+                    merges[2].height.shouldBe(((distanceAt(120.0) + distanceAt(100.0) + distanceAt(70.0)) / 3).plusOrMinus(1e-6))
                 }
             }
         }
@@ -166,16 +163,13 @@ class ClusteringSpec :
         given("three segments whose last merge is below the speaker threshold") {
             `when`("they are clustered in auto mode") {
                 then("they yield one speaker (ADR 0027), although the largest-gap rule alone would split them") {
-                    fun unit(degrees: Double) = floatArrayOf(cos(Math.toRadians(degrees)).toFloat(), sin(Math.toRadians(degrees)).toFloat())
-
-                    fun distance(degrees: Double) = 1 - cos(Math.toRadians(degrees))
                     // Unit vectors at 0°, 10° and 30°: merge 1 is {0} + {1} at d(10°) ≈ 0.015; merge 2 is {0, 1} + {2}
                     // at (d(30°) + d(20°)) / 2 ≈ 0.097, the last and highest merge. The single gap would give
                     // k = 3 - (0 + 1) = 2; below the threshold the count is 1.
-                    val lastHeight = (distance(30.0) + distance(20.0)) / 2
+                    val lastHeight = (distanceAt(30.0) + distanceAt(20.0)) / 2
                     lastHeight.shouldBeLessThan(SPEAKER_DISTANCE_THRESHOLD)
 
-                    clusterSegments(arrayOf(unit(0.0), unit(10.0), unit(30.0)), k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 0))
+                    clusterSegments(arrayOf(unitAt(0.0), unitAt(10.0), unitAt(30.0)), k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 0))
                 }
             }
         }
@@ -183,3 +177,9 @@ class ClusteringSpec :
 
 /** The merged `(i, j)` index pairs, in merge order. */
 private fun List<Merge>.pairs() = map { it.i to it.j }
+
+/** The unit vector at [degrees] in the plane. */
+private fun unitAt(degrees: Double) = floatArrayOf(cos(Math.toRadians(degrees)).toFloat(), sin(Math.toRadians(degrees)).toFloat())
+
+/** The cosine distance `1 - cos` of two unit vectors [degrees] apart. */
+private fun distanceAt(degrees: Double) = 1 - cos(Math.toRadians(degrees))
