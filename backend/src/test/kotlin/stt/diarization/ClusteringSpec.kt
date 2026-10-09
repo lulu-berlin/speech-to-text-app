@@ -1,7 +1,10 @@
 package stt.diarization
 
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.shouldBe
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 class ClusteringSpec :
@@ -34,6 +37,28 @@ class ClusteringSpec :
 
                     clusterSegments(pair(below), k = null, maxSpeakers = 8).shouldBe(listOf(0, 0))
                     clusterSegments(pair(atOrAbove), k = null, maxSpeakers = 8).shouldBe(listOf(0, 1))
+                }
+            }
+        }
+
+        given("four unit vectors at 0°, 20°, 50° and 120°") {
+            `when`("they are merged by UPGMA") {
+                then("each merge height is the mean distance over all member pairs of the two merged clusters") {
+                    fun unit(degrees: Double) = floatArrayOf(cos(Math.toRadians(degrees)).toFloat(), sin(Math.toRadians(degrees)).toFloat())
+
+                    fun distance(degrees: Double) = 1 - cos(Math.toRadians(degrees))
+                    // Pairwise distances: 0-1 = d(20°) ≈ 0.060, 1-2 = d(30°) ≈ 0.134, 0-2 = d(50°) ≈ 0.357,
+                    // 2-3 = d(70°) ≈ 0.658, 1-3 = d(100°) ≈ 1.174, 0-3 = d(120°) = 1.5.
+                    // Merge 1: {0} + {1} at d(20°), the smallest distance.
+                    // Merge 2: {0, 1} + {2} at (d(50°) + d(30°)) / 2 ≈ 0.246, below {0, 1}-{3} ≈ 1.337 and {2}-{3} ≈ 0.658.
+                    // Merge 3: {0, 1, 2} + {3} at (d(120°) + d(100°) + d(70°)) / 3 ≈ 1.111 (unweighted: every segment
+                    // counts once; the weighted WPGMA would give ((d(120°) + d(100°)) / 2 + d(70°)) / 2 ≈ 0.997).
+                    val merges = upgmaMerges(arrayOf(unit(0.0), unit(20.0), unit(50.0), unit(120.0)))
+
+                    merges.map { it.i to it.j }.shouldBe(listOf(0 to 1, 0 to 2, 0 to 3))
+                    merges[0].height.shouldBe(distance(20.0).plusOrMinus(1e-6))
+                    merges[1].height.shouldBe(((distance(50.0) + distance(30.0)) / 2).plusOrMinus(1e-6))
+                    merges[2].height.shouldBe(((distance(120.0) + distance(100.0) + distance(70.0)) / 3).plusOrMinus(1e-6))
                 }
             }
         }
