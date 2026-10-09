@@ -8,7 +8,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | ---- | --------------------------------------------------------------------------------------- | -------- | ---------- |
 | 0001 | [Stack and monorepo layout](0001-stack-and-monorepo.md)                                 | accepted | 2026-10-05 |
 | 0002 | [No Python in the app; transcribe.py is a reference oracle only](0002-no-python-oracle-only.md) | accepted | 2026-10-05 |
-| 0003 | [Diarization in Kotlin with CAM++ via ONNX Runtime](0003-kotlin-diarization-campplus-onnx.md) | accepted | 2026-10-05 |
+| 0003 | [Diarization in Kotlin with CAM++ via ONNX Runtime](0003-kotlin-diarization-campplus-onnx.md) | accepted, auto speaker-count rule amended by [0027](0027-auto-speaker-count-allows-one-speaker.md) | 2026-10-05 |
 | 0004 | [Chunked transcription with SIGSTOP/SIGCONT pause](0004-chunked-transcription-sigstop-pause.md) | accepted | 2026-10-05 |
 | 0005 | [Uploaded audio stored as SQLite BLOB](0005-audio-as-sqlite-blob.md)                    | superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) | 2026-10-05 |
 | 0006 | [Exposed, Flyway, and Kotest](0006-exposed-flyway-kotest.md)                            | accepted | 2026-10-05 |
@@ -32,3 +32,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0024 | [Audio storage: original kept only until chunking, chunks stored as FLAC](0024-audio-storage-original-until-chunking-flac-chunks.md) | accepted | 2026-10-07 |
 | 0025 | [Nix build uses Gradle's default JVM memory settings](0025-nix-build-gradle-default-jvm-memory.md) | accepted | 2026-10-08 |
 | 0026 | [No rule for where test fixtures live](0026-no-rule-for-test-fixture-location.md)          | accepted | 2026-10-09 |
+| 0027 | [Automatic speaker count allows one speaker](0027-auto-speaker-count-allows-one-speaker.md) | accepted | 2026-10-09 |

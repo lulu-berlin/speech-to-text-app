@@ -22,6 +22,7 @@ Let the user upload many audio files and manage the work queue from the browser:
 - Confirm `@dnd-kit` for drag reorder, or prefer another library / up-down buttons?
 - Which per-upload options are shown by default vs behind an "advanced" toggle, and whether options can be set once for a whole batch?
 - Confirmation dialog before cancel: yes/no?
+- Limits of the max-speakers and fixed-count inputs: follow the bound chosen in item 12 (moved from item 09, 2026-10-09)?
 
 ## Test list (written with the user; Canon TDD step 1)
 Seed — to be refined and approved with the user before any test is written:
