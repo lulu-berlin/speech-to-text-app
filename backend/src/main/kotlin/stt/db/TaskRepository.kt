@@ -156,6 +156,17 @@ class TaskRepository(
         }
     }
 
+    /**
+     * Writes the task's status alone. Whether the transition is allowed is the caller's business:
+     * [stt.queue.TaskStatus.canTransitionTo] is item 04's table, and the engine checks it first.
+     */
+    suspend fun setStatus(
+        id: Long,
+        status: TaskStatus,
+    ) {
+        updateTask(id) { it[TasksTable.status] = status }
+    }
+
     /** Marks the task RUNNING and records when it started. */
     suspend fun setRunning(
         id: Long,

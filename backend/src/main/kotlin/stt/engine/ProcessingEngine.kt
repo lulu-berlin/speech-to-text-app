@@ -20,6 +20,7 @@ import stt.db.TaskPhase
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.process.ProcessControl
+import stt.queue.TaskStatus
 import stt.transcribe.ChunkTranscription
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSettings
@@ -85,11 +86,48 @@ class ProcessingEngine(
         processControl.pause()
     }
 
-    /** Resumes the queue and wakes the worker: the frozen process continues and the next queued task starts. */
+    /**
+     * Resumes the queue and wakes the worker: the frozen process continues and the next queued task starts.
+     */
     suspend fun resumeQueue() {
         queueState.setPaused(false)
         processControl.resume()
         wake()
+    }
+
+    /**
+     * Pauses a task: its process is frozen and its status becomes PAUSED; the phase it is in stays, so
+     * a paused task can still say where it stopped. A QUEUED task only changes status (no process is in
+     * flight); only a QUEUED or RUNNING task can be paused (item 04's table).
+     */
+    suspend fun pauseTask(id: Long): TaskCommandOutcome {
+        val status = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
+        if (!status.canTransitionTo(TaskStatus.PAUSED)) {
+            return TaskCommandOutcome.Illegal(status, TaskStatus.PAUSED)
+        }
+        tasks.setStatus(id, TaskStatus.PAUSED)
+        publish(id)
+        processControl.pause()
+        return TaskCommandOutcome.Accepted
+    }
+
+    /**
+     * Resumes a paused task at once: item 04's table has no `PAUSED → RUNNING`, so the task is written as
+     * QUEUED and immediately as RUNNING again, and it continues where it stopped even when another QUEUED
+     * task is ahead of it — its worker is still inside it. Neither write touches the phase: only the
+     * queue-level QUEUED (retry, restart recovery) drops it, so a resume cannot lose a stopped task's phase.
+     */
+    suspend fun resumeTask(id: Long): TaskCommandOutcome {
+        val status = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
+        if (!status.canTransitionTo(TaskStatus.QUEUED)) {
+            return TaskCommandOutcome.Illegal(status, TaskStatus.QUEUED)
+        }
+        tasks.setStatus(id, TaskStatus.QUEUED)
+        publish(id)
+        tasks.setStatus(id, TaskStatus.RUNNING)
+        publish(id)
+        processControl.resume()
+        return TaskCommandOutcome.Accepted
     }
 
     /**
