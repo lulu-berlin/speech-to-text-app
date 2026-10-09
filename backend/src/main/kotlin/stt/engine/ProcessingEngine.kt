@@ -55,6 +55,7 @@ class ProcessingEngine(
     private val chunker: Chunker,
     private val transcriber: Transcriber,
     private val processControl: ProcessControl,
+    private val diarizer: Diarizer,
 ) {
     private val transcription = ChunkTranscription(transcriber, segments)
 
@@ -231,6 +232,7 @@ class ProcessingEngine(
         try {
             chunkAudio(id)
             transcribeChunks(id, task)
+            diarize(id, task)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -287,6 +289,21 @@ class ProcessingEngine(
                 prompt = resumePrompt(segments, id, chunk.idx),
             )
         }
+    }
+
+    /**
+     * DIARIZING: nothing to label when the task has no segments, so it is skipped (item 09 skips it too).
+     * Everything else is the [Diarizer]'s job: rebuilding the PCM from the stored chunks and assigning and
+     * storing the speakers.
+     */
+    private suspend fun diarize(
+        id: Long,
+        task: StoredTask,
+    ) {
+        if (segments.findByTask(id).isEmpty()) return
+        tasks.setPhase(id, TaskPhase.DIARIZING)
+        publish(id)
+        diarizer.diarize(task)
     }
 
     /**

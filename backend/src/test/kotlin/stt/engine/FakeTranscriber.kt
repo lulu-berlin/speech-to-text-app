@@ -30,6 +30,9 @@ internal class FakeTranscriber : Transcriber {
     /** The segments every call returns, offsets relative to the chunk's audio; none by default. */
     var segments: List<WhisperSegment> = emptyList()
 
+    /** Segments per task id, so one task can have speech and the next none; [segments] is the fallback. */
+    var segmentsByTask: Map<Long, List<WhisperSegment>> = emptyMap()
+
     /**
      * When set, a cancelled call does not die at once: it reports itself on [dyingStarted] and waits for
      * this before it is recorded in [cancelled], like item 05's runner waiting out its SIGTERM grace period.
@@ -70,6 +73,6 @@ internal class FakeTranscriber : Transcriber {
                 failNext = null
                 throw failure
             }
-            segments
+            segmentsByTask[taskIdOf(audio.parent)] ?: segments
         }
 }
