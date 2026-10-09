@@ -1,0 +1,18 @@
+{
+  "id": 7,
+  "filename": "memo.wav",
+  "status": "QUEUED",
+  "phase": null,
+  "language": "auto",
+  "speakersMode": "auto",
+  "speakersCount": null,
+  "maxSpeakers": 8,
+  "durationMs": null,
+  "sizeBytes": 3145772,
+  "transcriptionProgress": 0.0,
+  "diarizationProgress": 0.0,
+  "error": null,
+  "createdAt": 1791538200000,
+  "startedAt": null,
+  "finishedAt": null
+}

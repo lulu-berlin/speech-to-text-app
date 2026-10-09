@@ -1,0 +1,58 @@
+{
+  "speakers": [
+    {
+      "speakerId": 0,
+      "speaker": "Speaker 1"
+    },
+    {
+      "speakerId": 1,
+      "speaker": "Speaker 2"
+    }
+  ],
+  "turns": [
+    {
+      "speakerId": 0,
+      "startMs": 0,
+      "endMs": 5200,
+      "text": "Good morning. Thanks for joining us today.",
+      "segments": [
+        {
+          "startMs": 0,
+          "endMs": 2100,
+          "text": "Good morning."
+        },
+        {
+          "startMs": 2400,
+          "endMs": 5200,
+          "text": "Thanks for joining us today."
+        }
+      ]
+    },
+    {
+      "speakerId": 1,
+      "startMs": 5800,
+      "endMs": 9100,
+      "text": "Happy to be here.",
+      "segments": [
+        {
+          "startMs": 5800,
+          "endMs": 9100,
+          "text": "Happy to be here."
+        }
+      ]
+    },
+    {
+      "speakerId": 0,
+      "startMs": 9600,
+      "endMs": 14250,
+      "text": "Let's start with your background.",
+      "segments": [
+        {
+          "startMs": 9600,
+          "endMs": 14250,
+          "text": "Let's start with your background."
+        }
+      ]
+    }
+  ]
+}

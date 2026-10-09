@@ -1,0 +1,83 @@
+{
+  "tasks": [
+    {
+      "id": 5,
+      "filename": "lecture.m4a",
+      "status": "RUNNING",
+      "phase": "TRANSCRIBING",
+      "language": "de",
+      "speakersMode": "auto",
+      "speakersCount": null,
+      "maxSpeakers": 8,
+      "durationMs": 3600000,
+      "sizeBytes": 57671680,
+      "transcriptionProgress": 0.42,
+      "diarizationProgress": 0.0,
+      "error": null,
+      "createdAt": 1791537660000,
+      "startedAt": 1791537661000,
+      "finishedAt": null
+    },
+    {
+      "id": 7,
+      "filename": "memo.wav",
+      "status": "QUEUED",
+      "phase": null,
+      "language": "auto",
+      "speakersMode": "auto",
+      "speakersCount": null,
+      "maxSpeakers": 8,
+      "durationMs": null,
+      "sizeBytes": 3145772,
+      "transcriptionProgress": 0.0,
+      "diarizationProgress": 0.0,
+      "error": null,
+      "createdAt": 1791538200000,
+      "startedAt": null,
+      "finishedAt": null
+    },
+    {
+      "id": 3,
+      "filename": "interview.mp3",
+      "status": "COMPLETED",
+      "phase": null,
+      "language": "en",
+      "speakersMode": "fixed",
+      "speakersCount": 2,
+      "maxSpeakers": 8,
+      "durationMs": 1185000,
+      "sizeBytes": 18964512,
+      "transcriptionProgress": 1.0,
+      "diarizationProgress": 1.0,
+      "error": null,
+      "createdAt": 1791536400000,
+      "startedAt": 1791536472000,
+      "finishedAt": 1791537645000
+    },
+    {
+      "id": 4,
+      "filename": "call.ogg",
+      "status": "FAILED",
+      "phase": null,
+      "language": "en",
+      "speakersMode": "off",
+      "speakersCount": null,
+      "maxSpeakers": 8,
+      "durationMs": 600000,
+      "sizeBytes": 4718592,
+      "transcriptionProgress": 0.5,
+      "diarizationProgress": null,
+      "error": "whisper-cli exited with code 1 while transcribing chunk 1: failed to allocate memory",
+      "createdAt": 1791536410000,
+      "startedAt": 1791536420000,
+      "finishedAt": 1791537000000
+    }
+  ],
+  "queue": {
+    "paused": false,
+    "taskIds": [
+      5,
+      7
+    ]
+  }
+}

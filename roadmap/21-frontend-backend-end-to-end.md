@@ -29,7 +29,7 @@ Seed (the acceptance criteria moved from items 13–15), to be refined and appro
 
 - [ ] The shell loads and switches between Queue and History; the browser shows a live `/api/events` stream that reconnects after a backend restart (from item 13)
 - [ ] Uploading several files queues them in order; pause/resume/cancel, delete and reorder visibly take effect; both progress bars advance live without page reload (from item 14)
-- [ ] A completed transcription appears in History, its turns are readable, every download produces the matching file, and the audio plays and seeks (from item 15)
+- [ ] A completed transcription appears in History, its turns are readable, every download produces the matching file, and the audio plays and seeks with the played segment highlighted; a failed or cancelled task can be retried and finishes from its stored chunks (from item 15)
 
 ## Acceptance criteria
 

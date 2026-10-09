@@ -25,7 +25,7 @@ AGENTS.md  devenv.nix  flake.nix  .editorconfig  .prettierrc
 backend/   Gradle (Kotlin DSL) Ktor app; backend/deps.json = Nix lockfile for Gradle deps
 frontend/  Vite + React + TS + styled-components (pnpm)
 nix/       shared Nix expressions (models; more in item 16)
-docs/decisions/  docs/specs/  docs/conventions/  docs/oracle/transcribe.py (reference oracle)
+docs/decisions/  docs/specs/  docs/conventions/  docs/api/ (API contract examples, ADR 0029)  docs/oracle/transcribe.py (reference oracle)
 roadmap/   pending work, one file per item
 workspaces/  git worktrees (ignored)
 ```
