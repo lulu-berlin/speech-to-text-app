@@ -3,12 +3,14 @@ import { ThemeProvider } from 'styled-components';
 import { HistoryView } from '../features/history/HistoryView';
 import { TaskTranscriptView } from '../features/history/TaskTranscriptView';
 import { QueueView } from '../features/queue/QueueView';
-import { theme } from '../shared/theme/theme';
+import { themeFor } from '../shared/theme/theme';
+import { usePrefersDark } from '../shared/theme/usePrefersDark';
 import { AppHeader } from './AppHeader';
 import { ConnectionContext } from './ConnectionContext';
 import { NotFoundView } from './NotFoundView';
 
 export function App() {
+  const theme = themeFor(usePrefersDark());
   return (
     <ThemeProvider theme={theme}>
       <ConnectionContext.Provider>

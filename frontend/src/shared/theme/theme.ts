@@ -15,7 +15,7 @@ export interface ThemeTokens {
   };
 }
 
-export const theme: ThemeTokens = {
+export const lightTheme: ThemeTokens = {
   colors: {
     background: '#ffffff',
     text: '#1c1c1c',
@@ -29,6 +29,26 @@ export const theme: ThemeTokens = {
     title: '1.5rem',
   },
 };
+
+export const darkTheme: ThemeTokens = {
+  colors: {
+    background: '#14161a',
+    text: '#e8e8e8',
+    accent: '#7fb2e5',
+    border: '#3a3f47',
+  },
+  spacing: {
+    unit: 8,
+  },
+  fontSizes: {
+    title: '1.5rem',
+  },
+};
+
+// The token set for the OS preference.
+export function themeFor(prefersDark: boolean): ThemeTokens {
+  return prefersDark ? darkTheme : lightTheme;
+}
 
 declare module 'styled-components' {
   export interface DefaultTheme extends ThemeTokens {}
