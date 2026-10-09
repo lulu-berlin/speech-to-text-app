@@ -19,7 +19,7 @@ class ProcessRunner internal constructor(
     private val gracePeriod: Duration,
     /** Starts the built process. A seam so tests can act inside the spawn window (ADR 0020). */
     private val startProcess: (ProcessBuilder) -> Process,
-) {
+) : ProcessControl {
     constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, ProcessBuilder::start)
 
     /**
@@ -100,7 +100,7 @@ class ProcessRunner internal constructor(
     }
 
     /** Freezes the current run (SIGSTOP the whole tree), also when it is still spawning. No-op while no run is in flight. */
-    fun pause() {
+    override fun pause() {
         synchronized(runLock) {
             if (!inFlight) return
             paused = true
@@ -109,7 +109,7 @@ class ProcessRunner internal constructor(
     }
 
     /** Unfreezes the current run (SIGCONT the whole tree). No-op while no run is in flight. */
-    fun resume() {
+    override fun resume() {
         synchronized(runLock) {
             paused = false
             currentTree?.resume()
