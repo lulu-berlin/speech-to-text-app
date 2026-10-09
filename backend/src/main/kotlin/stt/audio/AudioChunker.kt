@@ -11,11 +11,11 @@ private const val SILENCE_MIN_SECONDS = "0.5"
 /** Decodes a source, plans its chunks at silences, and exports each chunk as FLAC (ADR 0004, ADR 0024). */
 class AudioChunker(
     private val runner: ProcessRunner,
-) {
+) : Chunker {
     private val decoder = AudioDecoder(runner)
 
     /** Chunks [source] into FLAC files in [workDir]; the decoded PCM is written there too. */
-    suspend fun chunk(
+    override suspend fun chunk(
         source: Path,
         workDir: Path,
     ): ChunkedAudio {

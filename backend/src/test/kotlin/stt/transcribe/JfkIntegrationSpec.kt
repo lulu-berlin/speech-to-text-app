@@ -29,7 +29,13 @@ class JfkIntegrationSpec :
                     val segments =
                         withTimeout(120.seconds) {
                             ChunkTranscriber(ProcessRunner())
-                                .transcribe(settings = settings, audio = jfk, outputPrefix = outputPrefix, prompt = null)
+                                .transcribe(
+                                    settings = settings,
+                                    audio = jfk,
+                                    outputPrefix = outputPrefix,
+                                    prompt = null,
+                                    onProgress = {},
+                                )
                         }
 
                     with(segments) {

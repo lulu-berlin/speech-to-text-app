@@ -6,12 +6,12 @@ import stt.process.ProcessRunner
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** Transcribes one chunk with one whisper-cli run through [runner] (ADR 0004). */
+/** Transcribes one chunk with one whisper-cli run through [runner] (ADR 0004); the [Transcriber] implementation. */
 class ChunkTranscriber internal constructor(
     private val runner: ProcessRunner,
     /** The whisper-cli executable. A seam so tests can stand in a script for whisper-cli. */
     private val executable: String,
-) {
+) : Transcriber {
     constructor(runner: ProcessRunner) : this(runner, "whisper-cli")
 
     /**
@@ -20,12 +20,12 @@ class ChunkTranscriber internal constructor(
      * a missing JSON output, or a malformed one: whisper-cli prints its error anywhere in stderr (before ~70
      * usage lines on a bad argument) and exits 0 on unreadable audio without writing JSON.
      */
-    suspend fun transcribe(
+    override suspend fun transcribe(
         settings: WhisperSettings,
         audio: Path,
         outputPrefix: Path,
         prompt: String?,
-        onProgress: (Double) -> Unit = {},
+        onProgress: (Double) -> Unit,
     ): List<WhisperSegment> {
         val command = whisperCommand(settings, audio, outputPrefix, prompt, executable)
         val result = runner.run(command, onStderrLine = { line -> parseProgress(line)?.let(onProgress) })
