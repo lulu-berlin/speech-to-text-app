@@ -1,6 +1,6 @@
 # 11 — Processing engine
 
-Status: draft
+Status: spec-approved
 Depends on: [04](../docs/specs/queue-domain-model.md) (done), [05](../docs/specs/process-runner.md) (done), [07](../docs/specs/whisper-transcription.md) (done), [09](../docs/specs/diarization.md) (done), [18](../docs/specs/audio-storage.md) (done), [20](../docs/specs/cleanup-refactors.md) (done)
 
 ## Goal
@@ -15,7 +15,7 @@ Run the queue: take queued tasks one at a time in queue order and drive each thr
 - [ADR 0006 — Exposed, Flyway, Kotest](../docs/decisions/0006-exposed-flyway-kotest.md): engine tests use Kotest + `kotlinx-coroutines-test`.
 - [ADR 0007 — SSE live updates](../docs/decisions/0007-sse-live-updates.md): engine events feed the SSE endpoint (item 12).
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Worker.** A single worker coroutine launched in the application `CoroutineScope` (`SupervisorJob`). It takes the QUEUED task with the lowest `queue_position` when the queue is not paused. Wakeups come from a `Channel`/`StateFlow` signalled by enqueue, resume, reorder, queue resume, and task completion — no polling. Concurrency stays 1.
 - **Phases per task** (status RUNNING, `phase` column from item 03):
@@ -61,7 +61,7 @@ Run the queue: take queued tasks one at a time in queue order and drive each thr
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] Queued tasks are processed one at a time in `queue_position` order
 - [ ] Reordering while a task runs changes which task starts next, without interrupting the running one
@@ -79,7 +79,7 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] A task whose plan is already stored but whose original was left behind (crash before its deletion) has the original deleted when it resumes
 - [ ] Startup cleanup keeps the work directories of pending tasks and the unchunked original of FAILED and CANCELED tasks, and removes the rest for terminal or deleted tasks
 - [ ] Diarization uses the PCM rebuilt from the stored chunks, with and without a restart
-- [ ] A task with `speakers = off` completes without the diarization phase, and its segments keep `speaker` NULL (moved from item 09, 2026-10-09)
+- [ ] A task with `speakers = off` completes without the diarization phase, and its segments keep `speaker_id` NULL with no speakers stored (moved from item 09, 2026-10-09)
 - [ ] A task with no speech segments completes without diarization
 - [ ] While a started task is paused, no other task starts, also after a restart; resuming continues that task directly, even if another QUEUED task is ahead of it
 - [ ] Pausing during chunking stops ffmpeg; resuming continues it
@@ -113,3 +113,4 @@ Seed — to be refined and approved with the user before any test is written:
 - 2026-10-09: phase rule from item 12's contract: kept on FAILED/CANCELED, cleared on QUEUED and COMPLETED.
 - 2026-10-09: item 13 consultation: the transition table is shared as `docs/api/task-transitions.json`; this item adds the backend check that `TaskStatus` matches it.
 - 2026-10-09: consultation answers approved: concurrency 1; faster clustering split out as item 23, in parallel, while this item uses item 09's clustering; `PauseGate` moves to a shared infrastructure package `stt.pause`; the diarization bar shows two stages (`EMBEDDING`, `CLUSTERING`) with progress within each (contract change in item 12 and `docs/api/`); `STT_WHISPER_MODEL` read into `Config` here (from item 07's spec). Test list not yet approved.
+- 2026-10-09: test list (32 items) approved by the user; status `spec-approved`.
