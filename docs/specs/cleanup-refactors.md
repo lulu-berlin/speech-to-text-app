@@ -1,6 +1,6 @@
-# 20 — Cleanup refactors: test placement, duplication, visibility, toolchain pin
+# Cleanup refactors: test placement, duplication, visibility, toolchain pin
 
-Status: in-review
+Status: done (roadmap item 20, merged 2026-10-09)
 Depends on: — (touches only merged code from items 02, 04, 05, 06, 07 and the dev environment; independent of 09 and 11)
 
 ## Goal
@@ -93,3 +93,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: R1–R7 done, each approved by the user and committed on its own (plus the approved `expectSuccess` rename). pnpm pin committed (`devenv.nix` alone, then the ADR 0012 amendment); awaiting the user's check in the re-entered worktree shell (test-list item 3).
 - 2026-10-09: test-list item 2 done. Final runs on `cd191e7` with `--rerun-tasks`: `gradle check` green, 108 tests in 34 specs, 0 failed (baseline 105 + 1 from test-list item 1 + 2 from the R1 split); `gradle integrationTest` green, 44 Integration tests run, 0 failed (as baseline); `pnpm test` green, 1 test in 1 file, prettier clean over the R5 file set; `pnpm build` green. Every refactor commit was checked with all four commands before committing.
 - 2026-10-09: test-list item 3 done (user-verified in the worktree's devenv shell after `direnv allow`): `pnpm --version` → `11.25.0`; `pnpm install --frozen-lockfile` → "Lockfile is up to date, resolution step is skipped", 108 packages added, "Done in 1.5s using pnpm v11.25.0". The two attempts before it failed with `EAGAIN` on `rmdir`/`rename` inside `node_modules/.pnpm` (virtiofs mount, while replacing a `node_modules` tied to the agent sandbox's pnpm store); the lockfile was accepted in both. Status `in-review`.
+- 2026-10-09: merged into `main` (head `78edfd0`) after the user approved the diff; spec and final test list moved here from `roadmap/20-cleanup-refactors.md`.

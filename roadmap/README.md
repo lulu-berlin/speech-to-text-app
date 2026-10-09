@@ -45,7 +45,7 @@ graph TD
   15 --> 16
   13 --> 17[17 branding: stenographer animation]
   16 --> 19[19 Docker image and compose]
-  20[20 cleanup refactors]
+  20[20 cleanup refactors ✓]:::done
   12 --> 21[21 frontend-backend end-to-end]
   14 --> 21
   15 --> 21
@@ -78,6 +78,6 @@ graph TD
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
-| [20 — Cleanup refactors](20-cleanup-refactors.md) | spec-approved | — |
+| [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |
 | [22 — Rename a task's speakers](22-speaker-rename.md) | draft | 09, 12, 15 |
