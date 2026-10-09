@@ -1,5 +1,10 @@
 import { expect } from 'vitest';
 
+// WCAG 2.x AA thresholds: 4.5:1 for normal text (1.4.3), 3:1 for user-interface components
+// such as focus indicators (1.4.11).
+export const AA_TEXT = 4.5;
+export const AA_NON_TEXT = 3;
+
 // One sRGB channel of a hex color (#rrggbb), linearized as in WCAG 2.x.
 function channel(hex: string, start: number): number {
   const c = parseInt(hex.slice(start, start + 2), 16) / 255;

@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { contrast } from '../../test/wcag';
+import { AA_NON_TEXT, AA_TEXT, contrast } from '../../test/wcag';
 import { darkTheme, lightTheme } from './theme';
 import type { StatusGroup, ThemeTokens } from './theme';
-
-// WCAG 2.x AA: 4.5:1 for normal text (1.4.3), 3:1 for user-interface components such as
-// focus indicators (1.4.11).
-const AA_TEXT = 4.5;
-const AA_NON_TEXT = 3;
 
 describe.each([
   ['light', lightTheme],
