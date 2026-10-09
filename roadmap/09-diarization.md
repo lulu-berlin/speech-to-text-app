@@ -1,6 +1,6 @@
 # 09 — Diarization
 
-Status: spec-approved
+Status: in-progress
 Depends on: [08](../docs/specs/speaker-embeddings.md) (done)
 
 ## Goal
