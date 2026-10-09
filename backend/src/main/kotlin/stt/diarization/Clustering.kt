@@ -39,9 +39,10 @@ private fun largestGapCount(
     maxSpeakers: Int,
 ): Int {
     val gaps = merges.size - 1
-    var idx = maxOf(0, gaps - maxSpeakers)
+    val start = maxOf(0, gaps - maxSpeakers)
+    var idx = start
     var largest = Double.NEGATIVE_INFINITY
-    for (g in idx until gaps) {
+    for (g in start until gaps) {
         val gap = merges[g + 1].height - merges[g].height
         if (gap > largest) {
             idx = g
