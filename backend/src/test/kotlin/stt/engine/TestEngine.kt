@@ -36,6 +36,7 @@ internal class EngineFixture(
     val chunker: FakeChunker,
     val transcriber: FakeTranscriber,
     val processControl: FakeProcessControl,
+    val diarizer: FakeDiarizer,
     val engine: ProcessingEngine,
     /** The ids of the tasks that reach COMPLETED, in order. */
     val completed: ReceiveChannel<Long>,
@@ -57,6 +58,7 @@ internal fun TestScope.engineUnderTest(
     val chunker = FakeChunker()
     val transcriber = FakeTranscriber()
     val processControl = FakeProcessControl()
+    val diarizer = FakeDiarizer()
     val engine =
         ProcessingEngine(
             scope = backgroundScope,
@@ -69,6 +71,7 @@ internal fun TestScope.engineUnderTest(
             chunker = chunker,
             transcriber = transcriber,
             processControl = processControl,
+            diarizer = diarizer,
         )
     val completed = Channel<Long>(Channel.UNLIMITED)
     val failed = Channel<Long>(Channel.UNLIMITED)
@@ -83,7 +86,7 @@ internal fun TestScope.engineUnderTest(
                 }
             }
     }
-    return EngineFixture(workDirectories, tasks, chunker, transcriber, processControl, engine, completed, failed)
+    return EngineFixture(workDirectories, tasks, chunker, transcriber, processControl, diarizer, engine, completed, failed)
 }
 
 /** Inserts a QUEUED task at [queuePosition] with an original in its work directory, as an upload does (ADR 0024). */
@@ -93,10 +96,11 @@ internal suspend fun enqueueTask(
     filename: String,
     queuePosition: Int,
     createdAt: Long,
+    speakersMode: SpeakersMode = SpeakersMode.OFF,
 ): Long {
     val id =
         tasks.insert(
-            queuedTask(filename, createdAt).copy(queuePosition = queuePosition, speakersMode = SpeakersMode.OFF),
+            queuedTask(filename, createdAt).copy(queuePosition = queuePosition, speakersMode = speakersMode),
         )
     val source = workDirectories.source(id)
     Files.createDirectories(source.parent)
