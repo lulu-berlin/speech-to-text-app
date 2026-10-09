@@ -146,6 +146,22 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("orthogonal segments, so every merge height is 1 and every gap is 0") {
+            `when`("they are clustered in auto mode") {
+                then("the count is clamped to max_speakers") {
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+
+                    fun orthogonal(n: Int) = Array(n) { row -> FloatArray(n) { if (it == row) 1f else 0f } }
+                    // All gaps tie at 0, so the first gap of the window wins: idx = start = max(0, (n - 2) - maxSpeakers).
+                    // n = 3, maxSpeakers = 1: idx 0, k = 3 - 1 = 2, clamped to 1.
+                    // n = 4, maxSpeakers = 2: idx 0, k = 4 - 1 = 3, clamped to 2. The merges are (0, 1), (0, 2), (0, 3)
+                    // (ties go to the lower pair); cutting after the first two leaves {0, 1, 2} and {3}.
+                    clusterSegments(orthogonal(3), k = null, maxSpeakers = 1).shouldBe(listOf(0, 0, 0))
+                    clusterSegments(orthogonal(4), k = null, maxSpeakers = 2).shouldBe(listOf(0, 0, 0, 1))
+                }
+            }
+        }
     })
 
 /** The merged `(i, j)` index pairs, in merge order. */
