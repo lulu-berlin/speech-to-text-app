@@ -47,6 +47,11 @@ export interface ThemeTokens {
   fontSizes: {
     title: string;
   };
+  iconSizes: {
+    sm: string;
+    md: string;
+    lg: string;
+  };
   fontFamilies: {
     sans: string;
   };
@@ -78,6 +83,11 @@ const baseTokens = {
   },
   fontSizes: {
     title: '1.5rem',
+  },
+  iconSizes: {
+    sm: '1rem',
+    md: '1.25rem',
+    lg: '1.5rem',
   },
   // The self-hosted font first, the system stack as fallback (the file is in ./fonts).
   fontFamilies: {

@@ -1,8 +1,9 @@
 // jsdom helpers for the tests that assert computed styles.
 
-// The element a primitive rendered, or a loud failure.
-export function required(element: Element | null | undefined): HTMLElement {
-  if (!(element instanceof HTMLElement)) {
+// The element a primitive rendered, or a loud failure. SVG elements are not HTMLElements,
+// so this accepts any Element (styles are read via getComputedStyle either way).
+export function required(element: Element | null | undefined): Element {
+  if (!(element instanceof Element)) {
     throw new Error('The element did not render');
   }
   return element;
