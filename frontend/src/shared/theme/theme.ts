@@ -57,6 +57,13 @@ export interface ThemeTokens {
   shadows: {
     card: string;
   };
+  // Durations and easings for the built-in animations (theme.ts may hold such keywords).
+  motion: {
+    spinDuration: string;
+    spinEasing: string;
+    pulseDuration: string;
+    pulseEasing: string;
+  };
   fontSizes: {
     title: string;
   };
@@ -107,6 +114,12 @@ const baseTokens = {
   // The self-hosted font first, the system stack as fallback (the file is in ./fonts).
   fontFamilies: {
     sans: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
+  },
+  motion: {
+    spinDuration: '0.8s',
+    spinEasing: 'linear',
+    pulseDuration: '1.6s',
+    pulseEasing: 'ease-in-out',
   },
 };
 
