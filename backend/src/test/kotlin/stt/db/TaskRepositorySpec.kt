@@ -262,6 +262,35 @@ class TaskRepositorySpec :
                 }
             }
         }
+
+        given("a QUEUED, a CANCELED, a PAUSED and a COMPLETED task") {
+            `when`("the worker's start write is tried on each") {
+                then("only the QUEUED one becomes RUNNING with its start time; the others are left exactly as they were") {
+                    withDatabase { db ->
+                        val tasks = taskRepository(db, dataDir)
+                        val ids =
+                            listOf(TaskStatus.QUEUED, TaskStatus.CANCELED, TaskStatus.PAUSED, TaskStatus.COMPLETED)
+                                .associateWith { status -> tasks.insert(queuedTask("$status.wav", createdAt = 1).copy(status = status)) }
+                        val before = ids.mapValues { (_, id) -> tasks.find(id) }
+
+                        ids.mapValues { (_, id) -> tasks.setRunningIfQueued(id, startedAt = 42) } shouldBe
+                            mapOf(
+                                TaskStatus.QUEUED to true,
+                                TaskStatus.CANCELED to false,
+                                TaskStatus.PAUSED to false,
+                                TaskStatus.COMPLETED to false,
+                            )
+
+                        val started = tasks.find(ids.getValue(TaskStatus.QUEUED))?.task
+                        started?.status shouldBe TaskStatus.RUNNING
+                        started?.startedAt shouldBe 42L
+                        for (status in listOf(TaskStatus.CANCELED, TaskStatus.PAUSED, TaskStatus.COMPLETED)) {
+                            tasks.find(ids.getValue(status)) shouldBe before.getValue(status)
+                        }
+                    }
+                }
+            }
+        }
     })
 
 /** Bytes in `stt.db` plus its WAL: everything the database has written to disk. */

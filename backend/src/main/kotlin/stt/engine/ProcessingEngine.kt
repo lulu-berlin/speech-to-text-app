@@ -216,7 +216,8 @@ class ProcessingEngine(
     /** Runs one task through its phases, in order, and leaves it COMPLETED. */
     private suspend fun runTask(task: StoredTask) {
         val id = task.id
-        tasks.setRunning(id, now())
+        // Refused when the task stopped being QUEUED after the worker picked it (a cancel won the race).
+        if (!tasks.setRunningIfQueued(id, now())) return
         publish(id)
         chunkAudio(id)
         transcribeChunks(id, task)

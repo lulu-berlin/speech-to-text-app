@@ -169,16 +169,21 @@ class TaskRepository(
         updateTask(id) { it[TasksTable.status] = status }
     }
 
-    /** Marks the task RUNNING and records when it started. */
-    suspend fun setRunning(
+    /**
+     * The worker's start: marks the task RUNNING and records when it started, but only while it is still
+     * QUEUED. A task cancelled (or paused) after the worker read it from the queue is left as it is, so
+     * the cancel wins the race. Returns whether the row was written.
+     */
+    suspend fun setRunningIfQueued(
         id: Long,
         startedAt: Long,
-    ) {
-        updateTask(id) {
-            it[TasksTable.status] = TaskStatus.RUNNING
-            it[TasksTable.startedAt] = startedAt
+    ): Boolean =
+        db.writeTransaction {
+            TasksTable.update({ (TasksTable.id eq id) and (TasksTable.status eq TaskStatus.QUEUED) }) {
+                it[TasksTable.status] = TaskStatus.RUNNING
+                it[TasksTable.startedAt] = startedAt
+            } > 0
         }
-    }
 
     /**
      * Sets the task's phase; null clears it. Per item 12's contract the phase is kept on FAILED and
