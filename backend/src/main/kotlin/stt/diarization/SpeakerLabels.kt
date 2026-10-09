@@ -21,9 +21,12 @@ internal fun speakerLabels(
     k: Int?,
     maxSpeakers: Int,
 ): List<Int> {
-    val clustered = segments.indices.filter { segments[it].endMs - segments[it].startMs >= SHORT_SEGMENT_MS }
+    val clustered = segments.indices.filter { segments[it].isLong() }
     val labels = clusterSegments(Array(clustered.size) { embeddings[clustered[it]] }, k, maxSpeakers)
     val speakers = IntArray(segments.size)
     clustered.forEachIndexed { pos, row -> speakers[row] = labels[pos] }
     return speakers.asList()
 }
+
+/** Whether this segment is at least [SHORT_SEGMENT_MS] long. */
+private fun Segment.isLong() = endMs - startMs >= SHORT_SEGMENT_MS
