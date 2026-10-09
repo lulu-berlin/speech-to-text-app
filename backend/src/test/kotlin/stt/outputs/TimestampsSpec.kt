@@ -24,4 +24,13 @@ class TimestampsSpec :
                 }
             }
         }
+        given("a timestamp of 1 234 ms") {
+            `when`("it is formatted") {
+                then("it equals the oracle's int(round(t * 1000)) result for the same time") {
+                    // Oracle with t = 1.234 s: ms = int(round(1.234 * 1000)) = 1234, divmod → 00:00:01,234.
+                    fmtSrt(1_234) shouldBe "00:00:01,234"
+                    fmtVtt(1_234) shouldBe "00:00:01.234"
+                }
+            }
+        }
     })
