@@ -35,7 +35,27 @@ internal fun renderJson(segments: List<Segment>): String =
 /** Seconds as Python's `repr(float)` prints them; JDK 21's shortest round-trip matches for segment times. */
 private fun seconds(ms: Long): String = (ms / 1000.0).toString()
 
-/** A json string. Escaping (quotes, backslashes, control characters) is not implemented yet. */
-private fun jsonString(text: String): String = "\"$text\""
+/**
+ * A json string as Python's encoder writes it with `ensure_ascii=False`: `"` and `\` are escaped, `\b \f \n \r \t`
+ * use their short escapes, every other character below U+0020 becomes `\u00xx` (lower-case hex), and everything else,
+ * non-ASCII included, is written as-is.
+ */
+private fun jsonString(text: String): String =
+    buildString {
+        append('"')
+        for (char in text) {
+            when (char) {
+                '"' -> append("\\\"")
+                '\\' -> append("\\\\")
+                '\b' -> append("\\b")
+                '\u000C' -> append("\\f")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (char < ' ') append("\\u").append(char.code.toString(16).padStart(4, '0')) else append(char)
+            }
+        }
+        append('"')
+    }
 
 private fun speakerIdOf(segment: Segment): Int = requireNotNull(segment.speakerId) { "Segment $segment has no speaker" }
