@@ -6,6 +6,9 @@ import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import java.lang.management.ManagementFactory
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -226,6 +229,48 @@ class ClusteringSpec :
                             upgmaMerges(embeddings),
                             naiveUpgmaMerges(embeddings),
                         )
+                    }
+                }
+            }
+        }
+
+        given("3000 random 512-d segments") {
+            `when`("clustering runs") {
+                then("the live-heap peak stays well under the O(n²) distance matrix size") {
+                    // The item 09 matrix at 3000 segments is 3000·3000·8 bytes ≈ 68.7 MiB. The NN-chain computes distances on demand
+                    // (per-cluster mean vectors, 3000·512·8 bytes ≈ 12.3 MiB; measured ~14 MiB live peak, ADR 0036), so the
+                    // peak of the measured run must stay well under the matrix size;the matrix implementation alone burns
+                    // ~82 MiB (item 23 measurement), which violates even the half-matrix bound used here. The half-matrix
+                    // bound (not a third) leaves room for the ambient heap of the other specs running in the same JVM.
+                    val n = 3000
+                    val dim = 512
+                    val random = Random(99L)
+                    val embeddings = Array(n) { l2Normalize(FloatArray(dim) { random.nextFloat() * 2f - 1f }) }
+
+                    fun usedHeap(): Long = ManagementFactory.getMemoryMXBean().heapMemoryUsage.used
+                    repeat(5) {
+                        System.gc()
+                        Thread.sleep(100)
+                    }
+                    val before = usedHeap()
+                    val peak = AtomicLong(0)
+                    val done = AtomicBoolean(false)
+                    val sampler =
+                        Thread {
+                            while (!done.get()) {
+                                peak.updateAndGet { current -> maxOf(current, usedHeap()) }
+                                Thread.sleep(1)
+                            }
+                        }
+                    sampler.start()
+                    upgmaMerges(embeddings)
+                    done.set(true)
+                    sampler.join()
+
+                    val deltaMiB = maxOf(0L, peak.get() - before) / (1024 * 1024)
+                    val matrixMiB = (n.toLong() * n * 8) / (1024 * 1024)
+                    withClue("peak $deltaMiB MiB vs ${matrixMiB / 2} MiB bound") {
+                        deltaMiB.toDouble().shouldBeLessThan((matrixMiB / 2).toDouble())
                     }
                 }
             }

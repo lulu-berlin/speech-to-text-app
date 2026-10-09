@@ -90,12 +90,20 @@ private fun cutLabels(
 }
 
 /**
- * The `n - 1` average-linkage merges of [embeddings] in merge order (oracle `cluster_segments` merge loop).
+ * The `n - 1` average-linkage merges of [embeddings] in merge order (oracle `cluster_segments` merge loop), found by the
+ * nearest-neighbor chain (ADR 0036).
  *
- * `D = 1 - E·Eᵀ` in double with `+∞` on the diagonal. Each step merges the first minimum of `D` in row-major order
- * over the active clusters (kept in original index order, so `i < j`); the merged row is the size-weighted mean
- * `(size_i·D[i,·] + size_j·D[j,·]) / (size_i + size_j)`, so every segment counts once; cluster `j` becomes inactive.
- * `O(n²)` memory, `O(n³)` time.
+ * Average linkage is reducible, so the chain finds the same merges: a chain of clusters is built by repeatedly appending
+ * the nearest active cluster of the chain's end;when the end and its predecessor are mutual nearest neighbors they are
+ * merged (a restart if not), and the chain continues from the merged cluster. Distances are computed on demand in double:
+ * each cluster keeps the mean of its members' embeddings and `d(A, B) = mean_{a∈A, b∈B} (1 − a·b) = 1 − vA·vB`
+ * (bilinearity), so no `n²` distance matrix is allocated — `O(n·512)` memory (ADR 0036: 14 MiB vs 71 MiB live heap at
+ * 3000 segments, 36.1 s vs 50.5 s at 5000).
+ *
+ * The chain's merges have non-decreasing heights;they are sorted by height (stable), which reproduces the item 09 merge
+ * order. Where two different merges have exactly equal heights the pair at each position may differ — accepted and
+ * documented (ADR 0036);the ADR 0027 and largest-gap rules read the heights, which are unchanged apart from ulp-level
+ * rounding and tie-run internal order.
  *
  * Before every merge, cancellation of this coroutine and [gate] (ADR 0004) are checked, so a long recording pauses or
  * stops at the next merge; [onMergeDone] reports `(merges done, n - 1)` after each merge.
@@ -106,48 +114,72 @@ internal suspend fun upgmaMerges(
     onMergeDone: Progress = { _, _ -> },
 ): List<Merge> {
     val n = embeddings.size
-    val d = DoubleArray(n * n)
-    for (a in 0 until n) {
-        d[a * n + a] = Double.POSITIVE_INFINITY
-        for (b in a + 1 until n) {
-            val distance = 1.0 - dot(embeddings[a], embeddings[b])
-            d[a * n + b] = distance
-            d[b * n + a] = distance
-        }
-    }
+    if (n <= 1) return emptyList()
+
+    val mean = Array(n) { row -> DoubleArray(embeddings[row].size) { embeddings[row][it].toDouble() } }
     val size = IntArray(n) { 1 }
     val active = MutableList(n) { it }
+
+    fun distance(
+        a: Int,
+        b: Int,
+    ): Double {
+        var dot = 0.0
+        for (k in mean[a].indices) dot += mean[a][k] * mean[b][k]
+        return 1.0 - dot
+    }
+
     val merges = ArrayList<Merge>(maxOf(n - 1, 0))
+    val chain = ArrayList<Int>()
     while (active.size > 1) {
-        currentCoroutineContext().ensureActive()
-        gate?.checkpoint()
-        // D is symmetric with +∞ on the diagonal, so the first row-major minimum lies above the diagonal.
-        var i = -1
-        var j = -1
+        if (chain.isEmpty()) chain.add(active[0])
+        val c = chain.last()
+        var nn = -1
         var best = Double.POSITIVE_INFINITY
-        for (ai in 0 until active.size - 1) {
-            val row = active[ai] * n
-            for (bi in ai + 1 until active.size) {
-                val value = d[row + active[bi]]
-                if (i < 0 || value < best) {
-                    i = active[ai]
-                    j = active[bi]
-                    best = value
-                }
+        for (x in active) { // first minimum over the active list, so the chain is deterministic for a given input
+            if (x == c) continue
+            val dist = distance(c, x)
+            if (nn < 0 || dist < best) {
+                nn = x
+                best = dist
             }
         }
-        merges.add(Merge(i, j, best))
-        val sizeI = size[i]
-        val sizeJ = size[j]
-        for (x in active) {
-            if (x == i || x == j) continue
-            val merged = (sizeI * d[i * n + x] + sizeJ * d[j * n + x]) / (sizeI + sizeJ)
-            d[i * n + x] = merged
-            d[x * n + i] = merged
+        if (chain.size >= 2 && chain[chain.size - 2] == nn) {
+            val p = chain.last()
+            val q = chain[chain.size - 2]
+            var back = -1
+            var backBest = Double.POSITIVE_INFINITY
+            for (x in active) { // a merge needs mutual nearest neighbors (the global closest pair is always mutual)
+                if (x == q) continue
+                val dist = distance(q, x)
+                if (back < 0 || dist < backBest) {
+                    back = x
+                    backBest = dist
+                }
+            }
+            if (back != p) {
+                chain.clear()
+                continue
+            }
+            currentCoroutineContext().ensureActive()
+            gate?.checkpoint()
+            chain.removeLast()
+            chain.removeLast()
+            val i = minOf(p, q)
+            val j = maxOf(p, q)
+            merges.add(Merge(i, j, best))
+            val sizeI = size[i]
+            val sizeJ = size[j]
+            for (k in mean[i].indices) mean[i][k] = (sizeI * mean[i][k] + sizeJ * mean[j][k]) / (sizeI + sizeJ)
+            size[i] = sizeI + sizeJ
+            active.remove(j)
+            chain.add(i)
+            onMergeDone(merges.size, n - 1)
+        } else if (chain.size < n) {
+            chain.add(nn)
+        } else {
+            chain.clear()
         }
-        size[i] = sizeI + sizeJ
-        active.remove(j)
-        onMergeDone(merges.size, n - 1)
     }
-    return merges
+    return merges.sortedWith(compareBy(Merge::height))
 }
