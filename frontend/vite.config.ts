@@ -3,6 +3,12 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react()],
+  // The MSW worker for `pnpm dev:mock`: served at the origin root (/mockServiceWorker.js),
+  // so its scope covers the page; `pnpm build` never copies it into dist/.
+  publicDir: 'mock',
+  build: {
+    copyPublicDir: false,
+  },
   server: {
     fs: {
       // docs/api/ is the single mock source and lies outside frontend/ (ADR 0029).

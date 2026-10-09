@@ -3,13 +3,10 @@
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { App } from './app/App';
-import { WORKER_URL, worker } from './mocks/browser';
+import { worker } from './mocks/browser';
 
 async function main() {
-  await worker.start({
-    serviceWorker: { url: WORKER_URL },
-    onUnhandledRequest: 'error',
-  });
+  await worker.start({ onUnhandledRequest: 'error' });
 
   const root = document.getElementById('root');
   if (root === null) {
