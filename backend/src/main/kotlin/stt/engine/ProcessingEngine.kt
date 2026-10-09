@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import stt.audio.Chunker
+import stt.audio.PcmDecoder
 import stt.config.Config
 import stt.db.Chunk
 import stt.db.ChunkRepository
@@ -40,6 +41,9 @@ import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSettings
 import stt.transcribe.resumePrompt
 import stt.transcribe.taskProgress
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -63,6 +67,7 @@ class ProcessingEngine internal constructor(
     private val transcriber: Transcriber,
     private val processControl: ProcessControl,
     private val diarizer: Diarizer,
+    private val pcmDecoder: PcmDecoder,
 ) {
     private val transcription = ChunkTranscription(transcriber, segments)
 
@@ -361,8 +366,8 @@ class ProcessingEngine internal constructor(
 
     /**
      * DIARIZING: skipped when the speakers are off (`speakers_mode = off` asks for no labels) and when the
-     * task has no segments (there is nothing to label; item 09 skips it then too). Everything else is the
-     * [Diarizer]'s job: rebuilding the PCM from the stored chunks and assigning and storing the speakers.
+     * task has no segments (there is nothing to label; item 09 skips it then too). Otherwise the whole-file
+     * PCM is rebuilt from the stored chunks (ADR 0024), and the [Diarizer] assigns and stores the speakers.
      */
     private suspend fun diarize(
         id: Long,
@@ -374,6 +379,7 @@ class ProcessingEngine internal constructor(
         // The contract (item 12): progress is 0 before diarization starts, 1 once the speakers are stored,
         // with no stage left over. The reports in between are each persisted and then published.
         diarizationProgress(id, null, 0.0)
+        val pcm = rebuildPcm(id)
         val reports = Channel<DiarizationReport?>(Channel.UNLIMITED)
         coroutineScope {
             launch {
@@ -381,6 +387,7 @@ class ProcessingEngine internal constructor(
                 diarizer.diarize(
                     task,
                     pauseGate,
+                    pcm,
                     onStage = { stage.value = it },
                     onProgress = { value -> reports.trySend(DiarizationReport(stage.value, value)) },
                 )
@@ -393,6 +400,26 @@ class ProcessingEngine internal constructor(
             }
         }
         diarizationProgress(id, null, 1.0)
+    }
+
+    /**
+     * Rebuilds the task's whole-file PCM from its stored chunk FLACs, each decoded and concatenated in
+     * `idx` order (ADR 0024). Only the stored chunks are read, so a restart changes nothing; the work
+     * directory is scratch.
+     */
+    private suspend fun rebuildPcm(id: Long): FloatArray {
+        val workDir = workDirectories.workDir(id)
+        val pcm = ByteArrayOutputStream()
+        for (chunk in chunks.findByTask(id)) {
+            val flac = workDir.resolve("chunk-${chunk.idx}.flac")
+            writeChunkFlac(id, chunk.idx, flac)
+            val decoded = workDir.resolve("chunk-${chunk.idx}.f32")
+            pcmDecoder.decode(flac, decoded)
+            withContext(Dispatchers.IO) { pcm.writeBytes(Files.readAllBytes(decoded)) }
+        }
+        val bytes = pcm.toByteArray()
+        val floats = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
+        return FloatArray(floats.remaining()) { floats.get() }
     }
 
     /** Persists a diarization stage report and then publishes it, so the database leads the event. */

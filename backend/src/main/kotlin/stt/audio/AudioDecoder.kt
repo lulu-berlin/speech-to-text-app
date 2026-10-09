@@ -8,9 +8,9 @@ import java.nio.file.Path
 
 class AudioDecoder(
     private val runner: ProcessRunner,
-) {
+) : PcmDecoder {
     /** Decodes [source] into the PCM file [pcm] and returns the decoded duration in milliseconds (sample count / 16). */
-    suspend fun decode(
+    override suspend fun decode(
         source: Path,
         pcm: Path,
     ): Long {

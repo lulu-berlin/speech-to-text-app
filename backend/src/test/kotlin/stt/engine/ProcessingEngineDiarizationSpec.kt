@@ -5,13 +5,17 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.withContext
+import stt.db.ChunkRepository
 import stt.db.DiarizationStage
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.queue.TaskStatus
 import stt.transcribe.WhisperSegment
+import java.nio.file.Files
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -178,6 +182,54 @@ class ProcessingEngineDiarizationSpec :
                             .find(off)
                             ?.task
                             ?.diarizationProgress shouldBe null
+                    }
+                }
+            }
+        }
+
+        given("two tasks with the same stored chunks, one chunked by this run and one before it") {
+            `when`("the engine diarizes both") {
+                then("each gets a whole-file PCM rebuilt from its stored chunk FLACs, identical across the restart") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val restarted =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "restarted.wav",
+                                queuePosition = 0,
+                                createdAt = 1,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        val fresh =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "fresh.wav",
+                                queuePosition = 1,
+                                createdAt = 2,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        // The "restart" task was chunked by a previous engine: its plan is stored and its
+                        // original is gone. The other is chunked by this run.
+                        ChunkRepository(db).storePlan(restarted, exportedPlan(fixture, restarted, chunkCount = 2))
+                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(restarted)) }
+                        fixture.chunker.chunkCount = 2
+                        fixture.transcriber.segmentsByTask =
+                            mapOf(
+                                restarted to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")),
+                                fresh to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")),
+                            )
+
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe restarted
+                        fixture.completed.receive() shouldBe fresh
+
+                        val expected = listOf(1.0.toFloat(), 2.0.toFloat(), 2.0.toFloat())
+                        fixture.diarizer.diarized shouldBe listOf(restarted, fresh)
+                        fixture.diarizer.pcms.map { it.toList() } shouldBe listOf(expected, expected)
+                        fixture.pcmDecoder.decoded.map { it.fileName.toString() } shouldBe
+                            listOf("chunk-0.flac", "chunk-1.flac", "chunk-0.flac", "chunk-1.flac")
                     }
                 }
             }
