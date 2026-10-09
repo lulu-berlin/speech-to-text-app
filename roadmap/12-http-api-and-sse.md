@@ -39,7 +39,7 @@ Expose the queue and the transcription history over a REST API for all commands 
     - its cached joined FLAC.
   - `204`, or `404` for an unknown id. Emits `task-deleted`, plus `queue-updated` if the task was pending.
 - **Queue.** `GET /api/queue` (paused flag + ordered task ids), `POST /api/queue/pause`, `POST /api/queue/resume`, `PUT /api/queue/order` with body `{ "taskIds": [...] }`: the full ordered list of non-terminal task ids. A different set → `409`.
-- **Transcript download.** `GET /api/tasks/{id}/transcript?format=txt|srt|vtt|json`, rendered on demand by item 10's renderers, served as an attachment with the matching content type. Only for COMPLETED tasks; any other status → `409 not-completed` (partial results of FAILED/CANCELED tasks are kept only for a retry).
+- **Transcript download.** `GET /api/tasks/{id}/transcript?format=txt|srt|vtt` (json dropped 2026-10-09, [ADR 0035](../docs/decisions/0035-no-json-download.md)), rendered on demand by item 10's renderers, served as an attachment with the matching content type. Only for COMPLETED tasks; any other status → `409 not-completed` (partial results of FAILED/CANCELED tasks are kept only for a retry).
 - **Turns for the transcript view.** `GET /api/tasks/{id}/turns` returns the task's speakers (id and stored name) and item 09's speaker turns, each with its segments, so turn merging exists only in Kotlin. Turns reference their speaker by `speakerId`, so a later rename changes one name and no turn. The JSON download stays the oracle format.
 - **Audio.**
   - `GET /api/tasks/{id}/audio` joins the task's stored chunk FLACs in `idx` order with ffmpeg's concat demuxer (`-c copy`, no re-encode) into one FLAC, served as `audio/flac` (16 kHz mono, ADR 0024).
@@ -136,7 +136,8 @@ The JSON shapes the frontend builds against.
 - `/turns` for a task that is not COMPLETED? → **`409 not-completed`.**
 - `/turns` with speakers `off`? → **One turn per segment, `speaker: null`.**
 - `phase` of FAILED and CANCELED tasks? → **Kept**: the phase the task stopped in. Plus a new field, `transcribedUntilMs` (end of the last stored segment), for "failed while transcribing at <time>". Resume stays per chunk (ADR 0004): segment-level resume was considered and rejected (it would commit segments while whisper-cli streams them and restart inside a chunk, possibly in the middle of speech).
-- Is segment text trimmed? → **Yes, everywhere it leaves the backend**, the API and every download format including json ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)). Storage stays untrimmed for item 07's prompt.
+- Is segment text trimmed? → **Yes, everywhere it leaves the backend**, the API and every download format ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md); its json point was dropped with the json download, [ADR 0035](../docs/decisions/0035-no-json-download.md)). Storage stays untrimmed for item 07's prompt.
+- Which download formats? → **txt, srt and vtt** (ADR 0035); speaker labels in them are the stored speaker names ([ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md)).
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -154,7 +155,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Reordering with the full set of non-terminal ids changes the queue order
 - [ ] Reordering with a different set of ids returns 409 and leaves the order unchanged
 - [ ] Pausing and resuming the queue is reflected in `GET /api/queue`
-- [ ] Downloading a transcript in each format returns the rendered output with the right content type
+- [ ] Downloading a transcript as txt, srt and vtt returns the rendered output with the right content type (json dropped 2026-10-09, ADR 0035)
 - [ ] Downloading with an unknown format returns 400; downloading the transcript of a task that is not COMPLETED returns 409 `not-completed`
 - [ ] The turns endpoint returns the task's speakers with their stored names and item 09's turns (by `speakerId`) with their segments for a COMPLETED task; with speakers `off`, no speakers and one turn per segment with `speakerId` null; 409 `not-completed` for any other status
 - [ ] (added 2026-10-09, from the phase/trim decisions) Turn and segment texts in `/turns` are trimmed, and a turn's text is its segments' trimmed texts joined with single spaces
@@ -185,3 +186,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: contract changed in the item 10/11 consultation: Task and `task-progress` gain `diarizationStage` (`EMBEDDING`, `CLUSTERING`, null), and `diarizationProgress` becomes the progress within that stage (replacing "1 while clustering"); `docs/api/` examples updated in the same commit (new `task.diarizing.json`; `task-progress.json` shows the clustering stage). Item 13 picks this up on its next rebase.
 - 2026-10-09: item 14 consultation: the upload `language` defaults to `auto` (whisper-cli's own default is `en`, and so is the oracle's `-l`), and the accepted codes are the contract file `docs/api/languages.json`, extracted from whisper.cpp 1.9.2's C API (procedure in `docs/api/README.md`), shared by the upload form and this item's validation.
 - 2026-10-09: contract changed in the item 15 consultation: Task gains `hasAudio` (boolean, computed from the stored chunk audio), so the History views hide the player for tasks without audio instead of failing on `404`; every Task example in `docs/api/` updated in the same commit.
+- 2026-10-09: item 10 consultation: the json transcript download is dropped ([ADR 0035](../docs/decisions/0035-no-json-download.md)), so `format` accepts `txt|srt|vtt`; [ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md) makes the speaker names the labels in the downloads (this item's `/turns` already returns them).
