@@ -74,14 +74,5 @@ private fun speakerCentroids(
     return centroids
 }
 
-private fun dot(
-    a: FloatArray,
-    b: DoubleArray,
-): Double {
-    var sum = 0.0
-    for (d in a.indices) sum += a[d] * b[d]
-    return sum
-}
-
 /** Whether this segment is at least [SHORT_SEGMENT_MS] long. */
 private fun Segment.isLong() = endMs - startMs >= SHORT_SEGMENT_MS

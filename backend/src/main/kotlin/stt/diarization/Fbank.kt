@@ -43,7 +43,7 @@ internal fun fbank(samples: FloatArray): Array<FloatArray> {
         im.fill(0f)
         FFT.transform(re, im)
         for (k in power.indices) power[k] = re[k] * re[k] + im[k] * im[k]
-        FloatArray(MEL_BINS) { bin -> ln(maxOf(dot(MEL_BANK[bin], power), LOG_FLOOR)) }
+        FloatArray(MEL_BINS) { bin -> ln(maxOf(dotInFloat(MEL_BANK[bin], power), LOG_FLOOR)) }
     }
 }
 
@@ -73,15 +73,6 @@ private fun processWindow(window: FloatArray) {
     for (i in FRAME_LENGTH - 1 downTo 1) window[i] -= PREEMPHASIS * window[i - 1]
     window[0] -= PREEMPHASIS * window[0]
     for (i in 0 until FRAME_LENGTH) window[i] *= WINDOW[i]
-}
-
-private fun dot(
-    a: FloatArray,
-    b: FloatArray,
-): Float {
-    var sum = 0f
-    for (i in a.indices) sum += a[i] * b[i]
-    return sum
 }
 
 /**

@@ -97,7 +97,7 @@ internal fun upgmaMerges(embeddings: Array<FloatArray>): List<Merge> {
     for (a in 0 until n) {
         d[a * n + a] = Double.POSITIVE_INFINITY
         for (b in a + 1 until n) {
-            val distance = cosineDistance(embeddings[a], embeddings[b])
+            val distance = 1.0 - dot(embeddings[a], embeddings[b])
             d[a * n + b] = distance
             d[b * n + a] = distance
         }
@@ -134,14 +134,4 @@ internal fun upgmaMerges(embeddings: Array<FloatArray>): List<Merge> {
         active.remove(j)
     }
     return merges
-}
-
-/** `1 - a·b` in double: the cosine distance of two L2-normalized rows. */
-private fun cosineDistance(
-    a: FloatArray,
-    b: FloatArray,
-): Double {
-    var dot = 0.0
-    for (i in a.indices) dot += a[i].toDouble() * b[i].toDouble()
-    return 1.0 - dot
 }
