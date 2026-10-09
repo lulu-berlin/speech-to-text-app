@@ -1,6 +1,6 @@
 # 13 — Frontend foundation
 
-Status: draft
+Status: spec-approved
 Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [12](12-http-api-and-sse.md) (spec-approved only: its contract, not its implementation)
 
 ## Goal
@@ -21,7 +21,7 @@ Provide the shared frontend building blocks that the Queue (item 14) and History
 - [ADR 0031 — Frontend routing with react-router, state with XState](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md): react-router URLs; XState v5 + `@xstate/react` machines for client actions, with server state applied as received; one transition table, `docs/api/task-transitions.json`.
 - [Frontend conventions](../docs/conventions/frontend.md): `app/`, `features/<feature>/`, `shared/`; design values only as theme tokens; named exports; colocated tests; typed API client in `src/shared/api/`.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 - **Dependencies** (each changes `pnpm-lock.yaml` and the flake's `fetchPnpmDeps` hash; `nix build .` is verified by the user, ADR 0012):
   - runtime: `react-router`, `xstate`, `@xstate/react`;
   - dev: `msw` (>= 2.12, which has the `sse()` API for Server-Sent Events).
@@ -65,7 +65,7 @@ Provide the shared frontend building blocks that the Queue (item 14) and History
 - Dialogs? → **Native `<dialog>`.**
 
 ## Test list (written with the user; Canon TDD step 1)
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 - [ ] The API client returns typed tasks for `GET /api/tasks` (served from `docs/api/task-list.json`)
 - [ ] The API client turns an error response into a typed error with code and message, and `duplicate-audio` with its `taskId`
 - [ ] The connection machine goes from connecting to live on the first `snapshot`, which replaces tasks and queue
@@ -89,3 +89,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Approval log
 - 2026-10-09: consultation answers approved: react-router; XState v5 + `@xstate/react` for client actions with server state applied as received ([ADR 0031](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md)); transition table shared as `docs/api/task-transitions.json`; light and dark following the OS; calm, document-like look; English only; `pnpm dev:mock`; native `<dialog>`. Test list not yet approved.
+- 2026-10-09: test list (13 items) approved by the user; status `spec-approved`.
