@@ -29,7 +29,7 @@ internal fun speakerTurns(
                 // The oracle appends each trimmed text as f"{acc} {text}".strip(): the non-blank trimmed texts joined
                 // with single spaces.
                 text = run.map { it.text.trim() }.filter { it.isNotEmpty() }.joinToString(" "),
-                segments = run.map { TurnSegment(startMs = it.startMs, endMs = it.endMs, text = it.text) },
+                segments = run.map { TurnSegment(startMs = it.startMs, endMs = it.endMs, text = it.text.trim()) },
             ),
         )
         start = end

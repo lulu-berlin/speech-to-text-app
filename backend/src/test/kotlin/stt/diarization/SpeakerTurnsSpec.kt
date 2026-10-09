@@ -9,7 +9,9 @@ class SpeakerTurnsSpec :
     BehaviorSpec({
         given("segments of speakers 0, 0, 0, 1, 0, one of them blank, with untrimmed texts") {
             `when`("they are collapsed into speaker turns") {
-                then("consecutive same-speaker segments form one turn that keeps its segments; a speaker change starts a new turn") {
+                then(
+                    "consecutive same-speaker segments form one turn that keeps its segments with trimmed texts; a speaker change starts a new turn",
+                ) {
                     val speakers = listOf(Speaker(speakerId = 0, speaker = "Speaker 1"), Speaker(speakerId = 1, speaker = "Speaker 2"))
                     val segments =
                         listOf(
@@ -21,7 +23,7 @@ class SpeakerTurnsSpec :
                         )
 
                     // Oracle `speaker_turns`: each text trimmed, appended as f"{acc} {text}".strip(), so the blank segment
-                    // adds no space: "Hello" -> "Hello" -> "Hello there.".
+                    // adds no space: "Hello" -> "Hello" -> "Hello there.". The kept segments' texts are trimmed too (ADR 0030).
                     speakerTurns(segments, speakers).shouldBe(
                         listOf(
                             SpeakerTurn(
@@ -32,8 +34,8 @@ class SpeakerTurnsSpec :
                                 text = "Hello there.",
                                 segments =
                                     listOf(
-                                        TurnSegment(startMs = 0, endMs = 1_000, text = " Hello "),
-                                        TurnSegment(startMs = 1_000, endMs = 2_000, text = "  "),
+                                        TurnSegment(startMs = 0, endMs = 1_000, text = "Hello"),
+                                        TurnSegment(startMs = 1_000, endMs = 2_000, text = ""),
                                         TurnSegment(startMs = 2_000, endMs = 3_000, text = "there."),
                                     ),
                             ),
@@ -43,7 +45,7 @@ class SpeakerTurnsSpec :
                                 startMs = 3_000,
                                 endMs = 4_000,
                                 text = "Hi.",
-                                segments = listOf(TurnSegment(startMs = 3_000, endMs = 4_000, text = " Hi.")),
+                                segments = listOf(TurnSegment(startMs = 3_000, endMs = 4_000, text = "Hi.")),
                             ),
                             SpeakerTurn(
                                 speakerId = 0,
@@ -51,7 +53,7 @@ class SpeakerTurnsSpec :
                                 startMs = 4_000,
                                 endMs = 5_000,
                                 text = "Bye.",
-                                segments = listOf(TurnSegment(startMs = 4_000, endMs = 5_000, text = " Bye.")),
+                                segments = listOf(TurnSegment(startMs = 4_000, endMs = 5_000, text = "Bye.")),
                             ),
                         ),
                     )
