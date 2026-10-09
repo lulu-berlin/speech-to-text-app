@@ -167,6 +167,35 @@ class TaskRepositorySpec :
             }
         }
 
+        given("two diarized tasks, each with two segments of two speakers") {
+            `when`("the first task is deleted") {
+                then("its segments and speakers are gone; the second task's segments and speakers remain") {
+                    withDatabase { db ->
+                        val tasks = taskRepository(db, dataDir)
+                        val segments = SegmentRepository(db)
+                        val doomedId = tasks.insert(queuedTask("doomed.wav", createdAt = 1L))
+                        val keptId = tasks.insert(queuedTask("kept.wav", createdAt = 2L))
+                        val transcribed =
+                            listOf(
+                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "x", speakerId = null),
+                                Segment(chunkIdx = 0, seq = 1, startMs = 900L, endMs = 1_800L, text = "y", speakerId = null),
+                            )
+                        for (taskId in listOf(doomedId, keptId)) {
+                            segments.insertAll(taskId, transcribed)
+                            segments.storeSpeakers(taskId, speakerIds = listOf(0, 1))
+                        }
+
+                        tasks.delete(doomedId)
+
+                        segments.findByTask(doomedId).shouldBe(emptyList())
+                        segments.findSpeakers(doomedId).shouldBe(emptyList())
+                        segments.findByTask(keptId).map { it.speakerId }.shouldBe(listOf(0, 1))
+                        segments.findSpeakers(keptId).map { it.speakerId }.shouldBe(listOf(0, 1))
+                    }
+                }
+            }
+        }
+
         given("two tasks created from uploads, and the chunk audio table made unreadable") {
             `when`("listing tasks") {
                 then("both tasks come back in creation order without reading chunk audio") {
