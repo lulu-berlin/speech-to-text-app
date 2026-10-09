@@ -1,8 +1,9 @@
 # Minimal flake building both parts (roadmap item 02, decision 7; ADR 0014 as amended
 # by ADR 0016). The app wrapper (bin/speech-to-text-app) ships in item 02 (ADR 0016);
 # since item 03 it refuses to start without STT_DATA_DIR (ADR 0017: one stderr line,
-# non-zero exit, no default). Full STT_* env wiring, models, and nix run . are finished
-# in roadmap item 16.
+# non-zero exit, no default); since item 08 it defaults STT_SPEAKER_MODEL to the pinned
+# CAM++ model from nix/models.nix (ADR 0003; a user-set value wins). Full STT_* env
+# wiring, models, and nix run . are finished in roadmap item 16.
 # Nix evaluation happens on the user's machine - this file is unverified here.
 {
   description = "Speech-to-Text app (backend + frontend build check, roadmap item 02)";
@@ -17,6 +18,7 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      models = import ./nix/models.nix { inherit pkgs; };
 
       backend = pkgs.stdenv.mkDerivation (finalAttrs: {
         pname = "stt-backend";
@@ -150,9 +152,12 @@
             # --run: STT_DATA_DIR has no default (ADR 0017); unset or empty fails with one
             # stderr line instead of a JVM stack trace. The doubled quotes escape the dollar
             # sign below, so the wrapper (not Nix) expands the variable.
+            # --set-default STT_SPEAKER_MODEL: the pinned CAM++ model (nix/models.nix, ADR 0003)
+            # unless the user sets one; item 16 may revisit this with the rest of the model wiring.
             makeWrapper ${pkgs.jre}/bin/java $out/bin/speech-to-text-app \
               --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then echo "speech-to-text-app: STT_DATA_DIR must be set to the data directory (it holds stt.db)" >&2; exit 1; fi' \
               --set STT_STATIC_DIR "$out/share/stt-app/static" \
+              --set-default STT_SPEAKER_MODEL ${models.speaker} \
               --set CLASSPATH "$CP" \
               --add-flags "stt.MainKt"
             runHook postInstall
