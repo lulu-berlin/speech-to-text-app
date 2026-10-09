@@ -1,5 +1,8 @@
 package stt.diarization
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+
 /**
  * Cosine distance below which the last (highest) merge means one speaker in auto mode (ADR 0027). Placeholder: the
  * oracle's 0.35 (tuned for ECAPA), until it is re-tuned for CAM++ (ADR 0003).
@@ -10,16 +13,19 @@ internal const val SPEAKER_DISTANCE_THRESHOLD = 0.35
  * The `speakerId` (0-based) of every row of [embeddings] (L2-normalized, one per clustered segment), by average-linkage
  * (UPGMA) agglomerative clustering on cosine distance. Ported from oracle `cluster_segments`
  * (docs/oracle/transcribe.py); [k] = `null` picks the count automatically (ADR 0027), otherwise it is the fixed count,
- * clamped to `[1, n]` and not limited by [maxSpeakers].
+ * clamped to `[1, n]` and not limited by [maxSpeakers]. [gate] and cancellation are checked between merges and
+ * [onMergeDone] reports `(merges done, total merges)` (see [upgmaMerges]).
  */
-internal fun clusterSegments(
+internal suspend fun clusterSegments(
     embeddings: Array<FloatArray>,
     k: Int?,
     maxSpeakers: Int,
+    gate: PauseGate? = null,
+    onMergeDone: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): List<Int> {
     val n = embeddings.size
     if (n <= 1) return List(n) { 0 }
-    val merges = upgmaMerges(embeddings)
+    val merges = upgmaMerges(embeddings, gate, onMergeDone)
     val speakerCount =
         when {
             k != null -> k.coerceIn(1, n)
@@ -90,8 +96,15 @@ private fun cutLabels(
  * over the active clusters (kept in original index order, so `i < j`); the merged row is the size-weighted mean
  * `(size_i·D[i,·] + size_j·D[j,·]) / (size_i + size_j)`, so every segment counts once; cluster `j` becomes inactive.
  * `O(n²)` memory, `O(n³)` time.
+ *
+ * Before every merge, cancellation of this coroutine and [gate] (ADR 0004) are checked, so a long recording pauses or
+ * stops at the next merge; [onMergeDone] reports `(merges done, n - 1)` after each merge.
  */
-internal fun upgmaMerges(embeddings: Array<FloatArray>): List<Merge> {
+internal suspend fun upgmaMerges(
+    embeddings: Array<FloatArray>,
+    gate: PauseGate? = null,
+    onMergeDone: (done: Int, total: Int) -> Unit = { _, _ -> },
+): List<Merge> {
     val n = embeddings.size
     val d = DoubleArray(n * n)
     for (a in 0 until n) {
@@ -106,6 +119,8 @@ internal fun upgmaMerges(embeddings: Array<FloatArray>): List<Merge> {
     val active = MutableList(n) { it }
     val merges = ArrayList<Merge>(maxOf(n - 1, 0))
     while (active.size > 1) {
+        currentCoroutineContext().ensureActive()
+        gate?.checkpoint()
         // D is symmetric with +∞ on the diagonal, so the first row-major minimum lies above the diagonal.
         var i = -1
         var j = -1
@@ -132,6 +147,7 @@ internal fun upgmaMerges(embeddings: Array<FloatArray>): List<Merge> {
         }
         size[i] = sizeI + sizeJ
         active.remove(j)
+        onMergeDone(merges.size, n - 1)
     }
     return merges
 }

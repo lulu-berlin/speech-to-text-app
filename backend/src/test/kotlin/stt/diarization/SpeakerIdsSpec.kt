@@ -1,12 +1,20 @@
 package stt.diarization
 
 import ch.qos.logback.classic.Level
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
 import stt.db.Segment
 import stt.withCapturedLogs
 import kotlin.math.sqrt
+import kotlin.time.Duration.Companion.milliseconds
 
 class SpeakerIdsSpec :
     BehaviorSpec({
@@ -193,6 +201,46 @@ class SpeakerIdsSpec :
                             .shouldBe(expectedSpeakerIds)
 
                         events.map { it.level to it.throwableProxy?.message }.shouldBe(listOf(Level.WARN to "boom"))
+                    }
+                }
+            }
+        }
+
+        given("four long segments with orthogonal embeddings (three merges), labelled with a fixed count of 4") {
+            `when`("pausing in the callback of merge 1 and resuming, then cancelling in it, without and with a gate") {
+                then("clustering suspends between merges and resumes; a cancel stops it before the next merge") {
+                    // ADR 0004: in-JVM phases pause cooperatively between steps. All distances are 1, so the merges are
+                    // (0, 1), (0, 2), (0, 3) by the tie rule; k = 4 applies none of them: [0, 1, 2, 3].
+                    val segments = List(4) { segment(startMs = it * 2_000L, endMs = (it + 1) * 2_000L) }
+                    val embeddings = Array(4) { row -> FloatArray(4) { if (it == row) 1f else 0f } }
+
+                    val gate = PauseGate()
+                    val paused =
+                        async {
+                            speakerIds(segments, embeddings, k = 4, maxSpeakers = 8, gate = gate) { done, _ ->
+                                if (done == 1) gate.pause()
+                            }
+                        }
+                    withTimeoutOrNull(500.milliseconds) { paused.await() }.shouldBe(null)
+                    gate.resume()
+                    paused.await().shouldBe(listOf(0, 1, 2, 3))
+
+                    for (cancelGate in listOf(null, PauseGate())) {
+                        val mergesDone = mutableListOf<Int>()
+                        lateinit var job: Deferred<List<Int>>
+                        job =
+                            async(start = CoroutineStart.LAZY) {
+                                speakerIds(segments, embeddings, k = 4, maxSpeakers = 8, gate = cancelGate) { done, _ ->
+                                    mergesDone.add(done)
+                                    if (done == 1) job.cancel()
+                                }
+                            }
+                        job.start()
+
+                        withClue(if (cancelGate == null) "without a pause gate" else "with a pause gate") {
+                            shouldThrow<CancellationException> { job.await() }
+                            mergesDone.shouldBe(listOf(1))
+                        }
                     }
                 }
             }
