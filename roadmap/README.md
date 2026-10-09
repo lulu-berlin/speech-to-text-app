@@ -91,4 +91,4 @@ graph TD
 | [22 — Rename a task's speakers](22-speaker-rename.md) | draft | 09, 12, 15 |
 | [23 — Faster speaker clustering](23-faster-clustering.md) | draft | 09 |
 | [24 — Design system: tokens and primitives](24-visual-design.md) | spec-approved | 13 |
-| [25 — Visual polish pass](25-visual-polish.md) | draft | 24, 14, 15 |
+| [25 — Visual polish pass](25-visual-polish.md) | spec-approved | 24, 14, 15 |
