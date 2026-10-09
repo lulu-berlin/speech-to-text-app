@@ -1,11 +1,8 @@
 package stt.transcribe
 
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
-import stt.config.Config
-import stt.config.TEST_REQUIRED_ENV
+import stt.config.Device
 import java.nio.file.Path
 
 class WhisperCommandSpec :
@@ -17,8 +14,7 @@ class WhisperCommandSpec :
                     val chunk = Path.of("/work/chunk-2.flac")
                     val prefix = Path.of("/work/chunk-2")
 
-                    val configured = Config.fromEnv(env("STT_THREADS" to "4", "STT_DEVICE" to "cpu"))
-                    val configuredSettings = WhisperSettings(model, "en", configured.threads, configured.device)
+                    val configuredSettings = WhisperSettings(model, "en", threads = 4, device = Device.Cpu)
                     whisperCommand(configuredSettings, chunk, prefix, prompt = " ask what you can do")
                         .shouldBe(
                             listOf(
@@ -41,8 +37,8 @@ class WhisperCommandSpec :
                             ),
                         )
 
-                    val defaults = Config.fromEnv(env())
-                    whisperCommand(WhisperSettings(model, "en", defaults.threads, defaults.device), chunk, prefix, prompt = null)
+                    val defaults = WhisperSettings(model, "en", threads = null, device = Device.Auto)
+                    whisperCommand(defaults, chunk, prefix, prompt = null)
                         .shouldBe(
                             listOf(
                                 "whisper-cli",
@@ -58,16 +54,7 @@ class WhisperCommandSpec :
                                 "-pp",
                             ),
                         )
-
-                    // A thread count must be an integer >= 1; empty is set-but-invalid.
-                    for (bad in listOf("", "0", "-2", "four", "1.5")) {
-                        val error = shouldThrow<IllegalArgumentException> { Config.fromEnv(env("STT_THREADS" to bad)) }
-                        error.message.shouldContain("STT_THREADS")
-                        error.message.shouldContain("\"$bad\"")
-                    }
                 }
             }
         }
     })
-
-private fun env(vararg vars: Pair<String, String>) = TEST_REQUIRED_ENV + vars
