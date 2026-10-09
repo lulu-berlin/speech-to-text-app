@@ -12,31 +12,31 @@ export interface ConfirmDialogProps {
 }
 
 const Dialog = styled.dialog`
-  padding: ${(props) => props.theme.spacing.unit * 3}px;
-  border: 1px solid ${(props) => props.theme.colors.border};
+  padding: ${(props) => props.theme.spacing.lg};
+  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
   border-radius: ${(props) => props.theme.radii.dialog};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 `;
 
 const Title = styled.h2`
-  margin: 0 0 ${(props) => props.theme.spacing.unit * 2}px;
+  margin: 0 0 ${(props) => props.theme.spacing.md};
   font-size: ${(props) => props.theme.fontSizes.title};
 `;
 
 const Body = styled.p`
-  margin: 0 0 ${(props) => props.theme.spacing.unit * 3}px;
+  margin: 0 0 ${(props) => props.theme.spacing.lg};
 `;
 
 const Actions = styled.div`
   display: flex;
   justify-content: flex-end;
-  gap: ${(props) => props.theme.spacing.unit}px;
+  gap: ${(props) => props.theme.spacing.sm};
 `;
 
 const Button = styled.button`
-  padding: ${(props) => props.theme.spacing.unit}px ${(props) => props.theme.spacing.unit * 2}px;
-  border: 1px solid ${(props) => props.theme.colors.border};
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
+  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
   border-radius: ${(props) => props.theme.radii.button};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
