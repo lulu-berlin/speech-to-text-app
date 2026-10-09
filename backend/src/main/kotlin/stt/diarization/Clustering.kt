@@ -4,10 +4,10 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 /**
- * Cosine distance below which the last (highest) merge means one speaker in auto mode (ADR 0027). Placeholder: the
- * oracle's 0.35 (tuned for ECAPA), until it is re-tuned for CAM++ (ADR 0003).
+ * Cosine distance below which the last (highest) merge means one speaker in auto mode (ADR 0027): 0.5448, measured
+ * for CAM++ on 18 LibriSpeech clips of 6 readers as the value with the fewest misclassified pairs (ADR 0032).
  */
-internal const val SPEAKER_DISTANCE_THRESHOLD = 0.35
+internal const val SPEAKER_DISTANCE_THRESHOLD = 0.5448
 
 /**
  * The `speakerId` (0-based) of every row of [embeddings] (L2-normalized, one per clustered segment), by average-linkage
