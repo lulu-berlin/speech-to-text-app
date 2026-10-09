@@ -41,3 +41,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0033 | [Design system: tokens, Radix primitives, IBM Plex Sans](0033-design-system-tokens-radix-plex.md) | accepted | 2026-10-09 |
 | 0034 | [Speaker labels in downloads are the stored speaker names](0034-speaker-labels-are-stored-names.md) | accepted | 2026-10-09 |
 | 0035 | [No json transcript download](0035-no-json-download.md) | accepted | 2026-10-09 |
+| 0036 | [One nixpkgs pin shared by devenv and the flake](0036-shared-nixpkgs-pin.md) | accepted | 2026-10-09 |
