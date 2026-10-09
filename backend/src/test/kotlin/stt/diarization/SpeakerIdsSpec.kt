@@ -164,9 +164,9 @@ class SpeakerIdsSpec :
                         )
                     val embeddings =
                         arrayOf(
-                            floatArrayOf(1f, 0f, 0f, 0f),
-                            floatArrayOf(1f, 0f, 0f, 0f),
-                            floatArrayOf(0.8f, 0.6f, 0f, 0f),
+                            voiceA,
+                            voiceA, // the short row equals A
+                            voiceA2,
                             floatArrayOf(0f, 0f, 1f, 0f),
                             floatArrayOf(0f, 0.28f, 0.96f, 0f),
                             floatArrayOf(0f, 0f, 0f, 1f),
