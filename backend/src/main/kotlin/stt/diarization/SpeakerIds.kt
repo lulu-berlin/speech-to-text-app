@@ -3,6 +3,7 @@ package stt.diarization
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import stt.db.Segment
+import stt.pause.PauseGate
 import kotlin.math.sqrt
 
 /**
