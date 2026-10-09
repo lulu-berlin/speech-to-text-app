@@ -1,4 +1,5 @@
 import 'styled-components';
+import { darkSpeakerTints, lightSpeakerTints } from './speakerPalette';
 
 // The five status groups (ADR 0033): pending = QUEUED, PAUSED; active = RUNNING;
 // done = COMPLETED; problem = FAILED; gone = CANCELED.
@@ -92,28 +93,7 @@ export const lightTheme: ThemeTokens = {
       problem: { background: '#fcebe9', text: '#b42318' },
       gone: { background: '#f3f3f3', text: '#5a616c' },
     },
-    speakerTints: [
-      '#0d559c',
-      '#df1212',
-      '#0b820b',
-      '#b912e3',
-      '#6e4f09',
-      '#952574',
-      '#0a7d7d',
-      '#6858f1',
-      '#d51186',
-      '#18603c',
-      '#7411d6',
-      '#7d710a',
-      '#a51d0d',
-      '#0f75b8',
-      '#a85c2a',
-      '#2135ed',
-      '#085d67',
-      '#4b5b07',
-      '#9b48d1',
-      '#cc3562',
-    ],
+    speakerTints: lightSpeakerTints,
   },
 };
 
@@ -137,44 +117,13 @@ export const darkTheme: ThemeTokens = {
       problem: { background: '#3a1c1c', text: '#f28b82' },
       gone: { background: '#22252a', text: '#9aa2ad' },
     },
-    speakerTints: [
-      '#79b6f4',
-      '#f25c5c',
-      '#0da60d',
-      '#d359f2',
-      '#e6a613',
-      '#e699cf',
-      '#0d9f9f',
-      '#8b7ff5',
-      '#f14eaf',
-      '#32ca7e',
-      '#cb9ff7',
-      '#9e900d',
-      '#f6998e',
-      '#1394ea',
-      '#cf793f',
-      '#a3acf8',
-      '#11c3d7',
-      '#9bbf0f',
-      '#b374dc',
-      '#da6b8c',
-    ],
+    speakerTints: darkSpeakerTints,
   },
 };
 
 // The token set for the OS preference.
 export function themeFor(prefersDark: boolean): ThemeTokens {
   return prefersDark ? darkTheme : lightTheme;
-}
-
-// A speaker's tint: the palette entry for its 0-based speaker index (item 12's speakerId),
-// wrapping when a task has more speakers than the palette has entries.
-export function speakerTint(tints: readonly string[], index: number): string {
-  const tint = tints[index % tints.length];
-  if (tint === undefined) {
-    throw new Error('The speaker palette is empty');
-  }
-  return tint;
 }
 
 declare module 'styled-components' {

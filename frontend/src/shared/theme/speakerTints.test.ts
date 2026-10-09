@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { contrast } from '../../test/wcag';
-import { darkTheme, lightTheme, speakerTint } from './theme';
+import { darkTheme, lightTheme } from './theme';
 import type { ThemeTokens } from './theme';
+import { speakerTint } from './speakerPalette';
 
 // Item 12 allows up to 20 speakers, so the palette carries one tint per speaker index.
 const SPEAKERS = 20;

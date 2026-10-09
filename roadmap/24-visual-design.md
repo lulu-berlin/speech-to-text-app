@@ -86,7 +86,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] The dark-mode control cycles auto → light → dark, stores the choice, and overrides the OS preference
 - [ ] The icon wrapper renders a token-sized, token-colored icon and is hidden from assistive technology when decorative
 - [x] Text and background contrast meets AA in both the light and the dark token set (measured)
-- [x] (discovered, confirmed 2026-10-09) A convention check fails on any literal color (hex, `rgb()`, `hsl()`) or length (`px`, `rem`, `em`, `vh`) in `src/` outside `theme.ts` and the tests, and on raw `px` everywhere, `theme.ts` included (user, 2026-10-09)
+- [x] (discovered, confirmed 2026-10-09) A convention check fails on any literal color (hex, `rgb()`, `hsl()`) or length (`px`, `rem`, `em`, `vh`) in `src/` outside the tokens (`src/shared/theme/`) and the tests, and on raw `px` everywhere, the token modules included (user, 2026-10-09)
 - [ ] (discovered, confirmed 2026-10-09) The body text uses IBM Plex Sans with the system stack as fallback (the font's shipping and loading are verified as acceptance work: the woff2 in `dist/assets`, `document.fonts` in Chromium)
 - [x] (added 2026-10-09, item 15) The speaker palette provides one tint per speaker index, wraps around, and meets AA in both themes
 
