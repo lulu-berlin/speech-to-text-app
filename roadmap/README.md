@@ -53,6 +53,9 @@ graph TD
   12 --> 22
   15 --> 22
   09 --> 23[23 faster clustering]
+  13 --> 24[24 visual design]
+  14 --> 24
+  15 --> 24
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -83,3 +86,4 @@ graph TD
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |
 | [22 — Rename a task's speakers](22-speaker-rename.md) | draft | 09, 12, 15 |
 | [23 — Faster speaker clustering](23-faster-clustering.md) | draft | 09 |
+| [24 — Visual design: a deliberate look](24-visual-design.md) | draft | 13, 14, 15 |
