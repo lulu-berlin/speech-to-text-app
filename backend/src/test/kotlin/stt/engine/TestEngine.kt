@@ -39,6 +39,8 @@ internal class EngineFixture(
     val engine: ProcessingEngine,
     /** The ids of the tasks that reach COMPLETED, in order. */
     val completed: ReceiveChannel<Long>,
+    /** The ids of the tasks that reach FAILED, in order. */
+    val failed: ReceiveChannel<Long>,
 )
 
 /**
@@ -69,13 +71,19 @@ internal fun TestScope.engineUnderTest(
             processControl = processControl,
         )
     val completed = Channel<Long>(Channel.UNLIMITED)
+    val failed = Channel<Long>(Channel.UNLIMITED)
     backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
         engine.events
             .filterIsInstance<Event.TaskUpdated>()
-            .filter { it.task.task.status == TaskStatus.COMPLETED }
-            .collect { completed.send(it.task.id) }
+            .collect { update ->
+                when (update.task.task.status) {
+                    TaskStatus.COMPLETED -> completed.send(update.task.id)
+                    TaskStatus.FAILED -> failed.send(update.task.id)
+                    else -> Unit
+                }
+            }
     }
-    return EngineFixture(workDirectories, tasks, chunker, transcriber, processControl, engine, completed)
+    return EngineFixture(workDirectories, tasks, chunker, transcriber, processControl, engine, completed, failed)
 }
 
 /** Inserts a QUEUED task at [queuePosition] with an original in its work directory, as an upload does (ADR 0024). */

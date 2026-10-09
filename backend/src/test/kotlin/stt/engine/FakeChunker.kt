@@ -34,10 +34,10 @@ internal class FakeChunker : Chunker {
     ): ChunkedAudio =
         probe.around {
             workDirs.add(workDir)
-            entered.send(workDir)
-            hold?.await()
             val file = workDir.resolve("chunk-0.flac")
             Files.writeString(file, "fake flac")
+            entered.send(workDir)
+            hold?.await()
             val chunks =
                 if (taskIdOf(workDir) == unwritablePlanFor) {
                     listOf(

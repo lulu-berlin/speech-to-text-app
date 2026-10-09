@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import stt.audio.Chunker
 import stt.config.Config
 import stt.db.ChunkRepository
@@ -151,7 +153,9 @@ class ProcessingEngine(
             // when the caller itself is being cancelled (item 12's DELETE, or a shutting-down application).
             withContext(NonCancellable) {
                 runningJob(id)?.cancelAndJoin()
-                if (tasks.cancelIfPossible(id, now())) publish(id)
+                val canceled = tasks.cancelIfPossible(id, now())
+                pruneWorkDir(id)
+                if (canceled) publish(id)
             }
             val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
             if (after == TaskStatus.CANCELED) {
@@ -230,7 +234,9 @@ class ProcessingEngine(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (tasks.failIfRunning(id, e.message ?: e.toString(), now())) publish(id)
+            val failed = tasks.failIfRunning(id, e.message ?: e.toString(), now())
+            pruneWorkDir(id)
+            if (failed) publish(id)
             return
         }
         tasks.setCompleted(id, now())
@@ -283,6 +289,31 @@ class ProcessingEngine(
         }
     }
 
+    /**
+     * Removes everything in the task's work directory except its original (ADR 0024): the chunker's decoded
+     * PCM and exported chunks, and the copies written for whisper-cli. A task that was never chunked keeps
+     * its original, which for a FAILED or CANCELED task is the only copy of the audio (a retry needs it); a
+     * chunked task has no original left. Best effort: a leftover file is logged and removed by the startup
+     * cleanup instead, so it cannot turn a finished cancel or failure into an error.
+     */
+    private suspend fun pruneWorkDir(id: Long) {
+        val workDir = workDirectories.workDir(id)
+        val source = workDirectories.source(id)
+        try {
+            withContext(Dispatchers.IO) {
+                if (!Files.isDirectory(workDir)) return@withContext
+                Files.walk(workDir).use { paths ->
+                    paths
+                        .filter { it != workDir && it != source }
+                        .sorted(Comparator.reverseOrder())
+                        .forEach { Files.deleteIfExists(it) }
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("Could not prune the work directory {}; the startup cleanup removes it: {}", workDir, e.toString())
+        }
+    }
+
     /** Writes chunk [idx]'s stored FLAC to [target], where whisper-cli reads it (ADR 0024). */
     private suspend fun writeChunkFlac(
         id: Long,
@@ -308,4 +339,8 @@ class ProcessingEngine(
         )
 
     private fun now(): Long = System.currentTimeMillis()
+
+    private companion object {
+        val logger: Logger = LoggerFactory.getLogger(ProcessingEngine::class.java)
+    }
 }
