@@ -1,6 +1,6 @@
 # 19 — Generic Unix build recipe with minimal dependencies
 
-Status: draft
+Status: spec-approved
 Depends on: [16](16-nix-flake-package.md)
 
 ## Goal
@@ -13,11 +13,11 @@ A documented recipe that builds and runs the app on a plain Unix machine — no 
 - The repo's own pins are the recipe's pins: JDK 21 with Gradle 8.14 ([ADR 0014](../docs/decisions/0014-build-tooling-gradle-catalog-no-wrapper.md) — there is no Gradle wrapper), pnpm 11 ([ADR 0012](../docs/decisions/0012-frontend-dependency-management-pnpm.md)), whisper-cli 1.9.2, ffmpeg (9.0.1 tested), util-linux `setsid` ([ADR 0020](../docs/decisions/0020-process-runner-jna-signals-process-groups.md)), and the two models with the hashes from `nix/models.nix`.
 - Docker was considered for a portable build and aborted (item 19, 2026-10-09); this recipe replaces that role by documentation instead of an image.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 The item writes two artifacts in the repo:
 - **`docs/recipe-unix.md`** — the recipe, structured as:
-  1. **Prerequisites** (the minimal set, with the exact versions the repo is built and tested against): `git`, a JDK 21 with Gradle 8.14, Node with pnpm 11, `curl` and `tar`, `ffmpeg`, whisper-cli 1.9.2, and `util-linux` (for `setsid`). One line each, with pointers for a distro without them (e.g. `apt install ffmpeg util-linux`; whisper-cli built from whisper.cpp `v1.9.2` with `cmake` — CPU only, or `-DGGML_VULKAN=ON` for the same GPU path the flake builds).
+  1. **Prerequisites** (the minimal set, with the exact versions the repo is built and tested against): `git`, a JDK 21 with Gradle 8.14, Node with pnpm 11, `curl` and `tar`, `ffmpeg`, whisper-cli 1.9.2, and `util-linux` (for `setsid`). One line each, with pointers for a distro without them (e.g. `apt install ffmpeg util-linux`; whisper-cli built from whisper.cpp `v1.9.2` with `cmake`, with whichever backend the machine wants — CPU, or a GPU backend (`-DGGML_VULKAN=ON`, CUDA, …). The recipe is not CPU-only: it uses the whisper-cli the user installed, so its GPU story is exactly the host's, as if the app ran directly).
   2. **The models** — the two `curl` commands from `nix/models.nix` with their `sha256sum -c` checks, into e.g. `~/.local/share/stt-app/models/`.
   3. **The build** — from a fresh checkout: `cd backend && gradle installDist` (Maven Central supplies the dependencies), `cd frontend && pnpm install --frozen-lockfile && pnpm build`.
   4. **The run** — a small POSIX `scripts/stt-app` example wrapper the item adds, or the documented equivalent:
@@ -28,7 +28,7 @@ The item writes two artifacts in the repo:
      export STT_WHISPER_CLI=$(command -v whisper-cli)
      export STT_FFMPEG=$(command -v ffmpeg)
      export STT_STATIC_DIR="$PWD/frontend/dist"
-     export STT_DEVICE=cpu            # or gpu, or an index
+     export STT_DEVICE=auto           # auto = first GPU; cpu forces CPU; or an index
      # optional: export STT_PORT=8080  STT_THREADS=4
      exec java -cp 'backend/build/install/stt-backend/lib/*' stt.MainKt
      ```
@@ -52,14 +52,14 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written. Every item is verified by the user on a machine without Nix:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Every item is verified by the user on a machine without Nix:
 
 - [ ] From a fresh clone on a machine with only the listed prerequisites, `gradle installDist` and `pnpm build` succeed
 - [ ] The model downloads verify against the hashes in `docs/recipe-unix.md` and `nix/models.nix`
 - [ ] Starting the app via `scripts/stt-app` (or the documented commands) answers `GET /api/health` with `{"status":"ok"}`
 - [ ] The frontend loads at `/`
 - [ ] Uploading a short audio file transcribes it to COMPLETED with a transcript
-- [ ] `STT_DEVICE=cpu` runs without a GPU; the same app and model work under the Nix delivery (item 16) as well
+- [ ] With a GPU-capable whisper-cli installed, `STT_DEVICE=auto` (or `gpu`) uses the GPU; the same app and models work under the Nix delivery (item 16) as well
 
 ## Acceptance criteria
 
@@ -70,3 +70,5 @@ Seed — to be refined and approved with the user before any test is written. Ev
 ## Approval log
 
 - 2026-10-09: item created to replace the aborted Docker item: a plain-tools Unix recipe (documentation plus a small example wrapper), minimal prerequisites, no Nix and no bundle (user's decision).
+- 2026-10-09: corrected after test-list approval (user): the recipe must not read as CPU-only — it uses whatever whisper-cli the user installed, so a GPU-capable local whisper-cli works; the example default is `auto` (the first GPU), not `cpu`.
+- 2026-10-09: test list (6 items) approved by the user; status `spec-approved`.
