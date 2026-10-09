@@ -43,12 +43,13 @@ export const connectionMachine = setup({
         'task-updated': {
           actions: assign(({ context, event }) => {
             const previous = context.tasks.find((task) => task.id === event.task.id);
+            if (previous === undefined) {
+              // A task the state does not hold yet (e.g. a new upload) is added.
+              return { tasks: [...context.tasks, event.task] };
+            }
             // Server state is applied as received: an update outside the transition table is
             // logged, not rejected, and the next snapshot repairs the gap (ADR 0031).
-            if (
-              previous !== undefined &&
-              !isAllowedTransition(previous.status, event.task.status)
-            ) {
+            if (!isAllowedTransition(previous.status, event.task.status)) {
               console.warn(
                 `task-updated for task ${event.task.id} leaves the transition table: ` +
                   `${previous.status} -> ${event.task.status}`,
