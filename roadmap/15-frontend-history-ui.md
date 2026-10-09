@@ -1,12 +1,13 @@
 # 15 — Frontend history UI
 
 Status: draft
-Depends on: [13](13-frontend-foundation.md)
+Depends on: [13](13-frontend-foundation.md), [24](24-visual-design.md)
 
 ## Goal
 Let the user browse past transcriptions: see finished tasks, read a transcript with speakers and timestamps, follow it during playback with the played segment highlighted, download it in every format, listen to the task's audio, and retry failed or cancelled tasks.
 
 ## Already decided
+- [Item 24 design system](24-visual-design.md): the History and transcript views are built with its tokens and primitives; item 25 does the final visual pass.
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
 - [ADR 0024 — Audio storage: original kept only until chunking, chunks stored as FLAC](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks — 16 kHz mono, not the original upload; a task canceled or failed before chunking has no audio (404).
 - Item 12's contract (consultation 2026-10-09): the transcript view reads `GET /api/tasks/{id}/turns`, which returns the task's speakers (`speakerId`, stored name `speaker`) and item 09's turns referencing them by `speakerId` (ADR 0028; names become renamable later); `/audio` supports Range, so seeking and click-to-seek are possible; `DELETE /api/tasks/{id}` exists; a `task-deleted` event removes a task from the list.

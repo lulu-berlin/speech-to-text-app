@@ -53,9 +53,13 @@ graph TD
   12 --> 22
   15 --> 22
   09 --> 23[23 faster clustering]
-  13 --> 24[24 visual design]
-  14 --> 24
-  15 --> 24
+  13 --> 24[24 design system]
+  24 --> 14
+  24 --> 15
+  24 --> 17
+  24 --> 25[25 visual polish]
+  14 --> 25
+  15 --> 25
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -76,14 +80,15 @@ graph TD
 | [11 — Processing engine](11-processing-engine.md) | spec-approved | 04, 05, 07, 09, 18, 20 |
 | [12 — HTTP API and SSE](12-http-api-and-sse.md) | spec-approved | 10, 11 |
 | [13 — Frontend foundation](13-frontend-foundation.md) | spec-approved | 02, 12 (spec-approved only) |
-| [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13 |
-| [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13 |
+| [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13, 24 |
+| [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13, 24 |
 | [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
-| [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13 |
+| [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13, 24 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |
 | [22 — Rename a task's speakers](22-speaker-rename.md) | draft | 09, 12, 15 |
 | [23 — Faster speaker clustering](23-faster-clustering.md) | draft | 09 |
-| [24 — Visual design: a deliberate look](24-visual-design.md) | draft | 13, 14, 15 |
+| [24 — Design system: tokens and primitives](24-visual-design.md) | draft | 13 |
+| [25 — Visual polish pass](25-visual-polish.md) | draft | 24, 14, 15 |
