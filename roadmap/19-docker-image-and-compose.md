@@ -1,6 +1,6 @@
 # 19 — Docker image and docker-compose setup
 
-Status: draft
+Status: spec-approved
 Depends on: [16](16-nix-flake-package.md)
 
 ## Goal
@@ -17,7 +17,7 @@ Make the app easy to build and run with Docker: a container image of the package
 - **The GPU story (2026-10-09, corrected by the user)**: Docker exposes host GPUs to the container — `docker run --gpus all`, by device index, or by UUID — with the NVIDIA Container Toolkit ([Docker's GPU docs](https://docs.docker.com/engine/containers/gpu/)). The image's whisper-cli is the closure's Vulkan build, which runs on NVIDIA through the driver's Vulkan ICD and on Intel/AMD through Vulkan. This reinstates item 19 after a brief abort whose "GPU is impossible in a container" claim the user disproved; a plain-tools recipe that briefly replaced the item was dropped.
 - User decisions: a **multi-stage Dockerfile** whose builder stage runs Nix (portable: only Docker needed on the host); **models baked in at build time**; **build locally only**; **`curl` for the healthcheck**.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Image** built from item 16's flake closure by a multi-stage Dockerfile:
   - builder stage on `nixos/nix`: `nix build .#stt-app` (item 16's package: wrapper, JRE, frontend, Vulkan whisper-cli, ffmpeg, `setsid`, both models);
@@ -47,7 +47,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written. All items are verified by the user on a machine with Docker:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
 
 - [ ] From a fresh clone with only Docker installed, the documented command builds the image and starts the app on `http://localhost:8080`
 - [ ] `GET /api/health` answers `{"status":"ok"}` and the compose healthcheck reports the service healthy
@@ -68,3 +68,4 @@ Seed — to be refined and approved with the user before any test is written. Al
 ## Approval log
 
 - 2026-10-09: item restored after a brief abort. The abort claimed the GPU requirement could not be delivered through a Linux container; the user pointed at `docker run --gpus all` and the reversal stuck. A plain-tools recipe that had replaced the item was dropped. The GPU matrix above is decided with the user.
+- 2026-10-09: test list (9 items) approved by the user; status `spec-approved`.
