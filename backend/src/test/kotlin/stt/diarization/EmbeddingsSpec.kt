@@ -128,6 +128,35 @@ class EmbeddingsSpec :
                 }
             }
         }
+        given("a 600 ms excerpt starting 2 s into each LibriSpeech clip, zero-padded to the 2 s window, and the three whole clips") {
+            `when`("the excerpts and the whole clips are embedded") {
+                then("each excerpt is more similar to every whole clip of its own speaker than to the whole clip of the other speaker") {
+                    // Review round 1, finding 1: CAM++ (normalize_samples = 1) takes samples in [-1, 1] unscaled, as
+                    // sherpa-onnx does. A wrong scale shifts every log-mel value of frames with sound but leaves the
+                    // zero padding at the log floor, so global-mean normalization hides it only for unpadded windows.
+                    val clips = librispeechClips()
+                    val workDir = tempdir("librispeech").toPath()
+                    SpeakerModel.load(realSpeakerModelPath()).use { model ->
+                        val embedder = Embeddings(model)
+                        val pcms =
+                            listOf("1089-134686-0002", "1089-134691-0023", "1188-133604-0025").associateWith { id ->
+                                decodePcm(clips.resolve("$id.flac"), workDir.resolve("$id.f32"))
+                            }
+                        val whole = pcms.mapValues { (_, pcm) -> embedder.embed(pcm, listOf(segment(0, pcm.size / 16L)))[0] }
+                        val excerpts = pcms.mapValues { (_, pcm) -> embedder.embed(pcm, listOf(segment(2000, 2600)))[0] }
+
+                        val speaker = { id: String -> id.substringBefore('-') }
+                        for ((id, excerpt) in excerpts) {
+                            val own = whole.filterKeys { speaker(it) == speaker(id) }.values.map { dot(excerpt, it) }
+                            val other = whole.filterKeys { speaker(it) != speaker(id) }.values.map { dot(excerpt, it) }
+                            withClue("excerpt of $id: own-speaker cosines $own, other-speaker cosines $other") {
+                                own.min().shouldBeGreaterThan(other.max())
+                            }
+                        }
+                    }
+                }
+            }
+        }
     })
 
 private fun segment(
