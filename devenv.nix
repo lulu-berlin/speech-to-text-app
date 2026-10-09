@@ -28,8 +28,9 @@ in
     pkgs.curl
     pkgs.jq
 
-    # Frontend package manager (ADR 0012)
-    pkgs.pnpm
+    # Frontend package manager (ADR 0012): same major as the flake's pnpm_11,
+    # because the lockfile format is tied to the pnpm major.
+    pkgs.pnpm_11
 
     # Process runner (roadmap item 05, ADR 0020): `setsid` puts every spawned
     # command in its own process group so SIGSTOP/SIGCONT/TERM/KILL reach the
