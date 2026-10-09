@@ -49,6 +49,9 @@ graph TD
   12 --> 21[21 frontend-backend end-to-end]
   14 --> 21
   15 --> 21
+  22 --> 21
+  25 --> 21
+  21 --> 16
   09 --> 22[22 speaker rename]
   12 --> 22
   15 --> 22
@@ -82,12 +85,12 @@ graph TD
 | [13 — Frontend foundation](../docs/specs/frontend-foundation.md) | done | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | spec-approved | 13, 24 |
 | [15 — Frontend history UI](15-frontend-history-ui.md) | spec-approved | 13, 24 |
-| [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15, 17 |
+| [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15, 17, 21 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | spec-approved | 13, 24 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
-| [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |
+| [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15, 22, 25 |
 | [22 — Rename and merge a task's speakers](22-speaker-rename.md) | spec-approved | 09, 10, 12, 15 |
 | [23 — Faster speaker clustering](23-faster-clustering.md) | spec-approved | 09 |
 | [24 — Design system: tokens and primitives](24-visual-design.md) | spec-approved | 13 |
