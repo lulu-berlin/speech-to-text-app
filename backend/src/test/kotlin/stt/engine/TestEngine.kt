@@ -1,6 +1,7 @@
 package stt.engine
 
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -144,4 +145,21 @@ internal suspend fun TestScope.tasksStartedWithin(
         runCurrent()
     }
     return fixture.chunker.workDirs.map(::taskIdOf)
+}
+
+/**
+ * Whether [deferred] completes while [window] of real time passes, returning early once it does. Like
+ * [tasksStartedWithin], "it did not finish" cannot be awaited, so the test pumps the dispatcher itself.
+ */
+internal suspend fun TestScope.completesWithin(
+    deferred: Deferred<*>,
+    window: Duration,
+): Boolean {
+    val deadline = System.nanoTime() + window.inWholeNanoseconds
+    runCurrent()
+    while (System.nanoTime() < deadline && !deferred.isCompleted) {
+        withContext(Dispatchers.Default) { delay(2.milliseconds) }
+        runCurrent()
+    }
+    return deferred.isCompleted
 }

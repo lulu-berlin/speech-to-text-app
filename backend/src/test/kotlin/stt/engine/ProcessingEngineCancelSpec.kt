@@ -5,6 +5,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import stt.db.TaskPhase
 import stt.queue.TaskStatus
 import kotlin.time.Duration.Companion.milliseconds
@@ -78,6 +79,43 @@ class ProcessingEngineCancelSpec :
                         fixture.transcriber.audioFiles.map { taskIdOf(it.parent) } shouldBe listOf(running)
                         fixture.transcriber.cancelled.shouldBeEmpty()
                         statusOf(fixture, queued) shouldBe TaskStatus.CANCELED
+                    }
+                }
+            }
+        }
+
+        given("a running task whose process takes a while to die") {
+            `when`("it is cancelled") {
+                then("the cancel returns only once the process is gone and CANCELED is stored") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+
+                        val death = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = CompletableDeferred()
+                        fixture.transcriber.death = death
+                        fixture.engine.start()
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe task
+
+                        val cancel = async { fixture.engine.cancelTask(task) }
+                        taskIdOf(
+                            fixture.transcriber.dyingStarted
+                                .receive()
+                                .parent,
+                        ) shouldBe task
+
+                        // The process is still dying, so the cancel must still be waiting for it.
+                        completesWithin(cancel, 200.milliseconds) shouldBe false
+                        fixture.transcriber.cancelled.shouldBeEmpty()
+
+                        death.complete(Unit)
+                        cancel.await() shouldBe TaskCommandOutcome.Accepted
+                        fixture.transcriber.cancelled.map { taskIdOf(it.parent) } shouldBe listOf(task)
+                        statusOf(fixture, task) shouldBe TaskStatus.CANCELED
                     }
                 }
             }
