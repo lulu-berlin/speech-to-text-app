@@ -1,6 +1,7 @@
-// MSW handlers for every item 12 endpoint and for the SSE stream. They serve only the
-// contract example files in docs/api/ (ADR 0029): the frontend's mock data is that
-// directory and nothing else.
+// MSW handlers for every item 12 endpoint and for the SSE stream. They serve the contract
+// example files in docs/api/ (ADR 0029). Where a response must reflect the request, the
+// handler changes an example; each such change is marked "Mock addition" and listed in
+// roadmap item 13, "Mock additions to settle with item 12".
 
 import { http, HttpResponse } from 'msw';
 import { eventsHandler } from './events';
@@ -32,8 +33,10 @@ export const handlers = [
     return HttpResponse.json(task);
   }),
 
-  // Task commands: POST /api/tasks/{id}/<command> -> 200 Task. Each response is the Task
-  // example whose status is the command's `to` in task-transitions.json, with the URL's id.
+  // Task commands: POST /api/tasks/{id}/<command> -> 200 Task.
+  // Mock addition: the response is the Task example whose status is the command's `to` in
+  // task-transitions.json, with the URL's id, because the examples hold one Task per status,
+  // not one per (task, command) pair.
   ...Object.entries(taskTransitions.commands).map(([command, { to }]) =>
     http.post(`/api/tasks/:id/${command}`, ({ params }) => {
       const example = taskExamples.find((task) => task.status === to);
@@ -49,8 +52,12 @@ export const handlers = [
 
   // Queue: GET /api/queue, POST /api/queue/pause|resume, PUT /api/queue/order.
   http.get('/api/queue', () => HttpResponse.json(queueFixture)),
+  // Mock addition: queue.json with `paused` set by the command, because queue.json has
+  // `paused: false` and a pause response must show the paused queue.
   http.post('/api/queue/pause', () => HttpResponse.json({ ...queueFixture, paused: true })),
   http.post('/api/queue/resume', () => HttpResponse.json({ ...queueFixture, paused: false })),
+  // Mock addition: queue.json with the requested `taskIds`, because the response is the
+  // queue in its new order.
   http.put('/api/queue/order', async ({ request }) => {
     const body = (await request.json()) as { taskIds: number[] };
     return HttpResponse.json({ ...queueFixture, taskIds: body.taskIds });

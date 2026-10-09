@@ -87,6 +87,19 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - Running against the real backend is checked in item 21.
 - All test-list items ticked and green; user approved the diff.
 
+## Mock additions to settle with item 12
+The user allowed additions to the mocks (2026-10-09) if each states why, so it can be settled with the backend (item 12's route tests, item 21's end-to-end check). Each is marked "Mock addition" in `frontend/src/shared/api/`.
+- **New examples `docs/api/task.paused.json` (id 7) and `docs/api/task.canceled.json` (id 5).** No example had status PAUSED or CANCELED, which the pause and cancel commands return. Listed in `docs/api/README.md`'s Shapes table; item 12's route tests should check them like the other Task examples.
+- **Task command responses** (`POST /api/tasks/{id}/pause|resume|cancel|retry`): the Task example whose status is the command's `to` in `task-transitions.json`, with the URL's id. The examples hold one Task per status, not one per (task, command) pair, so other fields (filename, progress, `finishedAt`) belong to the example, not to the requested task. The backend returns the real task.
+- **`POST /api/queue/pause|resume`**: `queue.json` with `paused` set to `true`/`false`. `queue.json` has `paused: false`, and a pause response must show the paused queue.
+- **`PUT /api/queue/order`**: `queue.json` with the request's `taskIds`. The response is the queue in its new order; the mock does not check the set (the backend answers `409 reorder-mismatch`).
+
+Known differences from the contract, no example to serve:
+- `GET /api/tasks/{id}/turns` returns turns for any known task (by its `speakersMode`), not `409 not-completed` for a task that is not COMPLETED: `error.json`'s code is `not-found`, and there is no `not-completed` example.
+- `DELETE /api/tasks/{id}` answers `204` for any id, also unknown ones (the backend answers `404`).
+- The `404` for an unknown task id serves `error.json` verbatim, so its message names task 42 whatever the id.
+- `POST /api/tasks` always returns `task.queued.json` (id 7), which already exists in `snapshot.json`.
+
 ## Approval log
 - 2026-10-09: consultation answers approved: react-router; XState v5 + `@xstate/react` for client actions with server state applied as received ([ADR 0031](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md)); transition table shared as `docs/api/task-transitions.json`; light and dark following the OS; calm, document-like look; English only; `pnpm dev:mock`; native `<dialog>`. Test list not yet approved.
 - 2026-10-09: test list (13 items) approved by the user; status `spec-approved`.
