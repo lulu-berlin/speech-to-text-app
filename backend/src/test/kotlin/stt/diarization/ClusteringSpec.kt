@@ -256,9 +256,10 @@ private fun unitAt(degrees: Double) = floatArrayOf(cos(Math.toRadians(degrees)).
 private fun distanceAt(degrees: Double) = 1 - cos(Math.toRadians(degrees))
 
 /**
- * Asserts [merges] matches the naive reference: every height matches (double rounding tolerance)and every pair
- * matches, except that a pair may differ where its height ties exactly with another height in the same sequence
- * (the accepted, documented exception of the NN-chain switch).
+ * Asserts [merges] matches the naive reference: every height matches (within 1e-12, because the chain-on-demand
+ * distance arithmetic rounds differently from the weighted-matrix updates)and every pair matches, except that a pair may
+ * differ where its height ties exactly with another height in the same sequence (recognized within 1e-9;the accepted,
+ * documented exception of the NN-chain switch).
  */
 private fun assertMatchesReference(
     merges: List<Merge>,
@@ -269,7 +270,7 @@ private fun assertMatchesReference(
         withClue(
             "merge $i: within-tolerance heights but pair (${merges[i].i}, ${merges[i].j}) vs (${naive[i].i}, ${naive[i].j})",
         ) {
-            abs(merges[i].height - naive[i].height).shouldBeLessThan(1e-12) // chain-on-demand rounding
+            abs(merges[i].height - naive[i].height).shouldBeLessThan(1e-12)
             if (merges[i].i != naive[i].i || merges[i].j != naive[i].j) {
                 withClue("pair differs without an exact height tie") {
                     naive.indices
