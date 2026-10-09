@@ -2,7 +2,6 @@ package stt.outputs
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
-import stt.db.Segment
 
 class RenderTxtSpec :
     BehaviorSpec({
@@ -27,8 +26,3 @@ class RenderTxtSpec :
             }
         }
     })
-
-private fun segment(
-    speakerId: Int,
-    text: String,
-) = Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 0, text = text, speakerId = speakerId)
