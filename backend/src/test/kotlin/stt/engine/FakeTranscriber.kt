@@ -27,10 +27,7 @@ internal class FakeTranscriber : Transcriber {
     /** The first call to wait on [hold]; earlier calls run through. */
     var holdFrom: Int = 1
 
-    /** The segments every call returns, offsets relative to the chunk's audio; none by default. */
-    var segments: List<WhisperSegment> = emptyList()
-
-    /** Segments per task id, so one task can have speech and the next none; [segments] is the fallback. */
+    /** The segments every call returns per task id, offsets relative to the chunk's audio; none by default. */
     var segmentsByTask: Map<Long, List<WhisperSegment>> = emptyMap()
 
     /**
@@ -73,6 +70,6 @@ internal class FakeTranscriber : Transcriber {
                 failNext = null
                 throw failure
             }
-            segmentsByTask[taskIdOf(audio.parent)] ?: segments
+            segmentsByTask[taskIdOf(audio.parent)].orEmpty()
         }
 }
