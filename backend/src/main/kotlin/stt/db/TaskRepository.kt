@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.statements.UpdateStatement
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -126,16 +127,24 @@ class TaskRepository(
                 ?.toStoredTask()
         }
 
+    /** Applies one `tasks` row update for [id]; the single place that knows how the row is addressed. */
+    private suspend fun updateTask(
+        id: Long,
+        body: TasksTable.(UpdateStatement) -> Unit,
+    ) {
+        db.writeTransaction {
+            TasksTable.update({ TasksTable.id eq id }) { body(it) }
+        }
+    }
+
     /** Marks the task RUNNING and records when it started. */
     suspend fun setRunning(
         id: Long,
         startedAt: Long,
     ) {
-        db.writeTransaction {
-            TasksTable.update({ TasksTable.id eq id }) {
-                it[TasksTable.status] = TaskStatus.RUNNING
-                it[TasksTable.startedAt] = startedAt
-            }
+        updateTask(id) {
+            it[TasksTable.status] = TaskStatus.RUNNING
+            it[TasksTable.startedAt] = startedAt
         }
     }
 
@@ -147,9 +156,7 @@ class TaskRepository(
         id: Long,
         phase: TaskPhase?,
     ) {
-        db.writeTransaction {
-            TasksTable.update({ TasksTable.id eq id }) { it[TasksTable.phase] = phase }
-        }
+        updateTask(id) { it[TasksTable.phase] = phase }
     }
 
     /** Stores the task's decoded duration, known once the source has been chunked. */
@@ -157,9 +164,7 @@ class TaskRepository(
         id: Long,
         durationMs: Long,
     ) {
-        db.writeTransaction {
-            TasksTable.update({ TasksTable.id eq id }) { it[TasksTable.durationMs] = durationMs }
-        }
+        updateTask(id) { it[TasksTable.durationMs] = durationMs }
     }
 
     /** Marks the task COMPLETED, clears its phase and records when it finished. */
@@ -167,12 +172,10 @@ class TaskRepository(
         id: Long,
         finishedAt: Long,
     ) {
-        db.writeTransaction {
-            TasksTable.update({ TasksTable.id eq id }) {
-                it[TasksTable.status] = TaskStatus.COMPLETED
-                it[TasksTable.phase] = null
-                it[TasksTable.finishedAt] = finishedAt
-            }
+        updateTask(id) {
+            it[TasksTable.status] = TaskStatus.COMPLETED
+            it[TasksTable.phase] = null
+            it[TasksTable.finishedAt] = finishedAt
         }
     }
 
