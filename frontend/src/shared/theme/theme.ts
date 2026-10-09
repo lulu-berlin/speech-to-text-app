@@ -10,6 +10,10 @@ export interface ThemeTokens {
   spacing: {
     unit: number;
   };
+  radii: {
+    dialog: string;
+    button: string;
+  };
   fontSizes: {
     title: string;
   };
@@ -25,6 +29,10 @@ export const lightTheme: ThemeTokens = {
   spacing: {
     unit: 8,
   },
+  radii: {
+    dialog: '8px',
+    button: '4px',
+  },
   fontSizes: {
     title: '1.5rem',
   },
@@ -39,6 +47,10 @@ export const darkTheme: ThemeTokens = {
   },
   spacing: {
     unit: 8,
+  },
+  radii: {
+    dialog: '8px',
+    button: '4px',
   },
   fontSizes: {
     title: '1.5rem',
