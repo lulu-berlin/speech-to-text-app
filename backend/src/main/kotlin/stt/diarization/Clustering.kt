@@ -33,7 +33,8 @@ internal fun clusterSegments(
  * Speaker count at the largest gap between consecutive merge heights, searched only among the last [maxSpeakers]
  * gaps (the top of the tree, so near-duplicate first merges cannot dominate): a cut after merge `idx` (the first
  * maximum of `heights[g + 1] - heights[g]` from `start = max(0, gaps - maxSpeakers)` on) leaves `n - (idx + 1)` clusters,
- * clamped to `[1, maxSpeakers]` (one too many when the largest gap is the first gap of the window).
+ * clamped to `[1, maxSpeakers]`: when the first gap of a full window is the largest, the cut would leave
+ * `maxSpeakers + 1` clusters.
  */
 private fun largestGapCount(
     merges: List<Merge>,
