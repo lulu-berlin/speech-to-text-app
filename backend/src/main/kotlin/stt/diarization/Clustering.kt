@@ -27,7 +27,6 @@ internal fun clusterSegments(
             n == 2 -> 2
             else -> largestGapCount(merges, maxSpeakers)
         }
-    if (speakers == 1) return List(n) { 0 }
     return cutLabels(n, merges.take(n - speakers))
 }
 
