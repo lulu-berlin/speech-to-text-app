@@ -171,4 +171,34 @@ class SegmentRepositorySpec :
                 }
             }
         }
+
+        given("a task with three segments whose speakers were stored as [0, 1, 0]") {
+            `when`("its speakers are stored again, as [0, 0, 1] and then as [0, 0, 0]") {
+                then("each store replaces the previous speaker ids and speakers; a speaker no longer used is gone") {
+                    withDatabase { db ->
+                        val segments = SegmentRepository(db)
+                        val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
+                        segments.insertAll(
+                            taskId,
+                            listOf(
+                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
+                                Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null),
+                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null),
+                            ),
+                        )
+                        segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
+
+                        segments.storeSpeakers(taskId, speakerIds = listOf(0, 0, 1))
+
+                        segments.findByTask(taskId).map { it.speakerId }.shouldBe(listOf(0, 0, 1))
+                        segments.findSpeakers(taskId).shouldBe(listOf(Speaker(0, "Speaker 1"), Speaker(1, "Speaker 2")))
+
+                        segments.storeSpeakers(taskId, speakerIds = listOf(0, 0, 0))
+
+                        segments.findByTask(taskId).map { it.speakerId }.shouldBe(listOf(0, 0, 0))
+                        segments.findSpeakers(taskId).shouldBe(listOf(Speaker(0, "Speaker 1")))
+                    }
+                }
+            }
+        }
     })

@@ -4,6 +4,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.batchInsert
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
@@ -76,7 +77,8 @@ class SegmentRepository(
     /**
      * Stores the speaker of every segment of the task in one transaction (item 09, ADR 0028): one [Speaker] per
      * distinct id in [speakerIds], named "Speaker N" (N = speakerId + 1), and each segment's `speaker_id`, given in
-     * [findByTask] order. A count that differs from the task's segment count fails and stores nothing.
+     * [findByTask] order. A count that differs from the task's segment count fails and stores nothing. Storing again
+     * replaces the task's previous speakers.
      */
     suspend fun storeSpeakers(
         taskId: Long,
@@ -92,6 +94,12 @@ class SegmentRepository(
             check(segmentIds.size == speakerIds.size) {
                 "Task $taskId has ${segmentIds.size} segments, but ${speakerIds.size} speaker ids were given"
             }
+            // Replace, not insert-only, for one failure case: the engine crashes after this transaction commits but
+            // before the task is marked COMPLETED, so the resumed task (ADR 0004) diarizes again and stores the same
+            // speakers (ADR 0024) a second time, which would otherwise fail on the speakers primary key. Speakers are
+            // renamed only on completed tasks, so no rename is lost.
+            SegmentsTable.update({ SegmentsTable.taskId eq taskId }) { it[SegmentsTable.speakerId] = null }
+            SpeakersTable.deleteWhere { SpeakersTable.taskId eq taskId }
             SpeakersTable.batchInsert(speakerIds.distinct().sorted(), shouldReturnGeneratedValues = false) { speakerId ->
                 this[SpeakersTable.taskId] = taskId
                 this[SpeakersTable.speakerId] = speakerId
