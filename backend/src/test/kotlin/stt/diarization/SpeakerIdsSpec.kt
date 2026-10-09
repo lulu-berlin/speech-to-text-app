@@ -11,7 +11,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
-import stt.db.Segment
 import stt.withCapturedLogs
 import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.milliseconds
@@ -253,8 +252,3 @@ private val voiceA = floatArrayOf(1f, 0f, 0f, 0f)
 private val voiceA2 = floatArrayOf(0.8f, 0.6f, 0f, 0f)
 private val voiceB = floatArrayOf(0f, 0f, 1f, 0f)
 private val voiceB2 = floatArrayOf(0f, 0f, 0.96f, 0.28f)
-
-private fun segment(
-    startMs: Long,
-    endMs: Long,
-) = Segment(chunkIdx = 0, seq = 0, startMs = startMs, endMs = endMs, text = "", speakerId = null)
