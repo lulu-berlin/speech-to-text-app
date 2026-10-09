@@ -48,7 +48,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 
 - [ ] The new merges equal item 09's hand-computed merge heights for the 4-point matrix
 - [ ] On inputs without equal distances, the labels equal the current clustering's for auto and fixed `k`
-- [ ] The differential test over random matrices agrees with the test-sources reference, except where two heights are exactly equal
+- [x] The differential test over random matrices agrees with the test-sources reference, except where two heights are exactly equal
 - [ ] Ties are resolved reproducibly for a given input (the exact pair is not required to match the old implementation)
 - [ ] Clustering still pauses and cancels between merges and reports progress per merge
 - [ ] Clustering allocates no distance matrix: peak memory stays well under the `O(n²)` matrix size at 3000 segments
@@ -65,3 +65,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: item created at the user's request (item 10/11 consultation): optimize clustering now, in parallel with item 11, and measure the accuracy impact.
 - 2026-10-09: consultation answers approved: switch only on identical labels apart from exact height ties (agreement recorded); the current `O(n³)` implementation moves into the test sources as a differential reference; a different tie order is accepted and documented; the measurement covers 1000/3000/5000 segments and all three variants; memory is cut to `O(n)` by computing distances on demand, with the time cost measured. Test list not yet approved.
 - 2026-10-09: test list (7 items) approved by the user; status `spec-approved`.
+- 2026-10-09 (cycle 1, test-list item 3, differential harness): red — `gradle test --tests 'stt.diarization.ClusteringSpec'`: compilation failed, "Unresolved reference 'naiveUpgmaMerges'". Green: the item 09 `O(n³)` implementation moved into test sources as `NaiveUpgma.kt` (`naiveUpgmaMerges`/`naiveClusterSegments`, renamed only,including copies of `largestGapCount`/`cutLabels`), and a new `ClusteringSpec` block compares `upgmaMerges` with `naiveUpgmaMerges` on five random L2-normalized 512-d matrices (n = 2, 3, 5, 8, 17, fixed seeds): per-index heights within 1e-12 and pairs equal, except a pair may differ where its height ties with another (1e-9); a hand-built tied matrix (four orthogonal pairs at 0.2, cross distances 1) exercises the accepted exception. `gradle check` (132 unit tests) green.

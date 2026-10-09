@@ -1,12 +1,16 @@
 package stt.diarization
 
+import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 class ClusteringSpec :
     BehaviorSpec({
@@ -203,6 +207,29 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("random matrices and a tied matrix") {
+            `when`("the merges are compared with the naive O(n³) reference") {
+                then("every height matches,and every pair matches except where an exact height tie lets it differ") {
+                    // Differential over random L2-normalized 512-d matrices: exact double ties are effectively impossible, so
+                    // the pair order must match the reference exactly;the hand-built tied matrix exercises the accepted exception
+                    // (a pair may differ only where its height ties with another in the same merge sequence).
+                    for ((seed, n) in listOf(1L to 2, 2L to 3, 3L to 5, 4L to 8, 5L to 17)) {
+                        val embeddings = randomNormalizedMatrix(seed, n)
+                        withClue("random seed $seed, n $n") {
+                            assertMatchesReference(upgmaMerges(embeddings), naiveUpgmaMerges(embeddings))
+                        }
+                    }
+                    withClue("tied matrix") {
+                        val embeddings = tiedMatrix()
+                        assertMatchesReference(
+                            upgmaMerges(embeddings),
+                            naiveUpgmaMerges(embeddings),
+                        )
+                    }
+                }
+            }
+        }
     })
 
 /**
@@ -227,3 +254,67 @@ private fun unitAt(degrees: Double) = floatArrayOf(cos(Math.toRadians(degrees)).
 
 /** The cosine distance `1 - cos` of two unit vectors [degrees] apart. */
 private fun distanceAt(degrees: Double) = 1 - cos(Math.toRadians(degrees))
+
+/**
+ * Asserts [merges] matches the naive reference: every height matches (double rounding tolerance)and every pair
+ * matches, except that a pair may differ where its height ties exactly with another height in the same sequence
+ * (the accepted, documented exception of the NN-chain switch).
+ */
+private fun assertMatchesReference(
+    merges: List<Merge>,
+    naive: List<Merge>,
+) {
+    naive.size.shouldBe(merges.size)
+    for (i in naive.indices) {
+        withClue(
+            "merge $i: within-tolerance heights but pair (${merges[i].i}, ${merges[i].j}) vs (${naive[i].i}, ${naive[i].j})",
+        ) {
+            abs(merges[i].height - naive[i].height).shouldBeLessThan(1e-12) // chain-on-demand rounding
+            if (merges[i].i != naive[i].i || merges[i].j != naive[i].j) {
+                withClue("pair differs without an exact height tie") {
+                    naive.indices
+                        .any { k -> k != i && abs(naive[i].height - naive[k].height) < 1e-9 }
+                        .shouldBeTrue()
+                }
+            }
+        }
+    }
+}
+
+/** [n] random rows in 512 dims,L2-normalized (as embeddings are), deterministic per [seed]. */
+private fun randomNormalizedMatrix(
+    seed: Long,
+    n: Int,
+): Array<FloatArray> {
+    val random = Random(seed)
+    return Array(n) {
+        l2Normalize(FloatArray(512) { random.nextFloat() * 2f - 1f })
+    }
+}
+
+/**
+ * Eight unit vectors as four pairs on orthogonal planes, all at distance 1 - 0.8; every cross distance is
+ * exactly 1: four merges tie at 0.2 and three at 1, so the pair order at each tied height is free.
+
+ */
+private fun tiedMatrix(): Array<FloatArray> {
+    fun row(
+        base: Int,
+        first: Float,
+    ): FloatArray =
+        FloatArray(8) { d ->
+            when {
+                d == base -> first
+                d == base + 1 -> 1f - first
+                else -> 0f
+            }
+        }
+    return (0 until 4)
+        .flatMap { p ->
+            val base = p * 2
+            listOf(
+                row(base, 1f),
+                row(base, 0.2f),
+            )
+        }.toTypedArray()
+}
