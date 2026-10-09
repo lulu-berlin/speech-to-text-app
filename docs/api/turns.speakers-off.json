@@ -1,0 +1,31 @@
+{
+  "speakers": [],
+  "turns": [
+    {
+      "speakerId": null,
+      "startMs": 0,
+      "endMs": 3400,
+      "text": "Remember to buy milk.",
+      "segments": [
+        {
+          "startMs": 0,
+          "endMs": 3400,
+          "text": "Remember to buy milk."
+        }
+      ]
+    },
+    {
+      "speakerId": null,
+      "startMs": 4100,
+      "endMs": 7900,
+      "text": "And call the dentist on Monday.",
+      "segments": [
+        {
+          "startMs": 4100,
+          "endMs": 7900,
+          "text": "And call the dentist on Monday."
+        }
+      ]
+    }
+  ]
+}

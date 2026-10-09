@@ -33,6 +33,7 @@ graph TD
   09 --> 11
   03 --> 18[18 audio storage ✓]:::done
   18 --> 11
+  20 --> 11
   11 --> 12[12 HTTP API and SSE]
   10 --> 12
   02 --> 13[13 frontend foundation]
@@ -68,7 +69,7 @@ graph TD
 | [08 — Speaker embeddings](../docs/specs/speaker-embeddings.md) | done | 06 |
 | [09 — Diarization](09-diarization.md) | spec-approved | 08 |
 | [10 — Output formats](10-output-formats.md) | draft | 09 |
-| [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18 |
+| [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18, 20 |
 | [12 — HTTP API and SSE](12-http-api-and-sse.md) | draft | 10, 11 |
 | [13 — Frontend foundation](13-frontend-foundation.md) | draft | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13 |

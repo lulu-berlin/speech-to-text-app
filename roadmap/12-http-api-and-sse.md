@@ -30,7 +30,7 @@ Expose the queue and the transcription history over a REST API for all commands 
   - The task is created QUEUED at the end of the queue. Returns `201` with the task.
   - A file whose bytes duplicate an existing task is rejected with `409` `duplicate-audio`, and the body names the existing task's id (see Contract).
 - **Tasks.** `GET /api/tasks` (list without audio), `GET /api/tasks/{id}`.
-- **Task commands.** `POST /api/tasks/{id}/pause`, `POST /api/tasks/{id}/resume`, `POST /api/tasks/{id}/cancel` delegate to the engine (item 11). Illegal transitions per item 04 → `409`.
+- **Task commands.** `POST /api/tasks/{id}/pause`, `POST /api/tasks/{id}/resume`, `POST /api/tasks/{id}/cancel`, `POST /api/tasks/{id}/retry` delegate to the engine (item 11). Retry is allowed for FAILED and CANCELED tasks only: the task goes back to the end of the queue and resumes from its stored chunks. Illegal transitions per item 04, as amended by item 11 → `409`.
 - **Delete.** `DELETE /api/tasks/{id}` works on any task.
   - A pending task (QUEUED, RUNNING, PAUSED) is first cancelled through the engine (its process is stopped and the cancel has finished), then deleted.
   - Deleting removes:
@@ -39,7 +39,7 @@ Expose the queue and the transcription history over a REST API for all commands 
     - its cached joined FLAC.
   - `204`, or `404` for an unknown id. Emits `task-deleted`, plus `queue-updated` if the task was pending.
 - **Queue.** `GET /api/queue` (paused flag + ordered task ids), `POST /api/queue/pause`, `POST /api/queue/resume`, `PUT /api/queue/order` with body `{ "taskIds": [...] }`: the full ordered list of non-terminal task ids. A different set → `409`.
-- **Transcript download.** `GET /api/tasks/{id}/transcript?format=txt|srt|vtt|json`, rendered on demand by item 10's renderers, served as an attachment with the matching content type.
+- **Transcript download.** `GET /api/tasks/{id}/transcript?format=txt|srt|vtt|json`, rendered on demand by item 10's renderers, served as an attachment with the matching content type. Only for COMPLETED tasks; any other status → `409 not-completed` (partial results of FAILED/CANCELED tasks are kept only for a retry).
 - **Turns for the transcript view.** `GET /api/tasks/{id}/turns` returns the task's speakers (id and stored name) and item 09's speaker turns, each with its segments, so turn merging exists only in Kotlin. Turns reference their speaker by `speakerId`, so a later rename changes one name and no turn. The JSON download stays the oracle format.
 - **Audio.**
   - `GET /api/tasks/{id}/audio` joins the task's stored chunk FLACs in `idx` order with ffmpeg's concat demuxer (`-c copy`, no re-encode) into one FLAC, served as `audio/flac` (16 kHz mono, ADR 0024).
@@ -57,7 +57,7 @@ Expose the queue and the transcription history over a REST API for all commands 
 
 The JSON shapes the frontend builds against.
 
-- **Example files.** One example JSON file per response body, SSE event payload and error lives in [`docs/api/`](../docs/api/), created on `main` when this spec is approved.
+- **Example files.** One example JSON file per response body, SSE event payload and error lives in [`docs/api/`](../docs/api/) (created 2026-10-09). The file-to-shape mapping and the nullability convention are in [`docs/api/README.md`](../docs/api/README.md).
   - Item 13's MSW handlers serve these files.
   - This item's route tests check that every real response has the example's structure: the same keys, value types and nullability.
   - A contract change edits the example file and this section in the same commit.
@@ -83,13 +83,14 @@ The JSON shapes the frontend builds against.
 - **Queue:** `{ "paused": boolean, "taskIds": [number] }` (pending tasks in queue order).
 - **Responses by route:**
   - upload → `201` Task;
-  - pause/resume/cancel → `200` Task;
+  - pause/resume/cancel/retry → `200` Task;
   - queue pause/resume/order → `200` Queue;
   - delete → `204` without a body.
 - **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
   - `speakers` are the task's rows of the `speakers` table (ADR 0028), ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until a rename feature exists).
   - `turns` are item 09's `speaker_turns`: consecutive segments with the same `speakerId` form one turn. A turn names its speaker only by `speakerId`; the UI shows the name from `speakers`.
   - Only for COMPLETED tasks; any other status → `409 not-completed`.
+  - Times: `startMs`/`endMs` of turns and segments are milliseconds on the timeline of `GET /api/tasks/{id}/audio`. The joined audio starts at 0, and item 06's chunks are contiguous and cover `[0, durationMs)`, so a segment's stored time is its position in the played file. Segments and turns come in transcript order. There can be gaps between segments (silence), where no segment is playing. So the transcript view can highlight the segment being played (item 15): the one whose `[startMs, endMs)` contains the player's current time.
   - With speakers `off`: `speakers` is empty, and there is one turn per segment with `speakerId: null`.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
@@ -103,7 +104,7 @@ The JSON shapes the frontend builds against.
   | ------ | ----- |
   | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format` |
   | `404` | `not-found` (unknown task), `no-audio` (task without stored chunks) |
-  | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns of an unfinished task) |
+  | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns or transcript of a task that is not COMPLETED) |
   | `500` | `internal` |
 
 ## Open questions (answered 2026-10-09)
@@ -124,7 +125,9 @@ The JSON shapes the frontend builds against.
 
 ## Remaining open questions
 
-- The contract above (field names, list order, status codes) as written?
+- Details the contract leaves open (the examples only illustrate them; settled with this item's test list):
+  - Is `phase` null outside RUNNING and PAUSED, or do FAILED and CANCELED tasks keep the phase they stopped in, so the UI can say "failed while transcribing"?
+  - Is segment `text` in `/turns` trimmed? (It is stored untrimmed, with whisper's leading space.)
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -135,15 +138,15 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] Uploading the same bytes again is rejected with 409 `duplicate-audio` naming the existing task's id
 - [ ] Listing tasks returns pending tasks in queue order, then finished tasks newest first, without audio data
 - [ ] Requesting an unknown task returns 404 with an error body
-- [ ] Pausing, resuming, and cancelling a task reach the engine and return the updated task
-- [ ] An illegal task command (e.g. pausing a COMPLETED task) returns 409
+- [ ] Pausing, resuming, cancelling and retrying a task reach the engine and return the updated task
+- [ ] An illegal task command (e.g. pausing a COMPLETED task, retrying a COMPLETED or QUEUED task) returns 409
 - [ ] Deleting a finished task removes it with its segments, chunk audio, work directory and cached audio; the same file can then be uploaded again
 - [ ] Deleting a pending task cancels it through the engine first, then removes it
 - [ ] Reordering with the full set of non-terminal ids changes the queue order
 - [ ] Reordering with a different set of ids returns 409 and leaves the order unchanged
 - [ ] Pausing and resuming the queue is reflected in `GET /api/queue`
 - [ ] Downloading a transcript in each format returns the rendered output with the right content type
-- [ ] Downloading with an unknown format returns 400
+- [ ] Downloading with an unknown format returns 400; downloading the transcript of a task that is not COMPLETED returns 409 `not-completed`
 - [ ] The turns endpoint returns the task's speakers with their stored names and item 09's turns (by `speakerId`) with their segments for a COMPLETED task; with speakers `off`, no speakers and one turn per segment with `speakerId` null; 409 `not-completed` for any other status
 - [ ] Audio download returns one FLAC (`audio/flac`) joining the task's stored chunks in order; a task without stored chunks returns 404
 - [ ] A Range request for the audio returns 206 with the requested bytes of the joined FLAC
@@ -164,3 +167,5 @@ Seed — to be refined and approved with the user before any test is written:
 - 2026-10-09: consultation answers approved (open questions above): no size limit; extension allow-list for audio and video; Range with a cached joined FLAC; DELETE for any task (a pending one is cancelled first); `snapshot` event first; item 10 added to `Depends on`; speaker bounds 1–20; `409 duplicate-audio` with `taskId`; `/turns` endpoint; contract examples in `docs/api/`. This item's spec becomes the frontend contract; the frontend items build against it with mocks, and the check against the running backend is item 21. Contract draft and remaining questions pending.
 - 2026-10-09: further answers: `language` validated against whisper-cli's codes plus `auto` (`400 invalid-language`); `/turns` only for COMPLETED tasks (`409 not-completed`); speakers `off` → one turn per segment with `speaker: null`. Remaining: approval of the contract as written.
 - 2026-10-09: contract adapted to item 09's speaker model (ADR 0028, user request): `/turns` returns `speakers` (`speakerId`, stored name `speaker`) and turns that reference their speaker by `speakerId` only; JSON naming follows ADR 0028 (`speakerId` = 0-based number, `speaker` = name). Remaining: approval of the contract as written.
+- 2026-10-09: cancel/failure decisions (item 11): `POST /api/tasks/{id}/retry` for FAILED and CANCELED tasks; transcript downloads, like `/turns`, only for COMPLETED tasks (`409 not-completed`); the contract states that segment times are on the `/audio` timeline, for item 15's playback highlighting. Remaining: approval of the contract as written.
+- 2026-10-09: contract approved by the user as written (section "Contract"); example files created in `docs/api/` with the file-to-shape mapping and nullability convention in `docs/api/README.md`. The rest of the item (Proposal details, test list) is still to be approved before `spec-approved`.
