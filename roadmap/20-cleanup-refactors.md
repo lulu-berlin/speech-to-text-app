@@ -69,7 +69,7 @@ Except for test-list item 1 (a TDD cycle) and the pnpm pin (a devenv change), ev
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] A status change through the queue that the per-task table forbids (e.g. `QUEUED → COMPLETED`, `PAUSED → RUNNING`) is rejected as an illegal transition naming both statuses, and the queue is unchanged
+- [x] A status change through the queue that the per-task table forbids (e.g. `QUEUED → COMPLETED`, `PAUSED → RUNNING`) is rejected as an illegal transition naming both statuses, and the queue is unchanged
 - [ ] Must not break: after every refactor, `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` are green, and the backend test count changes only by the new test above
 - [ ] Must not break (user-verified): in the re-entered devenv shell `pnpm --version` reports 11.x and `pnpm install --frozen-lockfile` succeeds
 
@@ -86,3 +86,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: decisions: R7 = option A (Boolean `canTransitionTo`, item 04 spec amended); R5 = `prettier . ../.prettierrc` + `.prettierignore`. Test list not yet approved.
 - 2026-10-09: spec and test list approved by the user (3 items); status `spec-approved`.
 - 2026-10-09: baseline on `da7bd63` (reference for test-list item 2): `gradle check` green, 105 tests in 34 specs, 0 failed; `gradle integrationTest` green, 44 Integration tests run, 0 failed (149 reported, the 105 untagged ones skipped); `pnpm test` green, 1 test in 1 file, prettier clean; `pnpm build` green.
+- 2026-10-09: test-list item 1 done (`TaskQueueSpec`, user-confirmed). Green on arrival; red recorded against a temporary, uncommitted mutation making `TaskQueue.transition` skip the per-task check: `expected:<Rejected(reason=IllegalTransition(from=QUEUED, to=COMPLETED))> but was:<Accepted(queue=TaskQueue(entries=[QueueEntry(id=2, status=PAUSED)], paused=false))>`; mutation reverted.
