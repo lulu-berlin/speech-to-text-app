@@ -1,13 +1,11 @@
 import { ApiError } from './types';
-import type { Task, TaskList } from './types';
+import type { ApiErrorBody, Task, TaskList } from './types';
 
 const json = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: string;
-      message?: string;
-      taskId?: number;
-    } | null;
+    // A body that is not the contract's error shape (e.g. a proxy's 502 page) falls back to
+    // the HTTP status and status text.
+    const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
     const code = body?.error ?? String(response.status);
     const message = body?.message ?? response.statusText;
     throw new ApiError(code, message, body?.taskId);
