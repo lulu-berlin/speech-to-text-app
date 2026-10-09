@@ -114,6 +114,38 @@ class ClusteringSpec :
                 }
             }
         }
+
+        given("two groups of three whose largest height gap lies below the last max_speakers merges") {
+            `when`("they are clustered in auto mode with max_speakers 3") {
+                then("the larger gap lower in the tree is ignored and the largest gap among the last 3 merges is cut") {
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+
+                    // A pair at dot product c plus a third point at dot product t from both: the pair merges at 1 - c,
+                    // the third point joins at the mean of two equal distances, 1 - t. Third point: r = a·(p + q) + b·z
+                    // with a = t / (1 + c) and b = sqrt(1 - 2t² / (1 + c)), z orthogonal to p and q. Each group lives
+                    // in its own three dimensions, so every cross-group distance is exactly 1.
+                    fun group(
+                        c: Double,
+                        t: Double,
+                        offset: Int,
+                    ): List<FloatArray> {
+                        val a = t / (1 + c)
+                        val b = sqrt(1 - 2 * t * t / (1 + c))
+                        return listOf(
+                            doubleArrayOf(1.0, 0.0, 0.0),
+                            doubleArrayOf(c, sqrt(1 - c * c), 0.0),
+                            doubleArrayOf(a * (1 + c), a * sqrt(1 - c * c), b),
+                        ).map { v -> FloatArray(6) { d -> if (d - offset in 0..2) v[d - offset].toFloat() else 0f } }
+                    }
+                    // Merge heights 0.015 (A pair), 0.55 (B pair), 0.6 (A third), 0.65 (B third), 1 (A + B);
+                    // gaps 0.535, 0.05, 0.05, 0.35. Over all gaps the largest is gap 0 (k = 6 - 1 = 5); among the
+                    // last max_speakers = 3 gaps (gaps 1..3) it is gap 3, so k = 6 - (3 + 1) = 2: groups A and B.
+                    val embeddings = (group(c = 0.985, t = 0.4, offset = 0) + group(c = 0.45, t = 0.35, offset = 3)).toTypedArray()
+
+                    clusterSegments(embeddings, k = null, maxSpeakers = 3).shouldBe(listOf(0, 0, 0, 1, 1, 1))
+                }
+            }
+        }
     })
 
 /** The merged `(i, j)` index pairs, in merge order. */
