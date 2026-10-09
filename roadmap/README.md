@@ -48,6 +48,9 @@ graph TD
   12 --> 21[21 frontend-backend end-to-end]
   14 --> 21
   15 --> 21
+  09 --> 22[22 speaker rename]
+  12 --> 22
+  15 --> 22
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -76,3 +79,4 @@ graph TD
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
 | [20 — Cleanup refactors](20-cleanup-refactors.md) | spec-approved | — |
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | draft | 12, 13, 14, 15 |
+| [22 — Rename a task's speakers](22-speaker-rename.md) | draft | 09, 12, 15 |
