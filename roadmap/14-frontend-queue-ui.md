@@ -1,12 +1,13 @@
 # 14 — Frontend queue UI
 
 Status: draft
-Depends on: [13](13-frontend-foundation.md)
+Depends on: [13](13-frontend-foundation.md), [24](24-visual-design.md)
 
 ## Goal
 Let the user upload many audio files and manage the work queue from the browser: see live status and progress, pause/resume/cancel individual tasks, reorder the queue, and pause the whole queue.
 
 ## Already decided
+- [Item 24 design system](24-visual-design.md): the Queue view is built with its tokens and primitives (buttons, status badge, progress bars, empty state), not with ad-hoc styles; item 25 does the final visual pass.
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
 - [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): pause/resume semantics the UI exposes.
 - [ADR 0007 — SSE live updates](../docs/decisions/0007-sse-live-updates.md): status/progress arrive via SSE; commands go via REST.
