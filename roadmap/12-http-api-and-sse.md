@@ -1,6 +1,6 @@
 # 12 — HTTP API and SSE
 
-Status: draft
+Status: spec-approved
 Depends on: [10](10-output-formats.md), [11](11-processing-engine.md)
 
 ## Goal
@@ -16,7 +16,7 @@ Expose the queue and the transcription history over a REST API for all commands 
 - [ADR 0028 — Speakers table; segments reference their speaker by `speaker_id`](../docs/decisions/0028-speakers-table-and-segment-speaker-id.md) (item 09, on branch `roadmap/09-diarization` until it merges): `speakers(task_id, speaker_id, speaker)` holds one row per speaker of a task, and segments reference it by `speaker_id`. A speaker is identified by its 0-based `speakerId`; `speaker` is only ever its name ("Speaker N" as stored by the app, renamable by a later feature).
 - **This item's spec is the frontend's contract** (consultation 2026-10-09): once it is `spec-approved`, items 13–15 build against it with MSW mocks, in parallel with items 09–12. The final check against the running backend is item 21.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Upload.**
   - `POST /api/tasks`, multipart, with these fields:
@@ -76,9 +76,15 @@ The JSON shapes the frontend builds against.
     - `transcriptionProgress` (0–1)
     - `diarizationProgress` (0–1, or null)
     - `error` (string or null)
+    - `transcribedUntilMs` (number, or null): the end of the task's last stored segment, on the `/audio` timeline; null while no segment is stored
     - `createdAt`, `startedAt`, `finishedAt` (epoch ms, or null)
   - `diarizationProgress` is `null` when diarization does not apply: speakers `off`, or the task finished without segments. Otherwise it is 0 until diarization starts.
   - While `phase = DIARIZING`, a value of 1 means clustering is running (item 11).
+  - `phase`:
+    - the phase the task is in while RUNNING or PAUSED;
+    - FAILED and CANCELED tasks keep the phase they stopped in, so the UI can say e.g. "failed while transcribing at 12:34" (with `transcribedUntilMs`);
+    - null for QUEUED tasks (also after a retry or a restart) and COMPLETED tasks.
+  - `transcribedUntilMs` is computed from the stored segments (no new column). Segments are committed per chunk (ADR 0004), so a retry resumes at the first chunk not DONE, which starts at or after this time. At most one chunk is redone.
 - **Task list** (`GET /api/tasks`): `{ "tasks": [Task] }`. Pending tasks come first, in queue order, then finished tasks, newest `finishedAt` first.
 - **Queue:** `{ "paused": boolean, "taskIds": [number] }` (pending tasks in queue order).
 - **Responses by route:**
@@ -92,6 +98,7 @@ The JSON shapes the frontend builds against.
   - Only for COMPLETED tasks; any other status → `409 not-completed`.
   - Times: `startMs`/`endMs` of turns and segments are milliseconds on the timeline of `GET /api/tasks/{id}/audio`. The joined audio starts at 0, and item 06's chunks are contiguous and cover `[0, durationMs)`, so a segment's stored time is its position in the played file. Segments and turns come in transcript order. There can be gaps between segments (silence), where no segment is playing. So the transcript view can highlight the segment being played (item 15): the one whose `[startMs, endMs)` contains the player's current time.
   - With speakers `off`: `speakers` is empty, and there is one turn per segment with `speakerId: null`.
+  - Text ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)): every segment `text` is trimmed; a turn's `text` is its segments' trimmed texts joined with single spaces, then trimmed.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task
@@ -122,16 +129,12 @@ The JSON shapes the frontend builds against.
 - `language`? → **Validated against whisper-cli's language codes plus `auto`**; otherwise `400 invalid-language`.
 - `/turns` for a task that is not COMPLETED? → **`409 not-completed`.**
 - `/turns` with speakers `off`? → **One turn per segment, `speaker: null`.**
-
-## Remaining open questions
-
-- Details the contract leaves open (the examples only illustrate them; settled with this item's test list):
-  - Is `phase` null outside RUNNING and PAUSED, or do FAILED and CANCELED tasks keep the phase they stopped in, so the UI can say "failed while transcribing"?
-  - Is segment `text` in `/turns` trimmed? (It is stored untrimmed, with whisper's leading space.)
+- `phase` of FAILED and CANCELED tasks? → **Kept**: the phase the task stopped in. Plus a new field, `transcribedUntilMs` (end of the last stored segment), for "failed while transcribing at <time>". Resume stays per chunk (ADR 0004): segment-level resume was considered and rejected (it would commit segments while whisper-cli streams them and restart inside a chunk, possibly in the middle of speech).
+- Is segment text trimmed? → **Yes, everywhere it leaves the backend**, the API and every download format including json ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)). Storage stays untrimmed for item 07's prompt.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] Uploading a file creates a QUEUED task at the end of the queue, records its `size_bytes`/`sha256`, and keeps the original in the task's work directory (no audio bytes in the database)
 - [ ] Uploading without a file, with an extension outside the allow-list, with a language whisper-cli does not know, or with an invalid `speakers` or `maxSpeakers` value (outside 1–20), is rejected with 400 and the matching error code
@@ -148,6 +151,8 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] Downloading a transcript in each format returns the rendered output with the right content type
 - [ ] Downloading with an unknown format returns 400; downloading the transcript of a task that is not COMPLETED returns 409 `not-completed`
 - [ ] The turns endpoint returns the task's speakers with their stored names and item 09's turns (by `speakerId`) with their segments for a COMPLETED task; with speakers `off`, no speakers and one turn per segment with `speakerId` null; 409 `not-completed` for any other status
+- [ ] (added 2026-10-09, from the phase/trim decisions) Turn and segment texts in `/turns` are trimmed, and a turn's text is its segments' trimmed texts joined with single spaces
+- [ ] (added 2026-10-09, from the phase/trim decisions) A FAILED or CANCELED task keeps the phase it stopped in, and `transcribedUntilMs` is the end of its last stored segment (null without segments); QUEUED and COMPLETED tasks have no phase
 - [ ] Audio download returns one FLAC (`audio/flac`) joining the task's stored chunks in order; a task without stored chunks returns 404
 - [ ] A Range request for the audio returns 206 with the requested bytes of the joined FLAC
 - [ ] An SSE client first receives a `snapshot`, then `task-updated`, `task-progress`, `queue-updated` and `task-deleted` events as the engine emits them
@@ -169,3 +174,4 @@ Seed — to be refined and approved with the user before any test is written:
 - 2026-10-09: contract adapted to item 09's speaker model (ADR 0028, user request): `/turns` returns `speakers` (`speakerId`, stored name `speaker`) and turns that reference their speaker by `speakerId` only; JSON naming follows ADR 0028 (`speakerId` = 0-based number, `speaker` = name). Remaining: approval of the contract as written.
 - 2026-10-09: cancel/failure decisions (item 11): `POST /api/tasks/{id}/retry` for FAILED and CANCELED tasks; transcript downloads, like `/turns`, only for COMPLETED tasks (`409 not-completed`); the contract states that segment times are on the `/audio` timeline, for item 15's playback highlighting. Remaining: approval of the contract as written.
 - 2026-10-09: contract approved by the user as written (section "Contract"); example files created in `docs/api/` with the file-to-shape mapping and nullability convention in `docs/api/README.md`. The rest of the item (Proposal details, test list) is still to be approved before `spec-approved`.
+- 2026-10-09: last details decided: FAILED and CANCELED tasks keep their `phase`; new Task field `transcribedUntilMs` (end of the last stored segment), resume stays per chunk (segment-level resume rejected); segment text trimmed everywhere it leaves the backend, including the json download ([ADR 0030](../docs/decisions/0030-trimmed-segment-text-in-all-outputs.md)). Test list (19 items) approved by the user; two items added from these decisions. Status `spec-approved`.

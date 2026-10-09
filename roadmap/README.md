@@ -70,7 +70,7 @@ graph TD
 | [09 — Diarization](09-diarization.md) | spec-approved | 08 |
 | [10 — Output formats](10-output-formats.md) | draft | 09 |
 | [11 — Processing engine](11-processing-engine.md) | draft | 04, 05, 07, 09, 18, 20 |
-| [12 — HTTP API and SSE](12-http-api-and-sse.md) | draft | 10, 11 |
+| [12 — HTTP API and SSE](12-http-api-and-sse.md) | spec-approved | 10, 11 |
 | [13 — Frontend foundation](13-frontend-foundation.md) | draft | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | draft | 13 |
 | [15 — Frontend history UI](15-frontend-history-ui.md) | draft | 13 |
