@@ -1,7 +1,7 @@
 # 16 — Nix flake package
 
 Status: draft
-Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md)
+Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md), [17](17-branding-stenographer-animation.md)
 
 ## Goal
 Deliver the app as a Nix flake derivation that runs backend, database, frontend, and whisper model together with one command (`nix run .`).

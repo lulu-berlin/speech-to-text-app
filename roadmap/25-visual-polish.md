@@ -26,7 +26,7 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
   - upload area and drag-over state;
   - **the transcript is a centred reading column** with a maximum measure (~70 characters): a header block with the task's name, date and duration, then the audio player and the download buttons, then the turns; comfortable line height and turn spacing, clear speaker labels and timestamps, and the playing-segment highlight;
   - **History is a list of cards** (filename, status, date, duration; FAILED cards show the error), which are touch-friendly and read well on a phone;
-  - **empty, loading and error states for every view**: an empty state is one line of guidance plus the primary action (e.g. "No tasks yet — drop audio files here, or click to choose them"); loading uses the skeleton primitives; an error is informative rather than raw.
+  - **empty, loading and error states for every view**: an empty state is one line of guidance plus the primary action (e.g. "No tasks yet — drop audio files here, or click to choose them"); loading shows the stenographer (item 17, which replaces the spinners and skeletons); an error is informative rather than raw.
 - **Responsive**: usable from a narrow phone width to a wide desktop; no horizontal overflow; controls reachable; the queue's rows and the history's cards stack on a narrow screen.
 - **Motion**: restrained transitions (hover/focus, view change), nothing that fights `prefers-reduced-motion`.
 - **Verification**: a real-browser check (Chromium, as item 13 did with CDP) in light and dark at phone and desktop widths, plus the existing view tests staying green.
@@ -55,7 +55,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Queue rows show the status badge, both progress bars and the phase label, and stack on a narrow screen
 - [ ] History renders one card per finished task, and a FAILED card shows its error
 - [ ] The transcript is a centred column with a bounded measure, its header block, the player and downloads, and the turns with speaker labels and timestamps
-- [ ] Every view has a distinct empty, loading and error state; the Queue's empty state offers the upload action
+- [ ] Every view has a distinct empty, loading and error state; loading shows the stenographer; the Queue's empty state offers the upload action
 - [ ] The transcription bar shows a percentage and the diarization bar its stage label
 - [ ] With reduced motion requested, no non-essential animation runs
 - [ ] Keyboard focus is visible in every view
@@ -74,3 +74,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: item drafted from the user's answers: the visual pass is separate from the design system (item 24), and comes after items 14 and 15 have built the views.
 - 2026-10-09: consultation answers approved: reference is document/editor-like; empty states carry one line of guidance plus the primary action; comfortable queue rows; the phase is a text label; the transcript is a centred reading column; History is cards; progress bars show a percentage / stage label. Test list not yet approved.
 - 2026-10-09: test list (10 items) approved by the user; status `spec-approved`.
+- 2026-10-09: item 17 consultation: loading states show the stenographer (item 17 replaces item 24's `Spinner` and `Skeleton`); progress bars are unchanged. Recorded here so the pass does not build skeleton placeholders.
