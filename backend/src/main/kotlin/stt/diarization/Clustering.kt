@@ -7,7 +7,7 @@ package stt.diarization
 internal const val SPEAKER_DISTANCE_THRESHOLD = 0.35
 
 /**
- * Speaker label (0-based) per row of [embeddings] (L2-normalized, one per clustered segment), by average-linkage
+ * The `speakerId` (0-based) of every row of [embeddings] (L2-normalized, one per clustered segment), by average-linkage
  * (UPGMA) agglomerative clustering on cosine distance. Ported from oracle `cluster_segments`
  * (docs/oracle/transcribe.py); [k] = `null` picks the count automatically (ADR 0027), otherwise it is the fixed count,
  * clamped to `[1, n]` and not limited by [maxSpeakers].
@@ -20,14 +20,14 @@ internal fun clusterSegments(
     val n = embeddings.size
     if (n <= 1) return List(n) { 0 }
     val merges = upgmaMerges(embeddings)
-    val speakers =
+    val speakerCount =
         when {
             k != null -> k.coerceIn(1, n)
             merges.last().height < SPEAKER_DISTANCE_THRESHOLD -> 1
             n == 2 -> 2
             else -> largestGapCount(merges, maxSpeakers)
         }
-    return cutLabels(n, merges.take(n - speakers))
+    return cutLabels(n, merges.take(n - speakerCount))
 }
 
 /**
