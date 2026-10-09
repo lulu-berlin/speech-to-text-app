@@ -66,7 +66,7 @@ Provide the shared frontend building blocks that the Queue (item 14) and History
 
 ## Test list (written with the user; Canon TDD step 1)
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
-- [ ] The API client returns typed tasks for `GET /api/tasks` (served from `docs/api/task-list.json`)
+- [x] The API client returns typed tasks for `GET /api/tasks` (served from `docs/api/task-list.json`)
 - [ ] The API client turns an error response into a typed error with code and message, and `duplicate-audio` with its `taskId`
 - [ ] The connection machine goes from connecting to live on the first `snapshot`, which replaces tasks and queue
 - [ ] `task-updated`, `task-progress`, `queue-updated` and `task-deleted` events update the state
@@ -90,3 +90,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 - 2026-10-09: consultation answers approved: react-router; XState v5 + `@xstate/react` for client actions with server state applied as received ([ADR 0031](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md)); transition table shared as `docs/api/task-transitions.json`; light and dark following the OS; calm, document-like look; English only; `pnpm dev:mock`; native `<dialog>`. Test list not yet approved.
 - 2026-10-09: test list (13 items) approved by the user; status `spec-approved`.
+- 2026-10-09 (workspace, cycle 1): added `docs/api/task.paused.json` and `docs/api/task.canceled.json` (PAUSED/CANCELED had no example), `allowBuilds: msw` in `pnpm-workspace.yaml`, then `Test: API client returns typed tasks for GET /api/tasks`. Installed `react-router@8.4.0`, `xstate@5.33.2`, `@xstate/react@6.1.0`, `msw@2.15.0`, `eventsource@5.1.2` (dev). MSW handlers + fixtures re-export serve only `docs/api/` (ADR 0029). Task/error types + typed client in `src/shared/api/`. Red: si: test could not run (client module missing) → added; green: 2 suites/2 tests pass, `tsc --noEmit` and `vite build` clean, prettier `--check` clean.
