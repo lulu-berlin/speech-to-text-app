@@ -1,7 +1,7 @@
 # 22 — Rename a task's speakers
 
 Status: draft
-Depends on: [09](09-diarization.md), [12](12-http-api-and-sse.md), [15](15-frontend-history-ui.md)
+Depends on: [09](../docs/specs/diarization.md) (done), [12](12-http-api-and-sse.md), [15](15-frontend-history-ui.md)
 
 ## Goal
 
