@@ -18,4 +18,15 @@ class NoSpeechSpec :
                 }
             }
         }
+        given("a task with speakers off and no segments") {
+            `when`("its outputs are rendered") {
+                then("the outputs are the same no-speech bytes as with speakers on") {
+                    // Decided 2026-10-09: no-speech output is identical with speakers on and off.
+                    renderTxt(emptyList(), null) shouldBe ""
+                    renderSrt(emptyList(), null) shouldBe ""
+                    renderVtt(emptyList(), null) shouldBe ""
+                    renderJson(emptyList(), null) shouldBe "{\"text\": \"\", \"segments\": []}\n"
+                }
+            }
+        }
     })
