@@ -19,6 +19,7 @@ import stt.db.StoredTask
 import stt.db.TaskPhase
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
+import stt.process.ProcessControl
 import stt.transcribe.ChunkTranscription
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSettings
@@ -44,6 +45,7 @@ class ProcessingEngine(
     private val workDirectories: TaskWorkDirectories,
     private val chunker: Chunker,
     private val transcriber: Transcriber,
+    private val processControl: ProcessControl,
 ) {
     private val transcription = ChunkTranscription(transcriber, segments)
 
@@ -74,14 +76,19 @@ class ProcessingEngine(
         wakeups.trySend(Unit)
     }
 
-    /** Pauses the queue: no further task starts until [resumeQueue]; a task already running is left to run. */
+    /**
+     * Pauses the queue: no further task starts until [resumeQueue], and the process of a task already
+     * running is frozen (SIGSTOP; a no-op when no process is in flight).
+     */
     suspend fun pauseQueue() {
         queueState.setPaused(true)
+        processControl.pause()
     }
 
-    /** Resumes the queue and wakes the worker, which starts the next queued task. */
+    /** Resumes the queue and wakes the worker: the frozen process continues and the next queued task starts. */
     suspend fun resumeQueue() {
         queueState.setPaused(false)
+        processControl.resume()
         wake()
     }
 

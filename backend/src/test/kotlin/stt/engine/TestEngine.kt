@@ -27,6 +27,7 @@ internal class EngineFixture(
     val tasks: TaskRepository,
     val chunker: FakeChunker,
     val transcriber: FakeTranscriber,
+    val processControl: FakeProcessControl,
     val engine: ProcessingEngine,
     /** The ids of the tasks that reach COMPLETED, in order. */
     val completed: ReceiveChannel<Long>,
@@ -45,6 +46,7 @@ internal fun TestScope.engineUnderTest(
     val tasks = TaskRepository(db, workDirectories)
     val chunker = FakeChunker()
     val transcriber = FakeTranscriber()
+    val processControl = FakeProcessControl()
     val engine =
         ProcessingEngine(
             scope = backgroundScope,
@@ -56,6 +58,7 @@ internal fun TestScope.engineUnderTest(
             workDirectories = workDirectories,
             chunker = chunker,
             transcriber = transcriber,
+            processControl = processControl,
         )
     val completed = Channel<Long>(Channel.UNLIMITED)
     backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -64,7 +67,7 @@ internal fun TestScope.engineUnderTest(
             .filter { it.task.task.status == TaskStatus.COMPLETED }
             .collect { completed.send(it.task.id) }
     }
-    return EngineFixture(workDirectories, tasks, chunker, transcriber, engine, completed)
+    return EngineFixture(workDirectories, tasks, chunker, transcriber, processControl, engine, completed)
 }
 
 /** Inserts a QUEUED task at [queuePosition] with an original in its work directory, as an upload does (ADR 0024). */

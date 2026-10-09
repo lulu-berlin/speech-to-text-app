@@ -107,6 +107,38 @@ class ProcessingEngineSpec :
                 }
             }
         }
+
+        given("a task running when the queue is paused") {
+            `when`("the queue is paused and then resumed") {
+                then("its process is frozen and continued, and the task still completes") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = release
+                        fixture.engine.start()
+
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe first
+                        fixture.processControl.frozen shouldBe false
+                        fixture.engine.pauseQueue()
+                        fixture.processControl.frozen shouldBe true
+                        fixture.engine.resumeQueue()
+                        fixture.processControl.frozen shouldBe false
+
+                        fixture.transcriber.hold = null
+                        release.complete(Unit)
+                        fixture.completed.receive() shouldBe first
+                        fixture.processControl.pauses shouldBe 1
+                        fixture.processControl.resumes shouldBe 1
+                    }
+                }
+            }
+        }
     })
 
 /**
