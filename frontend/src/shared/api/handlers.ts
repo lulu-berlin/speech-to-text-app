@@ -4,8 +4,8 @@
 // roadmap item 13, "Mock additions to settle with item 12".
 
 import { http, HttpResponse } from 'msw';
-import { eventsHandler } from './events';
 import {
+  snapshot as snapshotFixture,
   taskList as taskListFixture,
   taskQueued as taskQueuedFixture,
   taskExamples,
@@ -15,6 +15,13 @@ import {
   error as errorFixture,
   taskTransitions,
 } from './fixtures';
+
+// One text/event-stream frame. MSW's high-level sse() API only types unnamed "message"
+// events, but the contract needs named events (snapshot, task-updated, …), so the stream
+// is written directly (the msw docs' alternative SSE approach).
+function encodeFrame(event: string, data: unknown): Uint8Array {
+  return new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
 
 export const handlers = [
   // Upload: POST /api/tasks -> 201 Task (task.queued.json). The 409 duplicate-audio path
@@ -75,6 +82,16 @@ export const handlers = [
 
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
 
-  // Events: GET /api/events, the SSE stream (events.ts).
-  eventsHandler,
+  // Events: GET /api/events, the SSE stream. The first event of every connection is the
+  // snapshot; the stream then stays open.
+  http.get('/api/events', () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encodeFrame('snapshot', snapshotFixture));
+      },
+    });
+    return new HttpResponse(stream, {
+      headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+    });
+  }),
 ];
