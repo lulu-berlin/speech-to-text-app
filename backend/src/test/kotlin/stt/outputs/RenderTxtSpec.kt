@@ -4,7 +4,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import stt.db.Segment
 
-class TxtSpec :
+class RenderTxtSpec :
     BehaviorSpec({
         given("segments of speakers 0, 0, 1, 0 with untrimmed texts") {
             `when`("they are rendered as txt") {
