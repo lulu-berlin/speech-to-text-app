@@ -127,13 +127,32 @@ class TaskRepository(
                 ?.toStoredTask()
         }
 
-    /** Applies one `tasks` row update for [id]; the single place that knows how the row is addressed. */
+    /** Applies one `tasks` row update for [id] inside the caller's write transaction. */
+    private fun updateTaskRow(
+        id: Long,
+        body: TasksTable.(UpdateStatement) -> Unit,
+    ) {
+        TasksTable.update({ TasksTable.id eq id }) { body(it) }
+    }
+
+    /** Applies one `tasks` row update for [id]; the single place that opens and addresses the row. */
     private suspend fun updateTask(
         id: Long,
         body: TasksTable.(UpdateStatement) -> Unit,
     ) {
+        db.writeTransaction { updateTaskRow(id, body) }
+    }
+
+    /**
+     * Writes the queue order: the first id in [ids] gets `queue_position` 0, the next 1, and so on, all in
+     * one transaction so the worker can never read a half-written order. Item 12's `PUT /api/queue/order`
+     * checks the id set with item 04's queue aggregate before calling this and then wakes the engine.
+     */
+    suspend fun setQueuePositions(ids: List<Long>) {
         db.writeTransaction {
-            TasksTable.update({ TasksTable.id eq id }) { body(it) }
+            ids.forEachIndexed { position, id ->
+                updateTaskRow(id) { it[TasksTable.queuePosition] = position }
+            }
         }
     }
 
