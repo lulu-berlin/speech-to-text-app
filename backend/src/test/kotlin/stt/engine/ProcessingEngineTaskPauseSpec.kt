@@ -46,4 +46,41 @@ class ProcessingEngineTaskPauseSpec :
                 }
             }
         }
+
+        given("a task whose status does not allow the command") {
+            `when`("pause or resume is sent for it") {
+                then("it is refused with the reason and nothing changes") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+
+                        // QUEUED allows only pause, so a resume is refused before the task has ever run.
+                        fixture.engine.resumeTask(task) shouldBe
+                            TaskCommandOutcome.Illegal(TaskStatus.QUEUED, TaskStatus.QUEUED)
+                        statusOf(fixture, task) shouldBe TaskStatus.QUEUED
+
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe task
+
+                        // COMPLETED allows neither.
+                        fixture.engine.pauseTask(task) shouldBe
+                            TaskCommandOutcome.Illegal(TaskStatus.COMPLETED, TaskStatus.PAUSED)
+                        fixture.engine.resumeTask(task) shouldBe
+                            TaskCommandOutcome.Illegal(TaskStatus.COMPLETED, TaskStatus.QUEUED)
+                        statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
+
+                        // An id no task has is reported as unknown, for either command.
+                        fixture.engine.pauseTask(UNKNOWN_TASK) shouldBe TaskCommandOutcome.Unknown
+                        fixture.engine.resumeTask(UNKNOWN_TASK) shouldBe TaskCommandOutcome.Unknown
+
+                        // No refusal touched the running task's process.
+                        fixture.processControl.pauses shouldBe 0
+                        fixture.processControl.resumes shouldBe 0
+                    }
+                }
+            }
+        }
     })
+
+/** An id no task has: ids are autoincrement and start at 1. */
+private const val UNKNOWN_TASK = 999L
