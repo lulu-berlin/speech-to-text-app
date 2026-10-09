@@ -1,5 +1,6 @@
 package stt.engine
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import stt.transcribe.Transcriber
@@ -14,6 +15,9 @@ internal class FakeTranscriber : Transcriber {
 
     /** The audio file of every call, as the call starts, so a test can wait for the worker to be inside one. */
     val entered = Channel<Path>(Channel.UNLIMITED)
+
+    /** The audio file of every call whose wait was cancelled, so a test can see which process was killed. */
+    val cancelled = mutableListOf<Path>()
 
     /** When set, every call waits for it before returning; a test clears it to let later calls run through. */
     var hold: CompletableDeferred<Unit>? = null
@@ -30,7 +34,12 @@ internal class FakeTranscriber : Transcriber {
         probe.around {
             audioFiles.add(audio)
             entered.send(audio)
-            hold?.await()
+            try {
+                hold?.await()
+            } catch (e: CancellationException) {
+                cancelled.add(audio)
+                throw e
+            }
             emptyList()
         }
 }
