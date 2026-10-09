@@ -3,6 +3,7 @@ package stt.diarization
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import stt.db.Segment
 import java.nio.FloatBuffer
@@ -29,9 +30,9 @@ internal class Embeddings(
      * One embedding per [segments] segment, in segment order. Empty [pcm] yields every embedding all zeros
      * (oracle `embed_windows` with `total <= 0`), without touching the session.
      *
-     * [gate] (ADR 0004) is checked before every window: while it is paused the embedding suspends between
-     * windows, and a cancellation of this coroutine lands at the same boundary. [onWindowDone] reports
-     * `(windows done, total windows)` after each window.
+     * Cancellation of this coroutine is checked before every window, so a cancel lands at the next window
+     * boundary (inference itself blocks). [gate] (ADR 0004) is checked at the same boundary: while it is paused
+     * the embedding suspends between windows. [onWindowDone] reports `(windows done, total windows)` after each window.
      */
     suspend fun embed(
         pcm: FloatArray,
@@ -45,6 +46,7 @@ internal class Embeddings(
         val embeddings = ArrayList<FloatArray>(segments.size)
         withContext(Dispatchers.Default) {
             segments.forEachIndexed { index, segment ->
+                ensureActive()
                 gate?.checkpoint()
                 val window = embeddingWindow(pcm, segment.startMs, segment.endMs)
                 val samples = if (model.metadata.normalizeSamples) window else FloatArray(window.size) { window[it] * 32768f }
