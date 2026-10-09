@@ -17,15 +17,16 @@ const sources = import.meta.glob<string>('/src/**/*.{ts,tsx}', {
 const UNITS = 'px|rem|em|ex|ch|vh|vw|vmin|vmax';
 const LENGTH = new RegExp(
   `(?<![A-Za-z0-9_$])(?:\\d+\\.?\\d*|\\.\\d+|\\$\\{[^{}]*\\})(?:${UNITS})\\b`,
+  'g',
 );
-const PX = new RegExp(`(?<![A-Za-z0-9_$])(?:\\d+\\.?\\d*|\\.\\d+|\\$\\{[^{}]*\\})px\\b`);
-const COLOR = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/i;
+const PX = new RegExp(`(?<![A-Za-z0-9_$])(?:\\d+\\.?\\d*|\\.\\d+|\\$\\{[^{}]*\\})px\\b`, 'g');
+const COLOR = /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/gi;
 
 interface Violation {
   file: string;
   line: number;
   rule: string;
-  text: string;
+  match: string;
 }
 
 function violations(): Violation[] {
@@ -39,13 +40,16 @@ function violations(): Violation[] {
               ['literal color', COLOR],
               ['literal length', LENGTH],
             ];
-      return source
-        .split('\n')
-        .flatMap((text, index) =>
-          rules
-            .filter(([, pattern]) => pattern.test(text))
-            .map(([rule]) => ({ file, line: index + 1, rule, text: text.trim() })),
-        );
+      return source.split('\n').flatMap((text, index) =>
+        rules.flatMap(([rule, pattern]) =>
+          [...text.matchAll(pattern)].map((match) => ({
+            file,
+            line: index + 1,
+            rule,
+            match: match[0],
+          })),
+        ),
+      );
     })
     .sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 }
