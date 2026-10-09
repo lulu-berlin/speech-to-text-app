@@ -37,7 +37,7 @@ internal class Embeddings(
         pcm: FloatArray,
         segments: List<Segment>,
         gate: PauseGate? = null,
-        onWindowDone: (done: Int, total: Int) -> Unit = { _, _ -> },
+        onWindowDone: Progress = { _, _ -> },
     ): Array<FloatArray> {
         if (pcm.isEmpty()) {
             return Array(segments.size) { FloatArray(model.metadata.outputDim) }

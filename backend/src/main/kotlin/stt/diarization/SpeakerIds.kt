@@ -29,7 +29,7 @@ internal suspend fun speakerIds(
     maxSpeakers: Int,
     gate: PauseGate? = null,
     summary: (clusteredEmbeddings: Array<FloatArray>, clusteredSpeakerIds: List<Int>) -> Unit = ::logSpeakerSummary,
-    onMergeDone: (done: Int, total: Int) -> Unit = { _, _ -> },
+    onMergeDone: Progress = { _, _ -> },
 ): List<Int> =
     withContext(Dispatchers.Default) {
         val clustered = segments.indices.filter { segments[it].isLong() }.ifEmpty { segments.indices.toList() }

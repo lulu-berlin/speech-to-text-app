@@ -21,7 +21,7 @@ internal suspend fun clusterSegments(
     k: Int?,
     maxSpeakers: Int,
     gate: PauseGate? = null,
-    onMergeDone: (done: Int, total: Int) -> Unit = { _, _ -> },
+    onMergeDone: Progress = { _, _ -> },
 ): List<Int> {
     val n = embeddings.size
     if (n <= 1) return List(n) { 0 }
@@ -103,7 +103,7 @@ private fun cutLabels(
 internal suspend fun upgmaMerges(
     embeddings: Array<FloatArray>,
     gate: PauseGate? = null,
-    onMergeDone: (done: Int, total: Int) -> Unit = { _, _ -> },
+    onMergeDone: Progress = { _, _ -> },
 ): List<Merge> {
     val n = embeddings.size
     val d = DoubleArray(n * n)
