@@ -143,28 +143,19 @@ class SegmentRepositorySpec :
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
-                        val transcribed =
-                            listOf(
-                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null),
-                            )
-                        segments.insertAll(taskId, transcribed)
+                        segments.insertAll(taskId, threeSegments)
                         val other = Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 4_000L, text = "Other.", speakerId = null)
                         segments.insertAll(otherTaskId, listOf(other))
 
                         shouldThrowAny { segments.storeSpeakers(taskId, speakerIds = listOf(0, 1)) }
 
-                        segments.findByTask(taskId).shouldBe(transcribed)
+                        segments.findByTask(taskId).shouldBe(threeSegments)
                         segments.findSpeakers(taskId).shouldBe(emptyList())
 
                         segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
 
                         segments.findByTask(taskId).map { it.speakerId }.shouldBe(listOf(0, 1, 0))
-                        segments
-                            .findSpeakers(
-                                taskId,
-                            ).shouldBe(listOf(Speaker(speakerId = 0, speaker = "Speaker 1"), Speaker(speakerId = 1, speaker = "Speaker 2")))
+                        segments.findSpeakers(taskId).shouldBe(speakers1And2)
                         segments.findByTask(otherTaskId).shouldBe(listOf(other))
                         segments.findSpeakers(otherTaskId).shouldBe(emptyList())
                     }
@@ -178,27 +169,31 @@ class SegmentRepositorySpec :
                     withDatabase { db ->
                         val segments = SegmentRepository(db)
                         val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
-                        segments.insertAll(
-                            taskId,
-                            listOf(
-                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null),
-                            ),
-                        )
+                        segments.insertAll(taskId, threeSegments)
                         segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
 
                         segments.storeSpeakers(taskId, speakerIds = listOf(0, 0, 1))
 
                         segments.findByTask(taskId).map { it.speakerId }.shouldBe(listOf(0, 0, 1))
-                        segments.findSpeakers(taskId).shouldBe(listOf(Speaker(0, "Speaker 1"), Speaker(1, "Speaker 2")))
+                        segments.findSpeakers(taskId).shouldBe(speakers1And2)
 
                         segments.storeSpeakers(taskId, speakerIds = listOf(0, 0, 0))
 
                         segments.findByTask(taskId).map { it.speakerId }.shouldBe(listOf(0, 0, 0))
-                        segments.findSpeakers(taskId).shouldBe(listOf(Speaker(0, "Speaker 1")))
+                        segments.findSpeakers(taskId).shouldBe(listOf(Speaker(speakerId = 0, speaker = "Speaker 1")))
                     }
                 }
             }
         }
     })
+
+/** Three segments of a task over chunks 0 and 1, not yet diarized. */
+private val threeSegments =
+    listOf(
+        Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
+        Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null),
+        Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null),
+    )
+
+/** The speakers stored for speaker ids 0 and 1. */
+private val speakers1And2 = listOf(Speaker(speakerId = 0, speaker = "Speaker 1"), Speaker(speakerId = 1, speaker = "Speaker 2"))
