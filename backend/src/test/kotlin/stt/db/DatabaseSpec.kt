@@ -119,6 +119,37 @@ class DatabaseSpec :
             }
         }
 
+        given("a database migrated to V2 only, holding a task with two segments, one with a free-text speaker") {
+            `when`("the database is opened") {
+                then("V3 applies: both segments are kept with no speaker id, and the task has no speakers") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
+                        Flyway
+                            .configure()
+                            .dataSource(url, null, null)
+                            .target("2")
+                            .load()
+                            .migrate()
+                        DriverManager.getConnection(url).use { connection ->
+                            connection.createStatement().use { st -> v2Rows.forEach { sql -> st.executeUpdate(sql) } }
+                        }
+
+                        Database.open(dataDir).use { db ->
+                            val segments = SegmentRepository(db)
+                            segments.findByTask(1L).shouldBe(
+                                listOf(
+                                    Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "Hello.", speakerId = null),
+                                    Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 31_000L, text = "Bye.", speakerId = null),
+                                ),
+                            )
+                            segments.findSpeakers(1L).shouldBe(emptyList())
+                        }
+                    }
+                }
+            }
+        }
+
         given("a data directory that cannot be created, or whose stt.db cannot be opened") {
             `when`("opening the database") {
                 then("it fails with an error naming STT_DATA_DIR and the path") {
@@ -326,6 +357,15 @@ private val v1Rows =
         "INSERT INTO audio (task_id, size_bytes, sha256) VALUES (1, 3, 'aa')",
         "INSERT INTO chunks (task_id, idx, start_ms, end_ms, status) VALUES (1, 0, 0, 1000, 'PENDING')",
         "INSERT INTO audio_parts (task_id, part_no, part) VALUES (1, 0, x'616263')",
+    )
+
+/** A task and two segments over two chunks, as a database at V2 holds them; one segment has a free-text speaker. */
+private val v2Rows =
+    listOf(
+        "INSERT INTO tasks (id, original_filename, content_type, status, speakers_mode, created_at) " +
+            "VALUES (1, 'kept.wav', 'audio/wav', 'QUEUED', 'auto', 1)",
+        "INSERT INTO segments (task_id, chunk_idx, seq, start_ms, end_ms, text, speaker) VALUES (1, 0, 0, 0, 900, 'Hello.', 'SPEAKER_00')",
+        "INSERT INTO segments (task_id, chunk_idx, seq, start_ms, end_ms, text, speaker) VALUES (1, 1, 0, 30000, 31000, 'Bye.', NULL)",
     )
 
 private val expectedTables =
