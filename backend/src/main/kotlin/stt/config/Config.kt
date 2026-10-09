@@ -12,10 +12,12 @@ import java.nio.file.Path
  * `STT_THREADS` (an integer >= 1) is unset by default, leaving whisper-cli's and ONNX Runtime's own defaults
  * (it sets whisper-cli `-t` and the speaker model's intra-op threads); any other value, empty included, fails fast.
  * `STT_SPEAKER_MODEL` (the CAM++ ONNX model, ADR 0003) is required: unset or empty fails fast.
+ * `STT_WHISPER_MODEL` (the whisper.cpp model file, ADR 0008) is required the same way.
  */
 data class Config(
     val dataDir: Path,
     val speakerModel: Path,
+    val whisperModel: Path,
     val port: Int = 8080,
     val staticDir: Path? = null,
     val device: Device = Device.Auto,
@@ -32,17 +34,22 @@ data class Config(
             "STT_THREADS must be an integer >= 1, got \"%s\""
         private const val SPEAKER_MODEL_MISSING_ERROR =
             "STT_SPEAKER_MODEL must be set to the CAM++ speaker-embedding ONNX model file"
+        private const val WHISPER_MODEL_MISSING_ERROR =
+            "STT_WHISPER_MODEL must be set to the whisper.cpp model file"
 
         fun fromEnv(env: Map<String, String> = System.getenv()): Config {
             val dataDir = env["STT_DATA_DIR"]
             require(!dataDir.isNullOrEmpty()) { DATA_DIR_MISSING_ERROR }
             val speakerModel = env["STT_SPEAKER_MODEL"]
             require(!speakerModel.isNullOrEmpty()) { SPEAKER_MODEL_MISSING_ERROR }
+            val whisperModel = env["STT_WHISPER_MODEL"]
+            require(!whisperModel.isNullOrEmpty()) { WHISPER_MODEL_MISSING_ERROR }
             val rawPort = env["STT_PORT"]
             val port = if (rawPort == null) 8080 else parseIntIn(rawPort, 1..65535, PORT_LIMIT_ERROR)
             return Config(
                 dataDir = Path.of(dataDir),
                 speakerModel = Path.of(speakerModel),
+                whisperModel = Path.of(whisperModel),
                 port = port,
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
                 device = env["STT_DEVICE"]?.let { parseDevice(it) } ?: Device.Auto,

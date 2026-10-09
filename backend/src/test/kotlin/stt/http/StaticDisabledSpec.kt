@@ -8,6 +8,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import stt.config.Config
 import stt.config.TEST_SPEAKER_MODEL
+import stt.config.TEST_WHISPER_MODEL
 
 class StaticDisabledSpec :
     BehaviorSpec({
@@ -19,7 +20,15 @@ class StaticDisabledSpec :
                 then("health responds 200 and the path returns 404") {
                     testApplication {
                         application {
-                            sttApp(Config.fromEnv(mapOf("STT_DATA_DIR" to dataDir.path, "STT_SPEAKER_MODEL" to TEST_SPEAKER_MODEL)))
+                            sttApp(
+                                Config.fromEnv(
+                                    mapOf(
+                                        "STT_DATA_DIR" to dataDir.path,
+                                        "STT_SPEAKER_MODEL" to TEST_SPEAKER_MODEL,
+                                        "STT_WHISPER_MODEL" to TEST_WHISPER_MODEL,
+                                    ),
+                                ),
+                            )
                         }
                         client.get("/api/health").status.shouldBe(HttpStatusCode.OK)
                         client.get("/some/route").status.shouldBe(HttpStatusCode.NotFound)
