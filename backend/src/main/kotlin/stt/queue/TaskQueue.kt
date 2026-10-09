@@ -30,7 +30,7 @@ data class TaskQueue private constructor(
         val from =
             entries.firstOrNull { it.id == id }?.status
                 ?: return QueueTransitionOutcome.Rejected(QueueTransitionRejection.UnknownTask(id))
-        if (from.transition(to) is TransitionOutcome.Rejected) {
+        if (!from.canTransitionTo(to)) {
             return QueueTransitionOutcome.Rejected(QueueTransitionRejection.IllegalTransition(from, to))
         }
         if (to == TaskStatus.RUNNING && anotherTaskRunning(id)) {
