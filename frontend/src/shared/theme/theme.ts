@@ -18,6 +18,13 @@ export interface ThemeTokens {
     accentText: string;
     focusRing: string;
     danger: string;
+    // Button state fills (primary and danger hover/active, secondary active; the base
+    // fills are accent/surface/danger, secondary hover is surfaceRaised).
+    buttonPrimaryHover: string;
+    buttonPrimaryActive: string;
+    buttonSecondaryActive: string;
+    buttonDangerHover: string;
+    buttonDangerActive: string;
     status: Record<StatusGroup, { background: string; text: string }>;
     // One tint per speaker index (item 12's 0-based speakerId), taken modulo the size; the
     // speaker's name is shown in it (item 15). Chosen for contrast, AA in both themes.
@@ -35,6 +42,7 @@ export interface ThemeTokens {
   };
   borderWidths: {
     thin: string;
+    ring: string;
   };
   sizes: {
     viewportMinHeight: string;
@@ -72,6 +80,7 @@ const baseTokens = {
   },
   borderWidths: {
     thin: '0.0625rem',
+    ring: '0.125rem',
   },
   sizes: {
     viewportMinHeight: '100vh',
@@ -108,6 +117,11 @@ export const lightTheme: ThemeTokens = {
     accentText: '#ffffff',
     focusRing: '#0057a8',
     danger: '#b42318',
+    buttonPrimaryHover: '#004b94',
+    buttonPrimaryActive: '#00407f',
+    buttonSecondaryActive: '#e8ecf1',
+    buttonDangerHover: '#9c1e15',
+    buttonDangerActive: '#861a12',
     status: {
       pending: { background: '#eceef1', text: '#3d434c' },
       active: { background: '#e3eefa', text: '#0057a8' },
@@ -132,6 +146,11 @@ export const darkTheme: ThemeTokens = {
     accentText: '#14161a',
     focusRing: '#7fb2e5',
     danger: '#f28b82',
+    buttonPrimaryHover: '#93bceb',
+    buttonPrimaryActive: '#a4c8f0',
+    buttonSecondaryActive: '#242a31',
+    buttonDangerHover: '#f49c94',
+    buttonDangerActive: '#f6b3ac',
     status: {
       pending: { background: '#2a2e35', text: '#cdd2da' },
       active: { background: '#1a2a3c', text: '#7fb2e5' },
