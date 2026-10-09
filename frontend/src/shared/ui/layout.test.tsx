@@ -1,20 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { px, required } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { lightTheme } from '../theme/theme';
 import { Page, Row, Stack } from './layout';
-
-// jsdom normalises lengths to px at the default root font size (1rem = 16px) but keeps
-// `gap` exactly as written, so both forms are checked against the token they came from.
-function px(length: string): string {
-  return `${Number.parseFloat(length) * 16}px`;
-}
-
-function required(element: Element | null | undefined): HTMLElement {
-  if (!(element instanceof HTMLElement)) {
-    throw new Error('The layout primitive did not render');
-  }
-  return element;
-}
 
 describe('the layout primitives', () => {
   it('applies the token spacing and the page max width', () => {
