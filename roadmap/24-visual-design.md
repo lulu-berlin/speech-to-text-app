@@ -66,7 +66,17 @@ None.
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] Every primitive renders its documented variants and states using token values only (no literal colors or sizes)
+- [ ] Every primitive renders its documented variants and states using token values only (no literal colors or sizes); split by component (user, 2026-10-09), each sub-item asserts the computed styles against the token values:
+  - [ ] `Button`: primary, secondary and danger; disabled; loading
+  - [ ] `IconButton`
+  - [ ] `Card`/`Surface`
+  - [ ] `Spinner` and `Skeleton`, which stop animating under `prefers-reduced-motion`
+  - [ ] `EmptyState`
+  - [ ] `List`/`ListRow`
+  - [ ] `Tooltip`
+  - [ ] `DropdownMenu`
+  - [ ] `Switch`
+  - [ ] `Slider`
 - [ ] `StatusBadge` renders the five status groups, each with its own token-based treatment, and shows the exact status text
 - [ ] `ProgressBar` renders the transcription value, and both diarization stages (embedding, clustering)
 - [ ] `Page`/`Stack`/`Row` apply the token spacing and max width
@@ -75,6 +85,8 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] The dark-mode control cycles auto → light → dark, stores the choice, and overrides the OS preference
 - [ ] The icon wrapper renders a token-sized, token-colored icon and is hidden from assistive technology when decorative
 - [ ] Text and background contrast meets AA in both the light and the dark token set (measured)
+- [ ] (discovered, confirmed 2026-10-09) A convention check fails on any literal color (hex, `rgb()`, `hsl()`) or length (`px`, `rem`, `em`, `vh`) in `src/` outside `theme.ts` and the tests
+- [ ] (discovered, confirmed 2026-10-09) The body text uses IBM Plex Sans with the system stack as fallback (the font's shipping and loading are verified as acceptance work: the woff2 in `dist/assets`, `document.fonts` in Chromium)
 
 ## Acceptance criteria
 
@@ -88,3 +100,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 
 - 2026-10-09: item drafted at the user's request (the app had no item for its visual design). Restructured by the user's answers: this item is the design system only and comes before items 14 and 15; Radix (Dialog, Tooltip, DropdownMenu, Switch, Slider) plus `lucide-react`; palette keeps the current accent; IBM Plex Sans self-hosted; tokens as a TypeScript object only; dark mode follows the OS with a manual override; layout primitives included; the visual pass over the views is item 25.
 - 2026-10-09: test list (9 items) approved by the user; [ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md) written; status `spec-approved`.
+- 2026-10-09 (workspace, start): answers from the user. Item 1 is split by component (ten sub-items). A convention check for literal colors and lengths is added (ADR 0033's "convention check" did not exist yet). The font gets a test-list item (body text uses IBM Plex Sans with the system fallback) and acceptance verification (woff2 in `dist/assets`, `document.fonts` in Chromium). Cycle order confirmed: contrast, font, layout primitives, icon wrapper, simple primitives, StatusBadge, ProgressBar, dialog, Radix primitives, focus ring, dark-mode control. Typeface: the variable woff2 (`@fontsource-variable/ibm-plex-sans@5.3.0`, latin, weight axis 100–700, 45,712 bytes), smaller than the three static files 400/500/600 (22,588 + 24,184 + 24,252 = 71,024 bytes). Dependencies pinned at releases at least 10 days old: Radix `react-dialog@1.1.23`, `react-tooltip@1.2.16`, `react-dropdown-menu@2.1.24`, `react-switch@1.3.7`, `react-slider@1.4.7`; `lucide-react@1.48.0`. The sandbox has no `/bin/sh`, so `pnpm test`/`pnpm build` are run as their underlying commands through `node`.
