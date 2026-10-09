@@ -1,6 +1,6 @@
 # 24 — Design system: tokens and primitives
 
-Status: draft
+Status: spec-approved
 Depends on: [13](13-frontend-foundation.md)
 
 ## Goal
@@ -13,9 +13,10 @@ Establish the app's visual language as code before the Queue and History views a
 - [Frontend conventions](../docs/conventions/frontend.md): all design values live in `src/shared/theme/theme.ts` as tokens; **no literal colors or sizes in components**; shared components in `src/shared/`; named exports; colocated tests.
 - Item 13 decided the direction: **calm, document-like**; light and dark. It built the shell, the router, the connection indicator and a native-`<dialog>` `ConfirmDialog`, but the theme has only four colors, one spacing unit, two radii and one font size, and the views are placeholders.
 - [ADR 0026 — No rule for where test fixtures live](../docs/decisions/0026-no-rule-for-test-fixture-location.md): the self-hosted font is committed like the other assets, with its licence notice.
+- [ADR 0033 — Design system: tokens, Radix primitives, IBM Plex Sans](../docs/decisions/0033-design-system-tokens-radix-plex.md): the decisions below, recorded when this spec was approved.
 - User decisions (2026-10-09): this item comes **before** items 14 and 15; it is the **design system only** (the visual pass is item 25); the palette **keeps the current accent**; icons come from **`lucide-react`**; interactive primitives are built on **Radix** (Dialog, Tooltip, DropdownMenu, Switch, Slider); the typeface is **IBM Plex Sans**, self-hosted; tokens are a **TypeScript object only**; dark mode **follows the OS with a manual override**; **layout primitives** (`Page`, `Stack`, `Row`) are part of the system.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Dependencies** (each changes `pnpm-lock.yaml` and the flake's `fetchPnpmDeps` hash, verified by the user, ADR 0012):
   - `@radix-ui/react-dialog`, `-tooltip`, `-dropdown-menu`, `-switch`, `-slider` (behavior and accessibility only; all styling is ours, from tokens);
@@ -43,7 +44,7 @@ Establish the app's visual language as code before the Queue and History views a
 - **Dark mode**: follows the OS by default; a small control in the header cycles `auto → light → dark` and the choice is stored (localStorage) and overrides the OS.
 - **Accessibility, part of the primitives, not a later pass**: AA contrast in both themes, visible focus rings on every interactive element, full keyboard operation, `prefers-reduced-motion` respected, correct roles and labels.
 - **This item does not restyle the views.** It delivers tokens, the typeface, layout and primitives with their tests; items 14 and 15 consume them and item 25 does the final visual pass.
-- **Decision to record**: the design system (tokens, Radix, `lucide-react`, IBM Plex Sans, the dark-mode override) is worth an ADR when this spec is approved.
+- **Recorded**: [ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md) holds these decisions.
 
 ## Open questions (answered 2026-10-09)
 
@@ -63,7 +64,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] Every primitive renders its documented variants and states using token values only (no literal colors or sizes)
 - [ ] `StatusBadge` renders the five status groups, each with its own token-based treatment, and shows the exact status text
@@ -86,3 +87,4 @@ Seed — to be refined and approved with the user before any test is written:
 ## Approval log
 
 - 2026-10-09: item drafted at the user's request (the app had no item for its visual design). Restructured by the user's answers: this item is the design system only and comes before items 14 and 15; Radix (Dialog, Tooltip, DropdownMenu, Switch, Slider) plus `lucide-react`; palette keeps the current accent; IBM Plex Sans self-hosted; tokens as a TypeScript object only; dark mode follows the OS with a manual override; layout primitives included; the visual pass over the views is item 25.
+- 2026-10-09: test list (9 items) approved by the user; [ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md) written; status `spec-approved`.
