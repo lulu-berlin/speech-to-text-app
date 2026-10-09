@@ -80,6 +80,39 @@ class ProcessingEngineTaskPauseSpec :
                 }
             }
         }
+        given("a task being chunked when it is paused") {
+            `when`("the task is paused and then resumed") {
+                then("the chunking process is frozen and continued, and the task still completes") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.chunker.hold = release
+                        fixture.engine.start()
+
+                        taskIdOf(fixture.chunker.entered.receive()) shouldBe task
+                        statusOf(fixture, task) shouldBe TaskStatus.RUNNING
+                        phaseOf(fixture, task) shouldBe TaskPhase.CHUNKING
+
+                        fixture.engine.pauseTask(task) shouldBe TaskCommandOutcome.Accepted
+                        fixture.processControl.frozen shouldBe true
+                        statusOf(fixture, task) shouldBe TaskStatus.PAUSED
+
+                        fixture.engine.resumeTask(task) shouldBe TaskCommandOutcome.Accepted
+                        fixture.processControl.frozen shouldBe false
+                        statusOf(fixture, task) shouldBe TaskStatus.RUNNING
+                        phaseOf(fixture, task) shouldBe TaskPhase.CHUNKING
+
+                        fixture.chunker.hold = null
+                        release.complete(Unit)
+                        fixture.completed.receive() shouldBe task
+                        fixture.processControl.pauses shouldBe 1
+                        fixture.processControl.resumes shouldBe 1
+                    }
+                }
+            }
+        }
     })
 
 /** An id no task has: ids are autoincrement and start at 1. */
