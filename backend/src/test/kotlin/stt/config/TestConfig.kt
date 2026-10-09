@@ -20,6 +20,15 @@ internal val TEST_REQUIRED_ENV =
     )
 
 /**
+ * A [Config] for tests that only need configuration to load: [dataDir] plus the test model paths
+ * ([TEST_SPEAKER_MODEL], [TEST_WHISPER_MODEL]), which are never opened.
+ */
+internal fun testConfig(
+    dataDir: Path,
+    staticDir: Path? = null,
+): Config = Config(dataDir, Path.of(TEST_SPEAKER_MODEL), Path.of(TEST_WHISPER_MODEL), staticDir = staticDir)
+
+/**
  * The real CAM++ model path from the environment's `$STT_SPEAKER_MODEL`, read through [Config.fromEnv] as the app
  * reads it (`Integration` tests only). STT_DATA_DIR is required by [Config] but unused here.
  */
