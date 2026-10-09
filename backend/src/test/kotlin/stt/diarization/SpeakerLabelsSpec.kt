@@ -40,6 +40,37 @@ class SpeakerLabelsSpec :
                 }
             }
         }
+
+        given("a short segment between two segments of speaker A whose voice is nearer speaker B") {
+            `when`("the speakers are labelled in auto mode") {
+                then("the short segment is rescued to B, the nearest centroid, not to its neighbours' speaker") {
+                    // A on dims 0-1 (pair at 0.2), B on dims 2-3 (pair at 0.04), cross distances exactly 1: the long rows
+                    // 0, 2, 3, 4 give heights 0.04, 0.2, 1, gaps 0.16, 0.8, so k = 4 - (1 + 1) = 2: A = 0, B = 1.
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+                    val segments =
+                        listOf(
+                            segment(startMs = 0, endMs = 2_000), // A
+                            segment(startMs = 2_000, endMs = 2_300), // short
+                            segment(startMs = 2_300, endMs = 4_300), // A
+                            segment(startMs = 4_300, endMs = 6_300), // B
+                            segment(startMs = 6_300, endMs = 8_300), // B
+                        )
+                    // Centroids: A = (1.8, 0.6) / sqrt(3.6) ≈ (0.949, 0.316) on dims 0-1; B = (1.96, 0.28) / sqrt(3.92)
+                    // ≈ (0.990, 0.141) on dims 2-3. The short row (0.6, 0, 0.8, 0) has dot 0.6 · 0.949 ≈ 0.569 with A
+                    // and 0.8 · 0.990 ≈ 0.792 with B, so it gets B = 1 (it would stay 0 without the rescue).
+                    val embeddings =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f),
+                            floatArrayOf(0.6f, 0f, 0.8f, 0f),
+                            floatArrayOf(0.8f, 0.6f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f),
+                            floatArrayOf(0f, 0f, 0.96f, 0.28f),
+                        )
+
+                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 1, 0, 1, 1))
+                }
+            }
+        }
     })
 
 private fun segment(
