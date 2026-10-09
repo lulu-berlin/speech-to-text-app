@@ -183,13 +183,3 @@ class ProcessingEngineDiarizationSpec :
             }
         }
     })
-
-/** Every element a channel currently holds, without waiting for more. */
-private fun <T> drain(channel: ReceiveChannel<T>): List<T> =
-    buildList {
-        var next = channel.tryReceive()
-        while (next.isSuccess) {
-            add(next.getOrThrow())
-            next = channel.tryReceive()
-        }
-    }

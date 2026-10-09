@@ -184,6 +184,14 @@ class TaskRepository(
             it[TasksTable.startedAt] = startedAt
         }
 
+    /** Stores the transcription progress (0-1, weighted by chunk duration). */
+    suspend fun setProgress(
+        id: Long,
+        progress: Double,
+    ) {
+        updateTask(id) { it[TasksTable.progress] = progress }
+    }
+
     /** Stores the diarization stage and its progress within that stage (item 12's contract; both null clear them). */
     suspend fun setDiarizationProgress(
         id: Long,

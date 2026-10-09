@@ -21,6 +21,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import stt.audio.Chunker
 import stt.config.Config
+import stt.db.Chunk
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.DiarizationStage
@@ -38,6 +39,7 @@ import stt.transcribe.ChunkTranscription
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSettings
 import stt.transcribe.resumePrompt
+import stt.transcribe.taskProgress
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -291,20 +293,60 @@ class ProcessingEngine internal constructor(
     ) {
         tasks.setPhase(id, TaskPhase.TRANSCRIBING)
         publish(id)
+        val stored = chunks.findByTask(id)
         val workDir = workDirectories.workDir(id)
-        for (chunk in chunks.findByTask(id)) {
-            if (chunk.status == ChunkStatus.DONE) continue
-            val audio = workDir.resolve("chunk-${chunk.idx}.flac")
-            writeChunkFlac(id, chunk.idx, audio)
-            transcription.transcribe(
-                taskId = id,
-                chunk = chunk,
-                settings = settingsFor(task),
-                audio = audio,
-                outputPrefix = workDir.resolve("chunk-${chunk.idx}"),
-                prompt = resumePrompt(segments, id, chunk.idx),
-            )
+        // whisper's -pp lines arrive on a non-suspending callback, so the chunks run in a child coroutine
+        // and report over a channel, which this coroutine drains, persists and publishes in order.
+        val reports = Channel<TranscriptionReport?>(Channel.UNLIMITED)
+        coroutineScope {
+            launch {
+                for (chunk in stored) {
+                    if (chunk.status == ChunkStatus.DONE) continue
+                    val audio = workDir.resolve("chunk-${chunk.idx}.flac")
+                    writeChunkFlac(id, chunk.idx, audio)
+                    transcription.transcribe(
+                        taskId = id,
+                        chunk = chunk,
+                        settings = settingsFor(task),
+                        audio = audio,
+                        outputPrefix = workDir.resolve("chunk-${chunk.idx}"),
+                        prompt = resumePrompt(segments, id, chunk.idx),
+                        onProgress = { fraction -> reports.trySend(TranscriptionReport(chunk.idx, fraction)) },
+                    )
+                }
+                // The null report is the terminator: everything before it has been sent.
+                reports.trySend(null)
+            }
+            var doneIdx = -1
+            while (true) {
+                val report = reports.receive() ?: break
+                // The child transcribes chunks in order, so a report for a higher chunk means every chunk
+                // before it is DONE; item 07's weighted progress is evaluated against that knowledge.
+                if (report.chunkIdx > doneIdx) doneIdx = report.chunkIdx
+                val chunks =
+                    stored.map { chunk -> if (chunk.idx < doneIdx) chunk.copy(status = ChunkStatus.DONE) else chunk }
+                transcriptionProgress(id, chunks, report.chunkIdx, report.fraction)
+            }
         }
+    }
+
+    /** Persists the weighted transcription progress and then publishes it, so the database leads the event. */
+    private suspend fun transcriptionProgress(
+        id: Long,
+        chunks: List<Chunk>,
+        runningIdx: Int,
+        fraction: Double,
+    ) {
+        tasks.setProgress(id, taskProgress(chunks, runningIdx, fraction))
+        val task = tasks.find(id) ?: return
+        _events.emit(
+            Event.TaskProgress(
+                id = task.id,
+                transcriptionProgress = task.task.progress,
+                diarizationStage = task.task.diarizationStage,
+                diarizationProgress = task.task.diarizationProgress,
+            ),
+        )
     }
 
     /**
@@ -421,4 +463,10 @@ class ProcessingEngine internal constructor(
 private data class DiarizationReport(
     val stage: DiarizationStage?,
     val value: Double,
+)
+
+/** One whisper-cli progress report: the chunk it belongs to and the chunk fraction, as parsed. */
+private data class TranscriptionReport(
+    val chunkIdx: Int,
+    val fraction: Double,
 )
