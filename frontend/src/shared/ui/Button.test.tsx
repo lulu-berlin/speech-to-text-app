@@ -1,16 +1,10 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { asRgb } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { AA_TEXT, contrast } from '../../test/wcag';
 import { darkTheme, lightTheme } from '../theme/theme';
-import type { ThemeTokens } from '../theme/theme';
 import { Button } from './Button';
-
-// jsdom reports colours as rgb(), so a token is converted the same way (as in item 13).
-function asRgb(hex: string): string {
-  const value = Number.parseInt(hex.slice(1), 16);
-  return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
-}
 
 // The string-valued colour roles the button uses (speakerTints and status are excluded).
 type ColorKey =

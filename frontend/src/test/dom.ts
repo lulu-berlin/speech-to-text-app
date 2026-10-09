@@ -9,6 +9,12 @@ export function required(element: Element | null | undefined): Element {
   return element;
 }
 
+// jsdom reports colours as rgb(), so a token is converted the same way.
+export function asRgb(hex: string): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
+}
+
 // jsdom normalises lengths to px at the default root font size (1rem = 16px) but keeps
 // shorthands such as `gap` exactly as written, so both forms can be compared with the
 // token they came from.
