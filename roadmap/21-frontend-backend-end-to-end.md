@@ -1,6 +1,6 @@
 # 21 — Frontend–backend end-to-end check
 
-Status: draft
+Status: spec-approved
 Depends on: [12](12-http-api-and-sse.md), [13](../docs/specs/frontend-foundation.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md), [22](22-speaker-rename.md), [25](25-visual-polish.md)
 
 ## Goal
@@ -15,7 +15,7 @@ Prove the whole product works together on a real machine — an uploaded clip is
 - The committed LibriSpeech clips (items 08 and 09) and the devenv's tiny whisper model are available; item 09's Integration test already pins their speaker labels (1089 → 1188 → 1089).
 - User decisions (2026-10-09): the check is **automated with Playwright**; it **also carries the visual acceptance** (moved from item 25); it depends on items 22 and 25 as well, so it checks the final build; item 16 depends on this item; it transcribes **the committed clips with the tiny model**.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 
 - **Layout: a separate top-level `e2e/` package** (its own `package.json` and lockfile), so the frontend package and its flake build are not polluted by a test-only browser stack. Playwright's browser comes from `devenv.nix` (`PLAYWRIGHT_BROWSERS_PATH`), the `@playwright/test` package from `e2e/`'s own lockfile. Point to confirm with the user at the first checkpoint.
   - `devenv.nix` gains Playwright's Chromium (dev only). The **packaged app must not include it**: the flake's backend/frontend derivations are unchanged, and the e2e suite is not part of `nix build` (ADR 0010 still applies to the devenv change, which the user verifies by re-entering the shell).
@@ -41,7 +41,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] The suite starts the backend on a temporary `STT_DATA_DIR` and the built frontend, and the app loads at phone and desktop widths
 - [ ] Uploading several fixture clips queues them in order; the queue shows the status, the phase and both progress bars advancing live
@@ -66,3 +66,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 - 2026-10-09: item drafted with the frontend chain, to hold the acceptance criteria of items 13–15 that need the running backend.
 - 2026-10-09: consultation answers approved: automated with Playwright (a separate `e2e/` package, browsers from `devenv.nix`, absent from the packaged app); it also carries item 25's visual acceptance via screenshots; it depends on items 22 and 25, and item 16 depends on it; the committed LibriSpeech clips and the tiny model are the fixtures. Test list not yet approved.
+- 2026-10-09: test list (11 items) approved by the user; status `spec-approved`.
