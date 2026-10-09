@@ -1,6 +1,6 @@
 # 15 — Frontend history UI
 
-Status: draft
+Status: spec-approved
 Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
 
 ## Goal
@@ -15,7 +15,7 @@ Let the user browse past transcriptions: find a finished task, read its transcri
 - FAILED and CANCELED tasks can be retried (`POST /api/tasks/{id}/retry`, item 11).
 - Decided in the item 14 consultation: **delete is offered in History too, always with confirmation**; it frees the file's `sha256`, so the same file can be uploaded again.
 
-## Proposal (pending approval)
+## Proposal (approved 2026-10-09)
 - **History list** of finished tasks (COMPLETED, FAILED, CANCELED), newest first, with filename, status, date and duration; FAILED tasks show their error. **A filename search box and a status filter** (all / completed / failed / canceled), both client-side over the task list the app already holds (decided 2026-10-09; no backend search). The list updates live: a task that finishes appears, a retried one leaves, a deleted one disappears.
 - **Transcript view** for a COMPLETED task (`/history/:taskId`):
   - speaker turns with timestamps from `/turns`; each speaker's name shown with **a subtle per-speaker tint** from a speaker palette (tokens added to item 24, light and dark, AA-checked; speaker N uses palette entry N mod palette size); speakers-off transcripts show no labels;
@@ -43,7 +43,7 @@ Let the user browse past transcriptions: find a finished task, read its transcri
 None.
 
 ## Test list (written with the user; Canon TDD step 1)
-Seed — to be refined and approved with the user before any test is written:
+Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 - [ ] The history list shows completed, failed and canceled tasks, newest first, and no pending ones
 - [ ] The filename search and the status filter narrow the list
 - [ ] A failed task shows its error message in the list
@@ -69,3 +69,4 @@ Seed — to be refined and approved with the user before any test is written:
 
 ## Approval log
 - 2026-10-09: consultation answers approved: client-side filename search and status filter; click-to-seek seeks and plays; follow mode until the user scrolls; new Task field `hasAudio` (item 12 contract and `docs/api/` updated); a status page for failed/canceled tasks; speakers shown with a per-speaker tint (a speaker palette added to item 24); delete in History, always confirmed (item 14 consultation). Test list not yet approved.
+- 2026-10-09: test list (15 items) approved by the user; status `spec-approved`.
