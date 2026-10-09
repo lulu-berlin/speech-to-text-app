@@ -15,19 +15,28 @@ internal const val SHORT_SEGMENT_MS = 500L
  * embedding and the file writing). [embeddings] holds one L2-normalized row per segment; [k] = `null` is auto mode.
  *
  * Only segments of at least [SHORT_SEGMENT_MS] are clustered, or all of them when none is that long; the others start
- * at speakerId 0 and are then rescued to the nearest speaker (see [rescueShortSegments]).
+ * at speakerId 0 and are then rescued to the nearest speaker (see [rescueShortSegments]). Finally [summary] (by default
+ * [logSpeakerSummary]) gets the clustered rows with their final speakerIds; it is diagnostics only, so a failure in it
+ * is logged and never fails the labelling (oracle: `except Exception: pass`).
  */
 internal fun speakerIds(
     segments: List<Segment>,
     embeddings: Array<FloatArray>,
     k: Int?,
     maxSpeakers: Int,
+    summary: (clusteredEmbeddings: Array<FloatArray>, clusteredSpeakerIds: List<Int>) -> Unit = ::logSpeakerSummary,
 ): List<Int> {
     val clustered = segments.indices.filter { segments[it].isLong() }.ifEmpty { segments.indices.toList() }
-    val clusteredSpeakerIds = clusterSegments(Array(clustered.size) { embeddings[clustered[it]] }, k, maxSpeakers)
+    val clusteredEmbeddings = Array(clustered.size) { embeddings[clustered[it]] }
+    val clusteredSpeakerIds = clusterSegments(clusteredEmbeddings, k, maxSpeakers)
     val speakerIds = IntArray(segments.size)
     clustered.forEachIndexed { pos, row -> speakerIds[row] = clusteredSpeakerIds[pos] }
     rescueShortSegments(segments, speakerIds, embeddings)
+    try {
+        summary(clusteredEmbeddings, clustered.map { speakerIds[it] })
+    } catch (e: Exception) {
+        speakerSummaryLogger.warn("speaker summary failed", e)
+    }
     return speakerIds.asList()
 }
 
