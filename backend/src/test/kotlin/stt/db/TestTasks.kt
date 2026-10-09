@@ -19,6 +19,8 @@ internal fun queuedTask(
     maxSpeakers = 8,
     model = "large-v3-turbo-q5_0",
     progress = 0.0,
+    diarizationStage = null,
+    diarizationProgress = null,
     error = null,
     createdAt = createdAt,
     startedAt = null,

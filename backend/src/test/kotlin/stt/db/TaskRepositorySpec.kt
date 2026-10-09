@@ -41,6 +41,8 @@ class TaskRepositorySpec :
                                 maxSpeakers = 4,
                                 model = "base.en",
                                 progress = 0.25,
+                                diarizationStage = DiarizationStage.CLUSTERING,
+                                diarizationProgress = 0.37,
                                 error = "previous attempt failed",
                                 createdAt = 1_700_000_000_000L,
                                 startedAt = 1_700_000_001_000L,

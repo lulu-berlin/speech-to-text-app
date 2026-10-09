@@ -8,7 +8,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
@@ -21,6 +23,7 @@ import stt.audio.Chunker
 import stt.config.Config
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
+import stt.db.DiarizationStage
 import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
@@ -316,7 +319,46 @@ class ProcessingEngine internal constructor(
         if (task.task.speakersMode == SpeakersMode.OFF || segments.findByTask(id).isEmpty()) return
         tasks.setPhase(id, TaskPhase.DIARIZING)
         publish(id)
-        diarizer.diarize(task, pauseGate)
+        // The contract (item 12): progress is 0 before diarization starts, 1 once the speakers are stored,
+        // with no stage left over. The reports in between are each persisted and then published.
+        diarizationProgress(id, null, 0.0)
+        val reports = Channel<DiarizationReport?>(Channel.UNLIMITED)
+        coroutineScope {
+            launch {
+                val stage = MutableStateFlow<DiarizationStage?>(null)
+                diarizer.diarize(
+                    task,
+                    pauseGate,
+                    onStage = { stage.value = it },
+                    onProgress = { value -> reports.trySend(DiarizationReport(stage.value, value)) },
+                )
+                // The null report is the terminator: everything before it has been sent.
+                reports.trySend(null)
+            }
+            while (true) {
+                val report = reports.receive() ?: break
+                diarizationProgress(id, report.stage, report.value)
+            }
+        }
+        diarizationProgress(id, null, 1.0)
+    }
+
+    /** Persists a diarization stage report and then publishes it, so the database leads the event. */
+    private suspend fun diarizationProgress(
+        id: Long,
+        stage: DiarizationStage?,
+        value: Double,
+    ) {
+        tasks.setDiarizationProgress(id, stage, value)
+        val task = tasks.find(id) ?: return
+        _events.emit(
+            Event.TaskProgress(
+                id = task.id,
+                transcriptionProgress = task.task.progress,
+                diarizationStage = task.task.diarizationStage,
+                diarizationProgress = task.task.diarizationProgress,
+            ),
+        )
     }
 
     /**
@@ -374,3 +416,9 @@ class ProcessingEngine internal constructor(
         val logger: Logger = LoggerFactory.getLogger(ProcessingEngine::class.java)
     }
 }
+
+/** One stage report of the DIARIZING phase, with the stage snapshotted as the diarizer sent it. */
+private data class DiarizationReport(
+    val stage: DiarizationStage?,
+    val value: Double,
+)

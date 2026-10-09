@@ -16,6 +16,8 @@ data class Task(
     val maxSpeakers: Int,
     val model: String,
     val progress: Double,
+    val diarizationStage: DiarizationStage?,
+    val diarizationProgress: Double?,
     val error: String?,
     val createdAt: Long,
     val startedAt: Long?,

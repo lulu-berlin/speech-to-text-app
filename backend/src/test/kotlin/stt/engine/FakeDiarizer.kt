@@ -2,6 +2,7 @@ package stt.engine
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
+import stt.db.DiarizationStage
 import stt.db.StoredTask
 import stt.pause.PauseGate
 
@@ -23,10 +24,19 @@ internal class FakeDiarizer : Diarizer {
     override suspend fun diarize(
         task: StoredTask,
         gate: PauseGate,
+        onStage: (DiarizationStage) -> Unit,
+        onProgress: (Double) -> Unit,
     ) {
         diarized.add(task.id)
         entered.send(task.id)
         hold?.await()
+        onStage(DiarizationStage.EMBEDDING)
+        onProgress(0.0)
+        onProgress(0.5)
+        onProgress(1.0)
+        onStage(DiarizationStage.CLUSTERING)
+        onProgress(0.0)
+        onProgress(1.0)
         gate.checkpoint()
         passedGate = true
     }

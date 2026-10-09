@@ -1,5 +1,6 @@
 package stt.engine
 
+import stt.db.DiarizationStage
 import stt.db.StoredTask
 
 /**
@@ -11,5 +12,13 @@ sealed interface Event {
     /** The task's status, phase or error changed; carrying the whole task makes a repeated event harmless. */
     data class TaskUpdated(
         val task: StoredTask,
+    ) : Event
+
+    /** The transcription and diarization progress of a task (item 12's `task-progress` event). */
+    data class TaskProgress(
+        val id: Long,
+        val transcriptionProgress: Double,
+        val diarizationStage: DiarizationStage?,
+        val diarizationProgress: Double?,
     ) : Event
 }
