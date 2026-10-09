@@ -185,6 +185,32 @@ class SegmentRepositorySpec :
                 }
             }
         }
+
+        given("task T with speaker 0 only, and task U without speakers") {
+            `when`("segments that name a speaker are inserted") {
+                then("the database rejects a speaker id the segment's own task does not have, and accepts one it has") {
+                    withDatabase { db ->
+                        val tasks = taskRepository(db, dataDir)
+                        val segments = SegmentRepository(db)
+                        val taskT = tasks.insert(queuedTask("t.wav", createdAt = 1L))
+                        val taskU = tasks.insert(queuedTask("u.wav", createdAt = 2L))
+                        segments.insertAll(taskT, threeSegments)
+                        segments.storeSpeakers(taskT, speakerIds = listOf(0, 0, 0))
+                        val laterSegment =
+                            Segment(chunkIdx = 2, seq = 0, startMs = 60_000L, endMs = 62_000L, text = "Later.", speakerId = 0)
+
+                        // T's speaker 0 is not U's: the foreign key is (task_id, speaker_id).
+                        shouldThrowAny { segments.insertAll(taskU, listOf(laterSegment)) }
+                        segments.findByTask(taskU).shouldBe(emptyList())
+                        shouldThrowAny { segments.insertAll(taskT, listOf(laterSegment.copy(speakerId = 1))) }
+                        segments.findByTask(taskT).map { it.speakerId }.shouldBe(listOf(0, 0, 0))
+
+                        segments.insertAll(taskT, listOf(laterSegment))
+                        segments.findByTask(taskT).map { it.speakerId }.shouldBe(listOf(0, 0, 0, 0))
+                    }
+                }
+            }
+        }
     })
 
 /** Three segments of a task over chunks 0 and 1, not yet diarized. */
