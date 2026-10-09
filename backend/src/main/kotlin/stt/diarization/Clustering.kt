@@ -23,20 +23,25 @@ internal fun clusterSegments(
     val speakers =
         when {
             n == 2 -> if (merges.last().height < SPEAKER_DISTANCE_THRESHOLD) 1 else 2
-            else -> largestGapCount(merges)
+            else -> largestGapCount(merges, maxSpeakers)
         }
     if (speakers == 1) return List(n) { 0 }
     return cutLabels(n, merges.take(n - speakers))
 }
 
 /**
- * Speaker count at the largest gap between consecutive merge heights: a cut after merge `idx` (the first maximum of
- * `heights[g + 1] - heights[g]`) leaves `n - (idx + 1)` clusters.
+ * Speaker count at the largest gap between consecutive merge heights, searched only among the last [maxSpeakers]
+ * gaps (the top of the tree, so near-duplicate first merges cannot dominate): a cut after merge `idx` (the first
+ * maximum of `heights[g + 1] - heights[g]` from `start = max(0, gaps - maxSpeakers)` on) leaves `n - (idx + 1)` clusters.
  */
-private fun largestGapCount(merges: List<Merge>): Int {
-    var idx = 0
+private fun largestGapCount(
+    merges: List<Merge>,
+    maxSpeakers: Int,
+): Int {
+    val gaps = merges.size - 1
+    var idx = maxOf(0, gaps - maxSpeakers)
     var largest = Double.NEGATIVE_INFINITY
-    for (g in 0 until merges.size - 1) {
+    for (g in idx until gaps) {
         val gap = merges[g + 1].height - merges[g].height
         if (gap > largest) {
             idx = g
