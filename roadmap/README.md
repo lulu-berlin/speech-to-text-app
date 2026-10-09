@@ -43,7 +43,7 @@ graph TD
   02 --> 16[16 Nix flake package]
   14 --> 16
   15 --> 16
-  13 --> 17[17 branding: stenographer animation]
+  17 --> 16
   16 --> 19[19 Docker image and compose]
   20[20 cleanup refactors ✓]:::done
   12 --> 21[21 frontend-backend end-to-end]
@@ -82,7 +82,7 @@ graph TD
 | [13 — Frontend foundation](../docs/specs/frontend-foundation.md) | done | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | spec-approved | 13, 24 |
 | [15 — Frontend history UI](15-frontend-history-ui.md) | spec-approved | 13, 24 |
-| [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15 |
+| [16 — Nix flake package](16-nix-flake-package.md) | draft | 02, 14, 15, 17 |
 | [17 — Branding: stenographer typing animation](17-branding-stenographer-animation.md) | draft | 13, 24 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | draft | 16 |
