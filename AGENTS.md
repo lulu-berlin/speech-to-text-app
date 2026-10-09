@@ -44,7 +44,7 @@ Commits: one commit per green cycle (test + code, subject `Test: <scenario>`), o
 
 ## Workflow
 
-1. Pick the next roadmap item whose `Depends on` items are done.
+1. Pick the next roadmap item whose `Depends on` items are done; a dependency marked "spec-approved only" needs just its approved spec ([ADR 0029](docs/decisions/0029-contract-first-frontend-shared-api-examples.md)).
 2. Consult the user: walk through the item's Proposal and Open questions, and write the Test list together (Canon TDD step 1). Update the file with the answers. When the user approves, set `Status: spec-approved` and add a dated line to its Approval log. New decisions become new ADRs. Commit the approved roadmap file on `main`.
 3. `git worktree add workspaces/<NN-slug> -b roadmap/<NN-slug> main`; set `Status: in-progress` in the worktree's copy of the roadmap file (the copy on `main` stays `spec-approved` until merge). See [workspaces/README.md](workspaces/README.md).
 4. Give the user a startup prompt for the workspace agent: the roadmap file path, the worktree path as its only writable area, the current state (which test-list items are done, what is pending), the Canon TDD rules, the per-cycle checkpoints, and "do not merge". The main-tree agent does not start omp instances ([ADR 0011](docs/decisions/0011-one-omp-instance-per-workspace.md)).

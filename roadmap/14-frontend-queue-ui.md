@@ -10,10 +10,11 @@ Let the user upload many audio files and manage the work queue from the browser:
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
 - [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): pause/resume semantics the UI exposes.
 - [ADR 0007 — SSE live updates](../docs/decisions/0007-sse-live-updates.md): status/progress arrive via SSE; commands go via REST.
+- Item 12's contract (consultation 2026-10-09): speaker inputs 1–20; uploads limited to the extension allow-list; `DELETE /api/tasks/{id}` works on any task (a pending one is cancelled first); a duplicate upload answers `409 duplicate-audio` with the existing `taskId`. Item 11: two progress values, `transcriptionProgress` and `diarizationProgress` (null when diarization does not apply).
 
 ## Proposal (pending approval)
 - Drag-and-drop multi-file upload (plus a file picker) with per-upload options: language, speakers (`auto` / `off` / fixed count), max speakers; each file is sent as one `POST /api/tasks`.
-- Queue list showing each task's filename, status, phase (CHUNKING / TRANSCRIBING / DIARIZING) and a progress bar, updated live from `useEvents`.
+- Queue list showing each task's filename, status, phase (CHUNKING / TRANSCRIBING / DIARIZING) and two progress bars, updated live from `useEvents`: transcription, and diarization (hidden when `diarizationProgress` is null; at 100 % during `DIARIZING` it reads "clustering").
 - Per-task controls: pause, resume, cancel (`POST /api/tasks/{id}/pause|resume|cancel`), shown only when the transition is allowed for the task's status.
 - Drag reorder of non-terminal tasks (`@dnd-kit` proposed) calling `PUT /api/queue/order` with the full ordered id list; on a rejected reorder (409) the list reverts to the server order.
 - Queue pause toggle (`POST /api/queue/pause|resume`) reflecting `GET /api/queue` state.
@@ -22,13 +23,14 @@ Let the user upload many audio files and manage the work queue from the browser:
 - Confirm `@dnd-kit` for drag reorder, or prefer another library / up-down buttons?
 - Which per-upload options are shown by default vs behind an "advanced" toggle, and whether options can be set once for a whole batch?
 - Confirmation dialog before cancel: yes/no?
-- Limits of the max-speakers and fixed-count inputs: follow the bound chosen in item 12 (moved from item 09, 2026-10-09)?
+- Delete button in the queue (any task; a pending one is cancelled by the server first): offered here, in History (item 15), or both? Confirmation dialog?
+- How is a duplicate upload shown: error message with a link to the existing task?
 
 ## Test list (written with the user; Canon TDD step 1)
 Seed — to be refined and approved with the user before any test is written:
 - [ ] Dropping several files uploads each one with the chosen options
 - [ ] A new task appears in the queue list after upload
-- [ ] A `task-progress` event updates that task's progress bar
+- [ ] A `task-progress` event updates that task's two progress bars; the diarization bar is hidden when diarization does not apply
 - [ ] A `task-updated` event updates that task's status and phase
 - [ ] Pressing pause on a running task calls the pause endpoint and shows it as paused
 - [ ] Pressing resume on a paused task calls the resume endpoint
@@ -37,11 +39,11 @@ Seed — to be refined and approved with the user before any test is written:
 - [ ] Reordering sends the full ordered id list to `PUT /api/queue/order`
 - [ ] A rejected reorder restores the server order and shows the error message
 - [ ] The queue pause toggle calls pause/resume and reflects the queue state
-- [ ] An upload error is shown to the user
+- [ ] An upload error is shown to the user (unsupported format, duplicate with its existing task)
 
 ## Acceptance criteria
 - RTL interaction tests for each control pass against MSW handlers.
-- Against the running backend: uploading several files queues them in order; pause/resume/cancel and reorder visibly take effect; progress bars advance live without page reload.
+- Checked against the running backend in item 21.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
