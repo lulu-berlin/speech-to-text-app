@@ -13,158 +13,157 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    ...
-  }: let
-    system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
-    models = import ./nix/models.nix {inherit pkgs;};
+  outputs =
+    { self, nixpkgs, ... }:
+    let
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+      models = import ./nix/models.nix { inherit pkgs; };
 
-    backend = pkgs.stdenv.mkDerivation (finalAttrs: {
-      pname = "stt-backend";
-      version = "0.1.0-SNAPSHOT";
-      src = self;
+      backend = pkgs.stdenv.mkDerivation (finalAttrs: {
+        pname = "stt-backend";
+        version = "0.1.0-SNAPSHOT";
+        src = self;
 
-      # Directory sources unpack to `./source/` (stripHash of the store path);
-      # nixpkgs cds into `$sourceRoot` after unpackPhase, so it must include the
-      # `source/` prefix. Gradle then runs in backend/.
-      sourceRoot = "source/backend";
+        # Directory sources unpack to `./source/` (stripHash of the store path);
+        # nixpkgs cds into `$sourceRoot` after unpackPhase, so it must include the
+        # `source/` prefix. Gradle then runs in backend/.
+        sourceRoot = "source/backend";
 
-      # The unpacked copy keeps the store's 0555 directory modes; nixpkgs only
-      # chmods $sourceRoot, so the update script's exit-trap `rm -rf` would fail
-      # (EPERM noise) on the sibling dirs. Make the whole copy writable.
-      postUnpack = "chmod -R u+w .";
+        # The unpacked copy keeps the store's 0555 directory modes; nixpkgs only
+        # chmods $sourceRoot, so the update script's exit-trap `rm -rf` would fail
+        # (EPERM noise) on the sibling dirs. Make the whole copy writable.
+        postUnpack = "chmod -R u+w .";
 
-      nativeBuildInputs = [
-        pkgs.gradle
-        pkgs.makeWrapper
-        pkgs.jre
-      ];
+        nativeBuildInputs = [
+          pkgs.gradle
+          pkgs.makeWrapper
+          pkgs.jre
+        ];
 
-      # Rewritten by nixpkgs' gradle.fetchDeps mitm proxy.
-      # GENERATION (user): `nix build .#backend.mitmCache.updateScript --print-out-paths`
-      #   then run the printed script; it writes backend/deps.json (see gradle.section.md).
-      # Downstream (non-nixpkgs) packages must pass `pkg` explicitly; pname alone is
-      # resolved as an attribute path inside nixpkgs and fails. The default bwrapFlags
-      # bind-mounts $PWD read-only (fine for nixpkgs, broken for us): make it writable
-      # so the unpack phase can prepare the source and write deps.json.
-      mitmCache = pkgs.gradle.fetchDeps {
-        pkg = finalAttrs.finalPackage;
-        data = ./backend/deps.json;
-        bwrapFlags = ''--bind "$PWD" "$PWD"'';
-      };
+        # Rewritten by nixpkgs' gradle.fetchDeps mitm proxy.
+        # GENERATION (user): `nix build .#backend.mitmCache.updateScript --print-out-paths`
+        #   then run the printed script; it writes backend/deps.json (see gradle.section.md).
+        # Downstream (non-nixpkgs) packages must pass `pkg` explicitly; pname alone is
+        # resolved as an attribute path inside nixpkgs and fails. The default bwrapFlags
+        # bind-mounts $PWD read-only (fine for nixpkgs, broken for us): make it writable
+        # so the unpack phase can prepare the source and write deps.json.
+        mitmCache = pkgs.gradle.fetchDeps {
+          pkg = finalAttrs.finalPackage;
+          data = ./backend/deps.json;
+          bwrapFlags = ''--bind "$PWD" "$PWD"'';
+        };
 
-      # In-process Kotlin compilation (ADR 0022) and Gradle's default JVM memory
-      # settings, -Xmx512m -XX:MaxMetaspaceSize=384m (ADR 0025: the former
-      # 384m/256m cap ran out of metaspace in :compileKotlin).
-      gradleFlags = ["-Pkotlin.compiler.execution.strategy=in-process"];
+        # In-process Kotlin compilation (ADR 0022) and Gradle's default JVM memory
+        # settings, -Xmx512m -XX:MaxMetaspaceSize=384m (ADR 0025: the former
+        # 384m/256m cap ran out of metaspace in :compileKotlin).
+        gradleFlags = [ "-Pkotlin.compiler.execution.strategy=in-process" ];
 
-      # The Nix check runs `gradle check` (ktlintCheck + tests, ADR 0015): nixpkgs'
-      # gradle setup hook defaults gradleCheckTask to `test` (verified in the pinned
-      # nixpkgs setup-hook.sh), so it must be overridden. installDist produces bin/ +
-      # all runtime jars (the plain jar has no dependencies on its own).
-      gradleBuildTask = "installDist";
-      gradleCheckTask = "check";
-      doCheck = true;
+        # The Nix check runs `gradle check` (ktlintCheck + tests, ADR 0015): nixpkgs'
+        # gradle setup hook defaults gradleCheckTask to `test` (verified in the pinned
+        # nixpkgs setup-hook.sh), so it must be overridden. installDist produces bin/ +
+        # all runtime jars (the plain jar has no dependencies on its own).
+        gradleBuildTask = "installDist";
+        gradleCheckTask = "check";
+        doCheck = true;
 
-      installPhase = ''
-        runHook preInstall
-        mkdir -p $out/lib
-        # Distribution lib/: the app jar + all runtime dependencies (the plain
-        # jar has none). The generated launch scripts are not installed - they
-        # need /bin/sh, which is not guaranteed at runtime.
-        cp -r build/install/stt-backend/lib/. $out/lib/
-        runHook postInstall
-      '';
-    });
-
-    frontend = pkgs.stdenv.mkDerivation (finalAttrs: {
-      pname = "stt-frontend";
-      version = "0.1.0";
-      src = self;
-
-      sourceRoot = "source/frontend";
-
-      # pnpm 11 for the committed pnpm-lock.yaml (lockfileVersion 9, ADR 0012).
-      nativeBuildInputs = [
-        pkgs.nodejs
-        pkgs.pnpm_11
-        pkgs.pnpmConfigHook
-        pkgs.pnpmBuildHook
-      ];
-
-      # Symlink-nothing; pnpmConfigHook + pnpmBuildHook need the store.
-      # The sandbox OOM-killed pnpm's default install parallelism; keep it serial,
-      # skip lifecycle scripts (none of our deps need them - rolldown's binding is an
-      # optional dependency, not a postinstall) and cap network concurrency.
-      pnpmInstallFlags = [
-        "--child-concurrency=1"
-        "--network-concurrency=2"
-        "--ignore-scripts"
-      ];
-
-      pnpmDeps = pkgs.fetchPnpmDeps {
-        inherit (finalAttrs) pname version src sourceRoot pnpmBuildScript pnpmInstallFlags;
-        pnpm = pkgs.pnpm_11;
-        fetcherVersion = 4;
-        # pnpm store hash, generated by the fixed-output build (fetcherVersion = 4).
-        hash = "sha256-uNx1wux9hgAiGeIy9HPGlU0oQRv1sSRD+Y38gsKGvQY=";
-      };
-
-      # `pnpm build` runs tsc --noEmit && vite build (ADR 0015 still applies).
-      pnpmBuildScript = "build";
-
-      installPhase = ''
-        runHook preInstall
-        mkdir -p $out
-        # The build ran in source/frontend (sourceRoot), so dist is in $PWD.
-        cp -r dist/. $out/
-        runHook postInstall
-      '';
-    });
-  in {
-    packages.x86_64-linux = {
-      inherit backend frontend;
-
-      # `nix build .` builds both parts and provides bin/speech-to-text-app, which
-      # starts the backend serving the bundled frontend. A real derivation (not
-      # symlinkJoin) so the wrapper can hard-code the store paths via makeWrapper.
-      default = pkgs.stdenv.mkDerivation {
-        pname = "stt-app";
-        version = "0.1.0";
-        src = pkgs.writeTextDir "empty-src" "";
-        nativeBuildInputs = [backend frontend pkgs.makeWrapper pkgs.jre];
-        dontConfigure = true;
-        dontBuild = true;
         installPhase = ''
           runHook preInstall
-          mkdir -p $out/bin $out/lib $out/share/stt-app/static
-          # The frontend lives in its own directory ($out/share/stt-app/static): the app
-          # serves it over HTTP, so the backend jars and the wrapper must NOT sit inside
-          # the static root (review fix: /lib/*.jar and /bin/* were previously exposed).
-          cp -rL ${frontend}/. $out/share/stt-app/static/
-          cp -rL ${backend}/lib/. $out/lib/
-          CP="$(printf '%s:' "$out"/lib/*.jar)"
-          # --set, not --set-default: the -default form silently keeps a
-          # set-but-empty variable (devenv exports an empty CLASSPATH),
-          # and the packaged app always needs its own jars and frontend.
-          # --run: STT_DATA_DIR has no default (ADR 0017); unset or empty fails with one
-          # stderr line instead of a JVM stack trace. The doubled quotes escape the dollar
-          # sign below, so the wrapper (not Nix) expands the variable.
-          # --set-default STT_SPEAKER_MODEL: the pinned CAM++ model (nix/models.nix, ADR 0003)
-          # unless the user sets one; item 16 may revisit this with the rest of the model wiring.
-          makeWrapper ${pkgs.jre}/bin/java $out/bin/speech-to-text-app \
-            --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then echo "speech-to-text-app: STT_DATA_DIR must be set to the data directory (it holds stt.db)" >&2; exit 1; fi' \
-            --set STT_STATIC_DIR "$out/share/stt-app/static" \
-            --set-default STT_SPEAKER_MODEL ${models.speaker} \
-            --set CLASSPATH "$CP" \
-            --add-flags "stt.MainKt"
+          mkdir -p $out/lib
+          # Distribution lib/: the app jar + all runtime dependencies (the plain
+          # jar has none). The generated launch scripts are not installed - they
+          # need /bin/sh, which is not guaranteed at runtime.
+          cp -r build/install/stt-backend/lib/. $out/lib/
           runHook postInstall
         '';
-        meta.description = "Speech-to-Text app (backend + bundled frontend)";
+      });
+
+      frontend = pkgs.stdenv.mkDerivation (finalAttrs: {
+        pname = "stt-frontend";
+        version = "0.1.0";
+        src = self;
+
+        sourceRoot = "source/frontend";
+
+        # pnpm 11 for the committed pnpm-lock.yaml (lockfileVersion 9, ADR 0012).
+        nativeBuildInputs = [
+          pkgs.nodejs
+          pkgs.pnpm_11
+          pkgs.pnpmConfigHook
+          pkgs.pnpmBuildHook
+        ];
+
+        # Symlink-nothing; pnpmConfigHook + pnpmBuildHook need the store.
+        # The sandbox OOM-killed pnpm's default install parallelism; keep it serial,
+        # skip lifecycle scripts (none of our deps need them - rolldown's binding is an
+        # optional dependency, not a postinstall) and cap network concurrency.
+        pnpmInstallFlags = [
+          "--child-concurrency=1"
+          "--network-concurrency=2"
+          "--ignore-scripts"
+        ];
+
+        pnpmDeps = pkgs.fetchPnpmDeps {
+          inherit (finalAttrs) pname version src sourceRoot pnpmBuildScript pnpmInstallFlags;
+          pnpm = pkgs.pnpm_11;
+          fetcherVersion = 4;
+          # pnpm store hash, generated by the fixed-output build (fetcherVersion = 4).
+          hash = "sha256-uNx1wux9hgAiGeIy9HPGlU0oQRv1sSRD+Y38gsKGvQY=";
+        };
+
+        # `pnpm build` runs tsc --noEmit && vite build (ADR 0015 still applies).
+        pnpmBuildScript = "build";
+
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out
+          # The build ran in source/frontend (sourceRoot), so dist is in $PWD.
+          cp -r dist/. $out/
+          runHook postInstall
+        '';
+      });
+    in
+    {
+      packages.x86_64-linux = {
+        inherit backend frontend;
+
+        # `nix build .` builds both parts and provides bin/speech-to-text-app, which
+        # starts the backend serving the bundled frontend. A real derivation (not
+        # symlinkJoin) so the wrapper can hard-code the store paths via makeWrapper.
+        default = pkgs.stdenv.mkDerivation {
+          pname = "stt-app";
+          version = "0.1.0";
+          src = pkgs.writeTextDir "empty-src" "";
+          nativeBuildInputs = [ backend frontend pkgs.makeWrapper pkgs.jre ];
+          dontConfigure = true;
+          dontBuild = true;
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/bin $out/lib $out/share/stt-app/static
+            # The frontend lives in its own directory ($out/share/stt-app/static): the app
+            # serves it over HTTP, so the backend jars and the wrapper must NOT sit inside
+            # the static root (review fix: /lib/*.jar and /bin/* were previously exposed).
+            cp -rL ${frontend}/. $out/share/stt-app/static/
+            cp -rL ${backend}/lib/. $out/lib/
+            CP="$(printf '%s:' "$out"/lib/*.jar)"
+            # --set, not --set-default: the -default form silently keeps a
+            # set-but-empty variable (devenv exports an empty CLASSPATH),
+            # and the packaged app always needs its own jars and frontend.
+            # --run: STT_DATA_DIR has no default (ADR 0017); unset or empty fails with one
+            # stderr line instead of a JVM stack trace. The doubled quotes escape the dollar
+            # sign below, so the wrapper (not Nix) expands the variable.
+            # --set-default STT_SPEAKER_MODEL: the pinned CAM++ model (nix/models.nix, ADR 0003)
+            # unless the user sets one; item 16 may revisit this with the rest of the model wiring.
+            makeWrapper ${pkgs.jre}/bin/java $out/bin/speech-to-text-app \
+              --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then echo "speech-to-text-app: STT_DATA_DIR must be set to the data directory (it holds stt.db)" >&2; exit 1; fi' \
+              --set STT_STATIC_DIR "$out/share/stt-app/static" \
+              --set-default STT_SPEAKER_MODEL ${models.speaker} \
+              --set CLASSPATH "$CP" \
+              --add-flags "stt.MainKt"
+            runHook postInstall
+          '';
+          meta.description = "Speech-to-Text app (backend + bundled frontend)";
+        };
       };
     };
-  };
 }
