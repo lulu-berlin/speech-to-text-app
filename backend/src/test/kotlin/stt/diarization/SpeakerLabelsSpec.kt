@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import stt.db.Segment
+import kotlin.math.sqrt
 
 class SpeakerLabelsSpec :
     BehaviorSpec({
@@ -100,6 +101,42 @@ class SpeakerLabelsSpec :
                     val embeddings = Array(segments.size) { FloatArray(4) }
 
                     speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1))
+                }
+            }
+        }
+
+        given("a short segment exactly as near to speaker B's centroid as to speaker C's") {
+            `when`("the speakers are labelled in auto mode") {
+                then("it takes the lower-numbered speaker, B") {
+                    // A pair at 1 - 0.96 = 0.04 on dims 0-1; B and C pairs of the same shape at 1 - 0.8 = 0.2 on dims 2-3
+                    // and 4-5; every cross distance is exactly 1. Long rows: heights 0.04, 0.2, 0.2, 1, 1, gaps 0.16, 0,
+                    // 0.8, 0, so k = 6 - (2 + 1) = 3: A = 0, B = 1, C = 2.
+                    SPEAKER_DISTANCE_THRESHOLD.shouldBeLessThan(1.0)
+                    val segments =
+                        listOf(
+                            segment(startMs = 0, endMs = 2_000), // A
+                            segment(startMs = 2_000, endMs = 4_000), // A
+                            segment(startMs = 4_000, endMs = 4_300), // short
+                            segment(startMs = 4_300, endMs = 6_300), // B
+                            segment(startMs = 6_300, endMs = 8_300), // B
+                            segment(startMs = 8_300, endMs = 10_300), // C
+                            segment(startMs = 10_300, endMs = 12_300), // C
+                        )
+                    // The B and C centroids hold the same values, ≈ (0.949, 0.316), on their own dims; the short row has
+                    // the same s on B's and C's first dim, so both dot products are exactly s · 0.949 ≈ 0.671 (0 with A).
+                    val s = sqrt(0.5f)
+                    val embeddings =
+                        arrayOf(
+                            floatArrayOf(1f, 0f, 0f, 0f, 0f, 0f),
+                            floatArrayOf(0.96f, 0.28f, 0f, 0f, 0f, 0f),
+                            floatArrayOf(0f, 0f, s, 0f, s, 0f),
+                            floatArrayOf(0f, 0f, 1f, 0f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 0.8f, 0.6f, 0f, 0f),
+                            floatArrayOf(0f, 0f, 0f, 0f, 1f, 0f),
+                            floatArrayOf(0f, 0f, 0f, 0f, 0.8f, 0.6f),
+                        )
+
+                    speakerLabels(segments, embeddings, k = null, maxSpeakers = 8).shouldBe(listOf(0, 0, 1, 1, 1, 2, 2))
                 }
             }
         }
