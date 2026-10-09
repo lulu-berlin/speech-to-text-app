@@ -32,10 +32,10 @@ internal fun speakerLabels(
 }
 
 /**
- * Gives every segment shorter than [SHORT_SEGMENT_MS] the speaker whose centroid is nearest to its own embedding, any
- * speaker, not only its neighbours in time (oracle `_rescue_short_segments`). A centroid is the L2-normalized sum of the
- * embeddings of that speaker's long segments, or zero without any; the nearest is the highest dot product among the
- * non-zero centroids (the first on ties). Without long segments, or without a non-zero centroid, labels stay as they are.
+ * Gives every segment shorter than [SHORT_SEGMENT_MS] the speaker whose centroid ([speakerCentroids] of the long
+ * segments) is nearest to its own embedding, any speaker, not only its neighbours in time (oracle
+ * `_rescue_short_segments`): the highest dot product among the non-zero centroids (the first on ties). Without long
+ * segments, or without a non-zero centroid, labels stay as they are.
  */
 private fun rescueShortSegments(
     segments: List<Segment>,
@@ -44,21 +44,34 @@ private fun rescueShortSegments(
 ) {
     val long = segments.indices.filter { segments[it].isLong() }
     if (long.isEmpty()) return
-    val centroids = Array(speakers.max() + 1) { DoubleArray(embeddings[0].size) }
-    for (row in long) {
-        val centroid = centroids[speakers[row]]
-        for (d in centroid.indices) centroid[d] += embeddings[row][d].toDouble()
-    }
+    val centroids = speakerCentroids(long, speakers, embeddings)
     val nonZero = centroids.indices.filter { c -> centroids[c].any { it != 0.0 } }
     if (nonZero.isEmpty()) return
-    for (centroid in centroids) {
-        val norm = sqrt(centroid.sumOf { it * it })
-        if (norm > 0) for (d in centroid.indices) centroid[d] /= norm
-    }
     for (row in segments.indices) {
         if (segments[row].isLong()) continue
         speakers[row] = nonZero.maxBy { c -> dot(embeddings[row], centroids[c]) }
     }
+}
+
+/**
+ * One centroid per speaker `0..max(speakers)`: the L2-normalized sum, in double, of the embeddings of the [rows]
+ * labelled with that speaker; zero when there is none or the sum is zero.
+ */
+private fun speakerCentroids(
+    rows: List<Int>,
+    speakers: IntArray,
+    embeddings: Array<FloatArray>,
+): Array<DoubleArray> {
+    val centroids = Array(speakers.max() + 1) { DoubleArray(embeddings[0].size) }
+    for (row in rows) {
+        val centroid = centroids[speakers[row]]
+        for (d in centroid.indices) centroid[d] += embeddings[row][d].toDouble()
+    }
+    for (centroid in centroids) {
+        val norm = sqrt(centroid.sumOf { it * it })
+        if (norm > 0) for (d in centroid.indices) centroid[d] /= norm
+    }
+    return centroids
 }
 
 private fun dot(
