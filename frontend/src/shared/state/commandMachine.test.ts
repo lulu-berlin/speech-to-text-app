@@ -1,5 +1,9 @@
-import { createActor } from 'xstate';
+import { http, HttpResponse } from 'msw';
+import { createActor, waitFor } from 'xstate';
 import { describe, expect, it, vi } from 'vitest';
+import { server } from '../../test/server';
+import { error as errorFixture, taskPaused } from '../api/fixtures';
+import { ApiError } from '../api/types';
 import { commandMachine } from './commandMachine';
 
 describe('the command machine', () => {
@@ -24,5 +28,30 @@ describe('the command machine', () => {
     allowed.stop();
 
     fetchSpy.mockRestore();
+  });
+
+  it('goes sending to done with the task from the response, or to failed with the typed error', async () => {
+    // pause task 5 (RUNNING) -> the handler serves task.paused.json with the URL's id.
+    const done = createActor(commandMachine, {
+      input: { command: 'pause', taskId: 5, status: 'RUNNING' },
+    }).start();
+    done.send({ type: 'START' });
+    const finished = await waitFor(done, (state) => state.matches('done'), { timeout: 2000 });
+    expect(finished.context.task).toEqual({ ...taskPaused, id: 5 });
+    done.stop();
+
+    // Mock addition: the cancel handler is overridden with error.json at 409, because
+    // docs/api/ has no example for 409 illegal-transition.
+    server.use(
+      http.post('/api/tasks/:id/cancel', () => HttpResponse.json(errorFixture, { status: 409 })),
+    );
+    const failed = createActor(commandMachine, {
+      input: { command: 'cancel', taskId: 5, status: 'RUNNING' },
+    }).start();
+    failed.send({ type: 'START' });
+    const errored = await waitFor(failed, (state) => state.matches('failed'), { timeout: 2000 });
+    expect(errored.context.error).toBeInstanceOf(ApiError);
+    expect(errored.context.error).toMatchObject({ code: 'not-found' });
+    failed.stop();
   });
 });

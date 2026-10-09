@@ -40,6 +40,13 @@ export async function uploadTask(file: File): Promise<Task> {
   return json<Task>(response);
 }
 
+// Item 12 contract: POST /api/tasks/{id}/<command> -> 200 Task, or an error (409 for an
+// illegal transition).
+export async function runTaskCommand(id: number, command: string): Promise<Task> {
+  const response = await fetch(`/api/tasks/${id}/${command}`, { method: 'POST' });
+  return json<Task>(response);
+}
+
 // Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when
 // the connection drops (EventSource then reconnects). Returns a function that closes the
 // stream.
