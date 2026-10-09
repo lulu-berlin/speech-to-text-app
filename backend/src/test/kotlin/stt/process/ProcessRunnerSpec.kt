@@ -144,12 +144,7 @@ class ProcessRunnerSpec :
                         }
                     try {
                         withTimeout(10.seconds) { sawThree.await() }
-                        runner.pause()
-
-                        val frozenCount = underLock(delivered) { delivered.size }
-                        delay(500.milliseconds)
-                        val windowCount = underLock(delivered) { delivered.size }
-                        (windowCount - frozenCount).shouldBeLessThanOrEqualTo(1)
+                        pauseAndExpectFrozen(runner, delivered)
 
                         threshold.set(underLock(delivered) { delivered.last().toInt() })
                         runner.resume()
@@ -321,7 +316,7 @@ class ProcessRunnerSpec :
                     val pids = CompletableDeferred<List<Long>>()
                     var exception: IllegalStateException? = null
                     var aliveWhenRunThrew: List<Long>? = null
-                    try {
+                    killingReportedPids(pids) {
                         exception =
                             withTimeout(2.seconds) {
                                 shouldThrow<IllegalStateException> {
@@ -336,11 +331,9 @@ class ProcessRunnerSpec :
                             }
                         // Checked before the cleanup below, which force-kills every pid.
                         aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
-                    } finally {
-                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
                     }
 
-                    exception.message.shouldBe("boom")
+                    exception?.message.shouldBe("boom")
                     aliveWhenRunThrew.shouldBe(emptyList())
                 }
             }
@@ -352,7 +345,7 @@ class ProcessRunnerSpec :
                     val pids = CompletableDeferred<List<Long>>()
                     var thrown: IllegalStateException? = null
                     var aliveWhenRunThrew: List<Long>? = null
-                    try {
+                    killingReportedPids(pids) {
                         withTimeout(10.seconds) {
                             try {
                                 ProcessRunner(gracePeriod = 300.milliseconds).run(
@@ -371,8 +364,6 @@ class ProcessRunnerSpec :
                                 aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
                             }
                         }
-                    } finally {
-                        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
                     }
 
                     thrown?.message.shouldBe("boom")
@@ -444,11 +435,7 @@ class ProcessRunnerSpec :
                             }
                         }
 
-                        runner.pause()
-                        val frozenCount = underLock(delivered) { delivered.size }
-                        delay(500.milliseconds)
-                        val windowCount = underLock(delivered) { delivered.size }
-                        (windowCount - frozenCount).shouldBeLessThanOrEqualTo(1)
+                        pauseAndExpectFrozen(runner, delivered)
                     } finally {
                         job.cancelAndJoin()
                     }
@@ -534,6 +521,29 @@ private fun killForcibly(pid: Long) {
     ProcessHandle.of(pid).ifPresent { it.destroyForcibly() }
 }
 
+/** Runs [block], then force-kills every pid reported to [pids], even when [block] throws (safety net for leftover processes). */
+private inline fun <T> killingReportedPids(
+    pids: CompletableDeferred<List<Long>>,
+    block: () -> T,
+): T =
+    try {
+        block()
+    } finally {
+        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
+    }
+
+/** Pauses [runner] and asserts that at most one more line (one already in flight) reaches [delivered] within 0.5 s. */
+private suspend fun pauseAndExpectFrozen(
+    runner: ProcessRunner,
+    delivered: MutableList<String>,
+) {
+    runner.pause()
+    val frozenCount = underLock(delivered) { delivered.size }
+    delay(500.milliseconds)
+    val windowCount = underLock(delivered) { delivered.size }
+    (windowCount - frozenCount).shouldBeLessThanOrEqualTo(1)
+}
+
 /**
  * Runs [runner] against [command], waits for the first line (the pid line) to arrive, invokes
  * [beforeCancel] (e.g. to freeze the tree for the stopped-cancel scenario), cancels the run from
@@ -549,7 +559,7 @@ private suspend fun cancelAfterFirstLine(
     var aliveWhenRunThrew: List<Long>? = null
     var elapsed: Duration = Duration.ZERO
 
-    try {
+    killingReportedPids(pids) {
         withTimeout(10.seconds) {
             val job =
                 launch {
@@ -567,8 +577,6 @@ private suspend fun cancelAfterFirstLine(
             job.cancelAndJoin()
             elapsed = cancelledAt.elapsedNow()
         }
-    } finally {
-        if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
     }
 
     return CancelledRun(thrown, aliveWhenRunThrew, elapsed, pids.getCompleted())
