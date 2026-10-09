@@ -7,7 +7,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import stt.db.Segment
 import java.nio.FloatBuffer
-import kotlin.math.sqrt
 
 /**
  * Speaker embeddings over [SpeakerModel]: one L2-normalized vector per segment, from each segment's
@@ -71,17 +70,4 @@ internal class Embeddings(
             }
         }
     }
-}
-
-/**
- * L2-normalizes [vector] in place; a zero vector (no energy) stays all zeros, as the oracle sets the norm to 1
- * only when it is non-zero (`embed_windows`: `norms[norms == 0] = 1.0`).
- */
-internal fun l2Normalize(vector: FloatArray): FloatArray {
-    var sumSquares = 0.0
-    for (value in vector) sumSquares += value.toDouble() * value.toDouble()
-    val norm = sqrt(sumSquares)
-    if (norm == 0.0) return vector
-    for (i in vector.indices) vector[i] = (vector[i].toDouble() / norm).toFloat()
-    return vector
 }

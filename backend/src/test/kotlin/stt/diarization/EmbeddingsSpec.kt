@@ -81,7 +81,7 @@ class EmbeddingsSpec :
                             }
                         }
                         // Sanity: the 3 kHz middle segment is not the same vector as the 440 Hz first one.
-                        dot(embeddings[0], embeddings[1]).shouldBeLessThan(0.9999f)
+                        dotInFloat(embeddings[0], embeddings[1]).shouldBeLessThan(0.9999f)
                     }
                 }
             }
@@ -152,8 +152,8 @@ class EmbeddingsSpec :
                         val embedder = Embeddings(model)
                         val (speakerA1, speakerA2, speakerB) = pcms.values.map { pcm -> embedder.embed(pcm, listOf(wholeClip(pcm)))[0] }
 
-                        val same = dot(speakerA1, speakerA2)
-                        val different = listOf(dot(speakerA1, speakerB), dot(speakerA2, speakerB))
+                        val same = dotInFloat(speakerA1, speakerA2)
+                        val different = listOf(dotInFloat(speakerA1, speakerB), dotInFloat(speakerA2, speakerB))
 
                         withClue("same-speaker cosine $same, different-speaker cosines $different") {
                             different.forEach { same.shouldBeGreaterThan(it) }
@@ -176,8 +176,8 @@ class EmbeddingsSpec :
 
                         val speaker = { id: String -> id.substringBefore('-') }
                         for ((id, excerpt) in excerpts) {
-                            val own = whole.filterKeys { speaker(it) == speaker(id) }.values.map { dot(excerpt, it) }
-                            val other = whole.filterKeys { speaker(it) != speaker(id) }.values.map { dot(excerpt, it) }
+                            val own = whole.filterKeys { speaker(it) == speaker(id) }.values.map { dotInFloat(excerpt, it) }
+                            val other = whole.filterKeys { speaker(it) != speaker(id) }.values.map { dotInFloat(excerpt, it) }
                             withClue("excerpt of $id: own-speaker cosines $own, other-speaker cosines $other") {
                                 own.min().shouldBeGreaterThan(other.max())
                             }
@@ -204,7 +204,8 @@ class EmbeddingsSpec :
 
                         SHERPA_ONNX_REFERENCE.size.shouldBe(512)
                         // sherpa-onnx returns the raw embedding; ours has unit length, so cosine = dot / |reference|.
-                        val cosine = dot(embedding, SHERPA_ONNX_REFERENCE) / sqrt(dot(SHERPA_ONNX_REFERENCE, SHERPA_ONNX_REFERENCE))
+                        val cosine =
+                            dotInFloat(embedding, SHERPA_ONNX_REFERENCE) / sqrt(dotInFloat(SHERPA_ONNX_REFERENCE, SHERPA_ONNX_REFERENCE))
                         cosine.shouldBeGreaterThanOrEqual(0.999f)
                     }
                 }
@@ -222,11 +223,6 @@ private fun wholeClip(pcm: FloatArray): Segment = segment(0, pcm.size / 16L)
 
 /** [sampleCount] samples of a quiet (amplitude 0.05) 440 Hz tone at 16 kHz. */
 private fun tone440(sampleCount: Int): FloatArray = FloatArray(sampleCount) { i -> (0.05 * sin(2 * PI * 440 * i / 16_000)).toFloat() }
-
-private fun dot(
-    a: FloatArray,
-    b: FloatArray,
-): Float = a.indices.map { a[it] * b[it] }.sum()
 
 /** Decodes [source] with the app's decoder (mono 16 kHz float32, as item 11 feeds the embedder) into [pcm] and reads it. */
 private suspend fun decodePcm(
