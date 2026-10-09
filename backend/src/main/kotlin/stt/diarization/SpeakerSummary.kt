@@ -27,11 +27,14 @@ internal fun logSpeakerSummary(
     }
     if (speakerIds.max() + 1 > 1) {
         val present = rowsOf.keys.toList()
+
+        fun crossCos(
+            a: Int,
+            b: Int,
+        ) = meanDot(rowsOf.getValue(a), rowsOf.getValue(b), embeddings, skipSameRow = false)
         val pairs =
             present.flatMapIndexed { i, a ->
-                present.drop(i + 1).map { b ->
-                    "${a + 1}-${b + 1} ${threeDecimals(meanDot(rowsOf.getValue(a), rowsOf.getValue(b), embeddings, skipSameRow = false))}"
-                }
+                present.drop(i + 1).map { b -> "${a + 1}-${b + 1} ${threeDecimals(crossCos(a, b))}" }
             }
         speakerSummaryLogger.info("cluster-to-cluster cosine: " + pairs.joinToString("  "))
     }
