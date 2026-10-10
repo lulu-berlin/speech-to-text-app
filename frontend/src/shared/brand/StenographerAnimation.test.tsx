@@ -94,4 +94,45 @@ describe('the stenographer animation', () => {
     // jsdom normalizes the trailing zero the artwork uses (-0.10s) when serializing.
     expect(styleOf('.arm-l .f1')).toContain('animation-delay: -0.1s');
   });
+
+  it('shows the static frame under reduced motion: the fallback block is empty of animations and scoped to the component', () => {
+    renderThemed(<StenographerAnimation />);
+
+    // The component class, taken from a scoped rule the wrapper emits.
+    const rules = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
+    const componentClass = rules
+      .find((rule) => rule.selectorText.endsWith(' .word'))!
+      .selectorText.split(' ')[0];
+
+    // jsdom cannot evaluate media queries, so the emitted block is asserted.
+    const media = styleRules().filter(
+      (rule): rule is CSSMediaRule =>
+        rule instanceof CSSMediaRule && rule.conditionText.includes('prefers-reduced-motion'),
+    );
+    expect(media.length).toBeGreaterThan(0);
+    const mediaRules = media.flatMap((block) => [...block.cssRules]);
+    const selectors = mediaRules
+      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+      .map((rule) => rule.selectorText);
+
+    // Nothing animates, and the `*` is scoped to the component's class.
+    const stop = selectors.find((selector) => selector.endsWith(' *'));
+    expect(stop).toBe(`${componentClass} *`);
+    expect(
+      mediaRules
+        .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+        .find((rule) => rule.selectorText === stop)!.cssText,
+    ).toContain('animation: none !important');
+
+    // The words and waves are visible in the static frame.
+    const visible = mediaRules
+      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+      .find((rule) => rule.selectorText.includes('.word'));
+    expect(visible?.cssText).toContain('opacity: 1');
+
+    // Every rule of the block stays inside the component.
+    for (const selector of selectors) {
+      expect(selector.startsWith(`${componentClass} `)).toBe(true);
+    }
+  });
 });
