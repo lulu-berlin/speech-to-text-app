@@ -16,12 +16,19 @@ const json = async <T>(response: Response): Promise<T> => {
     // A body that is not the contract's error shape (e.g. a proxy's 502 page) falls back to
     // the HTTP status and status text.
     const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
-    const code = body?.error ?? String(response.status);
-    const message = body?.message ?? response.statusText;
-    throw new ApiError(code, message, body?.taskId);
+    throw apiError(body, response.status, response.statusText);
   }
   return (await response.json()) as T;
 };
+
+// The typed error for a non-2xx response: the body's error code and message, falling
+// back to the HTTP status and status text when the body is not the contract's error
+// shape (e.g. a proxy's 502 page). Shared by the fetch and XHR paths.
+function apiError(body: ApiErrorBody | null, status: number, statusText: string): ApiError {
+  const code = body?.error ?? String(status);
+  const message = body?.message ?? statusText;
+  return new ApiError(code, message, body?.taskId);
+}
 
 export async function listTasks(): Promise<TaskList> {
   const response = await fetch('/api/tasks');
@@ -65,9 +72,7 @@ export function uploadTask(file: File, options: UploadOptions): Promise<Task> {
       resolve(xhr.response as Task);
     } else {
       const body = xhr.response as ApiErrorBody | null;
-      const code = body?.error ?? String(xhr.status);
-      const message = body?.message ?? xhr.statusText;
-      reject(new ApiError(code, message, body?.taskId));
+      reject(apiError(body, xhr.status, xhr.statusText));
     }
   };
   xhr.onerror = () => reject(new ApiError(String(xhr.status || 0), 'Network error'));
