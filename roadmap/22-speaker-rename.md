@@ -90,6 +90,8 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 
 ## Approval log
 
+- 2026-10-10 (workspace, cycle 1, test-list item 1): read-path proposal confirmed by the user: `V5__speaker_merge` migration plus `SegmentRepository.findDiarized(taskId)` resolving the mapping in one read transaction, consumed only by TranscriptRoutes; `findByTask`/`findSpeakers` stay raw; renderers and `speakerTurns` unchanged. Rename test first, as confirmed.
+- 2026-10-10 (workspace, cycle 1): red — `gradle test --tests 'stt.db.SegmentRepositorySpec'`: compilation failed, "Unresolved reference 'renameSpeaker'" (`SegmentRepositorySpec.kt:204`). Fixture: task with three segments stored as `[0, 1, 0]` plus another task with speaker 1; a rename of speaker 1 to `Alice` must change only that row (segments read back identically, speaker 0 and the other task untouched).
 - 2026-10-09: item drafted at the user's request; the feature was announced in item 09's consultation (ADR 0028).
 - 2026-10-09: consultation answers approved: names trimmed, 1–40 characters, no control characters; duplicate names rejected; a "Reset name" action restores `"Speaker N"`; COMPLETED tasks only; **merging included**, as a group merge `{ group, into }`; made reversible with a **mapping table and no segment rewrite**, resolved in one place at read time; undo is **"Reset all merges"**; editing through a **speakers panel**. Test list not yet approved.
 - 2026-10-09: test list (15 items) approved by the user; `{"speaker": null}` confirmed as the name reset; status `spec-approved`.

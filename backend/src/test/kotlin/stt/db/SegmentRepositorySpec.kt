@@ -186,6 +186,38 @@ class SegmentRepositorySpec :
             }
         }
 
+        given("a task with three segments whose speakers were stored as [0, 1, 0], and another task with speaker 1") {
+            `when`("speaker 1 of the first task is renamed to Alice") {
+                then("only that speaker's name changes: the segments and every other speaker are untouched") {
+                    withDatabase { db ->
+                        val tasks = taskRepository(db, dataDir)
+                        val segments = SegmentRepository(db)
+                        val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
+                        val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
+                        segments.insertAll(taskId, threeSegments)
+                        segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
+                        val other = Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 4_000L, text = "Other.", speakerId = null)
+                        segments.insertAll(otherTaskId, listOf(other))
+                        segments.storeSpeakers(otherTaskId, speakerIds = listOf(1))
+                        val storedSegments = segments.findByTask(taskId)
+
+                        segments.renameSpeaker(taskId, speakerId = 1, name = "Alice")
+
+                        segments.findSpeakers(taskId).shouldBe(
+                            listOf(
+                                Speaker(speakerId = 0, speaker = "Speaker 1"),
+                                Speaker(speakerId = 1, speaker = "Alice"),
+                            ),
+                        )
+                        // A rename touches no segment row: the segments read back exactly as before.
+                        segments.findByTask(taskId).shouldBe(storedSegments)
+                        // The other task's speaker 1 is renamed in no task but its own.
+                        segments.findSpeakers(otherTaskId).shouldBe(listOf(Speaker(speakerId = 1, speaker = "Speaker 2")))
+                    }
+                }
+            }
+        }
+
         given("task T with speaker 0 only, and task U without speakers") {
             `when`("segments that name a speaker are inserted") {
                 then("the database rejects a speaker id the segment's own task does not have, and accepts one it has") {
