@@ -4,6 +4,7 @@ import { useMachine } from '@xstate/react';
 import { Link } from 'react-router';
 import styled from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { errorMessage } from '../../shared/api/types';
 import type { Task } from '../../shared/api/types';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -12,7 +13,7 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { Icon } from '../../shared/ui/Icon';
 import { Stack } from '../../shared/ui/layout';
 import { TextButton } from '../../shared/ui/TextButton';
-import { MetaText, Text } from '../../shared/ui/typography';
+import { MetaText } from '../../shared/ui/typography';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
@@ -21,12 +22,6 @@ import { isAllowedCommand } from '../../shared/state/transitions';
 const Filename = styled.span`
   color: ${(props) => props.theme.colors.text};
   font-weight: ${(props) => props.theme.fontWeights.medium};
-`;
-
-const ErrorLine = styled(Text)`
-  margin: 0;
-  color: ${(props) => props.theme.colors.danger};
-  font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
 const TaskLink = styled(Link)`
@@ -135,8 +130,18 @@ export function HistoryRow({ task }: { task: Task }) {
             Delete
           </TextButton>
         </Actions>
-        {retryError ? <ErrorLine>Retry failed: {String(retryError)}</ErrorLine> : null}
-        {deleteError ? <ErrorLine>Delete failed: {String(deleteError)}</ErrorLine> : null}
+        {retryError ? (
+          <CardError>
+            <Icon icon={CircleAlert} tone="danger" size="sm" />
+            <span>{`Retry failed: ${errorMessage(retryError)}`}</span>
+          </CardError>
+        ) : null}
+        {deleteError ? (
+          <CardError>
+            <Icon icon={CircleAlert} tone="danger" size="sm" />
+            <span>{`Delete failed: ${errorMessage(deleteError)}`}</span>
+          </CardError>
+        ) : null}
       </Stack>
       <ConfirmDialog
         open={deleteState.matches('confirming') || deleteState.matches('running')}

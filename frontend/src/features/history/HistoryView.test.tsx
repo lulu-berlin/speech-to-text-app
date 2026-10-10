@@ -394,4 +394,40 @@ describe('the history cards', () => {
     );
     expect(hoverRules.every((rule) => rule.style.backgroundColor === '')).toBe(true);
   });
+
+  it("shows a refused retry or delete as the server's message in the card's error style, not the raw error", async () => {
+    // Both commands are refused with the contract's error body (error.json: "Task 42 does
+    // not exist").
+    server.use(
+      http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])),
+      http.post('/api/tasks/:id/retry', () => HttpResponse.json(errorFixture, { status: 409 })),
+      http.delete('/api/tasks/:id', () => HttpResponse.json(errorFixture, { status: 409 })),
+    );
+    await renderHistory();
+
+    // A refused retry: the server's message, with no exception name, as an icon-led danger
+    // line like the FAILED error.
+    fireEvent.click(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' }));
+    const retryFailure = await within(rowOf('call.ogg')).findByText(
+      'Retry failed: Task 42 does not exist',
+    );
+    expect(rowOf('call.ogg')).not.toHaveTextContent('ApiError');
+    expect(getComputedStyle(retryFailure).color).toBe(asRgb(lightTheme.colors.danger));
+    expect(
+      required(required(retryFailure.parentElement).querySelector('svg')).closest(
+        '[aria-hidden="true"]',
+      ),
+    ).not.toBeNull();
+
+    // A refused delete reads the same way. (While the confirmation dialog is open the
+    // page is hidden from the accessibility tree, so the card is read once it closes.)
+    fireEvent.click(within(rowOf('interview.mp3')).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const deleteFailure = await within(rowOf('interview.mp3')).findByText(
+      'Delete failed: Task 42 does not exist',
+    );
+    expect(rowOf('interview.mp3')).not.toHaveTextContent('ApiError');
+    expect(getComputedStyle(deleteFailure).color).toBe(asRgb(lightTheme.colors.danger));
+  });
 });
