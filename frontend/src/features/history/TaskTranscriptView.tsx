@@ -19,7 +19,7 @@ import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { deleteTaskMachine } from './deleteTaskMachine';
-import { formatDuration, formatFinishDate } from './formatTask';
+import { formatTaskMeta } from './formatTask';
 import { useTaskCommand } from './useTaskCommand';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
@@ -384,14 +384,7 @@ const runCommand = useTaskCommand();
       <Stack gap="md">
         <Stack gap="xs">
           <Title>{task.filename}</Title>
-          <HeaderMeta>
-            {[
-              task.finishedAt !== null ? formatFinishDate(task.finishedAt) : null,
-              task.durationMs !== null ? formatDuration(task.durationMs) : null,
-            ]
-              .filter((part) => part !== null)
-              .join(' · ')}
-          </HeaderMeta>
+          <HeaderMeta>{formatTaskMeta(task)}</HeaderMeta>
         </Stack>
         <Row gap="sm">
           {DOWNLOAD_FORMATS.map((format) => (

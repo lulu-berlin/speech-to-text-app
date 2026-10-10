@@ -14,7 +14,12 @@ import { Text } from '../../shared/ui/typography';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
+<<<<<<< HEAD
 
+=======
+import { deleteTaskMachine } from './deleteTaskMachine';
+import { formatTaskMeta } from './formatTask';
+>>>>>>> c5c15478 (Refactor: one formatTaskMeta for the History card and the transcript header)
 
 const Filename = styled.span`
   color: ${(props) => props.theme.colors.text};
@@ -80,11 +85,7 @@ export function HistoryRow({ task }: { task: Task }) {
           </TaskLink>
           <StatusBadge status={task.status} />
         </Row>
-        <Meta>
-          {task.finishedAt !== null ? formatFinishDate(task.finishedAt) : ''}
-          {task.finishedAt !== null && task.durationMs !== null ? ' · ' : ''}
-          {task.durationMs !== null ? formatDuration(task.durationMs) : ''}
-        </Meta>
+        <Meta>{formatTaskMeta(task)}</Meta>
         {task.error !== null ? <Meta>{task.error}</Meta> : null}
         <Row gap="sm">
           {isAllowedCommand('retry', task.status) ? (
