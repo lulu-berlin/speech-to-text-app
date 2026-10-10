@@ -1,13 +1,14 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { NavLink } from 'react-router';
 import styled from 'styled-components';
+import { StenographerAnimation } from '../shared/brand/StenographerAnimation';
 import type { ThemeMode } from '../shared/theme/themeMode';
 import { IconButton } from '../shared/ui/IconButton';
 import { Tooltip } from '../shared/ui/Tooltip';
 import { ConnectionContext } from './ConnectionContext';
 
-// The product name, navigation between the views, the live connection indicator and the
-// theme control. Item 17 adds the stenographer animation here.
+// The brand mascot, product name, navigation between the views, the live connection
+// indicator and the theme control. The mascot types while a task runs (item 17).
 const Header = styled.header`
   display: flex;
   align-items: baseline;
@@ -68,8 +69,12 @@ export interface AppHeaderProps {
 
 export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
   const connection = ConnectionContext.useSelector((state) => state.value);
+  const running = ConnectionContext.useSelector((state) =>
+    state.context.tasks.some((task) => task.status === 'RUNNING'),
+  );
   return (
     <Header>
+      <StenographerAnimation typing={running} />
       <Title>Speech-to-Text</Title>
       <Nav>
         <NavItem to="/queue">Queue</NavItem>
