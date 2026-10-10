@@ -9,6 +9,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
+import stt.db.MergeOutcome
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
 import stt.db.Speaker
@@ -63,8 +64,15 @@ fun Application.speakerRoutes() {
         post("/api/tasks/{id}/speakers/merge") {
             val id = call.parameters["id"]!!.toLong()
             val request = call.receive<MergeSpeakersRequest>()
-            segments.mergeSpeakers(id, request.group, request.into)
-            call.respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
+            when (val outcome = segments.mergeSpeakers(id, request.group, request.into)) {
+                MergeOutcome.Merged -> {
+                    call.respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
+                }
+
+                is MergeOutcome.Invalid -> {
+                    call.respondError(HttpStatusCode.BadRequest, "invalid-merge", outcome.reason)
+                }
+            }
         }
     }
 }

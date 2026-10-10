@@ -151,20 +151,35 @@ class SegmentRepository(
     /**
      * Folds every speaker of [group] except [into] into [into] (item 22): one `speaker_merge` row each, in one write
      * transaction. No segment row and no `speakers` row is touched; [findDiarized] resolves the mapping at read time.
+     * Refused as [MergeOutcome.Invalid], storing nothing, when [into] is not in the group, the group names fewer than
+     * two speakers, or a member (or [into]) is already merged into another speaker; the check reads the mapping in
+     * the same transaction that writes it.
      */
     suspend fun mergeSpeakers(
         taskId: Long,
         group: List<Int>,
         into: Int,
-    ) {
+    ): MergeOutcome =
         db.writeTransaction {
-            SpeakerMergeTable.batchInsert(group.filter { it != into }, shouldReturnGeneratedValues = false) { merged ->
+            val members = group.distinct()
+            if (into !in members) return@writeTransaction MergeOutcome.Invalid("into $into is not in the group $members")
+            if (members.size < 2) return@writeTransaction MergeOutcome.Invalid("a merge needs at least two speakers, got $members")
+            val merged =
+                SpeakerMergeTable
+                    .selectAll()
+                    .where { SpeakerMergeTable.taskId eq taskId }
+                    .map { it[SpeakerMergeTable.mergedId] }
+                    .toSet()
+            members.firstOrNull { it in merged }?.let {
+                return@writeTransaction MergeOutcome.Invalid("speaker $it is already merged into another speaker")
+            }
+            SpeakerMergeTable.batchInsert(members.filter { it != into }, shouldReturnGeneratedValues = false) { member ->
                 this[SpeakerMergeTable.taskId] = taskId
-                this[SpeakerMergeTable.mergedId] = merged
+                this[SpeakerMergeTable.mergedId] = member
                 this[SpeakerMergeTable.intoId] = into
             }
+            MergeOutcome.Merged
         }
-    }
 
     /**
      * The task's transcript as readers see it (item 22, the one place the merge mapping is resolved): its segments
