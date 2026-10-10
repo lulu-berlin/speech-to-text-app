@@ -1,7 +1,7 @@
-# 27 — Pin the sqlite-jdbc version
+# Pin the sqlite-jdbc version
 
-Status: in-review
-Depends on: —
+Status: done (roadmap item 27, merged 2026-10-10)
+Depends on: none
 
 ## Goal
 
@@ -76,3 +76,8 @@ Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appe
 - `backend/deps.json` needed no regeneration: the branch's file is byte-identical to main's (0 diff lines) and the build's fixed-output Gradle step would have failed on a hash mismatch if the resolved graph had changed — it did not (same 3.50.3.0, now forced).
 - All four test-list items green; acceptance criteria met → status `in-review`.
 - Discovered: none.
+- 2026-10-10: merged into `main` (head `7bd65f4`) after the user approved the diff and ran
+  `nix build .`. The catalog now pins sqlite-jdbc 3.50.3.0 (what already resolved) and forces it
+  via `resolutionStrategy.force(libs.sqlite.jdbc)` (ADR 0042): `dependencyInsight` shows
+  "(forced)" and `backend/deps.json` came out byte-identical. Spec and final test list moved
+  here from `roadmap/27-sqlite-jdbc-drift.md`.

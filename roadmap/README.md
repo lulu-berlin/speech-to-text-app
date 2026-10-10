@@ -64,7 +64,7 @@ graph TD
   14 --> 25
   15 --> 25
   11 --> 26[26 engine shutdown race ✓]:::done
-  27[27 pin sqlite-jdbc]
+  27[27 pin sqlite-jdbc ✓]:::done
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -98,4 +98,4 @@ graph TD
 | [24 — Design system: tokens and primitives](../docs/specs/design-system.md) | done | 13 |
 | [25 — Visual polish pass](25-visual-polish.md) | spec-approved | 24, 14, 15 |
 | [26 — Engine start/stop race (flaky DatabaseDependencySpec)](../docs/specs/engine-shutdown-race.md) | done | 11 |
-| [27 — Pin the sqlite-jdbc version](27-sqlite-jdbc-drift.md) | draft | — |
+| [27 — Pin the sqlite-jdbc version](../docs/specs/sqlite-jdbc-pin.md) | done | — |
