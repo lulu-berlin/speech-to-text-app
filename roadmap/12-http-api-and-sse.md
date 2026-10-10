@@ -165,6 +165,8 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] An SSE client first receives a `snapshot`, then `task-updated`, `task-progress`, `queue-updated` and `task-deleted` events as the engine emits them
 - [ ] (added 2026-10-10, user decision at the first checkpoint) An SSE client that falls behind the engine's event buffer is disconnected instead of silently missing events, and on reconnecting it receives a fresh `snapshot`
 - [ ] Every response and event payload has the structure of its `docs/api/` example
+- [ ] (discovered, confirmed 2026-10-10) Requesting a known task returns 200 with the task
+- [ ] (discovered, confirmed 2026-10-10) Requesting a task by a non-numeric id (e.g. `/api/tasks/abc`) returns 404 `not-found`
 
 ## Acceptance criteria
 
@@ -190,3 +192,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: item 10 consultation: the json transcript download is dropped ([ADR 0035](../docs/decisions/0035-no-json-download.md)), so `format` accepts `txt|srt|vtt`; [ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md) makes the speaker names the labels in the downloads (this item's `/turns` already returns them).
 - 2026-10-10 (workspace, first checkpoint): item 11's event flow is `MutableSharedFlow(extraBufferCapacity = 64, DROP_OLDEST)`, so a connected SSE subscriber slower than the engine would silently miss events (the snapshot covers only reconnects). The user chose to disconnect a subscriber that falls behind, so EventSource reconnects and gets a fresh `snapshot`; a test-list item was added for it. The overflow detection is designed in its cycle.
 - 2026-10-10 (workspace, cycle 1, "Requesting an unknown task returns 404 with an error body"): `TaskRoutesSpec` asks an empty app for `GET /api/tasks/999` and expects `404`, `application/json`, the keys and value types of `docs/api/error.json`, `error: "not-found"` and a message naming the id. Red: `AssertionFailedError: Expected application/json but actual was null` (the status was already `404`, item 02's bare 404 for unknown `/api` routes, with no body). Green: `GET /api/tasks/{id}` answers `404` with the `{ "error", "message" }` body when `TaskRepository.find` has no such task.
+- 2026-10-10 (workspace, cycle 1 checkpoint): the user approved two refactors, each its own commit: the `docs/api` file lookup shared by the contract tests (`docsApiFile`), and the engine taking the application's `TaskRepository` from DI. Two discovered scenarios confirmed and appended to the test list: a known task returns 200 with the task; a non-numeric id returns 404 `not-found`.
