@@ -30,7 +30,7 @@ Make the resolved sqlite-jdbc artifact match the version the backend's version c
 Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [x] The runtime sqlite-jdbc equals the catalog version 3.50.3.0: `gradle dependencyInsight` output recorded in the log, plus a pinned unit test asserting the loaded driver's version (`SQLiteJDBCLoader.getVersion()`), commented "must equal the catalog pin — update both together"
-- [ ] A transitive dependency cannot silently override the pin: `dependencyInsight` shows the catalog version with "forced" selection reasons
+- [x] A transitive dependency cannot silently override the pin: `dependencyInsight` shows the catalog version with "forced" selection reasons
 - [ ] Must not break: `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` stay green against the pinned driver (Database open, WAL, Flyway migrations, the engine)
 - [ ] The user's `nix build .` succeeds; `deps.json` is regenerated only if the resolved graph changed (expected: unchanged)
 
@@ -52,4 +52,10 @@ Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appe
 - Red (baseline, before any code change): `gradle dependencyInsight --dependency sqlite-jdbc --configuration runtimeClasspath` resolves `org.xerial:sqlite-jdbc:3.50.3.0` with selection reason "By conflict resolution: between versions 3.50.3.0 and 3.49.1.0", pulled by `org.flywaydb:flyway-database-nc-sqlite:13.9.0`; the catalog pin 3.49.1.0 is overridden (`3.49.1.0 -> 3.50.3.0`). Nothing asserts the runtime driver version.
 - Test: `SqliteVersionSpec` (backend/src/test/kotlin/stt/db/) asserts `SQLiteJDBCLoader.getVersion()` is `"3.50.3.0"`, with the "must equal the catalog pin — update both together" comment. First run against the unchanged code: green immediately — highest-wins already resolves 3.50.3.0, so the pin change itself is noise-free (as predicted in the Proposal).
 - Green: catalog aligned 3.49.1.0 → 3.50.3.0 (catalog = resolution = assertion); `gradle check` (ktlint + all unit tests) green. ktlint initially flagged the missing final newline in the new spec; fixed.
+- Discovered: none.
+
+### 2026-10-10 — item 2: no transitive can silently override the pin (green)
+
+- Red (after cycle 1, before the force): `dependencyInsight --dependency sqlite-jdbc --configuration runtimeClasspath` resolves `org.xerial:sqlite-jdbc:3.50.3.0` with no selection reason at all — requested by `runtimeClasspath` and `flyway-database-nc-sqlite:13.9.0` in pure negotiation; nothing marks the pin as authoritative, so a future transitive bump could still resolve over it.
+- Green: `configurations.configureEach { resolutionStrategy.force(libs.sqlite.jdbc) }` in `backend/build.gradle.kts`, referencing the catalog version (single source of truth) with a comment tying it to this item. `dependencyInsight` now shows `org.xerial:sqlite-jdbc:3.50.3.0 (forced)`; `gradle check` green.
 - Discovered: none.
