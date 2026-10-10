@@ -61,7 +61,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] (added 2026-10-10) The transcript player is the themed one: play/pause via an `IconButton`, the seek bar is item 24's `Slider`, and current/total time labels; the playing-segment highlight from item 15 still follows the player without native controls
 - [ ] Every view has a distinct empty, loading and error state; loading shows the stenographer
 - [ ] Screenshots at phone and desktop widths, light and dark, are captured for item 21's approval; the Queue's empty state offers the upload action
-- [ ] The transcription bar shows a percentage and the diarization bar its stage label
+- [x] The transcription bar shows a percentage and the diarization bar its stage label (cycle 1, 2026-10-10; refactor approved: the diarization aria text now matches the visible within-stage label)
 - [ ] With reduced motion requested, no non-essential animation runs
 - [ ] Keyboard focus is visible in every view
 - [ ] The existing view and machine tests stay green
