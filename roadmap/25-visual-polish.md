@@ -53,7 +53,7 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] The shell and each view render on the token background/text and use the primitives, with no literal colors or sizes
-- [ ] The layout is usable at a phone width and a desktop width (no horizontal overflow, controls reachable)
+- [x] The layout is usable at a phone width and a desktop width (no horizontal overflow, controls reachable) (cycle 15, 2026-10-10; the geometry itself is item 21's browser acceptance)
 - [x] Queue rows show the status badge, both progress bars and the phase label, and stack on a narrow screen (cycle 2, 2026-10-10; full column stack below `breakpoints.sm`)
 - [x] History renders one card per finished task, and a FAILED card shows its error (cycle 12, 2026-10-10)
 - [x] The transcript is a centred column with a bounded measure, its header block, the player and downloads, and the turns with speaker labels and timestamps (cycle 11, 2026-10-10)
