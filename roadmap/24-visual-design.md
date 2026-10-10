@@ -1,6 +1,6 @@
 # 24 — Design system: tokens and primitives
 
-Status: in-progress
+Status: in-review
 Depends on: [13](../docs/specs/frontend-foundation.md) (done)
 
 ## Goal
