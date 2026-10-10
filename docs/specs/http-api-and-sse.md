@@ -94,7 +94,8 @@ The JSON shapes the frontend builds against.
   - upload → `201` Task;
   - pause/resume/cancel/retry → `200` Task;
   - queue pause/resume/order → `200` Queue;
-  - delete → `204` without a body.
+  - delete → `204` without a body;
+  - rename a speaker → `200` Speakers (item 22).
 - **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
   - `speakers` are the task's rows of the `speakers` table (ADR 0028), ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until a rename feature exists).
   - `turns` are item 09's `speaker_turns`: consecutive segments with the same `speakerId` form one turn. A turn names its speaker only by `speakerId`; the UI shows the name from `speakers`.
@@ -102,6 +103,8 @@ The JSON shapes the frontend builds against.
   - Times: `startMs`/`endMs` of turns and segments are milliseconds on the timeline of `GET /api/tasks/{id}/audio`. The joined audio starts at 0, and item 06's chunks are contiguous and cover `[0, durationMs)`, so a segment's stored time is its position in the played file. Segments and turns come in transcript order. There can be gaps between segments (silence), where no segment is playing. So the transcript view can highlight the segment being played (item 15): the one whose `[startMs, endMs)` contains the player's current time.
   - With speakers `off`: `speakers` is empty, and there is one turn per segment with `speakerId: null`.
   - Text ([ADR 0030](../decisions/0030-trimmed-segment-text-in-all-outputs.md)): every segment `text` is trimmed; a turn's `text` is its segments' non-blank trimmed texts joined with single spaces (a blank segment must not leave a double space, user decision 2026-10-10).
+- **Speakers** (added 2026-10-10, item 22): `{ "speakers": [{ "speakerId", "speaker" }] }`, the task's speakers ordered by `speakerId` ([`docs/api/speakers.json`](../api/speakers.json)).
+  - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is trimmed; empty after trimming, longer than 40 characters, or containing a control character → `400 invalid-speaker-name`, nothing changes.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task
@@ -112,7 +115,7 @@ The JSON shapes the frontend builds against.
 
   | Status | Codes |
   | ------ | ----- |
-  | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format` |
+  | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format`, `invalid-speaker-name` (item 22) |
   | `404` | `not-found` (unknown task), `no-audio` (task without stored chunks) |
   | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns or transcript of a task that is not COMPLETED) |
   | `500` | `internal` |
