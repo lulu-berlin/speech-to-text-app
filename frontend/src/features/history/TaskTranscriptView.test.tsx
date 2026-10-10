@@ -52,6 +52,15 @@ describe('the transcript view', () => {
     expect(screen.queryByText(/Speaker/)).not.toBeInTheDocument();
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
   });
+
+  it('links each download button to the transcript in its format', async () => {
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3).
+
+    for (const format of ['txt', 'srt', 'vtt'] as const) {
+      const link = screen.getByRole('link', { name: `Download transcript (${format})` });
+      expect(link).toHaveAttribute('href', `/api/tasks/3/transcript?format=${format}`);
+    }
+  });
 });
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
