@@ -10,6 +10,8 @@ export interface SearchableSelectOption {
 }
 
 export interface SearchableSelectProps {
+  // The id of the input, for a visible label's htmlFor (the aria-label names it too).
+  id?: string;
   // The accessible name of the control (also the listbox's).
   label: string;
   options: SearchableSelectOption[];
@@ -60,7 +62,7 @@ const Wrap = styled.div`
   position: relative;
 `;
 
-export function SearchableSelect({ label, options, value, onChange }: SearchableSelectProps) {
+export function SearchableSelect({ id, label, options, value, onChange }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -131,6 +133,7 @@ export function SearchableSelect({ label, options, value, onChange }: Searchable
   return (
     <Wrap>
       <Field
+        id={id}
         type="text"
         role="combobox"
         aria-label={label}
