@@ -1,13 +1,13 @@
 # 15 — Frontend history UI
 
 Status: spec-approved
-Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
+Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
 
 ## Goal
 Let the user browse past transcriptions: find a finished task, read its transcript with speakers and timestamps, follow it during playback with the played segment highlighted, jump around by clicking, download it in every format, listen to the task's audio, see why a task failed or was cancelled, and retry or delete it.
 
 ## Already decided
-- [Item 24 design system](24-visual-design.md) ([ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md)): the History and transcript views are built with its tokens and primitives (Card, StatusBadge, Button, ConfirmDialog, Slider for the seek bar, Page/Stack/Row, EmptyState, Skeleton); item 25 does the final visual pass (History as cards, the transcript as a centred reading column).
+- [Item 24 design system](../docs/specs/design-system.md) ([ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md)): the History and transcript views are built with its tokens and primitives (Card, StatusBadge, Button, ConfirmDialog, Slider for the seek bar, Page/Stack/Row, EmptyState, Skeleton); item 25 does the final visual pass (History as cards, the transcript as a centred reading column).
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
 - [ADR 0024 — Audio storage](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks (16 kHz mono, not the original upload); a task cancelled or failed before chunking has none.
 - [ADR 0029](../docs/decisions/0029-contract-first-frontend-shared-api-examples.md), [ADR 0031](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md): built against item 12's contract with MSW mocks; routes `/history` and `/history/:taskId`; commands through item 13's command machine.

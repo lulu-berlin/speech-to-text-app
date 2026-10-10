@@ -1,7 +1,7 @@
 # 14 — Frontend queue UI
 
 Status: spec-approved
-Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
+Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
 
 ## Goal
 Let the user upload many audio files and manage the work queue from the browser: see live status and progress, pause/resume/cancel/delete individual tasks, reorder the queue, and pause the whole queue.
