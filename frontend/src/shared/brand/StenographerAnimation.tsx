@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { styled, useTheme } from 'styled-components';
+import { css, styled, useTheme } from 'styled-components';
 
 // The artwork's style rules are nested under the component's own class (`&`), so the
 // generic class names (.word, .head) cannot reach elements outside the component.
@@ -28,7 +28,7 @@ const KEYS: [number, number, number, number, string][] = [
   [231, 241, 8, 4, '-0.7s'],
 ];
 
-const StyledSvg = styled.svg<{ $size: StenographerSize }>`
+const StyledSvg = styled.svg<{ $size: StenographerSize; $typing: boolean }>`
   display: block;
   width: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
   height: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
@@ -179,6 +179,24 @@ const StyledSvg = styled.svg<{ $size: StenographerSize }>`
     animation: stt-twinkle 2.2s ease-in-out infinite;
   }
 
+  // Resting (nothing running): the typing parts freeze on the static pose — the key
+  // flash, the fingers and the rising words stop, the words stay visible — while the
+  // idle parts (head, eyes, arms, lamp, sparkles and waves) keep their slow motion.
+  ${(props) =>
+    props.$typing
+      ? ''
+      : css`
+          & .keys rect,
+          & .f,
+          & .thumb,
+          & .word {
+            animation: none;
+          }
+          & .word {
+            opacity: 1;
+          }
+        `}
+
   // The artwork's reduced-motion fallback: a static frame, still scoped to this
   // component (the star rule can never reach the app around it).
   @media (prefers-reduced-motion: reduce) {
@@ -194,13 +212,19 @@ const StyledSvg = styled.svg<{ $size: StenographerSize }>`
 
 export interface StenographerAnimationProps {
   size?: StenographerSize;
+  // Whether a task is running: true keeps the typing animations going; false rests the
+  // piece (the header reads this from the connection machine, item 17).
+  typing?: boolean;
 }
 
 // The brand mascot (item 17): a seated stenographer at a steno machine on a warm backdrop.
 // Inlined from docs/oracle of item 17's artwork (stenographer.svg): every color comes from
 // the theme's illustration tokens, so the piece follows light and dark mode. It is
 // decorative wherever it appears, so it carries no role or accessible name of its own.
-export function StenographerAnimation({ size = 'header' }: StenographerAnimationProps) {
+export function StenographerAnimation({
+  size = 'header',
+  typing = false,
+}: StenographerAnimationProps) {
   const theme = useTheme();
   const i = theme.illustration;
   // The component appears more than once on a page (header + empty states), so each
@@ -209,7 +233,7 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
   const uid = useId().replace(/:/g, '');
   const defId = (name: string) => `${uid}-${name}`;
   return (
-    <StyledSvg viewBox="0 0 400 400" $size={size}>
+    <StyledSvg viewBox="0 0 400 400" $size={size} $typing={typing}>
       <defs>
         <radialGradient id={defId('bg')} cx="50%" cy="40%" r="60%">
           <stop offset="0%" stopColor={i.backdropFrom} />
