@@ -1,4 +1,5 @@
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play, X } from 'lucide-react';
+import { useState } from 'react';
 import { styled } from 'styled-components';
 import { createActor } from 'xstate';
 import { ConnectionContext } from '../../app/ConnectionContext';
@@ -6,6 +7,7 @@ import type { Task, TaskPhase } from '../../shared/api/types';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
 import type { TaskCommand } from '../../shared/state/transitions';
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
 import { IconButton } from '../../shared/ui/IconButton';
 import { ListRow } from '../../shared/ui/ListRow';
@@ -37,6 +39,13 @@ export interface TaskRowProps {
 // live state at once (the server's task-updated, when it arrives, carries the same task).
 export function TaskRow({ task }: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
+  const [cancelOpen, setCancelOpen] = useState(false);
+
+  // Work would be lost when cancelling a running task or a paused task that has started;
+  // a queued or never-started paused task is cancelled directly (its chunks were never
+  // processed, and the task can be retried from History).
+  const confirmCancel =
+    task.status === 'RUNNING' || (task.status === 'PAUSED' && task.startedAt !== null);
 
   const run = (command: TaskCommand) => {
     const actor = createActor(commandMachine, {
@@ -74,6 +83,13 @@ export function TaskRow({ task }: TaskRowProps) {
                 onClick={() => run('resume')}
               />
             ) : null}
+            {isAllowedCommand('cancel', task.status) ? (
+              <IconButton
+                icon={X}
+                label={`Cancel ${task.filename}`}
+                onClick={() => (confirmCancel ? setCancelOpen(true) : run('cancel'))}
+              />
+            ) : null}
           </Row>
         </RowContent>
         <ProgressBar value={task.transcriptionProgress} label="Transcription" />
@@ -84,6 +100,18 @@ export function TaskRow({ task }: TaskRowProps) {
           />
         ) : null}
       </Stack>
+      <ConfirmDialog
+        open={cancelOpen}
+        title={`Cancel ${task.filename}?`}
+        confirmLabel="Cancel task"
+        onConfirm={() => {
+          setCancelOpen(false);
+          run('cancel');
+        }}
+        onCancel={() => setCancelOpen(false)}
+      >
+        Stops the task; it can be retried from History.
+      </ConfirmDialog>
     </ListRow>
   );
 }

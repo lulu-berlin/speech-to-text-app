@@ -31,6 +31,10 @@ const SPEAKERS_CHOICES = ['auto', 'off', 'fixed'] as const;
 
 export type SpeakersChoice = (typeof SPEAKERS_CHOICES)[number];
 
+// The statuses the queue list holds (item 14): a task with any other status has left the
+// queue (finished, failed or canceled) and belongs to History.
+const PENDING_STATUSES = ['QUEUED', 'RUNNING', 'PAUSED'] as const;
+
 function isSpeakersChoice(value: string): value is SpeakersChoice {
   return (SPEAKERS_CHOICES as readonly string[]).includes(value);
 }
@@ -232,10 +236,15 @@ export function QueueView() {
     event.target.value = '';
   };
 
-  // The pending tasks (QUEUED, RUNNING, PAUSED) in queue order (docs/api/queue.json).
+  // The pending tasks (QUEUED, RUNNING, PAUSED) in queue order (docs/api/queue.json). A
+  // task that left the queue (canceled, finished) stays out even if its id lingers in the
+  // queue-updated event for a moment, so its row leaves at once.
   const pendingTasks = (queue?.taskIds ?? [])
     .map((id) => tasks.find((task) => task.id === id))
-    .filter((task): task is Task => task !== undefined);
+    .filter(
+      (task): task is Task =>
+        task !== undefined && (PENDING_STATUSES as readonly string[]).includes(task.status),
+    );
 
   // A successful upload row leaves once its task is in the live state (the server
   // announces a new upload with task-updated; item 13's machine adds it).
