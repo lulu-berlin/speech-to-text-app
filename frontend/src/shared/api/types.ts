@@ -139,3 +139,9 @@ export class ApiError extends Error {
     this.taskId = taskId;
   }
 }
+
+// The visible text of a failure: an Error's message (the typed ApiError carries the
+// server's), anything else as a string.
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

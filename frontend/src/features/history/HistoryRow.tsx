@@ -3,7 +3,6 @@ import { useMachine } from '@xstate/react';
 import { Link } from 'react-router';
 import styled from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
-import { ApiError } from '../../shared/api/types';
 import type { Task } from '../../shared/api/types';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -85,7 +84,6 @@ export function HistoryRow({ task }: { task: Task }) {
     }
   }, [deleteState, connection, task.id]);
 
-  const errorText = (error: unknown) => (error instanceof ApiError ? error.message : String(error));
   const retryError = retryState.matches('failed') ? retryState.context.error : null;
   const deleteError = deleteState.matches('failed') ? deleteState.context.error : null;
 
