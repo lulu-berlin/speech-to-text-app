@@ -45,3 +45,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0037 | [Nearest-neighbor chain for speaker clustering](0037-nearest-neighbor-chain-for-speaker-clustering.md) | accepted | 2026-10-09 |
 | 0038 | [UI state transitions and form-submission flows are machines; controlled input values may stay `useState`](0038-ui-state-transitions-are-machines.md) | accepted | 2026-10-10 |
 | 0039 | [The processing engine is created when the application starts](0039-engine-created-at-startup.md) | accepted | 2026-10-10 |
+| 0040 | [Stenographer animation timing lives on the elements (JSX `style`)](0040-stenographer-timing-in-jsx.md) | accepted | 2026-10-10 |
