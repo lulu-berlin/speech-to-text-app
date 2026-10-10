@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../app/App';
@@ -233,6 +233,32 @@ describe('the transcript view', () => {
     expect(screen.queryByLabelText(/Download transcript/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  it('after retry on the status page, goes back to the queue', async () => {
+    // Mock addition: retrying task 4 (FAILED, the default snapshot's task 4) returns it now
+    // QUEUED, so the status page navigates to the queue.
+    server.use(
+      http.post('/api/tasks/:id/retry', ({ params }) => {
+        const id = Number(params.id);
+        const base = taskFailed;
+        return HttpResponse.json({
+          ...base,
+          id,
+          status: 'QUEUED',
+          phase: null,
+          error: null,
+          finishedAt: null,
+        });
+      }),
+    );
+    await renderTranscript('4'); // task 4 is FAILED in the snapshot (id 4).
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    // The retried task leaves History (it is QUEUED) and the view navigates to /queue.
+    expect(await screen.findByRole('heading', { name: 'Queue' })).toBeInTheDocument();
+    expect(screen.queryByText('Not found')).not.toBeInTheDocument();
   });
 });
 
