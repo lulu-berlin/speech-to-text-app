@@ -43,3 +43,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0035 | [No json transcript download](0035-no-json-download.md) | accepted | 2026-10-09 |
 | 0036 | [One nixpkgs pin shared by devenv and the flake](0036-shared-nixpkgs-pin.md) | accepted | 2026-10-09 |
 | 0037 | [Nearest-neighbor chain for speaker clustering](0037-nearest-neighbor-chain-for-speaker-clustering.md) | accepted | 2026-10-09 |
+| 0038 | [UI state transitions and form-submission flows are machines; controlled input values may stay `useState`](0038-ui-state-transitions-are-machines.md) | accepted | 2026-10-10 |
