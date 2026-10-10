@@ -26,6 +26,7 @@ class EventsOverflowSpec :
                         is Event.TaskProgress -> "task-progress"
                         is Event.TaskDeleted -> "task-deleted"
                         is Event.SpeakersRenamed -> "speakers-renamed"
+                        is Event.SpeakersMerged -> "speakers-merged"
                     }
             }
 

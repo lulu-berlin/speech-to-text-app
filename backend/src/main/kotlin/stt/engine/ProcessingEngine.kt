@@ -26,6 +26,7 @@ import stt.db.Chunk
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.DiarizationStage
+import stt.db.MergeOutcome
 import stt.db.QueueStateRepository
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
@@ -236,6 +237,21 @@ class ProcessingEngine internal constructor(
     ): RenameOutcome {
         val outcome = segments.renameSpeaker(id, speakerId, name)
         if (outcome == RenameOutcome.Renamed) _events.emit(Event.SpeakersRenamed(id, segments.findSpeakers(id)))
+        return outcome
+    }
+
+    /**
+     * Folds the speakers of [group] into [into] for task [id] (item 22) and, only once the mapping is stored,
+     * publishes the task's effective speakers as read back through the merge mapping. A refused merge
+     * ([MergeOutcome.Invalid]) stores and publishes nothing.
+     */
+    suspend fun mergeSpeakers(
+        id: Long,
+        group: List<Int>,
+        into: Int,
+    ): MergeOutcome {
+        val outcome = segments.mergeSpeakers(id, group, into)
+        if (outcome == MergeOutcome.Merged) _events.emit(Event.SpeakersMerged(id, segments.findDiarized(id).speakers))
         return outcome
     }
 
