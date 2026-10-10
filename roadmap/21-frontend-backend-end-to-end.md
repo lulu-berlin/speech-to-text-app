@@ -1,7 +1,7 @@
 # 21 — Frontend–backend end-to-end check
 
 Status: spec-approved
-Depends on: [12](12-http-api-and-sse.md), [13](../docs/specs/frontend-foundation.md) (done), [14](../docs/specs/frontend-queue-ui.md) (done), [15](../docs/specs/frontend-history-ui.md) (done), [22](22-speaker-rename.md), [25](25-visual-polish.md)
+Depends on: [12](../docs/specs/http-api-and-sse.md) (done), [13](../docs/specs/frontend-foundation.md) (done), [14](../docs/specs/frontend-queue-ui.md) (done), [15](../docs/specs/frontend-history-ui.md) (done), [22](22-speaker-rename.md), [25](25-visual-polish.md)
 
 ## Goal
 

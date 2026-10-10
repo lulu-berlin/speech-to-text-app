@@ -34,7 +34,7 @@ graph TD
   03 --> 18[18 audio storage ✓]:::done
   18 --> 11
   20 --> 11
-  11 --> 12[12 HTTP API and SSE]
+  11 --> 12[12 HTTP API and SSE ✓]:::done
   10 --> 12
   02 --> 13[13 frontend foundation ✓]:::done
   12 -. spec only .-> 13
@@ -83,7 +83,7 @@ graph TD
 | [09 — Diarization](../docs/specs/diarization.md) | done | 08 |
 | [10 — Output formats](../docs/specs/output-formats.md) | done | 09 |
 | [11 — Processing engine](../docs/specs/processing-engine.md) | done | 04, 05, 07, 09, 18, 20 |
-| [12 — HTTP API and SSE](12-http-api-and-sse.md) | spec-approved | 10, 11 |
+| [12 — HTTP API and SSE](../docs/specs/http-api-and-sse.md) | done | 10, 11 |
 | [13 — Frontend foundation](../docs/specs/frontend-foundation.md) | done | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](../docs/specs/frontend-queue-ui.md) | done | 13, 24 |
 | [15 — Frontend history UI](../docs/specs/frontend-history-ui.md) | done | 13, 24 |
