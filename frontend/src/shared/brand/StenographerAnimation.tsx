@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { styled, useTheme } from 'styled-components';
 
 // The artwork's style rules are nested under the component's own class (`&`), so the
@@ -202,32 +203,37 @@ export interface StenographerAnimationProps {
 export function StenographerAnimation({ size = 'header' }: StenographerAnimationProps) {
   const theme = useTheme();
   const i = theme.illustration;
+  // The component appears more than once on a page (header + empty states), so each
+  // instance's defs get a unique prefix from useId; the five names keep the artwork's
+  // suffixes so the markup stays recognizable.
+  const uid = useId().replace(/:/g, '');
+  const defId = (name: string) => `${uid}-${name}`;
   return (
     <StyledSvg viewBox="0 0 400 400" $size={size}>
       <defs>
-        <radialGradient id="bg" cx="50%" cy="40%" r="60%">
+        <radialGradient id={defId('bg')} cx="50%" cy="40%" r="60%">
           <stop offset="0%" stopColor={i.backdropFrom} />
           <stop offset="100%" stopColor={i.backdropTo} />
         </radialGradient>
-        <linearGradient id="machineFront" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={defId('machineFront')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={i.machineFrom} />
           <stop offset="100%" stopColor={i.machineTo} />
         </linearGradient>
-        <linearGradient id="desk" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={defId('desk')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={i.desk} />
           <stop offset="100%" stopColor={i.deskDeep} />
         </linearGradient>
-        <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={defId('glow')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={i.lampGlow} stopOpacity={0.75} />
           <stop offset="100%" stopColor={i.lampGlow} stopOpacity={0} />
         </linearGradient>
-        <clipPath id="circle">
+        <clipPath id={defId('circle')}>
           <circle cx="200" cy="200" r="192" />
         </clipPath>
       </defs>
 
       {/* Background */}
-      <circle cx="200" cy="200" r="192" fill="url(#bg)" />
+      <circle cx="200" cy="200" r="192" fill={`url(#${defId('bg')})`} />
       <g>
         <circle className="spark" cx="342" cy="78" r="6" fill={i.accentPurpleSoft} />
         <circle className="spark" cx="60" cy="200" r="5" fill={i.accentYellow} />
@@ -377,13 +383,13 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
       <path
         className="lamp-glow"
         d="M282 214 L300 226 L312 290 L246 290 Z"
-        fill="url(#glow)"
-        clipPath="url(#circle)"
+        fill={`url(#${defId('glow')})`}
+        clipPath={`url(#${defId('circle')})`}
       />
 
       {/* Desk */}
-      <g clipPath="url(#circle)">
-        <rect x="0" y="290" width="400" height="120" fill="url(#desk)" />
+      <g clipPath={`url(#${defId('circle')})`}>
+        <rect x="0" y="290" width="400" height="120" fill={`url(#${defId('desk')})`} />
         <rect x="0" y="284" width="400" height="9" rx="2" fill={i.deskRim} />
       </g>
 
@@ -411,7 +417,7 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
       <ellipse cx="200" cy="288" rx="24" ry="4.5" fill={i.ink} opacity={0.15} />
       <rect x="195" y="268" width="10" height="19" rx="2" fill={i.machineMetal} />
       <ellipse cx="200" cy="287" rx="16" ry="3.5" fill={i.machineMetalSoft} />
-      <path d="M154 248 L246 248 L243 270 L157 270 Z" fill="url(#machineFront)" />
+      <path d="M154 248 L246 248 L243 270 L157 270 Z" fill={`url(#${defId('machineFront')})`} />
       <rect x="166" y="257" width="68" height="3" rx="1.5" fill={i.machineAccent} opacity={0.8} />
       <path d="M161 230 L239 230 L246 248 L154 248 Z" fill={i.machineTop} />
       <g className="keys">
