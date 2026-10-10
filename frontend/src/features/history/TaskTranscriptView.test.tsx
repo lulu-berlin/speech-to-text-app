@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../app/App';
@@ -17,10 +17,10 @@ describe('the transcript view', () => {
   it('shows the speaker turns with timestamps, each speaker name in its own tint', async () => {
     await renderTranscript('3'); // task 3 is COMPLETED with speakersMode "fixed" (id 3).
 
-    // Each turn's text (docs/api/turns.json) is visible.
-    expect(
-      await screen.findByText(/Good morning\. Thanks for joining us today\./),
-    ).toBeInTheDocument();
+    // Each turn's text is visible; turns are rendered per segment so that the playhead can
+    // highlight one, and the segments of a turn join into its text (docs/api/turns.json).
+    expect(await screen.findByText('Good morning.')).toBeInTheDocument();
+    expect(screen.getByText('Thanks for joining us today.')).toBeInTheDocument();
     expect(screen.getByText('Happy to be here.')).toBeInTheDocument();
     expect(screen.getByText(/Let's start with your background\./)).toBeInTheDocument();
 
@@ -73,6 +73,35 @@ describe('the transcript view', () => {
     await renderTranscript('7'); // task 7 (QUEUED) has hasAudio false.
     expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
     expect(screen.getByText(/has no audio/i)).toBeInTheDocument();
+  });
+
+  it('highlights the segment containing the playhead, nothing in a gap, and moves on seek', async () => {
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const activeSegment = () => document.querySelector('[data-active]');
+
+    // turns.json segments: turn 1 [0,2100) + [2400,5200); turn 2 [5800,9100);
+    // turn 3 [9600,14250); gaps at 2100-2400 and 5200-5800.
+
+    // Inside the first segment.
+    audio.currentTime = 1.0; // 1000 ms
+    fireEvent(audio, new Event('timeupdate'));
+    expect(activeSegment()?.textContent).toContain('Good morning.');
+
+    // In the gap after the first turn's first segment: nothing is highlighted.
+    audio.currentTime = 2.25; // 2250 ms, between 2100 and 2400
+    fireEvent(audio, new Event('timeupdate'));
+    expect(activeSegment()).toBeNull();
+
+    // Inside the second turn.
+    audio.currentTime = 6.0; // 6000 ms, inside [5800,9100)
+    fireEvent(audio, new Event('timeupdate'));
+    expect(activeSegment()?.textContent).toContain('Happy to be here.');
+
+    // Seeking moves the highlight to the new position.
+    audio.currentTime = 3.0; // 3000 ms, inside [2400,5200)
+    fireEvent(audio, new Event('seeked'));
+    expect(activeSegment()?.textContent).toContain('Thanks for joining us today.');
   });
 });
 
