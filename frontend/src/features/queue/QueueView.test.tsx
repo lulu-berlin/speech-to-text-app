@@ -522,6 +522,34 @@ describe('task controls', () => {
     await waitFor(() => expect(deleted).toEqual(['5', '7']));
     expect(screen.queryByText('memo.wav')).not.toBeInTheDocument();
   });
+
+  it('offers no controls for transitions the table does not allow', async () => {
+    const events = controllableEventStream();
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    const memo = screen.getByText('memo.wav').closest('li') as HTMLElement;
+
+    // RUNNING (docs/api/task-transitions.json): pause and cancel, no resume.
+    expect(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' })).toBeInTheDocument();
+    expect(
+      within(lecture).queryByRole('button', { name: 'Resume lecture.m4a' }),
+    ).not.toBeInTheDocument();
+    expect(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' })).toBeInTheDocument();
+
+    // QUEUED: pause and cancel, no resume.
+    expect(within(memo).getByRole('button', { name: 'Pause memo.wav' })).toBeInTheDocument();
+    expect(within(memo).queryByRole('button', { name: 'Resume memo.wav' })).not.toBeInTheDocument();
+    expect(within(memo).getByRole('button', { name: 'Cancel memo.wav' })).toBeInTheDocument();
+
+    // PAUSED: resume and cancel, no pause.
+    events.send('task-updated', taskPaused);
+    await waitFor(() => expect(within(memo).getByText('PAUSED')).toBeInTheDocument());
+    expect(within(memo).queryByRole('button', { name: 'Pause memo.wav' })).not.toBeInTheDocument();
+    expect(within(memo).getByRole('button', { name: 'Resume memo.wav' })).toBeInTheDocument();
+    expect(within(memo).getByRole('button', { name: 'Cancel memo.wav' })).toBeInTheDocument();
+  });
 });
 
 describe('upload errors', () => {
