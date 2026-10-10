@@ -5,3 +5,6 @@ data class Speaker(
     val speakerId: Int,
     val speaker: String,
 )
+
+/** The name the app gives speaker [speakerId] (ADR 0028): `"Speaker N"`, N = [speakerId] + 1; a name reset writes it again. */
+fun defaultSpeakerName(speakerId: Int): String = "Speaker ${speakerId + 1}"
