@@ -146,6 +146,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Uploading a file creates a QUEUED task at the end of the queue, records its `size_bytes`/`sha256`, and keeps the original in the task's work directory (no audio bytes in the database)
 - [x] Uploading without a file, with an extension outside the allow-list, with a language not in `docs/api/languages.json`, or with an invalid `speakers` or `maxSpeakers` value (outside 1–20), is rejected with 400 and the matching error code; an upload without `language` gets `auto`
 - [ ] Uploading the same bytes again is rejected with 409 `duplicate-audio` naming the existing task's id
+- [ ] (discovered, confirmed 2026-10-10) A non-numeric `maxSpeakers` (e.g. `many`) is rejected with 400 `invalid-max-speakers`, not silently defaulted
 - [ ] Listing tasks returns pending tasks in queue order, then finished tasks newest first, without audio data
 - [x] Requesting an unknown task returns 404 with an error body
 - [ ] Pausing, resuming, cancelling and retrying a task reach the engine and return the updated task
