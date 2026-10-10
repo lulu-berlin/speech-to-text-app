@@ -127,6 +127,9 @@ export interface ThemeTokens {
     spinEasing: string;
     pulseDuration: string;
     pulseEasing: string;
+    // A queue row sliding aside while another is dragged past it (item 25).
+    slideDuration: string;
+    slideEasing: string;
   };
   // The type scale: sizes ascend, weights are the font's 400/500/600, line heights are
   // unitless (WCAG 1.4.12 asks for at least 1.5; the transcript reads more loosely).
@@ -231,6 +234,8 @@ const baseTokens = {
     spinEasing: 'linear',
     pulseDuration: '1.6s',
     pulseEasing: 'ease-in-out',
+    slideDuration: '0.15s',
+    slideEasing: 'ease-out',
   },
 };
 

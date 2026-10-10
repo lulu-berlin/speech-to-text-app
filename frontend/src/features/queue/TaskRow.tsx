@@ -3,7 +3,7 @@ import { GripVertical, MoreVertical, Pause, Play, X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { HTMLAttributes, Ref } from 'react';
 import { useMachine } from '@xstate/react';
-import { styled } from 'styled-components';
+import { css, styled } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
 import type { Task, TaskPhase } from '../../shared/api/types';
@@ -38,6 +38,36 @@ const RowActionError = styled.span`
   color: ${(props) => props.theme.colors.danger};
 `;
 
+// A queue row that can be dragged: positioned so it can be offset while a drag is on. The
+// dragged row is raised — the raised fill, the card shadow (kept beside the focus ring
+// when its handle has keyboard focus) and stacked above its neighbours; the neighbours
+// slide aside, animated only when motion is welcome (item 25).
+const SortableRow = styled(ListRow)<{ $lifted: boolean }>`
+  position: relative;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition-property: top, left;
+    transition-duration: ${(props) => props.theme.motion.slideDuration};
+    transition-timing-function: ${(props) => props.theme.motion.slideEasing};
+  }
+
+  ${(props) =>
+    props.$lifted
+      ? css`
+          z-index: 1;
+          transition: none;
+          background: ${props.theme.colors.surfaceRaised};
+          box-shadow: ${props.theme.shadows.card};
+
+          &:focus-within {
+            box-shadow:
+              0 0 0 ${props.theme.borderWidths.ring} ${props.theme.colors.focusRing},
+              ${props.theme.shadows.card};
+          }
+        `
+      : ''}
+`;
+
 // The per-task command controls, in display order. A control is offered only when
 // docs/api/task-transitions.json allows its command for the task's status.
 const CONTROLS: {
@@ -61,6 +91,10 @@ export interface TaskRowProps {
   // listeners (pointer and keyboard dragging).
   rowRef?: Ref<HTMLLIElement>;
   dragHandleProps?: HTMLAttributes<HTMLButtonElement>;
+  // While a drag is on: this row's offset from its place (the dragged row follows the
+  // pointer; its neighbours slide aside), and whether it is the dragged row (item 25).
+  dragOffset?: { x: number; y: number } | null;
+  lifted?: boolean;
 }
 
 // One pending task of the queue list: its filename, phase and status, its controls, and
@@ -69,7 +103,16 @@ export interface TaskRowProps {
 // offered only when docs/api/task-transitions.json allows it, a confirmation opens only
 // where work would be lost, and the action's result is applied to the live state at
 // once (the server's own events, when they arrive, carry the same task).
-export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProps }: TaskRowProps) {
+export function TaskRow({
+  task,
+  index,
+  count,
+  onMoveTask,
+  rowRef,
+  dragHandleProps,
+  dragOffset,
+  lifted = false,
+}: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
   const [action, send] = useMachine(rowActionMachine, { input: { taskId: task.id } });
   // Delete runs through the shared dialog-action machine (item 28): the menu item opens
@@ -138,7 +181,12 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
   ];
 
   return (
-    <ListRow ref={rowRef}>
+    <SortableRow
+      ref={rowRef}
+      $lifted={lifted}
+      // React adds the unit to numeric offsets; they are pointer data, not design values.
+      style={dragOffset ? { left: dragOffset.x, top: dragOffset.y } : undefined}
+    >
       <Stack gap="sm">
         <RowContent>
           <RowName>{task.filename}</RowName>
@@ -212,6 +260,6 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
       >
         Removes the task, its transcript and audio for good.
       </ConfirmDialog>
-    </ListRow>
+    </SortableRow>
   );
 }

@@ -808,6 +808,56 @@ describe('the queue reorder', () => {
     ]);
   });
 
+  it('lifts the dragged row while it moves: raised above its neighbours, which slide aside, until the drop settles both', async () => {
+    server.use(
+      http.put('/api/queue/order', async ({ request }) => {
+        const body = (await request.json()) as { taskIds: number[] };
+        return HttpResponse.json({ paused: false, taskIds: body.taskIds });
+      }),
+    );
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+    const restoreLayout = stubRowLayout();
+    try {
+      renderQueue();
+      await screen.findByText('lecture.m4a');
+      const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+      const memo = screen.getByText('memo.wav').closest('li') as HTMLElement;
+      const handle = screen.getByRole('button', { name: 'Reorder lecture.m4a' });
+
+      // Picked up by keyboard: the row is raised — the raised fill, the card shadow, and
+      // stacked above its neighbours. Keyboard focus is on its handle, so the row keeps the
+      // focus ring beside the shadow.
+      handle.focus();
+      fireEvent.keyDown(handle, { code: 'Space', key: ' ' });
+      await settle();
+      const lifted = getComputedStyle(lecture);
+      expect(lifted.backgroundColor).toBe(asRgb(lightTheme.colors.surfaceRaised));
+      expect(lifted.boxShadow).toContain(lightTheme.shadows.card);
+      expect(lifted.position).toBe('relative');
+      expect(lifted.zIndex).toBe('1');
+
+      // Moved one place down: the row follows (the stubbed rows are 40px apart) and its
+      // neighbour slides up into the gap — animated only when motion is welcome.
+      fireEvent.keyDown(handle, { code: 'ArrowDown', key: 'ArrowDown' });
+      await settle();
+      expect(lecture.style.top).toBe('40px');
+      expect(memo.style.top).toBe('-40px');
+      const slide = mediaRulesFor(memo, '(prefers-reduced-motion: no-preference)');
+      expect(slide.map((rule) => rule.style.transitionProperty)).toContain('top,left');
+
+      // Dropped: both settle, and the lift ends.
+      fireEvent.keyDown(handle, { code: 'Space', key: ' ' });
+      await settle();
+      const rows = screen.getAllByRole('listitem');
+      for (const row of rows) {
+        expect(row.style.top).toBe('');
+        expect(getComputedStyle(row).boxShadow).not.toBe(lightTheme.shadows.card);
+      }
+    } finally {
+      restoreLayout();
+    }
+  });
+
   it('restores the server order and shows the error when a reorder is rejected', async () => {
     const ordered: number[][] = [];
     server.use(
