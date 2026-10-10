@@ -125,12 +125,6 @@ data class TurnsJson(
 )
 
 @Serializable
-data class SpeakerJson(
-    val speakerId: Int,
-    val speaker: String,
-)
-
-@Serializable
 data class TurnJson(
     val speakerId: Int?,
     val startMs: Long,
