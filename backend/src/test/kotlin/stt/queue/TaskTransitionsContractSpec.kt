@@ -9,8 +9,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import stt.docsApiFile
 import java.nio.file.Files
-import java.nio.file.Path
 
 /**
  * Checks the domain's transition table against the shared contract `docs/api/task-transitions.json`
@@ -56,15 +56,8 @@ class TaskTransitionsContractSpec :
         }
     })
 
-/** The parsed contract file, resolved from the Gradle project directory (`backend/`). */
+/** The parsed contract file `docs/api/task-transitions.json`. */
 private val contract: JsonObject =
     Json
-        .parseToJsonElement(Files.readString(contractFile()))
+        .parseToJsonElement(Files.readString(docsApiFile("task-transitions.json")))
         .jsonObject
-
-/** `docs/api/task-transitions.json`, wherever the test JVM's working directory sits in the repository. */
-private fun contractFile(): Path {
-    val candidates = listOf(Path.of("../docs/api/task-transitions.json"), Path.of("docs/api/task-transitions.json"))
-    return candidates.firstOrNull(Files::exists)
-        ?: error("task-transitions.json not found; working directory is ${Path.of("").toAbsolutePath()}")
-}

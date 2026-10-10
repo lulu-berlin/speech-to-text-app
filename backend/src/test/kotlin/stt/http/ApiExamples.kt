@@ -10,17 +10,11 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import stt.docsApiFile
 import java.nio.file.Files
-import java.nio.file.Path
 
-/** A contract example from `docs/api/` (item 12's contract), resolved from the Gradle project directory (`backend/`). */
-internal fun apiExample(fileName: String): JsonObject {
-    val candidates = listOf(Path.of("../docs/api", fileName), Path.of("docs/api", fileName))
-    val file =
-        candidates.firstOrNull(Files::exists)
-            ?: error("$fileName not found; working directory is ${Path.of("").toAbsolutePath()}")
-    return Json.parseToJsonElement(Files.readString(file)).jsonObject
-}
+/** A contract example from `docs/api/` (item 12's contract). */
+internal fun apiExample(fileName: String): JsonObject = Json.parseToJsonElement(Files.readString(docsApiFile(fileName))).jsonObject
 
 /** Asserts the example's structure (docs/api/README.md): the same keys, each with the same JSON value type. */
 internal infix fun JsonObject.shouldHaveShapeOf(example: JsonObject) {
