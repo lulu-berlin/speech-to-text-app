@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { getTurns } from '../../shared/api/client';
@@ -32,6 +32,9 @@ function phaseWord(phase: TaskPhase): string {
 
 // The statuses that get a status page instead of the transcript.
 const FINISHED_ISSUES: ReadonlySet<Task['status']> = new Set(['FAILED', 'CANCELED']);
+
+// The statuses that are still queued or running: no transcript, no status page yet.
+const PENDING: ReadonlySet<Task['status']> = new Set(['QUEUED', 'RUNNING', 'PAUSED']);
 
 // The transcript download formats (item 10, ADR 0035): txt, srt, vtt.
 const DOWNLOAD_FORMATS = ['txt', 'srt', 'vtt'] as const;
@@ -94,7 +97,8 @@ export function TaskTranscriptView() {
   const [turns, setTurns] = useState<Turns | null>(null);
 
   useEffect(() => {
-    if (task === undefined) {
+    // Only a completed task has turns (the backend answers 409 not-completed otherwise).
+    if (task === undefined || task.status !== 'COMPLETED') {
       return;
     }
     let cancelled = false;
@@ -205,6 +209,19 @@ export function TaskTranscriptView() {
             <Text>Loading…</Text>
           </Stack>
         )}
+      </Page>
+    );
+  }
+
+  // A task still in the queue (or running) has no transcript: say so and link to the queue.
+  if (PENDING.has(task.status)) {
+    return (
+      <Page>
+        <Stack gap="md">
+          <Title>{task.filename}</Title>
+          <Text>This task is still in the queue.</Text>
+          <Link to="/queue">Go to the queue</Link>
+        </Stack>
       </Page>
     );
   }
