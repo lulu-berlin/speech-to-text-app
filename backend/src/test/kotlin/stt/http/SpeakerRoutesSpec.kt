@@ -16,7 +16,9 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -156,6 +158,31 @@ class SpeakerRoutesSpec :
                         resetName shouldBe "speakers-renamed"
                         Json.parseToJsonElement(resetData) shouldBe
                             Json.parseToJsonElement("""{ "id": $id, "speakers": ${speakers("Speaker 1", "Speaker 2")} }""")
+                    }
+                }
+            }
+        }
+
+        given("a COMPLETED task whose segments are spoken by speakers 0, 0, 1 (queue paused)") {
+            `when`("speaker 0 is renamed to Alice and the turns are read again") {
+                then("/turns lists the new name, and its turns are exactly the turns before the rename") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), threeSegments, speakerIds = listOf(0, 0, 1))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        val before = Json.parseToJsonElement(client.get("/api/tasks/$id/turns").bodyAsText()).jsonObject
+
+                        client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
+
+                        val after = Json.parseToJsonElement(client.get("/api/tasks/$id/turns").bodyAsText()).jsonObject
+                        after shouldHaveShapeOf apiExample("turns.json")
+                        after.getValue("speakers") shouldBe speakers("Alice", "Speaker 2")
+                        // Turns name their speaker only by speakerId, so a rename leaves them as they were: segments
+                        // 0 and 1 form speaker 0's turn, segment 2 speaker 1's.
+                        after.getValue("turns") shouldBe before.getValue("turns")
+                        val turnSpeakers = after.getValue("turns").jsonArray.map { it.jsonObject.getValue("speakerId") }
+                        turnSpeakers shouldBe listOf(JsonPrimitive(0), JsonPrimitive(1))
                     }
                 }
             }
