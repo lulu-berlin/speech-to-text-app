@@ -31,7 +31,7 @@ Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appe
 
 - [x] The runtime sqlite-jdbc equals the catalog version 3.50.3.0: `gradle dependencyInsight` output recorded in the log, plus a pinned unit test asserting the loaded driver's version (`SQLiteJDBCLoader.getVersion()`), commented "must equal the catalog pin — update both together"
 - [x] A transitive dependency cannot silently override the pin: `dependencyInsight` shows the catalog version with "forced" selection reasons
-- [ ] Must not break: `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` stay green against the pinned driver (Database open, WAL, Flyway migrations, the engine)
+- [x] Must not break: `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` stay green against the pinned driver (Database open, WAL, Flyway migrations, the engine)
 - [ ] The user's `nix build .` succeeds; `deps.json` is regenerated only if the resolved graph changed (expected: unchanged)
 
 ## Acceptance criteria
@@ -58,4 +58,13 @@ Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appe
 
 - Red (after cycle 1, before the force): `dependencyInsight --dependency sqlite-jdbc --configuration runtimeClasspath` resolves `org.xerial:sqlite-jdbc:3.50.3.0` with no selection reason at all — requested by `runtimeClasspath` and `flyway-database-nc-sqlite:13.9.0` in pure negotiation; nothing marks the pin as authoritative, so a future transitive bump could still resolve over it.
 - Green: `configurations.configureEach { resolutionStrategy.force(libs.sqlite.jdbc) }` in `backend/build.gradle.kts`, referencing the catalog version (single source of truth) with a comment tying it to this item. `dependencyInsight` now shows `org.xerial:sqlite-jdbc:3.50.3.0 (forced)`; `gradle check` green.
+- Discovered: none.
+
+### 2026-10-10 — item 3: nothing breaks against the pinned driver (green)
+
+- No code change — pure verification, the "must not break" cycle that proves the alignment + force are noise-free.
+- `gradle check --rerun-tasks`: BUILD SUCCESSFUL (7/7 tasks executed), 189 unit tests green incl. `SqliteVersionSpec` and the DB suite (open/WAL/migrations).
+- `gradle integrationTest --rerun-tasks`: BUILD SUCCESSFUL (6/6 tasks executed), 47 Integration-tagged tests executed (the 189 non-tagged ones are skipped by the kotest.tags filter), 0 failures/errors (JFK end-to-end, engine, real CAM++ diarization).
+- Approved refactor (before this cycle): ADR 0042 added (next free number verified against main: 0041 was highest), the force comment now cites the ADR.
+- `backend/deps.json`: unchanged (0 stat lines) — the force pins the already-resolved version.
 - Discovered: none.
