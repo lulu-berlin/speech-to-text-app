@@ -60,16 +60,16 @@ fun Application.transcriptRoutes() {
         get("/api/tasks/{id}/turns") {
             val details = call.completedTaskOrError(tasks, "turns") ?: return@get
             val id = details.id
-            val stored = segments.findByTask(id)
             if (details.task.speakersMode == SpeakersMode.OFF) {
-                call.respond(TurnsJson(speakers = emptyList(), turns = stored.map { it.toNullSpeakerTurn() }))
+                call.respond(TurnsJson(speakers = emptyList(), turns = segments.findByTask(id).map { it.toNullSpeakerTurn() }))
             } else {
-                val speakers = segments.findSpeakers(id)
+                // Item 22: the effective speakers and the segments as merged; speakerTurns itself is unchanged.
+                val diarized = segments.findDiarized(id)
                 call.respond(
                     TurnsJson(
-                        speakers = speakers.map { it.toJson() },
+                        speakers = diarized.speakers.map { it.toJson() },
                         turns =
-                            speakerTurns(stored, speakers).map { turn ->
+                            speakerTurns(diarized.segments, diarized.speakers).map { turn ->
                                 TurnJson(
                                     speakerId = turn.speakerId,
                                     startMs = turn.startMs,

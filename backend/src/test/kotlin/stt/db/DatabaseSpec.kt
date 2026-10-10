@@ -60,13 +60,13 @@ class DatabaseSpec :
 
         given("an empty data directory") {
             `when`("opening the database for the first time") {
-                then("stt.db is created, V1 to V4 apply, and a reopen applies nothing and preserves rows") {
+                then("stt.db is created, V1 to V5 apply, and a reopen applies nothing and preserves rows") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
 
                         Database.open(dataDir).use { first ->
                             tableNames(first).shouldContainAll(expectedTables)
-                            migratedCount(first).shouldBe(4)
+                            migratedCount(first).shouldBe(5)
                             first.connection
                                 .createStatement()
                                 .use { st ->
@@ -82,7 +82,7 @@ class DatabaseSpec :
 
                         Database.open(dataDir).use { second ->
                             rowCount(second, "tasks").shouldBe(1)
-                            migratedCount(second).shouldBe(4)
+                            migratedCount(second).shouldBe(5)
                         }
                     }
                 }
@@ -376,6 +376,7 @@ private val expectedTables =
         "chunks",
         "segments",
         "speakers",
+        "speaker_merge",
         "queue_state",
         "flyway_schema_history",
     )

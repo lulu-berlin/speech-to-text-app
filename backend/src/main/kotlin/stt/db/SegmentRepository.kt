@@ -150,6 +150,62 @@ class SegmentRepository(
                 .orderBy(SpeakersTable.speakerId to SortOrder.ASC)
                 .map { it.toSpeaker() }
         }
+
+    /**
+     * Folds every speaker of [group] except [into] into [into] (item 22): one `speaker_merge` row each, in one write
+     * transaction. No segment row and no `speakers` row is touched; [findDiarized] resolves the mapping at read time.
+     */
+    suspend fun mergeSpeakers(
+        taskId: Long,
+        group: List<Int>,
+        into: Int,
+    ) {
+        db.writeTransaction {
+            SpeakerMergeTable.batchInsert(group.filter { it != into }, shouldReturnGeneratedValues = false) { merged ->
+                this[SpeakerMergeTable.taskId] = taskId
+                this[SpeakerMergeTable.mergedId] = merged
+                this[SpeakerMergeTable.intoId] = into
+            }
+        }
+    }
+
+    /**
+     * The task's transcript as readers see it (item 22, the one place the merge mapping is resolved): its segments
+     * in (`chunk_idx`, `seq`) order with each merged `speakerId` replaced by the speaker it was merged into, and its
+     * effective speakers, those not merged into another. One read transaction, so both agree with one mapping; the
+     * mapping is flat, so one lookup resolves a speaker.
+     */
+    suspend fun findDiarized(taskId: Long): DiarizedRead =
+        db.readTransaction {
+            val intoOf =
+                SpeakerMergeTable
+                    .selectAll()
+                    .where { SpeakerMergeTable.taskId eq taskId }
+                    .associate { it[SpeakerMergeTable.mergedId] to it[SpeakerMergeTable.intoId] }
+            val segments =
+                SegmentsTable
+                    .selectAll()
+                    .where { SegmentsTable.taskId eq taskId }
+                    .orderBy(SegmentsTable.chunkIdx to SortOrder.ASC, SegmentsTable.seq to SortOrder.ASC)
+                    .map { row ->
+                        Segment(
+                            chunkIdx = row[SegmentsTable.chunkIdx],
+                            seq = row[SegmentsTable.seq],
+                            startMs = row[SegmentsTable.startMs],
+                            endMs = row[SegmentsTable.endMs],
+                            text = row[SegmentsTable.text],
+                            speakerId = row[SegmentsTable.speakerId]?.let { intoOf[it] ?: it },
+                        )
+                    }
+            val speakers =
+                SpeakersTable
+                    .selectAll()
+                    .where { SpeakersTable.taskId eq taskId }
+                    .orderBy(SpeakersTable.speakerId to SortOrder.ASC)
+                    .map { it.toSpeaker() }
+                    .filter { it.speakerId !in intoOf }
+            DiarizedRead(segments, speakers)
+        }
 }
 
 /** A row of `speakers` as a [Speaker]. */

@@ -24,7 +24,7 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 | Task progress | `task-progress.json`, `task-progress.speakers-off.json` | event `task-progress` |
 | Task deleted | `task-deleted.json` | event `task-deleted` |
 | Turns | `turns.json`, `turns.speakers-off.json` | `GET /api/tasks/{id}/turns` |
-| Speakers | `speakers.json` | `200` of `PUT /api/tasks/{id}/speakers/{speakerId}` (item 22) |
+| Speakers | `speakers.json` | `200` of `PUT /api/tasks/{id}/speakers/{speakerId}` and `POST /api/tasks/{id}/speakers/merge` (item 22) |
 | Speakers event | `speakers-renamed.json` | event `speakers-renamed` (item 22) |
 | Error | `error.json`, `error.invalid-language.json` (mock addition, item 14) | every error response except `duplicate-audio` |
 | Error (duplicate) | `error.duplicate-audio.json` | `409 duplicate-audio` of `POST /api/tasks` |

@@ -6,6 +6,7 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -18,15 +19,18 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.Segment
 import stt.db.SegmentRepository
+import stt.db.Speaker
 import stt.db.Task
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
@@ -188,6 +192,67 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("a COMPLETED task whose segments are spoken by speakers 0, 1, 0, 2, speaker 0 named Alice (queue paused)") {
+            `when`("speakers 0 and 1 are merged into speaker 0") {
+                then("the survivor answers for both: /turns shows one turn across the former boundary; no segment row changes") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 2))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
+
+                        val merged = client.merge(id, group = listOf(0, 1), into = 0)
+                        merged.status shouldBe HttpStatusCode.OK
+                        val body = Json.parseToJsonElement(merged.bodyAsText()).jsonObject
+                        body shouldHaveShapeOf apiExample("speakers.json")
+                        // The effective speakers: the survivor keeps its id and name; speaker 1 is no longer listed.
+                        body shouldBe
+                            Json.parseToJsonElement(
+                                """{ "speakers": [ { "speakerId": 0, "speaker": "Alice" }, { "speakerId": 2, "speaker": "Speaker 3" } ] }""",
+                            )
+
+                        // Derived by hand from the contract: speaker 1's segment now reads as speaker 0's, so segments
+                        // 0–2 are one turn (first start, last end, texts trimmed and joined); segment 3 stays apart.
+                        client.turnsOf(id) shouldBe
+                            Json.parseToJsonElement(
+                                """
+                                {
+                                  "speakers": [
+                                    { "speakerId": 0, "speaker": "Alice" },
+                                    { "speakerId": 2, "speaker": "Speaker 3" }
+                                  ],
+                                  "turns": [
+                                    {
+                                      "speakerId": 0, "startMs": 0, "endMs": 3000, "text": "Hello. Hi. Hey.",
+                                      "segments": [
+                                        { "startMs": 0, "endMs": 1000, "text": "Hello." },
+                                        { "startMs": 1000, "endMs": 2000, "text": "Hi." },
+                                        { "startMs": 2000, "endMs": 3000, "text": "Hey." }
+                                      ]
+                                    },
+                                    {
+                                      "speakerId": 2, "startMs": 3000, "endMs": 4000, "text": "Bye.",
+                                      "segments": [ { "startMs": 3000, "endMs": 4000, "text": "Bye." } ]
+                                    }
+                                  ]
+                                }
+                                """.trimIndent(),
+                            )
+                    }
+
+                    // In the database: every segment row as seeded (speaker 1's included), and all three speakers kept.
+                    Database.open(dataDir).use { db ->
+                        val segments = SegmentRepository(db)
+                        val seeded = fourSegments.zip(listOf(0, 1, 0, 2)) { segment, speakerId -> segment.copy(speakerId = speakerId) }
+                        segments.findByTask(id) shouldBe seeded
+                        segments.findSpeakers(id) shouldBe
+                            listOf(Speaker(0, "Alice"), Speaker(1, "Speaker 2"), Speaker(2, "Speaker 3"))
+                    }
+                }
+            }
+        }
     })
 
 /** Two segments of a task, one per speaker once `storeSpeakers(listOf(0, 1))` has run. */
@@ -203,6 +268,15 @@ private val threeSegments =
         Segment(0, 0, 0, 1_000, " Hello.", speakerId = null),
         Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null),
         Segment(0, 2, 2_000, 3_000, " Hey.", speakerId = null),
+    )
+
+/** Four segments of a task, for speakers stored as `[0, 1, 0, 2]`. */
+private val fourSegments =
+    listOf(
+        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null),
+        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null),
+        Segment(0, 2, 2_000, 3_000, " Hey.", speakerId = null),
+        Segment(0, 3, 3_000, 4_000, " Bye.", speakerId = null),
     )
 
 /** A COMPLETED copy of a freshly queued task. */
@@ -236,6 +310,22 @@ private suspend fun HttpClient.rename(
     put("/api/tasks/$id/speakers/$speakerId") {
         contentType(ContentType.Application.Json)
         setBody(buildJsonObject { put("speaker", name) }.toString())
+    }
+
+/** `POST /api/tasks/{id}/speakers/merge` with `{ "group": group, "into": into }`. */
+private suspend fun HttpClient.merge(
+    id: Long,
+    group: List<Int>,
+    into: Int,
+): HttpResponse =
+    post("/api/tasks/$id/speakers/merge") {
+        contentType(ContentType.Application.Json)
+        setBody(
+            buildJsonObject {
+                putJsonArray("group") { group.forEach { add(it) } }
+                put("into", into)
+            }.toString(),
+        )
     }
 
 /** The body of `GET /api/tasks/{id}/turns`. */
