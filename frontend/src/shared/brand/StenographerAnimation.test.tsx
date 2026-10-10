@@ -6,6 +6,9 @@ import { renderThemed } from '../../test/render';
 import { lightTheme } from '../theme/theme';
 import { StenographerAnimation } from './StenographerAnimation';
 
+// The animation names the wrapper's rules reference (prefixed so they cannot collide).
+const ANIMATION_NAME = /stt-[a-z]+/g;
+
 describe('the stenographer animation', () => {
   it('scopes its rules to its own class: an outside element with a class like word or head is unaffected', () => {
     const { container } = renderThemed(
@@ -54,5 +57,41 @@ describe('the stenographer animation', () => {
     // The backdrop gradient's first stop renders the changed value.
     const backdrop = required(container.querySelector('stop'));
     expect(backdrop.getAttribute('stop-color')).toBe('#abcdef');
+  });
+
+  it('carries the artwork animations: every animated rule refers to an emitted keyframes rule, and the per-element delays are on the elements', () => {
+    const { container } = renderThemed(<StenographerAnimation />);
+
+    // jsdom cannot run animations, so the wiring is asserted: each scoped rule that
+    // declares an animation references a keyframes rule the wrapper emitted.
+    const keyframeNames = new Set(
+      styleRules()
+        .filter((rule): rule is CSSKeyframesRule => rule instanceof CSSKeyframesRule)
+        .map((rule) => rule.name),
+    );
+    const animatedRules = styleRules()
+      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+      .filter((rule) => rule.style.animation !== '');
+    expect(animatedRules.length).toBeGreaterThanOrEqual(9);
+    for (const rule of animatedRules) {
+      const names = [...rule.style.animation.matchAll(ANIMATION_NAME)].map((match) => match[0]);
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.every((name) => keyframeNames.has(name))).toBe(true);
+    }
+
+    // The artwork's nth-child delays and per-class durations live on the elements now
+    // (a sample: the waves, one word, the key pattern, the right arm and a finger).
+    const styleOf = (selector: string) =>
+      required(container.querySelector(selector)).getAttribute('style');
+    expect(
+      [...container.querySelectorAll('path.wave')].map((element) => element.getAttribute('style')),
+    ).toEqual(['animation-delay: 0s;', 'animation-delay: -1s;', 'animation-delay: -0.5s;']);
+    expect(styleOf('.word:nth-of-type(2)')).toContain('0.6s');
+    expect(styleOf('.keys rect:nth-of-type(1)')).toContain('-0.55s');
+    expect(styleOf('.keys rect:nth-of-type(4)')).toContain('-0.7s');
+    expect(styleOf('.arm-r')).toContain('-1.1s');
+    expect(styleOf('.arm-l .f1')).toContain('0.48s');
+    // jsdom normalizes the trailing zero the artwork uses (-0.10s) when serializing.
+    expect(styleOf('.arm-l .f1')).toContain('animation-delay: -0.1s');
   });
 });
