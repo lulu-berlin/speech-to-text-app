@@ -1,5 +1,6 @@
 package stt.db
 
+import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -129,7 +130,7 @@ class SegmentRepository(
                 SpeakersTable
                     .selectAll()
                     .where { SpeakersTable.taskId eq taskId }
-                    .map { row -> Speaker(speakerId = row[SpeakersTable.speakerId], speaker = row[SpeakersTable.speaker]) }
+                    .map { it.toSpeaker() }
                     .firstOrNull { it.speakerId != speakerId && it.speaker.equals(name, ignoreCase = true) }
             if (clash != null) return@writeTransaction RenameOutcome.DuplicateName(clash)
             val updated =
@@ -147,6 +148,9 @@ class SegmentRepository(
                 .selectAll()
                 .where { SpeakersTable.taskId eq taskId }
                 .orderBy(SpeakersTable.speakerId to SortOrder.ASC)
-                .map { row -> Speaker(speakerId = row[SpeakersTable.speakerId], speaker = row[SpeakersTable.speaker]) }
+                .map { it.toSpeaker() }
         }
 }
+
+/** A row of `speakers` as a [Speaker]. */
+private fun ResultRow.toSpeaker() = Speaker(speakerId = this[SpeakersTable.speakerId], speaker = this[SpeakersTable.speaker])
