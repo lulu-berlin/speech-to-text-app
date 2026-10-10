@@ -9,12 +9,13 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respondTextWriter
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
 import stt.engine.Event
-import stt.engine.ProcessingEngine
 import java.io.Writer
 
 /**
@@ -24,7 +25,7 @@ import java.io.Writer
  * harmless and a reconnect needs no refetch; `task-updated` carries the full task.
  */
 fun Application.eventsRoutes() {
-    val engine: ProcessingEngine by dependencies
+    val stream: EventStream by dependencies
     val tasks: TaskRepository by dependencies
     val queueState: QueueStateRepository by dependencies
     routing {
@@ -44,14 +45,38 @@ fun Application.eventsRoutes() {
                     ),
                 )
                 flush()
-                engine.events.collect { engineEvent ->
-                    writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
-                    flush()
+                try {
+                    pumpEvents(stream.events) { engineEvent ->
+                        writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
+                        flush()
+                    }
+                } catch (_: FellBehindException) {
+                    // Deliberate end of the stream; nothing more to write.
                 }
             }
         }
     }
 }
+
+/**
+ * Writes every event of [events] to [writeFrame]. A missing sequence number means this subscriber's buffer
+ * overflowed and events were dropped for it (user decision 2026-10-10): pumping throws [FellBehindException]
+ * and the SSE response ends, so EventSource reconnects and the snapshot makes the client whole again.
+ */
+internal suspend fun pumpEvents(
+    events: Flow<Pair<Long, Event>>,
+    writeFrame: suspend (Event) -> Unit,
+) {
+    var lastSeen = -1L
+    events.collect { (sequence, engineEvent) ->
+        if (lastSeen != -1L && sequence != lastSeen + 1) throw FellBehindException()
+        writeFrame(engineEvent)
+        lastSeen = sequence
+    }
+}
+
+/** Signals that this subscriber lost events and the SSE response must end. */
+internal class FellBehindException : Exception()
 
 /** The body of the first SSE event (item 12's contract, `docs/api/snapshot.json`): everything at once. */
 @Serializable

@@ -10,6 +10,10 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.path
 import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import stt.audio.AudioJoiner
 import stt.audio.FfmpegAudioJoiner
 import stt.config.Config
@@ -33,6 +37,8 @@ import java.io.File
  */
 fun Application.sttApp(config: Config) {
     install(ContentNegotiation) { json() }
+    // The events bridge runs for the application's lifetime (ADR 0007/0038): a scope under the app's job.
+    val eventsScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext[Job]) + Dispatchers.Default)
     dependencies {
         provide<Database> { Database.open(config.dataDir) }
         provide<TaskWorkDirectories> { TaskWorkDirectories(config.dataDir) }
@@ -43,6 +49,7 @@ fun Application.sttApp(config: Config) {
         provide<ChunkRepository> { ChunkRepository(resolve()) }
         provide<JoinedAudioCache> { JoinedAudioCache(resolve()) }
         provide<AudioJoiner> { FfmpegAudioJoiner(resolve(), resolve(), resolve()) }
+        provide<EventStream> { NumberedEventStream(resolve(), eventsScope) }
         require(DependencyKey<Database>())
     }
     processingEngine(config)
