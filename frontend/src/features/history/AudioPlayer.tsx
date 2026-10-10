@@ -4,15 +4,8 @@ import styled from 'styled-components';
 import { IconButton } from '../../shared/ui/IconButton';
 import { Row, Stack } from '../../shared/ui/layout';
 import { Slider } from '../../shared/ui/Slider';
+import { Surface } from '../../shared/ui/Surface';
 import { formatDuration } from './formatTask';
-
-// The player's block: a surface fill like an embedded block in the document.
-const PlayerBase = styled.div`
-  padding: ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.radii.card};
-  background: ${(props) => props.theme.colors.surface};
-  color: ${(props) => props.theme.colors.text};
-`;
 
 const ControlsRow = styled(Row)`
   justify-content: space-between;
@@ -72,7 +65,7 @@ export function AudioPlayer({
   };
 
   return (
-    <PlayerBase role="group" aria-label="Audio player">
+    <Surface role="group" aria-label="Audio player" padding="md">
       <audio
         ref={audioRef}
         src={src}
@@ -99,6 +92,6 @@ export function AudioPlayer({
           <Times>{`${formatDuration(currentTimeMs)} / ${formatDuration(durationMs)}`}</Times>
         </ControlsRow>
       </Stack>
-    </PlayerBase>
+    </Surface>
   );
 }
