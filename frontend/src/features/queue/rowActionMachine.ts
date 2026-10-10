@@ -1,11 +1,13 @@
-// One command or destructive action of a task row (item 14, ADR 0038): idle → confirming
-// (only when the action needs it, decided by the row) → running → done | failed. The
-// row's buttons ACTIVATE the machine; the shared I/O (runTaskCommand / deleteTask) lives
-// here. TaskRow reads done (forwarding the task or the deletion to the live state) and
-// failed (context.error is the inline error of item 17). ACTIVATE is handled on the
-// `ready` parent, so a failed action can start the next one, clearing the error.
+// The task commands of a queue row (item 14, ADR 0038): idle → confirming (only when the
+// action needs it, decided by the row) → running → done | failed. The row's buttons
+// ACTIVATE the machine; the shared I/O (runTaskCommand) lives here. Delete stays in the
+// row's action vocabulary but its dialog/delete lifecycle is delegated to
+// confirmActionMachine (item 28). TaskRow reads done (forwarding the returned task to the
+// live state) and failed (context.error is the inline error of item 17). ACTIVATE is
+// handled on the `ready` parent, so a failed action can start the next one, clearing the
+// error.
 import { assign, fromPromise, setup } from 'xstate';
-import { deleteTask, runTaskCommand } from '../../shared/api/client';
+import { runTaskCommand } from '../../shared/api/client';
 import type { Task } from '../../shared/api/types';
 
 export type RowAction = 'pause' | 'resume' | 'cancel' | 'delete';
@@ -40,11 +42,9 @@ export const rowActionMachine = setup({
       | { type: 'DISMISS' },
   },
   actors: {
-    run: fromPromise<Task | null, RunInput>(({ input }) =>
-      input.action === 'delete'
-        ? deleteTask(input.taskId).then(() => null)
-        : runTaskCommand(input.taskId, input.action),
-    ),
+    // Commands only: delete never reaches the run actor, TaskRow routes it to
+    // confirmActionMachine (item 28).
+    run: fromPromise<Task, RunInput>(({ input }) => runTaskCommand(input.taskId, input.action)),
   },
   actions: {
     // The row asked for an action: remember it and its task status, clear any previous

@@ -12,8 +12,8 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { Row, Stack } from '../../shared/ui/layout';
 import { Text } from '../../shared/ui/typography';
 import { commandMachine } from '../../shared/state/commandMachine';
+import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
-import { deleteTaskMachine } from './deleteTaskMachine';
 
 const Filename = styled.span`
   color: ${(props) => props.theme.colors.text};
@@ -58,8 +58,8 @@ function formatDuration(durationMs: number): string {
 }
 
 // One finished task in the history list. Retry runs through commandMachine and delete
-// through deleteTaskMachine, so the sending/done/failed state and any inline error live in
-// the machines (ADR 0031), not in React state.
+// through confirmActionMachine, so the sending/done/failed state and any inline error live
+// in the machines (ADR 0031), not in React state.
 export function HistoryRow({ task }: { task: Task }) {
   const connection = ConnectionContext.useActorRef();
 
@@ -68,7 +68,7 @@ export function HistoryRow({ task }: { task: Task }) {
   });
   const [retryState, retrySend, retryActor] = retry;
 
-  const deleteResult = useMachine(deleteTaskMachine, { input: { taskId: task.id } });
+  const deleteResult = useMachine(confirmActionMachine, { input: { taskId: task.id } });
   const [deleteState, deleteSend, deleteActor] = deleteResult;
 
   // On a successful retry the returned task (QUEUED) updates the store, which removes it
@@ -136,7 +136,7 @@ export function HistoryRow({ task }: { task: Task }) {
         {deleteError ? <ErrorLine>Delete failed: {String(deleteError)}</ErrorLine> : null}
       </Stack>
       <ConfirmDialog
-        open={deleteState.matches('confirming') || deleteState.matches('sending')}
+        open={deleteState.matches('confirming') || deleteState.matches('running')}
         title="Delete task?"
         confirmLabel="Delete"
         onConfirm={() => deleteSend({ type: 'CONFIRM' })}
