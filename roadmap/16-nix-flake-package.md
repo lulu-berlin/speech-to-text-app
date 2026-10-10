@@ -1,7 +1,7 @@
 # 16 — Nix flake package
 
 Status: spec-approved
-Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md), [17](17-branding-stenographer-animation.md), [21](21-frontend-backend-end-to-end.md)
+Depends on: [02](../docs/specs/repo-skeleton-and-conventions.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md), [17](../docs/specs/branding-stenographer-animation.md) (done), [21](21-frontend-backend-end-to-end.md)
 
 ## Goal
 
