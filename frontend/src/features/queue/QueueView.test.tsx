@@ -290,6 +290,30 @@ describe('the queue view upload flow', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('permits a drop in a real browser: dragOver is default-prevented, and dropping still enqueues', async () => {
+    const arrivals: string[] = [];
+    server.use(
+      http.post('/api/tasks', async ({ request }) => {
+        const body = await request.text();
+        arrivals.push(body.match(/Content-Type: ([^\r]+)/)?.[1] ?? '');
+        return HttpResponse.json(taskQueued, { status: 201 });
+      }),
+    );
+    renderQueue();
+    const dropZone = screen.getByRole('button', { name: /drop audio/i });
+
+    // A browser only permits a drop after a dragOver whose default is prevented (jsdom's
+    // synthetic drop skips that gate, which is why the other drop tests were green), and
+    // the zone asks for a copy drop.
+    const dragData = { dropEffect: 'none', files: [] };
+    expect(fireEvent.dragOver(dropZone, { dataTransfer: dragData })).toBe(false);
+    expect(dragData.dropEffect).toBe('copy');
+
+    const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
+    fireEvent.drop(dropZone, { dataTransfer: { files } });
+    await waitFor(() => expect(arrivals).toEqual(['audio/mpeg']));
+  });
 });
 
 describe('the queue list', () => {
@@ -675,8 +699,8 @@ describe('the queue reorder', () => {
     // error message is shown.
     await waitFor(() => expect(ordered).toEqual([[7, 5]]));
     await screen.findByText('Task 42 does not exist');
-    const rows = screen.getAllByRole('listitem');
-    expect(rows.map((row) => row.textContent)).toEqual([
+    const menuRows = screen.getAllByRole('listitem');
+    expect(menuRows.map((row) => row.textContent)).toEqual([
       expect.stringContaining('lecture.m4a'),
       expect.stringContaining('memo.wav'),
     ]);

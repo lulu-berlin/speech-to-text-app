@@ -286,6 +286,13 @@ export function QueueView() {
     enqueue(Array.from(event.dataTransfer.files));
   };
 
+  // A browser only permits a drop when the dragOver's default is prevented; the copy
+  // effect tells it to show the copy cursor over the zone.
+  const onDragOver = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
   const onPick = (event: ChangeEvent<HTMLInputElement>) => {
     enqueue(Array.from(event.target.files ?? []));
     // Allow picking the same file again: a file input does not fire change for a value
@@ -393,7 +400,12 @@ export function QueueView() {
             </Field>
           ) : null}
         </Stack>
-        <DropZone type="button" onClick={() => inputRef.current?.click()} onDrop={onDrop}>
+        <DropZone
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+        >
           Drop audio files here or click to choose
         </DropZone>
         <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
