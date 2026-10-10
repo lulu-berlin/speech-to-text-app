@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../app/App';
 import { lightTheme } from '../../shared/theme/theme';
 import { eventStreamResponse } from '../../shared/api/handlers';
-import { taskCanceled, taskFailed } from '../../shared/api/fixtures';
+import { taskCanceled, taskCompleted, taskFailed } from '../../shared/api/fixtures';
 import { server } from '../../test/server';
 
 function renderTranscript(taskId: string) {
@@ -90,7 +90,25 @@ describe('the transcript view', () => {
   });
 
   it('shows no player but a note when the task has no audio', async () => {
-    await renderTranscript('7'); // task 7 (QUEUED) has hasAudio false.
+    // Mock addition: a COMPLETED task with hasAudio false (a task failed/canceled before
+    // chunking may still be completed; the stock completed example has audio). The default
+    // snapshot's task 7 is QUEUED, which now shows "still in the queue" instead.
+    const completedWithoutAudio = { ...taskCompleted, id: 8, hasAudio: false };
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [completedWithoutAudio],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('8');
+
     expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
     expect(screen.getByText(/has no audio/i)).toBeInTheDocument();
   });
@@ -259,6 +277,21 @@ describe('the transcript view', () => {
     // The retried task leaves History (it is QUEUED) and the view navigates to /queue.
     expect(await screen.findByRole('heading', { name: 'Queue' })).toBeInTheDocument();
     expect(screen.queryByText('Not found')).not.toBeInTheDocument();
+  });
+
+  it('shows "still in the queue" for a pending task opened directly', async () => {
+    // task 5 is RUNNING and task 7 is QUEUED in the default snapshot.
+    await renderTranscript('5');
+
+    expect(await screen.findByText(/still in the queue/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /go to the queue/i })).toHaveAttribute(
+      'href',
+      '/queue',
+    );
+    // No transcript, downloads or player for a task that has not finished.
+    expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Download transcript/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
   });
 });
 
