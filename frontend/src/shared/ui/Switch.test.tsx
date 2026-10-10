@@ -23,7 +23,7 @@ describe('the switch', () => {
     const rootStyle = getComputedStyle(root);
     expect(rootStyle.width).toBe(px(lightTheme.sizes.switchWidth));
     expect(rootStyle.height).toBe(px(lightTheme.sizes.switchHeight));
-    expect(rootStyle.backgroundColor).toBe(asRgb(lightTheme.colors.border));
+    expect(rootStyle.backgroundColor).toBe(asRgb(lightTheme.colors.control));
     expect(rootStyle.justifyContent).toBe('flex-start');
     const thumb = required(root.firstElementChild);
     expect(getComputedStyle(thumb).width).toBe(px(lightTheme.sizes.switchThumb));

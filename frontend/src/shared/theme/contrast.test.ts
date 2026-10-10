@@ -41,4 +41,16 @@ describe.each([
       expect(contrast(colors.focusRing, color)).toBeGreaterThanOrEqual(AA_NON_TEXT);
     },
   );
+
+  // WCAG 1.4.11 for the controls: the unchecked Switch track, the Slider rail and the
+  // Slider thumb's border are `control`; the thumbs are `surfaceRaised`.
+  it('the switch and slider parts meet the non-text minimum against their surroundings', () => {
+    for (const surface of Object.values(surfaces)) {
+      expect(contrast(colors.control, surface)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    }
+    // The unchecked switch thumb on its track, the slider thumb on its rail.
+    expect(contrast(colors.surfaceRaised, colors.control)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    // The checked switch thumb, and the slider thumb over the filled range.
+    expect(contrast(colors.surfaceRaised, colors.accent)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  });
 });
