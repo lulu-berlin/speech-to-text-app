@@ -12,8 +12,11 @@ import io.ktor.server.routing.routing
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import stt.config.Config
+import stt.db.AudioRepository
 import stt.db.TaskRepository
 import java.io.ByteArrayInputStream
+import java.security.MessageDigest
+import java.util.HexFormat
 
 /**
  * The upload endpoint (item 12): a multipart POST /api/tasks with a `file` part and the optional form fields
@@ -24,6 +27,7 @@ import java.io.ByteArrayInputStream
  */
 fun Application.uploadRoutes(config: Config) {
     val tasks: TaskRepository by dependencies
+    val audio: AudioRepository by dependencies
     routing {
         post("/api/tasks") {
             var filename: String? = null
@@ -57,15 +61,31 @@ fun Application.uploadRoutes(config: Config) {
                 is UploadRequest.Either.Valid -> {
                     // A Valid request always carried a file part (UploadRequest rejects a missing one);
                     // the contract places a new upload at the end of the queue.
-                    val task =
-                        request.task.copy(
-                            createdAt = System.currentTimeMillis(),
-                            queuePosition = tasks.nextQueuePosition(),
+                    val bytes = upload!!
+                    val existingTaskId = audio.taskIdOfSha256(sha256Hex(bytes))
+                    if (existingTaskId != null) {
+                        call.respond(
+                            HttpStatusCode.Conflict,
+                            DuplicateAudioError(
+                                error = "duplicate-audio",
+                                message = "This file was already uploaded as task $existingTaskId",
+                                taskId = existingTaskId,
+                            ),
                         )
-                    val id = tasks.createFromUpload(task, ByteArrayInputStream(upload!!))
-                    call.respond(HttpStatusCode.Created, tasks.details(id)!!.toJson())
+                    } else {
+                        val task =
+                            request.task.copy(
+                                createdAt = System.currentTimeMillis(),
+                                queuePosition = tasks.nextQueuePosition(),
+                            )
+                        val id = tasks.createFromUpload(task, ByteArrayInputStream(bytes))
+                        call.respond(HttpStatusCode.Created, tasks.details(id)!!.toJson())
+                    }
                 }
             }
         }
     }
 }
+
+/** The lowercase hex SHA-256 of [bytes], the same digest the spool computes (UploadSpool). */
+private fun sha256Hex(bytes: ByteArray): String = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
