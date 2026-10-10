@@ -49,4 +49,34 @@ class ProcessingEngineRestartSpec :
                 }
             }
         }
+        given("a task that was chunked before the restart, whose original is gone") {
+            `when`("a new engine runs it") {
+                then("it resumes from its stored plan without the original") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val chunks = ChunkRepository(db)
+                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
+                        SegmentRepository(db).completeChunk(
+                            task,
+                            chunkIdx = 0,
+                            segments =
+                                listOf(
+                                    Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
+                                ),
+                        )
+                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(task)) }
+
+                        // The original is not needed: the plan is reused and the DONE chunk is not
+                        // transcribed again.
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe task
+
+                        statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
+                        fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-1.flac")
+                        chunks.findByTask(task).map { it.status } shouldBe listOf(ChunkStatus.DONE, ChunkStatus.DONE)
+                    }
+                }
+            }
+        }
     })
