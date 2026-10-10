@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { http } from 'msw';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../app/App';
@@ -100,5 +100,45 @@ describe('the history list', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     fireEvent.change(search, { target: { value: 'lecture' } });
     expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+
+  it('offers retry on failed and canceled tasks only; retrying calls the endpoint and the task leaves', async () => {
+    // Mock addition: the retry response is the retried task itself, now QUEUED (the stock
+    // handler answers task.queued.json, a different file), so the task leaves the list
+    // because of its status, not because its filename changed.
+    const retried: number[] = [];
+    server.use(
+      http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])),
+      http.post('/api/tasks/:id/retry', ({ params }) => {
+        const id = Number(params.id);
+        retried.push(id);
+        const task = historySnapshot.tasks.find((candidate) => candidate.id === id);
+        return HttpResponse.json({
+          ...task,
+          status: 'QUEUED',
+          phase: null,
+          error: null,
+          finishedAt: null,
+        });
+      }),
+    );
+    await renderHistory();
+
+    const rowOf = (filename: string) =>
+      screen.getAllByRole('listitem').find((row) => row.textContent?.includes(filename))!;
+
+    // task-transitions.json allows retry from FAILED and CANCELED, not from COMPLETED.
+    expect(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(within(rowOf('lecture.m4a')).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(
+      within(rowOf('interview.mp3')).queryByRole('button', { name: 'Retry' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' }));
+
+    // POST /api/tasks/4/retry was sent, and the now-QUEUED task leaves the history list.
+    await waitFor(() => expect(screen.queryByText('call.ogg')).not.toBeInTheDocument());
+    expect(retried).toEqual([4]);
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 });

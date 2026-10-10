@@ -6,8 +6,11 @@ import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { Task } from '../../shared/api/types';
+import { isAllowedCommand } from '../../shared/state/transitions';
+import { Button } from '../../shared/ui/Button';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
+import { useTaskCommand } from './useTaskCommand';
 
 // The finished statuses the history list shows; pending and active tasks stay in the queue.
 const FINISHED: ReadonlySet<Task['status']> = new Set(['COMPLETED', 'FAILED', 'CANCELED']);
@@ -45,6 +48,7 @@ const Controls = styled(Row)`
 
 export function HistoryView() {
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
+  const runCommand = useTaskCommand();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -89,15 +93,22 @@ export function HistoryView() {
         <List>
           {finished.map((task) => (
             <ListRow key={task.id} variant="card">
-              <TaskLink to={`/history/${task.id}`}>
-                <Stack gap="xs">
-                  <Row gap="sm">
+              <Stack gap="xs">
+                <Row gap="sm">
+                  <TaskLink to={`/history/${task.id}`}>
                     <Filename>{task.filename}</Filename>
-                    <StatusBadge status={task.status} />
+                  </TaskLink>
+                  <StatusBadge status={task.status} />
+                </Row>
+                {task.error !== null ? <Meta>{task.error}</Meta> : null}
+                {isAllowedCommand('retry', task.status) ? (
+                  <Row gap="sm">
+                    <Button variant="secondary" onClick={() => runCommand('retry', task)}>
+                      Retry
+                    </Button>
                   </Row>
-                  {task.error !== null ? <Meta>{task.error}</Meta> : null}
-                </Stack>
-              </TaskLink>
+                ) : null}
+              </Stack>
             </ListRow>
           ))}
         </List>
