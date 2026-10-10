@@ -1,6 +1,7 @@
 package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,7 @@ import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.queue.TaskStatus
 import java.nio.file.Files
+import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineRetrySpec :
     BehaviorSpec({
@@ -71,6 +73,31 @@ class ProcessingEngineRetrySpec :
                         fixture.completed.receive() shouldBe failed
                         fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-0.flac", "chunk-1.flac")
                         chunks.findByTask(failed).map { it.status } shouldBe listOf(ChunkStatus.DONE, ChunkStatus.DONE)
+                    }
+                }
+            }
+        }
+
+        given("a task that failed before chunking, whose original was kept for the retry") {
+            `when`("it is retried") {
+                then("it is chunked again from the kept original and completes") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        fixture.tasks.setStatus(task, TaskStatus.FAILED)
+                        val source = fixture.workDirectories.source(task)
+                        val chunks = ChunkRepository(db)
+                        Files.exists(source) shouldBe true
+                        chunks.findByTask(task).shouldBeEmpty()
+
+                        fixture.engine.start()
+                        fixture.engine.retryTask(task) shouldBe TaskCommandOutcome.Accepted
+                        pumpUntil(2.seconds) { statusOf(fixture, task) == TaskStatus.COMPLETED }
+
+                        statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
+                        fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-0.flac")
+                        chunks.findByTask(task).map { it.status } shouldBe listOf(ChunkStatus.DONE)
+                        Files.exists(source) shouldBe false
                     }
                 }
             }
