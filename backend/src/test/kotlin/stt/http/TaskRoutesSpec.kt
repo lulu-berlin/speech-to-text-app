@@ -42,6 +42,23 @@ class TaskRoutesSpec :
             }
         }
 
+        given("a request for a task with a non-numeric id") {
+            `when`("requesting /api/tasks/abc") {
+                then("404 is returned with a not-found error body") {
+                    testApplication {
+                        application { sttApp(testConfig()) }
+                        val response = client.get("/api/tasks/abc")
+                        response.status shouldBe HttpStatusCode.NotFound
+                        response.contentType()?.withoutParameters() shouldBe ContentType.Application.Json
+                        val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                        body shouldHaveShapeOf apiExample("error.json")
+                        body.getValue("error").jsonPrimitive.content shouldBe "not-found"
+                        body.getValue("message").jsonPrimitive.content shouldContain "abc"
+                    }
+                }
+            }
+        }
+
         given("a stored QUEUED task with its upload") {
             `when`("requesting it") {
                 then("200 is returned with the task") {
