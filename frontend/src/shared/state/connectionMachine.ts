@@ -3,12 +3,20 @@
 // stream drops, until the next snapshot. Server state is applied as received.
 import { assign, fromCallback, setup } from 'xstate';
 import { subscribeToEvents } from '../api/client';
-import type { Queue, StreamEvent, Task } from '../api/types';
+import type { Queue, StreamEvent, Task, TurnSpeaker } from '../api/types';
 import { isAllowedTransition } from './transitions';
+
+// The latest speakers event of a task (item 22): its effective speakers, and whether it was
+// a merge (or reset), after which a view showing the transcript reads /turns again.
+export interface SpeakerChange {
+  speakers: TurnSpeaker[];
+  merged: boolean;
+}
 
 export interface ConnectionContext {
   tasks: Task[];
   queue: Queue | null;
+  speakerChanges: Record<number, SpeakerChange>;
 }
 
 export const connectionMachine = setup({
@@ -22,7 +30,7 @@ export const connectionMachine = setup({
   },
 }).createMachine({
   id: 'connection',
-  context: { tasks: [], queue: null },
+  context: { tasks: [], queue: null, speakerChanges: {} },
   invoke: { src: 'eventStream' },
   initial: 'connecting',
   // Every snapshot (first connection or reconnect) replaces the whole state.
@@ -87,6 +95,22 @@ export const connectionMachine = setup({
         'task-deleted': {
           actions: assign({
             tasks: ({ context, event }) => context.tasks.filter((task) => task.id !== event.id),
+          }),
+        },
+        'speakers-renamed': {
+          actions: assign({
+            speakerChanges: ({ context, event }) => ({
+              ...context.speakerChanges,
+              [event.id]: { speakers: event.speakers, merged: false },
+            }),
+          }),
+        },
+        'speakers-merged': {
+          actions: assign({
+            speakerChanges: ({ context, event }) => ({
+              ...context.speakerChanges,
+              [event.id]: { speakers: event.speakers, merged: true },
+            }),
           }),
         },
       },

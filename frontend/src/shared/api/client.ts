@@ -178,6 +178,16 @@ export function subscribeToEvents(
     listen<TaskProgress>('task-progress', (progress) => ({ type: 'task-progress', progress }));
     listen<Queue>('queue-updated', (queue) => ({ type: 'queue-updated', queue }));
     listen<{ id: number }>('task-deleted', ({ id }) => ({ type: 'task-deleted', id }));
+    listen<Speakers & { id: number }>('speakers-renamed', ({ id, speakers }) => ({
+      type: 'speakers-renamed',
+      id,
+      speakers,
+    }));
+    listen<Speakers & { id: number }>('speakers-merged', ({ id, speakers }) => ({
+      type: 'speakers-merged',
+      id,
+      speakers,
+    }));
     next.addEventListener('error', () => {
       const closed = next.readyState === EventSource.CLOSED;
       onEvent({ type: 'disconnected', closed });

@@ -174,6 +174,35 @@ export function TaskTranscriptView() {
     };
   }, [id, task]);
 
+  // Item 22: the latest speakers event of this task. A rename brings the names (the turns
+  // stay as they are); a merge or a reset can join or split turns, so /turns is read again.
+  const speakerChange = ConnectionContext.useSelector((state) => state.context.speakerChanges[id]);
+  useEffect(() => {
+    if (speakerChange === undefined) {
+      return;
+    }
+    if (!speakerChange.merged) {
+      setTurns((previous) =>
+        previous === null ? previous : { ...previous, speakers: speakerChange.speakers },
+      );
+      return;
+    }
+    let cancelled = false;
+    getTurns(id)
+      .then((result) => {
+        if (!cancelled) {
+          setTurns(result);
+        }
+      })
+      .catch(() => {
+        /* A failed reload keeps the transcript as it was; the next event or visit reads it
+           again. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, speakerChange]);
+
   const theme = useTheme();
   const tints = theme.colors.speakerTints;
   const turnsBySpeaker = useMemo(() => {
