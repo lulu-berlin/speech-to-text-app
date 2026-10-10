@@ -23,6 +23,7 @@ import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Switch } from '../../shared/ui/Switch';
+import { TextButton } from '../../shared/ui/TextButton';
 import { StenographerAnimation } from '../../shared/brand/StenographerAnimation';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
@@ -90,18 +91,6 @@ const Select = styled.select`
 
 const NumberInput = styled.input`
   ${controlStyle}
-`;
-
-const AdvancedToggle = styled.button`
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-  border: none;
-  border-radius: ${(props) => props.theme.radii.button};
-  background: transparent;
-  color: ${(props) => props.theme.colors.accent};
-  font: inherit;
-  cursor: pointer;
-
-  ${focusRing}
 `;
 
 const DropZone = styled.button`
@@ -395,13 +384,12 @@ export function QueueView() {
               />
             </Field>
           ) : null}
-          <AdvancedToggle
-            type="button"
+          <TextButton
             aria-expanded={advanced.matches('open')}
             onClick={() => sendAdvanced({ type: 'TOGGLE' })}
           >
             Advanced
-          </AdvancedToggle>
+          </TextButton>
           {advanced.matches('open') ? (
             <Field label="Max speakers" htmlFor="max-speakers">
               <NumberInput
