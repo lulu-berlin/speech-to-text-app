@@ -54,6 +54,15 @@ export async function runTaskCommand(id: number, command: string): Promise<Task>
   return json<Task>(response);
 }
 
+// Item 12 contract: DELETE /api/tasks/{id} -> 204 without a body. Delete is not a status
+// transition, so it works on any task; an error body still becomes a typed ApiError.
+export async function deleteTask(id: number): Promise<void> {
+  const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  if (!response.ok) {
+    await json<never>(response); // throws the typed error
+  }
+}
+
 // Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when
 // the connection drops. EventSource retries a dropped connection by itself, but gives up
 // for good on an HTTP error, so this opens a new stream in that case. Returns a function
