@@ -23,6 +23,7 @@ import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Switch } from '../../shared/ui/Switch';
+import { StenographerAnimation } from '../../shared/brand/StenographerAnimation';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { toggleMachine } from '../../shared/state/toggleMachine';
@@ -115,6 +116,15 @@ const DropZone = styled.button`
   cursor: pointer;
 
   ${focusRing}
+`;
+
+// The drop zone's empty-state content (item 25): the mascot above the one line of
+// guidance, centred; the zone itself stays the action.
+const EmptyZoneContent = styled.span`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.sm};
 `;
 
 const RowStatus = styled.span`
@@ -219,6 +229,7 @@ function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
 export function QueueView() {
   const connection = ConnectionContext.useActorRef();
   const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
+  const live = ConnectionContext.useSelector((state) => state.value === 'live');
   const [language, setLanguage] = useState(languages.default);
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
   const [speakerCount, setSpeakerCount] = useState(2);
@@ -331,6 +342,10 @@ export function QueueView() {
       !tasks.some((task) => task.id === row.taskId),
   );
 
+  // The queue is empty once the snapshot has landed and nothing is pending or uploading;
+  // before that the shell's connecting region is the loading state (item 25).
+  const empty = live && pendingTasks.length === 0 && visibleRows.length === 0;
+
   return (
     <Page>
       <Stack gap="lg">
@@ -406,7 +421,14 @@ export function QueueView() {
           onDrop={onDrop}
           onDragOver={onDragOver}
         >
-          Drop audio files here or click to choose
+          {empty ? (
+            <EmptyZoneContent>
+              <StenographerAnimation size="empty" />
+              No tasks yet — drop audio files here, or click to choose them
+            </EmptyZoneContent>
+          ) : (
+            'Drop audio files here or click to choose'
+          )}
         </DropZone>
         <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
         {visibleRows.length > 0 ? (

@@ -18,7 +18,7 @@ import {
 } from '../../shared/api/fixtures';
 import { controllableEventStream } from '../../test/controllableEventStream';
 import { lightTheme } from '../../shared/theme/theme';
-import { required, styleRules } from '../../test/dom';
+import { px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
@@ -66,6 +66,7 @@ function stubRowLayout() {
     Element.prototype.getBoundingClientRect = original;
   };
 }
+
 
 describe('the queue view upload options', () => {
   it('offers the languages from docs/api/languages.json with auto as the default, and bounds speakers and max speakers to 1–20', () => {
@@ -307,6 +308,41 @@ describe('the queue view upload flow', () => {
     const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
     fireEvent.drop(dropZone, { dataTransfer: { files } });
     await waitFor(() => expect(arrivals).toEqual(['audio/mpeg']));
+  });
+});
+
+describe('the empty queue', () => {
+  it('turns the drop zone into the empty state once live with no tasks, and back to its compact form when a task arrives', async () => {
+    const events = controllableEventStream({ tasks: [], queue: { paused: false, taskIds: [] } });
+    const pick = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+
+    renderQueue();
+
+    // Before the snapshot the shell's connecting region is the loading state: the view
+    // does not claim yet that the queue is empty.
+    expect(screen.queryByText(/No tasks yet/)).not.toBeInTheDocument();
+
+    // Live with no tasks: the drop zone carries the one line of guidance and leads with
+    // the mascot at the empty-state size (decorative).
+    const zone = await screen.findByRole('button', {
+      name: 'No tasks yet — drop audio files here, or click to choose them',
+    });
+    const mascot = required(zone.querySelector('svg'));
+    expect(getComputedStyle(mascot).width).toBe(px(lightTheme.sizes.stenoEmpty));
+    expect(mascot).toHaveAttribute('aria-hidden', 'true');
+
+    // The zone itself is the primary action: clicking it opens the file picker.
+    fireEvent.click(zone);
+    expect(pick).toHaveBeenCalledTimes(1);
+
+    // A task arrives: the zone returns to its compact form, without the mascot.
+    events.send('task-updated', taskQueued);
+    events.send('queue-updated', { paused: false, taskIds: [taskQueued.id] });
+    const compact = await screen.findByRole('button', {
+      name: 'Drop audio files here or click to choose',
+    });
+    expect(compact.querySelector('svg')).toBeNull();
+    pick.mockRestore();
   });
 });
 
