@@ -1,7 +1,7 @@
-# 22 — Rename and merge a task's speakers
+# Rename and merge a task's speakers
 
-Status: in-review
-Depends on: [09](../docs/specs/diarization.md) (done), [10](../docs/specs/output-formats.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [15](../docs/specs/frontend-history-ui.md) (done)
+Status: done (roadmap item 22, merged 2026-10-10)
+Depends on: [09 — Diarization](diarization.md), [10 — Output formats](output-formats.md), [12 — HTTP API and SSE](http-api-and-sse.md), [15 — Frontend history UI](frontend-history-ui.md)
 
 ## Goal
 
@@ -9,15 +9,15 @@ Let the user give a finished transcription's speakers real names ("Speaker 1" �
 
 ## Already decided
 
-- [ADR 0028 — Speakers table; segments reference their speaker by `speaker_id`](../docs/decisions/0028-speakers-table-and-segment-speaker-id.md) (item 09):
+- [ADR 0028 — Speakers table; segments reference their speaker by `speaker_id`](../decisions/0028-speakers-table-and-segment-speaker-id.md) (item 09):
   - `speakers(task_id, speaker_id, speaker TEXT NOT NULL)`, one row per speaker of a task; segments reference it by `speaker_id`.
   - The app writes the initial name `"Speaker N"` (N = `speaker_id` + 1).
   - Naming: `speakerId` is the 0-based number, `speaker` only ever the name.
 - Item 09 (`storeSpeakers`): storing a task's speakers again replaces them. That happens only when diarization reruns before the task is COMPLETED, so a rename on a completed task cannot be lost. A COMPLETED task is never retried (item 11 retries FAILED/CANCELED only), so a merge is safe there too.
-- [ADR 0029 — Contract-first frontend](../docs/decisions/0029-contract-first-frontend-shared-api-examples.md): new endpoints and events extend item 12's contract and its `docs/api/` examples.
-- [ADR 0034 — Speaker labels are the stored names](../docs/decisions/0034-speaker-labels-are-stored-names.md): txt/srt/vtt already print the stored name, so a rename and a merge change the downloads with no work in item 10's renderers themselves.
+- [ADR 0029 — Contract-first frontend](../decisions/0029-contract-first-frontend-shared-api-examples.md): new endpoints and events extend item 12's contract and its `docs/api/` examples.
+- [ADR 0034 — Speaker labels are the stored names](../decisions/0034-speaker-labels-are-stored-names.md): txt/srt/vtt already print the stored name, so a rename and a merge change the downloads with no work in item 10's renderers themselves.
 - Item 12's contract: `GET /api/tasks/{id}/turns` returns `speakers` (`speakerId`, `speaker`) and turns that reference them by `speakerId`.
-- User decisions (2026-10-09): a name is trimmed, 1–40 characters, no control characters (amended 2026-10-10: the **client** trims; the API rejects a name with leading or trailing whitespace); two speakers of one task may **not** share a name; a "Reset name" action restores `"Speaker N"`; only COMPLETED tasks can be renamed or merged; **merging is part of this item** ([ADR 0028](../docs/decisions/0028-speakers-table-and-segment-speaker-id.md) made the speaker a table for exactly this); merging uses a **mapping, not a segment rewrite**; the transcript is edited through a **speakers panel**; a merge is confirmed in a dialog and can be undone with **"Reset all merges"**.
+- User decisions (2026-10-09): a name is trimmed, 1–40 characters, no control characters (amended 2026-10-10: the **client** trims; the API rejects a name with leading or trailing whitespace); two speakers of one task may **not** share a name; a "Reset name" action restores `"Speaker N"`; only COMPLETED tasks can be renamed or merged; **merging is part of this item** ([ADR 0028](../decisions/0028-speakers-table-and-segment-speaker-id.md) made the speaker a table for exactly this); merging uses a **mapping, not a segment rewrite**; the transcript is edited through a **speakers panel**; a merge is confirmed in a dialog and can be undone with **"Reset all merges"**.
 
 ## Proposal (approved 2026-10-09)
 
@@ -155,3 +155,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: item drafted at the user's request; the feature was announced in item 09's consultation (ADR 0028).
 - 2026-10-09: consultation answers approved: names trimmed, 1–40 characters, no control characters; duplicate names rejected; a "Reset name" action restores `"Speaker N"`; COMPLETED tasks only; **merging included**, as a group merge `{ group, into }`; made reversible with a **mapping table and no segment rewrite**, resolved in one place at read time; undo is **"Reset all merges"**; editing through a **speakers panel**. Test list not yet approved.
 - 2026-10-09: test list (15 items) approved by the user; `{"speaker": null}` confirmed as the name reset; status `spec-approved`.
+- 2026-10-10: merged into `main` (head `5a7305aa`) after the user approved the diff. The mapping design (speaker_merge, flat by re-chaining), the single read path (findDiarized; speakerTurns and the renderers untouched), the three endpoints and the two events landed as specified; 24/24 test-list items green (244/244 backend, 49/49 integration, 127/127 frontend). Spec and final test list moved here from `roadmap/22-speaker-rename.md`.

@@ -52,7 +52,7 @@ graph TD
   25 --> 21
   16 --> 19[19 Docker image and compose]
   21 --> 16
-  09 --> 22[22 speaker rename]
+  09 --> 22[22 speaker rename ✓]:::done
   12 --> 22
   15 --> 22
   09 --> 23[23 faster clustering ✓]:::done
@@ -94,7 +94,7 @@ graph TD
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | spec-approved | 16 |
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | spec-approved | 12, 13, 14, 15, 22, 25 |
-| [22 — Rename and merge a task's speakers](22-speaker-rename.md) | spec-approved | 09, 10, 12, 15 |
+| [22 — Rename and merge a task's speakers](../docs/specs/speaker-rename.md) | done | 09, 10, 12, 15 |
 | [23 — Faster speaker clustering](../docs/specs/faster-clustering.md) | done | 09 |
 | [24 — Design system: tokens and primitives](../docs/specs/design-system.md) | done | 13 |
 | [25 — Visual polish pass](25-visual-polish.md) | spec-approved | 24, 14, 15 |
