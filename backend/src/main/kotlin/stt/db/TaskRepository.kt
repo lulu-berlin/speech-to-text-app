@@ -122,24 +122,7 @@ class TaskRepository(
                 .selectAll()
                 .where { TasksTable.id eq id }
                 .singleOrNull()
-                ?.let { row ->
-                    val lastSegmentEnd = SegmentsTable.endMs.max()
-                    TaskDetails(
-                        id = id,
-                        task = row.toTask(),
-                        sizeBytes = row[AudioTable.sizeBytes],
-                        hasAudio =
-                            !ChunkAudioTable
-                                .select(ChunkAudioTable.taskId)
-                                .where { ChunkAudioTable.taskId eq id }
-                                .empty(),
-                        transcribedUntilMs =
-                            SegmentsTable
-                                .select(lastSegmentEnd)
-                                .where { SegmentsTable.taskId eq id }
-                                .single()[lastSegmentEnd],
-                    )
-                }
+                ?.toDetails()
         }
 
     /** All tasks in creation (id) order; reads only `tasks`, never audio. */
@@ -149,6 +132,20 @@ class TaskRepository(
                 .selectAll()
                 .orderBy(TasksTable.id)
                 .map { it.toStoredTask() }
+        }
+
+    /**
+     * Every task with the facts the API reports beside its row ([TaskDetails]), read in one transaction so
+     * the list is one consistent snapshot. Item 12's list route orders the result (pending tasks in queue
+     * order, then finished tasks newest `finishedAt` first).
+     */
+    suspend fun listDetails(): List<TaskDetails> =
+        db.readTransaction {
+            TasksTable
+                .join(AudioTable, JoinType.INNER, TasksTable.id, AudioTable.taskId)
+                .selectAll()
+                .map { row -> row.toDetails() }
+                .sortedWith(ListOrder)
         }
 
     /**
@@ -433,6 +430,27 @@ internal fun JdbcTransaction.insertTaskRow(task: Task): Long =
 
 private fun ResultRow.toStoredTask() = StoredTask(this[TasksTable.id], toTask())
 
+/** The row (joined with `audio`) as the API's task view ([TaskDetails]). */
+private fun ResultRow.toDetails(): TaskDetails {
+    val id = this[TasksTable.id]
+    val lastSegmentEnd = SegmentsTable.endMs.max()
+    return TaskDetails(
+        id = id,
+        task = toTask(),
+        sizeBytes = this[AudioTable.sizeBytes],
+        hasAudio =
+            !ChunkAudioTable
+                .select(ChunkAudioTable.taskId)
+                .where { ChunkAudioTable.taskId eq id }
+                .empty(),
+        transcribedUntilMs =
+            SegmentsTable
+                .select(lastSegmentEnd)
+                .where { SegmentsTable.taskId eq id }
+                .single()[lastSegmentEnd],
+    )
+}
+
 private fun ResultRow.toTask() =
     Task(
         originalFilename = this[TasksTable.originalFilename],
@@ -457,6 +475,27 @@ private fun ResultRow.toTask() =
 
 /** The non-terminal statuses: the queue holds exactly these. */
 private val pendingStatuses = listOf(TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.PAUSED)
+
+/**
+ * The item 12 list order: pending tasks (`QUEUED`, `RUNNING`, `PAUSED`) first, in queue order (ties by id),
+ * then finished tasks newest `finishedAt` first. Pending tasks have no `finishedAt`, so a descending sort of
+ * it must treat null as "oldest" — for them the pending-first key already decided the order.
+ */
+private val ListOrder: Comparator<TaskDetails> =
+    Comparator { a: TaskDetails, b: TaskDetails ->
+        val aPending = a.task.status in pendingStatuses
+        val bPending = b.task.status in pendingStatuses
+        when {
+            aPending != bPending -> if (aPending) -1 else 1
+
+            // Both pending: queue order, ties by id.
+            aPending -> compareValuesBy(a, b) { it.task.queuePosition }.let { if (it != 0) it else a.id.compareTo(b.id) }
+
+            // Both finished: newest `finishedAt` first; a null `finishedAt` counts as oldest (it only
+            // occurs outside the pending set), achieved by ascending on the inverted value.
+            else -> compareValuesBy(a, b) { Long.MAX_VALUE - (it.task.finishedAt ?: Long.MAX_VALUE) }
+        }
+    }
 
 /** The statuses a task can be cancelled from (item 04's table: QUEUED, RUNNING, PAUSED). */
 private val cancellableFrom = TaskStatus.entries.filter { it.canTransitionTo(TaskStatus.CANCELED) }
