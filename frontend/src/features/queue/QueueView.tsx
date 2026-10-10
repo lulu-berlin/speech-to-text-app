@@ -15,6 +15,7 @@ import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
+import { toggleMachine } from '../../shared/state/toggleMachine';
 import { RowContent, RowName } from './rowParts';
 import { TaskRow } from './TaskRow';
 import { uploadBatchMachine } from './uploadBatchMachine';
@@ -178,7 +179,7 @@ export function QueueView() {
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
   const [speakerCount, setSpeakerCount] = useState(2);
   const [maxSpeakers, setMaxSpeakers] = useState(8);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [advanced, sendAdvanced] = useMachine(toggleMachine);
   const [upload, sendToUploader] = useMachine(uploadBatchMachine);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -268,12 +269,12 @@ export function QueueView() {
           ) : null}
           <AdvancedToggle
             type="button"
-            aria-expanded={advancedOpen}
-            onClick={() => setAdvancedOpen((open) => !open)}
+            aria-expanded={advanced.matches('open')}
+            onClick={() => sendAdvanced({ type: 'TOGGLE' })}
           >
             Advanced
           </AdvancedToggle>
-          {advancedOpen ? (
+          {advanced.matches('open') ? (
             <Field label="Max speakers" htmlFor="max-speakers">
               <NumberInput
                 id="max-speakers"
