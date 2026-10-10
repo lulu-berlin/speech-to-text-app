@@ -104,7 +104,7 @@ class SegmentRepository(
             SpeakersTable.batchInsert(speakerIds.distinct().sorted(), shouldReturnGeneratedValues = false) { speakerId ->
                 this[SpeakersTable.taskId] = taskId
                 this[SpeakersTable.speakerId] = speakerId
-                this[SpeakersTable.speaker] = "Speaker ${speakerId + 1}"
+                this[SpeakersTable.speaker] = defaultSpeakerName(speakerId)
             }
             segmentIds.zip(speakerIds).forEach { (segmentId, speakerId) ->
                 SegmentsTable.update({ SegmentsTable.id eq segmentId }) { it[SegmentsTable.speakerId] = speakerId }

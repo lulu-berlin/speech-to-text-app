@@ -10,6 +10,7 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
+import stt.db.defaultSpeakerName
 
 /**
  * Renaming a task's speakers (item 22): `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }`
@@ -34,7 +35,7 @@ fun Application.speakerRoutes() {
                     "speaker must be 1–$MAX_SPEAKER_NAME characters, without leading or trailing whitespace or control characters",
                 )
             }
-            val name = requested ?: "Speaker ${speakerId + 1}"
+            val name = requested ?: defaultSpeakerName(speakerId)
             when (val outcome = segments.renameSpeaker(id, speakerId, name)) {
                 RenameOutcome.Renamed -> {
                     call.respond(SpeakersJson(segments.findSpeakers(id).map { SpeakerJson(it.speakerId, it.speaker) }))
