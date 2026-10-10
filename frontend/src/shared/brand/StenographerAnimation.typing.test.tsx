@@ -11,7 +11,10 @@ import { StenographerAnimation } from './StenographerAnimation';
 function restingRule(): CSSStyleRule | undefined {
   return styleRules()
     .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-    .find((rule) => rule.selectorText.endsWith(' *') && rule.cssText.includes('animation: none'));
+    .find(
+      (rule) =>
+        rule.selectorText.endsWith(' *') && rule.cssText.includes('animation: none !important'),
+    );
 }
 
 describe('the stenographer typing state', () => {
@@ -23,19 +26,13 @@ describe('the stenographer typing state', () => {
 
     const resting = renderThemed(<StenographerAnimation typing={false} />);
     const rules = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
-    // The resting gate freezes every element and comes after the animation rules, so it
-    // wins the cascade.
+    // The resting gate freezes every element and must be `!important`: a plain `.cls *`
+    // (0,1,0) loses the cascade to the animation rules (e.g. `.cls .keys rect`, 0,2,1),
+    // which real browsers obey but jsdom's cascade does not — so the assertion pins the
+    // guard itself, the part that makes the freeze hold everywhere.
     const rest = restingRule();
     expect(rest).toBeDefined();
-    expect(rest!.cssText).toContain('animation: none');
-    const flashIndex = rules.findIndex(
-      (rule) =>
-        rule.selectorText.includes('.keys rect') &&
-        rule.style.animation !== '' &&
-        rule.style.animation !== 'none',
-    );
-    const restingIndex = rules.indexOf(rest!);
-    expect(restingIndex).toBeGreaterThan(flashIndex);
+    expect(rest!.cssText).toContain('animation: none !important');
     // The words stay visible at rest; the sound waves stay hidden (no rule makes them
     // visible, and the explicit resting rule keeps them at their hidden base).
     expect(

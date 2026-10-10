@@ -204,13 +204,17 @@ const StyledSvg = styled.svg<{ $size: StenographerSize; $typing: boolean }>`
 
   // Resting (nothing running): the whole piece freezes on the static pose — the typing
   // stops and the idle motion is off, so the pause reads clearly; the sound waves are
-  // hidden and the finished words stay visible (user, 2026-10-10: no idle at rest).
+  // hidden and the finished words stay visible. The freeze needs !important: a plain
+  // .cls * (0,1,0) loses the cascade to the animation rules like .cls .keys rect
+  // (0,2,1), so in a real browser the actions would keep running (found 2026-10-10 while
+  // the user watched a resting mascot that still typed). Same guard as the
+  // reduced-motion fallback below.
   ${(props) =>
     props.$typing
       ? ''
       : css`
           & * {
-            animation: none;
+            animation: none !important;
           }
           & .word {
             opacity: 1;
