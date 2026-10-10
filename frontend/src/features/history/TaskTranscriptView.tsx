@@ -21,6 +21,7 @@ import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { deleteTaskMachine } from './deleteTaskMachine';
 import { formatTaskMeta } from './formatTask';
 import { useTaskCommand } from './useTaskCommand';
+import { AudioPlayer } from './AudioPlayer';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
 import { SpeakersPanel } from './SpeakersPanel';
@@ -311,22 +312,19 @@ const runCommand = useTaskCommand();
     );
   }
 
-  // The audio block is shared: the player when the task has audio, otherwise the note.
+  // The audio block is shared: the themed player when the task has audio, otherwise the
+  // note.
   const audioBlock = task.hasAudio ? (
-    <audio
-      ref={audioRef}
-      controls
+    <AudioPlayer
       src={`/api/tasks/${id}/audio`}
-      aria-label={`Audio for ${task.filename}`}
-      onTimeUpdate={(event) =>
-        playbackSend({ type: 'PLAYHEAD', ms: event.currentTarget.currentTime * 1000 })
-      }
-      onSeeked={(event) =>
-        playbackSend({ type: 'PLAYHEAD', ms: event.currentTarget.currentTime * 1000 })
-      }
-    >
-      Your browser does not support the audio element.
-    </audio>
+      filename={task.filename}
+      durationMs={task.durationMs ?? 0}
+      currentTimeMs={currentTimeMs}
+      playing={playback.matches('playing')}
+      audioRef={audioRef}
+      onPlayhead={(ms) => playbackSend({ type: 'PLAYHEAD', ms })}
+      onPlayingChange={(playing) => playbackSend({ type: playing ? 'PLAYED' : 'PAUSED' })}
+    />
   ) : (
     <NoAudioNote>This task has no audio because it ended before chunking.</NoAudioNote>
   );

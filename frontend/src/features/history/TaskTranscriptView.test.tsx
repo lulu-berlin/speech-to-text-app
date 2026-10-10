@@ -53,8 +53,10 @@ describe('the transcript view', () => {
     expect(getComputedStyle(speakerOne).color).toBe(asRgb(lightTheme.colors.speakerTints[0]!));
     expect(getComputedStyle(speakerTwo).color).toBe(asRgb(lightTheme.colors.speakerTints[1]!));
 
-    // A turn's timestamp is shown (as a time of day label).
-    expect(screen.getByText(/00:00/)).toBeInTheDocument();
+    // A turn's timestamp is shown (as a time of day label), in the transcript itself (the
+    // player's time label also reads 00:00).
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    expect(within(region).getByText(/00:00/)).toBeInTheDocument();
   });
 
   it('shows a speakers-off transcript without speaker labels', async () => {
@@ -83,7 +85,9 @@ describe('the transcript view', () => {
     // No speaker name is shown; the timestamps still are.
     expect(screen.queryByText('Speaker 1')).not.toBeInTheDocument();
     expect(screen.queryByText(/Speaker/)).not.toBeInTheDocument();
-    expect(screen.getByText(/00:00/)).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Transcript' })).getByText(/00:00/),
+    ).toBeInTheDocument();
   });
 
   it('links each download button to the transcript in its format', async () => {
@@ -682,6 +686,65 @@ describe('the transcript header block', () => {
     expect(heading.nextElementSibling).toBe(meta);
     expect(getComputedStyle(meta).color).toBe(asRgb(lightTheme.colors.textMuted));
     expect(screen.queryByRole('heading', { name: 'Transcript' })).not.toBeInTheDocument();
+  });
+});
+
+describe('the themed player', () => {
+  it('plays and pauses with an icon button, seeks with the Slider, shows the current and total time, and the highlight follows without native controls', async () => {
+    // durationMs 1185000 -> total "19:45" and a seek bar of 1185 seconds.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskCompleted, id: 3, durationMs: 1185000 }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('3');
+    await screen.findByText('Good morning.');
+
+    // The audio element stays (it plays and reports the playhead) but shows no native
+    // controls; the themed player is a group on the surface fill.
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    expect(audio).not.toHaveAttribute('controls');
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    expect(getComputedStyle(player).backgroundColor).toBe(asRgb(lightTheme.colors.surface));
+
+    // Play/pause is an icon button that follows the audio element's own events.
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    expect(play).toHaveBeenCalledTimes(1);
+    fireEvent(audio, new Event('play'));
+    fireEvent.click(within(player).getByRole('button', { name: 'Pause' }));
+    expect(pause).toHaveBeenCalledTimes(1);
+    fireEvent(audio, new Event('pause'));
+    expect(within(player).getByRole('button', { name: 'Play' })).toBeInTheDocument();
+
+    // The seek bar is item 24's Slider in seconds; the labels read current / total, muted.
+    const seek = within(player).getByRole('slider', { name: 'Seek' });
+    expect(seek).toHaveAttribute('aria-valuemax', '1185');
+    expect(within(player).getByText('00:00 / 19:45')).toBeInTheDocument();
+    audio.currentTime = 6.0; // 6000 ms, inside turn 2 [5800,9100)
+    fireEvent(audio, new Event('timeupdate'));
+    expect(seek).toHaveAttribute('aria-valuenow', '6');
+    const times = within(player).getByText('00:06 / 19:45');
+    expect(getComputedStyle(times).color).toBe(asRgb(lightTheme.colors.textMuted));
+    expect(document.querySelector('[data-active]')?.textContent).toContain('Happy to be here.');
+
+    // Seeking with the Slider moves the audio and the highlight: one second back is
+    // 5000 ms, inside [2400,5200).
+    fireEvent.keyDown(seek, { key: 'ArrowLeft' });
+    expect(audio.currentTime).toBe(5);
+    expect(document.querySelector('[data-active]')?.textContent).toContain(
+      'Thanks for joining us today.',
+    );
+    expect(within(player).getByText('00:05 / 19:45')).toBeInTheDocument();
   });
 });
 
