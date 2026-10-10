@@ -72,7 +72,7 @@ class ProcessingEngine internal constructor(
     private val transcription = ChunkTranscription(transcriber, segments)
 
     private val _events =
-        MutableSharedFlow<Event>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        MutableSharedFlow<Event>(extraBufferCapacity = EVENT_BUFFER, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** Every state change, in order, after it has been persisted. */
     val events: SharedFlow<Event> = _events.asSharedFlow()
