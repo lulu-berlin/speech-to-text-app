@@ -61,6 +61,19 @@ describe('the transcript view', () => {
       expect(link).toHaveAttribute('href', `/api/tasks/3/transcript?format=${format}`);
     }
   });
+
+  it('points the audio player at the task audio when the task has audio', async () => {
+    await renderTranscript('3'); // task 3 is COMPLETED with hasAudio true.
+    const player = screen.getByLabelText('Audio for interview.mp3');
+    expect(player.tagName).toBe('AUDIO');
+    expect(player).toHaveAttribute('src', '/api/tasks/3/audio');
+  });
+
+  it('shows no player but a note when the task has no audio', async () => {
+    await renderTranscript('7'); // task 7 (QUEUED) has hasAudio false.
+    expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
+    expect(screen.getByText(/has no audio/i)).toBeInTheDocument();
+  });
 });
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
