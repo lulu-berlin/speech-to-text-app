@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { ThemeProvider } from 'styled-components';
-import { required, styleRules } from '../../test/dom';
+import { asRgb, required, styleRules } from '../../test/dom';
 import { renderThemed } from '../../test/render';
-import { lightTheme } from '../theme/theme';
+import { darkTheme, lightTheme } from '../theme/theme';
 import { StenographerAnimation } from './StenographerAnimation';
-
-// The animation names the wrapper's rules reference (prefixed so they cannot collide).
-const ANIMATION_NAME = /stt-[a-z]+/g;
 
 describe('the stenographer animation', () => {
   it('scopes its rules to its own class: an outside element with a class like word or head is unaffected', () => {
@@ -80,9 +77,8 @@ describe('the stenographer animation', () => {
       );
     expect(animatedRules.length).toBeGreaterThanOrEqual(9);
     for (const rule of animatedRules) {
-      const names = [...rule.style.animation.matchAll(ANIMATION_NAME)].map((match) => match[0]);
-      expect(names.length).toBeGreaterThan(0);
-      expect(names.every((name) => keyframeNames.has(name))).toBe(true);
+      const name = rule.style.animation.split(' ')[0]!;
+      expect(keyframeNames.has(name)).toBe(true);
     }
 
     // The artwork's nth-child delays and per-class durations live on the elements now
@@ -186,5 +182,52 @@ describe('the stenographer animation', () => {
     expect(svg.getAttribute('aria-hidden')).toBe('true');
     expect(svg.hasAttribute('role')).toBe(false);
     expect(svg.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('resolves each theme key flash to its own theme: a light instance flashes with the light key tokens', () => {
+    const renderTheme = (theme: typeof lightTheme) =>
+      render(
+        <ThemeProvider theme={theme}>
+          <StenographerAnimation typing />
+        </ThemeProvider>,
+      );
+    const light = renderTheme(lightTheme);
+    const dark = renderTheme(darkTheme);
+
+    // The flash rule of each instance and the keyframes name it animates.
+    const flashOf = (svg: Element) => {
+      const classes = svg.getAttribute('class')!.split(' ');
+      const rule = classes
+        .flatMap((cls) =>
+          styleRules().filter(
+            (candidate): candidate is CSSStyleRule =>
+              candidate instanceof CSSStyleRule &&
+              candidate.selectorText === `.${cls} .keys rect` &&
+              candidate.style.animation !== 'none',
+          ),
+        )
+        .find(() => true);
+      expect(rule).toBeDefined();
+      const name = rule!.style.animation.split(' ')[0];
+      // The last rule under a keyframes name wins (cascade); jsdom cannot animate.
+      const frames = styleRules()
+        .filter((candidate): candidate is CSSKeyframesRule => candidate instanceof CSSKeyframesRule)
+        .filter((candidate) => candidate.name === name);
+      expect(frames.length).toBeGreaterThan(0);
+      const last = frames[frames.length - 1]!;
+      const key = last.cssRules[0] as CSSKeyframeRule;
+      const keyFlash = last.cssRules[1] as CSSKeyframeRule;
+      return { name, key: key.style.fill, keyFlash: keyFlash.style.fill };
+    };
+
+    const lightFlash = flashOf(required(light.container.querySelector('svg')));
+    const darkFlash = flashOf(required(dark.container.querySelector('svg')));
+
+    // Each instance animates its own keyframes (the review bug: one global name made
+    // the last theme's definition win for every instance).
+    expect(lightFlash.name).not.toBe(darkFlash.name);
+    expect(lightFlash.key).toBe(asRgb(lightTheme.illustration.key));
+    expect(lightFlash.keyFlash).toBe(asRgb(lightTheme.illustration.keyFlash));
+    expect(darkFlash.key).toBe(asRgb(darkTheme.illustration.key));
   });
 });

@@ -1,5 +1,7 @@
 import { useId } from 'react';
-import { css, styled, useTheme } from 'styled-components';
+import { css, keyframes, styled, useTheme } from 'styled-components';
+import type { Keyframes } from 'styled-components';
+import type { ThemeTokens } from '../theme/theme';
 
 // The artwork's style rules are nested under the component's own class (`&`), so the
 // generic class names (.word, .head) cannot reach elements outside the component.
@@ -28,155 +30,174 @@ const KEYS: [number, number, number, number, string][] = [
   [231, 241, 8, 4, '-0.7s'],
 ];
 
+// The artwork's nine animations as styled-components keyframes, so each gets a hashed,
+// collision-free name. The eight theme-free ones are defined once. The key flash carries
+// the theme's key tokens, so it is built per token set and memoized: one global keyframes
+// name would make the last theme's definition win for every instance (discovered in
+// review), while the hashed per-theme names keep each instance on its own colors. Item 17
+// relaxes the motion budget to allow fill: the key flash is paint only, the rest animate
+// transform/opacity. The artwork's px translates become percentages of the viewBox/fill-box
+// (the tokens hold no px), so the motion is unchanged.
+const wave = keyframes`
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+`;
+const bob = keyframes`
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+`;
+const blink = keyframes`
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+`;
+const drift = keyframes`
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-0.25%, 0.25%);
+  }
+`;
+const press = keyframes`
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  30% {
+    transform: translateY(-17%) scaleY(0.72);
+  }
+  45% {
+    transform: translateY(12%) scaleY(1.06);
+  }
+  55% {
+    transform: translateY(0) scaleY(1);
+  }
+`;
+const rise = keyframes`
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(14.5%, -26%);
+    opacity: 0;
+  }
+`;
+const hum = keyframes`
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+`;
+const twinkle = keyframes`
+  0%,
+  100% {
+    transform: scale(0.4);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+`;
+
+const flashCache = new WeakMap<ThemeTokens['illustration'], Keyframes>();
+
+function flashFor(illustration: ThemeTokens['illustration']): Keyframes {
+  let frames = flashCache.get(illustration);
+  if (frames === undefined) {
+    frames = keyframes`
+      0% {
+        fill: ${illustration.key};
+      }
+      15% {
+        fill: ${illustration.keyFlash};
+      }
+      30% {
+        fill: ${illustration.key};
+      }
+    `;
+    flashCache.set(illustration, frames);
+  }
+  return frames;
+}
+
 const StyledSvg = styled.svg<{ $size: StenographerSize; $typing: boolean }>`
   display: block;
   width: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
   height: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
 
-  // The artwork's nine animations, namespaced so their names cannot collide with the app.
-  // Item 17 relaxes the motion budget to allow fill: the key flash is paint only, the rest
-  // animate transform/opacity. The artwork's px translates become percentages of the
-  // viewBox/fill-box (the tokens hold no px), so the motion is unchanged.
-  @keyframes stt-wave {
-    0% {
-      opacity: 0;
-    }
-    30% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-  @keyframes stt-bob {
-    0%,
-    100% {
-      transform: rotate(-2deg);
-    }
-    50% {
-      transform: rotate(2deg);
-    }
-  }
-  @keyframes stt-blink {
-    0%,
-    92%,
-    100% {
-      transform: scaleY(1);
-    }
-    95% {
-      transform: scaleY(0.1);
-    }
-  }
-  @keyframes stt-drift {
-    0%,
-    100% {
-      transform: translate(0, 0);
-    }
-    50% {
-      transform: translate(-0.25%, 0.25%);
-    }
-  }
-  @keyframes stt-press {
-    0%,
-    100% {
-      transform: translateY(0) scaleY(1);
-    }
-    30% {
-      transform: translateY(-17%) scaleY(0.72);
-    }
-    45% {
-      transform: translateY(12%) scaleY(1.06);
-    }
-    55% {
-      transform: translateY(0) scaleY(1);
-    }
-  }
-  @keyframes stt-flash {
-    0% {
-      fill: ${(props) => props.theme.illustration.key};
-    }
-    15% {
-      fill: ${(props) => props.theme.illustration.keyFlash};
-    }
-    30% {
-      fill: ${(props) => props.theme.illustration.key};
-    }
-  }
-  @keyframes stt-rise {
-    0% {
-      transform: translate(0, 0);
-      opacity: 0;
-    }
-    15% {
-      opacity: 1;
-    }
-    100% {
-      transform: translate(14.5%, -26%);
-      opacity: 0;
-    }
-  }
-  @keyframes stt-hum {
-    0%,
-    100% {
-      opacity: 0.8;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
-  @keyframes stt-twinkle {
-    0%,
-    100% {
-      transform: scale(0.4);
-      opacity: 0.4;
-    }
-    50% {
-      transform: scale(1);
-      opacity: 1;
-    }
-  }
-
   & .wave {
     opacity: 0;
-    animation: stt-wave 1.5s ease-out infinite;
+    animation: ${wave} 1.5s ease-out infinite;
   }
   & .head {
     transform-box: view-box;
     transform-origin: 50% 42%;
-    animation: stt-bob 2.6s ease-in-out infinite;
+    animation: ${bob} 2.6s ease-in-out infinite;
   }
   & .eye {
     transform-box: fill-box;
     transform-origin: center;
-    animation: stt-blink 4s infinite;
+    animation: ${blink} 4s infinite;
   }
   & .arm-l {
-    animation: stt-drift 2.8s ease-in-out infinite;
+    animation: ${drift} 2.8s ease-in-out infinite;
   }
   & .arm-r {
-    animation: stt-drift 3.2s ease-in-out infinite;
+    animation: ${drift} 3.2s ease-in-out infinite;
   }
   & .f,
   & .thumb {
     transform-box: fill-box;
     transform-origin: 50% 0;
-    animation: stt-press 0.5s ease-in-out infinite;
+    animation: ${press} 0.5s ease-in-out infinite;
   }
   & .keys rect {
     fill: ${(props) => props.theme.illustration.key};
-    animation: stt-flash 0.9s steps(1) infinite;
+    // The key flash is theme-dependent, so the keyframes come from a function
+    // interpolation (styled-components requires the css helper to interpolate keyframes
+    // inside one), and each theme animates its own hashed keyframes.
+    animation: ${(props) => css`
+      ${flashFor(props.theme.illustration)} 0.9s steps(1) infinite
+    `};
   }
   & .word {
     opacity: 0;
-    animation: stt-rise 3s ease-out infinite;
+    animation: ${rise} 3s ease-out infinite;
   }
   & .lamp-glow {
-    animation: stt-hum 3s ease-in-out infinite;
+    animation: ${hum} 3s ease-in-out infinite;
   }
   & .spark {
     transform-box: fill-box;
     transform-origin: center;
-    animation: stt-twinkle 2.2s ease-in-out infinite;
+    animation: ${twinkle} 2.2s ease-in-out infinite;
   }
 
   // Resting (nothing running): the typing parts freeze on the static pose — the key

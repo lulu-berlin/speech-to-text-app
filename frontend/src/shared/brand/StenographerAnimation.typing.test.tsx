@@ -31,13 +31,21 @@ describe('the stenographer typing state', () => {
     expect(restingRule).toBeDefined();
     expect(restingRule!.cssText).toContain('animation: none');
     const flashIndex = rules.findIndex(
-      (rule) => rule.selectorText.includes('.keys rect') && rule.cssText.includes('stt-flash'),
+      (rule) =>
+        rule.selectorText.includes('.keys rect') &&
+        rule.style.animation !== '' &&
+        rule.style.animation !== 'none',
     );
     const restingIndex = rules.indexOf(restingRule!);
     expect(restingIndex).toBeGreaterThan(flashIndex);
     // The idle parts keep their animations; the words stay visible at rest.
     expect(
-      rules.some((rule) => rule.selectorText.includes('.head') && rule.cssText.includes('stt-bob')),
+      rules.some(
+        (rule) =>
+          rule.selectorText.includes('.head') &&
+          rule.style.animation !== '' &&
+          rule.style.animation !== 'none',
+      ),
     ).toBe(true);
     expect(
       rules.some(
