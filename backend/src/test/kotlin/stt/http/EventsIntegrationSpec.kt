@@ -59,6 +59,11 @@ class EventsIntegrationSpec :
                                 when (name) {
                                     "task-progress" -> {
                                         sawProgress = true
+                                        json shouldHaveShapeOf
+                                            listOf(
+                                                apiExample("task-progress.json"),
+                                                apiExample("task-progress.speakers-off.json"),
+                                            )
                                         json
                                             .getValue("transcriptionProgress")
                                             .jsonPrimitive.content

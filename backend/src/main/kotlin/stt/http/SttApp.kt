@@ -37,6 +37,7 @@ import java.io.File
  */
 fun Application.sttApp(config: Config) {
     install(ContentNegotiation) { json() }
+    internalErrorHandler()
     // The events bridge runs for the application's lifetime (ADR 0007/0038): a scope under the app's job.
     val eventsScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext[Job]) + Dispatchers.Default)
     dependencies {
