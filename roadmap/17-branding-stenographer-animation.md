@@ -1,6 +1,6 @@
 # 17 — Branding: stenographer animation
 
-Status: in-review
+Status: in-progress
 Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
 
 ## Goal
@@ -63,6 +63,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Two instances on one page do not collide: each renders its own gradient and clip-path ids
 - [x] The component's styles do not leak: an element outside it with a class like `word` or `head` is unaffected
 - [x] The favicon is the static stenographer artwork
+- [ ] (discovered, review 2026-10-10) Each theme's key flash uses its own colors: after a theme toggle, an instance's key-flash animation resolves to its own theme's `key`/`keyFlash` tokens
 
 ## Acceptance criteria
 
