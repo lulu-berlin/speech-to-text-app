@@ -1,14 +1,11 @@
 import type { LucideIcon } from 'lucide-react';
 import { MoreVertical, Pause, Play, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { useMachine } from '@xstate/react';
 import { styled } from 'styled-components';
-import { createActor } from 'xstate';
 import { ConnectionContext } from '../../app/ConnectionContext';
-import { deleteTask } from '../../shared/api/client';
 import type { Task, TaskPhase } from '../../shared/api/types';
-import { commandMachine } from '../../shared/state/commandMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
-import type { TaskCommand } from '../../shared/state/transitions';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
 import { DropdownMenu } from '../../shared/ui/DropdownMenu';
@@ -17,15 +14,8 @@ import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { Row, Stack } from '../../shared/ui/layout';
+import { rowActionMachine } from './rowActionMachine';
 import { RowContent, RowName } from './rowParts';
-
-// The per-task command controls, in display order. A control is offered only when
-// docs/api/task-transitions.json allows its command for the task's status.
-const CONTROLS: { command: TaskCommand; icon: LucideIcon; verb: string }[] = [
-  { command: 'pause', icon: Pause, verb: 'Pause' },
-  { command: 'resume', icon: Play, verb: 'Resume' },
-  { command: 'cancel', icon: X, verb: 'Cancel' },
-];
 
 // The phase a task is in, as a text label next to its status (none while queued).
 const PHASE_LABELS: Record<NonNullable<TaskPhase>, string> = {
@@ -39,19 +29,31 @@ const RowPhase = styled.span`
   font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
+// The per-task command controls, in display order. A control is offered only when
+// docs/api/task-transitions.json allows its command for the task's status.
+const CONTROLS: {
+  command: 'pause' | 'resume' | 'cancel';
+  icon: LucideIcon;
+  verb: string;
+}[] = [
+  { command: 'pause', icon: Pause, verb: 'Pause' },
+  { command: 'resume', icon: Play, verb: 'Resume' },
+  { command: 'cancel', icon: X, verb: 'Cancel' },
+];
+
 export interface TaskRowProps {
   task: Task;
 }
 
 // One pending task of the queue list: its filename, phase and status, its controls, and
 // the two progress bars (transcription; diarization by stage, hidden when it does not
-// apply). Each control runs one command machine (ADR 0031) and is offered only when
-// docs/api/task-transitions.json allows it; the task the command returns updates the
-// live state at once (the server's task-updated, when it arrives, carries the same task).
+// apply). Each action runs through the row's action machine (ADR 0038): a control is
+// offered only when docs/api/task-transitions.json allows it, a confirmation opens only
+// where work would be lost, and the action's result is applied to the live state at
+// once (the server's own events, when they arrive, carry the same task).
 export function TaskRow({ task }: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [action, send] = useMachine(rowActionMachine, { input: { taskId: task.id } });
 
   // Work would be lost when cancelling a running task or a paused task that has started;
   // a queued or never-started paused task is cancelled directly (its chunks were never
@@ -59,31 +61,20 @@ export function TaskRow({ task }: TaskRowProps) {
   const confirmCancel =
     task.status === 'RUNNING' || (task.status === 'PAUSED' && task.startedAt !== null);
 
-  const run = (command: TaskCommand) => {
-    const actor = createActor(commandMachine, {
-      input: { command, taskId: task.id, status: task.status },
-    });
-    actor.subscribe((snapshot) => {
-      if (snapshot.matches('done') && snapshot.context.task !== null) {
-        connection.send({ type: 'task-updated', task: snapshot.context.task });
-        actor.stop();
-      }
-    });
-    actor.start();
-    actor.send({ type: 'START' });
-  };
-
-  // Delete removes the task for good; on success the row leaves through the machine's
-  // task-deleted handling. On failure the dialog stays open so the user can retry.
-  const remove = async () => {
-    try {
-      await deleteTask(task.id);
-      setDeleteOpen(false);
-      connection.send({ type: 'task-deleted', id: task.id });
-    } catch (error) {
-      console.error('deleting task failed', error);
+  // A finished action updates the live state: a delete removes the task, any command
+  // applies its returned task (both are idempotent with the server's own events).
+  useEffect(() => {
+    if (!action.matches('done')) {
+      return;
     }
-  };
+    if (action.context.action === 'delete') {
+      connection.send({ type: 'task-deleted', id: action.context.taskId });
+    } else if (action.context.task !== null) {
+      connection.send({ type: 'task-updated', task: action.context.task });
+    }
+  }, [action, connection]);
+
+  const confirmingAction = action.matches('confirming') ? action.context.action : null;
 
   return (
     <ListRow>
@@ -99,20 +90,33 @@ export function TaskRow({ task }: TaskRowProps) {
                   key={command}
                   icon={icon}
                   label={`${verb} ${task.filename}`}
-                  onClick={() => {
-                    if (command === 'cancel' && confirmCancel) {
-                      setCancelOpen(true);
-                    } else {
-                      run(command);
-                    }
-                  }}
+                  onClick={() =>
+                    send({
+                      type: 'ACTIVATE',
+                      action: command,
+                      status: task.status,
+                      confirm: command === 'cancel' && confirmCancel,
+                    })
+                  }
                 />
               ),
             )}
             <DropdownMenu
               trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
               align="end"
-              items={[{ label: 'Delete', danger: true, onSelect: () => setDeleteOpen(true) }]}
+              items={[
+                {
+                  label: 'Delete',
+                  danger: true,
+                  onSelect: () =>
+                    send({
+                      type: 'ACTIVATE',
+                      action: 'delete',
+                      status: task.status,
+                      confirm: true,
+                    }),
+                },
+              ]}
             />
           </Row>
         </RowContent>
@@ -125,23 +129,20 @@ export function TaskRow({ task }: TaskRowProps) {
         ) : null}
       </Stack>
       <ConfirmDialog
-        open={cancelOpen}
+        open={confirmingAction === 'cancel'}
         title={`Cancel ${task.filename}?`}
         confirmLabel="Cancel task"
-        onConfirm={() => {
-          setCancelOpen(false);
-          run('cancel');
-        }}
-        onCancel={() => setCancelOpen(false)}
+        onConfirm={() => send({ type: 'CONFIRM' })}
+        onCancel={() => send({ type: 'DISMISS' })}
       >
         Stops the task; it can be retried from History.
       </ConfirmDialog>
       <ConfirmDialog
-        open={deleteOpen}
+        open={confirmingAction === 'delete'}
         title={`Delete ${task.filename}?`}
         confirmLabel="Delete task"
-        onConfirm={remove}
-        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => send({ type: 'CONFIRM' })}
+        onCancel={() => send({ type: 'DISMISS' })}
       >
         Removes the task, its transcript and audio for good.
       </ConfirmDialog>
