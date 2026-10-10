@@ -2,6 +2,7 @@ import * as Menu from '@radix-ui/react-dropdown-menu';
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
 import { floatingPanel } from './floatingPanel';
+import { focusRing } from './focusRing';
 
 export interface DropdownMenuItem {
   label: string;
@@ -28,6 +29,8 @@ const Item = styled(Menu.Item)<{ $danger: boolean }>`
   cursor: pointer;
   user-select: none;
   outline: none;
+
+  ${focusRing}
 
   &[data-highlighted] {
     background: ${(props) => props.theme.colors.surface};
