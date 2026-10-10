@@ -71,7 +71,13 @@ describe('the stenographer animation', () => {
     );
     const animatedRules = styleRules()
       .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-      .filter((rule) => rule.style.animation !== '');
+      .filter(
+        (rule) =>
+          rule.style.animation !== '' &&
+          // The resting gate and the media fallback freeze parts with `animation: none`;
+          // those rules are not "animated parts".
+          rule.style.animation !== 'none',
+      );
     expect(animatedRules.length).toBeGreaterThanOrEqual(9);
     for (const rule of animatedRules) {
       const names = [...rule.style.animation.matchAll(ANIMATION_NAME)].map((match) => match[0]);
