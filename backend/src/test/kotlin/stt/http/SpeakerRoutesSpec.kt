@@ -321,6 +321,35 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("cycle 8's task with speakers 0, 1 and 2, and an SSE client (queue paused, real server)") {
+            `when`("an invalid merge is requested, then {0, 1} is merged into 0") {
+                then("the stored merge emits speakers-merged with the effective speakers; the rejected one emits nothing") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+
+                    SseServer({ sttApp(stt.config.testConfig(dataDir)) }).use { server ->
+                        val events = server.connectEvents()
+                        events.readEvent().first shouldBe "snapshot"
+
+                        // Rejected (`into` outside the group): nothing stored, nothing emitted; the next frame is the
+                        // stored merge's, whose speakers can only come from reading the stored mapping.
+                        server.command("POST", "/api/tasks/$id/speakers/merge", """{ "group": [0, 1], "into": 2 }""") shouldBe 400
+                        server.command("POST", "/api/tasks/$id/speakers/merge", """{ "group": [0, 1], "into": 0 }""") shouldBe 200
+                        val (name, data) = events.readEvent()
+                        name shouldBe "speakers-merged"
+                        val merged = Json.parseToJsonElement(data).jsonObject
+                        merged shouldHaveShapeOf apiExample("speakers-merged.json")
+                        merged shouldBe
+                            Json.parseToJsonElement(
+                                """
+                                { "id": $id, "speakers": [ { "speakerId": 0, "speaker": "Speaker 1" }, { "speakerId": 2, "speaker": "Speaker 3" } ] }
+                                """.trimIndent(),
+                            )
+                    }
+                }
+            }
+        }
     })
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */

@@ -46,4 +46,10 @@ sealed interface Event {
         val id: Long,
         val speakers: List<Speaker>,
     ) : Event
+
+    /** The task's merges changed (a merge, or a reset of all merges); item 22's `speakers-merged` event. */
+    data class SpeakersMerged(
+        val id: Long,
+        val speakers: List<Speaker>,
+    ) : Event
 }

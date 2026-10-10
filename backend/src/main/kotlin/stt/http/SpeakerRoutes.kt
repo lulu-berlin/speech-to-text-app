@@ -64,7 +64,7 @@ fun Application.speakerRoutes() {
         post("/api/tasks/{id}/speakers/merge") {
             val id = call.parameters["id"]!!.toLong()
             val request = call.receive<MergeSpeakersRequest>()
-            when (val outcome = segments.mergeSpeakers(id, request.group, request.into)) {
+            when (val outcome = engine.mergeSpeakers(id, request.group, request.into)) {
                 MergeOutcome.Merged -> {
                     call.respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
                 }
