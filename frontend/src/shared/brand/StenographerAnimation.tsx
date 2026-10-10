@@ -252,7 +252,7 @@ export function StenographerAnimation({
   const theme = useTheme();
   const i = theme.illustration;
   // The component appears more than once on a page (header + empty states), so each
-  // instance's defs get a unique prefix from useId; the five names keep the artwork's
+  // instance's defs get a unique prefix from useId; the four names keep the artwork's
   // suffixes so the markup stays recognizable.
   const uid = useId().replace(/:/g, '');
   const defId = (name: string) => `${uid}-${name}`;
@@ -275,13 +275,11 @@ export function StenographerAnimation({
           <stop offset="0%" stopColor={i.lampGlow} stopOpacity={0.75} />
           <stop offset="100%" stopColor={i.lampGlow} stopOpacity={0} />
         </linearGradient>
-        <clipPath id={defId('circle')}>
-          <circle cx="200" cy="200" r="192" />
-        </clipPath>
       </defs>
 
-      {/* Background */}
-      <circle cx="200" cy="200" r="192" fill={`url(#${defId('bg')})`} />
+      {/* Background: a full-bleed field (the artwork's warm disc became a rectangle so
+          the frame has no transparent corners or clipped arcs) */}
+      <rect x="0" y="0" width="400" height="400" fill={`url(#${defId('bg')})`} />
       <g>
         <circle className="spark" cx="342" cy="78" r="6" fill={i.accentPurpleSoft} />
         <circle className="spark" cx="60" cy="200" r="5" fill={i.accentYellow} />
@@ -432,11 +430,10 @@ export function StenographerAnimation({
         className="lamp-glow"
         d="M282 214 L300 226 L312 290 L246 290 Z"
         fill={`url(#${defId('glow')})`}
-        clipPath={`url(#${defId('circle')})`}
       />
 
       {/* Desk */}
-      <g clipPath={`url(#${defId('circle')})`}>
+      <g>
         <rect x="0" y="290" width="400" height="120" fill={`url(#${defId('desk')})`} />
         <rect x="0" y="284" width="400" height="9" rx="2" fill={i.deskRim} />
       </g>

@@ -16,6 +16,10 @@
 - **Note for item 17**: the file's `<style>` block uses generic class names and a
   `* { animation: none !important; }` reduced-motion rule, and its 32 colors are literals.
   Both must be handled when it is inlined (see the item's Proposal).
+- **Deviation (2026-10-10, user)**: the app's inline component renders the scene on a
+  full-bleed field instead of the circular backdrop, so the header and empty-state frames
+  have no transparent corners or clipped arcs; the `circle` clip-path is gone with it. The
+  static derivatives below keep the original circular frame.
 
 ## `favicon.svg`
 
