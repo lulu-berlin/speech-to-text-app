@@ -63,72 +63,66 @@ export function HistoryView() {
       task.filename.toLowerCase().includes(search.trim().toLowerCase()),
   );
 
-  // Nothing has finished: once live the empty state, before that nothing (the shell's
-  // connecting region is the loading state); the search and filter have nothing to search.
-  if (allFinished.length === 0) {
-    return (
-      <Page>
-        <Stack gap="md">
-          <Title>History</Title>
-          {live ? (
-            <EmptyState title="No transcripts yet">
-              Finished tasks appear here — <QueueLink to="/queue">go to the queue</QueueLink> to add
-              audio
-            </EmptyState>
-          ) : null}
-        </Stack>
-      </Page>
-    );
-  }
-
+  // Under the heading: the search, the filter and the list once something has finished;
+  // otherwise, once live, the empty state (before that nothing — the shell's connecting
+  // region is the loading state).
   return (
     <Page>
       <Stack gap="md">
         <Title>History</Title>
-        <Controls gap="sm">
-          <label>
-            Search
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label="Search by filename"
-            />
-          </label>
-          <label>
-            Status
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              aria-label="Filter by status"
-            >
-              {FILTER_STATUSES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </Controls>
-        {finished.length > 0 ? (
-          <List>
-            {finished.map((task) => (
-              <HistoryRow key={task.id} task={task} />
-            ))}
-          </List>
-        ) : (
-          <NoMatches gap="sm">
-            <NoMatchesLine>No tasks match your search and filter.</NoMatchesLine>
-            <TextButton
-              onClick={() => {
-                setSearch('');
-                setStatusFilter('ALL');
-              }}
-            >
-              Clear filters
-            </TextButton>
-          </NoMatches>
-        )}
+        {allFinished.length > 0 ? (
+          <>
+            <Controls gap="sm">
+              <label>
+                Search
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  aria-label="Search by filename"
+                />
+              </label>
+              <label>
+                Status
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  aria-label="Filter by status"
+                >
+                  {FILTER_STATUSES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </Controls>
+            {finished.length > 0 ? (
+              <List>
+                {finished.map((task) => (
+                  <HistoryRow key={task.id} task={task} />
+                ))}
+              </List>
+            ) : (
+              <NoMatches gap="sm">
+                <NoMatchesLine>No tasks match your search and filter.</NoMatchesLine>
+                <TextButton
+                  onClick={() => {
+                    setSearch('');
+                    setStatusFilter('ALL');
+                  }}
+                >
+                  Clear filters
+                </TextButton>
+              </NoMatches>
+            )}
+          </>
+        ) : live ? (
+          <EmptyState title="No transcripts yet">
+            Finished tasks appear here — <QueueLink to="/queue">go to the queue</QueueLink> to add
+            audio
+          </EmptyState>
+        ) : null}
       </Stack>
     </Page>
   );
