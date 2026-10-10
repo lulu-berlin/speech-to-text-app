@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+.e2e-state.json
+test-results/
+playwright-report/
+screenshots/

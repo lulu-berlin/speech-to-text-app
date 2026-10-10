@@ -1,0 +1,6 @@
+# Runtime state and outputs of the e2e suite (roadmap item 21)
+.e2e-state.json
+test-results/
+playwright-report/
+screenshots/
+node_modules/
