@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
-import type { Segment, Task, TaskPhase, Turn } from '../../shared/api/types';
+import type { Segment, Task, TaskPhase } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
