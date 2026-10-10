@@ -1,0 +1,14 @@
+{
+  "name": "stt-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "prettier --check . && playwright test",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "prettier": "^3.9.9"
+  }
+}
