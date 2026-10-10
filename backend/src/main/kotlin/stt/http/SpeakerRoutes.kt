@@ -5,6 +5,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
@@ -28,7 +29,8 @@ import stt.engine.ProcessingEngine
  *
  * Merging (item 22): `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }`
  * folds every other member of the group into `into` through the merge mapping (no segment row is rewritten) and
- * answers `200` with the task's effective speakers.
+ * answers `200` with the task's effective speakers. `DELETE /api/tasks/{id}/speakers/merges` ("Reset all merges")
+ * removes every merge of the task and answers `200` with all its speakers; both publish `speakers-merged`.
  */
 fun Application.speakerRoutes() {
     val engine: ProcessingEngine by dependencies
@@ -73,6 +75,12 @@ fun Application.speakerRoutes() {
                     call.respondError(HttpStatusCode.BadRequest, "invalid-merge", outcome.reason)
                 }
             }
+        }
+
+        delete("/api/tasks/{id}/speakers/merges") {
+            val id = call.parameters["id"]!!.toLong()
+            engine.resetMerges(id)
+            call.respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
         }
     }
 }

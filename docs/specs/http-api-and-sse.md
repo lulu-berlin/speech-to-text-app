@@ -95,7 +95,7 @@ The JSON shapes the frontend builds against.
   - pause/resume/cancel/retry → `200` Task;
   - queue pause/resume/order → `200` Queue;
   - delete → `204` without a body;
-  - rename a speaker, merge speakers → `200` Speakers (item 22).
+  - rename a speaker, merge speakers, reset all merges → `200` Speakers (item 22).
 - **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
   - `speakers` are the task's **effective** speakers (item 22): its rows of the `speakers` table (ADR 0028) except those merged into another speaker, ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until renamed). A rename changes only the name here, never the turns, which reference their speaker by `speakerId`. A merged speaker's segments carry the `speakerId` of the speaker it was merged into, so its turns join that speaker's neighbouring turns.
   - `turns` are item 09's `speaker_turns`: consecutive segments with the same `speakerId` form one turn. A turn names its speaker only by `speakerId`; the UI shows the name from `speakers`.
@@ -106,6 +106,7 @@ The JSON shapes the frontend builds against.
 - **Speakers** (added 2026-10-10, item 22): `{ "speakers": [{ "speakerId", "speaker" }] }`, the task's speakers ordered by `speakerId` ([`docs/api/speakers.json`](../api/speakers.json)).
   - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is stored as sent; clients trim it first (user decision 2026-10-10). Leading or trailing whitespace, empty, longer than 40 characters, or a control character anywhere → `400 invalid-speaker-name`, nothing changes. A name another speaker of the task already has, compared case-insensitively and including speakers hidden by a merge → `409 duplicate-speaker-name`; a speaker's own current name is no duplicate (user decisions 2026-10-10). `{ "speaker": null }` resets the name to `"Speaker N"` (N = `speakerId` + 1), written by the server and checked for duplicates like any other name.
   - `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }` folds every other member of `group` into `into`, which keeps its id and name; the answer is the task's effective speakers. No segment row is rewritten: the merge is a mapping resolved when the transcript is read, so it can be undone. The downloads (txt, srt, vtt) label a merged speaker's segments with the survivor's name, in the survivor's turns. `into` not in `group`, a group naming fewer than two speakers, or a member (or `into`) already merged into another speaker → `400 invalid-merge`, nothing changes.
+  - `DELETE /api/tasks/{id}/speakers/merges` ("Reset all merges") removes every merge of the task; the answer is all its speakers again, each with the name its row kept, and the turns and downloads are as before the first merge.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task
@@ -113,7 +114,7 @@ The JSON shapes the frontend builds against.
   - `queue-updated` → Queue
   - `task-deleted` → `{ "id" }`
   - `speakers-renamed` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored rename or name reset, the task's speakers as stored; a rejected rename emits nothing
-  - `speakers-merged` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored merge, the task's effective speakers; a rejected merge emits nothing. Turns can join across a former boundary, so a client showing the task's transcript refetches `/turns`
+  - `speakers-merged` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored merge or a reset of all merges, the task's effective speakers; a rejected merge emits nothing. Turns can join or split along a former boundary, so a client showing the task's transcript refetches `/turns`
 - **Error codes:**
 
   | Status | Codes |

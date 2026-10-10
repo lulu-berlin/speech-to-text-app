@@ -177,6 +177,14 @@ class SegmentRepository(
         }
 
     /**
+     * Removes every merge of the task (item 22, "Reset all merges"): the task's `speaker_merge` rows go in one write
+     * transaction, so every speaker is effective again with the name its row kept, and the segments read as stored.
+     */
+    suspend fun resetMerges(taskId: Long) {
+        db.writeTransaction { SpeakerMergeTable.deleteWhere { SpeakerMergeTable.taskId eq taskId } }
+    }
+
+    /**
      * The task's transcript as readers see it (item 22, the one place the merge mapping is resolved): its segments
      * in (`chunk_idx`, `seq`) order with each merged `speakerId` replaced by the speaker it was merged into, and its
      * effective speakers, those not merged into another. One read transaction, so both agree with one mapping; the
