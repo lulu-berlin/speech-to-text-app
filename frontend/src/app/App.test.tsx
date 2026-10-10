@@ -8,7 +8,10 @@ import {
   snapshot as snapshotFixture,
   taskCompleted,
 } from '../shared/api/fixtures';
-import { asRgb, mediaRulesFor, px, required, stateRulesFor } from '../test/dom';
+import { asRgb, mediaRulesFor, px, required, stateRulesFor, styleRules } from '../test/dom';
+import { renderThemed } from '../test/render';
+import { Skeleton } from '../shared/ui/Skeleton';
+import { Spinner } from '../shared/ui/Spinner';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { controllableEventStream } from '../test/eventStream';
 import { server } from '../test/server';
@@ -368,5 +371,65 @@ describe('the phone layout', () => {
     renderAt('/history/3');
     const heading = await screen.findByRole('heading', { level: 2, name: 'interview.mp3' });
     expect(getComputedStyle(heading).overflowWrap).toBe('anywhere');
+  });
+});
+
+describe('reduced motion', () => {
+  it('runs no animation or transition outside a prefers-reduced-motion gate', async () => {
+    // A running task makes the header's mascot type, so its animation rules land in the
+    // sheet; the loading primitives' pulses are rendered alongside.
+    renderAt('/queue');
+    await screen.findByText('Live');
+    renderThemed(
+      <>
+        <Spinner />
+        <Skeleton />
+      </>,
+    );
+
+    // Every rule that declares an animation or transition, with the media block it sits in
+    // (jsdom cannot evaluate media queries, so the gating is asserted structurally).
+    const entries: { rule: CSSStyleRule; media: string | null }[] = [];
+    for (const top of styleRules()) {
+      if (top instanceof CSSMediaRule) {
+        for (const inner of [...top.cssRules]) {
+          if (inner instanceof CSSStyleRule) {
+            entries.push({ rule: inner, media: top.conditionText });
+          }
+        }
+      } else if (top instanceof CSSStyleRule) {
+        entries.push({ rule: top, media: null });
+      }
+    }
+    const motion = entries.filter(
+      ({ rule }) => rule.style.animation !== '' || rule.style.transition !== '',
+    );
+
+    // The reduce block's neutralizations (the Spinner and Skeleton pulses stop by name).
+    const reduced = new Set(
+      entries
+        .filter(
+          ({ rule, media }) =>
+            media === '(prefers-reduced-motion: reduce)' && rule.style.animation === 'none',
+        )
+        .map(({ rule }) => rule.selectorText),
+    );
+
+    for (const { rule, media } of motion) {
+      if (media === '(prefers-reduced-motion: no-preference)') {
+        continue;
+      }
+      // An ungated transition would run for everyone: none may exist.
+      expect(rule.style.transition).toBe('');
+      // An ungated animation must be one the reduce block stops by the same selector.
+      expect(reduced.has(rule.selectorText)).toBe(true);
+    }
+
+    // Not vacuous: some rule is gated or neutralized (the mascot's animations at least).
+    const gated = motion.filter(
+      ({ rule, media }) =>
+        media === '(prefers-reduced-motion: no-preference)' || reduced.has(rule.selectorText),
+    );
+    expect(gated.length).toBeGreaterThan(0);
   });
 });
