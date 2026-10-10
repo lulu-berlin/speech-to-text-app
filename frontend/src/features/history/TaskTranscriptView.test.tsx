@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -292,6 +292,58 @@ describe('the transcript view', () => {
     expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Download transcript/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
+  });
+
+  it('deletes from the status page with confirmation, then returns to the history list', async () => {
+    // Mock addition: the delete handler records the ids it receives (the stock handler
+    // answers 204 without recording).
+    const deleted: number[] = [];
+    server.use(
+      http.delete('/api/tasks/:id', ({ params }) => {
+        deleted.push(Number(params.id));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await renderTranscript('4'); // task 4 is FAILED.
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    let dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('call.ogg');
+
+    // Cancel sends nothing and keeps the page.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(deleted).toEqual([]);
+
+    // Confirming sends DELETE /api/tasks/4 and lands back on the history list.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
+    );
+    expect(deleted).toEqual([4]);
+  });
+
+  it('deletes from the transcript view with confirmation, then returns to the history list', async () => {
+    const deleted: number[] = [];
+    server.use(
+      http.delete('/api/tasks/:id', ({ params }) => {
+        deleted.push(Number(params.id));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await renderTranscript('3'); // task 3 is COMPLETED.
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('interview.mp3');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
+    );
+    expect(deleted).toEqual([3]);
   });
 });
 

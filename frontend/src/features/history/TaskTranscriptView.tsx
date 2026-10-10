@@ -4,13 +4,16 @@ import { Link, useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { getTurns } from '../../shared/api/client';
+import { ApiError } from '../../shared/api/types';
 import type { Segment, Task, TaskPhase, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
+import { deleteTaskMachine } from './deleteTaskMachine';
 import { useTaskCommand } from './useTaskCommand';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
@@ -94,10 +97,24 @@ export function TaskTranscriptView() {
   const id = Number(taskId);
   const navigate = useNavigate();
   const runCommand = useTaskCommand();
+  // The visible form of a command/delete refusal (the typed ApiError's message).
+  const errorText = (error: unknown) => (error instanceof ApiError ? error.message : String(error));
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const connection = ConnectionContext.useSelector((state) => state.value);
   const task = tasks.find((candidate) => candidate.id === id);
   const [turns, setTurns] = useState<Turns | null>(null);
+
+  // Delete from the detail view (status page and transcript), always confirmed (decision B,
+  // 2026-10-10): the flow lives in deleteTaskMachine; on success the view returns to the
+  // history list. The same machine serves both branches via one shared dialog.
+  const [deleteState, deleteSend, deleteActor] = useMachine(deleteTaskMachine, {
+    input: { taskId: id },
+  });
+  useEffect(() => {
+    if (deleteState.matches('done')) {
+      navigate('/history');
+    }
+  }, [deleteState, navigate]);
 
   useEffect(() => {
     // Only a completed task has turns (the backend answers 409 not-completed otherwise).
@@ -218,6 +235,20 @@ export function TaskTranscriptView() {
     );
   }
 
+  // The shared delete confirmation, opened by the Delete button in either branch. The
+  // dialog's open/closed lives in deleteTaskMachine (confirming/sending), not React state.
+  const deleteDialog = (
+    <ConfirmDialog
+      open={deleteState.matches('confirming') || deleteState.matches('sending')}
+      title="Delete task?"
+      confirmLabel="Delete"
+      onConfirm={() => deleteSend({ type: 'CONFIRM' })}
+      onCancel={() => deleteSend({ type: 'CANCEL' })}
+    >
+      {task.filename} and its transcript and audio will be deleted.
+    </ConfirmDialog>
+  );
+
   // A task still in the queue (or running) has no transcript: say so and link to the queue.
   if (PENDING.has(task.status)) {
     return (
@@ -277,11 +308,25 @@ export function TaskTranscriptView() {
             >
               Retry
             </Button>
-            <Button type="button" variant="danger">
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                if (deleteState.matches('failed') || deleteState.matches('done')) {
+                  deleteActor.stop();
+                  deleteActor.start();
+                }
+                deleteSend({ type: 'REQUEST' });
+              }}
+            >
               Delete
             </Button>
           </Row>
+          {deleteState.matches('failed') ? (
+            <Text>Delete failed: {errorText(deleteState.context.error)}</Text>
+          ) : null}
         </Stack>
+        {deleteDialog}
       </Page>
     );
   }
@@ -300,6 +345,19 @@ export function TaskTranscriptView() {
               {format.toUpperCase()}
             </DownloadLink>
           ))}
+          <Button
+            type="button"
+            variant="danger"
+            onClick={() => {
+              if (deleteState.matches('failed') || deleteState.matches('done')) {
+                deleteActor.stop();
+                deleteActor.start();
+              }
+              deleteSend({ type: 'REQUEST' });
+            }}
+          >
+            Delete
+          </Button>
         </Row>
         {audioBlock}
         {turnsBySpeaker === null ? (
@@ -346,6 +404,7 @@ export function TaskTranscriptView() {
           Back to playing position
         </Button>
       ) : null}
+      {deleteDialog}
     </Page>
   );
 }
