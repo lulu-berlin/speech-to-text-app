@@ -111,6 +111,25 @@ class SegmentRepository(
         }
     }
 
+    /**
+     * Renames one speaker of the task (item 22): updates only that speaker's row, so no segment row and no other
+     * speaker is touched. The caller (the rename route) has already validated the name and the speaker's existence;
+     * a missing row here fails loudly.
+     */
+    suspend fun renameSpeaker(
+        taskId: Long,
+        speakerId: Int,
+        name: String,
+    ) {
+        db.writeTransaction {
+            val updated =
+                SpeakersTable.update({ (SpeakersTable.taskId eq taskId) and (SpeakersTable.speakerId eq speakerId) }) {
+                    it[speaker] = name
+                }
+            check(updated == 1) { "Task $taskId has no speaker $speakerId" }
+        }
+    }
+
     /** The task's speakers in `speaker_id` order. */
     suspend fun findSpeakers(taskId: Long): List<Speaker> =
         db.readTransaction {
