@@ -539,6 +539,37 @@ describe('the transcript view', () => {
     expect(within(transcript).getAllByText('Alice')).toHaveLength(1);
     expect(within(panel).getByRole('button', { name: 'Reset all merges' })).toBeInTheDocument();
   });
+
+  it('resets a speaker name from the panel: "Speaker N" comes back in the field and every turn', async () => {
+    // Mock addition (item 22): the rename stores names like the backend; `null` stores the
+    // default "Speaker N" (N = speakerId + 1), which only the server writes.
+    const sent: unknown[] = [];
+    let stored = turnsFixture.speakers;
+    server.use(
+      http.put('/api/tasks/:id/speakers/:speakerId', async ({ params, request }) => {
+        const speakerId = Number(params.speakerId);
+        const body = (await request.json()) as { speaker: string | null };
+        sent.push(body);
+        const name = body.speaker ?? `Speaker ${speakerId + 1}`;
+        stored = stored.map((s) => (s.speakerId === speakerId ? { ...s, speaker: name } : s));
+        return HttpResponse.json({ speakers: stored });
+      }),
+    );
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json: speaker 0 speaks twice.
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    const field = within(panel).getByRole('textbox', { name: 'Name of speaker 1' });
+    fireEvent.change(field, { target: { value: 'Alice' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => expect(within(transcript).getAllByText('Alice')).toHaveLength(2));
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Reset name of speaker 1' }));
+
+    await waitFor(() => expect(within(transcript).getAllByText('Speaker 1')).toHaveLength(2));
+    expect(within(transcript).queryByText('Alice')).not.toBeInTheDocument();
+    expect(field).toHaveValue('Speaker 1');
+    expect(sent).toEqual([{ speaker: 'Alice' }, { speaker: null }]);
+  });
 });
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
