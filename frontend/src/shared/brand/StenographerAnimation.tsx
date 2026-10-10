@@ -6,20 +6,176 @@ const STENO_SIZE_TOKEN = { header: 'stenoHeader', empty: 'stenoEmpty' } as const
 
 export type StenographerSize = keyof typeof STENO_SIZE_TOKEN;
 
+// The machine's keys (x, y, width, height, flash delay). The artwork's nth-child delays
+// are data here, so the look does not depend on element order.
+const KEYS: [number, number, number, number, string][] = [
+  [164, 234, 7, 4, '-0.55s'],
+  [173, 234, 7, 4, '0s'],
+  [182, 234, 7, 4, '-0.2s'],
+  [191, 234, 7, 4, '-0.7s'],
+  [202, 234, 7, 4, '0s'],
+  [211, 234, 7, 4, '-0.2s'],
+  [220, 234, 7, 4, '-0.55s'],
+  [229, 234, 7, 4, '-0.7s'],
+  [161, 241, 8, 4, '-0.2s'],
+  [171, 241, 8, 4, '-0.55s'],
+  [181, 241, 8, 4, '0s'],
+  [191, 241, 8, 4, '-0.7s'],
+  [201, 241, 8, 4, '-0.55s'],
+  [211, 241, 8, 4, '0s'],
+  [221, 241, 8, 4, '-0.2s'],
+  [231, 241, 8, 4, '-0.7s'],
+];
+
 const StyledSvg = styled.svg<{ $size: StenographerSize }>`
   display: block;
   width: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
   height: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
 
+  // The artwork's nine animations, namespaced so their names cannot collide with the app.
+  // Item 17 relaxes the motion budget to allow fill: the key flash is paint only, the rest
+  // animate transform/opacity. The artwork's px translates become percentages of the
+  // viewBox/fill-box (the tokens hold no px), so the motion is unchanged.
+  @keyframes stt-wave {
+    0% {
+      opacity: 0;
+    }
+    30% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes stt-bob {
+    0%,
+    100% {
+      transform: rotate(-2deg);
+    }
+    50% {
+      transform: rotate(2deg);
+    }
+  }
+  @keyframes stt-blink {
+    0%,
+    92%,
+    100% {
+      transform: scaleY(1);
+    }
+    95% {
+      transform: scaleY(0.1);
+    }
+  }
+  @keyframes stt-drift {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+    50% {
+      transform: translate(-0.25%, 0.25%);
+    }
+  }
+  @keyframes stt-press {
+    0%,
+    100% {
+      transform: translateY(0) scaleY(1);
+    }
+    30% {
+      transform: translateY(-17%) scaleY(0.72);
+    }
+    45% {
+      transform: translateY(12%) scaleY(1.06);
+    }
+    55% {
+      transform: translateY(0) scaleY(1);
+    }
+  }
+  @keyframes stt-flash {
+    0% {
+      fill: ${(props) => props.theme.illustration.key};
+    }
+    15% {
+      fill: ${(props) => props.theme.illustration.keyFlash};
+    }
+    30% {
+      fill: ${(props) => props.theme.illustration.key};
+    }
+  }
+  @keyframes stt-rise {
+    0% {
+      transform: translate(0, 0);
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate(14.5%, -26%);
+      opacity: 0;
+    }
+  }
+  @keyframes stt-hum {
+    0%,
+    100% {
+      opacity: 0.8;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+  @keyframes stt-twinkle {
+    0%,
+    100% {
+      transform: scale(0.4);
+      opacity: 0.4;
+    }
+    50% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
   & .wave {
     opacity: 0;
+    animation: stt-wave 1.5s ease-out infinite;
   }
   & .head {
     transform-box: view-box;
     transform-origin: 50% 42%;
+    animation: stt-bob 2.6s ease-in-out infinite;
+  }
+  & .eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: stt-blink 4s infinite;
+  }
+  & .arm-l {
+    animation: stt-drift 2.8s ease-in-out infinite;
+  }
+  & .arm-r {
+    animation: stt-drift 3.2s ease-in-out infinite;
+  }
+  & .f,
+  & .thumb {
+    transform-box: fill-box;
+    transform-origin: 50% 0;
+    animation: stt-press 0.5s ease-in-out infinite;
+  }
+  & .keys rect {
+    fill: ${(props) => props.theme.illustration.key};
+    animation: stt-flash 0.9s steps(1) infinite;
   }
   & .word {
     opacity: 0;
+    animation: stt-rise 3s ease-out infinite;
+  }
+  & .lamp-glow {
+    animation: stt-hum 3s ease-in-out infinite;
+  }
+  & .spark {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: stt-twinkle 2.2s ease-in-out infinite;
   }
 `;
 
@@ -68,9 +224,24 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
 
       {/* Sound waves arriving at the headphones */}
       <g fill="none" strokeLinecap="round" strokeWidth={4}>
-        <path className="wave" d="M140 118 Q132 132 140 146" stroke={i.accentPurple} />
-        <path className="wave" d="M128 108 Q116 132 128 156" stroke={i.accentPink} />
-        <path className="wave" d="M116 98 Q100 132 116 166" stroke={i.accentYellow} />
+        <path
+          className="wave"
+          style={{ animationDelay: '0s' }}
+          d="M140 118 Q132 132 140 146"
+          stroke={i.accentPurple}
+        />
+        <path
+          className="wave"
+          style={{ animationDelay: '-1s' }}
+          d="M128 108 Q116 132 128 156"
+          stroke={i.accentPink}
+        />
+        <path
+          className="wave"
+          style={{ animationDelay: '-0.5s' }}
+          d="M116 98 Q100 132 116 166"
+          stroke={i.accentYellow}
+        />
       </g>
 
       {/* Chair */}
@@ -140,6 +311,7 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
       <g>
         <rect
           className="word"
+          style={{ animationDelay: '0s' }}
           x="226"
           y="226"
           width="18"
@@ -147,10 +319,29 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
           rx="3.5"
           fill={i.accentPurple}
         />
-        <rect className="word" x="228" y="226" width="12" height="7" rx="3.5" fill={i.accentPink} />
-        <rect className="word" x="224" y="226" width="22" height="7" rx="3.5" fill={i.accentTeal} />
         <rect
           className="word"
+          style={{ animationDelay: '0.6s' }}
+          x="228"
+          y="226"
+          width="12"
+          height="7"
+          rx="3.5"
+          fill={i.accentPink}
+        />
+        <rect
+          className="word"
+          style={{ animationDelay: '1.2s' }}
+          x="224"
+          y="226"
+          width="22"
+          height="7"
+          rx="3.5"
+          fill={i.accentTeal}
+        />
+        <rect
+          className="word"
+          style={{ animationDelay: '1.8s' }}
           x="229"
           y="226"
           width="10"
@@ -158,7 +349,16 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
           rx="3.5"
           fill={i.accentYellow}
         />
-        <rect className="word" x="226" y="226" width="16" height="7" rx="3.5" fill={i.accentBlue} />
+        <rect
+          className="word"
+          style={{ animationDelay: '2.4s' }}
+          x="226"
+          y="226"
+          width="16"
+          height="7"
+          rx="3.5"
+          fill={i.accentBlue}
+        />
       </g>
 
       {/* Lamp light */}
@@ -203,25 +403,16 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
       <rect x="166" y="257" width="68" height="3" rx="1.5" fill={i.machineAccent} opacity={0.8} />
       <path d="M161 230 L239 230 L246 248 L154 248 Z" fill={i.machineTop} />
       <g className="keys">
-        {[
-          [164, 234, 7, 4],
-          [173, 234, 7, 4],
-          [182, 234, 7, 4],
-          [191, 234, 7, 4],
-          [202, 234, 7, 4],
-          [211, 234, 7, 4],
-          [220, 234, 7, 4],
-          [229, 234, 7, 4],
-          [161, 241, 8, 4],
-          [171, 241, 8, 4],
-          [181, 241, 8, 4],
-          [191, 241, 8, 4],
-          [201, 241, 8, 4],
-          [211, 241, 8, 4],
-          [221, 241, 8, 4],
-          [231, 241, 8, 4],
-        ].map(([x, y, width, height]) => (
-          <rect key={`${x}-${y}`} x={x} y={y} width={width} height={height} rx="1.2" />
+        {KEYS.map(([x, y, width, height, delay]) => (
+          <rect
+            key={`${x}-${y}`}
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            rx="1.2"
+            style={{ animationDelay: delay }}
+          />
         ))}
       </g>
 
@@ -236,35 +427,35 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
           strokeLinejoin="round"
         />
         <g transform="rotate(9 173.8 229)">
-          <g className="f f1">
+          <g className="f f1" style={{ animationDuration: '0.48s', animationDelay: '-0.10s' }}>
             <rect x="172" y="229.6" width="5" height="10.5" rx="2.5" fill={i.skinShade} />
             <rect x="171.3" y="229" width="5" height="10.5" rx="2.5" fill={i.skin} />
             <ellipse cx="173.8" cy="236.3" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g transform="rotate(3 179.4 229)">
-          <g className="f f2">
+          <g className="f f2" style={{ animationDuration: '0.62s', animationDelay: '-0.37s' }}>
             <rect x="177.3" y="229.6" width="5.6" height="13.5" rx="2.8" fill={i.skinShade} />
             <rect x="176.6" y="229" width="5.6" height="13.5" rx="2.8" fill={i.skin} />
             <ellipse cx="179.4" cy="239.3" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g>
-          <g className="f f3">
+          <g className="f f3" style={{ animationDuration: '0.44s', animationDelay: '-0.21s' }}>
             <rect x="182.8" y="229.6" width="5.8" height="14.5" rx="2.9" fill={i.skinShade} />
             <rect x="182.1" y="229" width="5.8" height="14.5" rx="2.9" fill={i.skin} />
             <ellipse cx="185" cy="240.3" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g transform="rotate(-3 190.6 229)">
-          <g className="f f4">
+          <g className="f f4" style={{ animationDuration: '0.56s', animationDelay: '-0.49s' }}>
             <rect x="188.5" y="229.6" width="5.6" height="13" rx="2.8" fill={i.skinShade} />
             <rect x="187.8" y="229" width="5.6" height="13" rx="2.8" fill={i.skin} />
             <ellipse cx="190.6" cy="238.8" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g transform="rotate(-16 191 228)">
-          <g className="thumb">
+          <g className="thumb" style={{ animationDuration: '0.9s' }}>
             <rect x="188.7" y="228.6" width="6" height="10" rx="3" fill={i.skinShade} />
             <rect x="188" y="228" width="6" height="10" rx="3" fill={i.skin} />
             <path
@@ -284,7 +475,7 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
       </g>
 
       {/* Right arm */}
-      <g className="arm-r">
+      <g className="arm-r" style={{ animationDelay: '-1.1s' }}>
         <path
           d="M240 206 Q264 228 250 243 Q236 248 224 228"
           fill="none"
@@ -294,35 +485,35 @@ export function StenographerAnimation({ size = 'header' }: StenographerAnimation
           strokeLinejoin="round"
         />
         <g transform="rotate(-9 226.2 229)">
-          <g className="f f1">
+          <g className="f f1" style={{ animationDuration: '0.52s', animationDelay: '-0.31s' }}>
             <rect x="224.4" y="229.6" width="5" height="10.5" rx="2.5" fill={i.skinShade} />
             <rect x="223.7" y="229" width="5" height="10.5" rx="2.5" fill={i.skin} />
             <ellipse cx="226.2" cy="236.3" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g transform="rotate(-3 220.6 229)">
-          <g className="f f2">
+          <g className="f f2" style={{ animationDuration: '0.46s', animationDelay: '-0.04s' }}>
             <rect x="218.5" y="229.6" width="5.6" height="13.5" rx="2.8" fill={i.skinShade} />
             <rect x="217.8" y="229" width="5.6" height="13.5" rx="2.8" fill={i.skin} />
             <ellipse cx="220.6" cy="239.3" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g>
-          <g className="f f3">
+          <g className="f f3" style={{ animationDuration: '0.60s', animationDelay: '-0.43s' }}>
             <rect x="212.8" y="229.6" width="5.8" height="14.5" rx="2.9" fill={i.skinShade} />
             <rect x="212.1" y="229" width="5.8" height="14.5" rx="2.9" fill={i.skin} />
             <ellipse cx="215" cy="240.3" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g transform="rotate(3 209.4 229)">
-          <g className="f f4">
+          <g className="f f4" style={{ animationDuration: '0.50s', animationDelay: '-0.18s' }}>
             <rect x="207.3" y="229.6" width="5.6" height="13" rx="2.8" fill={i.skinShade} />
             <rect x="206.6" y="229" width="5.6" height="13" rx="2.8" fill={i.skin} />
             <ellipse cx="209.4" cy="238.8" rx="1.7" ry="2.1" fill={i.skinHighlight} />
           </g>
         </g>
         <g transform="rotate(16 209 228)">
-          <g className="thumb">
+          <g className="thumb" style={{ animationDuration: '0.9s', animationDelay: '-0.55s' }}>
             <rect x="206.7" y="228.6" width="6" height="10" rx="3" fill={i.skinShade} />
             <rect x="206" y="228" width="6" height="10" rx="3" fill={i.skin} />
             <path
