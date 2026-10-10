@@ -1,6 +1,6 @@
 # 27 — Pin the sqlite-jdbc version
 
-Status: in-progress
+Status: in-review
 Depends on: —
 
 ## Goal
@@ -32,7 +32,7 @@ Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The runtime sqlite-jdbc equals the catalog version 3.50.3.0: `gradle dependencyInsight` output recorded in the log, plus a pinned unit test asserting the loaded driver's version (`SQLiteJDBCLoader.getVersion()`), commented "must equal the catalog pin — update both together"
 - [x] A transitive dependency cannot silently override the pin: `dependencyInsight` shows the catalog version with "forced" selection reasons
 - [x] Must not break: `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` stay green against the pinned driver (Database open, WAL, Flyway migrations, the engine)
-- [ ] The user's `nix build .` succeeds; `deps.json` is regenerated only if the resolved graph changed (expected: unchanged)
+- [x] The user's `nix build .` succeeds; `deps.json` is regenerated only if the resolved graph changed (expected: unchanged)
 
 ## Acceptance criteria
 
@@ -67,4 +67,12 @@ Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appe
 - `gradle integrationTest --rerun-tasks`: BUILD SUCCESSFUL (6/6 tasks executed), 47 Integration-tagged tests executed (the 189 non-tagged ones are skipped by the kotest.tags filter), 0 failures/errors (JFK end-to-end, engine, real CAM++ diarization).
 - Approved refactor (before this cycle): ADR 0042 added (next free number verified against main: 0041 was highest), the force comment now cites the ADR.
 - `backend/deps.json`: unchanged (0 stat lines) — the force pins the already-resolved version.
+- Discovered: none.
+
+### 2026-10-10 — item 4: user's `nix build .` succeeds, `deps.json` unchanged (green)
+
+- No agent-side code change; Nix-level verification is the user's (ADR 0010/0014).
+- User ran `nix build .` from inside the worktree (direnv/devenv shell): **succeeded**.
+- `backend/deps.json` needed no regeneration: the branch's file is byte-identical to main's (0 diff lines) and the build's fixed-output Gradle step would have failed on a hash mismatch if the resolved graph had changed — it did not (same 3.50.3.0, now forced).
+- All four test-list items green; acceptance criteria met → status `in-review`.
 - Discovered: none.
