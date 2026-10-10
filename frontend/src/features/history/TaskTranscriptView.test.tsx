@@ -222,6 +222,18 @@ describe('the transcript view', () => {
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
   });
+
+  it('shows a not-found message for a missing task', async () => {
+    // task 999 is not in the snapshot, as a deleted or never-uploaded task would be absent.
+    await renderTranscript('999');
+
+    expect(await screen.findByText('Task not found')).toBeInTheDocument();
+    // No transcript, downloads, player or status controls are shown for a missing task.
+    expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Download transcript/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  });
 });
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
