@@ -39,7 +39,8 @@ const TitleRow = styled.div`
   gap: ${(props) => props.theme.spacing.sm};
 `;
 
-// A FAILED card's error: a small danger line led by a decorative alert icon.
+// A card's error line (the FAILED error, a refused retry or delete): small, danger,
+// led by a decorative alert icon.
 const CardError = styled.p`
   display: flex;
   align-items: center;
@@ -48,6 +49,15 @@ const CardError = styled.p`
   color: ${(props) => props.theme.colors.danger};
   font-size: ${(props) => props.theme.fontSizes.small};
 `;
+
+function CardErrorLine({ children }: { children: string }) {
+  return (
+    <CardError>
+      <Icon icon={CircleAlert} tone="danger" size="sm" />
+      <span>{children}</span>
+    </CardError>
+  );
+}
 
 // The card's quiet actions, right-aligned at the bottom.
 const Actions = styled.div`
@@ -97,12 +107,7 @@ export function HistoryRow({ task }: { task: Task }) {
           <StatusBadge status={task.status} />
         </TitleRow>
         <MetaText>{formatTaskMeta(task)}</MetaText>
-        {task.error !== null ? (
-          <CardError>
-            <Icon icon={CircleAlert} tone="danger" size="sm" />
-            <span>{task.error}</span>
-          </CardError>
-        ) : null}
+        {task.error !== null ? <CardErrorLine>{task.error}</CardErrorLine> : null}
         <Actions>
           {isAllowedCommand('retry', task.status) ? (
             <TextButton
@@ -131,16 +136,10 @@ export function HistoryRow({ task }: { task: Task }) {
           </TextButton>
         </Actions>
         {retryError ? (
-          <CardError>
-            <Icon icon={CircleAlert} tone="danger" size="sm" />
-            <span>{`Retry failed: ${errorMessage(retryError)}`}</span>
-          </CardError>
+          <CardErrorLine>{`Retry failed: ${errorMessage(retryError)}`}</CardErrorLine>
         ) : null}
         {deleteError ? (
-          <CardError>
-            <Icon icon={CircleAlert} tone="danger" size="sm" />
-            <span>{`Delete failed: ${errorMessage(deleteError)}`}</span>
-          </CardError>
+          <CardErrorLine>{`Delete failed: ${errorMessage(deleteError)}`}</CardErrorLine>
         ) : null}
       </Stack>
       <ConfirmDialog
