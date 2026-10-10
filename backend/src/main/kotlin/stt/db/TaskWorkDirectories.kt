@@ -10,9 +10,12 @@ import java.nio.file.Path
 class TaskWorkDirectories(
     dataDir: Path,
 ) {
-    private val workRoot = dataDir.resolve("work")
+    private val root = dataDir.resolve("work")
 
-    fun workDir(taskId: Long): Path = workRoot.resolve(taskId.toString())
+    /** The directory holding every task's work directory (`$STT_DATA_DIR/work`). */
+    fun workRoot(): Path = root
+
+    fun workDir(taskId: Long): Path = root.resolve(taskId.toString())
 
     fun source(taskId: Long): Path = workDir(taskId).resolve("source")
 }

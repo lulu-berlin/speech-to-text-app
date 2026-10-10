@@ -113,6 +113,7 @@ class ProcessingEngine internal constructor(
     fun start() {
         scope.launch {
             tasks.recoverRunning()
+            cleanupWorkDirectories()
             workerLoop()
         }
     }
@@ -293,6 +294,7 @@ class ProcessingEngine internal constructor(
             return
         }
         tasks.setCompleted(id, now())
+        removeCompletedWorkDir(id)
         publish(id)
     }
 
@@ -471,6 +473,67 @@ class ProcessingEngine internal constructor(
             withContext(Dispatchers.IO) { Files.deleteIfExists(source) }
         } catch (e: Exception) {
             logger.warn("Could not delete the leftover original {}; the startup cleanup removes it: {}", source, e.toString())
+        }
+    }
+
+    /**
+     * Startup sweep (item 15): the work directory of every pending task is kept (an unchunked one holds
+     * the only copy of its original); a FAILED or CANCELED task keeps only an unchunked original, for a
+     * retry; COMPLETED, deleted and leftover directories are removed. Each directory is best effort, so
+     * one failure never skips the rest.
+     */
+    private suspend fun cleanupWorkDirectories() {
+        val root = workDirectories.workRoot()
+        val dirs =
+            withContext(Dispatchers.IO) {
+                if (Files.isDirectory(root)) Files.list(root).use { it.toList() } else emptyList()
+            }
+        dirs.forEach { dir -> cleanupTaskDirectory(dir) }
+    }
+
+    /** Applies the sweep's rule to one work directory, named by its task's id. */
+    private suspend fun cleanupTaskDirectory(dir: Path) {
+        val id = dir.fileName.toString().toLongOrNull() ?: return
+        try {
+            val task = tasks.find(id)?.task
+            if (task == null) {
+                deleteTree(dir)
+            } else {
+                when (task.status) {
+                    TaskStatus.COMPLETED -> {
+                        deleteTree(dir)
+                    }
+
+                    TaskStatus.FAILED, TaskStatus.CANCELED -> {
+                        if (chunks.findByTask(id).isEmpty()) pruneWorkDir(id) else deleteTree(dir)
+                    }
+
+                    else -> {
+                        Unit
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("Could not clean up the work directory {}; skipped: {}", dir, e.toString())
+        }
+    }
+
+    /** Removes [dir] and everything in it, including [dir] itself. */
+    private suspend fun deleteTree(dir: Path) {
+        withContext(Dispatchers.IO) {
+            Files.walk(dir).use { paths ->
+                paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+            }
+        }
+    }
+
+    /** Removes the task's work directory now that it is COMPLETED; best effort, the startup sweep is the backstop. */
+    private suspend fun removeCompletedWorkDir(id: Long) {
+        val dir = workDirectories.workDir(id)
+        try {
+            deleteTree(dir)
+        } catch (e: Exception) {
+            logger.warn("Could not remove the completed task's work directory {}: {}", dir, e.toString())
         }
     }
 
