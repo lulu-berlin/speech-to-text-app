@@ -12,6 +12,7 @@ import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
 import stt.config.Config
 import stt.db.Database
+import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.engine.processingEngine
 import java.io.File
@@ -28,10 +29,12 @@ fun Application.sttApp(config: Config) {
     dependencies {
         provide<Database> { Database.open(config.dataDir) }
         provide<TaskWorkDirectories> { TaskWorkDirectories(config.dataDir) }
+        provide<TaskRepository> { TaskRepository(resolve(), resolve()) }
         require(DependencyKey<Database>())
     }
     processingEngine(config)
     healthRoutes()
+    taskRoutes()
     val staticDir = config.staticDir
     routing {
         if (staticDir != null) {
