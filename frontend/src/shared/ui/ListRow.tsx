@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { forwardRef } from 'react';
+import type { LiHTMLAttributes, ReactNode } from 'react';
 import styled from 'styled-components';
 import type { ThemeTokens } from '../theme/theme';
 import { focusWithinRing } from './focusRing';
@@ -33,11 +34,20 @@ const ListRowBase = styled.li<{ $variant: ListRowVariant }>`
   ${focusWithinRing}
 `;
 
-export interface ListRowProps {
+export interface ListRowProps extends LiHTMLAttributes<HTMLLIElement> {
   variant?: ListRowVariant;
   children: ReactNode;
 }
 
-export function ListRow({ variant = 'row', children }: ListRowProps) {
-  return <ListRowBase $variant={variant}>{children}</ListRowBase>;
-}
+// The row the Queue and History lists sit in; forwards its ref so a parent can mark it
+// (the queue rows pass it to dnd-kit as the sortable node).
+export const ListRow = forwardRef<HTMLLIElement, ListRowProps>(function ListRow(
+  { variant = 'row', children, ...rest },
+  ref,
+) {
+  return (
+    <ListRowBase ref={ref} $variant={variant} {...rest}>
+      {children}
+    </ListRowBase>
+  );
+});

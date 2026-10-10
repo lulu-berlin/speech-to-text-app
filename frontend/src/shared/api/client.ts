@@ -105,6 +105,17 @@ export async function deleteTask(id: number): Promise<void> {
   }
 }
 
+// Item 12 contract: PUT /api/queue/order with the full ordered list of pending task
+// ids; 200 Queue, or 409 reorder-mismatch for a different set.
+export async function reorderQueue(taskIds: number[]): Promise<Queue> {
+  const response = await fetch('/api/queue/order', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ taskIds }),
+  });
+  return json<Queue>(response);
+}
+
 // Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when
 // the connection drops. EventSource retries a dropped connection by itself, but gives up
 // for good on an HTTP error, so this opens a new stream in that case. Returns a function

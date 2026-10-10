@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
-import { MoreVertical, Pause, Play, X } from 'lucide-react';
+import { GripVertical, MoreVertical, Pause, Play, X } from 'lucide-react';
 import { useEffect } from 'react';
+import type { HTMLAttributes, Ref } from 'react';
 import { useMachine } from '@xstate/react';
 import { styled } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
@@ -9,6 +10,7 @@ import { isAllowedCommand } from '../../shared/state/transitions';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
 import { DropdownMenu } from '../../shared/ui/DropdownMenu';
+import type { DropdownMenuItem } from '../../shared/ui/DropdownMenu';
 import { IconButton } from '../../shared/ui/IconButton';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
@@ -43,6 +45,15 @@ const CONTROLS: {
 
 export interface TaskRowProps {
   task: Task;
+  // The row's position in the queue (the move actions and their bounds).
+  index: number;
+  count: number;
+  // A drag or a menu move asks the parent to reorder this row to `to`.
+  onMoveTask: (id: number, to: number) => void;
+  // The dnd-kit sortable wiring: the row node ref, and the drag handle's attributes and
+  // listeners (pointer and keyboard dragging).
+  rowRef?: Ref<HTMLLIElement>;
+  dragHandleProps?: HTMLAttributes<HTMLButtonElement>;
 }
 
 // One pending task of the queue list: its filename, phase and status, its controls, and
@@ -51,7 +62,7 @@ export interface TaskRowProps {
 // offered only when docs/api/task-transitions.json allows it, a confirmation opens only
 // where work would be lost, and the action's result is applied to the live state at
 // once (the server's own events, when they arrive, carry the same task).
-export function TaskRow({ task }: TaskRowProps) {
+export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProps }: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
   const [action, send] = useMachine(rowActionMachine, { input: { taskId: task.id } });
 
@@ -76,14 +87,51 @@ export function TaskRow({ task }: TaskRowProps) {
 
   const confirmingAction = action.matches('confirming') ? action.context.action : null;
 
+  // The move actions, plus delete; the bound moves are disabled.
+  const menuItems: DropdownMenuItem[] = [
+    {
+      label: 'Move to top',
+      disabled: index === 0,
+      onSelect: () => onMoveTask(task.id, 0),
+    },
+    {
+      label: 'Move up',
+      disabled: index === 0,
+      onSelect: () => onMoveTask(task.id, index - 1),
+    },
+    {
+      label: 'Move down',
+      disabled: index === count - 1,
+      onSelect: () => onMoveTask(task.id, index + 1),
+    },
+    {
+      label: 'Move to bottom',
+      disabled: index === count - 1,
+      onSelect: () => onMoveTask(task.id, count - 1),
+    },
+    {
+      label: 'Delete',
+      danger: true,
+      onSelect: () =>
+        send({ type: 'ACTIVATE', action: 'delete', status: task.status, confirm: true }),
+    },
+  ];
+
   return (
-    <ListRow>
+    <ListRow ref={rowRef}>
       <Stack gap="sm">
         <RowContent>
           <RowName>{task.filename}</RowName>
           <Row>
             {task.phase !== null ? <RowPhase>{PHASE_LABELS[task.phase]}</RowPhase> : null}
             <StatusBadge status={task.status} />
+            {dragHandleProps !== undefined ? (
+              <IconButton
+                icon={GripVertical}
+                label={`Reorder ${task.filename}`}
+                {...dragHandleProps}
+              />
+            ) : null}
             {CONTROLS.filter(({ command }) => isAllowedCommand(command, task.status)).map(
               ({ command, icon, verb }) => (
                 <IconButton
@@ -104,19 +152,7 @@ export function TaskRow({ task }: TaskRowProps) {
             <DropdownMenu
               trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
               align="end"
-              items={[
-                {
-                  label: 'Delete',
-                  danger: true,
-                  onSelect: () =>
-                    send({
-                      type: 'ACTIVATE',
-                      action: 'delete',
-                      status: task.status,
-                      confirm: true,
-                    }),
-                },
-              ]}
+              items={menuItems}
             />
           </Row>
         </RowContent>

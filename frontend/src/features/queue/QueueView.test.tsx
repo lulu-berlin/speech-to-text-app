@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { RenderResult } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -33,6 +34,31 @@ function renderQueue() {
 function multipartField(body: string, name: string): string {
   const match = body.match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)\\r\\n`));
   return match?.[1] ?? '';
+}
+
+// jsdom has no layout, so dnd-kit would measure every droppable at 0x0 and a keyboard
+// drag could not move past it. Each element is placed 40px below its previous sibling,
+// which gives the queue rows their positions. Returns the restore function.
+function stubRowLayout() {
+  const original = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function getBoundingClientRect(this: Element): DOMRect {
+    const index = Array.prototype.indexOf.call(this.parentElement?.children ?? [], this);
+    const top = index * 40;
+    const rect = {
+      x: 0,
+      y: top,
+      top,
+      bottom: top + 40,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 40,
+    };
+    return { ...rect, toJSON: () => rect } as DOMRect;
+  };
+  return () => {
+    Element.prototype.getBoundingClientRect = original;
+  };
 }
 
 // A live /api/events stream for one test: it opens with the snapshot
@@ -549,6 +575,76 @@ describe('task controls', () => {
     expect(within(memo).queryByRole('button', { name: 'Pause memo.wav' })).not.toBeInTheDocument();
     expect(within(memo).getByRole('button', { name: 'Resume memo.wav' })).toBeInTheDocument();
     expect(within(memo).getByRole('button', { name: 'Cancel memo.wav' })).toBeInTheDocument();
+  });
+});
+
+describe('the queue reorder', () => {
+  it('sends the full ordered id list to PUT /api/queue/order from a drag or a menu move', async () => {
+    const ordered: number[][] = [];
+    server.use(
+      http.put('/api/queue/order', async ({ request }) => {
+        const body = (await request.json()) as { taskIds: number[] };
+        ordered.push(body.taskIds);
+        return HttpResponse.json({ paused: false, taskIds: body.taskIds });
+      }),
+    );
+
+    // Dragging: the queue grows by keyboard (Space to grab, ArrowDown to move, Space to
+    // drop) with stubbed row rects, since jsdom has no layout.
+    const restoreLayout = stubRowLayout();
+    let dragged: RenderResult | undefined;
+    try {
+      dragged = renderQueue();
+      await screen.findByText('lecture.m4a');
+      const handle = screen.getByRole('button', { name: 'Reorder lecture.m4a' });
+      handle.focus();
+      fireEvent.keyDown(handle, { code: 'Space', key: ' ' });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      fireEvent.keyDown(handle, { code: 'ArrowDown', key: 'ArrowDown' });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      fireEvent.keyDown(handle, { code: 'Space', key: ' ' });
+      await waitFor(() => expect(ordered).toEqual([[7, 5]]));
+      const draggedRows = screen.getAllByRole('listitem');
+      expect(draggedRows.map((row) => row.textContent)).toEqual([
+        expect.stringContaining('memo.wav'),
+        expect.stringContaining('lecture.m4a'),
+      ]);
+    } finally {
+      dragged?.unmount();
+      restoreLayout();
+    }
+
+    // Menu: move memo.wav to the top, then lecture.m4a back up.
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Actions for memo.wav' }), {
+      button: 0,
+    });
+    await screen.findByRole('menu');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to top' }));
+    await waitFor(() =>
+      expect(ordered).toEqual([
+        [7, 5],
+        [7, 5],
+      ]),
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Actions for lecture.m4a' }), {
+      button: 0,
+    });
+    await screen.findByRole('menu');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move up' }));
+    await waitFor(() =>
+      expect(ordered).toEqual([
+        [7, 5],
+        [7, 5],
+        [5, 7],
+      ]),
+    );
+    const menuRows = screen.getAllByRole('listitem');
+    expect(menuRows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('lecture.m4a'),
+      expect.stringContaining('memo.wav'),
+    ]);
   });
 });
 
