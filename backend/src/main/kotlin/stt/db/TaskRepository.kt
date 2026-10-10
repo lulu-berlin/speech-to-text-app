@@ -9,6 +9,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.core.statements.UpdateStatement
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -113,6 +114,21 @@ class TaskRepository(
                 .selectAll()
                 .orderBy(TasksTable.id)
                 .map { it.toStoredTask() }
+        }
+
+    /**
+     * The started PAUSED task, if any: one that once ran and is parked in a pause. It blocks the worker
+     * (roadmap item 19) until it is resumed. The first in queue order stands in for "the" one.
+     */
+    suspend fun startedPaused(): StoredTask? =
+        db.readTransaction {
+            TasksTable
+                .selectAll()
+                .where { (TasksTable.status eq TaskStatus.PAUSED) and TasksTable.startedAt.isNotNull() }
+                .orderBy(TasksTable.queuePosition to SortOrder.ASC_NULLS_LAST, TasksTable.id to SortOrder.ASC)
+                .limit(1)
+                .singleOrNull()
+                ?.toStoredTask()
         }
 
     /**
