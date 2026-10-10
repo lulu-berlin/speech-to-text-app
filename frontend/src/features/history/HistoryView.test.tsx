@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { http } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
@@ -48,5 +48,37 @@ describe('the history list', () => {
     expect(rows[1]).toHaveTextContent('interview.mp3');
     expect(rows[2]).toHaveTextContent('lecture.m4a');
     expect(screen.queryByText('memo.wav')).not.toBeInTheDocument();
+  });
+
+  it('narrows the list by filename search and the status filter', async () => {
+    server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])));
+    await renderHistory();
+
+    const search = screen.getByRole('searchbox', { name: /search/i });
+    const filter = screen.getByRole('combobox', { name: /status/i });
+
+    // Filename search narrows to the matching task.
+    fireEvent.change(search, { target: { value: 'interview' } });
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByRole('listitem')).toHaveTextContent('interview.mp3');
+
+    // Status filter narrows to that status.
+    fireEvent.change(search, { target: { value: '' } });
+    fireEvent.change(filter, { target: { value: 'FAILED' } });
+    const onlyFailed = screen.getAllByRole('listitem');
+    expect(onlyFailed).toHaveLength(1);
+    expect(onlyFailed[0]).toHaveTextContent('call.ogg');
+
+    fireEvent.change(filter, { target: { value: 'CANCELED' } });
+    const onlyCanceled = screen.getAllByRole('listitem');
+    expect(onlyCanceled).toHaveLength(1);
+    expect(onlyCanceled[0]).toHaveTextContent('lecture.m4a');
+
+    // Search and filter combine: the intersection of both.
+    fireEvent.change(filter, { target: { value: 'COMPLETED' } });
+    fireEvent.change(search, { target: { value: 'interview' } });
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    fireEvent.change(search, { target: { value: 'lecture' } });
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
   });
 });
