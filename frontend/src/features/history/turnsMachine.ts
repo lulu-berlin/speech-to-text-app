@@ -47,7 +47,9 @@ export const turnsMachine = setup({
         SPEAKERS: {
           actions: assign({
             turns: ({ context, event }) =>
-              context.turns === null ? context.turns : { ...context.turns, speakers: event.speakers },
+              context.turns === null
+                ? context.turns
+                : { ...context.turns, speakers: event.speakers },
           }),
         },
         RELOAD: 'loading',

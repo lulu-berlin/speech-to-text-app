@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
 import type { Task, TaskPhase } from '../../shared/api/types';
@@ -17,10 +17,8 @@ import { turnsMachine } from './turnsMachine';
 import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
-import { deleteTaskMachine } from './deleteTaskMachine';
 import { formatDuration, formatTaskMeta } from './formatTask';
 import { TranscriptTurns } from './TranscriptTurns';
-import { useTaskCommand } from './useTaskCommand';
 import { AudioPlayer } from './AudioPlayer';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
@@ -109,7 +107,6 @@ export function TaskTranscriptView() {
   const { taskId } = useParams();
   const id = Number(taskId);
   const navigate = useNavigate();
-const runCommand = useTaskCommand();
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const connection = ConnectionContext.useSelector((state) => state.value);
   const task = tasks.find((candidate) => candidate.id === id);
@@ -376,8 +373,7 @@ const runCommand = useTaskCommand();
             Delete
           </Button>
         </Row>
-        {audioBlock}
-{turns !== null && turns.speakers.length > 0 ? (
+        {turns !== null && turns.speakers.length > 0 ? (
           // Item 22: the panel edits the effective speakers; a stored change replaces the
           // speakers the turns are labelled with (turns reference them by speakerId).
           <SpeakersPanel

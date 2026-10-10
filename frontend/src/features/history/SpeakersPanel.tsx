@@ -4,10 +4,16 @@ import styled from 'styled-components';
 import type { TurnSpeaker } from '../../shared/api/types';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
+import { controlStyle } from '../../shared/ui/controlStyle';
 import { Row, Stack } from '../../shared/ui/layout';
 import { Text } from '../../shared/ui/typography';
 import { speakerRenameMachine } from './speakerRenameMachine';
 import { resetMergesMachine, speakerMergeMachine } from './speakerMergeMachine';
+
+// The speaker-name field: the shared control look with its focus ring (item 25).
+const NameInput = styled.input`
+  ${controlStyle}
+`;
 
 export interface SpeakersPanelProps {
   taskId: number;
@@ -168,7 +174,7 @@ function SpeakerNameField({ taskId, speaker, onSpeakersChanged }: SpeakerNameFie
   return (
     <Stack gap="xs">
       <Row gap="sm">
-        <input
+        <NameInput
           type="text"
           aria-label={`Name of speaker ${speaker.speakerId + 1}`}
           value={state.context.draft}

@@ -16,7 +16,6 @@ import {
   taskQueued,
   taskRunning,
 } from '../../shared/api/fixtures';
-import { controllableEventStream } from '../../test/controllableEventStream';
 import { lightTheme } from '../../shared/theme/theme';
 import { asRgb, mediaRulesFor, px, required } from '../../test/dom';
 import { controllableEventStream } from '../../test/eventStream';
@@ -67,7 +66,6 @@ function stubRowLayout() {
     Element.prototype.getBoundingClientRect = original;
   };
 }
-
 
 describe('the queue view upload options', () => {
   it('offers the languages from docs/api/languages.json with auto as the default, and bounds speakers and max speakers to 1–20', () => {

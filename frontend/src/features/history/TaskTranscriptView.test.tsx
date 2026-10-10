@@ -12,7 +12,7 @@ import {
   taskFailed,
   turns as turnsFixture,
 } from '../../shared/api/fixtures';
-import { controllableEventStream } from '../../test/controllableEventStream';
+import { controllableEventStream } from '../../test/eventStream';
 import { mediaRulesFor, px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
 
@@ -338,8 +338,9 @@ describe('the transcript view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     dialog = screen.getByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-1: @ours
-2: @ours
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
+      { timeout: NAVIGATION_TIMEOUT_MS },
     );
     expect(deleted).toEqual([4]);
   });
