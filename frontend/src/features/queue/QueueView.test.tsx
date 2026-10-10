@@ -33,6 +33,38 @@ function multipartField(body: string, name: string): string {
   return match?.[1] ?? '';
 }
 
+// A live /api/events stream for one test: it opens with the snapshot
+// (docs/api/snapshot.json), then sends each event the test pushes, so the test can check
+// one state before the next event arrives.
+function controllableEventStream() {
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const events = {
+    send(name: string, data: unknown) {
+      if (controller === undefined) {
+        throw new Error('the event stream is not connected yet');
+      }
+      controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+    },
+  };
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          new ReadableStream<Uint8Array>({
+            start(streamController) {
+              controller = streamController;
+              events.send('snapshot', snapshotFixture);
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } },
+        ),
+    ),
+  );
+  return events;
+}
+
 describe('the queue view upload options', () => {
   it('offers the languages from docs/api/languages.json with auto as the default, and bounds speakers and max speakers to 1–20', () => {
     renderQueue();
@@ -232,35 +264,8 @@ describe('the queue list', () => {
   it('shows a new task in the queue list after its upload', async () => {
     const newTask = { ...taskQueued, id: 99, filename: 'a.mp3' };
     const newQueue = { ...queueFixture, taskIds: [...queueFixture.taskIds, 99] };
-    const { promise: announce, resolve: releaseAnnounce } = Promise.withResolvers<void>();
-
-    // The real backend announces a new upload on the stream (task-updated plus the queue
-    // change) only after the task exists, so the mock sends the snapshot first and holds
-    // the announcement until the test has completed the upload.
-    server.use(
-      http.post('/api/tasks', () => HttpResponse.json(newTask, { status: 201 })),
-      http.get('/api/events', () => {
-        const encoder = new TextEncoder();
-        const stream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(
-              encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshotFixture)}\n\n`),
-            );
-            void announce.then(() => {
-              controller.enqueue(
-                encoder.encode(`event: task-updated\ndata: ${JSON.stringify(newTask)}\n\n`),
-              );
-              controller.enqueue(
-                encoder.encode(`event: queue-updated\ndata: ${JSON.stringify(newQueue)}\n\n`),
-              );
-            });
-          },
-        });
-        return new HttpResponse(stream, {
-          headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
-        });
-      }),
-    );
+    server.use(http.post('/api/tasks', () => HttpResponse.json(newTask, { status: 201 })));
+    const events = controllableEventStream();
 
     renderQueue();
 
@@ -268,14 +273,15 @@ describe('the queue list', () => {
     await screen.findByText('lecture.m4a');
     expect(screen.getByText('memo.wav')).toBeInTheDocument();
 
-    // Upload a file; it completes while the announcement is still held.
+    // Upload a file; it completes before the server announces the new task.
     const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
     fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
     await waitFor(() => expect(screen.getByText('done')).toBeInTheDocument());
 
-    // The announcement arrives: the task joins the queue list at the end, and its upload
-    // row leaves (the task is now in the queue).
-    releaseAnnounce();
+    // The real backend announces a new upload with task-updated plus the queue change:
+    // the task joins the queue list at the end, and its upload row leaves.
+    events.send('task-updated', newTask);
+    events.send('queue-updated', newQueue);
     await waitFor(() => expect(screen.queryByText('done')).not.toBeInTheDocument());
     const rows = screen.getAllByRole('listitem');
     expect(rows.map((row) => row.textContent)).toEqual([
@@ -287,50 +293,7 @@ describe('the queue list', () => {
   });
 
   it("updates a task's two progress bars from task-progress events; the diarization bar shows its stage and hides when diarization does not apply", async () => {
-    const { promise: withStage, resolve: releaseStage } = Promise.withResolvers<void>();
-    const { promise: noDiarization, resolve: releaseNoDiarization } = Promise.withResolvers<void>();
-
-    // Two task-progress events for the running task 5, each held until the test has
-    // observed the previous state.
-    server.use(
-      http.get('/api/events', () => {
-        const encoder = new TextEncoder();
-        const stream = new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(
-              encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshotFixture)}\n\n`),
-            );
-            void withStage.then(() => {
-              controller.enqueue(
-                encoder.encode(
-                  `event: task-progress\ndata: ${JSON.stringify({
-                    id: 5,
-                    transcriptionProgress: 0.75,
-                    diarizationStage: 'CLUSTERING',
-                    diarizationProgress: 0.4,
-                  })}\n\n`,
-                ),
-              );
-            });
-            void noDiarization.then(() => {
-              controller.enqueue(
-                encoder.encode(
-                  `event: task-progress\ndata: ${JSON.stringify({
-                    id: 5,
-                    transcriptionProgress: 0.85,
-                    diarizationStage: null,
-                    diarizationProgress: null,
-                  })}\n\n`,
-                ),
-              );
-            });
-          },
-        });
-        return new HttpResponse(stream, {
-          headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
-        });
-      }),
-    );
+    const events = controllableEventStream();
 
     renderQueue();
 
@@ -345,8 +308,13 @@ describe('the queue list', () => {
       within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
     ).toHaveAttribute('aria-valuenow', '0');
 
-    // The first event updates both bars; the diarization bar names its stage.
-    releaseStage();
+    // A progress event updates both bars; the diarization bar names its stage.
+    events.send('task-progress', {
+      id: 5,
+      transcriptionProgress: 0.75,
+      diarizationStage: 'CLUSTERING',
+      diarizationProgress: 0.4,
+    });
     await waitFor(() =>
       expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toHaveAttribute(
         'aria-valuenow',
@@ -358,7 +326,12 @@ describe('the queue list', () => {
     ).toHaveAttribute('aria-valuetext', 'Clustering 70%');
 
     // When diarization does not apply, its bar disappears; transcription keeps updating.
-    releaseNoDiarization();
+    events.send('task-progress', {
+      id: 5,
+      transcriptionProgress: 0.85,
+      diarizationStage: null,
+      diarizationProgress: null,
+    });
     await waitFor(() =>
       expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toHaveAttribute(
         'aria-valuenow',
