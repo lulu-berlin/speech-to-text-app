@@ -132,6 +132,19 @@ class TaskRepository(
         }
 
     /**
+     * The ids of every non-terminal task in queue order (`queue_position`), as the queue event (item 12)
+     * carries them.
+     */
+    suspend fun pendingOrderedIds(): List<Long> =
+        db.readTransaction {
+            TasksTable
+                .selectAll()
+                .where { TasksTable.status inList pendingStatuses }
+                .orderBy(TasksTable.queuePosition to SortOrder.ASC_NULLS_LAST, TasksTable.id to SortOrder.ASC)
+                .map { it[TasksTable.id] }
+        }
+
+    /**
      * The QUEUED task with the lowest `queue_position` (ties broken by id), or null when none is queued.
      * The engine asks this before every task, so a stale in-memory order cannot start one out of turn.
      */
@@ -388,6 +401,9 @@ private fun ResultRow.toTask() =
         startedAt = this[TasksTable.startedAt],
         finishedAt = this[TasksTable.finishedAt],
     )
+
+/** The non-terminal statuses: the queue holds exactly these. */
+private val pendingStatuses = listOf(TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.PAUSED)
 
 /** The statuses a task can be cancelled from (item 04's table: QUEUED, RUNNING, PAUSED). */
 private val cancellableFrom = TaskStatus.entries.filter { it.canTransitionTo(TaskStatus.CANCELED) }

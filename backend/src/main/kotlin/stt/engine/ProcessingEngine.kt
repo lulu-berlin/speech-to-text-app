@@ -136,6 +136,7 @@ class ProcessingEngine internal constructor(
         queueState.setPaused(true)
         processControl.pause()
         pauseGate.pause()
+        queueUpdated()
     }
 
     /**
@@ -145,6 +146,17 @@ class ProcessingEngine internal constructor(
         queueState.setPaused(false)
         processControl.resume()
         pauseGate.resume()
+        queueUpdated()
+        wake()
+    }
+
+    /**
+     * Writes a new queue order and publishes it. Item 12's `PUT /api/queue/order` checks the id set with
+     * item 04's queue aggregate first and delegates here.
+     */
+    suspend fun reorderQueue(ids: List<Long>) {
+        tasks.setQueuePositions(ids)
+        queueUpdated()
         wake()
     }
 
@@ -199,6 +211,7 @@ class ProcessingEngine internal constructor(
             tasks.delete(id)
             _events.emit(Event.TaskDeleted(id))
         }
+        queueUpdated()
         wake()
         return TaskCommandOutcome.Accepted
     }
@@ -213,6 +226,7 @@ class ProcessingEngine internal constructor(
         command(id, TaskStatus.QUEUED) {
             if (tasks.retryIfPossible(id)) {
                 publish(id)
+                queueUpdated()
                 wake()
                 TaskCommandOutcome.Accepted
             } else {
@@ -236,6 +250,7 @@ class ProcessingEngine internal constructor(
                 val canceled = tasks.cancelIfPossible(id, now())
                 pruneWorkDir(id)
                 if (canceled) publish(id)
+                if (canceled) queueUpdated()
             }
             val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
             if (after == TaskStatus.CANCELED) {
@@ -302,6 +317,11 @@ class ProcessingEngine internal constructor(
         }
     }
 
+    /** Publishes the queue as it is now; call only after a change that affects it has been persisted. */
+    private suspend fun queueUpdated() {
+        _events.emit(Event.QueueUpdated(paused = queueState.isPaused(), taskIds = tasks.pendingOrderedIds()))
+    }
+
     /** The job running [id]'s phases, or null when that task is not the one being processed. */
     private suspend fun runningJob(id: Long): Job? = runningLock.withLock { running?.takeIf { it.id == id }?.job }
 
@@ -328,11 +348,13 @@ class ProcessingEngine internal constructor(
             val failed = tasks.failIfRunning(id, e.message ?: e.toString(), now())
             pruneWorkDir(id)
             if (failed) publish(id)
+            if (failed) queueUpdated()
             return
         }
         tasks.setCompleted(id, now())
         removeCompletedWorkDir(id)
         publish(id)
+        queueUpdated()
     }
 
     /**

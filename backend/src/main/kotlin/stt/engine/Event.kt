@@ -26,4 +26,10 @@ sealed interface Event {
     data class TaskDeleted(
         val id: Long,
     ) : Event
+
+    /** The queue as it is now; item 12's `queue-updated` event. */
+    data class QueueUpdated(
+        val paused: Boolean,
+        val taskIds: List<Long>,
+    ) : Event
 }
