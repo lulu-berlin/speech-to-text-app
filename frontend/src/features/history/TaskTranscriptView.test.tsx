@@ -13,6 +13,7 @@ import {
   turns as turnsFixture,
 } from '../../shared/api/fixtures';
 import { controllableEventStream } from '../../test/controllableEventStream';
+import { px, required } from '../../test/dom';
 import { server } from '../../test/server';
 
 function renderTranscript(taskId: string) {
@@ -578,6 +579,43 @@ describe('the transcript view', () => {
     expect(within(transcript).queryByText('Alice')).not.toBeInTheDocument();
     expect(field).toHaveValue('Speaker 1');
     expect(sent).toEqual([{ speaker: 'Alice' }, { speaker: null }]);
+  });
+});
+
+describe('the transcript loading states', () => {
+  it('renders nothing of its own before the snapshot, then the known parts with the mascot and a label in place of the turns until they arrive', async () => {
+    // The turns answer is held back until the test releases it.
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get('/api/tasks/:id/turns', async () => {
+        await held;
+        return HttpResponse.json(turnsFixture);
+      }),
+    );
+    const live = renderTranscript('3');
+
+    // Before the snapshot the shell's connecting region is the loading state; the view
+    // renders nothing of its own (no second mascot, no bare "Loading…").
+    expect(screen.getByRole('main').textContent).toBe('');
+    await live;
+
+    // The task is known: its downloads and Delete are there at once, and the mascot with
+    // a label stands where the turns will appear.
+    const label = await screen.findByText('Loading transcript…');
+    const mascot = required(required(label.parentElement).querySelector('svg'));
+    expect(getComputedStyle(mascot).width).toBe(px(lightTheme.sizes.stenoEmpty));
+    expect(getComputedStyle(label).color).toBe(asRgb(lightTheme.colors.textMuted));
+    expect(screen.getByRole('link', { name: 'Download transcript (txt)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.queryByText('Good morning.')).not.toBeInTheDocument();
+
+    // The turns arrive and take its place.
+    release();
+    expect(await screen.findByText('Good morning.')).toBeInTheDocument();
+    expect(screen.queryByText('Loading transcript…')).not.toBeInTheDocument();
   });
 });
 
