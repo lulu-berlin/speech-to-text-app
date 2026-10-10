@@ -11,10 +11,9 @@ repositories {
     mavenCentral()
 }
 
-// The version catalog is the single source of truth for sqlite-jdbc (roadmap item 27):
-// flyway-database-nc-sqlite once declared a newer version and resolved over the catalog
-// pin via highest-wins. Force the catalog version so no transitive can ever override it;
-// keep this in lockstep with `sqlite-jdbc` in gradle/libs.versions.toml.
+// sqlite-jdbc is forced at the catalog version (ADR 0042): flyway-database-nc-sqlite once resolved a
+// newer version over the catalog pin via highest-wins. The catalog stays the single source of truth —
+// change the version in gradle/libs.versions.toml, not here.
 configurations.configureEach {
     resolutionStrategy.force(libs.sqlite.jdbc)
 }
