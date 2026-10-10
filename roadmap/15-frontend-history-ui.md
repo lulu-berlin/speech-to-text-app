@@ -44,10 +44,10 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
-- [ ] The history list shows completed, failed and canceled tasks, newest first, and no pending ones
-- [ ] The filename search and the status filter narrow the list
-- [ ] A failed task shows its error message in the list
-- [ ] Opening a completed task shows its speaker turns with timestamps and each speaker's name with its own tint
+- [x] The history list shows completed, failed and canceled tasks, newest first, and no pending ones
+- [x] The filename search and the status filter narrow the list
+- [x] A failed task shows its error message in the list
+- [x] Opening a completed task shows its speaker turns with timestamps and each speaker's name with its own tint
 - [ ] A speakers-off transcript is shown without speaker labels
 - [ ] Each download button links to the transcript in its format
 - [ ] The audio player points at the task's audio endpoint; with `hasAudio` false no player is rendered and a note explains why
