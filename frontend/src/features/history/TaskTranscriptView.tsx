@@ -13,6 +13,7 @@ import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
 import { useTaskCommand } from './useTaskCommand';
 import { playbackMachine } from './playbackMachine';
+import { followModeMachine } from './followModeMachine';
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -164,7 +165,8 @@ export function TaskTranscriptView() {
   // Follow mode (item 10): while the playhead moves and the user has not scrolled by hand,
   // the active segment is kept in view. A hand scroll stops following; "Back to playing
   // position" resumes it.
-  const [following, setFollowing] = useState(true);
+  const [followMode, followModeSend] = useMachine(followModeMachine);
+  const following = followMode.matches('following');
   const transcriptRegionRef = useRef<HTMLDivElement>(null);
   // True right after we scroll the active segment ourselves, so the scroll event that
   // programmatic follow fires is not mistaken for the user's hand (cleared on the next
@@ -193,7 +195,7 @@ export function TaskTranscriptView() {
     if (holdOffFollowScrollRef.current) {
       return;
     }
-    setFollowing(false);
+    followModeSend({ type: 'SCROLLED' });
   };
 
   // Until the first snapshot lands, "no such task" just means the store has not loaded yet;
@@ -340,7 +342,7 @@ export function TaskTranscriptView() {
         )}
       </Stack>
       {!following ? (
-        <Button type="button" onClick={() => setFollowing(true)}>
+        <Button type="button" onClick={() => followModeSend({ type: 'RESUME' })}>
           Back to playing position
         </Button>
       ) : null}
