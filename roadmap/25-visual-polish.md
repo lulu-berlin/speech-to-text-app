@@ -74,7 +74,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] (discovered, confirmed 2026-10-10) The drop zone shows a distinct drag-over state while files are dragged over it (in the Proposal, missing from the list) (cycle 16, 2026-10-10)
 - [x] (discovered, confirmed 2026-10-10) A queue row being dragged to reorder looks lifted (dnd-kit `DragOverlay` or an equivalent; today the dragged row stays in place) (cycle 17, 2026-10-10; lift in place)
 - [x] (discovered, confirmed 2026-10-10) A History card's failed retry or delete shows the server's message, not the raw error (was `String(error)`: "Retry failed: ApiError: Task 42 does not exist") (cycle 13, 2026-10-10)
-- [ ] (discovered, confirmed 2026-10-10) The turn timestamps and the player read times the same way past one hour (turns use `formatTime`, minutes unbounded — "61:05"; the player and History use `formatDuration` — "1:01:05")
+- [x] (discovered, confirmed 2026-10-10) The turn timestamps and the player read times the same way past one hour (turns use `formatTime`, minutes unbounded — "61:05"; the player and History use `formatDuration` — "1:01:05") (cycle 20, 2026-10-10; h:mm:ss everywhere)
 
 ## Acceptance criteria
 
