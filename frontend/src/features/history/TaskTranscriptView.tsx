@@ -13,6 +13,7 @@ import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { LoadingState } from '../../shared/ui/LoadingState';
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
+import { TextLink } from '../../shared/ui/TextLink';
 import { turnsMachine } from './turnsMachine';
 import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
@@ -55,13 +56,6 @@ const DownloadLink = styled.a`
   &:hover {
     text-decoration: underline;
   }
-`;
-
-// The not-found callout's way back (item 25).
-const HistoryLink = styled(Link)`
-  color: ${(props) => props.theme.colors.accent};
-
-  ${focusRing}
 `;
 
 const Title = styled(PageHeading)`
@@ -283,7 +277,7 @@ export function TaskTranscriptView() {
           <ErrorCallout
             title="This task doesn't exist"
             detail="It was deleted, or the link is wrong."
-            action={<HistoryLink to="/history">Back to History</HistoryLink>}
+            action={<TextLink to="/history">Back to History</TextLink>}
           />
         </Stack>
       </Page>

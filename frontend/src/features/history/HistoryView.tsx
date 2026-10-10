@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
 import styled from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { List } from '../../shared/ui/List';
 import type { Task } from '../../shared/api/types';
-import { focusRing } from '../../shared/ui/focusRing';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
+import { TextLink } from '../../shared/ui/TextLink';
 import { TextButton } from '../../shared/ui/TextButton';
 import { HistoryRow } from './HistoryRow';
 
@@ -28,13 +27,6 @@ const Title = styled(PageHeading)`
 
 const Controls = styled(Row)`
   flex-wrap: wrap;
-`;
-
-// The empty state's action, an inline link in the guidance line.
-const QueueLink = styled(Link)`
-  color: ${(props) => props.theme.colors.accent};
-
-  ${focusRing}
 `;
 
 // The no-matches state (item 25): a compact muted line with the action that clears the
@@ -119,7 +111,7 @@ export function HistoryView() {
           </>
         ) : live ? (
           <EmptyState title="No transcripts yet">
-            Finished tasks appear here — <QueueLink to="/queue">go to the queue</QueueLink> to add
+            Finished tasks appear here — <TextLink to="/queue">go to the queue</TextLink> to add
             audio
           </EmptyState>
         ) : null}
