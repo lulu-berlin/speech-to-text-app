@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { createActor, waitFor } from 'xstate';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
-import { error as errorFixture, taskPaused } from '../api/fixtures';
+import { error as errorFixture, taskRunning } from '../api/fixtures';
 import { ApiError } from '../api/types';
 import { commandMachine } from './commandMachine';
 
@@ -31,13 +31,14 @@ describe('the command machine', () => {
   });
 
   it('goes sending to done with the task from the response, or to failed with the typed error', async () => {
-    // pause task 5 (RUNNING) -> the handler serves task.paused.json with the URL's id.
+    // Mock addition (revised, item 14): pause task 5 (RUNNING) answers with task 5
+    // itself, paused — snapshot.json's lecture.m4a, which equals task.running.json.
     const done = createActor(commandMachine, {
       input: { command: 'pause', taskId: 5, status: 'RUNNING' },
     }).start();
     done.send({ type: 'START' });
     const finished = await waitFor(done, (state) => state.matches('done'), { timeout: 2000 });
-    expect(finished.context.task).toEqual({ ...taskPaused, id: 5 });
+    expect(finished.context.task).toEqual({ ...taskRunning, status: 'PAUSED' });
     done.stop();
 
     // Mock addition: the cancel handler is overridden with error.json at 409, because
