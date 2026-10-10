@@ -433,3 +433,51 @@ describe('reduced motion', () => {
     expect(gated.length).toBeGreaterThan(0);
   });
 });
+
+describe('the shell and the views on the tokens', () => {
+  it('renders every view on the token background and text, inside the layout primitives, with the header on the token border', async () => {
+    // Each view falls back to the page token background and text; the page and its stack
+    // are the layout primitives; the header's rule is the border token.
+    const assertView = () => {
+      const main = screen.getByRole('main');
+      expect(getComputedStyle(main).backgroundColor).toBe(asRgb(lightTheme.colors.background));
+      expect(getComputedStyle(main).color).toBe(asRgb(lightTheme.colors.text));
+      const page = required(main.firstElementChild) as HTMLElement;
+      expect(getComputedStyle(page).marginLeft).toBe('auto');
+      expect(getComputedStyle(page).marginRight).toBe('auto');
+      const stack = required(page.firstElementChild) as HTMLElement;
+      expect(getComputedStyle(stack).display).toBe('flex');
+      expect(getComputedStyle(stack).flexDirection).toBe('column');
+      const header = required(document.querySelector('header')) as HTMLElement;
+      expect(getComputedStyle(header).borderBottomColor).toBe(asRgb(lightTheme.colors.border));
+    };
+
+    const queue = renderAt('/queue');
+    await screen.findByText('lecture.m4a');
+    assertView();
+    queue.unmount();
+
+    const history = renderAt('/history');
+    await screen.findByRole('searchbox', { name: /search/i });
+    assertView();
+    history.unmount();
+
+    const transcript = renderAt('/history/3');
+    await screen.findByText('Good morning.');
+    assertView();
+    transcript.unmount();
+
+    const failed = renderAt('/history/4');
+    await screen.findByRole('heading', { name: 'call.ogg' });
+    assertView();
+    failed.unmount();
+
+    const pending = renderAt('/history/7');
+    await screen.findByRole('heading', { name: 'memo.wav' });
+    assertView();
+    pending.unmount();
+
+    renderAt('/no-such-page');
+    assertView();
+  });
+});
