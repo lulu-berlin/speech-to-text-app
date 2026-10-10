@@ -70,7 +70,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] With reduced motion requested, no non-essential animation runs
 - [x] Keyboard focus is visible in every view (cycle 8, 2026-10-10; the native audio element goes with the themed player)
 - [ ] The existing view and machine tests stay green
-- [ ] (discovered, confirmed 2026-10-10) The upload row's progress bar has a visible width at desktop and phone widths (it sits beside the filename as a flex item with no width of its own, so it collapses to its border)
+- [x] (discovered, confirmed 2026-10-10) The upload row's progress bar has a visible width at desktop and phone widths (it sat beside the filename as a flex item with no width of its own, so it collapsed to its border) (cycle 14, 2026-10-10)
 - [ ] (discovered, confirmed 2026-10-10) The drop zone shows a distinct drag-over state while files are dragged over it (in the Proposal, missing from the list)
 - [ ] (discovered, confirmed 2026-10-10) A queue row being dragged to reorder looks lifted (dnd-kit `DragOverlay` or an equivalent; today the dragged row stays in place)
 - [x] (discovered, confirmed 2026-10-10) A History card's failed retry or delete shows the server's message, not the raw error (was `String(error)`: "Retry failed: ApiError: Task 42 does not exist") (cycle 13, 2026-10-10)
