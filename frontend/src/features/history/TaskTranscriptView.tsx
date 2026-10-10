@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useMachine } from '@xstate/react';
 import { Link, useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
-import { getTurns } from '../../shared/api/client';
 import { ApiError } from '../../shared/api/types';
-import type { Segment, Task, TaskPhase, Turn, Turns } from '../../shared/api/types';
+import type { Segment, Task, TaskPhase, Turn } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
@@ -13,6 +12,8 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { LoadingState } from '../../shared/ui/LoadingState';
+import { ErrorCallout } from '../../shared/ui/ErrorCallout';
+import { turnsMachine } from './turnsMachine';
 import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
@@ -137,7 +138,7 @@ export function TaskTranscriptView() {
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const connection = ConnectionContext.useSelector((state) => state.value);
   const task = tasks.find((candidate) => candidate.id === id);
-  const [turns, setTurns] = useState<Turns | null>(null);
+  const completed = task?.status === 'COMPLETED';
 
   // Delete from the detail view (status page and transcript), always confirmed (decision B,
   // 2026-10-10): the flow lives in confirmActionMachine; on success the view returns to the
@@ -151,38 +152,16 @@ export function TaskTranscriptView() {
     }
   }, [deleteState, navigate]);
 
-  // The one place the view reads /turns: the answer replaces the turns while `isCurrent()`
-  // holds (an effect cleaned up meanwhile drops it), and a failure runs `onFailure`.
-  const loadTurns = (isCurrent: () => boolean, onFailure: () => void) => {
-    getTurns(id)
-      .then((result) => {
-        if (isCurrent()) {
-          setTurns(result);
-        }
-      })
-      .catch(() => {
-        if (isCurrent()) {
-          onFailure();
-        }
-      });
-  };
-
+  // The turns of a completed task load through turnsMachine (only a completed task has
+  // turns; the backend answers 409 not-completed otherwise): once per task, again when the
+  // view moves to another task, and on Retry after a failure.
+  const [turnsState, turnsSend] = useMachine(turnsMachine, { input: { taskId: id } });
   useEffect(() => {
-    // Only a completed task has turns (the backend answers 409 not-completed otherwise).
-    if (task === undefined || task.status !== 'COMPLETED') {
-      return;
+    if (completed && (turnsState.matches('idle') || turnsState.context.taskId !== id)) {
+      turnsSend({ type: 'LOAD', taskId: id });
     }
-    let cancelled = false;
-    /* The turns fetch failing is handled by a later item (the failed/status page and the
-       not-found view); until then a failed load leaves the turns empty. */
-    loadTurns(
-      () => !cancelled,
-      () => setTurns(null),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [id, task]);
+  }, [completed, id, turnsState, turnsSend]);
+  const turns = turnsState.context.turns;
 
   // Item 22: the latest speakers event of this task. A rename brings the names (the turns
   // stay as they are); a merge or a reset can join or split turns, so /turns is read again.
@@ -192,21 +171,12 @@ export function TaskTranscriptView() {
       return;
     }
     if (!speakerChange.merged) {
-      setTurns((previous) =>
-        previous === null ? previous : { ...previous, speakers: speakerChange.speakers },
-      );
+      turnsSend({ type: 'SPEAKERS', speakers: speakerChange.speakers });
       return;
     }
-    let cancelled = false;
-    // A failed reload keeps the transcript as it was; the next event or visit reads it again.
-    loadTurns(
-      () => !cancelled,
-      () => {},
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [id, speakerChange]);
+    // A failed reload lands on the turns error callout, like the initial load.
+    turnsSend({ type: 'RELOAD' });
+  }, [id, speakerChange, turnsSend]);
 
   const theme = useTheme();
   const tints = theme.colors.speakerTints;
@@ -421,27 +391,34 @@ export function TaskTranscriptView() {
           </Button>
         </Row>
         {audioBlock}
-        {turns !== null && turns.speakers.length > 0 ? (
+{turns !== null && turns.speakers.length > 0 ? (
           // Item 22: the panel edits the effective speakers; a stored change replaces the
           // speakers the turns are labelled with (turns reference them by speakerId).
           <SpeakersPanel
             taskId={id}
             speakers={turns.speakers}
             hasMerges={turns.hasMerges}
-            onSpeakersChanged={(speakers) =>
-              setTurns((previous) => (previous === null ? previous : { ...previous, speakers }))
-            }
-            // A merge or a reset joins or splits turns, so the turns are read again; a failed
-            // reload keeps the transcript as it was.
-            onMergesChanged={() =>
-              loadTurns(
-                () => true,
-                () => {},
-              )
-            }
+            onSpeakersChanged={(speakers) => turnsSend({ type: 'SPEAKERS', speakers })}
+            // A merge or a reset joins or splits turns, so the turns are read again; a
+            // failed reload shows the turns error callout, like the initial load.
+            onMergesChanged={() => turnsSend({ type: 'RELOAD' })}
           />
         ) : null}
-        {turnsBySpeaker === null ? (
+        {turnsState.matches('failed') ? (
+          <ErrorCallout
+            title="Couldn't load the transcript"
+            detail={errorMessage(turnsState.context.error)}
+            action={
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => turnsSend({ type: 'RETRY' })}
+              >
+                Retry
+              </Button>
+            }
+          />
+        ) : turnsBySpeaker === null ? (
           <LoadingState label="Loading transcript…" />
         ) : (
           <TranscriptRegion
