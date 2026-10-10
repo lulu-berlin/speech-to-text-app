@@ -62,6 +62,7 @@ export interface Task {
   sizeBytes: number;
   transcriptionProgress: number;
   diarizationStage: DiarizationStage;
+  hasAudio: boolean;
   diarizationProgress: number | null;
   error: string | null;
   transcribedUntilMs: number | null;

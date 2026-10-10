@@ -31,6 +31,11 @@ const Title = styled(PageHeading)`
   margin: 0;
 `;
 
+const NoAudioNote = styled(Text)`
+  color: ${(props) => props.theme.colors.textMuted};
+  font-size: ${(props) => props.theme.fontSizes.small};
+`;
+
 const TurnText = styled(Text)`
   margin: 0;
 `;
@@ -110,6 +115,17 @@ export function TaskTranscriptView() {
             </DownloadLink>
           ))}
         </Row>
+        {task?.hasAudio ? (
+          <audio
+            controls
+            src={`/api/tasks/${id}/audio`}
+            aria-label={task?.filename !== undefined ? `Audio for ${task.filename}` : 'Audio'}
+          >
+            Your browser does not support the audio element.
+          </audio>
+        ) : task !== undefined ? (
+          <NoAudioNote>This task has no audio because it ended before chunking.</NoAudioNote>
+        ) : null}
         {turnsBySpeaker === null ? (
           <Text>Loading…</Text>
         ) : (
