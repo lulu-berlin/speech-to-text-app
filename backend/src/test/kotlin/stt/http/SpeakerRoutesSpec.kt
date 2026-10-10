@@ -75,6 +75,41 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("a COMPLETED task with speakers 0, 1 and 2, and another COMPLETED task (queue paused)") {
+            `when`("speakers are renamed to names the task already has, in any case, and to their own name") {
+                then("another speaker's name, in any case, answers 409 duplicate-speaker-name; own and other tasks' names pass") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), threeSegments, speakerIds = listOf(0, 1, 2))
+                    val otherId = seed(dataDir, completed("other.wav"), twoSegments, speakerIds = listOf(0, 1))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
+                        client.rename(otherId, speakerId = 0, "Bob").status shouldBe HttpStatusCode.OK
+
+                        // Another speaker of the task already has the name: exactly, in another case, or as an
+                        // untouched default name (user decision 2026-10-10: compared case-insensitively).
+                        for ((speakerId, taken) in listOf(1 to "Alice", 1 to "ALICE", 2 to "alice", 1 to "speaker 3")) {
+                            withClue("speaker $speakerId renamed to \"$taken\"") {
+                                val response = client.rename(id, speakerId, taken)
+                                response.status shouldBe HttpStatusCode.Conflict
+                                val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                                body shouldHaveShapeOf apiExample("error.json")
+                                body.getValue("error").jsonPrimitive.content shouldBe "duplicate-speaker-name"
+                            }
+                        }
+                        client.speakersOf(id) shouldBe speakers("Alice", "Speaker 2", "Speaker 3")
+
+                        // A speaker's own name, in any case, is no duplicate; another task's names do not count.
+                        client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
+                        client.rename(id, speakerId = 0, "ALICE").status shouldBe HttpStatusCode.OK
+                        client.rename(id, speakerId = 2, "Bob").status shouldBe HttpStatusCode.OK
+                        client.speakersOf(id) shouldBe speakers("ALICE", "Speaker 2", "Bob")
+                    }
+                }
+            }
+        }
     })
 
 /** Two segments of a task, one per speaker once `storeSpeakers(listOf(0, 1))` has run. */
@@ -82,6 +117,14 @@ private val twoSegments =
     listOf(
         Segment(0, 0, 0, 1_000, " Hello.", speakerId = null),
         Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null),
+    )
+
+/** Three segments of a task, one per speaker once `storeSpeakers(listOf(0, 1, 2))` has run. */
+private val threeSegments =
+    listOf(
+        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null),
+        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null),
+        Segment(0, 2, 2_000, 3_000, " Hey.", speakerId = null),
     )
 
 /** A COMPLETED copy of a freshly queued task. */

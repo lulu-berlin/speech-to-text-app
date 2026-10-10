@@ -113,22 +113,32 @@ class SegmentRepository(
 
     /**
      * Renames one speaker of the task (item 22): updates only that speaker's row, so no segment row and no other
-     * speaker is touched. The caller (the rename route) has already validated the name and the speaker's existence;
-     * a missing row here fails loudly.
+     * speaker is touched. Within the same write transaction, a name that another speaker of the task already has,
+     * compared case-insensitively, is refused as [RenameOutcome.DuplicateName] and nothing is stored (user decisions
+     * 2026-10-10). Every `speakers` row counts, a merged one included, so undoing merges never yields two speakers
+     * with one name; the speaker's own current name is no duplicate. The caller (the rename route) has already
+     * validated the name and the speaker's existence; a missing row here fails loudly.
      */
     suspend fun renameSpeaker(
         taskId: Long,
         speakerId: Int,
         name: String,
-    ) {
+    ): RenameOutcome =
         db.writeTransaction {
+            val clash =
+                SpeakersTable
+                    .selectAll()
+                    .where { SpeakersTable.taskId eq taskId }
+                    .map { row -> Speaker(speakerId = row[SpeakersTable.speakerId], speaker = row[SpeakersTable.speaker]) }
+                    .firstOrNull { it.speakerId != speakerId && it.speaker.equals(name, ignoreCase = true) }
+            if (clash != null) return@writeTransaction RenameOutcome.DuplicateName(clash)
             val updated =
                 SpeakersTable.update({ (SpeakersTable.taskId eq taskId) and (SpeakersTable.speakerId eq speakerId) }) {
                     it[speaker] = name
                 }
             check(updated == 1) { "Task $taskId has no speaker $speakerId" }
+            RenameOutcome.Renamed
         }
-    }
 
     /** The task's speakers in `speaker_id` order. */
     suspend fun findSpeakers(taskId: Long): List<Speaker> =

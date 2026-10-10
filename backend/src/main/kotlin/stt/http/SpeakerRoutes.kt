@@ -8,6 +8,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
+import stt.db.RenameOutcome
 import stt.db.SegmentRepository
 
 /**
@@ -15,7 +16,8 @@ import stt.db.SegmentRepository
  * stores the name as sent and answers `200` with the task's speakers (`docs/api/speakers.json`). Clients trim
  * (user decision 2026-10-10), so a name with leading or trailing whitespace, an empty one, one longer than
  * [MAX_SPEAKER_NAME] characters, or one with a control character anywhere answers `400 invalid-speaker-name` and
- * changes nothing.
+ * changes nothing; a name another speaker of the task already has, in any letter case, answers
+ * `409 duplicate-speaker-name`.
  */
 fun Application.speakerRoutes() {
     val segments: SegmentRepository by dependencies
@@ -31,8 +33,19 @@ fun Application.speakerRoutes() {
                     "speaker must be 1–$MAX_SPEAKER_NAME characters, without leading or trailing whitespace or control characters",
                 )
             }
-            segments.renameSpeaker(id, speakerId, name)
-            call.respond(SpeakersJson(segments.findSpeakers(id).map { SpeakerJson(it.speakerId, it.speaker) }))
+            when (val outcome = segments.renameSpeaker(id, speakerId, name)) {
+                RenameOutcome.Renamed -> {
+                    call.respond(SpeakersJson(segments.findSpeakers(id).map { SpeakerJson(it.speakerId, it.speaker) }))
+                }
+
+                is RenameOutcome.DuplicateName -> {
+                    call.respondError(
+                        HttpStatusCode.Conflict,
+                        "duplicate-speaker-name",
+                        "Speaker ${outcome.existing.speakerId} of task $id is already named \"${outcome.existing.speaker}\"",
+                    )
+                }
+            }
         }
     }
 }
