@@ -23,7 +23,7 @@ describe('the slider', () => {
     const rootSpan = required(required(required(root.parentElement).parentElement));
     const track = required(rootSpan.firstElementChild);
     expect(getComputedStyle(track).height).toBe(px(lightTheme.spacing.xs));
-    expect(getComputedStyle(track).backgroundColor).toBe(asRgb(lightTheme.colors.border));
+    expect(getComputedStyle(track).backgroundColor).toBe(asRgb(lightTheme.colors.control));
     const range = required(track.firstElementChild);
     expect(getComputedStyle(range).backgroundColor).toBe(asRgb(lightTheme.colors.accent));
 
@@ -32,6 +32,7 @@ describe('the slider', () => {
     expect(thumbStyle.width).toBe(px(lightTheme.sizes.sliderThumb));
     expect(thumbStyle.height).toBe(px(lightTheme.sizes.sliderThumb));
     expect(thumbStyle.backgroundColor).toBe(asRgb(lightTheme.colors.surfaceRaised));
+    expect(thumbStyle.borderTopColor).toBe(asRgb(lightTheme.colors.control));
 
     // The arrow keys step the value (Radix's arrow-key handling).
     fireEvent.keyDown(root, { key: 'ArrowRight' });

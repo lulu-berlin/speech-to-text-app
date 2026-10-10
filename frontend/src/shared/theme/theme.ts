@@ -20,6 +20,9 @@ export interface ThemeTokens {
     danger: string;
     // The dimming layer under dialogs and menus (an alpha value; theme.ts may hold it).
     overlay: string;
+    // The neutral that marks a control's shape and state (unchecked switch track, slider
+    // rail and thumb border): at least 3:1 against every surface (WCAG 1.4.11).
+    control: string;
     // Button state fills (primary and danger hover/active, secondary active; the base
     // fills are accent/surface/danger, secondary hover is surfaceRaised).
     buttonPrimaryHover: string;
@@ -184,6 +187,7 @@ export const lightTheme: ThemeTokens = {
     focusRing: '#0057a8',
     danger: '#b42318',
     overlay: 'rgba(16, 24, 40, 0.4)',
+    control: '#7c838e',
     buttonPrimaryHover: '#004b94',
     buttonPrimaryActive: '#00407f',
     buttonSecondaryActive: '#e8ecf1',
@@ -217,6 +221,7 @@ export const darkTheme: ThemeTokens = {
     focusRing: '#7fb2e5',
     danger: '#f28b82',
     overlay: 'rgba(0, 0, 0, 0.5)',
+    control: '#7e8794',
     buttonPrimaryHover: '#93bceb',
     buttonPrimaryActive: '#a4c8f0',
     buttonSecondaryActive: '#242a31',

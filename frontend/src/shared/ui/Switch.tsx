@@ -10,7 +10,7 @@ const Track = styled(SwitchPrimitive.Root)`
   height: ${(props) => props.theme.sizes.switchHeight};
   padding: ${(props) => props.theme.borderWidths.thin};
   border-radius: ${(props) => props.theme.radii.pill};
-  background: ${(props) => props.theme.colors.border};
+  background: ${(props) => props.theme.colors.control};
   cursor: pointer;
 
   &[data-state='checked'] {

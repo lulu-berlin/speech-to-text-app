@@ -13,7 +13,7 @@ const Track = styled(SliderPrimitive.Track)`
   flex-grow: 1;
   height: ${(props) => props.theme.spacing.xs};
   border-radius: ${(props) => props.theme.radii.pill};
-  background: ${(props) => props.theme.colors.border};
+  background: ${(props) => props.theme.colors.control};
 `;
 
 const Range = styled(SliderPrimitive.Range)`
@@ -29,7 +29,7 @@ const Thumb = styled(SliderPrimitive.Thumb)`
   display: block;
   width: ${(props) => props.theme.sizes.sliderThumb};
   height: ${(props) => props.theme.sizes.sliderThumb};
-  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
+  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.control};
   border-radius: ${(props) => props.theme.radii.pill};
   background: ${(props) => props.theme.colors.surfaceRaised};
 
