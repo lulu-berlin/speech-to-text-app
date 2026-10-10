@@ -276,6 +276,16 @@ class ClusteringSpec :
             }
         }
 
+        given("a tie-heavy matrix") {
+            `when`("clustering runs twice on the same input") {
+                then("both runs produce the identical merge sequence") {
+                    // The four merges tied at 0.2 and the three tied at 1 (see [tiedMatrix]) may pair differently from
+                    // the item 09 order — accepted — but a given input must always resolve the same way.
+                    upgmaMerges(tiedMatrix()).shouldBe(upgmaMerges(tiedMatrix()))
+                }
+            }
+        }
+
         given("random L2-normalized matrices without exact distance ties") {
             `when`("the labels are compared with the naive reference, auto and fixed counts") {
                 then("they match") {
