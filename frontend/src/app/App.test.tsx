@@ -60,7 +60,7 @@ describe('the app root', () => {
     expect(style.height).toBe(px(lightTheme.sizes.stenoHeader));
   });
 
-  it('redirects / to /queue, shows the history and transcript views, and a not-found view otherwise', () => {
+  it('redirects / to /queue, shows the history and transcript views, and a not-found view otherwise', async () => {
     const queue = renderAt('/');
     expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument();
     queue.unmount();
@@ -69,8 +69,10 @@ describe('the app root', () => {
     expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
     history.unmount();
 
+    // The transcript view renders nothing of its own before the snapshot (item 25), so the
+    // route is identified by its page for task 7 (memo.wav, still queued in snapshot.json).
     const transcript = renderAt('/history/7');
-    expect(screen.getByRole('heading', { name: 'Transcript' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'memo.wav' })).toBeInTheDocument();
     transcript.unmount();
 
     renderAt('/no-such-page');

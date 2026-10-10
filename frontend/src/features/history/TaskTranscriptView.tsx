@@ -12,6 +12,7 @@ import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
+import { LoadingState } from '../../shared/ui/LoadingState';
 import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
@@ -286,22 +287,20 @@ export function TaskTranscriptView() {
     followModeSend({ type: 'SCROLLED' });
   };
 
-  // Until the first snapshot lands, "no such task" just means the store has not loaded yet;
-  // only once the connection is live is an absent id a missing task (deleted or never made).
+  // Until the first snapshot lands, "no such task" just means the store has not loaded yet,
+  // and the shell's connecting region is the loading state, so the view renders nothing of
+  // its own (item 25); only once the connection is live is an absent id a missing task
+  // (deleted or never made).
   if (task === undefined) {
+    if (connection !== 'live') {
+      return null;
+    }
     return (
       <Page>
-        {connection === 'live' ? (
-          <Stack gap="md">
-            <Title>Task not found</Title>
-            <Text>The task does not exist or was deleted.</Text>
-          </Stack>
-        ) : (
-          <Stack gap="md">
-            <Title>Transcript</Title>
-            <Text>Loading…</Text>
-          </Stack>
-        )}
+        <Stack gap="md">
+          <Title>Task not found</Title>
+          <Text>The task does not exist or was deleted.</Text>
+        </Stack>
       </Page>
     );
   }
@@ -443,7 +442,7 @@ export function TaskTranscriptView() {
           />
         ) : null}
         {turnsBySpeaker === null ? (
-          <Text>Loading…</Text>
+          <LoadingState label="Loading transcript…" />
         ) : (
           <TranscriptRegion
             ref={transcriptRegionRef}
