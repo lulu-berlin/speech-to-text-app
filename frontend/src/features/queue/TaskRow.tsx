@@ -19,7 +19,7 @@ import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { Row, Stack } from '../../shared/ui/layout';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { rowActionMachine } from './rowActionMachine';
-import { RowContent, RowName } from './rowParts';
+import { RowContent, RowControls, RowName } from './rowParts';
 
 // The phase a task is in, as a text label next to its status (none while queued).
 const PHASE_LABELS: Record<NonNullable<TaskPhase>, string> = {
@@ -142,7 +142,7 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
       <Stack gap="sm">
         <RowContent>
           <RowName>{task.filename}</RowName>
-          <Row>
+          <RowControls>
             {task.phase !== null ? <RowPhase>{PHASE_LABELS[task.phase]}</RowPhase> : null}
             <StatusBadge status={task.status} />
             {dragHandleProps !== undefined ? (
@@ -174,7 +174,7 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
               align="end"
               items={menuItems}
             />
-          </Row>
+          </RowControls>
         </RowContent>
         {action.matches({ ready: 'failed' }) ? (
           <RowActionError>{errorMessage(action.context.error)}</RowActionError>

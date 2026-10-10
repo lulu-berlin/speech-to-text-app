@@ -20,6 +20,28 @@ const Header = styled.header`
   padding: 0 ${(props) => props.theme.spacing.lg} 0 0;
   border-bottom: ${(props) => props.theme.borderWidths.thin} solid
     ${(props) => props.theme.colors.border};
+
+  // On a phone the header wraps: the mascot and title on the first line, the controls
+  // group on its own line below (item 25).
+  @media (max-width: ${(props) => props.theme.breakpoints.sm}) {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+`;
+
+// The navigation, the connection indicator and the theme control: the rest of the first
+// line on desktop, a line of its own on a phone (indented to the page padding there,
+// since the mascot that touches the page edge is above it).
+const HeaderControls = styled.div`
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.lg};
+
+  @media (max-width: ${(props) => props.theme.breakpoints.sm}) {
+    flex-basis: 100%;
+    padding: 0 0 ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
+  }
 `;
 
 const Title = styled.h1`
@@ -82,18 +104,20 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
     <Header>
       <StenographerAnimation typing={running} />
       <Title>Speech-to-Text</Title>
-      <Nav>
-        <NavItem to="/queue">Queue</NavItem>
-        <NavItem to="/history">History</NavItem>
-      </Nav>
-      <Indicator>{CONNECTION_LABEL[connection]}</Indicator>
-      <Tooltip label={THEME_LABEL[themeMode]}>
-        <IconButton
-          icon={THEME_ICON[themeMode]}
-          label={THEME_LABEL[themeMode]}
-          onClick={onCycleThemeMode}
-        />
-      </Tooltip>
+      <HeaderControls>
+        <Nav>
+          <NavItem to="/queue">Queue</NavItem>
+          <NavItem to="/history">History</NavItem>
+        </Nav>
+        <Indicator>{CONNECTION_LABEL[connection]}</Indicator>
+        <Tooltip label={THEME_LABEL[themeMode]}>
+          <IconButton
+            icon={THEME_ICON[themeMode]}
+            label={THEME_LABEL[themeMode]}
+            onClick={onCycleThemeMode}
+          />
+        </Tooltip>
+      </HeaderControls>
     </Header>
   );
 }
