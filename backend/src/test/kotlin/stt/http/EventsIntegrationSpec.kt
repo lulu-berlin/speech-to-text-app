@@ -4,8 +4,6 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.ranges.shouldBeIn
 import io.kotest.matchers.shouldBe
-import io.ktor.server.engine.embeddedServer
-import io.ktor.server.netty.Netty
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -19,10 +17,6 @@ import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.transcribe.transcriptFixtures
 import java.io.ByteArrayInputStream
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.file.Files
 
 /**
@@ -46,52 +40,38 @@ class EventsIntegrationSpec :
                         )
                     }
 
-                    val server =
-                        embeddedServer(Netty, port = 0, host = "127.0.0.1") {
-                            sttApp(Config(dataDir, realSpeakerModelPath(), whisperModel, device = Device.Cpu))
-                        }
-                    server.start(wait = false)
-                    val base = "http://127.0.0.1:${server.engine.resolvedConnectors().single().port}"
-                    val http = HttpClient.newHttpClient()
-                    try {
-                        val body =
-                            http
-                                .send(
-                                    HttpRequest.newBuilder(URI("$base/api/events")).GET().build(),
-                                    HttpResponse.BodyHandlers.ofInputStream(),
-                                ).body()
-                        val events = SseTestReader(body.bufferedReader())
+                    SseServer({ sttApp(Config(dataDir, realSpeakerModelPath(), whisperModel, device = Device.Cpu)) })
+                        .use { server ->
+                            val events = server.connectEvents()
 
-                        val (snapshotName, _) = events.readEvent()
-                        snapshotName shouldBe "snapshot"
+                            val (snapshotName, _) = events.readEvent()
+                            snapshotName shouldBe "snapshot"
 
-                        // Drain until the task progressed and then completed; the per-line deadline in
-                        // SseTestReader plus this check gives the whole run a bound.
-                        var sawProgress = false
-                        var completed = false
-                        val deadline = System.currentTimeMillis() + 3 * 60_000L
-                        while (!(sawProgress && completed)) {
-                            check(System.currentTimeMillis() < deadline) { "timed out before the task progressed and completed" }
-                            val (name, data) = events.readEvent()
-                            val json = Json.parseToJsonElement(data).jsonObject
-                            when (name) {
-                                "task-progress" -> {
-                                    sawProgress = true
-                                    json
-                                        .getValue("transcriptionProgress")
-                                        .jsonPrimitive.content
-                                        .toDouble()
-                                        .shouldBeIn(0.0..1.0)
-                                }
+                            // Drain until the task progressed and then completed; the per-line deadline in
+                            // SseTestReader plus this check gives the whole run a bound.
+                            var sawProgress = false
+                            var completed = false
+                            val deadline = System.currentTimeMillis() + 3 * 60_000L
+                            while (!(sawProgress && completed)) {
+                                check(System.currentTimeMillis() < deadline) { "timed out before the task progressed and completed" }
+                                val (name, data) = events.readEvent()
+                                val json = Json.parseToJsonElement(data).jsonObject
+                                when (name) {
+                                    "task-progress" -> {
+                                        sawProgress = true
+                                        json
+                                            .getValue("transcriptionProgress")
+                                            .jsonPrimitive.content
+                                            .toDouble()
+                                            .shouldBeIn(0.0..1.0)
+                                    }
 
-                                "task-updated" -> {
-                                    if (json.getValue("status").jsonPrimitive.content == "COMPLETED") completed = true
+                                    "task-updated" -> {
+                                        if (json.getValue("status").jsonPrimitive.content == "COMPLETED") completed = true
+                                    }
                                 }
                             }
                         }
-                    } finally {
-                        server.stop(gracePeriodMillis = 100, timeoutMillis = 5_000)
-                    }
                 }
             }
         }
