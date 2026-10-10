@@ -10,7 +10,7 @@ import { focusRing } from '../../shared/ui/focusRing';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { Row, Stack } from '../../shared/ui/layout';
-import { Text } from '../../shared/ui/typography';
+import { MetaText, Text } from '../../shared/ui/typography';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
@@ -24,12 +24,6 @@ import { formatTaskMeta } from './formatTask';
 const Filename = styled.span`
   color: ${(props) => props.theme.colors.text};
   font-weight: ${(props) => props.theme.fontWeights.medium};
-`;
-
-const Meta = styled(Text)`
-  margin: 0;
-  color: ${(props) => props.theme.colors.textMuted};
-  font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
 const ErrorLine = styled(Text)`
@@ -85,8 +79,8 @@ export function HistoryRow({ task }: { task: Task }) {
           </TaskLink>
           <StatusBadge status={task.status} />
         </Row>
-        <Meta>{formatTaskMeta(task)}</Meta>
-        {task.error !== null ? <Meta>{task.error}</Meta> : null}
+        <MetaText>{formatTaskMeta(task)}</MetaText>
+        {task.error !== null ? <MetaText>{task.error}</MetaText> : null}
         <Row gap="sm">
           {isAllowedCommand('retry', task.status) ? (
             <Button

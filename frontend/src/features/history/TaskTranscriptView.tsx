@@ -6,7 +6,7 @@ import { ConnectionContext } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
 import type { Segment, Task, TaskPhase } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
-import { PageHeading, Text } from '../../shared/ui/typography';
+import { MetaText, PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { speakerTint } from '../../shared/theme/speakerPalette';
@@ -65,14 +65,6 @@ const DownloadLink = styled.a`
 
 const Title = styled(PageHeading)`
   margin: 0;
-`;
-
-// The header block's second line: the finish date and the duration, muted, in the History
-// card's format (item 25).
-const HeaderMeta = styled(Text)`
-  margin: 0;
-  color: ${(props) => props.theme.colors.textMuted};
-  font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
 const NoAudioNote = styled(Text)`
@@ -384,7 +376,7 @@ const runCommand = useTaskCommand();
       <Stack gap="md">
         <Stack gap="xs">
           <Title>{task.filename}</Title>
-          <HeaderMeta>{formatTaskMeta(task)}</HeaderMeta>
+          <MetaText>{formatTaskMeta(task)}</MetaText>
         </Stack>
         <Row gap="sm">
           {DOWNLOAD_FORMATS.map((format) => (
