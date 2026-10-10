@@ -20,9 +20,11 @@ import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
-import { Page, Stack } from '../../shared/ui/layout';
+import { Switch } from '../../shared/ui/Switch';
+import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { toggleMachine } from '../../shared/state/toggleMachine';
+import { queuePauseMachine } from './queuePauseMachine';
 import { reorderMachine } from './reorderMachine';
 import { RowContent, RowName } from './rowParts';
 import { SortableTaskRow } from './SortableTaskRow';
@@ -187,6 +189,7 @@ function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
 }
 
 export function QueueView() {
+  const connection = ConnectionContext.useActorRef();
   const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
   const [language, setLanguage] = useState(languages.default);
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
@@ -197,11 +200,20 @@ export function QueueView() {
   const [reorder, sendReorder] = useMachine(reorderMachine, {
     input: { order: queue?.taskIds ?? [] },
   });
+  const [pause, sendPause] = useMachine(queuePauseMachine);
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // The pause POST answered: apply its queue to the live state (the server's own
+  // queue-updated carries the same queue, so applying it twice is harmless).
+  useEffect(() => {
+    if (pause.context.queue !== null) {
+      connection.send({ type: 'queue-updated', queue: pause.context.queue });
+    }
+  }, [pause.context.queue, connection]);
 
   // Follow the live queue while no reorder is in flight: a new upload or a removal
   // reconciles into the displayed order (the machine ignores SYNC while sending).
@@ -339,6 +351,15 @@ export function QueueView() {
             ))}
           </List>
         ) : null}
+        <Row gap="sm">
+          <span>Pause the queue</span>
+          <Switch
+            checked={queue?.paused ?? false}
+            onCheckedChange={() => sendPause({ type: 'TOGGLE', paused: !(queue?.paused ?? false) })}
+            label="Pause the queue"
+            disabled={pause.matches('sending')}
+          />
+        </Row>
         {pendingTasks.length > 0 ? (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <SortableContext items={reorder.context.order} strategy={verticalListSortingStrategy}>
