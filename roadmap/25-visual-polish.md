@@ -67,12 +67,12 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
   - [x] (e) The not-found view and "task not found" use the same error callout (cycle 7, 2026-10-10)
 - [ ] Screenshots at phone and desktop widths, light and dark, are captured for item 21's approval; the Queue's empty state offers the upload action
 - [x] The transcription bar shows a percentage and the diarization bar its stage label (cycle 1, 2026-10-10; refactor approved: the diarization aria text now matches the visible within-stage label)
-- [ ] With reduced motion requested, no non-essential animation runs
+- [x] With reduced motion requested, no non-essential animation runs (cycle 18, 2026-10-10; green on the first run — the invariant was locked, not broken)
 - [x] Keyboard focus is visible in every view (cycle 8, 2026-10-10; the native audio element goes with the themed player)
 - [ ] The existing view and machine tests stay green
 - [x] (discovered, confirmed 2026-10-10) The upload row's progress bar has a visible width at desktop and phone widths (it sat beside the filename as a flex item with no width of its own, so it collapsed to its border) (cycle 14, 2026-10-10)
 - [x] (discovered, confirmed 2026-10-10) The drop zone shows a distinct drag-over state while files are dragged over it (in the Proposal, missing from the list) (cycle 16, 2026-10-10)
-- [ ] (discovered, confirmed 2026-10-10) A queue row being dragged to reorder looks lifted (dnd-kit `DragOverlay` or an equivalent; today the dragged row stays in place)
+- [x] (discovered, confirmed 2026-10-10) A queue row being dragged to reorder looks lifted (dnd-kit `DragOverlay` or an equivalent; today the dragged row stays in place) (cycle 17, 2026-10-10; lift in place)
 - [x] (discovered, confirmed 2026-10-10) A History card's failed retry or delete shows the server's message, not the raw error (was `String(error)`: "Retry failed: ApiError: Task 42 does not exist") (cycle 13, 2026-10-10)
 - [ ] (discovered, confirmed 2026-10-10) The turn timestamps and the player read times the same way past one hour (turns use `formatTime`, minutes unbounded — "61:05"; the player and History use `formatDuration` — "1:01:05")
 
