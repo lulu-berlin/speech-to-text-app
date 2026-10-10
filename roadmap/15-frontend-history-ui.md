@@ -48,7 +48,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The filename search and the status filter narrow the list
 - [x] A failed task shows its error message in the list
 - [x] Opening a completed task shows its speaker turns with timestamps and each speaker's name with its own tint
-- [ ] A speakers-off transcript is shown without speaker labels
+- [x] A speakers-off transcript is shown without speaker labels
 - [ ] Each download button links to the transcript in its format
 - [ ] The audio player points at the task's audio endpoint; with `hasAudio` false no player is rendered and a note explains why
 - [ ] While the audio plays, the segment containing the current time is highlighted; in a gap between segments none is; seeking moves the highlight
