@@ -126,11 +126,17 @@ describe('the stenographer animation', () => {
         .find((rule) => rule.selectorText === stop)!.cssText,
     ).toContain('animation: none !important');
 
-    // The words and waves are visible in the static frame.
+    // The words are visible in the static frame; the waves are not.
     const visible = mediaRules
       .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
       .find((rule) => rule.selectorText.includes('.word'));
     expect(visible?.cssText).toContain('opacity: 1');
+    // The static frame matches the resting pose: the sound waves are not made visible.
+    expect(
+      mediaRules
+        .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+        .some((rule) => rule.selectorText.includes('.wave')),
+    ).toBe(false);
 
     // Every rule of the block stays inside the component.
     for (const selector of selectors) {
