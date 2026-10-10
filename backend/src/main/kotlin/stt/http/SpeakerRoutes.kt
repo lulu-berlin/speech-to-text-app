@@ -52,3 +52,10 @@ private data class RenameSpeakerRequest(
 data class SpeakersJson(
     val speakers: List<SpeakerJson>,
 )
+
+/** One speaker of a task (ADR 0028): `speakerId` the 0-based number, `speaker` the stored name; used by `/turns` too. */
+@Serializable
+data class SpeakerJson(
+    val speakerId: Int,
+    val speaker: String,
+)
