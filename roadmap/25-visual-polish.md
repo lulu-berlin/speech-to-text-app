@@ -25,7 +25,8 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
   - **the phase (CHUNKING / TRANSCRIBING / DIARIZING) is a text label** beside the progress bars, not a separate step indicator or icon;
   - upload area and drag-over state;
   - **the transcript is a centred reading column** with a maximum measure (~70 characters): a header block with the task's name, date and duration, then the audio player and the download buttons, then the turns; comfortable line height and turn spacing, clear speaker labels and timestamps, and the playing-segment highlight;
-  - **History is a list of cards** (filename, status, date, duration; FAILED cards show the error), which are touch-friendly and read well on a phone;
+    - The history rows already show the date and duration once item 15 merges (added there 2026-10-10); this item restyles them, it does not add them.
+  - **History is a list of cards** (filename, status, date, duration; FAILED cards show the error), which are touch-friendly and read well on a phone; the date and duration land with item 15 (2026-10-10), this item makes the cards look finished;
   - **empty, loading and error states for every view**: an empty state is one line of guidance plus the primary action (e.g. "No tasks yet — drop audio files here, or click to choose them"); loading shows the stenographer (item 17, which replaces the spinners and skeletons); an error is informative rather than raw.
 - **Responsive**: usable from a narrow phone width to a wide desktop; no horizontal overflow; controls reachable; the queue's rows and the history's cards stack on a narrow screen.
 - **Motion**: restrained transitions (hover/focus, view change), nothing that fights `prefers-reduced-motion`.
@@ -44,7 +45,7 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
 
 ## Remaining open questions
 
-None.
+- Seek bar (question reopened 2026-10-10, item 15 review): item 15 shipped the native `<audio controls>` player instead of item 24's `Slider`; the user accepted native controls and reopened whether the transcript player gets a Slider-based seek bar here. Decide in the item 25 consultation; until then `Slider` has no consumer.
 
 ## Test list (written with the user; Canon TDD step 1)
 
