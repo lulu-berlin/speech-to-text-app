@@ -66,8 +66,10 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - RTL interaction tests for each control pass against MSW handlers.
 - `pnpm test` and `pnpm build` are green; the user's `nix build .` succeeds with the new dependency.
 - Checked against the running backend in item 21.
+- User-checked in the browser (carried over from item 24, 2026-10-09): in the cancel and delete confirmation dialogs, Tab and Shift+Tab keep focus inside the dialog and wrap between its buttons, and Escape cancels. jsdom cannot simulate Tab navigation, so item 24's tests cover only focus moving into the dialog and Escape cancelling.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
 - 2026-10-09: consultation answers approved: `@dnd-kit` drag plus row-menu move actions; one batch options panel; language select over `docs/api/languages.json` (extracted from whisper.cpp 1.9.2's C API), default `auto` (item 12 contract changed accordingly); per-file upload progress, one file at a time (XMLHttpRequest in the client); cancel confirmation only for a running or started paused task; delete in the queue and in History, always confirmed; duplicate shown inline with a link to the existing task; a notice with a link when a task finishes. Test list not yet approved.
 - 2026-10-09: test list (17 items) approved by the user; status `spec-approved`.
+- 2026-10-09: acceptance criterion added at the user's request: the browser check of the confirmation dialog's Tab-key focus cycle, carried over from item 24 because no dialog was rendered in the app before this item.
