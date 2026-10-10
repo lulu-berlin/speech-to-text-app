@@ -37,6 +37,12 @@ in
     # command in its own process group so SIGSTOP/SIGCONT/TERM/KILL reach the
     # whole tree (negative pid), not just the direct child.
     pkgs.util-linux
+
+    # E2E browser runtime (roadmap item 21): Chromium for `pnpm --dir e2e test`,
+    # found through PLAYWRIGHT_BROWSERS_PATH below. e2e/'s @playwright/test stays
+    # pinned to the nixpkgs playwright version (1.63.0 at nixpkgs 494ce7fd) so the
+    # browser revisions match. Dev only — the flake's build is untouched (ADR 0010).
+    pkgs.playwright-driver
   ];
 
   # https://devenv.sh/languages/
@@ -55,6 +61,10 @@ in
   # Integration-test fixtures of roadmap item 07 (test-only, TEST_ prefix: STT_* is read only by Config)
   env.TEST_WHISPER_TINY_EN_MODEL = "${models.whisperTinyEn}";
   env.TEST_JFK_WAV = "${testFixtures.jfkWav}";
+
+  # E2E browsers (roadmap item 21): the suite resolves its browser from the store
+  # (ADR 0010) instead of downloading one ad hoc; only Chromium is in the farm.
+  env.PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers.override { withFirefox = false; withWebkit = false; withFfmpeg = false; }}";
 
   # Roadmap item 34 (dev mode): dev data (stt.db, uploads) lives in devenv's state dir, a
   # fixed, git-ignored location (.gitignore covers .devenv*), so the queue and history
