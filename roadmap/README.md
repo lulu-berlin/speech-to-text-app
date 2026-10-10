@@ -60,7 +60,7 @@ graph TD
   24 --> 14
   24 --> 15
   24 --> 17
-  24 --> 25[25 visual polish]
+  24 --> 25[25 visual polish ✓]:::done
   14 --> 25
   15 --> 25
   11 --> 26[26 engine shutdown race ✓]:::done
@@ -97,7 +97,7 @@ graph TD
 | [22 — Rename and merge a task's speakers](../docs/specs/speaker-rename.md) | done | 09, 10, 12, 15 |
 | [23 — Faster speaker clustering](../docs/specs/faster-clustering.md) | done | 09 |
 | [24 — Design system: tokens and primitives](../docs/specs/design-system.md) | done | 13 |
-| [25 — Visual polish pass](25-visual-polish.md) | spec-approved | 24, 14, 15 |
+| [25 — Visual polish pass](../docs/specs/visual-polish.md) | done | 24, 14, 15 |
 | [26 — Engine start/stop race (flaky DatabaseDependencySpec)](../docs/specs/engine-shutdown-race.md) | done | 11 |
 | [27 — Pin the sqlite-jdbc version](../docs/specs/sqlite-jdbc-pin.md) | done | — |
 | [28 — Post-merge cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |

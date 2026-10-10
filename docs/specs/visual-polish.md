@@ -1,7 +1,7 @@
-# 25 — Visual polish pass
+# Visual polish pass
 
-Status: in-review
-Depends on: [24](../docs/specs/design-system.md) (done), [14](../docs/specs/frontend-queue-ui.md) (done), [15](../docs/specs/frontend-history-ui.md) (done)
+Status: done (roadmap item 25, merged 2026-10-10)
+Depends on: [24 — Design system](design-system.md), [14 — Frontend queue UI](frontend-queue-ui.md), [15 — Frontend history UI](frontend-history-ui.md)
 
 ## Goal
 
@@ -9,8 +9,8 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
 
 ## Already decided
 
-- [Frontend conventions](../docs/conventions/frontend.md): design values only as tokens; shared components in `src/shared/`; colocated tests.
-- [ADR 0033 — Design system](../docs/decisions/0033-design-system-tokens-radix-plex.md): the tokens, the typeface and the primitives this item applies.
+- [Frontend conventions](../conventions/frontend.md): design values only as tokens; shared components in `src/shared/`; colocated tests.
+- [ADR 0033 — Design system](../decisions/0033-design-system-tokens-radix-plex.md): the tokens, the typeface and the primitives this item applies.
 - Item 24 delivers the tokens and primitives; items 14 and 15 build the views with them. This item is the pass that makes them look finished and consistent.
 - Item 13 decided the direction: calm, document-like, light and dark.
 - Item 17 (the stenographer animation) supplies the logo/mascot; it depends on item 24 so it uses the same palette.
@@ -130,3 +130,10 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-10 (workspace, cycle 20 = discovered timestamp-format scenario): the user chose h:mm:ss everywhere (the turn gutter and the status page's "at" time switch to `formatDuration`, matching the player and History; the `timeGutter` token widens 7ch → 8ch so "1:01:05" fits). `Test: read as h:mm:ss like the player, in the turn gutter and on the status page` (new `it` in `TaskTranscriptView.test.tsx`; a custom turns fixture with a turn at 3661000 ms → "1:01:01", and a FAILED snapshot with `transcribedUntilMs` 3661000 → "failed while transcribing at 1:01:01"). Red: `Unable to find an element with the text: 1:01:01` — the gutter read "61:01". Green: `TranscriptTurns` and the status line use `formatDuration`; `formatTime` (the unbounded-mm:ss helper) is deleted from `formatTask.ts`. Times under an hour are unchanged ("00:00", "04:58", "19:45"), so the item-15 timestamp tests pass as they are. Full suite 31 files / 142 tests (vitest exit 0), prettier and `tsc --noEmit` clean.
 - 2026-10-10 (workspace, item 13): the closing verification of the whole item: `node node_modules/prettier/bin/prettier.cjs --check . ../.prettierrc` clean; `node node_modules/typescript/bin/tsc --noEmit` clean; `node node_modules/vitest/vitest.mjs run` — 31 files, 142 tests, exit 0; `node node_modules/vite/bin/vite.js build` — exit 0 (the >500 kB chunk warning is informational and pre-existing, not item 25's scope). Every test-list item is ticked. Status set to in-review; remaining approvals are outside this workspace: item 21's browser screenshots and the visual acceptance (capture list in the item-9 log entry), and the user's diff approval per the workflow.
 - 2026-10-10 (workspace, rebase onto main): main had meanwhile merged item 22 (speaker rename — its SpeakersPanel, speakerRenameMachine, speakerMergeMachine, confirmActionMachine, NavigationTimeout, and a test event-stream helper). The branch was rebased onto main and every conflict resolved in one reconciliation commit (`fcb0cdb9`): **turnsMachine** gains `SPEAKERS` (in-place rename) and `RELOAD` (merge/reset refetch) events, which the transcript's speaker-change effect and SpeakersPanel drive (replacing item 22's `setTurns`/`loadTurns`); the view uses item 22's `RetryButton` and `confirmActionMachine` (identical API to the removed `deleteTaskMachine`); the duplicate player placement in the completed branch and stale `runCommand`/`useTaskCommand`/`deleteTaskMachine` bindings are gone; HistoryRow imports `formatTaskMeta`; the waits use item 22's `NAVIGATION_TIMEOUT_MS`; the two near-identical stream helpers are unified onto `src/test/eventStream` (item 22's `controllableEventStream.ts` deleted, its import repointed); SpeakersPanel's name fields take the shared `controlStyle` (found by the keyboard-focus walk, which now also covers item 22's inputs). Final gate after the rebase: prettier, `tsc --noEmit`, vitest 34 files / 149 tests (exit 0), `vite build` (exit 0). Status stays in-review.
+- 2026-10-10: merged into `main` (head `dd3b2180`) after the user approved the diff. The pass
+  delivered the themed transcript player (Slider seek bar), the header block, the mascot loading
+  pattern, Queue/History empty states, the bar labels, the drop-zone drag-over state, the
+  reorder lift in place, one error style, `h:mm:ss` everywhere and the reading column; the
+  turns-fetch failure now has a real error state. The item-21 capture list is prepared. The
+  unused `Skeleton` stayed (recorded from item 28; a later sweep may delete it). Spec and
+  final test list moved here from `roadmap/25-visual-polish.md`.
