@@ -68,16 +68,23 @@ export const handlers = [
   }),
 
   // Task commands: POST /api/tasks/{id}/<command> -> 200 Task.
-  // Mock addition: the response is the Task example whose status is the command's `to` in
-  // task-transitions.json, with the URL's id, because the examples hold one Task per status,
-  // not one per (task, command) pair.
+  // Mock addition (revised, item 14): the response is the requested task (from the
+  // snapshot) with its status set to the command's `to` in task-transitions.json,
+  // because the backend returns the real, updated task. The previous answer was the
+  // unchanged example of the target status, whose filename and progress belonged to that
+  // other task. For an id the snapshot does not hold, the old answer remains the fallback.
   ...Object.entries(taskTransitions.commands).map(([command, { to }]) =>
     http.post(`/api/tasks/:id/${command}`, ({ params }) => {
+      const id = Number(params.id);
+      const requested = snapshotFixture.tasks.find((task) => task.id === id);
+      if (requested !== undefined) {
+        return HttpResponse.json({ ...requested, status: to });
+      }
       const example = taskExamples.find((task) => task.status === to);
       if (example === undefined) {
         throw new Error(`no docs/api/ Task example with status ${to}`);
       }
-      return HttpResponse.json({ ...example, id: Number(params.id) });
+      return HttpResponse.json({ ...example, id });
     }),
   ),
 
