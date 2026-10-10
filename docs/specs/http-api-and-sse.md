@@ -97,7 +97,7 @@ The JSON shapes the frontend builds against.
   - delete → `204` without a body;
   - rename a speaker → `200` Speakers (item 22).
 - **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
-  - `speakers` are the task's rows of the `speakers` table (ADR 0028), ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until a rename feature exists).
+  - `speakers` are the task's rows of the `speakers` table (ADR 0028), ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until renamed; item 22). A rename changes only the name here, never the turns, which reference their speaker by `speakerId`.
   - `turns` are item 09's `speaker_turns`: consecutive segments with the same `speakerId` form one turn. A turn names its speaker only by `speakerId`; the UI shows the name from `speakers`.
   - Only for COMPLETED tasks; any other status → `409 not-completed`.
   - Times: `startMs`/`endMs` of turns and segments are milliseconds on the timeline of `GET /api/tasks/{id}/audio`. The joined audio starts at 0, and item 06's chunks are contiguous and cover `[0, durationMs)`, so a segment's stored time is its position in the played file. Segments and turns come in transcript order. There can be gaps between segments (silence), where no segment is playing. So the transcript view can highlight the segment being played (item 15): the one whose `[startMs, endMs)` contains the player's current time.
