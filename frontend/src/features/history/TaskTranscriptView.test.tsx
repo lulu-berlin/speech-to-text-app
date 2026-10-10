@@ -10,9 +10,9 @@ import {
   taskCanceled,
   taskCompleted,
   taskFailed,
-  snapshot as snapshotFixture,
   turns as turnsFixture,
 } from '../../shared/api/fixtures';
+import { controllableEventStream } from '../../test/controllableEventStream';
 import { server } from '../../test/server';
 
 function renderTranscript(taskId: string) {
@@ -540,37 +540,6 @@ describe('the transcript view', () => {
     expect(within(panel).getByRole('button', { name: 'Reset all merges' })).toBeInTheDocument();
   });
 });
-
-// A live /api/events stream for one test (as in QueueView.test.tsx): it opens with the
-// snapshot (docs/api/snapshot.json), then sends each event the test pushes.
-function controllableEventStream() {
-  const encoder = new TextEncoder();
-  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
-  const events = {
-    send(name: string, data: unknown) {
-      if (controller === undefined) {
-        throw new Error('the event stream is not connected yet');
-      }
-      controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
-    },
-  };
-  server.use(
-    http.get(
-      '/api/events',
-      () =>
-        new HttpResponse(
-          new ReadableStream<Uint8Array>({
-            start(streamController) {
-              controller = streamController;
-              events.send('snapshot', snapshotFixture);
-            },
-          }),
-          { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } },
-        ),
-    ),
-  );
-  return events;
-}
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
 function asRgb(hex: string): string {
