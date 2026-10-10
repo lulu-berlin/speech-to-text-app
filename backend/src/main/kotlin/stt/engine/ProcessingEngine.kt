@@ -90,6 +90,12 @@ class ProcessingEngine internal constructor(
      */
     private val pauseGate = PauseGate()
 
+    /**
+     * The started task the worker is waiting to resume (item 19): set while it is paused, cleared when it
+     * is picked again, so the resumed task wins over any task queued ahead of it.
+     */
+    private var waitingOn: Long? = null
+
     /** The task whose phases are running and the job running them, so [cancelTask] can kill its process. */
     private class Running(
         val id: Long,
@@ -163,10 +169,18 @@ class ProcessingEngine internal constructor(
      */
     suspend fun resumeTask(id: Long): TaskCommandOutcome =
         command(id, TaskStatus.QUEUED) {
+            val runningHere = runningJob(id) != null
             tasks.setStatus(id, TaskStatus.QUEUED)
             publish(id)
-            tasks.setStatus(id, TaskStatus.RUNNING)
-            publish(id)
+            if (runningHere) {
+                // A mid-run pause: the worker is inside this task, so it is RUNNING again at once.
+                tasks.setStatus(id, TaskStatus.RUNNING)
+                publish(id)
+            } else {
+                // A pause across a restart: there is no runner. The worker, which is waiting for this
+                // task (item 19), picks it up directly and moves it to RUNNING itself, as for any task.
+                wake()
+            }
             processControl.resume()
             pauseGate.resume()
             TaskCommandOutcome.Accepted
@@ -211,15 +225,22 @@ class ProcessingEngine internal constructor(
     }
 
     /**
-     * The task to run next: nothing while the queue is paused, otherwise the QUEUED task with the
-     * lowest `queue_position`.
+     * The task to run next. Nothing while the queue is paused; and while a started task is paused, nothing
+     * else either (item 19: the paused one is the only task that may resume, so the worker waits for it
+     * instead of competing with it). Otherwise the QUEUED task with the lowest `queue_position` — or the
+     * just-resumed task first, even when another task is waiting ahead of it in the queue.
      */
-    private suspend fun nextTask(): StoredTask? =
-        if (queueState.isPaused()) {
-            null
-        } else {
-            tasks.nextQueued()
+    private suspend fun nextTask(): StoredTask? {
+        if (queueState.isPaused()) return null
+        val paused = tasks.startedPaused()
+        if (paused != null) {
+            waitingOn = paused.id
+            return null
         }
+        val resumed = waitingOn?.let { id -> tasks.find(id)?.takeIf { it.task.status == TaskStatus.QUEUED } }
+        waitingOn = null
+        return resumed ?: tasks.nextQueued()
+    }
 
     private suspend fun workerLoop() {
         while (true) {

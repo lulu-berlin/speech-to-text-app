@@ -2,17 +2,19 @@ package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import stt.audio.ExportedChunk
-import stt.audio.PlannedChunk
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.Segment
 import stt.db.SegmentRepository
+import stt.db.SpeakersMode
+import stt.db.TaskPhase
 import stt.queue.TaskStatus
 import java.nio.file.Files
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineRestartSpec :
@@ -96,6 +98,65 @@ class ProcessingEngineRestartSpec :
 
                         statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
                         Files.exists(fixture.workDirectories.source(task)) shouldBe false
+                    }
+                }
+            }
+        }
+        given("a started task paused across a restart, with another task queued ahead of it") {
+            `when`("a new engine starts") {
+                then("nothing else starts while it is paused, and resuming continues it directly") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val started =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "started.wav",
+                                queuePosition = 1,
+                                createdAt = 1,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        val ahead =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "ahead.wav",
+                                queuePosition = 0,
+                                createdAt = 2,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        // The crash state of a started, mid-transcription pause: plan stored, chunk 0 DONE,
+                        // original gone, status PAUSED with its phase and start time.
+                        val chunks = ChunkRepository(db)
+                        chunks.storePlan(started, exportedPlan(fixture, started, chunkCount = 2))
+                        SegmentRepository(db).completeChunk(
+                            started,
+                            chunkIdx = 0,
+                            segments =
+                                listOf(
+                                    Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
+                                ),
+                        )
+                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(started)) }
+                        fixture.tasks.setRunningIfQueued(started, startedAt = 1_000L)
+                        fixture.tasks.setStatus(started, TaskStatus.PAUSED)
+                        fixture.tasks.setPhase(started, TaskPhase.TRANSCRIBING)
+
+                        fixture.engine.start()
+                        pumpUntil(200.milliseconds) { fixture.chunker.workDirs.isNotEmpty() }
+                        fixture.chunker.workDirs.shouldBeEmpty()
+                        statusOf(fixture, started) shouldBe TaskStatus.PAUSED
+                        statusOf(fixture, ahead) shouldBe TaskStatus.QUEUED
+                        fixture.transcriber.audioFiles.shouldBeEmpty()
+
+                        // The resume continues the paused task directly, even though the other task is ahead.
+                        fixture.engine.resumeTask(started) shouldBe TaskCommandOutcome.Accepted
+                        fixture.completed.receive() shouldBe started
+                        fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-1.flac")
+                        statusOf(fixture, ahead) shouldBe TaskStatus.QUEUED
+
+                        // Once it finished, the queued task runs normally.
+                        fixture.completed.receive() shouldBe ahead
                     }
                 }
             }
