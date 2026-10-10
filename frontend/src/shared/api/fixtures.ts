@@ -19,6 +19,7 @@ export { default as turnsSpeakersOff } from '../../../../docs/api/turns.speakers
 export { default as error } from '../../../../docs/api/error.json';
 export { default as errorDuplicateAudio } from '../../../../docs/api/error.duplicate-audio.json';
 export { default as taskTransitions } from '../../../../docs/api/task-transitions.json';
+export { default as languages } from '../../../../docs/api/languages.json';
 
 import type { Task } from './types';
 import taskQueuedExample from '../../../../docs/api/task.queued.json';

@@ -60,6 +60,7 @@ export interface Task {
   maxSpeakers: number;
   durationMs: number | null;
   sizeBytes: number;
+  hasAudio: boolean;
   transcriptionProgress: number;
   diarizationStage: DiarizationStage;
   hasAudio: boolean;
