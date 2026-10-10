@@ -86,12 +86,10 @@ const TurnRow = styled.div`
   }
 `;
 
-const Timestamp = styled.span`
+// A turn's start time in the gutter: muted, small, fixed-width digits.
+const TurnGutter = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
   font-size: ${(props) => props.theme.fontSizes.small};
-`;
-
-const TurnGutter = styled(Timestamp)`
   font-variant-numeric: tabular-nums;
 `;
 
