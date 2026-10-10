@@ -152,6 +152,24 @@ class TaskRepository(
         }
 
     /**
+     * The position of the next task appended to the queue: one after the highest `queue_position`, or 0 when
+     * nothing is queued (item 12's upload contract: a new upload joins the end of the queue). Retry appends
+     * with the same rule ([retryIfPossible]).
+     */
+    suspend fun nextQueuePosition(): Int =
+        db.readTransaction {
+            TasksTable
+                .selectAll()
+                .where { TasksTable.queuePosition.isNotNull() }
+                .orderBy(TasksTable.queuePosition to SortOrder.DESC)
+                .limit(1)
+                .singleOrNull()
+                ?.get(TasksTable.queuePosition)
+                ?.let { it + 1 }
+                ?: 0
+        }
+
+    /**
      * The started PAUSED task, if any: one that once ran and is parked in a pause. It blocks the worker
      * (roadmap item 19) until it is resumed. The first in queue order stands in for "the" one.
      */
