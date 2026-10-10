@@ -175,6 +175,22 @@ interface UploadRow {
   duplicateTaskId?: number;
 }
 
+// The trailing side of an upload row: the progress bar while uploading, the duplicate
+// notice or the error message on a failed upload, and the status text otherwise.
+function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
+  if (row.status === 'uploading') {
+    return <ProgressBar value={row.progress} label={`Uploading ${row.file.name}`} />;
+  }
+  if (row.status === 'error') {
+    return row.duplicateTaskId !== undefined ? (
+      <DuplicateNotice taskId={row.duplicateTaskId} tasks={tasks} />
+    ) : (
+      <RowError>{row.error}</RowError>
+    );
+  }
+  return <RowStatus>{row.status}</RowStatus>;
+}
+
 export function QueueView() {
   const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
   const [language, setLanguage] = useState(languages.default);
@@ -368,17 +384,7 @@ export function QueueView() {
               <ListRow key={row.id}>
                 <RowContent>
                   <RowName>{row.file.name}</RowName>
-                  {row.status === 'uploading' ? (
-                    <ProgressBar value={row.progress} label={`Uploading ${row.file.name}`} />
-                  ) : row.status === 'error' ? (
-                    row.duplicateTaskId !== undefined ? (
-                      <DuplicateNotice taskId={row.duplicateTaskId} tasks={tasks} />
-                    ) : (
-                      <RowError>{row.error}</RowError>
-                    )
-                  ) : (
-                    <RowStatus>{row.status}</RowStatus>
-                  )}
+                  <UploadRowTrailing row={row} tasks={tasks} />
                 </RowContent>
               </ListRow>
             ))}
