@@ -6,8 +6,13 @@ import type { SpacingKey } from '../theme/theme';
 // hand (frontend conventions). Gaps are named spacing tokens, so a caller cannot invent a
 // value; the transient prop keeps them off the DOM.
 
-const PageBase = styled.div`
-  max-width: ${(props) => props.theme.sizes.pageMaxWidth};
+// The page widths: the general page, and the transcript's ~70-character reading column.
+export type PageMeasure = 'page' | 'reading';
+
+const PAGE_WIDTH_TOKEN = { page: 'pageMaxWidth', reading: 'readingMeasure' } as const;
+
+const PageBase = styled.div<{ $measure: PageMeasure }>`
+  max-width: ${(props) => props.theme.sizes[PAGE_WIDTH_TOKEN[props.$measure]]};
   margin: 0 auto;
   padding: ${(props) => props.theme.spacing.lg};
 `;
@@ -25,6 +30,7 @@ const RowBase = styled.div<{ $gap: SpacingKey }>`
 `;
 
 export interface PageProps {
+  measure?: PageMeasure;
   children: ReactNode;
 }
 
@@ -38,9 +44,9 @@ export interface RowProps {
   children: ReactNode;
 }
 
-// The page: a centred column at the reading width.
-export function Page({ children }: PageProps) {
-  return <PageBase>{children}</PageBase>;
+// The page: a centred column at the page width, or at the reading measure.
+export function Page({ measure = 'page', children }: PageProps) {
+  return <PageBase $measure={measure}>{children}</PageBase>;
 }
 
 // A vertical rhythm.

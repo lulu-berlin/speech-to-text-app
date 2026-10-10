@@ -87,6 +87,11 @@ export interface ThemeTokens {
   sizes: {
     viewportMinHeight: string;
     pageMaxWidth: string;
+    // The transcript's reading column (item 25): a measure of about 70 characters, in ch
+    // so it follows the typeface; and the left gutter its turn start times sit in, wide
+    // enough for h:mm:ss.
+    readingMeasure: string;
+    timeGutter: string;
     switchWidth: string;
     switchHeight: string;
     switchThumb: string;
@@ -170,6 +175,8 @@ const baseTokens = {
   sizes: {
     viewportMinHeight: '100vh',
     pageMaxWidth: '48rem',
+    readingMeasure: '70ch',
+    timeGutter: '7ch',
     switchWidth: '2.75rem',
     switchHeight: '1.5rem',
     switchThumb: '1.25rem',

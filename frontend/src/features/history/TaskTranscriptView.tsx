@@ -73,18 +73,47 @@ const NoAudioNote = styled(Text)`
   font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
-const TurnText = styled(Text)`
-  margin: 0;
-`;
+// One turn of the reading column: its start time in a left gutter of one shared width,
+// and the speaker's name on its own line above the turn's text. On a phone the gutter
+// folds into one column, the time above the speaker.
+const TurnRow = styled.div`
+  display: grid;
+  grid-template-columns: ${(props) => props.theme.sizes.timeGutter} 1fr;
+  gap: ${(props) => props.theme.spacing.md};
 
-const SpeakerName = styled.span<{ $color: string }>`
-  color: ${(props) => props.$color};
-  font-weight: ${(props) => props.theme.fontWeights.medium};
+  @media (max-width: ${(props) => props.theme.breakpoints.sm}) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Timestamp = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
   font-size: ${(props) => props.theme.fontSizes.small};
+`;
+
+const TurnGutter = styled(Timestamp)`
+  font-variant-numeric: tabular-nums;
+`;
+
+const TurnBody = styled.div`
+  min-width: 0;
+`;
+
+// The turns list: the reading line height and the large gap between turns.
+const TurnsList = styled(Stack)`
+  gap: ${(props) => props.theme.spacing.lg};
+`;
+
+const TurnText = styled(Text)`
+  margin: 0;
+  line-height: ${(props) => props.theme.lineHeights.reading};
+  overflow-wrap: anywhere;
+`;
+
+const SpeakerName = styled.span<{ $color: string }>`
+  display: block;
+  color: ${(props) => props.$color};
+  font-weight: ${(props) => props.theme.fontWeights.medium};
 `;
 
 const Segment = styled.button<{ $active: boolean }>`
@@ -277,7 +306,7 @@ const runCommand = useTaskCommand();
       return null;
     }
     return (
-      <Page>
+      <Page measure="reading">
         <Stack gap="md">
           <Title>Task not found</Title>
           <ErrorCallout
@@ -307,7 +336,7 @@ const runCommand = useTaskCommand();
   // A task still in the queue (or running) has no transcript: say so and link to the queue.
   if (PENDING.has(task.status)) {
     return (
-      <Page>
+      <Page measure="reading">
         <Stack gap="md">
           <Title>{task.filename}</Title>
           <Text>This task is still in the queue.</Text>
@@ -341,7 +370,7 @@ const runCommand = useTaskCommand();
     const progress =
       task.transcribedUntilMs !== null ? ` at ${formatTime(task.transcribedUntilMs)}` : '';
     return (
-      <Page>
+      <Page measure="reading">
         <Stack gap="md">
           <Title>{task.filename}</Title>
           <Text>
@@ -376,12 +405,13 @@ const runCommand = useTaskCommand();
   }
 
   return (
-    <Page>
+    <Page measure="reading">
       <Stack gap="md">
         <Stack gap="xs">
           <Title>{task.filename}</Title>
           <MetaText>{formatTaskMeta(task)}</MetaText>
         </Stack>
+        {audioBlock}
         <Row gap="sm">
           {DOWNLOAD_FORMATS.map((format) => (
             <DownloadLink
@@ -443,33 +473,35 @@ const runCommand = useTaskCommand();
             aria-label="Transcript"
             onScroll={handleScroll}
           >
-            <Stack gap="md">
+            <TurnsList gap="lg">
               {turnsBySpeaker.map(({ turn, speaker }, index) => (
-                <Stack key={index} gap="xs">
-                  <TurnText>
-                    <Timestamp>
-                      {formatTime(turn.startMs)} – {formatTime(turn.endMs)}
-                    </Timestamp>{' '}
-                    {speaker !== undefined ? (
-                      <SpeakerName $color={speakerTint(tints, speaker.speakerId)}>
-                        {speaker.speaker}
-                      </SpeakerName>
-                    ) : null}{' '}
-                    {turn.segments.map((segment) => (
-                      <span key={`${segment.startMs}-${segment.endMs}`}>
-                        <Segment
-                          $active={segment === activeSegment}
-                          data-active={segment === activeSegment || undefined}
-                          onClick={() => seekTo(segment.startMs)}
-                        >
-                          {segment.text}
-                        </Segment>{' '}
-                      </span>
-                    ))}
-                  </TurnText>
-                </Stack>
+                <TurnRow key={index}>
+                  <TurnGutter>{formatTime(turn.startMs)}</TurnGutter>
+                  <TurnBody>
+                    <Stack gap="xs">
+                      {speaker !== undefined ? (
+                        <SpeakerName $color={speakerTint(tints, speaker.speakerId)}>
+                          {speaker.speaker}
+                        </SpeakerName>
+                      ) : null}
+                      <TurnText>
+                        {turn.segments.map((segment) => (
+                          <span key={`${segment.startMs}-${segment.endMs}`}>
+                            <Segment
+                              $active={segment === activeSegment}
+                              data-active={segment === activeSegment || undefined}
+                              onClick={() => seekTo(segment.startMs)}
+                            >
+                              {segment.text}
+                            </Segment>{' '}
+                          </span>
+                        ))}
+                      </TurnText>
+                    </Stack>
+                  </TurnBody>
+                </TurnRow>
               ))}
-            </Stack>
+            </TurnsList>
           </TranscriptRegion>
         )}
       </Stack>
