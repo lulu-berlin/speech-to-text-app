@@ -16,6 +16,7 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -171,11 +172,11 @@ class SpeakerRoutesSpec :
 
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }
-                        val before = Json.parseToJsonElement(client.get("/api/tasks/$id/turns").bodyAsText()).jsonObject
+                        val before = client.turnsOf(id)
 
                         client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
 
-                        val after = Json.parseToJsonElement(client.get("/api/tasks/$id/turns").bodyAsText()).jsonObject
+                        val after = client.turnsOf(id)
                         after shouldHaveShapeOf apiExample("turns.json")
                         after.getValue("speakers") shouldBe speakers("Alice", "Speaker 2")
                         // Turns name their speaker only by speakerId, so a rename leaves them as they were: segments
@@ -237,9 +238,11 @@ private suspend fun HttpClient.rename(
         setBody(buildJsonObject { put("speaker", name) }.toString())
     }
 
+/** The body of `GET /api/tasks/{id}/turns`. */
+private suspend fun HttpClient.turnsOf(id: Long): JsonObject = Json.parseToJsonElement(get("/api/tasks/$id/turns").bodyAsText()).jsonObject
+
 /** The task's speakers as `/turns` reports them. */
-private suspend fun HttpClient.speakersOf(id: Long): JsonElement =
-    Json.parseToJsonElement(get("/api/tasks/$id/turns").bodyAsText()).jsonObject.getValue("speakers")
+private suspend fun HttpClient.speakersOf(id: Long): JsonElement = turnsOf(id).getValue("speakers")
 
 /** The JSON speakers list for names given in `speakerId` order. */
 private fun speakers(vararg names: String): JsonElement =
