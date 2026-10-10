@@ -208,7 +208,11 @@ class ProcessingEngine internal constructor(
      * this.
      */
     suspend fun deleteTask(id: Long): TaskCommandOutcome {
-        if (tasks.find(id) == null) return TaskCommandOutcome.Unknown
+        val status = tasks.find(id)?.task?.status ?: return TaskCommandOutcome.Unknown
+        // The item 12 contract: a pending task is cancelled through the engine first — its process is
+        // stopped and the cancel has finished — then deleted. `cancelTask` guards the status itself, so a
+        // cancel that races a completion loses and the row still goes.
+        if (status in PENDING_DELETE) cancelTask(id)
         withContext(NonCancellable) {
             tasks.delete(id)
             deleteCachedAudio(id)
@@ -224,13 +228,8 @@ class ProcessingEngine internal constructor(
      * effort: the file lives outside the database, and a failure to remove it only wastes disk until the next
      * startup empties `tmp/` (the spec's cache lifecycle).
      */
-    private suspend fun deleteCachedAudio(id: Long) {
-        try {
-            withContext(Dispatchers.IO) { Files.deleteIfExists(workDirectories.cachedAudio(id)) }
-        } catch (_: Exception) {
-            logger.warn("Could not delete the cached audio of task {}; skipped", id)
-        }
-    }
+    private suspend fun deleteCachedAudio(id: Long) =
+        deleteFileBestEffort(workDirectories.cachedAudio(id), "cached audio of task $id", "the next startup empties tmp/")
 
     /**
      * Retries a FAILED or CANCELED task: it is queued at the end with its error cleared and runs again
@@ -543,11 +542,22 @@ class ProcessingEngine internal constructor(
     }
 
     /** Deletes a leftover original of a task whose plan is already stored; best effort, as it changes nothing. */
-    private suspend fun deleteLeftoverOriginal(source: Path) {
+    private suspend fun deleteLeftoverOriginal(source: Path) =
+        deleteFileBestEffort(source, "the leftover original", "the startup cleanup removes it")
+
+    /**
+     * Removes [file] best effort: a failure is logged with [what] and [consequence] and never propagates,
+     * so a leftover file can never turn a task's success path into an error.
+     */
+    private suspend fun deleteFileBestEffort(
+        file: Path,
+        what: String,
+        consequence: String,
+    ) {
         try {
-            withContext(Dispatchers.IO) { Files.deleteIfExists(source) }
+            withContext(Dispatchers.IO) { Files.deleteIfExists(file) }
         } catch (e: Exception) {
-            logger.warn("Could not delete the leftover original {}; the startup cleanup removes it: {}", source, e.toString())
+            logger.warn("Could not delete {} {}; {}: {}", file, what, consequence, e.toString())
         }
     }
 
@@ -667,6 +677,9 @@ class ProcessingEngine internal constructor(
         val logger: Logger = LoggerFactory.getLogger(ProcessingEngine::class.java)
     }
 }
+
+/** The statuses whose deletion must cancel the task through the engine first (item 12's contract). */
+private val PENDING_DELETE = setOf(TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.PAUSED)
 
 /** One stage report of the DIARIZING phase, with the stage snapshotted as the diarizer sent it. */
 private data class DiarizationReport(
