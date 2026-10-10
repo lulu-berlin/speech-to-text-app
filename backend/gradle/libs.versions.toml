@@ -10,7 +10,7 @@ ktlint = "1.8.0"
 kotlinx-coroutines = "1.11.0"
 exposed = "1.5.0"
 flyway = "13.9.0"
-sqlite-jdbc = "3.49.1.0"
+sqlite-jdbc = "3.50.3.0"
 jna = "5.14.0"
 onnxruntime = "1.30.0"
 
