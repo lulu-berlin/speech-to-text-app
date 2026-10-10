@@ -213,9 +213,9 @@ class ClusteringSpec :
 
         given("random matrices and a tied matrix") {
             `when`("the merges are compared with the naive O(n³) reference") {
-                then("every height matches,and every pair matches except where an exact height tie lets it differ") {
+                then("every height matches, and every pair matches except where an exact height tie lets it differ") {
                     // Differential over random L2-normalized 512-d matrices: exact double ties are effectively impossible, so
-                    // the pair order must match the reference exactly;the hand-built tied matrix exercises the accepted exception
+                    // the pair order must match the reference exactly; the hand-built tied matrix exercises the accepted exception
                     // (a pair may differ only where its height ties with another in the same merge sequence).
                     for ((seed, n) in listOf(1L to 2, 2L to 3, 3L to 5, 4L to 8, 5L to 17)) {
                         val embeddings = randomNormalizedMatrix(seed, n)
@@ -238,8 +238,8 @@ class ClusteringSpec :
             `when`("clustering runs") {
                 then("the live-heap peak stays well under the O(n²) distance matrix size") {
                     // The item 09 matrix at 3000 segments is 3000·3000·8 bytes ≈ 68.7 MiB. The NN-chain computes distances on demand
-                    // (per-cluster mean vectors, 3000·512·8 bytes ≈ 12.3 MiB; measured ~14 MiB live peak, ADR 0036), so the
-                    // peak of the measured run must stay well under the matrix size;the matrix implementation alone burns
+                    // (per-cluster mean vectors, 3000·512·8 bytes ≈ 12.3 MiB; measured ~14 MiB live peak, ADR 0037), so the
+                    // peak of the measured run must stay well under the matrix size; the matrix implementation alone burns
                     // ~82 MiB (item 23 measurement), which violates even the half-matrix bound used here. The half-matrix
                     // bound (not a third) leaves room for the ambient heap of the other specs running in the same JVM.
                     val n = 3000
@@ -329,7 +329,7 @@ private fun distanceAt(degrees: Double) = 1 - cos(Math.toRadians(degrees))
 /**
  * Asserts [merges] matches the naive reference: every height matches (within 1e-12, because the chain-on-demand
  * distance arithmetic rounds differently from the weighted-matrix updates)and every pair matches, except that a pair may
- * differ where its height ties exactly with another height in the same sequence (recognized within 1e-9;the accepted,
+ * differ where its height ties exactly with another height in the same sequence (recognized within 1e-9; the accepted,
  * documented exception of the NN-chain switch).
  */
 private fun assertMatchesReference(

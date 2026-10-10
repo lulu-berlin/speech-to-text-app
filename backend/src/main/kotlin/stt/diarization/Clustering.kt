@@ -91,18 +91,18 @@ private fun cutLabels(
 
 /**
  * The `n - 1` average-linkage merges of [embeddings] in merge order (oracle `cluster_segments` merge loop), found by the
- * nearest-neighbor chain (ADR 0036).
+ * nearest-neighbor chain (ADR 0037).
  *
  * Average linkage is reducible, so the chain finds the same merges: a chain of clusters is built by repeatedly appending
- * the nearest active cluster of the chain's end;when the end and its predecessor are mutual nearest neighbors they are
+ * the nearest active cluster of the chain's end; when the end and its predecessor are mutual nearest neighbors they are
  * merged (a restart if not), and the chain continues from the merged cluster. Distances are computed on demand in double:
  * each cluster keeps the mean of its members' embeddings and `d(A, B) = mean_{a∈A, b∈B} (1 − a·b) = 1 − vA·vB`
- * (bilinearity), so no `n²` distance matrix is allocated — `O(n·512)` memory (ADR 0036: 14 MiB vs 71 MiB live heap at
+ * (bilinearity), so no `n²` distance matrix is allocated — `O(n·512)` memory (ADR 0037: 14 MiB vs 71 MiB live heap at
  * 3000 segments, 36.1 s vs 50.5 s at 5000).
  *
- * The chain's merges have non-decreasing heights;they are sorted by height (stable), which reproduces the item 09 merge
+ * The chain's merges have non-decreasing heights; they are sorted by height (stable), which reproduces the item 09 merge
  * order. Where two different merges have exactly equal heights the pair at each position may differ — accepted and
- * documented (ADR 0036);the ADR 0027 and largest-gap rules read the heights, which are unchanged apart from ulp-level
+ * documented (ADR 0037); the ADR 0027 and largest-gap rules read the heights, which are unchanged apart from ulp-level
  * rounding and tie-run internal order.
  *
  * Before every merge, cancellation of this coroutine and [gate] (ADR 0004) are checked, so a long recording pauses or
@@ -154,7 +154,7 @@ internal suspend fun upgmaMerges(
         if (chain.size >= 2 && chain[chain.size - 2] == nn) {
             val p = chain.last()
             val q = chain[chain.size - 2]
-            // A merge needs mutual nearest neighbors (the global closest pair is always mutual);restart otherwise.
+            // A merge needs mutual nearest neighbors (the global closest pair is always mutual); restart otherwise.
             val (back, _) = nearestOf(q)
             if (back != p) {
                 chain.clear()

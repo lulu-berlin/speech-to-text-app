@@ -8,8 +8,8 @@ import kotlinx.coroutines.ensureActive
  * the nearest-neighbor-chain differential tests (roadmap item 23): it must stay the 1:1 port of `docs/oracle/transcribe.py`
  * so that it never drifts from the behavior the chain is compared against.
 
- * [naiveUpgmaMerges] matches [upgmaMerges]'s contract exactly (bridge suspend, gate, cancellation,and progress
- * between merges);[naiveClusterSegments] matches [clusterSegments]'s labels for the same inputs. Neither takes the
+ * [naiveUpgmaMerges] matches [upgmaMerges]'s contract exactly (bridge suspend, gate, cancellation, and progress
+ * between merges); [naiveClusterSegments] matches [clusterSegments]'s labels for the same inputs. Neither takes the
  * progress callbacks:the differential tests compare merges and labels directly, so no pausing is involved.
 
  * Both are byte-for-byte the pre-switch bodies, renamed only.
@@ -111,7 +111,7 @@ private fun cutLabels(
 
 /**
  * Labels on [embeddings] by the item 09 implementation of [clusterSegments]:naive reference for the
- * label-level differential test. Matches [clusterSegments]'s contract ([k] = `null` is auto mode;the speaker
+ * label-level differential test. Matches [clusterSegments]'s contract ([k] = `null` is auto mode; the speaker
  * threshold, ADR 0027 and the largest-gap rule all come from the copied code above).
  */
 internal suspend fun naiveClusterSegments(
