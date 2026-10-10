@@ -24,6 +24,11 @@ function renderTranscript(taskId: string) {
   return screen.findByText('Live');
 }
 
+// A navigation renders a whole other view; under a loaded test run that can take longer than
+// Testing Library's 1 s default (seen with two suites in parallel), so the waits that follow a
+// navigation get more time. The assertion is unchanged; a view that never arrives still fails.
+const NAVIGATION_TIMEOUT_MS = 5000;
+
 describe('the transcript view', () => {
   it('shows the speaker turns with timestamps, each speaker name in its own tint', async () => {
     await renderTranscript('3'); // task 3 is COMPLETED with speakersMode "fixed" (id 3).
@@ -282,7 +287,9 @@ describe('the transcript view', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
 
     // The retried task leaves History (it is QUEUED) and the view navigates to /queue.
-    expect(await screen.findByRole('heading', { name: 'Queue' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Queue' }, { timeout: NAVIGATION_TIMEOUT_MS }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Not found')).not.toBeInTheDocument();
   });
 
@@ -326,8 +333,9 @@ describe('the transcript view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     dialog = screen.getByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
+      { timeout: NAVIGATION_TIMEOUT_MS },
     );
     expect(deleted).toEqual([4]);
   });
@@ -347,8 +355,9 @@ describe('the transcript view', () => {
     expect(dialog).toHaveTextContent('interview.mp3');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
+      { timeout: NAVIGATION_TIMEOUT_MS },
     );
     expect(deleted).toEqual([3]);
   });
