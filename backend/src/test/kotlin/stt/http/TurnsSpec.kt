@@ -152,6 +152,51 @@ class TurnsSpec :
             }
         }
 
+        given("a COMPLETED task whose segment texts carry surrounding spaces and a blank segment (queue paused)") {
+            `when`("requesting its turns") {
+                then("segment texts are trimmed and the turn text joins the non-blank trimmed texts with single spaces") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id =
+                        seed(
+                            dataDir,
+                            completed("spaces.wav"),
+                            listOf(
+                                Segment(0, 0, 0, 1_000, "  Hi  ", speakerId = null),
+                                Segment(0, 1, 1_000, 2_000, "   ", speakerId = null),
+                                Segment(0, 2, 2_000, 3_000, " there ", speakerId = null),
+                            ),
+                            speakerIds = listOf(0, 0, 0),
+                        )
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        val response = client.get("/api/tasks/$id/turns")
+                        response.status shouldBe HttpStatusCode.OK
+                        // Hand trace of the oracle's speaker_turns: "Hi"; f"Hi ".strip() = "Hi";
+                        // f"Hi there".strip() = "Hi there" — the blank segment adds no second space.
+                        Json.parseToJsonElement(response.bodyAsText()) shouldBe
+                            Json.parseToJsonElement(
+                                """
+                                {
+                                  "speakers": [ { "speakerId": 0, "speaker": "Speaker 1" } ],
+                                  "turns": [
+                                    {
+                                      "speakerId": 0, "startMs": 0, "endMs": 3000, "text": "Hi there",
+                                      "segments": [
+                                        { "startMs": 0, "endMs": 1000, "text": "Hi" },
+                                        { "startMs": 1000, "endMs": 2000, "text": "" },
+                                        { "startMs": 2000, "endMs": 3000, "text": "there" }
+                                      ]
+                                    }
+                                  ]
+                                }
+                                """.trimIndent(),
+                            )
+                    }
+                }
+            }
+        }
+
         given("a QUEUED task (queue paused)") {
             `when`("requesting its turns") {
                 then("409 not-completed is returned with the error body") {
