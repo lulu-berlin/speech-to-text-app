@@ -35,17 +35,17 @@ fun Application.queueRoutes() {
     val queueState: QueueStateRepository by dependencies
     routing {
         get("/api/queue") {
-            call.respondQueue(engine, tasks, queueState)
+            call.respondQueue(tasks, queueState)
         }
 
         post("/api/queue/pause") {
             engine.pauseQueue()
-            call.respondQueue(engine, tasks, queueState)
+            call.respondQueue(tasks, queueState)
         }
 
         post("/api/queue/resume") {
             engine.resumeQueue()
-            call.respondQueue(engine, tasks, queueState)
+            call.respondQueue(tasks, queueState)
         }
 
         put("/api/queue/order") {
@@ -60,14 +60,13 @@ fun Application.queueRoutes() {
                 )
             } else {
                 engine.reorderQueue(ids)
-                call.respondQueue(engine, tasks, queueState)
+                call.respondQueue(tasks, queueState)
             }
         }
     }
 }
 
 private suspend fun RoutingCall.respondQueue(
-    engine: ProcessingEngine,
     tasks: TaskRepository,
     queueState: QueueStateRepository,
 ) {
