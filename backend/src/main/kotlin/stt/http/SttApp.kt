@@ -35,6 +35,7 @@ fun Application.sttApp(config: Config) {
     processingEngine(config)
     healthRoutes()
     taskRoutes()
+    uploadRoutes(config)
     val staticDir = config.staticDir
     routing {
         if (staticDir != null) {
