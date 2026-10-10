@@ -35,17 +35,19 @@ class SpeakerRoutesSpec :
     BehaviorSpec({
 
         given("a COMPLETED task with speakers 0 and 1 (queue paused)") {
-            `when`("speaker 1 is renamed with invalid names, a 40-character name and a padded name") {
-                then("an empty, blank, over-long or control-character name answers 400 invalid-speaker-name; valid names are trimmed") {
+            `when`("speaker 1 is renamed with invalid names, a 40-character name and a name with an inner space") {
+                then("an untrimmed, empty, over-long or control-character name answers 400 invalid-speaker-name; others are stored") {
                     val dataDir = tempdir("stt-data").toPath()
                     val id = seed(dataDir, completed("memo.wav"), twoSegments, speakerIds = listOf(0, 1))
 
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }
 
-                        // Each rule of the contract: trimmed, 1–40 characters, no control character. The tab and
-                        // DEL sit where trimming does not remove them.
-                        for (invalid in listOf("", "   ", "A".repeat(41), "Al\tice", "Bob\u007F")) {
+                        // Each rule of the contract: the client trims, so leading or trailing whitespace is rejected,
+                        // as are empty and over-long names and a control character anywhere (inside, or at the edge).
+                        val invalidNames =
+                            listOf("", "   ", "  Alice  ", " Alice", "Alice ", "A".repeat(41), "Al\tice", "\tAlice", "Bob\u007F")
+                        for (invalid in invalidNames) {
                             withClue("name ${Json.encodeToString(invalid)}") {
                                 val response = client.rename(id, speakerId = 1, invalid)
                                 response.status shouldBe HttpStatusCode.BadRequest
@@ -63,12 +65,12 @@ class SpeakerRoutesSpec :
                         atLimit.status shouldBe HttpStatusCode.OK
                         Json.parseToJsonElement(atLimit.bodyAsText()).jsonObject shouldHaveShapeOf apiExample("speakers.json")
 
-                        // Surrounding spaces are trimmed before storing; the response is the task's speakers.
-                        val padded = client.rename(id, speakerId = 1, "  Alice  ")
-                        padded.status shouldBe HttpStatusCode.OK
-                        Json.parseToJsonElement(padded.bodyAsText()) shouldBe
-                            Json.parseToJsonElement("""{ "speakers": ${speakers("Speaker 1", "Alice")} }""")
-                        client.speakersOf(id) shouldBe speakers("Speaker 1", "Alice")
+                        // A valid name is stored exactly as sent, inner space included; the response is the task's speakers.
+                        val renamed = client.rename(id, speakerId = 1, "Alice Smith")
+                        renamed.status shouldBe HttpStatusCode.OK
+                        Json.parseToJsonElement(renamed.bodyAsText()) shouldBe
+                            Json.parseToJsonElement("""{ "speakers": ${speakers("Speaker 1", "Alice Smith")} }""")
+                        client.speakersOf(id) shouldBe speakers("Speaker 1", "Alice Smith")
                     }
                 }
             }
