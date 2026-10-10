@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../app/App';
+import { lightTheme } from '../../shared/theme/theme';
 import { eventStreamResponse } from '../../shared/api/handlers';
 import {
   error as errorFixture,
@@ -12,6 +13,7 @@ import {
   taskQueued,
   taskRunning,
 } from '../../shared/api/fixtures';
+import { asRgb, px, required } from '../../test/dom';
 import { server } from '../../test/server';
 
 // Mock addition (settle with item 12): the snapshot holds a COMPLETED (3), FAILED (4) and
@@ -288,5 +290,62 @@ describe('the history list', () => {
 
     // One hour and up: h:mm:ss. 3661000 ms -> 1:01:01.
     expect(rowOf('lecture.m4a')).toHaveTextContent('Oct 9, 2026 · 1:01:01');
+  });
+});
+
+describe('the empty history', () => {
+  it('shows the empty state when nothing has finished, and a distinct no-matches line when search and filter exclude every task', async () => {
+    // Nothing has finished: only a running and a queued task.
+    const pendingOnly = {
+      tasks: [
+        { ...taskRunning, id: 6, finishedAt: null },
+        { ...taskQueued, id: 7, finishedAt: null },
+      ],
+      queue: { paused: false, taskIds: [6, 7] },
+    };
+    server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', pendingOnly]])));
+    const live = renderHistory();
+
+    // Before the snapshot the shell's connecting region is the loading state: the view
+    // does not claim yet that the history is empty.
+    expect(screen.queryByText('No transcripts yet')).not.toBeInTheDocument();
+    await live;
+
+    // Live with nothing finished: the empty state leads with the mascot, gives one line of
+    // guidance whose action links to the queue, and the search and filter are hidden.
+    const title = await screen.findByText('No transcripts yet');
+    const block = required(title.parentElement) as HTMLElement;
+    const mascot = required(block.querySelector('svg'));
+    expect(getComputedStyle(mascot).width).toBe(px(lightTheme.sizes.stenoEmpty));
+    expect(block).toHaveTextContent('Finished tasks appear here — go to the queue to add audio');
+    expect(within(block).getByRole('link', { name: 'go to the queue' })).toHaveAttribute(
+      'href',
+      '/queue',
+    );
+    expect(screen.queryByRole('searchbox', { name: /search/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /status/i })).not.toBeInTheDocument();
+
+    cleanup();
+
+    // Finished tasks exist, but the search and the filter exclude all of them: a compact
+    // muted line (no mascot, no empty state) with an action that clears both.
+    server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])));
+    await renderHistory();
+    fireEvent.change(screen.getByRole('searchbox', { name: /search/i }), {
+      target: { value: 'interview' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: /status/i }), {
+      target: { value: 'FAILED' },
+    });
+    const line = screen.getByText('No tasks match your search and filter.');
+    expect(getComputedStyle(line).color).toBe(asRgb(lightTheme.colors.textMuted));
+    expect(screen.queryByText('No transcripts yet')).not.toBeInTheDocument();
+    expect(required(line.parentElement).querySelector('svg')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByRole('searchbox', { name: /search/i })).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: /status/i })).toHaveValue('ALL');
+    expect(screen.queryByText('No tasks match your search and filter.')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 });
