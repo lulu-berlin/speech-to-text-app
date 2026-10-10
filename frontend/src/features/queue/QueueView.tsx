@@ -18,6 +18,7 @@ import { ApiError } from '../../shared/api/types';
 import type { Task, TaskStatus } from '../../shared/api/types';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { finishNoticeMachine } from './finishNoticeMachine';
+import { dropZoneMachine } from './dropZoneMachine';
 import type { FinishNotice } from './finishNoticeMachine';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
@@ -74,13 +75,18 @@ const NumberInput = styled.input`
   ${controlStyle}
 `;
 
-const DropZone = styled.button`
+// The drop zone: dashed on the surface fill; while files are dragged over it, a solid
+// accent border on the light accent tint (item 25).
+const DropZone = styled.button<{ $over: boolean }>`
   display: block;
   width: 100%;
   padding: ${(props) => props.theme.spacing.xl};
-  border: ${(props) => props.theme.borderWidths.thin} dashed ${(props) => props.theme.colors.border};
+  border: ${(props) => props.theme.borderWidths.thin}
+    ${(props) => (props.$over ? 'solid' : 'dashed')}
+    ${(props) => (props.$over ? props.theme.colors.accent : props.theme.colors.border)};
   border-radius: ${(props) => props.theme.radii.card};
-  background: ${(props) => props.theme.colors.surface};
+  background: ${(props) =>
+    props.$over ? props.theme.colors.status.active.background : props.theme.colors.surface};
   color: ${(props) => props.theme.colors.textMuted};
   font: inherit;
   cursor: pointer;
@@ -210,6 +216,8 @@ export function QueueView() {
   });
   const [pause, sendPause] = useMachine(queuePauseMachine);
   const [notices, sendNotice] = useMachine(finishNoticeMachine);
+  const [dropZone, sendDropZone] = useMachine(dropZoneMachine);
+  const dragOver = dropZone.matches('over');
   const previousStatusesRef = useRef<Record<number, TaskStatus>>({});
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -263,6 +271,7 @@ export function QueueView() {
 
   const onDrop = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
+    sendDropZone({ type: 'DROP' });
     enqueue(Array.from(event.dataTransfer.files));
   };
 
@@ -385,15 +394,22 @@ export function QueueView() {
         </Stack>
         <DropZone
           type="button"
+          $over={dragOver}
           onClick={() => inputRef.current?.click()}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onDragEnter={() => sendDropZone({ type: 'ENTER' })}
+          onDragLeave={() => sendDropZone({ type: 'LEAVE' })}
         >
           {empty ? (
             <EmptyZoneContent>
               <StenographerAnimation size="empty" />
-              No tasks yet — drop audio files here, or click to choose them
+              {dragOver
+                ? 'Release to upload'
+                : 'No tasks yet — drop audio files here, or click to choose them'}
             </EmptyZoneContent>
+          ) : dragOver ? (
+            'Release to upload'
           ) : (
             'Drop audio files here or click to choose'
           )}
