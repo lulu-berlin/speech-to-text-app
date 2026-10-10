@@ -71,6 +71,7 @@ class EventsSpec :
                         val (updatedName, updatedData) = events.readEvent()
                         updatedName shouldBe "task-updated"
                         val updated = Json.parseToJsonElement(updatedData).jsonObject
+                        updated shouldHaveShapeOf taskExamples
                         updated
                             .getValue("id")
                             .jsonPrimitive.content
@@ -81,24 +82,23 @@ class EventsSpec :
                         server.command("POST", "/api/queue/pause") shouldBe 200
                         val (queueName, queueData) = events.readEvent()
                         queueName shouldBe "queue-updated"
-                        Json
-                            .parseToJsonElement(queueData)
-                            .jsonObject
-                            .getValue("paused")
-                            .jsonPrimitive.content shouldBe "true"
+                        val queue = Json.parseToJsonElement(queueData).jsonObject
+                        queue shouldHaveShapeOf apiExample("queue.json")
+                        queue.getValue("paused").jsonPrimitive.content shouldBe "true"
 
                         // 4. task-deleted: deleting the COMPLETED task; the delete also re-emits the queue.
                         server.command("DELETE", "/api/tasks/$completed") shouldBe 204
                         val (deletedName, deletedData) = events.readEvent()
                         deletedName shouldBe "task-deleted"
-                        Json
-                            .parseToJsonElement(deletedData)
-                            .jsonObject
+                        val deleted = Json.parseToJsonElement(deletedData).jsonObject
+                        deleted shouldHaveShapeOf apiExample("task-deleted.json")
+                        deleted
                             .getValue("id")
                             .jsonPrimitive.content
                             .toLong() shouldBe completed
-                        val (finalQueueName, _) = events.readEvent()
+                        val (finalQueueName, finalQueueData) = events.readEvent()
                         finalQueueName shouldBe "queue-updated"
+                        Json.parseToJsonElement(finalQueueData).jsonObject shouldHaveShapeOf apiExample("queue.json")
                     }
                 }
             }
