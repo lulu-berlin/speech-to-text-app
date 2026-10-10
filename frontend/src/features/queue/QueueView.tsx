@@ -6,17 +6,17 @@ import { uploadTask } from '../../shared/api/client';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
-import type { Task, TaskPhase } from '../../shared/api/types';
+import type { Task } from '../../shared/api/types';
 import { ConnectionContext } from '../../app/ConnectionContext';
-import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
-import { StatusBadge } from '../../shared/ui/StatusBadge';
-import { Page, Row, Stack } from '../../shared/ui/layout';
+import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
+import { RowContent, RowName } from './rowParts';
+import { TaskRow } from './TaskRow';
 import { isSupportedFormat } from './uploadValidation';
 
 // The upload options, one set for the whole batch (item 14): the language codes come
@@ -90,30 +90,8 @@ const DropZone = styled.button`
   ${focusRing}
 `;
 
-const RowContent = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: ${(props) => props.theme.spacing.sm};
-`;
-
-const RowName = styled.span`
-  color: ${(props) => props.theme.colors.text};
-`;
-
 const RowStatus = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
-`;
-
-// The phase a task is in, as a text label next to its status (none while queued).
-const PHASE_LABELS: Record<NonNullable<TaskPhase>, string> = {
-  CHUNKING: 'Chunking',
-  TRANSCRIBING: 'Transcribing',
-  DIARIZING: 'Diarizing',
-};
-
-const RowPhase = styled.span`
-  color: ${(props) => props.theme.colors.textMuted};
-  font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
 const RowError = styled.span`
@@ -406,24 +384,7 @@ export function QueueView() {
         {pendingTasks.length > 0 ? (
           <List label="Pending tasks">
             {pendingTasks.map((task) => (
-              <ListRow key={task.id}>
-                <Stack gap="sm">
-                  <RowContent>
-                    <RowName>{task.filename}</RowName>
-                    <Row>
-                      {task.phase !== null ? <RowPhase>{PHASE_LABELS[task.phase]}</RowPhase> : null}
-                      <StatusBadge status={task.status} />
-                    </Row>
-                  </RowContent>
-                  <ProgressBar value={task.transcriptionProgress} label="Transcription" />
-                  {task.diarizationProgress !== null ? (
-                    <DiarizationProgressBar
-                      stage={task.diarizationStage}
-                      progress={task.diarizationProgress}
-                    />
-                  ) : null}
-                </Stack>
-              </ListRow>
+              <TaskRow key={task.id} task={task} />
             ))}
           </List>
         ) : null}
