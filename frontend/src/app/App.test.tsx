@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { asRgb } from '../test/dom';
+import { asRgb, px } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { App } from './App';
 
@@ -91,6 +91,37 @@ describe('the app root', () => {
     // The self-hosted font comes first; the system stack is the fallback.
     expect(lightTheme.fontFamilies.sans).toMatch(/^"IBM Plex Sans", system-ui, /);
     expect(lightTheme.fontFamilies.sans.endsWith('sans-serif')).toBe(true);
+  });
+
+  it('sets the body text from a type scale that ascends and meets WCAG line spacing', () => {
+    const { fontSizes, fontWeights, lineHeights, breakpoints } = lightTheme;
+    const rem = (length: string) => {
+      expect(length).toMatch(/^\d*\.?\d+rem$/);
+      return Number.parseFloat(length);
+    };
+
+    // Sizes and breakpoints ascend (rem only).
+    expect(rem(fontSizes.small)).toBeLessThan(rem(fontSizes.body));
+    expect(rem(fontSizes.body)).toBeLessThan(rem(fontSizes.title));
+    expect(rem(breakpoints.sm)).toBeLessThan(rem(breakpoints.md));
+    expect(rem(breakpoints.md)).toBeLessThan(rem(breakpoints.lg));
+    // The weights are the font's 400/500/600, inside its 100–700 axis (fonts/README.md).
+    expect([fontWeights.regular, fontWeights.medium, fontWeights.semibold]).toEqual([
+      400, 500, 600,
+    ]);
+    // WCAG 1.4.12: line height at least 1.5; the transcript reads more loosely.
+    expect(lineHeights.body).toBeGreaterThanOrEqual(1.5);
+    expect(lineHeights.reading).toBeGreaterThan(lineHeights.body);
+    // Both themes share the scale.
+    expect(darkTheme.fontSizes).toEqual(fontSizes);
+    expect(darkTheme.lineHeights).toEqual(lineHeights);
+
+    // The app root sets the body size and line height (read there for the same jsdom
+    // reason as the font family above).
+    renderAt('/queue');
+    const shell = screen.getByRole('main').parentElement as HTMLElement;
+    expect(getComputedStyle(shell).fontSize).toBe(px(fontSizes.body));
+    expect(getComputedStyle(shell).lineHeight).toBe(String(lineHeights.body));
   });
 
   it('cycles the theme control through auto, light and dark, storing the choice', () => {
