@@ -3,7 +3,7 @@ import { useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { getTurns } from '../../shared/api/client';
-import type { Segment, Turn, Turns } from '../../shared/api/types';
+import type { Segment, Task, TaskPhase, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
@@ -17,6 +17,20 @@ function formatTime(ms: number): string {
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
+
+// The plain-word form of a running phase, for "Failed/Canceled while <phase>".
+const PHASE_WORDS: Record<Exclude<TaskPhase, null>, string> = {
+  CHUNKING: 'chunking',
+  TRANSCRIBING: 'transcribing',
+  DIARIZING: 'diarizing',
+};
+
+function phaseWord(phase: TaskPhase): string {
+  return phase === null ? 'processing' : PHASE_WORDS[phase];
+}
+
+// The statuses that get a status page instead of the transcript.
+const FINISHED_ISSUES: ReadonlySet<Task['status']> = new Set(['FAILED', 'CANCELED']);
 
 // The transcript download formats (item 10, ADR 0035): txt, srt, vtt.
 const DOWNLOAD_FORMATS = ['txt', 'srt', 'vtt'] as const;
@@ -180,6 +194,48 @@ export function TaskTranscriptView() {
     );
   }
 
+  // The audio block is shared: the player when the task has audio, otherwise the note.
+  const audioBlock = task.hasAudio ? (
+    <audio
+      ref={audioRef}
+      controls
+      src={`/api/tasks/${id}/audio`}
+      aria-label={`Audio for ${task.filename}`}
+      onTimeUpdate={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
+      onSeeked={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
+    >
+      Your browser does not support the audio element.
+    </audio>
+  ) : (
+    <NoAudioNote>This task has no audio because it ended before chunking.</NoAudioNote>
+  );
+
+  // A failed or canceled task gets a status page, not a transcript (item 15).
+  if (FINISHED_ISSUES.has(task.status)) {
+    const outcome = task.status === 'FAILED' ? 'Failed' : 'Canceled';
+    const progress =
+      task.transcribedUntilMs !== null ? ` at ${formatTime(task.transcribedUntilMs)}` : '';
+    return (
+      <Page>
+        <Stack gap="md">
+          <Title>{task.filename}</Title>
+          <Text>
+            {outcome} while {phaseWord(task.phase)}
+            {progress}
+          </Text>
+          {task.error !== null ? <Text>Error: {task.error}</Text> : null}
+          {audioBlock}
+          <Row gap="sm">
+            <Button type="button">Retry</Button>
+            <Button type="button" variant="danger">
+              Delete
+            </Button>
+          </Row>
+        </Stack>
+      </Page>
+    );
+  }
+
   return (
     <Page>
       <Stack gap="md">
@@ -195,20 +251,7 @@ export function TaskTranscriptView() {
             </DownloadLink>
           ))}
         </Row>
-        {task?.hasAudio ? (
-          <audio
-            ref={audioRef}
-            controls
-            src={`/api/tasks/${id}/audio`}
-            aria-label={task?.filename !== undefined ? `Audio for ${task.filename}` : 'Audio'}
-            onTimeUpdate={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
-            onSeeked={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
-          >
-            Your browser does not support the audio element.
-          </audio>
-        ) : task !== undefined ? (
-          <NoAudioNote>This task has no audio because it ended before chunking.</NoAudioNote>
-        ) : null}
+        {audioBlock}
         {turnsBySpeaker === null ? (
           <Text>Loading…</Text>
         ) : (

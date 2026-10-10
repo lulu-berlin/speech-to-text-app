@@ -1,8 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { http } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../app/App';
 import { lightTheme } from '../../shared/theme/theme';
+import { eventStreamResponse } from '../../shared/api/handlers';
+import { taskCanceled, taskFailed } from '../../shared/api/fixtures';
+import { server } from '../../test/server';
 
 function renderTranscript(taskId: string) {
   render(
@@ -41,7 +45,23 @@ describe('the transcript view', () => {
   });
 
   it('shows a speakers-off transcript without speaker labels', async () => {
-    await renderTranscript('4'); // task 4 is FAILED with speakersMode "off" (id 4).
+    // Mock addition: the snapshot's task 4 is COMPLETED with speakersMode "off" (the
+    // default snapshot has it FAILED, which now shows a status page). The /turns handler
+    // serves turns.speakers-off.json for id 4's off mode.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskFailed, id: 4, status: 'COMPLETED', speakersMode: 'off' }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('4');
 
     // The turn text (docs/api/turns.speakers-off.json) is visible.
     expect(await screen.findByText('Remember to buy milk.')).toBeInTheDocument();
@@ -156,6 +176,51 @@ describe('the transcript view', () => {
     // "Back to playing position" resumes following and scrolls to the current segment.
     fireEvent.click(screen.getByRole('button', { name: /back to playing position/i }));
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a status page for a failed task: what happened, error, retry, delete, no transcript', async () => {
+    await renderTranscript('4'); // task 4 is FAILED in the snapshot (id 4).
+
+    // No transcript: no speaker name or segment text.
+    expect(screen.queryByText('Speaker 1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Listening|Good morning/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Download transcript/)).not.toBeInTheDocument();
+
+    // What happened: the phase (TRANSCRIBING -> "transcribing") and transcribedUntilMs.
+    expect(await screen.findByText(/failed while transcribing at/i)).toBeInTheDocument();
+    // transcribedUntilMs 298650 -> 04:58
+    expect(screen.getByText(/04:58/)).toBeInTheDocument();
+
+    // The error message, Retry and Delete controls, and (hasAudio) the player.
+    expect(screen.getByText(/failed to allocate memory/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Audio for call.ogg')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a status page for a canceled task with no error and no transcript', async () => {
+    // Mock addition: the snapshot's task 5 is CANCELED (the default snapshot has it RUNNING),
+    // so the canceled status page is reachable.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            { tasks: [{ ...taskCanceled, id: 5 }], queue: { paused: false, taskIds: [] } },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('5');
+
+    expect(await screen.findByText(/canceled while transcribing at/i)).toBeInTheDocument();
+    expect(screen.getByText(/19:56/)).toBeInTheDocument(); // transcribedUntilMs 1196480
+    // CANCELED carries error: null, so no error message.
+    expect(screen.queryByText(/failed to allocate/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
   });
 });
 
