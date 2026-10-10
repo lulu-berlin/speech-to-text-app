@@ -158,7 +158,9 @@ const StyledSvg = styled.svg<{ $size: StenographerSize; $typing: boolean }>`
   }
   & .head {
     transform-box: view-box;
-    transform-origin: 50% 42%;
+    // The artwork's bob pivot (200, 168) of the 400 box, as percentages of the cropped
+    // 293-box (x: 200/293, y: 168/293) so the head still nods around the neck.
+    transform-origin: 68.3% 57.3%;
     animation: ${bob} 2.6s ease-in-out infinite;
   }
   & .eye {
@@ -255,7 +257,7 @@ export function StenographerAnimation({
   const uid = useId().replace(/:/g, '');
   const defId = (name: string) => `${uid}-${name}`;
   return (
-    <StyledSvg viewBox="0 0 400 400" $size={size} $typing={typing} aria-hidden="true">
+    <StyledSvg viewBox="55 61 293 293" $size={size} $typing={typing} aria-hidden="true">
       <defs>
         <radialGradient id={defId('bg')} cx="50%" cy="40%" r="60%">
           <stop offset="0%" stopColor={i.backdropFrom} />

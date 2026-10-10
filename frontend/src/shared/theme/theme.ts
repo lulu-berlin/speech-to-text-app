@@ -92,7 +92,8 @@ export interface ThemeTokens {
     switchThumb: string;
     sliderThumb: string;
     // The stenographer animation's sizes (item 17): the header instance and the
-    // empty-state instance (32-40 px and 120-160 px respectively at 16 px roots).
+    // empty-state instance. The artwork is cropped to its drawing (no margin), so the
+    // header reads clearly at 120 px; the empty-state instance is 140 px.
     stenoHeader: string;
     stenoEmpty: string;
   };
@@ -169,7 +170,7 @@ const baseTokens = {
     switchHeight: '1.5rem',
     switchThumb: '1.25rem',
     sliderThumb: '1.25rem',
-    stenoHeader: '2.25rem',
+    stenoHeader: '7.5rem',
     stenoEmpty: '8.75rem',
   },
   radii: {

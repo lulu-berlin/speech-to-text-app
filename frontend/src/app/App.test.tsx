@@ -54,7 +54,7 @@ describe('the app root', () => {
     // The mascot sits directly before the product name.
     expect(steno.nextElementSibling).toBe(title);
 
-    // And it renders at the header size (32-40 px at 16 px roots).
+    // And it renders at the header size (the cropped artwork fills the box).
     const style = getComputedStyle(steno);
     expect(style.width).toBe(px(lightTheme.sizes.stenoHeader));
     expect(style.height).toBe(px(lightTheme.sizes.stenoHeader));
