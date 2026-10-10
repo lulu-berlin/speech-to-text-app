@@ -52,6 +52,8 @@ export function TaskTranscriptView() {
         }
       })
       .catch(() => {
+        /* The turns fetch failing is handled by a later item (the failed/status page and
+           the not-found view); until then a failed load leaves the turns empty. */
         if (!cancelled) {
           setTurns(null);
         }
