@@ -96,12 +96,12 @@ export async function runTaskCommand(id: number, command: string): Promise<Task>
   return json<Task>(response);
 }
 
-// Item 12 contract: DELETE /api/tasks/{id} -> 204 without a body. Delete is not a status
-// transition, so it works on any task; an error body still becomes a typed ApiError.
+// Item 12 contract: DELETE /api/tasks/{id} -> 204 without a body; the task is gone.
 export async function deleteTask(id: number): Promise<void> {
   const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
   if (!response.ok) {
-    await json<never>(response); // throws the typed error
+    const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
+    throw apiError(body, response.status, response.statusText);
   }
 }
 
