@@ -1,8 +1,12 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { http } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
+import { eventStreamResponse } from '../shared/api/handlers';
+import { snapshot as snapshotFixture } from '../shared/api/fixtures';
 import { asRgb, px, required } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
+import { server } from '../test/server';
 import { App } from './App';
 
 function renderAt(path: string) {
@@ -17,6 +21,27 @@ describe('the app root', () => {
   it('renders the page title', () => {
     renderAt('/queue');
     expect(screen.getByRole('heading', { name: 'Speech-to-Text' })).toBeInTheDocument();
+  });
+
+  it('labels the loading region by state: Connecting… until the snapshot, Reconnecting… on a drop', async () => {
+    // The stream sends the snapshot then ends; the eventsource pauses its auto-retry
+    // for the SSE retry field, so the machine stays reconnecting through the assertions.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([['snapshot', snapshotFixture]], { end: true, retryMs: 60000 }),
+      ),
+    );
+    renderAt('/queue');
+
+    // Until the first snapshot arrives the region says Connecting…
+    expect(screen.getByText('Connecting…')).toBeInTheDocument();
+    await screen.findByText('Live');
+
+    // The connection drops: the region returns, labelled for the reconnect, with the mascot.
+    expect(await screen.findByText('Reconnecting…')).toBeInTheDocument();
+    expect(screen.queryByText('Connecting…')).toBeNull();
+    const region = required(screen.getByText('Reconnecting…').parentElement);
+    expect(required(region.querySelector('svg')).getAttribute('aria-hidden')).toBe('true');
   });
 
   it('shows the stenographer animation next to the product name at the header size', () => {
