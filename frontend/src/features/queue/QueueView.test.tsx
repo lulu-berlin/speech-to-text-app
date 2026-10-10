@@ -10,6 +10,9 @@ import {
   errorInvalidLanguage,
   queue as queueFixture,
   snapshot as snapshotFixture,
+  taskCanceled,
+  taskCompleted,
+  taskFailed,
   taskPaused,
   taskQueued,
   taskRunning,
@@ -707,6 +710,46 @@ describe('the queue pause', () => {
     fireEvent.click(toggle);
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'));
     expect(calls).toEqual(['pause', 'resume']);
+  });
+});
+
+describe('finished tasks', () => {
+  it('shows a notice with a link when a task leaves the queue finished, and the row leaves', async () => {
+    const events = controllableEventStream();
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    // RUNNING -> COMPLETED: a transcript link.
+    events.send('task-updated', { ...taskCompleted, id: 5, filename: 'lecture.m4a' });
+    await screen.findByRole('link', { name: 'open' });
+    expect(screen.getByText(/lecture\.m4a transcribed/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'open' })).toHaveAttribute('href', '/history/5');
+
+    // A fresh task, queued -> running -> failed (transitions stay in the table): a
+    // History link.
+    events.send('task-updated', { ...taskQueued, id: 9, filename: 'notes.mp3' });
+    events.send('queue-updated', { ...queueFixture, taskIds: [9] });
+    await screen.findByText('notes.mp3');
+    events.send('task-updated', { ...taskRunning, id: 9, filename: 'notes.mp3' });
+    events.send('task-updated', { ...taskFailed, id: 9, filename: 'notes.mp3' });
+    await screen.findByText(/notes\.mp3 failed/);
+
+    // Queued -> canceled (another fresh task): a History link too.
+    events.send('task-updated', { ...taskQueued, id: 10, filename: 'draft.wav' });
+    events.send('queue-updated', { ...queueFixture, taskIds: [10] });
+    await screen.findByText('draft.wav');
+    events.send('task-updated', { ...taskCanceled, id: 10, filename: 'draft.wav' });
+    await screen.findByText(/draft\.wav canceled/);
+
+    // Every finished task's notice links to History (completed links to its transcript).
+    const historyLinks = screen.getAllByRole('link', { name: 'see History' });
+    expect(historyLinks).toHaveLength(2);
+    for (const link of historyLinks) {
+      expect(link).toHaveAttribute('href', '/history');
+    }
+
+    // The finished rows left the queue list (the notices are not rows).
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
   });
 });
 

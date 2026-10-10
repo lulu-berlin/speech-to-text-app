@@ -13,8 +13,10 @@ import { css, styled } from 'styled-components';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
-import type { Task } from '../../shared/api/types';
+import type { Task, TaskStatus } from '../../shared/api/types';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { finishNoticeMachine } from './finishNoticeMachine';
+import type { FinishNotice } from './finishNoticeMachine';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
@@ -48,8 +50,16 @@ export type SpeakersChoice = (typeof SPEAKERS_CHOICES)[number];
 // queue (finished, failed or canceled) and belongs to History.
 const PENDING_STATUSES = ['QUEUED', 'RUNNING', 'PAUSED'] as const;
 
+// A task leaving the queue finished shows a short notice with a link (item 16).
+const FINISHED_STATUSES = ['COMPLETED', 'FAILED', 'CANCELED'] as const;
+
 function isSpeakersChoice(value: string): value is SpeakersChoice {
   return (SPEAKERS_CHOICES as readonly string[]).includes(value);
+}
+
+// Whether a task has left the queue finished (item 16); also narrows the status.
+function finishedStatus(status: TaskStatus): status is 'COMPLETED' | 'FAILED' | 'CANCELED' {
+  return (FINISHED_STATUSES as readonly string[]).includes(status);
 }
 
 // The shared look of the panel's text controls (selects and number inputs).
@@ -172,6 +182,24 @@ function DuplicateNotice({ taskId, tasks }: { taskId: number; tasks: Task[] }) {
   );
 }
 
+// One finished task's notice: "... transcribed — open" (to its transcript) or
+// "... failed/canceled — see History" (item 16).
+function FinishNoticeLine({ notice }: { notice: FinishNotice }) {
+  if (notice.status === 'COMPLETED') {
+    return (
+      <span>
+        {notice.filename} transcribed — <Link to={`/history/${notice.id}`}>open</Link>
+      </span>
+    );
+  }
+  return (
+    <span>
+      {notice.filename} {notice.status === 'FAILED' ? 'failed' : 'canceled'} —{' '}
+      <Link to="/history">see History</Link>
+    </span>
+  );
+}
+
 // The trailing side of an upload row: the progress bar while uploading, the duplicate
 // notice or the error message on a failed upload, and the status text otherwise.
 function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
@@ -201,6 +229,8 @@ export function QueueView() {
     input: { order: queue?.taskIds ?? [] },
   });
   const [pause, sendPause] = useMachine(queuePauseMachine);
+  const [notices, sendNotice] = useMachine(finishNoticeMachine);
+  const previousStatusesRef = useRef<Record<number, TaskStatus>>({});
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -214,6 +244,27 @@ export function QueueView() {
       connection.send({ type: 'queue-updated', queue: pause.context.queue });
     }
   }, [pause.context.queue, connection]);
+
+  // A task that just turned finished (its status left the pending group) gets a notice;
+  // the statuses of the initial snapshot are the baseline, so already-finished tasks do
+  // not notice.
+  useEffect(() => {
+    const previous = previousStatusesRef.current;
+    for (const task of tasks) {
+      const was = previous[task.id];
+      if (was !== undefined && !finishedStatus(was) && finishedStatus(task.status)) {
+        sendNotice({
+          type: 'NOTICE',
+          notice: { id: task.id, filename: task.filename, status: task.status },
+        });
+      }
+    }
+    const nextStatuses: Record<number, TaskStatus> = {};
+    for (const task of tasks) {
+      nextStatuses[task.id] = task.status;
+    }
+    previousStatusesRef.current = nextStatuses;
+  }, [tasks, sendNotice]);
 
   // Follow the live queue while no reorder is in flight: a new upload or a removal
   // reconciles into the displayed order (the machine ignores SYNC while sending).
@@ -277,6 +328,13 @@ export function QueueView() {
     <Page>
       <Stack gap="lg">
         <PageHeading>Queue</PageHeading>
+        {notices.context.notices.length > 0 ? (
+          <Stack gap="sm">
+            {notices.context.notices.map((notice) => (
+              <FinishNoticeLine key={notice.id} notice={notice} />
+            ))}
+          </Stack>
+        ) : null}
         <Stack gap="md">
           <Field label="Language" htmlFor="language">
             <SearchableSelect
