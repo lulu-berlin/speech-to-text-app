@@ -13,7 +13,7 @@ import {
   turns as turnsFixture,
 } from '../../shared/api/fixtures';
 import { controllableEventStream } from '../../test/controllableEventStream';
-import { px, required } from '../../test/dom';
+import { px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
 
 function renderTranscript(taskId: string) {
@@ -745,6 +745,76 @@ describe('the themed player', () => {
       'Thanks for joining us today.',
     );
     expect(within(player).getByText('00:05 / 19:45')).toBeInTheDocument();
+  });
+});
+
+describe('the reading column', () => {
+  it('is one centred 70ch column: header, player, downloads, then the turns with the start time in a left gutter and the speaker above the text', async () => {
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json has three turns.
+    await screen.findByText('Good morning.');
+
+    // The whole page is one centred column at the ~70-character measure. jsdom computes
+    // 70ch to 560px, so the token is asserted on the emitted rule.
+    const column = required(screen.getByRole('main').firstElementChild) as HTMLElement;
+    const columnRules = styleRules()
+      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+      .filter((rule) => column.matches(rule.selectorText));
+    expect(columnRules.map((rule) => rule.style.maxWidth)).toContain('70ch');
+    expect(getComputedStyle(column).marginLeft).toBe('auto');
+    expect(getComputedStyle(column).marginRight).toBe('auto');
+
+    // In order: the header block, the player, the downloads, then the turns.
+    const parts = [
+      screen.getByRole('heading', { level: 2, name: 'interview.mp3' }),
+      screen.getByRole('group', { name: 'Audio player' }),
+      screen.getByRole('link', { name: 'Download transcript (txt)' }),
+      screen.getByRole('region', { name: 'Transcript' }),
+    ];
+    for (const [index, part] of parts.entries()) {
+      expect(column).toContainElement(part);
+      if (index > 0) {
+        expect(
+          parts[index - 1]!.compareDocumentPosition(part) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+      }
+    }
+
+    // Each turn is a row: its start time, muted, in a left gutter of one shared width, and
+    // the speaker's name on a line above the turn's text.
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    const start = within(region).getByText('00:00');
+    expect(getComputedStyle(start).color).toBe(asRgb(lightTheme.colors.textMuted));
+    const row = required(start.parentElement) as HTMLElement;
+    expect(getComputedStyle(row).display).toBe('grid');
+    const rows = [...required(row.parentElement).children] as HTMLElement[];
+    expect(rows).toHaveLength(3);
+    const gutters = rows.map((turn) => getComputedStyle(turn).gridTemplateColumns);
+    expect(new Set(gutters).size).toBe(1);
+    expect(gutters[0]).toMatch(/^\S+ 1fr$/);
+    expect(gutters[0]).not.toMatch(/^(auto|max-content|min-content) /);
+    const speaker = within(row).getByText('Speaker 1');
+    expect(getComputedStyle(speaker).display).toBe('block');
+    const text = required(within(row).getByText('Good morning.').closest('p'));
+    expect(speaker.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // The reading rhythm: the transcript line height, and the large gap between turns.
+    expect(getComputedStyle(text).lineHeight).toBe(String(lightTheme.lineHeights.reading));
+    expect(getComputedStyle(required(row.parentElement)).gap).toBe(lightTheme.spacing.lg);
+
+    // On a phone the gutter folds: one column, the time above the speaker. jsdom cannot
+    // evaluate media queries, so the emitted rule is asserted.
+    const narrow = styleRules()
+      .filter(
+        (rule): rule is CSSMediaRule =>
+          rule instanceof CSSMediaRule &&
+          rule.conditionText === `(max-width: ${lightTheme.breakpoints.sm})`,
+      )
+      .flatMap((rule) => [...rule.cssRules])
+      .filter(
+        (rule): rule is CSSStyleRule =>
+          rule instanceof CSSStyleRule && row.matches(rule.selectorText),
+      );
+    expect(narrow.map((rule) => rule.style.gridTemplateColumns)).toContain('1fr');
   });
 });
 
