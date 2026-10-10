@@ -1,6 +1,6 @@
 # 28 — Post-merge cleanup refactors
 
-Status: in-progress
+Status: in-review
 Depends on: —
 
 ## Goal
@@ -33,12 +33,12 @@ Remove the redundancies the codebase sweep found after items 12, 14, 15, 17, 22,
 
 Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] The upload allow-list has one source: backend and frontend both pin `docs/api/allowed-extensions.json`, and an extension inside/outside the list still behaves as before (backend 400 `unsupported-format`; frontend row error before any request)
-- [ ] The delete flow runs through one shared dialog-action machine: the History list, the History detail (status page and transcript) and the queue rows confirm, cancel on Escape, show the inline error and remove the task on done exactly as today
-- [ ] Command responses update the store through one mechanism: a successful pause/resume/cancel/retry still lands the returned task in the live state, and a retry from the status page still navigates to `/queue`
-- [ ] The engine's event buffer and the SSE stream's `BUFFER` are one constant: changing one is a compile error, not a silent divergence
-- [ ] Engine startup resolves the engine once: the module starts the engine it created at startup and no code path resolves the engine twice
-- [ ] (must not break) Everything above is refactor-only: `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` stay green, and no existing test changes (they are the behavior proof)
+- [x] The upload allow-list has one source: backend and frontend both pin `docs/api/allowed-extensions.json`, and an extension inside/outside the list still behaves as before (backend 400 `unsupported-format`; frontend row error before any request)
+- [x] The delete flow runs through one shared dialog-action machine: the History list, the History detail (status page and transcript) and the queue rows confirm, cancel on Escape, show the inline error and remove the task on done exactly as today
+- [x] Command responses update the store through one mechanism: a successful pause/resume/cancel/retry still lands the returned task in the live state, and a retry from the status page still navigates to `/queue`
+- [x] The engine's event buffer and the SSE stream's `BUFFER` are one constant: changing one is a compile error, not a silent divergence
+- [x] Engine startup resolves the engine once: the module starts the engine it created at startup and no code path resolves the engine twice
+- [x] (must not break) Everything above is refactor-only: `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` stay green, and no existing test changes (they are the behavior proof)
 
 ## Acceptance criteria
 
@@ -50,3 +50,4 @@ Approved 2026-10-10 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 
 - 2026-10-10: drafted by the root agent after the codebase sweep (evidence above); the user approved the scope (findings 1–3 and 5–6; findings 4 and the time-formatting hoist recorded for item 25) and the test list; status `spec-approved`.
+- 2026-10-10: workspace agent completed all six test-list items — mechanism (allowed-extensions.json contract pin; `confirmActionMachine`; `commandMachine` for the status-page retry; `EVENT_BUFFER` constant; EngineModule single resolve) was confirmed by the user before implementation. `gradle check`, `gradle integrationTest`, vitest + prettier + tsc + vite build all green; no existing test changed. Status `in-review`.
