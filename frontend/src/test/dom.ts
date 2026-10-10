@@ -25,6 +25,22 @@ export function allStyleRules(): CSSRule[] {
   );
 }
 
+// The style rules inside `@media <condition>` (e.g. "(max-width: 40rem)") whose selector
+// matches `element`: jsdom cannot evaluate media queries, so a responsive rule is asserted
+// at this level.
+export function mediaRulesFor(element: Element, condition: string): CSSStyleRule[] {
+  return styleRules()
+    .filter(
+      (rule): rule is CSSMediaRule =>
+        rule instanceof CSSMediaRule && rule.conditionText === condition,
+    )
+    .flatMap((rule) => [...rule.cssRules])
+    .filter(
+      (rule): rule is CSSStyleRule =>
+        rule instanceof CSSStyleRule && element.matches(rule.selectorText),
+    );
+}
+
 // jsdom reports colours as rgb(), so a token is converted the same way.
 export function asRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
