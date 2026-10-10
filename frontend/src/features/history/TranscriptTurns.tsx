@@ -4,7 +4,7 @@ import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { Stack } from '../../shared/ui/layout';
 import { Text } from '../../shared/ui/typography';
-import { formatTime } from './formatTask';
+import { formatDuration } from './formatTask';
 
 // One turn of the reading column: its start time in a left gutter of one shared width,
 // and the speaker's name on its own line above the turn's text. On a phone the gutter
@@ -81,7 +81,7 @@ export function TranscriptTurns({
     <TurnsList gap="lg">
       {turnsBySpeaker.map(({ turn, speaker }, index) => (
         <TurnRow key={index}>
-          <TurnGutter>{formatTime(turn.startMs)}</TurnGutter>
+          <TurnGutter>{formatDuration(turn.startMs)}</TurnGutter>
           <TurnBody>
             <Stack gap="xs">
               {speaker !== undefined ? (

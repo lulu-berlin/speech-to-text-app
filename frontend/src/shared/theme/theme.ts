@@ -184,7 +184,7 @@ const baseTokens = {
     viewportMinHeight: '100vh',
     pageMaxWidth: '48rem',
     readingMeasure: '70ch',
-    timeGutter: '7ch',
+    timeGutter: '8ch',
     uploadBar: '16rem',
     switchWidth: '2.75rem',
     switchHeight: '1.5rem',

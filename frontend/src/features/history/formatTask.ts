@@ -32,12 +32,3 @@ export function formatTaskMeta(task: Pick<Task, 'finishedAt' | 'durationMs'>): s
     .filter((part) => part !== null)
     .join(' · ');
 }
-
-// A position on the audio timeline as mm:ss (the turn start times, the status page's
-// "at" time); minutes keep counting past the hour.
-export function formatTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
