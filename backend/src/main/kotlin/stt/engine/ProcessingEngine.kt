@@ -188,6 +188,24 @@ class ProcessingEngine internal constructor(
         }
 
     /**
+     * Retries a FAILED or CANCELED task: it is queued at the end with its error cleared and runs again
+     * like after a restart — the stored plan is reused, DONE chunks are skipped, the interrupted chunk is
+     * rerun and diarization replaces the stored speakers (item 09). A COMPLETED task cannot be retried
+     * (item 04's table has no way out of it).
+     */
+    suspend fun retryTask(id: Long): TaskCommandOutcome =
+        command(id, TaskStatus.QUEUED) {
+            if (tasks.retryIfPossible(id)) {
+                publish(id)
+                wake()
+                TaskCommandOutcome.Accepted
+            } else {
+                val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
+                TaskCommandOutcome.Illegal(after, TaskStatus.QUEUED)
+            }
+        }
+
+    /**
      * Cancels a task: its phase job is cancelled, which kills the task's process (item 05), and the task
      * becomes CANCELED with `finished_at` set; the phase it stopped in stays. It returns once the process
      * is gone and the status is stored, so item 12's `DELETE` can cancel a pending task and then delete it.
@@ -280,6 +298,9 @@ class ProcessingEngine internal constructor(
         val id = task.id
         // Refused when the task stopped being QUEUED after the worker picked it (a cancel won the race).
         if (!tasks.setRunningIfQueued(id, now())) return
+        // The work directory is scratch; a task whose terminal status (item 15) cleaned it up must get it
+        // back before it writes chunk copies and decoded PCM again.
+        withContext(Dispatchers.IO) { Files.createDirectories(workDirectories.workDir(id)) }
         publish(id)
         try {
             chunkAudio(id)
