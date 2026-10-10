@@ -136,12 +136,7 @@ export function TaskTranscriptView() {
   const { taskId } = useParams();
   const id = Number(taskId);
   const navigate = useNavigate();
-<<<<<<< HEAD
-  // The visible form of a command/delete refusal (the typed ApiError's message).
-  const errorText = (error: unknown) => (error instanceof ApiError ? error.message : String(error));
-=======
-  const runCommand = useTaskCommand();
->>>>>>> 606a77ac (Refactor: one errorMessage helper for the transcript view; drop HistoryRow's dead errorText)
+const runCommand = useTaskCommand();
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const connection = ConnectionContext.useSelector((state) => state.value);
   const task = tasks.find((candidate) => candidate.id === id);

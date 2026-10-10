@@ -19,6 +19,7 @@ import {
 import { controllableEventStream } from '../../test/controllableEventStream';
 import { lightTheme } from '../../shared/theme/theme';
 import { px, required, styleRules } from '../../test/dom';
+import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
