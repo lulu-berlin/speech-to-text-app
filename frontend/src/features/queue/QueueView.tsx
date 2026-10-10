@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMachine } from '@xstate/react';
+import { useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent, ReactNode } from 'react';
 import { Link } from 'react-router';
 import { css, styled } from 'styled-components';
-import { uploadTask } from '../../shared/api/client';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
@@ -17,6 +17,8 @@ import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { RowContent, RowName } from './rowParts';
 import { TaskRow } from './TaskRow';
+import { uploadBatchMachine } from './uploadBatchMachine';
+import type { UploadRow } from './uploadBatchMachine';
 import { isSupportedFormat } from './uploadValidation';
 
 // The upload options, one set for the whole batch (item 14): the language codes come
@@ -154,22 +156,6 @@ function DuplicateNotice({ taskId, tasks }: { taskId: number; tasks: Task[] }) {
   );
 }
 
-// One file of the batch, with the options it was dropped under. The rows drive the
-// uploader: the first queued row uploads, then the next, one at a time in drop order.
-interface UploadRow {
-  id: number;
-  file: File;
-  options: UploadOptions;
-  status: 'queued' | 'uploading' | 'done' | 'error';
-  // Upload progress 0..1 while uploading (bytes sent).
-  progress: number;
-  error: string | null;
-  // The task a successful upload created; the row leaves once it is in the live state.
-  taskId?: number;
-  // The existing task a duplicate upload names; the row links to it.
-  duplicateTaskId?: number;
-}
-
 // The trailing side of an upload row: the progress bar while uploading, the duplicate
 // notice or the error message on a failed upload, and the status text otherwise.
 function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
@@ -193,9 +179,7 @@ export function QueueView() {
   const [speakerCount, setSpeakerCount] = useState(2);
   const [maxSpeakers, setMaxSpeakers] = useState(8);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [rows, setRows] = useState<UploadRow[]>([]);
-  const [busy, setBusy] = useState(false);
-  const nextRowId = useRef(0);
+  const [upload, sendToUploader] = useMachine(uploadBatchMachine);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const enqueue = (files: File[]) => {
@@ -204,24 +188,7 @@ export function QueueView() {
       speakers: speakers === 'fixed' ? String(speakerCount) : speakers,
       maxSpeakers,
     };
-    setRows((current) => [
-      ...current,
-      ...files.map((file) => {
-        // Item 12 contract: the extension allow-list is checked client-side, so an
-        // unsupported file never uploads.
-        const supported = isSupportedFormat(file.name);
-        return {
-          id: ++nextRowId.current,
-          file,
-          options,
-          status: supported ? ('queued' as const) : ('error' as const),
-          progress: 0,
-          error: supported ? null : 'Unsupported file format',
-          taskId: undefined,
-          duplicateTaskId: undefined,
-        };
-      }),
-    ]);
+    sendToUploader({ type: 'DROP', files: files.map((file) => ({ file, options })) });
   };
 
   const onDrop = (event: DragEvent<HTMLButtonElement>) => {
@@ -246,71 +213,16 @@ export function QueueView() {
         task !== undefined && (PENDING_STATUSES as readonly string[]).includes(task.status),
     );
 
-  // A successful upload row leaves once its task is in the live state (the server
-  // announces a new upload with task-updated; item 13's machine adds it).
-  useEffect(() => {
-    setRows((current) => {
-      const remaining = current.filter(
-        (row) =>
-          row.status !== 'done' ||
-          row.taskId === undefined ||
-          !tasks.some((task) => task.id === row.taskId),
-      );
-      return remaining.length === current.length ? current : remaining;
-    });
-  }, [tasks]);
-
-  // The uploader: while no upload is running, start the first queued row. When it
-  // finishes (done or error), the effect runs again and starts the next one.
-  useEffect(() => {
-    if (busy) {
-      return;
-    }
-    const next = rows.find((row) => row.status === 'queued');
-    if (next === undefined) {
-      return;
-    }
-    setBusy(true);
-    setRows((current) =>
-      current.map((row) => (row.id === next.id ? { ...row, status: 'uploading' } : row)),
-    );
-    uploadTask(next.file, next.options, (sentBytes, totalBytes) => {
-      const fraction = totalBytes > 0 ? sentBytes / totalBytes : 0;
-      setRows((current) =>
-        current.map((row) => (row.id === next.id ? { ...row, progress: fraction } : row)),
-      );
-    })
-      .then((task) => {
-        setRows((current) =>
-          current.map((row) =>
-            row.id === next.id ? { ...row, status: 'done', taskId: task.id } : row,
-          ),
-        );
-      })
-      .catch((error: unknown) => {
-        if (
-          error instanceof ApiError &&
-          error.code === 'duplicate-audio' &&
-          error.taskId !== undefined
-        ) {
-          setRows((current) =>
-            current.map((row) =>
-              row.id === next.id
-                ? { ...row, status: 'error', error: null, duplicateTaskId: error.taskId }
-                : row,
-            ),
-          );
-          return;
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        setRows((current) =>
-          current.map((row) =>
-            row.id === next.id ? { ...row, status: 'error', error: message } : row,
-          ),
-        );
-      })
-      .finally(() => setBusy(false));
-  }, [rows, busy]);
+  // The upload rows the view shows: a successful row leaves once its task is in the
+  // live state (the server announces a new upload with task-updated; item 13's machine
+  // adds it). The rows themselves stay in the machine, waiting for their task to
+  // appear; the uploader itself runs inside the machine.
+  const visibleRows = upload.context.rows.filter(
+    (row) =>
+      row.status !== 'done' ||
+      row.taskId === undefined ||
+      !tasks.some((task) => task.id === row.taskId),
+  );
 
   return (
     <Page>
@@ -378,9 +290,9 @@ export function QueueView() {
           Drop audio files here or click to choose
         </DropZone>
         <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
-        {rows.length > 0 ? (
+        {visibleRows.length > 0 ? (
           <List label="Uploads">
-            {rows.map((row) => (
+            {visibleRows.map((row) => (
               <ListRow key={row.id}>
                 <RowContent>
                   <RowName>{row.file.name}</RowName>
