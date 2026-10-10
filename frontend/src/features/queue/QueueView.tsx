@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent, ReactNode } from 'react';
+import { Link } from 'react-router';
 import { css, styled } from 'styled-components';
 import { uploadTask } from '../../shared/api/client';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
+import { ApiError } from '../../shared/api/types';
 import type { Task } from '../../shared/api/types';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { focusRing } from '../../shared/ui/focusRing';
@@ -14,6 +16,7 @@ import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
+import { isSupportedFormat } from './uploadValidation';
 
 // The upload options, one set for the whole batch (item 14): the language codes come
 // from docs/api/languages.json (contract data, ADR 0029), speakers is auto/off/fixed with
@@ -100,6 +103,10 @@ const RowStatus = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
 `;
 
+const RowError = styled.span`
+  color: ${(props) => props.theme.colors.danger};
+`;
+
 interface FieldProps {
   label: string;
   htmlFor: string;
@@ -126,6 +133,32 @@ function clampCount(raw: string, fallback: number): number {
   return Math.min(20, Math.max(1, parsed));
 }
 
+// The link target of a duplicate upload: the existing task's queue row while it is
+// pending, its transcript once it is finished. A task the state does not hold yet is
+// treated as pending (the queue view is the safe default).
+function duplicateTarget(tasks: Task[], taskId: number): string {
+  const existing = tasks.find((task) => task.id === taskId);
+  if (
+    existing === undefined ||
+    existing.status === 'QUEUED' ||
+    existing.status === 'RUNNING' ||
+    existing.status === 'PAUSED'
+  ) {
+    return '/queue';
+  }
+  return `/history/${taskId}`;
+}
+
+// The inline error of a duplicate upload: "Already uploaded" with a link to the existing
+// task (item 14).
+function DuplicateNotice({ taskId, tasks }: { taskId: number; tasks: Task[] }) {
+  return (
+    <RowError>
+      Already uploaded — <Link to={duplicateTarget(tasks, taskId)}>open</Link>
+    </RowError>
+  );
+}
+
 // One file of the batch, with the options it was dropped under. The rows drive the
 // uploader: the first queued row uploads, then the next, one at a time in drop order.
 interface UploadRow {
@@ -138,6 +171,8 @@ interface UploadRow {
   error: string | null;
   // The task a successful upload created; the row leaves once it is in the live state.
   taskId?: number;
+  // The existing task a duplicate upload names; the row links to it.
+  duplicateTaskId?: number;
 }
 
 export function QueueView() {
@@ -160,14 +195,32 @@ export function QueueView() {
     };
     setRows((current) => [
       ...current,
-      ...files.map((file) => ({
-        id: ++nextRowId.current,
-        file,
-        options,
-        status: 'queued' as const,
-        progress: 0,
-        error: null,
-      })),
+      ...files.map((file) => {
+        if (!isSupportedFormat(file.name)) {
+          // Item 12 contract: the extension allow-list is checked client-side, so an
+          // unsupported file never uploads.
+          return {
+            id: ++nextRowId.current,
+            file,
+            options,
+            status: 'error' as const,
+            progress: 0,
+            error: 'Unsupported file format',
+            taskId: undefined,
+            duplicateTaskId: undefined,
+          };
+        }
+        return {
+          id: ++nextRowId.current,
+          file,
+          options,
+          status: 'queued' as const,
+          progress: 0,
+          error: null,
+          taskId: undefined,
+          duplicateTaskId: undefined,
+        };
+      }),
     ]);
   };
 
@@ -230,6 +283,20 @@ export function QueueView() {
         );
       })
       .catch((error: unknown) => {
+        if (
+          error instanceof ApiError &&
+          error.code === 'duplicate-audio' &&
+          error.taskId !== undefined
+        ) {
+          setRows((current) =>
+            current.map((row) =>
+              row.id === next.id
+                ? { ...row, status: 'error', error: null, duplicateTaskId: error.taskId }
+                : row,
+            ),
+          );
+          return;
+        }
         const message = error instanceof Error ? error.message : String(error);
         setRows((current) =>
           current.map((row) =>
@@ -314,6 +381,12 @@ export function QueueView() {
                   <RowName>{row.file.name}</RowName>
                   {row.status === 'uploading' ? (
                     <ProgressBar value={row.progress} label={`Uploading ${row.file.name}`} />
+                  ) : row.status === 'error' ? (
+                    row.duplicateTaskId !== undefined ? (
+                      <DuplicateNotice taskId={row.duplicateTaskId} tasks={tasks} />
+                    ) : (
+                      <RowError>{row.error}</RowError>
+                    )
                   ) : (
                     <RowStatus>{row.status}</RowStatus>
                   )}
