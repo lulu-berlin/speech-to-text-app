@@ -52,6 +52,7 @@ export interface ThemeTokens {
     dialog: string;
     button: string;
     card: string;
+    pill: string;
   };
   // Elevation, as a literal shadow value (theme.ts may hold such values).
   shadows: {
@@ -105,6 +106,7 @@ const baseTokens = {
     dialog: '0.5rem',
     button: '0.25rem',
     card: '0.5rem',
+    pill: '62.5rem',
   },
   fontSizes: {
     title: '1.5rem',
