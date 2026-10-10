@@ -53,7 +53,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The audio player points at the task's audio endpoint; with `hasAudio` false no player is rendered and a note explains why
 - [x] While the audio plays, the segment containing the current time is highlighted; in a gap between segments none is; seeking moves the highlight
 - [x] Clicking a segment seeks the player to its start and plays
-- [ ] While playing, the highlighted segment is kept in view; scrolling by hand stops following and "Back to playing position" resumes it
+- [x] While playing, the highlighted segment is kept in view; scrolling by hand stops following and "Back to playing position" resumes it
 - [ ] A failed or canceled task opens a status page with what happened (phase and `transcribedUntilMs`), the error, Retry and Delete, and no transcript
 - [ ] Retry is offered on failed and canceled tasks only and calls the retry endpoint; the retried task leaves the history list
 - [ ] Delete always asks for confirmation; confirming calls the delete endpoint and the task leaves the list
