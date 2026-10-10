@@ -8,6 +8,7 @@ import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
 import type { Task } from '../../shared/api/types';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
@@ -394,10 +395,19 @@ export function QueueView() {
           <List label="Pending tasks">
             {pendingTasks.map((task) => (
               <ListRow key={task.id}>
-                <RowContent>
-                  <RowName>{task.filename}</RowName>
-                  <StatusBadge status={task.status} />
-                </RowContent>
+                <Stack gap="sm">
+                  <RowContent>
+                    <RowName>{task.filename}</RowName>
+                    <StatusBadge status={task.status} />
+                  </RowContent>
+                  <ProgressBar value={task.transcriptionProgress} label="Transcription" />
+                  {task.diarizationProgress !== null ? (
+                    <DiarizationProgressBar
+                      stage={task.diarizationStage}
+                      progress={task.diarizationProgress}
+                    />
+                  ) : null}
+                </Stack>
               </ListRow>
             ))}
           </List>
