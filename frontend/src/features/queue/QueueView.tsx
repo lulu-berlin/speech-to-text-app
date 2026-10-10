@@ -101,6 +101,17 @@ const RowStatus = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
 `;
 
+// An uploading file's progress bar beside its filename: a fixed width that does not
+// shrink, so the track never collapses; under the filename it spans the row (item 25).
+const UploadProgress = styled.div`
+  width: ${(props) => props.theme.sizes.uploadBar};
+  flex-shrink: 0;
+
+  @media (max-width: ${(props) => props.theme.breakpoints.sm}) {
+    width: 100%;
+  }
+`;
+
 const RowError = styled.span`
   color: ${(props) => props.theme.colors.danger};
 `;
@@ -168,7 +179,11 @@ function FinishNoticeLine({ notice }: { notice: FinishNotice }) {
 // notice or the error message on a failed upload, and the status text otherwise.
 function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
   if (row.status === 'uploading') {
-    return <ProgressBar value={row.progress} label={`Uploading ${row.file.name}`} />;
+    return (
+      <UploadProgress>
+        <ProgressBar value={row.progress} label={`Uploading ${row.file.name}`} />
+      </UploadProgress>
+    );
   }
   if (row.status === 'error') {
     return row.duplicateTaskId !== undefined ? (

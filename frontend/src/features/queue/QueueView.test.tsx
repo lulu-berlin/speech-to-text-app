@@ -310,6 +310,45 @@ describe('the queue view upload flow', () => {
     fireEvent.drop(dropZone, { dataTransfer: { files } });
     await waitFor(() => expect(arrivals).toEqual(['audio/mpeg']));
   });
+
+  it("gives an uploading file's progress bar a fixed width beside the filename, and the full row width on a phone", async () => {
+    // A fake XHR that reports 50% sent and never completes, so the row stays uploading.
+    class StalledXhr {
+      upload = {
+        onprogress: null as
+          ((event: { lengthComputable: true; loaded: number; total: number }) => void) | null,
+      };
+      responseType = '';
+      status = 0;
+      response: unknown = null;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      open(): void {}
+      send(): void {
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 });
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', StalledXhr);
+    try {
+      renderQueue();
+      const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
+      fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+      const uploads = screen.getByRole('list', { name: 'Uploads' });
+      const bar = await within(uploads).findByRole('progressbar', { name: /a\.mp3/i });
+
+      // The bar's slot beside the filename has a width of its own (16rem) and does not
+      // shrink, so the track does not collapse to its border.
+      const slot = required(required(bar.parentElement).parentElement) as HTMLElement;
+      expect(getComputedStyle(slot).width).toBe(px('16rem'));
+      expect(getComputedStyle(slot).flexShrink).toBe('0');
+
+      // On a phone (the row stacks below the small breakpoint) the slot spans the row.
+      const narrow = mediaRulesFor(slot, `(max-width: ${lightTheme.breakpoints.sm})`);
+      expect(narrow.map((rule) => rule.style.width)).toContain('100%');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe('the empty queue', () => {

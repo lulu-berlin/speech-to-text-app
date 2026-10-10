@@ -92,6 +92,8 @@ export interface ThemeTokens {
     // enough for h:mm:ss.
     readingMeasure: string;
     timeGutter: string;
+    // The width of an uploading file's progress bar beside its filename (item 25).
+    uploadBar: string;
     switchWidth: string;
     switchHeight: string;
     switchThumb: string;
@@ -177,6 +179,7 @@ const baseTokens = {
     pageMaxWidth: '48rem',
     readingMeasure: '70ch',
     timeGutter: '7ch',
+    uploadBar: '16rem',
     switchWidth: '2.75rem',
     switchHeight: '1.5rem',
     switchThumb: '1.25rem',
