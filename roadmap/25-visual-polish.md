@@ -54,7 +54,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 
 - [ ] The shell and each view render on the token background/text and use the primitives, with no literal colors or sizes
 - [ ] The layout is usable at a phone width and a desktop width (no horizontal overflow, controls reachable)
-- [ ] Queue rows show the status badge, both progress bars and the phase label, and stack on a narrow screen
+- [x] Queue rows show the status badge, both progress bars and the phase label, and stack on a narrow screen (cycle 2, 2026-10-10; full column stack below `breakpoints.sm`)
 - [ ] History renders one card per finished task, and a FAILED card shows its error
 - [ ] The transcript is a centred column with a bounded measure, its header block, the player and downloads, and the turns with speaker labels and timestamps
 - [ ] (added 2026-10-10) The transcript's header block shows the task's name, its finish date and its duration (item 15 only titled it "Transcript")
@@ -65,6 +65,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] With reduced motion requested, no non-essential animation runs
 - [ ] Keyboard focus is visible in every view
 - [ ] The existing view and machine tests stay green
+- [ ] (discovered, confirmed 2026-10-10) The upload row's progress bar has a visible width at desktop and phone widths (it sits beside the filename as a flex item with no width of its own, so it collapses to its border)
 
 ## Acceptance criteria
 
