@@ -27,6 +27,12 @@ data class TaskJson(
     val finishedAt: Long?,
 )
 
+/** The response of `GET /api/tasks` (item 12's contract, `docs/api/task-list.json`). */
+@Serializable
+data class TaskListJson(
+    val tasks: List<TaskJson>,
+)
+
 fun TaskDetails.toJson(): TaskJson =
     TaskJson(
         id = id,
