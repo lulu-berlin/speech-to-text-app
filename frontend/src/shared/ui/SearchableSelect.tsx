@@ -1,6 +1,8 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo } from 'react';
 import type { KeyboardEvent } from 'react';
+import { useMachine } from '@xstate/react';
 import styled from 'styled-components';
+import { comboboxMachine } from '../state/comboboxMachine';
 import { floatingPanel } from './floatingPanel';
 import { focusRing } from './focusRing';
 
@@ -21,8 +23,9 @@ export interface SearchableSelectProps {
 
 // The searchable select (item 14): a combobox input that shows the selected option's
 // label, opens a filterable listbox on focus or click, and selects with the mouse or the
-// arrow keys + Enter. The value is the option's code; the input text is only a label, so
-// typing never invents a value (the listbox filters, selection sets the value).
+// arrow keys + Enter (ADR 0038: the open/filter/active interaction is the combobox
+// machine, the option list stays a prop). The value is the option's code; the input
+// text is only a label, so typing never invents a value.
 const Field = styled.input`
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
   border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
@@ -62,10 +65,11 @@ const Wrap = styled.div`
 `;
 
 export function SearchableSelect({ id, label, options, value, onChange }: SearchableSelectProps) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [combobox, sendCombobox] = useMachine(comboboxMachine);
   const listboxId = useId();
+  const open = combobox.matches('open');
+  const query = combobox.context.query;
+  const activeIndex = combobox.context.activeIndex;
 
   const selected = options.find((option) => option.value === value);
   const filtered = useMemo(() => {
@@ -79,34 +83,27 @@ export function SearchableSelect({ id, label, options, value, onChange }: Search
     );
   }, [options, query]);
 
-  const openListbox = () => {
-    setQuery('');
-    setActiveIndex(0);
-    setOpen(true);
-  };
-
   const select = (option: SearchableSelectOption) => {
     onChange(option.value);
-    setQuery(option.label);
-    setOpen(false);
+    sendCombobox({ type: 'CLOSE' });
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (!open) {
       if (event.key === 'ArrowDown' || event.key === 'Enter') {
         event.preventDefault();
-        openListbox();
+        sendCombobox({ type: 'OPEN' });
       }
       return;
     }
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        setActiveIndex((index) => Math.min(index + 1, filtered.length - 1));
+        sendCombobox({ type: 'ARROW_DOWN', max: filtered.length });
         break;
       case 'ArrowUp':
         event.preventDefault();
-        setActiveIndex((index) => Math.max(index - 1, 0));
+        sendCombobox({ type: 'ARROW_UP', max: filtered.length });
         break;
       case 'Enter': {
         event.preventDefault();
@@ -118,11 +115,10 @@ export function SearchableSelect({ id, label, options, value, onChange }: Search
       }
       case 'Escape':
         event.preventDefault();
-        setOpen(false);
-        setQuery(selected?.label ?? '');
+        sendCombobox({ type: 'CLOSE' });
         break;
       case 'Tab':
-        setOpen(false);
+        sendCombobox({ type: 'CLOSE' });
         break;
     }
   };
@@ -142,19 +138,10 @@ export function SearchableSelect({ id, label, options, value, onChange }: Search
           open && active !== undefined ? `${listboxId}-${activeIndex}` : undefined
         }
         value={open ? query : (selected?.label ?? '')}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setActiveIndex(0);
-          if (!open) {
-            setOpen(true);
-          }
-        }}
-        onFocus={openListbox}
-        onClick={openListbox}
-        onBlur={() => {
-          setOpen(false);
-          setQuery(selected?.label ?? '');
-        }}
+        onChange={(event) => sendCombobox({ type: 'QUERY', value: event.target.value })}
+        onFocus={() => sendCombobox({ type: 'OPEN' })}
+        onClick={() => sendCombobox({ type: 'OPEN' })}
+        onBlur={() => sendCombobox({ type: 'CLOSE' })}
         onKeyDown={onKeyDown}
       />
       {open ? (
