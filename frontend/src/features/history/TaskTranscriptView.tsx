@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
-import type { Segment, Task, TaskPhase } from '../../shared/api/types';
+import type { Task, TaskPhase } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { MetaText, PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
-import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { LoadingState } from '../../shared/ui/LoadingState';
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
@@ -19,19 +18,13 @@ import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { deleteTaskMachine } from './deleteTaskMachine';
-import { formatTaskMeta } from './formatTask';
+import { formatTaskMeta, formatTime } from './formatTask';
+import { TranscriptTurns } from './TranscriptTurns';
 import { useTaskCommand } from './useTaskCommand';
 import { AudioPlayer } from './AudioPlayer';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
 import { SpeakersPanel } from './SpeakersPanel';
-
-function formatTime(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
 
 // The plain-word form of a running phase, for "Failed/Canceled while <phase>".
 const PHASE_WORDS: Record<Exclude<TaskPhase, null>, string> = {
@@ -71,57 +64,6 @@ const Title = styled(PageHeading)`
 const NoAudioNote = styled(Text)`
   color: ${(props) => props.theme.colors.textMuted};
   font-size: ${(props) => props.theme.fontSizes.small};
-`;
-
-// One turn of the reading column: its start time in a left gutter of one shared width,
-// and the speaker's name on its own line above the turn's text. On a phone the gutter
-// folds into one column, the time above the speaker.
-const TurnRow = styled.div`
-  display: grid;
-  grid-template-columns: ${(props) => props.theme.sizes.timeGutter} 1fr;
-  gap: ${(props) => props.theme.spacing.md};
-
-  @media (max-width: ${(props) => props.theme.breakpoints.sm}) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-// A turn's start time in the gutter: muted, small, fixed-width digits.
-const TurnGutter = styled.span`
-  color: ${(props) => props.theme.colors.textMuted};
-  font-size: ${(props) => props.theme.fontSizes.small};
-  font-variant-numeric: tabular-nums;
-`;
-
-const TurnBody = styled.div`
-  min-width: 0;
-`;
-
-// The turns list: the reading line height and the large gap between turns.
-const TurnsList = styled(Stack)`
-  gap: ${(props) => props.theme.spacing.lg};
-`;
-
-const TurnText = styled(Text)`
-  margin: 0;
-  line-height: ${(props) => props.theme.lineHeights.reading};
-  overflow-wrap: anywhere;
-`;
-
-const SpeakerName = styled.span<{ $color: string }>`
-  display: block;
-  color: ${(props) => props.$color};
-  font-weight: ${(props) => props.theme.fontWeights.medium};
-`;
-
-const Segment = styled.button<{ $active: boolean }>`
-  border: none;
-  padding: 0;
-  background: ${(props) => (props.$active ? props.theme.colors.accent : 'transparent')};
-  color: ${(props) => (props.$active ? props.theme.colors.accentText : 'inherit')};
-  font: inherit;
-  cursor: pointer;
-  ${focusRing}
 `;
 
 const TranscriptRegion = styled.div`
@@ -471,35 +413,11 @@ const runCommand = useTaskCommand();
             aria-label="Transcript"
             onScroll={handleScroll}
           >
-            <TurnsList gap="lg">
-              {turnsBySpeaker.map(({ turn, speaker }, index) => (
-                <TurnRow key={index}>
-                  <TurnGutter>{formatTime(turn.startMs)}</TurnGutter>
-                  <TurnBody>
-                    <Stack gap="xs">
-                      {speaker !== undefined ? (
-                        <SpeakerName $color={speakerTint(tints, speaker.speakerId)}>
-                          {speaker.speaker}
-                        </SpeakerName>
-                      ) : null}
-                      <TurnText>
-                        {turn.segments.map((segment) => (
-                          <span key={`${segment.startMs}-${segment.endMs}`}>
-                            <Segment
-                              $active={segment === activeSegment}
-                              data-active={segment === activeSegment || undefined}
-                              onClick={() => seekTo(segment.startMs)}
-                            >
-                              {segment.text}
-                            </Segment>{' '}
-                          </span>
-                        ))}
-                      </TurnText>
-                    </Stack>
-                  </TurnBody>
-                </TurnRow>
-              ))}
-            </TurnsList>
+            <TranscriptTurns
+              turnsBySpeaker={turnsBySpeaker}
+              activeSegment={activeSegment}
+              onSegmentClick={seekTo}
+            />
           </TranscriptRegion>
         )}
       </Stack>
