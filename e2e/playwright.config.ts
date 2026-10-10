@@ -12,6 +12,11 @@ export default defineConfig({
   timeout: 180_000,
   expect: { timeout: 20_000 },
   use: {
+    // The farm's chromium-headless-shell renderer hits a Blink NOTREACHED crash on the
+    // app's self-hosted WOFF2 (font-face loading) — the full chromium build is unaffected.
+    // Decided: found while wiring up this suite; pinned here so the tests run the stable
+    // binary headlessly.
+    channel: 'chromium',
     viewport: { width: 1280, height: 800 },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
