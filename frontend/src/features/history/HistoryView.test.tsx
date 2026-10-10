@@ -50,6 +50,26 @@ describe('the history list', () => {
     expect(screen.queryByText('memo.wav')).not.toBeInTheDocument();
   });
 
+  it('shows a failed task its error message, and no other task an error', async () => {
+    server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])));
+    await renderHistory();
+
+    const rows = screen.getAllByRole('listitem');
+    const failedRow = rows.find((row) => row.textContent?.includes('call.ogg'));
+    expect(failedRow).toBeDefined();
+    expect(failedRow).toHaveTextContent(
+      'whisper-cli exited with code 1 while transcribing chunk 1: failed to allocate memory',
+    );
+
+    // The completed and canceled rows carry error: null; no error is shown in them.
+    for (const row of rows) {
+      if (row.textContent?.includes('call.ogg')) {
+        continue;
+      }
+      expect(row.textContent).not.toContain('exited with code');
+    }
+  });
+
   it('narrows the list by filename search and the status filter', async () => {
     server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])));
     await renderHistory();
