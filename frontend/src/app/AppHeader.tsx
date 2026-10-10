@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { StenographerAnimation } from '../shared/brand/StenographerAnimation';
 import type { ThemeMode } from '../shared/theme/themeMode';
 import { IconButton } from '../shared/ui/IconButton';
+import { focusRing } from '../shared/ui/focusRing';
 import { Tooltip } from '../shared/ui/Tooltip';
 import { ConnectionContext } from './ConnectionContext';
 
@@ -39,6 +40,8 @@ const NavItem = styled(NavLink)`
   &.active {
     text-decoration: underline;
   }
+
+  ${focusRing}
 `;
 
 const Indicator = styled.span`

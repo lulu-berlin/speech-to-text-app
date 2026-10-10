@@ -7,9 +7,11 @@ import {
 } from '@dnd-kit/sortable';
 import { useMachine } from '@xstate/react';
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, DragEvent, ReactNode } from 'react';
-import { Link } from 'react-router';
-import { css, styled } from 'styled-components';
+import type { ChangeEvent, DragEvent } from 'react';
+import { styled } from 'styled-components';
+import { controlStyle } from '../../shared/ui/controlStyle';
+import { Field } from '../../shared/ui/Field';
+import { TextLink } from '../../shared/ui/TextLink';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
@@ -64,27 +66,6 @@ function finishedStatus(status: TaskStatus): status is 'COMPLETED' | 'FAILED' | 
   return (FINISHED_STATUSES as readonly string[]).includes(status);
 }
 
-// The shared look of the panel's text controls (selects and number inputs).
-const controlStyle = css`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
-  border-radius: ${(props) => props.theme.radii.button};
-  background: ${(props) => props.theme.colors.surface};
-  color: ${(props) => props.theme.colors.text};
-  font: inherit;
-`;
-
-const FieldBase = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${(props) => props.theme.spacing.xs};
-`;
-
-const FieldLabel = styled.label`
-  color: ${(props) => props.theme.colors.textMuted};
-  font-size: ${(props) => props.theme.fontSizes.small};
-`;
-
 const Select = styled.select`
   ${controlStyle}
 `;
@@ -129,22 +110,6 @@ const ReorderError = styled.p`
   color: ${(props) => props.theme.colors.danger};
 `;
 
-interface FieldProps {
-  label: string;
-  htmlFor: string;
-  children: ReactNode;
-}
-
-// A labelled control of the upload options panel.
-function Field({ label, htmlFor, children }: FieldProps) {
-  return (
-    <FieldBase>
-      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
-      {children}
-    </FieldBase>
-  );
-}
-
 // The count inputs accept 1–20 only (item 12 contract): anything else is clamped, and a
 // non-numeric value keeps the previous one.
 function clampCount(raw: string, fallback: number): number {
@@ -176,7 +141,7 @@ function duplicateTarget(tasks: Task[], taskId: number): string {
 function DuplicateNotice({ taskId, tasks }: { taskId: number; tasks: Task[] }) {
   return (
     <RowError>
-      Already uploaded — <Link to={duplicateTarget(tasks, taskId)}>open</Link>
+      Already uploaded — <TextLink to={duplicateTarget(tasks, taskId)}>open</TextLink>
     </RowError>
   );
 }
@@ -187,14 +152,14 @@ function FinishNoticeLine({ notice }: { notice: FinishNotice }) {
   if (notice.status === 'COMPLETED') {
     return (
       <span>
-        {notice.filename} transcribed — <Link to={`/history/${notice.id}`}>open</Link>
+        {notice.filename} transcribed — <TextLink to={`/history/${notice.id}`}>open</TextLink>
       </span>
     );
   }
   return (
     <span>
       {notice.filename} {notice.status === 'FAILED' ? 'failed' : 'canceled'} —{' '}
-      <Link to="/history">see History</Link>
+      <TextLink to="/history">see History</TextLink>
     </span>
   );
 }

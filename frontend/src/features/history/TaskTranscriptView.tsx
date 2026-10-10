@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useMachine } from '@xstate/react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
@@ -56,6 +56,8 @@ const DownloadLink = styled.a`
   &:hover {
     text-decoration: underline;
   }
+
+  ${focusRing}
 `;
 
 const Title = styled(PageHeading)`
@@ -305,7 +307,7 @@ export function TaskTranscriptView() {
         <Stack gap="md">
           <Title>{task.filename}</Title>
           <Text>This task is still in the queue.</Text>
-          <Link to="/queue">Go to the queue</Link>
+          <TextLink to="/queue">Go to the queue</TextLink>
         </Stack>
       </Page>
     );
