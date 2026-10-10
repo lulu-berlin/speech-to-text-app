@@ -11,6 +11,9 @@ The frontend (items 13–15) needs navigation between the queue, the history and
   - Deep links and the back button work, and a reload keeps the view.
   - The backend's SPA fallback (item 02) serves `index.html` for these paths.
 - **State: XState v5 with `@xstate/react`.**
+  - Amended by [ADR 0038](0038-ui-state-transitions-are-machines.md) (2026-10-10): UI state
+    transitions and form-submission flows are machines; controlled input values (plain form
+    field values) may stay `useState`.
   - Machines model what the client controls:
     - the SSE connection: connecting → live → reconnecting; every `snapshot` replaces the state;
     - each command's lifecycle: idle → sending → done or failed;
