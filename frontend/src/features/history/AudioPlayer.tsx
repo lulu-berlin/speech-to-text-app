@@ -34,8 +34,10 @@ export interface AudioPlayerProps {
   currentTimeMs: number;
   playing: boolean;
   audioRef: RefObject<HTMLAudioElement | null>;
-  // The playhead moved (playback, a seek in the browser, or the seek bar).
+  // The playhead moved (playback, or a seek in the browser).
   onPlayhead: (ms: number) => void;
+  // The seek bar asks to move the audio to `ms`.
+  onSeek: (ms: number) => void;
   // The audio element started or stopped playing.
   onPlayingChange: (playing: boolean) => void;
 }
@@ -51,6 +53,7 @@ export function AudioPlayer({
   playing,
   audioRef,
   onPlayhead,
+  onSeek,
   onPlayingChange,
 }: AudioPlayerProps) {
   const toggle = () => {
@@ -66,15 +69,6 @@ export function AudioPlayer({
            the button in step with what actually happens. */
       });
     }
-  };
-
-  const seek = (seconds: number) => {
-    const audio = audioRef.current;
-    if (audio === null) {
-      return;
-    }
-    audio.currentTime = seconds;
-    onPlayhead(seconds * 1000);
   };
 
   return (
@@ -93,7 +87,7 @@ export function AudioPlayer({
         <Slider
           value={Math.floor(currentTimeMs / 1000)}
           max={Math.floor(durationMs / 1000)}
-          onChange={seek}
+          onChange={(seconds) => onSeek(seconds * 1000)}
           label="Seek"
         />
         <ControlsRow gap="sm">
