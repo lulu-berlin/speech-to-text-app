@@ -327,5 +327,7 @@ describe('keyboard focus', () => {
     collect('not found');
 
     expect([...missing]).toEqual([]);
-  });
+    // The walk renders six views in turn, so it gets an explicit budget beyond vitest's
+    // 5 s default for a loaded host (item 25, user's call).
+  }, 15_000);
 });
