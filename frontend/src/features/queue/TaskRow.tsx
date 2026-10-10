@@ -1,6 +1,13 @@
+import { Pause } from 'lucide-react';
 import { styled } from 'styled-components';
+import { createActor } from 'xstate';
+import { ConnectionContext } from '../../app/ConnectionContext';
 import type { Task, TaskPhase } from '../../shared/api/types';
+import { commandMachine } from '../../shared/state/commandMachine';
+import { isAllowedCommand } from '../../shared/state/transitions';
+import type { TaskCommand } from '../../shared/state/transitions';
 import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
+import { IconButton } from '../../shared/ui/IconButton';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -23,9 +30,28 @@ export interface TaskRowProps {
   task: Task;
 }
 
-// One pending task of the queue list: its filename, phase and status, and the two
-// progress bars (transcription; diarization by stage, hidden when it does not apply).
+// One pending task of the queue list: its filename, phase and status, its controls, and
+// the two progress bars (transcription; diarization by stage, hidden when it does not
+// apply). Each control runs one command machine (ADR 0031) and is offered only when
+// docs/api/task-transitions.json allows it; the task the command returns updates the
+// live state at once (the server's task-updated, when it arrives, carries the same task).
 export function TaskRow({ task }: TaskRowProps) {
+  const connection = ConnectionContext.useActorRef();
+
+  const run = (command: TaskCommand) => {
+    const actor = createActor(commandMachine, {
+      input: { command, taskId: task.id, status: task.status },
+    });
+    actor.subscribe((snapshot) => {
+      if (snapshot.matches('done') && snapshot.context.task !== null) {
+        connection.send({ type: 'task-updated', task: snapshot.context.task });
+        actor.stop();
+      }
+    });
+    actor.start();
+    actor.send({ type: 'START' });
+  };
+
   return (
     <ListRow>
       <Stack gap="sm">
@@ -34,6 +60,13 @@ export function TaskRow({ task }: TaskRowProps) {
           <Row>
             {task.phase !== null ? <RowPhase>{PHASE_LABELS[task.phase]}</RowPhase> : null}
             <StatusBadge status={task.status} />
+            {isAllowedCommand('pause', task.status) ? (
+              <IconButton
+                icon={Pause}
+                label={`Pause ${task.filename}`}
+                onClick={() => run('pause')}
+              />
+            ) : null}
           </Row>
         </RowContent>
         <ProgressBar value={task.transcriptionProgress} label="Transcription" />

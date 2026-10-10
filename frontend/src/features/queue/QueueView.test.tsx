@@ -10,6 +10,7 @@ import {
   snapshot as snapshotFixture,
   taskPaused,
   taskQueued,
+  taskRunning,
 } from '../../shared/api/fixtures';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
@@ -363,6 +364,32 @@ describe('the queue list', () => {
     events.send('task-updated', taskPaused);
     await waitFor(() => expect(within(memo).getByText('PAUSED')).toBeInTheDocument());
     expect(within(memo).getByText('Transcribing')).toBeInTheDocument();
+  });
+});
+
+describe('task controls', () => {
+  it('pauses a running task: the pause control calls the pause endpoint and the row shows it paused', async () => {
+    // The stock pause handler answers with task.paused.json under the URL's id, whose
+    // other fields (filename, progress) belong to task 7; the real backend returns the
+    // requested task, so the test answers with task 5 itself, paused.
+    const paused: string[] = [];
+    server.use(
+      http.post('/api/tasks/:id/pause', ({ params }) => {
+        paused.push(String(params.id));
+        return HttpResponse.json({ ...taskRunning, status: 'PAUSED' });
+      }),
+    );
+
+    renderQueue();
+
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' }));
+
+    // The stream sends nothing after the snapshot, so the paused state comes from the
+    // command's response.
+    await waitFor(() => expect(within(lecture).getByText('PAUSED')).toBeInTheDocument());
+    expect(paused).toEqual(['5']);
   });
 });
 
