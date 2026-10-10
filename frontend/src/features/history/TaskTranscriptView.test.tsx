@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../app/App';
 import { lightTheme } from '../../shared/theme/theme';
 
@@ -102,6 +102,24 @@ describe('the transcript view', () => {
     audio.currentTime = 3.0; // 3000 ms, inside [2400,5200)
     fireEvent(audio, new Event('seeked'));
     expect(activeSegment()?.textContent).toContain('Thanks for joining us today.');
+  });
+
+  it('clicks a segment to seek the player to its start and play', async () => {
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+
+    // Click the "Thanks for joining us today." segment (starts at 2400 ms).
+    fireEvent.click(screen.getByRole('button', { name: /Thanks for joining us today\./ }));
+
+    // The player sought to the segment's start (2400 ms) and played.
+    expect(audio.currentTime).toBe(2.4);
+    expect(play).toHaveBeenCalledTimes(1);
+
+    // The highlight moved to the sought segment.
+    expect(document.querySelector('[data-active]')?.textContent).toContain(
+      'Thanks for joining us today.',
+    );
   });
 });
 

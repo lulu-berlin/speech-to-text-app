@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
@@ -7,6 +7,7 @@ import type { Segment, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
 import { speakerTint } from '../../shared/theme/speakerPalette';
+import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
 
 function formatTime(ms: number): string {
@@ -51,9 +52,14 @@ const Timestamp = styled.span`
   font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
-const Segment = styled.span<{ $active: boolean }>`
+const Segment = styled.button<{ $active: boolean }>`
+  border: none;
+  padding: 0;
   background: ${(props) => (props.$active ? props.theme.colors.accent : 'transparent')};
   color: ${(props) => (props.$active ? props.theme.colors.accentText : 'inherit')};
+  font: inherit;
+  cursor: pointer;
+  ${focusRing}
 `;
 
 export function TaskTranscriptView() {
@@ -100,6 +106,22 @@ export function TaskTranscriptView() {
   // The playhead on the /audio timeline in milliseconds (item 8): updated from the audio
   // element's timeupdate and seeked events; drives the playback highlight.
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Clicking a segment seeks the player to the segment's start and plays from there
+  // (item 9, decided 2026-10-09).
+  const seekTo = (startMs: number) => {
+    const audio = audioRef.current;
+    if (audio === null) {
+      return;
+    }
+    setCurrentTimeMs(startMs);
+    audio.currentTime = startMs / 1000;
+    audio.play().catch(() => {
+      /* A browser may refuse playback before any user gesture (autoplay policy); the seek
+         itself still landed, so the highlight follows. */
+    });
+  };
 
   // All segments in time order, so the highlight can be a binary search over the starts.
   const segmentsInOrder = useMemo(
@@ -134,6 +156,7 @@ export function TaskTranscriptView() {
         </Row>
         {task?.hasAudio ? (
           <audio
+            ref={audioRef}
             controls
             src={`/api/tasks/${id}/audio`}
             aria-label={task?.filename !== undefined ? `Audio for ${task.filename}` : 'Audio'}
@@ -165,6 +188,7 @@ export function TaskTranscriptView() {
                       <Segment
                         $active={segment === activeSegment}
                         data-active={segment === activeSegment || undefined}
+                        onClick={() => seekTo(segment.startMs)}
                       >
                         {segment.text}
                       </Segment>{' '}
