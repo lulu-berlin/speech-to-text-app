@@ -49,11 +49,7 @@ class SpeakerRoutesSpec :
                             listOf("", "   ", "  Alice  ", " Alice", "Alice ", "A".repeat(41), "Al\tice", "\tAlice", "Bob\u007F")
                         for (invalid in invalidNames) {
                             withClue("name ${Json.encodeToString(invalid)}") {
-                                val response = client.rename(id, speakerId = 1, invalid)
-                                response.status shouldBe HttpStatusCode.BadRequest
-                                val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                                body shouldHaveShapeOf apiExample("error.json")
-                                body.getValue("error").jsonPrimitive.content shouldBe "invalid-speaker-name"
+                                client.rename(id, speakerId = 1, invalid).shouldBeError(HttpStatusCode.BadRequest, "invalid-speaker-name")
                             }
                         }
                         // A rejected name keeps the stored one.
@@ -92,11 +88,7 @@ class SpeakerRoutesSpec :
                         // untouched default name (user decision 2026-10-10: compared case-insensitively).
                         for ((speakerId, taken) in listOf(1 to "Alice", 1 to "ALICE", 2 to "alice", 1 to "speaker 3")) {
                             withClue("speaker $speakerId renamed to \"$taken\"") {
-                                val response = client.rename(id, speakerId, taken)
-                                response.status shouldBe HttpStatusCode.Conflict
-                                val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                                body shouldHaveShapeOf apiExample("error.json")
-                                body.getValue("error").jsonPrimitive.content shouldBe "duplicate-speaker-name"
+                                client.rename(id, speakerId, taken).shouldBeError(HttpStatusCode.Conflict, "duplicate-speaker-name")
                             }
                         }
                         client.speakersOf(id) shouldBe speakers("Alice", "Speaker 2", "Speaker 3")
@@ -175,3 +167,14 @@ private fun speakers(vararg names: String): JsonElement =
                 }
             }.toString(),
     )
+
+/** Asserts an error response (item 12's contract): [status], the `docs/api/error.json` shape, and the [code]. */
+private suspend fun HttpResponse.shouldBeError(
+    status: HttpStatusCode,
+    code: String,
+) {
+    this.status shouldBe status
+    val body = Json.parseToJsonElement(bodyAsText()).jsonObject
+    body shouldHaveShapeOf apiExample("error.json")
+    body.getValue("error").jsonPrimitive.content shouldBe code
+}
