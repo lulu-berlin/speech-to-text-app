@@ -253,6 +253,41 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("the merged task of the previous scenario: speakers 0, 1, 0, 2, speaker 0 named Alice, {0, 1} merged into 0") {
+            `when`("its transcript is downloaded as txt, srt and vtt") {
+                then("every folded segment carries the survivor's name, in one turn across the former boundary") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 2))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
+                        client.merge(id, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+
+                        // Derived by hand from item 10's formats (as TranscriptDownloadSpec's goldens) for the turns
+                        // Alice 0–3 000 ms (Hello., Hi., Hey.) and Speaker 3 3 000–4 000 ms (Bye.).
+                        val expected =
+                            mapOf(
+                                "txt" to "[Alice]\nHello.\nHi.\nHey.\n\n[Speaker 3]\nBye.\n",
+                                "srt" to
+                                    "1\n00:00:00,000 --> 00:00:03,000\nAlice: Hello. Hi. Hey.\n\n" +
+                                    "2\n00:00:03,000 --> 00:00:04,000\nSpeaker 3: Bye.\n\n",
+                                "vtt" to
+                                    "WEBVTT\n\n00:00:00.000 --> 00:00:03.000\nAlice: Hello. Hi. Hey.\n\n" +
+                                    "00:00:03.000 --> 00:00:04.000\nSpeaker 3: Bye.\n\n",
+                            )
+                        for ((format, body) in expected) {
+                            withClue(format) {
+                                val response = client.get("/api/tasks/$id/transcript?format=$format")
+                                response.status shouldBe HttpStatusCode.OK
+                                response.bodyAsText() shouldBe body
+                            }
+                        }
+                    }
+                }
+            }
+        }
     })
 
 /** Two segments of a task, one per speaker once `storeSpeakers(listOf(0, 1))` has run. */

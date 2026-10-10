@@ -29,10 +29,13 @@ import stt.queue.TaskStatus
  * The two views of a COMPLETED task's transcript (item 12); any other status answers `409 not-completed`.
  * - `GET /api/tasks/{id}/transcript?format=txt|srt|vtt`: rendered on demand by item 10's pure renderers and
  *   served as an attachment (`Content-Disposition`, `downloadFileName`). Labels are the stored speaker names
- *   (ADR 0034); a speakers-off task renders without labels.
- * - `GET /api/tasks/{id}/turns`: the stored speakers and item 09's `speakerTurns` with their segments, for the
+ *   (ADR 0034), a merged speaker's segments under its survivor's name (item 22); a speakers-off task renders
+ *   without labels.
+ * - `GET /api/tasks/{id}/turns`: the effective speakers and item 09's `speakerTurns` with their segments, for the
  *   transcript view; a turn names its speaker only by `speakerId`. Speakers off: no speakers and one turn per
  *   segment with `speakerId` null. Texts are trimmed (ADR 0030).
+ *
+ * With speakers on, both read [SegmentRepository.findDiarized], the one place a task's merges are resolved.
  */
 fun Application.transcriptRoutes() {
     val tasks: TaskRepository by dependencies
@@ -48,8 +51,15 @@ fun Application.transcriptRoutes() {
                     "invalid-transcript-format",
                     "format must be one of ${TRANSCRIPT_FORMATS.keys.joinToString()}, got \"${requested ?: "(missing)"}\"",
                 )
-            val speakers = if (details.task.speakersMode == SpeakersMode.OFF) null else segments.findSpeakers(id)
-            val content = format.render(segments.findByTask(id), speakers)
+            // Item 22: with speakers on, the renderers get the segments as merged and the effective speakers;
+            // the renderers themselves are unchanged.
+            val content =
+                if (details.task.speakersMode == SpeakersMode.OFF) {
+                    format.render(segments.findByTask(id), null)
+                } else {
+                    val diarized = segments.findDiarized(id)
+                    format.render(diarized.segments, diarized.speakers)
+                }
             call.response.header(
                 HttpHeaders.ContentDisposition,
                 "attachment; filename=\"${downloadFileName(details.task.originalFilename, format.extension)}\"",
