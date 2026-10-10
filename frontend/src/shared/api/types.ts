@@ -109,7 +109,11 @@ export type ServerEvent =
   | { type: 'task-updated'; task: Task }
   | { type: 'task-progress'; progress: TaskProgress }
   | { type: 'queue-updated'; queue: Queue }
-  | { type: 'task-deleted'; id: number };
+  | { type: 'task-deleted'; id: number }
+  // Item 22 (docs/api/speakers-renamed.json, speakers-merged.json): the task's effective
+  // speakers after a stored rename, or after a merge or reset of all merges.
+  | { type: 'speakers-renamed'; id: number; speakers: TurnSpeaker[] }
+  | { type: 'speakers-merged'; id: number; speakers: TurnSpeaker[] };
 
 // What the event stream reports: a server event, or `disconnected` when the connection
 // dropped. `closed` is true when EventSource gave up (an HTTP error) and will not retry,

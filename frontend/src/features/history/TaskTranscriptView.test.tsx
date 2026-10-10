@@ -10,6 +10,7 @@ import {
   taskCanceled,
   taskCompleted,
   taskFailed,
+  snapshot as snapshotFixture,
   turns as turnsFixture,
 } from '../../shared/api/fixtures';
 import { server } from '../../test/server';
@@ -480,7 +481,96 @@ describe('the transcript view', () => {
       within(panel).queryByRole('button', { name: 'Reset all merges' }),
     ).not.toBeInTheDocument();
   });
+
+  it('applies a speakers-renamed event to the open view and refetches /turns on speakers-merged', async () => {
+    // The speakers events of item 22 (docs/api/speakers-*.json shapes), pushed after the
+    // snapshot. Mock addition: /turns answers turns.json until the server-side merge, then the
+    // turns merged by hand ({0, 1} into 0, speaker 0 already named Alice by the rename event).
+    const merged = {
+      speakers: [{ speakerId: 0, speaker: 'Alice' }],
+      hasMerges: true,
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 0,
+          endMs: 14250,
+          text: turnsFixture.turns.map((turn) => turn.text).join(' '),
+          segments: turnsFixture.turns.flatMap((turn) => turn.segments),
+        },
+      ],
+    };
+    let isMerged = false;
+    let turnsRequests = 0;
+    server.use(
+      http.get('/api/tasks/:id/turns', () => {
+        turnsRequests += 1;
+        return HttpResponse.json(isMerged ? merged : turnsFixture);
+      }),
+    );
+    const events = controllableEventStream();
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json has speakers 0 and 1.
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    expect(turnsRequests).toBe(1);
+
+    // A rename elsewhere: its names land in the panel and every turn, with no refetch.
+    events.send('speakers-renamed', {
+      id: 3,
+      speakers: [
+        { speakerId: 0, speaker: 'Alice' },
+        { speakerId: 1, speaker: 'Speaker 2' },
+      ],
+    });
+    await waitFor(() => expect(within(transcript).getAllByText('Alice')).toHaveLength(2));
+    expect(within(panel).getByRole('textbox', { name: 'Name of speaker 1' })).toHaveValue('Alice');
+    expect(turnsRequests).toBe(1);
+
+    // Another task's event changes nothing here.
+    events.send('speakers-renamed', { id: 5, speakers: [{ speakerId: 0, speaker: 'Zoe' }] });
+    expect(within(transcript).queryByText('Zoe')).not.toBeInTheDocument();
+
+    // A merge elsewhere: turns can join, so the view reads /turns again.
+    isMerged = true;
+    events.send('speakers-merged', { id: 3, speakers: merged.speakers });
+    await waitFor(() =>
+      expect(within(transcript).queryByText('Speaker 2')).not.toBeInTheDocument(),
+    );
+    expect(turnsRequests).toBe(2);
+    expect(within(transcript).getAllByText('Alice')).toHaveLength(1);
+    expect(within(panel).getByRole('button', { name: 'Reset all merges' })).toBeInTheDocument();
+  });
 });
+
+// A live /api/events stream for one test (as in QueueView.test.tsx): it opens with the
+// snapshot (docs/api/snapshot.json), then sends each event the test pushes.
+function controllableEventStream() {
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const events = {
+    send(name: string, data: unknown) {
+      if (controller === undefined) {
+        throw new Error('the event stream is not connected yet');
+      }
+      controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+    },
+  };
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          new ReadableStream<Uint8Array>({
+            start(streamController) {
+              controller = streamController;
+              events.send('snapshot', snapshotFixture);
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } },
+        ),
+    ),
+  );
+  return events;
+}
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
 function asRgb(hex: string): string {
