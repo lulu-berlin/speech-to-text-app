@@ -15,6 +15,7 @@ import stt.db.MergeOutcome
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
 import stt.db.Speaker
+import stt.db.TaskRepository
 import stt.db.defaultSpeakerName
 import stt.engine.ProcessingEngine
 
@@ -35,11 +36,19 @@ import stt.engine.ProcessingEngine
  */
 fun Application.speakerRoutes() {
     val engine: ProcessingEngine by dependencies
+    val tasks: TaskRepository by dependencies
     val segments: SegmentRepository by dependencies
     routing {
         put("/api/tasks/{id}/speakers/{speakerId}") {
-            val id = call.parameters["id"]!!.toLong()
-            val speakerId = call.parameters["speakerId"]!!.toInt()
+            val id = call.completedTaskOrError(tasks, "speakers to rename")?.id ?: return@put
+            val speakerId = call.parameters["speakerId"]?.toIntOrNull()
+            if (speakerId == null || segments.findSpeakers(id).none { it.speakerId == speakerId }) {
+                return@put call.respondError(
+                    HttpStatusCode.NotFound,
+                    "not-found",
+                    "Task $id has no speaker ${call.parameters["speakerId"]}",
+                )
+            }
             val requested = call.receive<RenameSpeakerRequest>().speaker
             if (requested != null && !isValidSpeakerName(requested)) {
                 return@put call.respondError(
@@ -65,8 +74,12 @@ fun Application.speakerRoutes() {
         }
 
         post("/api/tasks/{id}/speakers/merge") {
-            val id = call.parameters["id"]!!.toLong()
+            val id = call.completedTaskOrError(tasks, "speakers to merge")?.id ?: return@post
             val request = call.receive<MergeSpeakersRequest>()
+            val known = segments.findSpeakers(id).map { it.speakerId }.toSet()
+            (request.group + request.into).firstOrNull { it !in known }?.let {
+                return@post call.respondError(HttpStatusCode.NotFound, "not-found", "Task $id has no speaker $it")
+            }
             when (val outcome = engine.mergeSpeakers(id, request.group, request.into)) {
                 MergeOutcome.Merged -> {
                     call.respondSpeakers(segments, id)
@@ -79,7 +92,7 @@ fun Application.speakerRoutes() {
         }
 
         delete("/api/tasks/{id}/speakers/merges") {
-            val id = call.parameters["id"]!!.toLong()
+            val id = call.completedTaskOrError(tasks, "merges to reset")?.id ?: return@delete
             engine.resetMerges(id)
             call.respondSpeakers(segments, id)
         }
