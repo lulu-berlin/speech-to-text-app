@@ -1,6 +1,6 @@
 # 26 — Engine start/stop race (flaky DatabaseDependencySpec)
 
-Status: in-progress
+Status: in-review
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 
 ## Goal
@@ -45,10 +45,10 @@ Recorded as [ADR 0038](../docs/decisions/0038-engine-created-at-startup.md) in t
 Behaviors only.
 
 - [x] X1. **Race regression** — an application whose engine creation is still in flight when shutdown begins never runs engine code on a closed `Database`: holding the engine's creation open (its `ProcessRunner` dependency) until the stop sequence is past the engine's cleanup, no uncaught engine exception escapes the application, and the `Database` closes cleanly. (Deterministic repro: fails before the fix with the reported `SQLException`; passes after.)
-- [ ] X2. **Normal stop** — with the engine already running, stopping the application still joins the engine's work (no uncaught exception, engine job completed, `Database` closed) — the existing engine cleanup behavior is preserved.
-- [ ] X3. **Must not break: `DatabaseDependencySpec`** — DI still opens/closes the `Database`, and a test-provided `Database` still replaces the module's; the spec passes unchanged.
-- [ ] X4. **Must not break: `EngineWiringSpec`** — the engine is created and its worker recovers a crashed RUNNING task without the test touching the engine ("only the app's startup can do it"); DI still provides the engine.
-- [ ] X5. **Must not break: the engine specs and the Integration suite** — `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` stay green.
+- [x] X2. **Normal stop** — with the engine already running, stopping the application still joins the engine's work (no uncaught exception, engine job completed, `Database` closed) — the existing engine cleanup behavior is preserved.
+- [x] X3. **Must not break: `DatabaseDependencySpec`** — DI still opens/closes the `Database`, and a test-provided `Database` still replaces the module's; the spec passes unchanged.
+- [x] X4. **Must not break: `EngineWiringSpec`** — the engine is created and its worker recovers a crashed RUNNING task without the test touching the engine ("only the app's startup can do it"); DI still provides the engine.
+- [x] X5. **Must not break: the engine specs and the Integration suite** — `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` stay green.
 
 Out of scope, noted only:
 
@@ -74,3 +74,5 @@ Out of scope, noted only:
 - 2026-10-10: diagnosis proven (probes + Ktor 3.6.0 sources; evidence above); fix decision (eager engine creation, option A) and test list X1–X5 written with the user and approved; status `draft` → `spec-approved`. ADR 0038 accompanies the fix.
 - 2026-10-10: worktree `workspaces/26-engine-shutdown-race` started (branch `roadmap/26-engine-shutdown-race`); status → `in-progress`. Canon TDD begins at X1.
 - 2026-10-10: X1 cycle — Test commit `fdee4bf` (deterministic red: engine worker escapes with `SQLException: database connection closed`), Fix commit `87f7160` (+ ADR 0038; engine created at startup via DI `require`). `gradle check` green. Note: the fully gated reproduction cannot run unchanged post-fix (gating the engine's creation would block startup); the permanent `EngineShutdownRaceSpec` asserts the fix's invariant and the red was demonstrated pre-fix. X1 ticked.
+- 2026-10-10: X2 cycle — `EngineShutdownNormalStopSpec` (stop joins a live worker before `Database.close()`) in commit `14983e6`. X3/X4 pass unchanged; X5 green: `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` (real processes via the devenv fixtures). All list items ticked. Acceptance on the user's side: `nix build .` and the diff review.
+- 2026-10-10: full clean `gradle check --rerun-tasks` — 188 unit tests, 0 failures; `gradle integrationTest --rerun-tasks` green; new specs stable across repeat runs. Status → `in-review`.
