@@ -25,8 +25,13 @@ const ListRowBase = styled.li<{ $variant: ListRowVariant }>`
     ${(props) => (props.$variant === 'card' ? props.theme.colors.border : 'transparent')};
   border-radius: ${(props) => props.theme.radii.card};
 
+  // Hover: a plain row takes the surface fill; a card keeps its fill and darkens its
+  // border to the control neutral (item 25), with no motion.
   &:hover {
-    background: ${(props) => props.theme.colors.surface};
+    ${(props) =>
+      props.$variant === 'card'
+        ? `border-color: ${props.theme.colors.control};`
+        : `background: ${props.theme.colors.surface};`}
   }
 
   // The row itself is not focusable; the ring appears when the control inside it is

@@ -13,7 +13,7 @@ import {
   taskQueued,
   taskRunning,
 } from '../../shared/api/fixtures';
-import { asRgb, px, required } from '../../test/dom';
+import { asRgb, px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
 
 // Mock addition (settle with item 12): the snapshot holds a COMPLETED (3), FAILED (4) and
@@ -347,5 +347,57 @@ describe('the empty history', () => {
     expect(screen.getByRole('combobox', { name: /status/i })).toHaveValue('ALL');
     expect(screen.queryByText('No tasks match your search and filter.')).not.toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+});
+
+describe('the history cards', () => {
+  it('renders one card per finished task with a title row, meta and quiet actions; a FAILED card shows its error as a danger line', async () => {
+    server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])));
+    await renderHistory();
+
+    // One card per finished task (COMPLETED 3, FAILED 4, CANCELED 5); pending ones stay out.
+    const cards = screen.getAllByRole('listitem');
+    expect(cards).toHaveLength(3);
+    for (const card of cards) {
+      expect(getComputedStyle(card).backgroundColor).toBe(asRgb(lightTheme.colors.surfaceRaised));
+    }
+
+    // The title row: the filename link on the left, the status badge on the right.
+    const failed = rowOf('call.ogg');
+    const link = within(failed).getByRole('link', { name: 'call.ogg' });
+    const badge = within(failed).getByText('FAILED');
+    const titleRow = required(link.parentElement) as HTMLElement;
+    expect(titleRow).toContainElement(badge);
+    expect(getComputedStyle(titleRow).justifyContent).toBe('space-between');
+
+    // The FAILED card's error: a danger line led by a decorative alert icon.
+    const error = within(failed).getByText(taskFailed.error!);
+    expect(getComputedStyle(error).color).toBe(asRgb(lightTheme.colors.danger));
+    const errorLine = required(error.parentElement);
+    expect(required(errorLine.querySelector('svg')).closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(within(rowOf('interview.mp3')).queryByText(/failed/i)).not.toBeInTheDocument();
+
+    // The actions are quiet text buttons, right-aligned; Delete reads in danger.
+    const retry = within(failed).getByRole('button', { name: 'Retry' });
+    const remove = within(failed).getByRole('button', { name: 'Delete' });
+    expect(getComputedStyle(retry).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    expect(getComputedStyle(retry).color).toBe(asRgb(lightTheme.colors.accent));
+    expect(getComputedStyle(remove).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    expect(getComputedStyle(remove).color).toBe(asRgb(lightTheme.colors.danger));
+    expect(getComputedStyle(required(retry.parentElement)).justifyContent).toBe('flex-end');
+
+    // Hover darkens the card's border to the control neutral and leaves its fill alone
+    // (asserted as emitted rules: jsdom cannot apply :hover).
+    const hoverRules = styleRules()
+      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+      .filter(
+        (rule) =>
+          rule.selectorText.includes(':hover') &&
+          failed.matches(rule.selectorText.replace(':hover', '')),
+      );
+    expect(hoverRules.map((rule) => rule.style.borderColor)).toContain(
+      asRgb(lightTheme.colors.control),
+    );
+    expect(hoverRules.every((rule) => rule.style.backgroundColor === '')).toBe(true);
   });
 });

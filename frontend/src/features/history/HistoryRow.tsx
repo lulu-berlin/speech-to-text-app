@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { CircleAlert } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { Link } from 'react-router';
 import styled from 'styled-components';
@@ -7,9 +8,10 @@ import type { Task } from '../../shared/api/types';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { focusRing } from '../../shared/ui/focusRing';
-import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
-import { Row, Stack } from '../../shared/ui/layout';
+import { Icon } from '../../shared/ui/Icon';
+import { Stack } from '../../shared/ui/layout';
+import { TextButton } from '../../shared/ui/TextButton';
 import { MetaText, Text } from '../../shared/ui/typography';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
@@ -32,6 +34,31 @@ const TaskLink = styled(Link)`
   text-decoration: none;
 
   ${focusRing}
+`;
+
+// The card's first line: the filename on the left, the status badge on the right.
+const TitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${(props) => props.theme.spacing.sm};
+`;
+
+// A FAILED card's error: a small danger line led by a decorative alert icon.
+const CardError = styled.p`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.xs};
+  margin: 0;
+  color: ${(props) => props.theme.colors.danger};
+  font-size: ${(props) => props.theme.fontSizes.small};
+`;
+
+// The card's quiet actions, right-aligned at the bottom.
+const Actions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: ${(props) => props.theme.spacing.xs};
 `;
 
 // One finished task in the history list. Retry runs through commandMachine and delete
@@ -68,18 +95,22 @@ export function HistoryRow({ task }: { task: Task }) {
   return (
     <ListRow variant="card">
       <Stack gap="xs">
-        <Row gap="sm">
+        <TitleRow>
           <TaskLink to={`/history/${task.id}`}>
             <Filename>{task.filename}</Filename>
           </TaskLink>
           <StatusBadge status={task.status} />
-        </Row>
+        </TitleRow>
         <MetaText>{formatTaskMeta(task)}</MetaText>
-        {task.error !== null ? <MetaText>{task.error}</MetaText> : null}
-        <Row gap="sm">
+        {task.error !== null ? (
+          <CardError>
+            <Icon icon={CircleAlert} tone="danger" size="sm" />
+            <span>{task.error}</span>
+          </CardError>
+        ) : null}
+        <Actions>
           {isAllowedCommand('retry', task.status) ? (
-            <Button
-              variant="secondary"
+            <TextButton
               onClick={() => {
                 if (retryState.matches('failed') || retryState.matches('done')) {
                   retryActor.stop();
@@ -89,10 +120,10 @@ export function HistoryRow({ task }: { task: Task }) {
               }}
             >
               Retry
-            </Button>
+            </TextButton>
           ) : null}
-          <Button
-            variant="danger"
+          <TextButton
+            $tone="danger"
             onClick={() => {
               if (deleteState.matches('failed') || deleteState.matches('done')) {
                 deleteActor.stop();
@@ -102,8 +133,8 @@ export function HistoryRow({ task }: { task: Task }) {
             }}
           >
             Delete
-          </Button>
-        </Row>
+          </TextButton>
+        </Actions>
         {retryError ? <ErrorLine>Retry failed: {String(retryError)}</ErrorLine> : null}
         {deleteError ? <ErrorLine>Delete failed: {String(deleteError)}</ErrorLine> : null}
       </Stack>
