@@ -55,11 +55,16 @@ internal class UploadRequest(
             }
         }
 
-        val maxSpeakers = fields["maxSpeakers"]?.toIntOrNull() ?: 8
-        if (maxSpeakers !in 1..MAX_SPEAKERS) {
+        val rawMaxSpeakers = fields["maxSpeakers"]
+        val maxSpeakers =
+            when {
+                rawMaxSpeakers == null -> 8
+                else -> rawMaxSpeakers.toIntOrNull()
+            }
+        if (maxSpeakers == null || maxSpeakers !in 1..MAX_SPEAKERS) {
             return Either.Rejected(
                 "invalid-max-speakers",
-                "maxSpeakers must be a number between 1 and $MAX_SPEAKERS, got \"${fields["maxSpeakers"]}\"",
+                "maxSpeakers must be a number between 1 and $MAX_SPEAKERS, got \"${rawMaxSpeakers ?: "(missing)"}\"",
             )
         }
 

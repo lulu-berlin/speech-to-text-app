@@ -89,6 +89,7 @@ class UploadValidationSpec :
                         }
                         upload(client, "maxSpeakers" to "0").expectBadRequest("invalid-max-speakers")
                         upload(client, "maxSpeakers" to "21").expectBadRequest("invalid-max-speakers")
+                        upload(client, "maxSpeakers" to "many", bytes = "many.wav".toByteArray()).expectBadRequest("invalid-max-speakers")
                         upload(client, "maxSpeakers" to "8", bytes = "three.wav".toByteArray()).let {
                             it.status shouldBe HttpStatusCode.Created
                         }
