@@ -9,10 +9,10 @@ Remove the redundancies and inconsistencies found in the repository review of 20
 
 ## Already decided
 
-- [ADR 0012 — Frontend dependency management: pnpm](../docs/decisions/0012-frontend-dependency-management-pnpm.md): the lockfile format is tied to a pnpm major version; the flake uses `pkgs.pnpm_11`.
-- [ADR 0015 — Code formatting](../docs/decisions/0015-code-formatting-ktlint-prettier.md): `prettier --check` runs inside `pnpm test`.
-- [Backend conventions](../docs/conventions/backend.md): tests are `<Subject>Spec.kt` in the subject's package; all environment access goes through `Config.fromEnv`.
-- [Item 04 spec](../docs/specs/queue-domain-model.md): illegal transitions are typed rejections, never exceptions.
+- [ADR 0012 — Frontend dependency management: pnpm](../decisions/0012-frontend-dependency-management-pnpm.md): the lockfile format is tied to a pnpm major version; the flake uses `pkgs.pnpm_11`.
+- [ADR 0015 — Code formatting](../decisions/0015-code-formatting-ktlint-prettier.md): `prettier --check` runs inside `pnpm test`.
+- [Backend conventions](../conventions/backend.md): tests are `<Subject>Spec.kt` in the subject's package; all environment access goes through `Config.fromEnv`.
+- [Item 04 spec](queue-domain-model.md): illegal transitions are typed rejections, never exceptions.
 - Review decisions (user, 2026-10-09): every recommended finding is in scope, plus the cosmetic changes (`data class Config`, `fun main()` without `args`). A generic `QueueOutcome<R>` replacing `QueueCreationOutcome`/`QueueTransitionOutcome`/`ReorderOutcome` is **not** wanted.
 
 ## Proposal (approved 2026-10-09)
