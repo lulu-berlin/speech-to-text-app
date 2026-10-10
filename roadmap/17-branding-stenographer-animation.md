@@ -28,7 +28,7 @@ Give the frontend a recognizable brand: an animated stenographer, shown in the a
   - the **app shell header**, next to the product name, at 120 px — the artwork is cropped to its drawing (no margin) and the header carries no top/bottom/left padding, so the scene fills the frame flush from the page top to the separation line and the left page edge; the right side keeps the token margin so the last control does not sit on the page edge;
   - the **empty states** of the Queue (item 14) and History (item 15), ~120–160 px;
   - as the **loading indicator**: it **replaces** item 24's `Spinner` and `Skeleton` — a view or region waiting on data shows the stenographer with a short label ("Transcribing…"), while the **progress bars stay** as they are (they show real progress, not just "waiting").
-- **Behaviour** (decided 2026-10-09): the stenographer **types only while a task is running**; otherwise it rests on a static frame (a slow idle is enough). The header instance reads the running state from item 13's connection machine.
+- **Behaviour** (decided 2026-10-09; revised 2026-10-10): the stenographer **types only while a task is running**; otherwise it rests on a **fully static frame** — the whole piece freezes (no idle motion), the sound waves are hidden, and the finished words stay visible; the `prefers-reduced-motion` fallback shows the same pose. The header instance reads the running state from item 13's connection machine.
 - **Accessibility**:
   - decorative everywhere it appears (the product name or the empty state's text carries the meaning), so it is `aria-hidden="true"` — the file's own `role="img"`/`aria-label` are overridden;
   - `prefers-reduced-motion: reduce` shows the static frame, scoped to the component;

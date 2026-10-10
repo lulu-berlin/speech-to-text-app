@@ -202,32 +202,32 @@ const StyledSvg = styled.svg<{ $size: StenographerSize; $typing: boolean }>`
     animation: ${twinkle} 2.2s ease-in-out infinite;
   }
 
-  // Resting (nothing running): the typing parts freeze on the static pose — the key
-  // flash, the fingers and the rising words stop, the words stay visible — while the
-  // idle parts (head, eyes, arms, lamp, sparkles and waves) keep their slow motion.
+  // Resting (nothing running): the whole piece freezes on the static pose — the typing
+  // stops and the idle motion is off, so the pause reads clearly; the sound waves are
+  // hidden and the finished words stay visible (user, 2026-10-10: no idle at rest).
   ${(props) =>
     props.$typing
       ? ''
       : css`
-          & .keys rect,
-          & .f,
-          & .thumb,
-          & .word {
+          & * {
             animation: none;
           }
           & .word {
             opacity: 1;
           }
+          & .wave {
+            opacity: 0;
+          }
         `}
 
-  // The artwork's reduced-motion fallback: a static frame, still scoped to this
-  // component (the star rule can never reach the app around it).
+  // The artwork's reduced-motion fallback: the same static frame as the resting pose
+  // (words visible, waves hidden), still scoped to this component (the star rule can
+  // never reach the app around it).
   @media (prefers-reduced-motion: reduce) {
     & * {
       animation: none !important;
     }
-    & .word,
-    & .wave {
+    & .word {
       opacity: 1;
     }
   }
