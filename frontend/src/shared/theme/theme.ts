@@ -99,6 +99,7 @@ export interface ThemeTokens {
     // The transcript's scroll region (item 15): tall enough to read, short enough that
     // the player stays on screen while the transcript follows playback.
     transcriptMaxHeight: string;
+    listboxMaxHeight: string;
   };
   radii: {
     dialog: string;
@@ -176,6 +177,7 @@ const baseTokens = {
     stenoHeader: '7.5rem',
     stenoEmpty: '8.75rem',
     transcriptMaxHeight: '60vh',
+    listboxMaxHeight: '16rem',
   },
   radii: {
     dialog: '0.5rem',
