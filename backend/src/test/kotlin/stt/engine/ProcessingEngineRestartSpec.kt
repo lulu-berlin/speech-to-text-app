@@ -79,4 +79,25 @@ class ProcessingEngineRestartSpec :
                 }
             }
         }
+        given("a task whose plan is stored but whose original was left behind by a crash") {
+            `when`("a new engine runs it") {
+                then("it resumes from the stored plan and deletes the leftover original") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val chunks = ChunkRepository(db)
+                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
+                        // The crash between the plan's commit and the original's deletion: the original is
+                        // still there, though the stored chunks already make it redundant.
+                        Files.exists(fixture.workDirectories.source(task)) shouldBe true
+
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe task
+
+                        statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
+                        Files.exists(fixture.workDirectories.source(task)) shouldBe false
+                    }
+                }
+            }
+        }
     })

@@ -284,10 +284,14 @@ class ProcessingEngine internal constructor(
         tasks.setPhase(id, TaskPhase.CHUNKING)
         publish(id)
         val source = workDirectories.source(id)
-        // A stored plan means a previous run chunked this task: reuse the stored chunks and leave whatever
-        // is in the work directory alone (ADR 0004). Only first-time chunking needs the original, which is
-        // the only copy of the audio until the plan is committed (ADR 0024).
-        if (chunks.findByTask(id).isNotEmpty()) return
+        // A stored plan means a previous run chunked this task: reuse the stored chunks (ADR 0004); a crash
+        // between the plan's commit and the original's deletion can still have left the original behind,
+        // and it is redundant now. Only first-time chunking needs it, as the only copy of the audio until
+        // the plan is committed (ADR 0024).
+        if (chunks.findByTask(id).isNotEmpty()) {
+            deleteLeftoverOriginal(source)
+            return
+        }
         check(withContext(Dispatchers.IO) { Files.exists(source) }) {
             "the task's original audio is missing at $source"
         }
@@ -438,6 +442,15 @@ class ProcessingEngine internal constructor(
                 diarizationProgress = task.task.diarizationProgress,
             ),
         )
+    }
+
+    /** Deletes a leftover original of a task whose plan is already stored; best effort, as it changes nothing. */
+    private suspend fun deleteLeftoverOriginal(source: Path) {
+        try {
+            withContext(Dispatchers.IO) { Files.deleteIfExists(source) }
+        } catch (e: Exception) {
+            logger.warn("Could not delete the leftover original {}; the startup cleanup removes it: {}", source, e.toString())
+        }
     }
 
     /**
