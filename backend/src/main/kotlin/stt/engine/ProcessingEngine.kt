@@ -211,11 +211,25 @@ class ProcessingEngine internal constructor(
         if (tasks.find(id) == null) return TaskCommandOutcome.Unknown
         withContext(NonCancellable) {
             tasks.delete(id)
+            deleteCachedAudio(id)
             _events.emit(Event.TaskDeleted(id))
         }
         queueUpdated()
         wake()
         return TaskCommandOutcome.Accepted
+    }
+
+    /**
+     * Removes the task's cached joined FLAC (`$STT_DATA_DIR/tmp/<id>.flac`, item 12's `/audio` cache), best
+     * effort: the file lives outside the database, and a failure to remove it only wastes disk until the next
+     * startup empties `tmp/` (the spec's cache lifecycle).
+     */
+    private suspend fun deleteCachedAudio(id: Long) {
+        try {
+            withContext(Dispatchers.IO) { Files.deleteIfExists(workDirectories.cachedAudio(id)) }
+        } catch (_: Exception) {
+            logger.warn("Could not delete the cached audio of task {}; skipped", id)
+        }
     }
 
     /**

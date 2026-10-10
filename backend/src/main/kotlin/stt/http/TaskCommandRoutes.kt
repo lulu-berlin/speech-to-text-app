@@ -5,6 +5,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingCall
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import stt.db.TaskRepository
@@ -20,6 +21,22 @@ fun Application.taskCommandRoutes() {
     val engine: ProcessingEngine by dependencies
     val tasks: TaskRepository by dependencies
     routing {
+        delete("/api/tasks/{id}") {
+            val id = call.taskIdOrNotFound() ?: return@delete
+            when (engine.deleteTask(id)) {
+                is TaskCommandOutcome.Accepted -> {
+                    call.respond(HttpStatusCode.NoContent)
+                }
+
+                else -> {
+                    call.respondError(
+                        HttpStatusCode.NotFound,
+                        "not-found",
+                        "Task ${call.parameters["id"]} does not exist",
+                    )
+                }
+            }
+        }
         post("/api/tasks/{id}/pause") {
             val id = call.taskIdOrNotFound() ?: return@post
             call.respondTaskCommand(engine.pauseTask(id), tasks)

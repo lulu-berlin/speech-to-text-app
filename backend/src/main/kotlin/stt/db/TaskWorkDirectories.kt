@@ -11,6 +11,7 @@ class TaskWorkDirectories(
     dataDir: Path,
 ) {
     private val root = dataDir.resolve("work")
+    private val tmp = dataDir.resolve("tmp")
 
     /** The directory holding every task's work directory (`$STT_DATA_DIR/work`). */
     fun workRoot(): Path = root
@@ -18,4 +19,7 @@ class TaskWorkDirectories(
     fun workDir(taskId: Long): Path = root.resolve(taskId.toString())
 
     fun source(taskId: Long): Path = workDir(taskId).resolve("source")
+
+    /** The task's cached joined FLAC under `$STT_DATA_DIR/tmp` (item 12's `/audio` cache), removed on delete. */
+    fun cachedAudio(taskId: Long): Path = tmp.resolve("$taskId.flac")
 }
