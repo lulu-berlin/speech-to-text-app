@@ -471,6 +471,57 @@ describe('task controls', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByText('draft.wav')).not.toBeInTheDocument();
   });
+
+  it('deletes a task only after confirmation: the delete endpoint is called and the row leaves', async () => {
+    const deleted: string[] = [];
+    server.use(
+      http.delete('/api/tasks/:id', ({ params }) => {
+        deleted.push(String(params.id));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    // Delete (in the row's menu) always asks for confirmation: cancelling the dialog
+    // sends no request.
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    const openMenu = () => {
+      fireEvent.pointerDown(
+        within(lecture).getByRole('button', { name: 'Actions for lecture.m4a' }),
+        { button: 0 },
+      );
+    };
+    openMenu();
+    await screen.findByRole('menu');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    const cancelDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(cancelDialog).getByRole('button', { name: 'Cancel' }));
+    expect(deleted).toEqual([]);
+    expect(screen.getByText('lecture.m4a')).toBeInTheDocument();
+
+    // Confirming deletes it: the endpoint is called and the row leaves the list.
+    openMenu();
+    await screen.findByRole('menu');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    const confirmDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Delete task' }));
+    await waitFor(() => expect(deleted).toEqual(['5']));
+    expect(screen.queryByText('lecture.m4a')).not.toBeInTheDocument();
+
+    // A queued task goes through the same confirmation.
+    const memo = screen.getByText('memo.wav').closest('li') as HTMLElement;
+    fireEvent.pointerDown(within(memo).getByRole('button', { name: 'Actions for memo.wav' }), {
+      button: 0,
+    });
+    await screen.findByRole('menu');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    const memoDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(memoDialog).getByRole('button', { name: 'Delete task' }));
+    await waitFor(() => expect(deleted).toEqual(['5', '7']));
+    expect(screen.queryByText('memo.wav')).not.toBeInTheDocument();
+  });
 });
 
 describe('upload errors', () => {

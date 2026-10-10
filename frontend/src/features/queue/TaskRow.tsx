@@ -1,15 +1,17 @@
 import type { LucideIcon } from 'lucide-react';
-import { Pause, Play, X } from 'lucide-react';
+import { MoreVertical, Pause, Play, X } from 'lucide-react';
 import { useState } from 'react';
 import { styled } from 'styled-components';
 import { createActor } from 'xstate';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { deleteTask } from '../../shared/api/client';
 import type { Task, TaskPhase } from '../../shared/api/types';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
 import type { TaskCommand } from '../../shared/state/transitions';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
+import { DropdownMenu } from '../../shared/ui/DropdownMenu';
 import { IconButton } from '../../shared/ui/IconButton';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
@@ -49,6 +51,7 @@ export interface TaskRowProps {
 export function TaskRow({ task }: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Work would be lost when cancelling a running task or a paused task that has started;
   // a queued or never-started paused task is cancelled directly (its chunks were never
@@ -68,6 +71,18 @@ export function TaskRow({ task }: TaskRowProps) {
     });
     actor.start();
     actor.send({ type: 'START' });
+  };
+
+  // Delete removes the task for good; on success the row leaves through the machine's
+  // task-deleted handling. On failure the dialog stays open so the user can retry.
+  const remove = async () => {
+    try {
+      await deleteTask(task.id);
+      setDeleteOpen(false);
+      connection.send({ type: 'task-deleted', id: task.id });
+    } catch (error) {
+      console.error('deleting task failed', error);
+    }
   };
 
   return (
@@ -94,6 +109,11 @@ export function TaskRow({ task }: TaskRowProps) {
                 />
               ),
             )}
+            <DropdownMenu
+              trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
+              align="end"
+              items={[{ label: 'Delete', danger: true, onSelect: () => setDeleteOpen(true) }]}
+            />
           </Row>
         </RowContent>
         <ProgressBar value={task.transcriptionProgress} label="Transcription" />
@@ -115,6 +135,15 @@ export function TaskRow({ task }: TaskRowProps) {
         onCancel={() => setCancelOpen(false)}
       >
         Stops the task; it can be retried from History.
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={deleteOpen}
+        title={`Delete ${task.filename}?`}
+        confirmLabel="Delete task"
+        onConfirm={remove}
+        onCancel={() => setDeleteOpen(false)}
+      >
+        Removes the task, its transcript and audio for good.
       </ConfirmDialog>
     </ListRow>
   );
