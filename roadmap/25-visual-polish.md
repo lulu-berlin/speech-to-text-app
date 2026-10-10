@@ -1,7 +1,7 @@
 # 25 — Visual polish pass
 
 Status: spec-approved
-Depends on: [24](../docs/specs/design-system.md) (done), [14](14-frontend-queue-ui.md), [15](../docs/specs/frontend-history-ui.md) (done)
+Depends on: [24](../docs/specs/design-system.md) (done), [14](../docs/specs/frontend-queue-ui.md) (done), [15](../docs/specs/frontend-history-ui.md) (done)
 
 ## Goal
 
@@ -23,7 +23,9 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
   - **queue rows, comfortable density** (~48–56 px): filename, status badge, the two progress bars, and the row controls; hover and focus-visible states;
   - **progress bars show a value**: the transcription bar a percentage, the diarization bar its stage label (embedding, clustering), since its percentage restarts per stage;
   - **the phase (CHUNKING / TRANSCRIBING / DIARIZING) is a text label** beside the progress bars, not a separate step indicator or icon;
-  - upload area and drag-over state;
+  - upload area and drag-over state (the functional drop exists since item 14; the drag-over
+    visual and the drag-reorder lift — dnd-kit without a DragOverlay leaves the dragged row in
+    place — are this item's);
   - **the transcript is a centred reading column** with a maximum measure (~70 characters): a header block with the task's name, date and duration, then the audio player and the download buttons, then the turns; comfortable line height and turn spacing, clear speaker labels and timestamps, and the playing-segment highlight;
     - The history rows already show the date and duration (added by item 15, merged 2026-10-10); this item restyles them, it does not add them.
   - **History is a list of cards** (filename, status, date, duration; FAILED cards show the error), which are touch-friendly and read well on a phone; the date and duration land with item 15 (2026-10-10), this item makes the cards look finished;

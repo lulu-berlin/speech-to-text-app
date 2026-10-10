@@ -1,17 +1,17 @@
-# 14 — Frontend queue UI
+# Frontend queue UI
 
-Status: in-review
-Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
+Status: done (roadmap item 14, merged 2026-10-10)
+Depends on: [13 — Frontend foundation](frontend-foundation.md), [24 — Design system](design-system.md)
 
 ## Goal
 Let the user upload many audio files and manage the work queue from the browser: see live status and progress, pause/resume/cancel/delete individual tasks, reorder the queue, and pause the whole queue.
 
 ## Already decided
-- [Item 24 design system](../docs/specs/design-system.md) ([ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md)): the Queue view is built with its tokens and primitives (Button, StatusBadge, ProgressBar, EmptyState, List/ListRow, DropdownMenu, Switch, ConfirmDialog, Page/Stack/Row), not with ad-hoc styles; item 25 does the final visual pass (comfortable rows, phase as a text label, empty state with guidance).
-- [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
-- [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): pause/resume semantics the UI exposes.
-- [ADR 0007 — SSE live updates](../docs/decisions/0007-sse-live-updates.md): status/progress arrive via SSE; commands go via REST.
-- [ADR 0029](../docs/decisions/0029-contract-first-frontend-shared-api-examples.md) and [ADR 0031](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md): built against item 12's contract with MSW mocks; commands go through item 13's command machine, which only offers what `docs/api/task-transitions.json` allows.
+- [Item 24 design system](design-system.md) ([ADR 0033](../decisions/0033-design-system-tokens-radix-plex.md)): the Queue view is built with its tokens and primitives (Button, StatusBadge, ProgressBar, EmptyState, List/ListRow, DropdownMenu, Switch, ConfirmDialog, Page/Stack/Row), not with ad-hoc styles; item 25 does the final visual pass (comfortable rows, phase as a text label, empty state with guidance).
+- [ADR 0001 — Stack and monorepo](../decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
+- [ADR 0004 — Chunked transcription, SIGSTOP pause](../decisions/0004-chunked-transcription-sigstop-pause.md): pause/resume semantics the UI exposes.
+- [ADR 0007 — SSE live updates](../decisions/0007-sse-live-updates.md): status/progress arrive via SSE; commands go via REST.
+- [ADR 0029](../decisions/0029-contract-first-frontend-shared-api-examples.md) and [ADR 0031](../decisions/0031-frontend-routing-react-router-state-xstate.md): built against item 12's contract with MSW mocks; commands go through item 13's command machine, which only offers what `docs/api/task-transitions.json` allows.
 - Item 12's contract: speaker inputs 1–20; uploads limited to the extension allow-list; `language` from [`docs/api/languages.json`](../docs/api/languages.json), default `auto`; `DELETE /api/tasks/{id}` works on any task (a pending one is cancelled first); a duplicate upload answers `409 duplicate-audio` with the existing `taskId`. Item 11: two progress bars, `transcriptionProgress` and `diarizationProgress`; the diarization bar runs once per `diarizationStage` (`EMBEDDING`, then `CLUSTERING`) and is hidden when `diarizationProgress` is null.
 - The queue shows pending tasks (QUEUED, RUNNING, PAUSED) in queue order; finished tasks are in History (item 15).
 
@@ -105,3 +105,12 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-10 (workspace, cycle 18, discovered by the root agent's browser review): `Test: the drop zone permits a drop in a real browser — dragOver is default-prevented, and dropping still enqueues`. Red: `expected true to be false` (the dragOver default was not prevented). Green: the `DropZone` now handles `dragOver` — `preventDefault()` (what permits the drop) and `dataTransfer.dropEffect = 'copy'` (the copy cursor; user-confirmed nice-to-have). Root cause recorded: jsdom's synthetic `drop` skips the browser's dragOver gate, so the earlier drop tests were green without it. Test list item ticked; on the rebased tree (main includes items 15 and 17) the suite is now 31 files / 119 tests.
 - 2026-10-10 (workspace, cycle 19, discovered in the user's dev-mode browser test): `Test: a finished upload row stays in the upload list until the backend confirms the task`. The user observed a dropped file appearing "for a split second and then disappearing" and ruled: the move to the queue happens only after the backend confirms the task in the queue; without it the row stays in the upload list. Red: `Unable to find an element with the text: done` — the stock upload mock answered with `task.queued.json` (id 7), which the snapshot already holds, so the "task confirmed" rule fired against the wrong task and the row vanished. Green: the mock answers uploads with a **fresh id** (counter starting at 100, above every example id), so no live task ever matches the uploaded one; the dev-mode stream sends no task-updated, so the row stays until a reload, and the real backend (item 21) still moves it to the queue. Recorded in the foundation spec's known-differences list. 2 source files / 120 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
 - 2026-10-10 (workspace, acceptance): the user confirmed in `pnpm dev:mock` that dropping audio files now behaves like the open dialog — the file's upload row appears with progress and stays (done) until the backend confirms the task; the Delete confirmation dialog's Tab/Shift+Tab cycle and Escape cancel also confirmed in the browser. The remaining acceptance bits are outside this workspace's hands: the user's `nix build .` re-run with the renewed hash (ADR 0012) and the root agent's re-review + diff approval.
+- 2026-10-10: merged into `main` (head `2441557`) after the user approved the diff and
+  confirmed the browser run in `pnpm dev:mock` (drop behaves like the picker, upload rows,
+  controls, dialogs incl. the Tab-cycle and Escape, reorder by menu and drag, pause switch).
+  The browser review added two discovered items, both done as TDD cycles: the drop zone
+  permits a drop in a real browser (dragOver default-prevented, copy effect — jsdom's drop
+  bypasses that gate), and a finished upload row leaves only after the backend confirms the
+  task. The drag-reorder lift visual is item 25's pass; inline errors are covered by tests;
+  audio/backend flows are item 21's. Spec and final test list moved here from
+  `roadmap/14-frontend-queue-ui.md`.
