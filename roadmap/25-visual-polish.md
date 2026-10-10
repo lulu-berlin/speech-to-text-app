@@ -71,6 +71,8 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Keyboard focus is visible in every view
 - [ ] The existing view and machine tests stay green
 - [ ] (discovered, confirmed 2026-10-10) The upload row's progress bar has a visible width at desktop and phone widths (it sits beside the filename as a flex item with no width of its own, so it collapses to its border)
+- [ ] (discovered, confirmed 2026-10-10) The drop zone shows a distinct drag-over state while files are dragged over it (in the Proposal, missing from the list)
+- [ ] (discovered, confirmed 2026-10-10) A queue row being dragged to reorder looks lifted (dnd-kit `DragOverlay` or an equivalent; today the dragged row stays in place)
 
 ## Acceptance criteria
 
