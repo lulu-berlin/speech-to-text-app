@@ -1,7 +1,7 @@
-# 23 — Faster speaker clustering
+# Faster speaker clustering
 
-Status: in-review
-Depends on: [09](../docs/specs/diarization.md) (done)
+Status: done (roadmap item 23, merged 2026-10-10)
+Depends on: [09 — Diarization](diarization.md)
 
 ## Goal
 
@@ -11,7 +11,7 @@ Make speaker clustering fast and light enough for long recordings without changi
 
 - [Item 09 spec](../docs/specs/diarization.md): UPGMA (average linkage) on cosine distance, ported 1:1 from the oracle (`O(n²)` memory for the distance matrix, `O(n³)` time). Measured: 1000 segments 0.68 s / 8 MiB, 3000 segments 11.4 s / 69 MiB. The spec says to revisit this, with its own decision, if performance becomes an issue.
 - User decision (item 10/11 consultation, 2026-10-09): optimize now, as its own item in parallel with item 11, and measure the accuracy impact.
-- [ADR 0027](../docs/decisions/0027-auto-speaker-count-allows-one-speaker.md), [ADR 0032](../docs/decisions/0032-speaker-distance-threshold-for-campplus.md): the speaker-count rules and the threshold apply to the merge heights. They are unchanged by this item.
+- [ADR 0027](../decisions/0027-auto-speaker-count-allows-one-speaker.md), [ADR 0032](../decisions/0032-speaker-distance-threshold-for-campplus.md): the speaker-count rules and the threshold apply to the merge heights. They are unchanged by this item.
 - The distance stays `1 − a·b` computed in double on L2-normalized embeddings (item 09), whatever computes it.
 
 ## Proposal (approved 2026-10-09)
@@ -70,3 +70,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09 (cycle 4, test-list items 6 + 1 + 5, the switch): red — `gradle test --tests 'stt.diarization.ClusteringSpec'`, the new memory test against the matrix implementation: "peak 82 MiB vs 22 MiB bound — 82.0 should be < 22.0". Green (ADR 0037): `upgmaMerges` replaced by the nearest-neighbor chain — no matrix;each cluster keeps its members' mean vector and distances are `1 − vA·vB` in double on demand, mutual-nearest-neighbor check, merges sorted by height (stable), pair orientation `i < j`, cancellation/gate checked before every merge, progress per merge unchanged. Items 1 and 5 ride on existing tests: the hand-computed 4-point merges and the pause/cancel/progress contract stay green (both must, or the switch failed;both did). The memory bound is half the matrix (14 MiB measured vs 68.7 MiB matrix;the third-of-matrix bound flaked at 22 MiB against the 22.9 bound under full-suite ambient heap, so the guard is set at half). `gradle check` (134 unit tests) green.
 - 2026-10-10 (cycle 5, test-list item 4, tie reproducibility): red — `gradle test --tests 'stt.diarization.ClusteringSpec'` with a temporary, uncommitted mutation `merges.shuffled().sortedWith(...)` in `upgmaMerges` (shuffling before the stable height sort, so only tie-run order changes): the new "tie-heavy matrix" test fails — "Element differ at index: [0, 1]" — because two runs resolve the tied 0.2 merges differently (two existing tie-order tests break too, also expected under the mutation). Green on arrival: `upgmaMerges(tiedMatrix()).shouldBe(upgmaMerges(tiedMatrix()))` — the chain's first-minimum scan plus the stable sort make every merge sequence deterministic for a given input. `gradle check` (134 unit tests) green.
 - 2026-10-10 (final, test-list item 7): the throwaway benchmark spec and its `/tmp` outputs are deleted (only ADR 0037 keeps the numbers). `gradle integrationTest` green on the chain: 0 failures;in particular LibriSpeechDiarizationSpec (1089 → 1188 → 1089 → `[0, 0, 1, 1, 0, 0]`) and SpeakerThresholdSpec (all 289 whole-clip and 5 s-excerpt pairs on the right side of 0.5448) pass, so the two item-09 fixture acceptances and the threshold rules are unchanged by the switch. Status set to `in-review`;all 7 test-list items ticked.
+- 2026-10-10: merged into `main` (head `ee2870f`) after the user approved the diff. The nearest-neighbor chain ([ADR 0037](../decisions/0037-nearest-neighbor-chain-for-speaker-clustering.md)) replaced item 09's `O(n³)` search; the ADR was renumbered from 0036 to 0037 at the merge, because main had taken 0036 for the shared nixpkgs pin. Spec and final test list moved here from `roadmap/23-faster-clustering.md`.

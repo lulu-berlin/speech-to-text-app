@@ -3,7 +3,7 @@
 Status: accepted · Date: 2026-10-09
 
 ## Context
-[Roadmap item 23](../README.md) (in progress; spec `roadmap/23-faster-clustering.md`) replaces the item 09 UPGMA port's
+[Roadmap item 23](../specs/faster-clustering.md) (done 2026-10-10) replaces the item 09 UPGMA port's
 `O(n²)` distance matrix and `O(n³)` minimum search with the **nearest-neighbor chain** for average linkage, computed on
 demand (no stored matrix, `O(n)` memory), after measuring the alternative. The consensus at the item's creation
 ([ADR 0027](0027-auto-speaker-count-allows-one-speaker.md), [ADR 0032](0032-speaker-distance-threshold-for-campplus.md)
