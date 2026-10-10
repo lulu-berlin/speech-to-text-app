@@ -1,6 +1,6 @@
 # 26 — Engine start/stop race (flaky DatabaseDependencySpec)
 
-Status: spec-approved
+Status: in-progress
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 
 ## Goal
@@ -72,3 +72,4 @@ Out of scope, noted only:
 
 - 2026-10-10: drafted by the root agent from the user's failing `nix build .` log and item 17's agent's analysis. At the user's request, the investigation, the consultation (spec and test list) and the fix are delegated to the workspace `workspaces/26-engine-shutdown-race`. The approval lines are recorded in the worktree's copy and reach `main` with the merge.
 - 2026-10-10: diagnosis proven (probes + Ktor 3.6.0 sources; evidence above); fix decision (eager engine creation, option A) and test list X1–X5 written with the user and approved; status `draft` → `spec-approved`. ADR 0038 accompanies the fix.
+- 2026-10-10: worktree `workspaces/26-engine-shutdown-race` started (branch `roadmap/26-engine-shutdown-race`); status → `in-progress`. Canon TDD begins at X1.
