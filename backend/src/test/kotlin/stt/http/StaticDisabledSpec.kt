@@ -5,7 +5,6 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.testing.testApplication
 import stt.config.Config
 import stt.config.TEST_SPEAKER_MODEL
 import stt.config.TEST_WHISPER_MODEL
@@ -18,7 +17,7 @@ class StaticDisabledSpec :
         given("an application configured without STT_STATIC_DIR") {
             `when`("requesting /api/health and an unknown non-/api path") {
                 then("health responds 200 and the path returns 404") {
-                    testApplication {
+                    verifyCleanStop {
                         application {
                             sttApp(
                                 Config.fromEnv(

@@ -6,7 +6,6 @@ import io.kotest.matchers.shouldBe
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.testing.testApplication
 import java.nio.file.Files
 
 class SpaFallbackSpec :
@@ -19,7 +18,7 @@ class SpaFallbackSpec :
                 then("index.html is returned") {
                     val indexPath = staticDir.toPath().resolve("index.html")
                     Files.writeString(indexPath, "<!DOCTYPE html><html><head><title>stt</title></head><body>hi</body></html>")
-                    testApplication {
+                    verifyCleanStop {
                         application { sttApp(testConfig(staticDir = staticDir.toPath())) }
                         val response = client.get("/some/route")
                         response.status.shouldBe(HttpStatusCode.OK)
@@ -33,7 +32,7 @@ class SpaFallbackSpec :
             `when`("requesting it with static serving enabled") {
                 then("it gets the SPA fallback, not 404") {
                     Files.writeString(staticDir.toPath().resolve("index.html"), "<h1>index</h1>")
-                    testApplication {
+                    verifyCleanStop {
                         application { sttApp(testConfig(staticDir = staticDir.toPath())) }
                         val response = client.get("/apiary")
                         response.status.shouldBe(HttpStatusCode.OK)

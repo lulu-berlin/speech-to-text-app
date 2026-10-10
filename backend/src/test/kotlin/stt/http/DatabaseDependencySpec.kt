@@ -7,7 +7,6 @@ import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.testing.testApplication
 import stt.db.Database
 import java.nio.file.Files
 
@@ -19,28 +18,32 @@ class DatabaseDependencySpec :
                 then("it opens \$STT_DATA_DIR/stt.db and provides it via DI; a Database the test provides first replaces it unopened") {
                     val dataDir = tempdir("stt-data").toPath()
                     val dbFile = dataDir.resolve("stt.db")
-                    testApplication {
+                    verifyCleanStop {
                         application { sttApp(stt.config.testConfig(dataDir)) }
                         startApplication()
                         Files.exists(dbFile).shouldBeTrue()
-                        val db = application.dependencies.resolve<Database>()
-                        db.connection.metaData.url
+                        application.dependencies.resolve<Database>().connection.metaData.url
                             .shouldBe("jdbc:sqlite:$dbFile")
                     }
 
+                    var overrideRef: Database? = null
                     val moduleDataDir = tempdir("stt-module-data").toPath()
-                    // DI also closes the override on stop (probed 2026-10-06); use {} makes the test's ownership explicit.
-                    Database.open(tempdir("stt-override-data").toPath()).use { override ->
-                        testApplication {
+                    val override = Database.open(tempdir("stt-override-data").toPath())
+                    try {
+                        verifyCleanStop {
                             application {
                                 dependencies.provide<Database> { override }
                                 sttApp(stt.config.testConfig(moduleDataDir))
                             }
                             startApplication()
-                            application.dependencies.resolve<Database>().shouldBeSameInstanceAs(override)
-                            Files.exists(moduleDataDir.resolve("stt.db")).shouldBeFalse()
+                            overrideRef = application.dependencies
+                                .resolve<Database>()
                         }
+                    } finally {
+                        override.close()
                     }
+                    overrideRef.shouldBeSameInstanceAs(override)
+                    Files.exists(moduleDataDir.resolve("stt.db")).shouldBeFalse()
                 }
             }
         }
@@ -49,10 +52,11 @@ class DatabaseDependencySpec :
             `when`("the application stops") {
                 then("the Database provided by DI is closed") {
                     lateinit var db: Database
-                    testApplication {
+                    verifyCleanStop {
                         application { sttApp(stt.config.testConfig(tempdir("stt-data").toPath())) }
                         startApplication()
-                        db = application.dependencies.resolve<Database>()
+                        db = application.dependencies
+                            .resolve<Database>()
                         db.connection.isClosed.shouldBeFalse()
                     }
 

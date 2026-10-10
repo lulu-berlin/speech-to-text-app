@@ -6,7 +6,6 @@ import io.kotest.matchers.shouldBe
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.testing.testApplication
 import java.nio.file.Files
 
 class StaticFilesSpec :
@@ -18,7 +17,7 @@ class StaticFilesSpec :
             `when`("requesting it by name") {
                 then("it is returned with its content") {
                     Files.writeString(staticDir.toPath().resolve("hello.txt"), "hello")
-                    testApplication {
+                    verifyCleanStop {
                         application { sttApp(testConfig(staticDir = staticDir.toPath())) }
                         val response = client.get("/hello.txt")
                         response.status.shouldBe(HttpStatusCode.OK)
