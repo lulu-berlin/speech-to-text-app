@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import styled from 'styled-components';
 import type { ThemeTokens } from '../theme/theme';
@@ -67,15 +68,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 // A token-styled action button. `loading` disables the control and flags it busy; the
 // spinner glyph itself arrives with the Spinner primitive.
-export function Button({
-  variant = 'primary',
-  loading = false,
-  disabled,
-  children,
-  ...rest
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = 'primary', loading = false, disabled, children, ...rest },
+  ref,
+) {
   return (
     <ButtonBase
+      ref={ref}
       type="button"
       $variant={variant}
       disabled={disabled || loading}
@@ -86,4 +85,4 @@ export function Button({
       {children}
     </ButtonBase>
   );
-}
+});
