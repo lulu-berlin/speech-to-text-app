@@ -422,6 +422,55 @@ describe('task controls', () => {
     expect(within(memo).queryByRole('button', { name: 'Resume memo.wav' })).not.toBeInTheDocument();
     expect(resumes).toEqual(['7']);
   });
+
+  it('confirms cancel only when work would be lost, then calls the cancel endpoint', async () => {
+    const events = controllableEventStream();
+    const canceled: string[] = [];
+    server.use(
+      http.post('/api/tasks/:id/cancel', ({ params }) => {
+        canceled.push(String(params.id));
+        return HttpResponse.json({ ...taskRunning, id: Number(params.id), status: 'CANCELED' });
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    // A queued task cancels directly, without asking.
+    const memo = screen.getByText('memo.wav').closest('li') as HTMLElement;
+    fireEvent.click(within(memo).getByRole('button', { name: 'Cancel memo.wav' }));
+    await waitFor(() => expect(canceled).toEqual(['7']));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('memo.wav')).not.toBeInTheDocument();
+
+    // A running task asks for confirmation first.
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Cancel lecture.m4a?')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel task' }));
+    await waitFor(() => expect(canceled).toEqual(['7', '5']));
+    expect(screen.queryByText('lecture.m4a')).not.toBeInTheDocument();
+
+    // A paused task that has started also asks for confirmation.
+    events.send('task-updated', { ...taskPaused, id: 9, filename: 'notes.mp3' });
+    events.send('queue-updated', { ...queueFixture, taskIds: [9] });
+    const notesRow = (await screen.findByText('notes.mp3')).closest('li') as HTMLElement;
+    fireEvent.click(within(notesRow).getByRole('button', { name: 'Cancel notes.mp3' }));
+    const pauseDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(pauseDialog).getByRole('button', { name: 'Cancel task' }));
+    await waitFor(() => expect(canceled).toEqual(['7', '5', '9']));
+    expect(screen.queryByText('notes.mp3')).not.toBeInTheDocument();
+
+    // A paused task that never started cancels directly.
+    events.send('task-updated', { ...taskPaused, id: 10, filename: 'draft.wav', startedAt: null });
+    events.send('queue-updated', { ...queueFixture, taskIds: [10] });
+    const draftRow = (await screen.findByText('draft.wav')).closest('li') as HTMLElement;
+    fireEvent.click(within(draftRow).getByRole('button', { name: 'Cancel draft.wav' }));
+    await waitFor(() => expect(canceled).toEqual(['7', '5', '9', '10']));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('draft.wav')).not.toBeInTheDocument();
+  });
 });
 
 describe('upload errors', () => {
