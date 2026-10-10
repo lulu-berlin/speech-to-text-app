@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
 import io.ktor.client.HttpClient
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
@@ -386,6 +387,62 @@ class SpeakerRoutesSpec :
                         // Turns and downloads are exactly as they were before the merge.
                         server.request("GET", "/api/tasks/$id/turns") shouldBe turnsBefore
                         formats.map { server.request("GET", "/api/tasks/$id/transcript?format=$it") } shouldBe downloadsBefore
+                    }
+                }
+            }
+        }
+
+        given("a QUEUED and a FAILED task with speakers, and cycle 8's COMPLETED task (queue paused)") {
+            `when`("speakers are renamed, merged or reset there, on unknown tasks, and with unknown speakers") {
+                then("a task that is not COMPLETED answers 409 not-completed; an unknown task or speaker 404 not-found") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val queued =
+                        seed(dataDir, queuedTask("q.wav", createdAt = 1).copy(queuePosition = 0), twoSegments, speakerIds = listOf(0, 1))
+                    val failed =
+                        seed(dataDir, queuedTask("f.wav", createdAt = 2).copy(status = TaskStatus.FAILED), twoSegments, listOf(0, 1))
+                    val id = seedSpeakers0102(dataDir)
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+
+                        // Only a COMPLETED task's speakers can be renamed or merged (the spec's decision covers reset too).
+                        for (task in listOf(queued, failed)) {
+                            withClue("task $task") {
+                                client.rename(task, speakerId = 0, "Alice").shouldBeError(HttpStatusCode.Conflict, "not-completed")
+                                client.merge(task, group = listOf(0, 1), into = 0).shouldBeError(HttpStatusCode.Conflict, "not-completed")
+                                client.delete("/api/tasks/$task/speakers/merges").shouldBeError(HttpStatusCode.Conflict, "not-completed")
+                            }
+                        }
+
+                        // An unknown or non-numeric task id.
+                        for (task in listOf("999", "abc")) {
+                            withClue("task $task") {
+                                client
+                                    .put("/api/tasks/$task/speakers/0") {
+                                        contentType(ContentType.Application.Json)
+                                        setBody("""{ "speaker": "Alice" }""")
+                                    }.shouldBeError(HttpStatusCode.NotFound, "not-found")
+                                client
+                                    .post("/api/tasks/$task/speakers/merge") {
+                                        contentType(ContentType.Application.Json)
+                                        setBody("""{ "group": [0, 1], "into": 0 }""")
+                                    }.shouldBeError(HttpStatusCode.NotFound, "not-found")
+                                client.delete("/api/tasks/$task/speakers/merges").shouldBeError(HttpStatusCode.NotFound, "not-found")
+                            }
+                        }
+
+                        // An unknown or non-numeric speaker of a COMPLETED task, renamed or named in a merge.
+                        client.rename(id, speakerId = 7, "Alice").shouldBeError(HttpStatusCode.NotFound, "not-found")
+                        client
+                            .put("/api/tasks/$id/speakers/x") {
+                                contentType(ContentType.Application.Json)
+                                setBody("""{ "speaker": "Alice" }""")
+                            }.shouldBeError(HttpStatusCode.NotFound, "not-found")
+                        client.merge(id, group = listOf(0, 7), into = 0).shouldBeError(HttpStatusCode.NotFound, "not-found")
+                        client.merge(id, group = listOf(0, 1), into = 7).shouldBeError(HttpStatusCode.NotFound, "not-found")
+
+                        // Nothing changed anywhere.
+                        client.speakersOf(id) shouldBe speakers("Speaker 1", "Speaker 2", "Speaker 3")
                     }
                 }
             }

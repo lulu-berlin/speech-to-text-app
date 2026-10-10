@@ -101,7 +101,7 @@ private suspend fun RoutingCall.notFound() = respondError(HttpStatusCode.NotFoun
  * The route's task when it exists and is COMPLETED; otherwise responds `404 not-found` (missing or non-numeric
  * id, unknown task) or `409 not-completed` (naming what only a COMPLETED task has) and returns null.
  */
-private suspend fun RoutingCall.completedTaskOrError(
+internal suspend fun RoutingCall.completedTaskOrError(
     tasks: TaskRepository,
     what: String,
 ): TaskDetails? {
