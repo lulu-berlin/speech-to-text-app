@@ -447,6 +447,27 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("cycle 8's merged task: speaker 0 named Alice, {0, 1} merged into 0 (queue paused)") {
+            `when`("the hidden speaker 1 is renamed, or its name reset") {
+                then("both answer 404 not-found, and after resetting all merges speaker 1 still has its old name") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.nameAliceAndMerge1Into0(id)
+
+                        // A speaker hidden by a merge is not one of the task's speakers as shown (user decision 2026-10-10).
+                        client.rename(id, speakerId = 1, "Bob").shouldBeError(HttpStatusCode.NotFound, "not-found")
+                        client.rename(id, speakerId = 1, null).shouldBeError(HttpStatusCode.NotFound, "not-found")
+
+                        client.delete("/api/tasks/$id/speakers/merges").status shouldBe HttpStatusCode.OK
+                        client.speakersOf(id) shouldBe speakers("Alice", "Speaker 2", "Speaker 3")
+                    }
+                }
+            }
+        }
     })
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */
