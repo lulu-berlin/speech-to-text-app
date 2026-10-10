@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import stt.engine.EVENT_BUFFER
 import stt.engine.Event
 import stt.engine.ProcessingEngine
 
@@ -30,7 +31,7 @@ class NumberedEventStream(
 ) : EventStream {
     private val numbered =
         MutableSharedFlow<Pair<Long, Event>>(
-            extraBufferCapacity = BUFFER,
+            extraBufferCapacity = EVENT_BUFFER,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
     private var sequence = 0L
@@ -42,10 +43,5 @@ class NumberedEventStream(
         scope.launch {
             engine.events.collect { event -> numbered.emit(sequence++ to event) }
         }
-    }
-
-    private companion object {
-        /** The same buffer the engine's flow uses; lag beyond this is a dropped event. */
-        const val BUFFER = 64
     }
 }

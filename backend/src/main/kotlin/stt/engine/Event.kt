@@ -4,6 +4,13 @@ import stt.db.DiarizationStage
 import stt.db.StoredTask
 
 /**
+ * The engine's event-flow buffer and the SSE stream's numbered bridge buffer, as one constant (item 28):
+ * both [ProcessingEngine] and [stt.http.NumberedEventStream] drop the oldest events for a subscriber
+ * that lags beyond this many emissions.
+ */
+const val EVENT_BUFFER = 64
+
+/**
  * A state change the engine publishes for live updates (ADR 0007, roadmap item 11); the SSE endpoint
  * (item 12) serializes these into its `task-updated` and `task-progress` events. Every event is emitted
  * only after the change it reports has been persisted, so a client that reconnects can trust the snapshot.
