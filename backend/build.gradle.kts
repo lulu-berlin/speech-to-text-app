@@ -11,6 +11,14 @@ repositories {
     mavenCentral()
 }
 
+// The version catalog is the single source of truth for sqlite-jdbc (roadmap item 27):
+// flyway-database-nc-sqlite once declared a newer version and resolved over the catalog
+// pin via highest-wins. Force the catalog version so no transitive can ever override it;
+// keep this in lockstep with `sqlite-jdbc` in gradle/libs.versions.toml.
+configurations.configureEach {
+    resolutionStrategy.force(libs.sqlite.jdbc)
+}
+
 // Custom configuration: ktlint CLI for the formatting check (ADR 0015).
 // No type-safe accessor exists for script-defined configurations, so the standard API is used.
 val ktlintConfiguration = configurations.create("ktlint")
