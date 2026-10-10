@@ -205,16 +205,21 @@ const runCommand = useTaskCommand();
   const currentTimeMs = playback.context.currentTimeMs;
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Clicking a segment seeks the player to the segment's start and plays from there
-  // (item 9, decided 2026-10-09).
-  const seekTo = (startMs: number) => {
+  // Moves the audio and the playhead to `ms`: the player's seek bar and click-to-seek.
+  const seek = (ms: number) => {
     const audio = audioRef.current;
     if (audio === null) {
       return;
     }
-    playbackSend({ type: 'PLAYHEAD', ms: startMs });
-    audio.currentTime = startMs / 1000;
-    audio.play().catch(() => {
+    playbackSend({ type: 'PLAYHEAD', ms });
+    audio.currentTime = ms / 1000;
+  };
+
+  // Clicking a segment seeks the player to the segment's start and plays from there
+  // (item 9, decided 2026-10-09).
+  const seekTo = (startMs: number) => {
+    seek(startMs);
+    audioRef.current?.play().catch(() => {
       /* A browser may refuse playback before any user gesture (autoplay policy); the seek
          itself still landed, so the highlight follows. */
     });
@@ -323,6 +328,7 @@ const runCommand = useTaskCommand();
       playing={playback.matches('playing')}
       audioRef={audioRef}
       onPlayhead={(ms) => playbackSend({ type: 'PLAYHEAD', ms })}
+      onSeek={seek}
       onPlayingChange={(playing) => playbackSend({ type: playing ? 'PLAYED' : 'PAUSED' })}
     />
   ) : (
