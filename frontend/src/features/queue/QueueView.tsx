@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { css, styled } from 'styled-components';
 import { languages } from '../../shared/api/fixtures';
+import { focusRing } from '../../shared/ui/focusRing';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
@@ -59,6 +60,8 @@ const AdvancedToggle = styled.button`
   color: ${(props) => props.theme.colors.accent};
   font: inherit;
   cursor: pointer;
+
+  ${focusRing}
 `;
 
 interface FieldProps {
