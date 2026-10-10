@@ -65,7 +65,7 @@ None.
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] Renaming a speaker updates one `speakers` row and nothing else (no segment changes, other speakers unchanged)
+- [x] Renaming a speaker updates one `speakers` row and nothing else (no segment changes, other speakers unchanged)
 - [ ] A name is trimmed; empty, longer than 40 characters, or containing a control character is rejected with 400 `invalid-speaker-name`
 - [ ] A name another speaker of the same task already has is rejected with 409 `duplicate-speaker-name`
 - [ ] Renaming or merging on a task that is not COMPLETED returns 409 `not-completed`; an unknown task or speaker returns 404
