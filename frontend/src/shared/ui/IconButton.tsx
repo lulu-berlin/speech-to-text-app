@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { ButtonHTMLAttributes } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import styled from 'styled-components';
@@ -35,10 +36,13 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
 
 // An icon-only control, square and token-styled. The same token states as the secondary
 // Button (surface → surfaceRaised hover → buttonSecondaryActive active, muted when disabled).
-export function IconButton({ icon: Glyph, label, disabled, ...rest }: IconButtonProps) {
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { icon: Glyph, label, disabled, ...rest },
+  ref,
+) {
   return (
-    <IconButtonBase type="button" aria-label={label} disabled={disabled} {...rest}>
+    <IconButtonBase ref={ref} type="button" aria-label={label} disabled={disabled} {...rest}>
       <Icon icon={Glyph} />
     </IconButtonBase>
   );
-}
+});
