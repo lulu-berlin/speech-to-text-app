@@ -13,7 +13,7 @@ import {
   taskQueued,
   taskRunning,
 } from '../../shared/api/fixtures';
-import { asRgb, px, required, styleRules } from '../../test/dom';
+import { asRgb, px, required, stateRulesFor } from '../../test/dom';
 import { server } from '../../test/server';
 
 // Mock addition (settle with item 12): the snapshot holds a COMPLETED (3), FAILED (4) and
@@ -388,13 +388,7 @@ describe('the history cards', () => {
 
     // Hover darkens the card's border to the control neutral and leaves its fill alone
     // (asserted as emitted rules: jsdom cannot apply :hover).
-    const hoverRules = styleRules()
-      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-      .filter(
-        (rule) =>
-          rule.selectorText.includes(':hover') &&
-          failed.matches(rule.selectorText.replace(':hover', '')),
-      );
+    const hoverRules = stateRulesFor(failed, ':hover');
     expect(hoverRules.map((rule) => rule.style.borderColor)).toContain(
       asRgb(lightTheme.colors.control),
     );

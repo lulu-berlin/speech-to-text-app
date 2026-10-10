@@ -41,6 +41,23 @@ export function mediaRulesFor(element: Element, condition: string): CSSStyleRule
     );
 }
 
+// The style rules of a pseudo-class state (":hover", ":focus-visible") whose selector,
+// with the pseudo-class removed, matches `element`: jsdom cannot apply pseudo-classes, so
+// a state's declarations are asserted at this level.
+export function stateRulesFor(element: Element, pseudo: string): CSSStyleRule[] {
+  return styleRules()
+    .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+    .filter((rule) =>
+      rule.selectorText.split(',').some((selector) => {
+        if (!selector.includes(pseudo)) {
+          return false;
+        }
+        const base = selector.replace(pseudo, '').trim();
+        return base !== '' && element.matches(base);
+      }),
+    );
+}
+
 // jsdom reports colours as rgb(), so a token is converted the same way.
 export function asRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
