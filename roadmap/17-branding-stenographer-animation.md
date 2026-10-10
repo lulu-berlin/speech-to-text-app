@@ -61,7 +61,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] While a task is running the stenographer types; with nothing running it rests
 - [ ] The artwork's colors come from theme tokens (changing an illustration token changes the rendered color)
 - [ ] Two instances on one page do not collide: each renders its own gradient and clip-path ids
-- [ ] The component's styles do not leak: an element outside it with a class like `word` or `head` is unaffected
+- [x] The component's styles do not leak: an element outside it with a class like `word` or `head` is unaffected
 - [ ] The favicon is the static stenographer artwork
 
 ## Acceptance criteria
@@ -76,5 +76,6 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 
 ## Approval log
 
+- 2026-10-10 (workspace, cycle 1): `Test: the component's styles do not leak`. First checkpoint 2026-10-10: token grouping proposed (`theme.illustration.*`, 30 entries, light/dark table approved with a later visual sign-off; backdrop is a surface-derived gradient) plus mechanisms (header reads the connection machine and passes a `typing` prop; per-element delays via JSX `style` — a narrow exception to the no-inline-style convention, ADR candidate; new `sizes` tokens `stenoHeader` 2.25rem / `stenoEmpty` 8.75rem). Red: `Error: Failed to resolve import "./StenographerAnimation"` (vitest, `src/shared/brand/StenographerAnimation.test.tsx`; the file did not exist). Green: `src/shared/brand/StenographerAnimation.tsx` — a `styled.svg` wrapper nesting the artwork's rules under `&` (`.wave`, `.head` with `transform-origin: 50% 42%`, `.word`), so the generated selectors are scoped to the component class and no bare `.word`/`.head` rule exists; the test renders the component beside two outside `<div class="word|head">` elements and asserts the outside elements carry no style. Full suite 66/66, prettier and `tsc --noEmit` clean.
 - 2026-10-09: consultation answers approved: the user supplied the artwork (`stenographer.svg`, now committed with `PROVENANCE.md`); it is inlined as a component via a styled wrapper with nested rules and `keyframes`, with its palette converted to tokens and unique `useId` ids per instance; it appears in the header, on the empty states and as the loading indicator, replacing the spinners and skeletons but not the progress bars; it types only while a task is running; the favicon and a still are derived from it; item 16 gains a dependency on this item. Test list not yet approved.
 - 2026-10-09: test list (10 items) approved by the user; status `spec-approved`.
