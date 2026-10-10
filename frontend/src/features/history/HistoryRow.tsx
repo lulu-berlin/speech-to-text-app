@@ -6,6 +6,7 @@ import { ConnectionContext } from '../../app/ConnectionContext';
 import type { Task } from '../../shared/api/types';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
+import { focusRing } from '../../shared/ui/focusRing';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { Row, Stack } from '../../shared/ui/layout';
@@ -34,6 +35,8 @@ const ErrorLine = styled(Text)`
 const TaskLink = styled(Link)`
   color: inherit;
   text-decoration: none;
+
+  ${focusRing}
 `;
 
 // The fixed month names and UTC rendering of the finish date, so the text is the same for

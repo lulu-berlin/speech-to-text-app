@@ -1,10 +1,14 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { eventStreamResponse } from '../shared/api/handlers';
-import { snapshot as snapshotFixture } from '../shared/api/fixtures';
-import { asRgb, px, required } from '../test/dom';
+import {
+  errorDuplicateAudio,
+  snapshot as snapshotFixture,
+  taskCompleted,
+} from '../shared/api/fixtures';
+import { asRgb, px, required, styleRules } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { server } from '../test/server';
 import { App } from './App';
@@ -241,5 +245,117 @@ describe('the not-found pages', () => {
       '/history',
     );
     expect(getComputedStyle(taskCallout).borderLeftColor).toBe(asRgb(lightTheme.colors.danger));
+  });
+});
+
+// The focusable elements of the document that no `:focus-visible` rule gives the focus
+// ring token. jsdom cannot apply `:focus-visible`, so each element is matched against
+// the emitted rules' selectors with the pseudo-class removed. Hidden elements (the file
+// input) are skipped.
+function elementsWithoutFocusRing(): string[] {
+  const ringSelectors = styleRules()
+    .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
+    .filter((rule) => rule.style.boxShadow.includes(lightTheme.colors.focusRing))
+    .flatMap((rule) => rule.selectorText.split(','))
+    .filter((selector) => selector.includes(':focus-visible'))
+    .map((selector) => selector.replace(':focus-visible', '').trim())
+    .filter((selector) => selector !== '');
+  const focusable = document.querySelectorAll<HTMLElement>(
+    'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+  );
+  return [...focusable]
+    .filter((element) => element.closest('[hidden]') === null)
+    .filter((element) => !ringSelectors.some((selector) => element.matches(selector)))
+    .map(
+      (element) =>
+        `${element.tagName.toLowerCase()} "${element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''}"`,
+    );
+}
+
+// A live /api/events stream that opens with snapshot.json and sends what the test pushes.
+function controllableEventStream() {
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const events = {
+    send(name: string, data: unknown) {
+      controller?.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+    },
+  };
+  server.use(
+    http.get(
+      '/api/events',
+      () =>
+        new HttpResponse(
+          new ReadableStream<Uint8Array>({
+            start(streamController) {
+              controller = streamController;
+              events.send('snapshot', snapshotFixture);
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } },
+        ),
+    ),
+  );
+  return events;
+}
+
+describe('keyboard focus', () => {
+  it('is visible on every focusable element of every view: each carries the focus ring token', async () => {
+    const missing = new Set<string>();
+    const collect = (view: string) => {
+      for (const element of elementsWithoutFocusRing()) {
+        missing.add(`${view}: ${element}`);
+      }
+    };
+
+    // Queue, with every control on show: both number inputs, a finish notice and a
+    // duplicate upload's link.
+    const events = controllableEventStream();
+    server.use(
+      http.post('/api/tasks', () => HttpResponse.json(errorDuplicateAudio, { status: 409 })),
+    );
+    const queue = renderAt('/queue');
+    await screen.findByText('Live');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Speakers' }), {
+      target: { value: 'fixed' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    events.send('task-updated', { ...taskCompleted, id: 5, filename: 'lecture.m4a' });
+    await screen.findByText(/lecture\.m4a transcribed/);
+    const files = [new File(['x'], 'again.mp3', { type: 'audio/mpeg' })];
+    fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+    await screen.findByText(/Already uploaded/);
+    collect('queue');
+    queue.unmount();
+
+    // History, its controls and cards.
+    const history = renderAt('/history');
+    await screen.findByText('Live');
+    await screen.findByRole('searchbox', { name: /search/i });
+    collect('history');
+    history.unmount();
+
+    // A completed transcript (task 3) with its turns.
+    const transcript = renderAt('/history/3');
+    await screen.findByText('Good morning.');
+    collect('transcript');
+    transcript.unmount();
+
+    // A failed task's status page (task 4), a pending task's page (task 7), and an
+    // unknown address.
+    const failed = renderAt('/history/4');
+    await screen.findByRole('heading', { name: 'call.ogg' });
+    collect('failed task');
+    failed.unmount();
+
+    const pending = renderAt('/history/7');
+    await screen.findByRole('heading', { name: 'memo.wav' });
+    collect('pending task');
+    pending.unmount();
+
+    renderAt('/no-such-page');
+    collect('not found');
+
+    expect([...missing]).toEqual([]);
   });
 });

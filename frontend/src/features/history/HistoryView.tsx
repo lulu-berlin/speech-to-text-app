@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { List } from '../../shared/ui/List';
+import { controlStyle } from '../../shared/ui/controlStyle';
+import { Field } from '../../shared/ui/Field';
 import type { Task } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
@@ -27,6 +29,15 @@ const Title = styled(PageHeading)`
 
 const Controls = styled(Row)`
   flex-wrap: wrap;
+`;
+
+// History's search and status filter take the shared form-control look (item 25).
+const SearchInput = styled.input`
+  ${controlStyle}
+`;
+
+const StatusSelect = styled.select`
+  ${controlStyle}
 `;
 
 // The no-matches state (item 25): a compact muted line with the action that clears the
@@ -65,18 +76,18 @@ export function HistoryView() {
         {allFinished.length > 0 ? (
           <>
             <Controls gap="sm">
-              <label>
-                Search
-                <input
+              <Field label="Search" htmlFor="history-search">
+                <SearchInput
+                  id="history-search"
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   aria-label="Search by filename"
                 />
-              </label>
-              <label>
-                Status
-                <select
+              </Field>
+              <Field label="Status" htmlFor="history-status">
+                <StatusSelect
+                  id="history-status"
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}
                   aria-label="Filter by status"
@@ -86,8 +97,8 @@ export function HistoryView() {
                       {option.label}
                     </option>
                   ))}
-                </select>
-              </label>
+                </StatusSelect>
+              </Field>
             </Controls>
             {finished.length > 0 ? (
               <List>
