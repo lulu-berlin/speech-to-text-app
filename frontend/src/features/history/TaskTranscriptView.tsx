@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMachine } from '@xstate/react';
 import { Link, useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
@@ -11,6 +12,7 @@ import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
 import { useTaskCommand } from './useTaskCommand';
+import { playbackMachine } from './playbackMachine';
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -133,7 +135,8 @@ export function TaskTranscriptView() {
 
   // The playhead on the /audio timeline in milliseconds (item 8): updated from the audio
   // element's timeupdate and seeked events; drives the playback highlight.
-  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+  const [playback, playbackSend] = useMachine(playbackMachine);
+  const currentTimeMs = playback.context.currentTimeMs;
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Clicking a segment seeks the player to the segment's start and plays from there
@@ -143,7 +146,7 @@ export function TaskTranscriptView() {
     if (audio === null) {
       return;
     }
-    setCurrentTimeMs(startMs);
+    playbackSend({ type: 'PLAYHEAD', ms: startMs });
     audio.currentTime = startMs / 1000;
     audio.play().catch(() => {
       /* A browser may refuse playback before any user gesture (autoplay policy); the seek
@@ -233,8 +236,12 @@ export function TaskTranscriptView() {
       controls
       src={`/api/tasks/${id}/audio`}
       aria-label={`Audio for ${task.filename}`}
-      onTimeUpdate={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
-      onSeeked={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
+      onTimeUpdate={(event) =>
+        playbackSend({ type: 'PLAYHEAD', ms: event.currentTarget.currentTime * 1000 })
+      }
+      onSeeked={(event) =>
+        playbackSend({ type: 'PLAYHEAD', ms: event.currentTarget.currentTime * 1000 })
+      }
     >
       Your browser does not support the audio element.
     </audio>
