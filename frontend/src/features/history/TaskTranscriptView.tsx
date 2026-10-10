@@ -150,25 +150,34 @@ export function TaskTranscriptView() {
     }
   }, [deleteState, navigate]);
 
+  // The one place the view reads /turns: the answer replaces the turns while `isCurrent()`
+  // holds (an effect cleaned up meanwhile drops it), and a failure runs `onFailure`.
+  const loadTurns = (isCurrent: () => boolean, onFailure: () => void) => {
+    getTurns(id)
+      .then((result) => {
+        if (isCurrent()) {
+          setTurns(result);
+        }
+      })
+      .catch(() => {
+        if (isCurrent()) {
+          onFailure();
+        }
+      });
+  };
+
   useEffect(() => {
     // Only a completed task has turns (the backend answers 409 not-completed otherwise).
     if (task === undefined || task.status !== 'COMPLETED') {
       return;
     }
     let cancelled = false;
-    getTurns(id)
-      .then((result) => {
-        if (!cancelled) {
-          setTurns(result);
-        }
-      })
-      .catch(() => {
-        /* The turns fetch failing is handled by a later item (the failed/status page and
-           the not-found view); until then a failed load leaves the turns empty. */
-        if (!cancelled) {
-          setTurns(null);
-        }
-      });
+    /* The turns fetch failing is handled by a later item (the failed/status page and the
+       not-found view); until then a failed load leaves the turns empty. */
+    loadTurns(
+      () => !cancelled,
+      () => setTurns(null),
+    );
     return () => {
       cancelled = true;
     };
@@ -188,16 +197,11 @@ export function TaskTranscriptView() {
       return;
     }
     let cancelled = false;
-    getTurns(id)
-      .then((result) => {
-        if (!cancelled) {
-          setTurns(result);
-        }
-      })
-      .catch(() => {
-        /* A failed reload keeps the transcript as it was; the next event or visit reads it
-           again. */
-      });
+    // A failed reload keeps the transcript as it was; the next event or visit reads it again.
+    loadTurns(
+      () => !cancelled,
+      () => {},
+    );
     return () => {
       cancelled = true;
     };
@@ -428,15 +432,14 @@ export function TaskTranscriptView() {
             onSpeakersChanged={(speakers) =>
               setTurns((previous) => (previous === null ? previous : { ...previous, speakers }))
             }
-            // A merge or a reset joins or splits turns, so the turns are read again.
-            onMergesChanged={() => {
-              getTurns(id)
-                .then(setTurns)
-                .catch(() => {
-                  /* A failed reload keeps the transcript as it was; the next event or visit
-                     reads it again. */
-                });
-            }}
+            // A merge or a reset joins or splits turns, so the turns are read again; a failed
+            // reload keeps the transcript as it was.
+            onMergesChanged={() =>
+              loadTurns(
+                () => true,
+                () => {},
+              )
+            }
           />
         ) : null}
         {turnsBySpeaker === null ? (
