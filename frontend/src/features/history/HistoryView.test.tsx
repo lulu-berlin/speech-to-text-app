@@ -141,4 +141,40 @@ describe('the history list', () => {
     expect(retried).toEqual([4]);
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
+
+  it('asks for confirmation before deleting; confirming calls the endpoint and the task leaves', async () => {
+    // Mock addition: the delete handler records the ids it receives (the stock handler
+    // answers 204 without recording).
+    const deleted: number[] = [];
+    server.use(
+      http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])),
+      http.delete('/api/tasks/:id', ({ params }) => {
+        deleted.push(Number(params.id));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await renderHistory();
+
+    const rowOf = (filename: string) =>
+      screen.getAllByRole('listitem').find((row) => row.textContent?.includes(filename))!;
+
+    // Delete is offered on every finished task; it first asks.
+    fireEvent.click(within(rowOf('interview.mp3')).getByRole('button', { name: 'Delete' }));
+    let dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('interview.mp3');
+
+    // Cancel sends nothing and keeps the task.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(deleted).toEqual([]);
+    expect(screen.getByText('interview.mp3')).toBeInTheDocument();
+
+    // Confirming sends DELETE /api/tasks/3 once, and the task leaves the list.
+    fireEvent.click(within(rowOf('interview.mp3')).getByRole('button', { name: 'Delete' }));
+    dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.queryByText('interview.mp3')).not.toBeInTheDocument());
+    expect(deleted).toEqual([3]);
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
 });

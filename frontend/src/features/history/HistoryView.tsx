@@ -6,8 +6,10 @@ import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import type { Task } from '../../shared/api/types';
+import { deleteTask } from '../../shared/api/client';
 import { isAllowedCommand } from '../../shared/state/transitions';
 import { Button } from '../../shared/ui/Button';
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { useTaskCommand } from './useTaskCommand';
@@ -48,9 +50,19 @@ const Controls = styled(Row)`
 
 export function HistoryView() {
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
+  const connection = ConnectionContext.useActorRef();
   const runCommand = useTaskCommand();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  // The task whose deletion awaits confirmation (delete is always confirmed, item 14).
+  const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
+
+  // On 204 the task leaves the store as a task-deleted event, the same event the server
+  // sends to every client.
+  const confirmDelete = (task: Task) => {
+    setPendingDelete(null);
+    void deleteTask(task.id).then(() => connection.send({ type: 'task-deleted', id: task.id }));
+  };
 
   const finished = tasks
     .filter((task) => FINISHED.has(task.status))
@@ -101,18 +113,34 @@ export function HistoryView() {
                   <StatusBadge status={task.status} />
                 </Row>
                 {task.error !== null ? <Meta>{task.error}</Meta> : null}
-                {isAllowedCommand('retry', task.status) ? (
-                  <Row gap="sm">
+                <Row gap="sm">
+                  {isAllowedCommand('retry', task.status) ? (
                     <Button variant="secondary" onClick={() => runCommand('retry', task)}>
                       Retry
                     </Button>
-                  </Row>
-                ) : null}
+                  ) : null}
+                  <Button variant="danger" onClick={() => setPendingDelete(task)}>
+                    Delete
+                  </Button>
+                </Row>
               </Stack>
             </ListRow>
           ))}
         </List>
       </Stack>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete task?"
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (pendingDelete !== null) {
+            confirmDelete(pendingDelete);
+          }
+        }}
+        onCancel={() => setPendingDelete(null)}
+      >
+        {pendingDelete?.filename} and its transcript and audio will be deleted.
+      </ConfirmDialog>
     </Page>
   );
 }
