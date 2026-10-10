@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { http } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -211,5 +211,35 @@ describe('the app root', () => {
 
     unmount();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('the not-found pages', () => {
+  it('keep their heading and explain with the error callout and a way back, for an unknown page and an unknown task', async () => {
+    // An unknown address: the heading, then the callout with the way to the queue.
+    const page = renderAt('/no-such-page');
+    expect(screen.getByRole('heading', { name: 'Not found' })).toBeInTheDocument();
+    const pageCallout = screen.getByRole('alert');
+    expect(pageCallout).toHaveTextContent("This page doesn't exist");
+    expect(pageCallout).toHaveTextContent('Check the address, or go to the queue.');
+    expect(within(pageCallout).getByRole('link', { name: 'Go to the queue' })).toHaveAttribute(
+      'href',
+      '/queue',
+    );
+    expect(getComputedStyle(pageCallout).borderLeftColor).toBe(asRgb(lightTheme.colors.danger));
+    page.unmount();
+
+    // An unknown task (no id 42 in snapshot.json), once live: the same callout form with
+    // the way back to History.
+    renderAt('/history/42');
+    expect(await screen.findByRole('heading', { name: 'Task not found' })).toBeInTheDocument();
+    const taskCallout = screen.getByRole('alert');
+    expect(taskCallout).toHaveTextContent("This task doesn't exist");
+    expect(taskCallout).toHaveTextContent('It was deleted, or the link is wrong.');
+    expect(within(taskCallout).getByRole('link', { name: 'Back to History' })).toHaveAttribute(
+      'href',
+      '/history',
+    );
+    expect(getComputedStyle(taskCallout).borderLeftColor).toBe(asRgb(lightTheme.colors.danger));
   });
 });

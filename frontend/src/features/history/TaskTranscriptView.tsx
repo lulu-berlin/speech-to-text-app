@@ -57,6 +57,13 @@ const DownloadLink = styled.a`
   }
 `;
 
+// The not-found callout's way back (item 25).
+const HistoryLink = styled(Link)`
+  color: ${(props) => props.theme.colors.accent};
+
+  ${focusRing}
+`;
+
 const Title = styled(PageHeading)`
   margin: 0;
 `;
@@ -273,7 +280,11 @@ export function TaskTranscriptView() {
       <Page>
         <Stack gap="md">
           <Title>Task not found</Title>
-          <Text>The task does not exist or was deleted.</Text>
+          <ErrorCallout
+            title="This task doesn't exist"
+            detail="It was deleted, or the link is wrong."
+            action={<HistoryLink to="/history">Back to History</HistoryLink>}
+          />
         </Stack>
       </Page>
     );
