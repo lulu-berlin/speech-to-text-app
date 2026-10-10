@@ -8,6 +8,7 @@ import type { Task } from '../../shared/api/types';
 import { focusRing } from '../../shared/ui/focusRing';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
+import { TextButton } from '../../shared/ui/TextButton';
 import { HistoryRow } from './HistoryRow';
 
 // The finished statuses the history list shows; pending and active tasks stay in the queue.
@@ -45,18 +46,6 @@ const NoMatches = styled(Row)`
 const NoMatchesLine = styled.p`
   margin: 0;
   color: ${(props) => props.theme.colors.textMuted};
-`;
-
-const ClearFilters = styled.button`
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-  border: none;
-  border-radius: ${(props) => props.theme.radii.button};
-  background: transparent;
-  color: ${(props) => props.theme.colors.accent};
-  font: inherit;
-  cursor: pointer;
-
-  ${focusRing}
 `;
 
 export function HistoryView() {
@@ -130,15 +119,14 @@ export function HistoryView() {
         ) : (
           <NoMatches gap="sm">
             <NoMatchesLine>No tasks match your search and filter.</NoMatchesLine>
-            <ClearFilters
-              type="button"
+            <TextButton
               onClick={() => {
                 setSearch('');
                 setStatusFilter('ALL');
               }}
             >
               Clear filters
-            </ClearFilters>
+            </TextButton>
           </NoMatches>
         )}
       </Stack>
