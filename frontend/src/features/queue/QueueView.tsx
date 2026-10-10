@@ -1,8 +1,12 @@
-import { useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, DragEvent, ReactNode } from 'react';
 import { css, styled } from 'styled-components';
+import { uploadTask } from '../../shared/api/client';
+import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { focusRing } from '../../shared/ui/focusRing';
+import { List } from '../../shared/ui/List';
+import { ListRow } from '../../shared/ui/ListRow';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
@@ -64,6 +68,34 @@ const AdvancedToggle = styled.button`
   ${focusRing}
 `;
 
+const DropZone = styled.button`
+  display: block;
+  width: 100%;
+  padding: ${(props) => props.theme.spacing.xl};
+  border: ${(props) => props.theme.borderWidths.thin} dashed ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.radii.card};
+  background: ${(props) => props.theme.colors.surface};
+  color: ${(props) => props.theme.colors.textMuted};
+  font: inherit;
+  cursor: pointer;
+
+  ${focusRing}
+`;
+
+const RowContent = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: ${(props) => props.theme.spacing.sm};
+`;
+
+const RowName = styled.span`
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const RowStatus = styled.span`
+  color: ${(props) => props.theme.colors.textMuted};
+`;
+
 interface FieldProps {
   label: string;
   htmlFor: string;
@@ -90,12 +122,87 @@ function clampCount(raw: string, fallback: number): number {
   return Math.min(20, Math.max(1, parsed));
 }
 
+// One file of the batch, with the options it was dropped under. The rows drive the
+// uploader: the first queued row uploads, then the next, one at a time in drop order.
+interface UploadRow {
+  id: number;
+  file: File;
+  options: UploadOptions;
+  status: 'queued' | 'uploading' | 'done' | 'error';
+  error: string | null;
+}
+
 export function QueueView() {
   const [language, setLanguage] = useState(languages.default);
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
   const [speakerCount, setSpeakerCount] = useState(2);
   const [maxSpeakers, setMaxSpeakers] = useState(8);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [rows, setRows] = useState<UploadRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const nextRowId = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const enqueue = (files: File[]) => {
+    const options: UploadOptions = {
+      language,
+      speakers: speakers === 'fixed' ? String(speakerCount) : speakers,
+      maxSpeakers,
+    };
+    setRows((current) => [
+      ...current,
+      ...files.map((file) => ({
+        id: ++nextRowId.current,
+        file,
+        options,
+        status: 'queued' as const,
+        error: null,
+      })),
+    ]);
+  };
+
+  const onDrop = (event: DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    enqueue(Array.from(event.dataTransfer.files));
+  };
+
+  const onPick = (event: ChangeEvent<HTMLInputElement>) => {
+    enqueue(Array.from(event.target.files ?? []));
+    // Allow picking the same file again: a file input does not fire change for a value
+    // it already holds.
+    event.target.value = '';
+  };
+
+  // The uploader: while no upload is running, start the first queued row. When it
+  // finishes (done or error), the effect runs again and starts the next one.
+  useEffect(() => {
+    if (busy) {
+      return;
+    }
+    const next = rows.find((row) => row.status === 'queued');
+    if (next === undefined) {
+      return;
+    }
+    setBusy(true);
+    setRows((current) =>
+      current.map((row) => (row.id === next.id ? { ...row, status: 'uploading' } : row)),
+    );
+    uploadTask(next.file, next.options)
+      .then(() => {
+        setRows((current) =>
+          current.map((row) => (row.id === next.id ? { ...row, status: 'done' } : row)),
+        );
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setRows((current) =>
+          current.map((row) =>
+            row.id === next.id ? { ...row, status: 'error', error: message } : row,
+          ),
+        );
+      })
+      .finally(() => setBusy(false));
+  }, [rows, busy]);
 
   return (
     <Page>
@@ -159,6 +266,22 @@ export function QueueView() {
             </Field>
           ) : null}
         </Stack>
+        <DropZone type="button" onClick={() => inputRef.current?.click()} onDrop={onDrop}>
+          Drop audio files here or click to choose
+        </DropZone>
+        <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
+        {rows.length > 0 ? (
+          <List>
+            {rows.map((row) => (
+              <ListRow key={row.id}>
+                <RowContent>
+                  <RowName>{row.file.name}</RowName>
+                  <RowStatus>{row.status}</RowStatus>
+                </RowContent>
+              </ListRow>
+            ))}
+          </List>
+        ) : null}
       </Stack>
     </Page>
   );

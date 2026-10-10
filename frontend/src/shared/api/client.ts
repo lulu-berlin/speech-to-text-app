@@ -39,12 +39,40 @@ export async function getTurns(id: number): Promise<Turns> {
   return json<Turns>(response);
 }
 
-// Item 12 contract: POST /api/tasks, multipart with a `file` field.
-export async function uploadTask(file: File): Promise<Task> {
+// The upload options of one file (item 12 contract): language from docs/api/languages.json,
+// speakers auto|off|<n> (1–20), maxSpeakers 1–20.
+export interface UploadOptions {
+  language: string;
+  speakers: string;
+  maxSpeakers: number;
+}
+
+// Item 12 contract: POST /api/tasks, multipart with a `file` field and the batch options.
+// XMLHttpRequest, because fetch has no upload progress (item 14); this stays the only
+// place that talks to POST /api/tasks.
+export function uploadTask(file: File, options: UploadOptions): Promise<Task> {
+  const { promise, resolve, reject } = Promise.withResolvers<Task>();
   const form = new FormData();
   form.append('file', file);
-  const response = await fetch('/api/tasks', { method: 'POST', body: form });
-  return json<Task>(response);
+  form.append('language', options.language);
+  form.append('speakers', options.speakers);
+  form.append('maxSpeakers', String(options.maxSpeakers));
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/tasks');
+  xhr.responseType = 'json';
+  xhr.onload = () => {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      resolve(xhr.response as Task);
+    } else {
+      const body = xhr.response as ApiErrorBody | null;
+      const code = body?.error ?? String(xhr.status);
+      const message = body?.message ?? xhr.statusText;
+      reject(new ApiError(code, message, body?.taskId));
+    }
+  };
+  xhr.onerror = () => reject(new ApiError(String(xhr.status || 0), 'Network error'));
+  xhr.send(form);
+  return promise;
 }
 
 // Item 12 contract: POST /api/tasks/{id}/<command> -> 200 Task, or an error (409 for an
