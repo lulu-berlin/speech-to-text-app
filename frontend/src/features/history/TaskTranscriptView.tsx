@@ -4,7 +4,7 @@ import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { getTurns } from '../../shared/api/client';
 import type { Turn, Turns } from '../../shared/api/types';
-import { Page, Stack } from '../../shared/ui/layout';
+import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 
@@ -14,6 +14,18 @@ function formatTime(ms: number): string {
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
+
+// The transcript download formats (item 10, ADR 0035): txt, srt, vtt.
+const DOWNLOAD_FORMATS = ['txt', 'srt', 'vtt'] as const;
+
+const DownloadLink = styled.a`
+  color: ${(props) => props.theme.colors.accent};
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
 
 const Title = styled(PageHeading)`
   margin: 0;
@@ -87,6 +99,17 @@ export function TaskTranscriptView() {
     <Page>
       <Stack gap="md">
         <Title>Transcript</Title>
+        <Row gap="sm">
+          {DOWNLOAD_FORMATS.map((format) => (
+            <DownloadLink
+              key={format}
+              href={`/api/tasks/${id}/transcript?format=${format}`}
+              aria-label={`Download transcript (${format})`}
+            >
+              {format.toUpperCase()}
+            </DownloadLink>
+          ))}
+        </Row>
         {turnsBySpeaker === null ? (
           <Text>Loading…</Text>
         ) : (
