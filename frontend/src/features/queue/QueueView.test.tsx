@@ -209,13 +209,17 @@ describe('the queue view upload flow', () => {
       const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
       fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
 
-      // The uploading file's row shows its progress.
-      const progress = await screen.findByRole('progressbar', { name: /a\.mp3/i });
+      // The uploading file's row shows its progress (scoped to the uploads list: the
+      // task rows carry their own progress bars).
+      const uploads = screen.getByRole('list', { name: 'Uploads' });
+      const progress = await within(uploads).findByRole('progressbar', { name: /a\.mp3/i });
       expect(progress).toHaveAttribute('aria-valuenow', '50');
 
       // Once the upload completes, the progress bar leaves the row.
       release();
-      await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(within(uploads).queryByRole('progressbar')).not.toBeInTheDocument(),
+      );
       expect(screen.getByText('a.mp3')).toBeInTheDocument();
       expect(screen.getByText('done')).toBeInTheDocument();
     } finally {
@@ -280,6 +284,90 @@ describe('the queue list', () => {
       expect.stringContaining('a.mp3'),
     ]);
     expect(within(rows[2] as HTMLElement).getByText('QUEUED')).toBeInTheDocument();
+  });
+
+  it("updates a task's two progress bars from task-progress events; the diarization bar shows its stage and hides when diarization does not apply", async () => {
+    const { promise: withStage, resolve: releaseStage } = Promise.withResolvers<void>();
+    const { promise: noDiarization, resolve: releaseNoDiarization } = Promise.withResolvers<void>();
+
+    // Two task-progress events for the running task 5, each held until the test has
+    // observed the previous state.
+    server.use(
+      http.get('/api/events', () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshotFixture)}\n\n`),
+            );
+            void withStage.then(() => {
+              controller.enqueue(
+                encoder.encode(
+                  `event: task-progress\ndata: ${JSON.stringify({
+                    id: 5,
+                    transcriptionProgress: 0.75,
+                    diarizationStage: 'CLUSTERING',
+                    diarizationProgress: 0.4,
+                  })}\n\n`,
+                ),
+              );
+            });
+            void noDiarization.then(() => {
+              controller.enqueue(
+                encoder.encode(
+                  `event: task-progress\ndata: ${JSON.stringify({
+                    id: 5,
+                    transcriptionProgress: 0.85,
+                    diarizationStage: null,
+                    diarizationProgress: null,
+                  })}\n\n`,
+                ),
+              );
+            });
+          },
+        });
+        return new HttpResponse(stream, {
+          headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+        });
+      }),
+    );
+
+    renderQueue();
+
+    // The running task shows both bars from the snapshot's progress (42%, diarization 0).
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toHaveAttribute(
+      'aria-valuenow',
+      '42',
+    );
+    expect(
+      within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
+    ).toHaveAttribute('aria-valuenow', '0');
+
+    // The first event updates both bars; the diarization bar names its stage.
+    releaseStage();
+    await waitFor(() =>
+      expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toHaveAttribute(
+        'aria-valuenow',
+        '75',
+      ),
+    );
+    expect(
+      within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
+    ).toHaveAttribute('aria-valuetext', 'Clustering 70%');
+
+    // When diarization does not apply, its bar disappears; transcription keeps updating.
+    releaseNoDiarization();
+    await waitFor(() =>
+      expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toHaveAttribute(
+        'aria-valuenow',
+        '85',
+      ),
+    );
+    expect(
+      within(lecture).queryByRole('progressbar', { name: 'Speaker diarization' }),
+    ).not.toBeInTheDocument();
   });
 });
 
