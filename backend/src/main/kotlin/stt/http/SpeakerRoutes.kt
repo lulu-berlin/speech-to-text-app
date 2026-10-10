@@ -5,6 +5,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
@@ -23,6 +24,10 @@ import stt.engine.ProcessingEngine
  * `409 duplicate-speaker-name`. `{ "speaker": null }` resets the name to the default `"Speaker N"`
  * (N = speakerId + 1, item 09's rule), which is checked for duplicates like any other name. A stored rename or
  * reset goes through the engine, which publishes `speakers-renamed` after the write (item 11's event flow).
+ *
+ * Merging (item 22): `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }`
+ * folds every other member of the group into `into` through the merge mapping (no segment row is rewritten) and
+ * answers `200` with the task's effective speakers.
  */
 fun Application.speakerRoutes() {
     val engine: ProcessingEngine by dependencies
@@ -54,6 +59,13 @@ fun Application.speakerRoutes() {
                 }
             }
         }
+
+        post("/api/tasks/{id}/speakers/merge") {
+            val id = call.parameters["id"]!!.toLong()
+            val request = call.receive<MergeSpeakersRequest>()
+            segments.mergeSpeakers(id, request.group, request.into)
+            call.respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
+        }
     }
 }
 
@@ -68,6 +80,13 @@ private fun isValidSpeakerName(name: String): Boolean =
 @Serializable
 private data class RenameSpeakerRequest(
     val speaker: String?,
+)
+
+/** The body of `POST /api/tasks/{id}/speakers/merge`: the speakers to join, and the one that remains. */
+@Serializable
+private data class MergeSpeakersRequest(
+    val group: List<Int>,
+    val into: Int,
 )
 
 /** The body of the speaker endpoints' `200` (item 22, `docs/api/speakers.json`): the task's speakers by `speakerId`. */

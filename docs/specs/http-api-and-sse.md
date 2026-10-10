@@ -95,9 +95,9 @@ The JSON shapes the frontend builds against.
   - pause/resume/cancel/retry → `200` Task;
   - queue pause/resume/order → `200` Queue;
   - delete → `204` without a body;
-  - rename a speaker → `200` Speakers (item 22).
+  - rename a speaker, merge speakers → `200` Speakers (item 22).
 - **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
-  - `speakers` are the task's rows of the `speakers` table (ADR 0028), ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until renamed; item 22). A rename changes only the name here, never the turns, which reference their speaker by `speakerId`.
+  - `speakers` are the task's **effective** speakers (item 22): its rows of the `speakers` table (ADR 0028) except those merged into another speaker, ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until renamed). A rename changes only the name here, never the turns, which reference their speaker by `speakerId`. A merged speaker's segments carry the `speakerId` of the speaker it was merged into, so its turns join that speaker's neighbouring turns.
   - `turns` are item 09's `speaker_turns`: consecutive segments with the same `speakerId` form one turn. A turn names its speaker only by `speakerId`; the UI shows the name from `speakers`.
   - Only for COMPLETED tasks; any other status → `409 not-completed`.
   - Times: `startMs`/`endMs` of turns and segments are milliseconds on the timeline of `GET /api/tasks/{id}/audio`. The joined audio starts at 0, and item 06's chunks are contiguous and cover `[0, durationMs)`, so a segment's stored time is its position in the played file. Segments and turns come in transcript order. There can be gaps between segments (silence), where no segment is playing. So the transcript view can highlight the segment being played (item 15): the one whose `[startMs, endMs)` contains the player's current time.
@@ -105,6 +105,7 @@ The JSON shapes the frontend builds against.
   - Text ([ADR 0030](../decisions/0030-trimmed-segment-text-in-all-outputs.md)): every segment `text` is trimmed; a turn's `text` is its segments' non-blank trimmed texts joined with single spaces (a blank segment must not leave a double space, user decision 2026-10-10).
 - **Speakers** (added 2026-10-10, item 22): `{ "speakers": [{ "speakerId", "speaker" }] }`, the task's speakers ordered by `speakerId` ([`docs/api/speakers.json`](../api/speakers.json)).
   - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is stored as sent; clients trim it first (user decision 2026-10-10). Leading or trailing whitespace, empty, longer than 40 characters, or a control character anywhere → `400 invalid-speaker-name`, nothing changes. A name another speaker of the task already has, compared case-insensitively and including speakers hidden by a merge → `409 duplicate-speaker-name`; a speaker's own current name is no duplicate (user decisions 2026-10-10). `{ "speaker": null }` resets the name to `"Speaker N"` (N = `speakerId` + 1), written by the server and checked for duplicates like any other name.
+  - `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }` folds every other member of `group` into `into`, which keeps its id and name; the answer is the task's effective speakers. No segment row is rewritten: the merge is a mapping resolved when the transcript is read, so it can be undone.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task
