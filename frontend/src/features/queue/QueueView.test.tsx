@@ -18,7 +18,7 @@ import {
 } from '../../shared/api/fixtures';
 import { controllableEventStream } from '../../test/controllableEventStream';
 import { lightTheme } from '../../shared/theme/theme';
-import { mediaRulesFor, px, required } from '../../test/dom';
+import { asRgb, mediaRulesFor, px, required } from '../../test/dom';
 import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
@@ -383,6 +383,44 @@ describe('the empty queue', () => {
     });
     expect(compact.querySelector('svg')).toBeNull();
     pick.mockRestore();
+  });
+});
+
+describe('the drop zone while dragging', () => {
+  it('shows a solid accent border, the accent tint and "Release to upload" while files are over it, through its children, until they leave or drop', async () => {
+    controllableEventStream({ tasks: [], queue: { paused: false, taskIds: [] } });
+    renderQueue();
+    const idleName = 'No tasks yet — drop audio files here, or click to choose them';
+    const zone = await screen.findByRole('button', { name: idleName });
+    const mascot = required(zone.querySelector('svg')) as SVGElement;
+    const idle = getComputedStyle(zone);
+    expect(idle.borderTopStyle).toBe('dashed');
+    expect(idle.backgroundColor).toBe(asRgb(lightTheme.colors.surface));
+
+    // Files enter the zone: the drag-over look and text; the mascot stays.
+    fireEvent.dragEnter(zone, { dataTransfer: { types: ['Files'], files: [] } });
+    expect(zone).toHaveAccessibleName('Release to upload');
+    expect(zone).toContainElement(mascot);
+    const over = getComputedStyle(zone);
+    expect(over.borderTopStyle).toBe('solid');
+    expect(over.borderTopColor).toBe(asRgb(lightTheme.colors.accent));
+    expect(over.backgroundColor).toBe(asRgb(lightTheme.colors.status.active.background));
+
+    // Moving over the mascot (a child) and back off it does not end the drag-over state.
+    fireEvent.dragEnter(mascot, { dataTransfer: { types: ['Files'], files: [] } });
+    fireEvent.dragLeave(mascot);
+    expect(zone).toHaveAccessibleName('Release to upload');
+
+    // Leaving the zone ends it.
+    fireEvent.dragLeave(zone);
+    expect(zone).toHaveAccessibleName(idleName);
+    expect(getComputedStyle(zone).borderTopStyle).toBe('dashed');
+
+    // So does a drop.
+    fireEvent.dragEnter(zone, { dataTransfer: { types: ['Files'], files: [] } });
+    expect(zone).toHaveAccessibleName('Release to upload');
+    fireEvent.drop(zone, { dataTransfer: { files: [] } });
+    expect(zone).toHaveAccessibleName(idleName);
   });
 });
 
