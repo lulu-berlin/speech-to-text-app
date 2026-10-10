@@ -164,12 +164,7 @@ class SegmentRepository(
             val members = group.distinct()
             if (into !in members) return@writeTransaction MergeOutcome.Invalid("into $into is not in the group $members")
             if (members.size < 2) return@writeTransaction MergeOutcome.Invalid("a merge needs at least two speakers, got $members")
-            val merged =
-                SpeakerMergeTable
-                    .selectAll()
-                    .where { SpeakerMergeTable.taskId eq taskId }
-                    .map { it[SpeakerMergeTable.mergedId] }
-                    .toSet()
+            val merged = selectMerges(taskId)
             members.firstOrNull { it in merged }?.let {
                 return@writeTransaction MergeOutcome.Invalid("speaker $it is already merged into another speaker")
             }
@@ -189,15 +184,18 @@ class SegmentRepository(
      */
     suspend fun findDiarized(taskId: Long): DiarizedRead =
         db.readTransaction {
-            val intoOf =
-                SpeakerMergeTable
-                    .selectAll()
-                    .where { SpeakerMergeTable.taskId eq taskId }
-                    .associate { it[SpeakerMergeTable.mergedId] to it[SpeakerMergeTable.intoId] }
+            val intoOf = selectMerges(taskId)
             val segments = selectSegments(taskId).map { it.copy(speakerId = it.speakerId?.let { id -> intoOf[id] ?: id }) }
             val speakers = selectSpeakers(taskId).filter { it.speakerId !in intoOf }
             DiarizedRead(segments, speakers)
         }
+
+    /** The task's merge mapping, merged speaker id → the id it was merged into; runs inside the caller's transaction. */
+    private fun selectMerges(taskId: Long): Map<Int, Int> =
+        SpeakerMergeTable
+            .selectAll()
+            .where { SpeakerMergeTable.taskId eq taskId }
+            .associate { it[SpeakerMergeTable.mergedId] to it[SpeakerMergeTable.intoId] }
 }
 
 /** A row of `speakers` as a [Speaker]. */
