@@ -9,13 +9,13 @@ import { ConnectionContext } from './ConnectionContext';
 
 // The brand mascot, product name, navigation between the views, the live connection
 // indicator and the theme control. The mascot types while a task runs (item 17); it is
-// the header's dominant element and fills the whole band — no vertical padding, so it
-// touches the page top and the separation line — while the controls centre against it.
+// the header's dominant element and fills the whole band — no padding, so it touches the
+// page edge all around — while the controls centre against it.
 const Header = styled.header`
   display: flex;
   align-items: center;
   gap: ${(props) => props.theme.spacing.lg};
-  padding: 0 ${(props) => props.theme.spacing.lg};
+  padding: 0;
   border-bottom: ${(props) => props.theme.borderWidths.thin} solid
     ${(props) => props.theme.colors.border};
 `;
