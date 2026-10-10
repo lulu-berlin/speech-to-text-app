@@ -219,8 +219,9 @@ export interface StenographerAnimationProps {
 
 // The brand mascot (item 17): a seated stenographer at a steno machine on a warm backdrop.
 // Inlined from docs/oracle of item 17's artwork (stenographer.svg): every color comes from
-// the theme's illustration tokens, so the piece follows light and dark mode. It is
-// decorative wherever it appears, so it carries no role or accessible name of its own.
+// the theme's illustration tokens, so the piece follows light and dark mode. Decorative
+// everywhere it appears (the product name or the empty state's text carries the meaning),
+// so it is aria-hidden and carries no role or accessible name of its own.
 export function StenographerAnimation({
   size = 'header',
   typing = false,
@@ -233,7 +234,7 @@ export function StenographerAnimation({
   const uid = useId().replace(/:/g, '');
   const defId = (name: string) => `${uid}-${name}`;
   return (
-    <StyledSvg viewBox="0 0 400 400" $size={size} $typing={typing}>
+    <StyledSvg viewBox="0 0 400 400" $size={size} $typing={typing} aria-hidden="true">
       <defs>
         <radialGradient id={defId('bg')} cx="50%" cy="40%" r="60%">
           <stop offset="0%" stopColor={i.backdropFrom} />
