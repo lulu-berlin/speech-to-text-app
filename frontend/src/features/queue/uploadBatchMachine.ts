@@ -5,7 +5,7 @@
 import { assign, fromCallback, setup } from 'xstate';
 import { uploadTask } from '../../shared/api/client';
 import type { UploadOptions } from '../../shared/api/client';
-import { ApiError } from '../../shared/api/types';
+import { ApiError, errorMessage } from '../../shared/api/types';
 import type { Task } from '../../shared/api/types';
 import { isSupportedFormat } from './uploadValidation';
 
@@ -87,7 +87,7 @@ export const uploadBatchMachine = setup({
           sendBack({
             type: 'UPLOAD_ERROR',
             id: input.row.id,
-            message: error instanceof Error ? error.message : String(error),
+            message: errorMessage(error),
           });
         },
       );

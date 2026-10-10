@@ -5,6 +5,7 @@
 // land.
 import { assign, fromPromise, setup } from 'xstate';
 import { reorderQueue } from '../../shared/api/client';
+import { errorMessage } from '../../shared/api/types';
 
 export interface ReorderInput {
   order: number[];
@@ -78,8 +79,7 @@ export const reorderMachine = setup({
           actions: assign({
             // The server kept its order: restore the one the reorder started from.
             order: ({ context }) => context.previousOrder,
-            error: ({ event }) =>
-              event.error instanceof Error ? event.error.message : String(event.error),
+            error: ({ event }) => errorMessage(event.error),
           }),
         },
       },

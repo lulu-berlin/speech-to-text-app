@@ -5,6 +5,7 @@ import type { HTMLAttributes, Ref } from 'react';
 import { useMachine } from '@xstate/react';
 import { styled } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { errorMessage } from '../../shared/api/types';
 import type { Task, TaskPhase } from '../../shared/api/types';
 import { isAllowedCommand } from '../../shared/state/transitions';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
@@ -176,11 +177,7 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
           </Row>
         </RowContent>
         {action.matches({ ready: 'failed' }) ? (
-          <RowActionError>
-            {action.context.error instanceof Error
-              ? action.context.error.message
-              : String(action.context.error)}
-          </RowActionError>
+          <RowActionError>{errorMessage(action.context.error)}</RowActionError>
         ) : null}
         {deleteState.matches('failed') ? (
           <RowActionError>
