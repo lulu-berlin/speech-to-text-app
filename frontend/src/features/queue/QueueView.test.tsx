@@ -753,6 +753,30 @@ describe('finished tasks', () => {
   });
 });
 
+describe('failed commands', () => {
+  it("shows a failed command's error on the task's row until the next action", async () => {
+    // 409 illegal-transition has no docs/api example, so error.json stands in.
+    server.use(
+      http.post('/api/tasks/:id/pause', () => HttpResponse.json(errorFixture, { status: 409 })),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' }));
+    await waitFor(() =>
+      expect(within(lecture).getByText('Task 42 does not exist')).toBeInTheDocument(),
+    );
+
+    // The next action clears the error; the failed attempt changed nothing (the task is
+    // still RUNNING, so its cancel asks for confirmation).
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' }));
+    await screen.findByRole('dialog');
+    expect(within(lecture).queryByText('Task 42 does not exist')).not.toBeInTheDocument();
+  });
+});
+
 describe('upload errors', () => {
   it("keeps each error on its file's row: unsupported format, invalid input, and a duplicate with a link", async () => {
     // The three files that reach the server answer differently; the rejected file (a.txt)

@@ -1,6 +1,6 @@
 # 14 — Frontend queue UI
 
-Status: in-progress
+Status: in-review
 Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
 
 ## Goal
@@ -60,7 +60,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A rejected reorder restores the server order and shows the error message
 - [x] The queue pause switch calls pause/resume and reflects the queue state
 - [x] When a task finishes, a notice with a link to its transcript (or to History) appears and the row leaves the queue
-- [ ] A failed command shows its error on the task's row
+- [x] A failed command shows its error on the task's row
 
 ## Acceptance criteria
 - RTL interaction tests for each control pass against MSW handlers.
@@ -99,3 +99,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-10 (workspace, cycle 14): `Test: a rejected reorder restores the server order and shows the error message`. Red: `Unable to find an element with the text: Task 42 does not exist`. Green: the `reorderMachine` already reverted to `previousOrder` on rejection; the view now renders the machine's `context.error` as a danger notice under the queue list, and a queue sync (SYNC) clears it. The test overrides `PUT /api/queue/order` with a 409 (`error.json` stands in for `reorder-mismatch`, as the contract has no example), moves memo.wav to the top, and asserts the PUT was attempted, the rows fell back to `[5, 7]`, and the message is visible. 3 files / 79 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
 - 2026-10-10 (workspace, cycle 15): `Test: the queue pause switch calls pause/resume and reflects the queue state`. Red: `Unable to find an accessible element with the role "switch" and name "Pause the queue"`. Green: client `setQueuePaused(paused)` (POST /api/queue/pause|resume -> 200 Queue); `queuePauseMachine` (features/queue) runs the POST (idle → sending, disabled while sending), the returned queue in context is applied to the connection state by the view (`queue-updated`, idempotent with the server's own event); the design system's `Switch` ("Pause the queue") renders above the queue list, checked from the live `paused` flag. The test clicks the switch, asserts the pause endpoint and checked state, then resumes back. 4 files / 80 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
 - 2026-10-10 (workspace, cycle 16): `Test: when a task finishes, a notice with a link to its transcript (or to History) appears and the row leaves the queue`. Red: `Unable to find role="link" and name "open"`. Green: `finishNoticeMachine` (features/queue) holds the most recent five notices; `QueueView` diffs each task's status against a ref of the previous statuses (seeded by the snapshot, so the already-finished tasks do not notice) and sends NOTICE when a pending task turns COMPLETED/FAILED/CANCELED; the notices render under the heading as "… transcribed — open" (`/history/:id`) or "… failed/canceled — see History" (`/history`); the row leaves through the existing pending filter. The test drives COMPLETED, then a fresh task RUNNING → FAILED, then another QUEUED → CANCELED (transitions all inside the table), and asserts the notice links and that no rows remain. 3 files / 81 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
+- 2026-10-10 (workspace, cycle 17): `Test: a failed command shows its error on the task's row`. Red: `Unable to find an element with the text: Task 42 does not exist`. The green also surfaced a real bug found by the test's second half: the row action machine stopped in `failed` and ignored further ACTIVATE events, so the next action (and the error's clearing) never happened. Green: `TaskRow` renders the machine's `context.error` as a danger line under the row's header while `ready.failed`; the machine was restructured — `idle` and `failed` are children of a `ready` parent that owns ACTIVATE (confirming/running on demand, clearing `error`), `DISMISS` returns to `ready` — so the next action works from either state. The test presses pause (409), asserts the message on the row, then presses cancel and asserts the dialog opens with the error gone. 3 files / 82 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
