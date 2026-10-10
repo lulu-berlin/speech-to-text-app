@@ -163,6 +163,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Audio download returns one FLAC (`audio/flac`) joining the task's stored chunks in order; a task without stored chunks returns 404, and its `hasAudio` is false (true once chunks are stored) (hasAudio added 2026-10-09)
 - [ ] A Range request for the audio returns 206 with the requested bytes of the joined FLAC
 - [ ] An SSE client first receives a `snapshot`, then `task-updated`, `task-progress`, `queue-updated` and `task-deleted` events as the engine emits them
+- [ ] (added 2026-10-10, user decision at the first checkpoint) An SSE client that falls behind the engine's event buffer is disconnected instead of silently missing events, and on reconnecting it receives a fresh `snapshot`
 - [ ] Every response and event payload has the structure of its `docs/api/` example
 
 ## Acceptance criteria
@@ -187,3 +188,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: item 14 consultation: the upload `language` defaults to `auto` (whisper-cli's own default is `en`, and so is the oracle's `-l`), and the accepted codes are the contract file `docs/api/languages.json`, extracted from whisper.cpp 1.9.2's C API (procedure in `docs/api/README.md`), shared by the upload form and this item's validation.
 - 2026-10-09: contract changed in the item 15 consultation: Task gains `hasAudio` (boolean, computed from the stored chunk audio), so the History views hide the player for tasks without audio instead of failing on `404`; every Task example in `docs/api/` updated in the same commit.
 - 2026-10-09: item 10 consultation: the json transcript download is dropped ([ADR 0035](../docs/decisions/0035-no-json-download.md)), so `format` accepts `txt|srt|vtt`; [ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md) makes the speaker names the labels in the downloads (this item's `/turns` already returns them).
+- 2026-10-10 (workspace, first checkpoint): item 11's event flow is `MutableSharedFlow(extraBufferCapacity = 64, DROP_OLDEST)`, so a connected SSE subscriber slower than the engine would silently miss events (the snapshot covers only reconnects). The user chose to disconnect a subscriber that falls behind, so EventSource reconnects and gets a fresh `snapshot`; a test-list item was added for it. The overflow detection is designed in its cycle.
