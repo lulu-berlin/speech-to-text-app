@@ -71,11 +71,27 @@ export interface ThemeTokens {
     pulseDuration: string;
     pulseEasing: string;
   };
+  // The type scale: sizes ascend, weights are the font's 400/500/600, line heights are
+  // unitless (WCAG 1.4.12 asks for at least 1.5; the transcript reads more loosely).
   fontSizes: {
+    small: string;
+    body: string;
     title: string;
   };
   fontWeights: {
+    regular: number;
+    medium: number;
     semibold: number;
+  };
+  lineHeights: {
+    body: number;
+    reading: number;
+  };
+  // Viewport widths for media queries, in rem.
+  breakpoints: {
+    sm: string;
+    md: string;
+    lg: string;
   };
   iconSizes: {
     sm: string;
@@ -119,10 +135,23 @@ const baseTokens = {
     pill: '62.5rem',
   },
   fontSizes: {
+    small: '0.875rem',
+    body: '1rem',
     title: '1.5rem',
   },
   fontWeights: {
+    regular: 400,
+    medium: 500,
     semibold: 600,
+  },
+  lineHeights: {
+    body: 1.5,
+    reading: 1.7,
+  },
+  breakpoints: {
+    sm: '40rem',
+    md: '48rem',
+    lg: '64rem',
   },
   iconSizes: {
     sm: '1rem',

@@ -26,12 +26,16 @@ const GlobalStyle = createGlobalStyle`
     background: ${(props) => props.theme.colors.background};
     color: ${(props) => props.theme.colors.text};
     font-family: ${(props) => props.theme.fontFamilies.sans};
+    font-size: ${(props) => props.theme.fontSizes.body};
+    line-height: ${(props) => props.theme.lineHeights.body};
   }
 `;
 
 const Shell = styled.div`
   min-height: ${(props) => props.theme.sizes.viewportMinHeight};
   font-family: ${(props) => props.theme.fontFamilies.sans};
+  font-size: ${(props) => props.theme.fontSizes.body};
+  line-height: ${(props) => props.theme.lineHeights.body};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 `;
