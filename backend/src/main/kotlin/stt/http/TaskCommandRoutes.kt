@@ -21,22 +21,35 @@ fun Application.taskCommandRoutes() {
     val tasks: TaskRepository by dependencies
     routing {
         post("/api/tasks/{id}/pause") {
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respondTaskCommand(TaskCommandOutcome.Unknown, tasks)
+            val id = call.taskIdOrNotFound() ?: return@post
             call.respondTaskCommand(engine.pauseTask(id), tasks)
         }
         post("/api/tasks/{id}/resume") {
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respondTaskCommand(TaskCommandOutcome.Unknown, tasks)
+            val id = call.taskIdOrNotFound() ?: return@post
             call.respondTaskCommand(engine.resumeTask(id), tasks)
         }
         post("/api/tasks/{id}/cancel") {
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respondTaskCommand(TaskCommandOutcome.Unknown, tasks)
+            val id = call.taskIdOrNotFound() ?: return@post
             call.respondTaskCommand(engine.cancelTask(id), tasks)
         }
         post("/api/tasks/{id}/retry") {
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respondTaskCommand(TaskCommandOutcome.Unknown, tasks)
+            val id = call.taskIdOrNotFound() ?: return@post
             call.respondTaskCommand(engine.retryTask(id), tasks)
         }
     }
+}
+
+/** The route's `{id}` as a Long, or — when it is missing or not a number — a `404 not-found` response and null. */
+private suspend fun RoutingCall.taskIdOrNotFound(): Long? {
+    val id = parameters["id"]?.toLongOrNull()
+    if (id == null) {
+        respondError(
+            HttpStatusCode.NotFound,
+            "not-found",
+            "Task ${parameters["id"]} does not exist",
+        )
+    }
+    return id
 }
 
 private suspend fun RoutingCall.respondTaskCommand(
