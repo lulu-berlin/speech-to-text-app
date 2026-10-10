@@ -2,6 +2,7 @@ package stt.diarization
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import stt.pause.PauseGate
 
 /**
  * The item 09 `O(n³)` implementation of [upgmaMerges] and [clusterSegments], kept in test sources as the reference for
