@@ -197,7 +197,7 @@ class SpeakerRoutesSpec :
             `when`("speakers 0 and 1 are merged into speaker 0") {
                 then("the survivor answers for both: /turns shows one turn across the former boundary; no segment row changes") {
                     val dataDir = tempdir("stt-data").toPath()
-                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 2))
+                    val id = seedSpeakers0102(dataDir)
 
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }
@@ -258,12 +258,11 @@ class SpeakerRoutesSpec :
             `when`("its transcript is downloaded as txt, srt and vtt") {
                 then("every folded segment carries the survivor's name, in one turn across the former boundary") {
                     val dataDir = tempdir("stt-data").toPath()
-                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 2))
+                    val id = seedSpeakers0102(dataDir)
 
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }
-                        client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
-                        client.merge(id, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+                        client.nameAliceAndMerge1Into0(id)
 
                         // Derived by hand from item 10's formats (as TranscriptDownloadSpec's goldens) for the turns
                         // Alice 0–3 000 ms (Hello., Hi., Hey.) and Speaker 3 3 000–4 000 ms (Bye.).
@@ -289,6 +288,16 @@ class SpeakerRoutesSpec :
             }
         }
     })
+
+/** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */
+private suspend fun seedSpeakers0102(dataDir: Path): Long =
+    seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 2))
+
+/** Cycle 8's merge on [seedSpeakers0102]'s task: speaker 0 named `Alice`, then `{0, 1}` merged into 0. */
+private suspend fun HttpClient.nameAliceAndMerge1Into0(id: Long) {
+    rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
+    merge(id, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+}
 
 /** Two segments of a task, one per speaker once `storeSpeakers(listOf(0, 1))` has run. */
 private val twoSegments =
