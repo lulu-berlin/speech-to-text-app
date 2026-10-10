@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
 import type { ThemeTokens } from '../theme/theme';
+import { focusWithinRing } from './focusRing';
 
 export type ListRowVariant = 'row' | 'card';
 
@@ -29,10 +30,7 @@ const ListRowBase = styled.li<{ $variant: ListRowVariant }>`
 
   // The row itself is not focusable; the ring appears when the control inside it is
   // focused by keyboard.
-  &:focus-within {
-    box-shadow: 0 0 0 ${(props) => props.theme.borderWidths.ring}
-      ${(props) => props.theme.colors.focusRing};
-  }
+  ${focusWithinRing}
 `;
 
 export interface ListRowProps {
