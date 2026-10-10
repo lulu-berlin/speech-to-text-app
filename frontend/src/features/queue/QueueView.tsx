@@ -85,8 +85,7 @@ const DropZone = styled.button<{ $over: boolean }>`
     ${(props) => (props.$over ? 'solid' : 'dashed')}
     ${(props) => (props.$over ? props.theme.colors.accent : props.theme.colors.border)};
   border-radius: ${(props) => props.theme.radii.card};
-  background: ${(props) =>
-    props.$over ? props.theme.colors.status.active.background : props.theme.colors.surface};
+  background: ${(props) => (props.$over ? props.theme.colors.accentTint : props.theme.colors.surface)};
   color: ${(props) => props.theme.colors.textMuted};
   font: inherit;
   cursor: pointer;

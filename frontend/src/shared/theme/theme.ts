@@ -16,6 +16,9 @@ export interface ThemeTokens {
     border: string;
     accent: string;
     accentText: string;
+    // A light wash of the accent behind muted text (the drop zone while files are over
+    // it, item 25); the same value as the active status background.
+    accentTint: string;
     focusRing: string;
     danger: string;
     // The dimming layer under dialogs and menus (an alpha value; theme.ts may hold it).
@@ -242,6 +245,7 @@ export const lightTheme: ThemeTokens = {
     border: '#d7d7d7',
     accent: '#0057a8',
     accentText: '#ffffff',
+    accentTint: '#e3eefa',
     focusRing: '#0057a8',
     danger: '#b42318',
     overlay: 'rgba(16, 24, 40, 0.4)',
@@ -308,6 +312,7 @@ export const darkTheme: ThemeTokens = {
     border: '#3a3f47',
     accent: '#7fb2e5',
     accentText: '#14161a',
+    accentTint: '#1a2a3c',
     focusRing: '#7fb2e5',
     danger: '#f28b82',
     overlay: 'rgba(0, 0, 0, 0.5)',

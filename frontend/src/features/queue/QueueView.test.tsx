@@ -404,7 +404,7 @@ describe('the drop zone while dragging', () => {
     const over = getComputedStyle(zone);
     expect(over.borderTopStyle).toBe('solid');
     expect(over.borderTopColor).toBe(asRgb(lightTheme.colors.accent));
-    expect(over.backgroundColor).toBe(asRgb(lightTheme.colors.status.active.background));
+    expect(over.backgroundColor).toBe(asRgb(lightTheme.colors.accentTint));
 
     // Moving over the mascot (a child) and back off it does not end the drag-over state.
     fireEvent.dragEnter(mascot, { dataTransfer: { types: ['Files'], files: [] } });
