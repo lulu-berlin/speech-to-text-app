@@ -1,6 +1,6 @@
 # 24 — Design system: tokens and primitives
 
-Status: in-review
+Status: in-progress
 Depends on: [13](../docs/specs/frontend-foundation.md) (done)
 
 ## Goal
@@ -67,7 +67,7 @@ None.
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] Every primitive renders its documented variants and states using token values only (no literal colors or sizes); split by component (user, 2026-10-09), each sub-item asserts the computed styles against the token values:
+- [x] Every primitive renders its documented variants and states using token values only (no literal colors or sizes); split by component (user, 2026-10-09), each sub-item asserts the computed styles against the token values:
   - [x] `Button`: primary, secondary and danger; disabled; loading
   - [x] `IconButton`
   - [x] `Card`/`Surface`
@@ -89,6 +89,9 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] (discovered, confirmed 2026-10-09) A convention check fails on any literal color (hex, `rgb()`, `hsl()`) or length (`px`, `rem`, `em`, `vh`) in `src/` outside the tokens (`src/shared/theme/`) and the tests, and on raw `px` everywhere, the token modules included (user, 2026-10-09)
 - [x] (discovered, confirmed 2026-10-09) The body text uses IBM Plex Sans with the system stack as fallback (the font's shipping and loading are verified as acceptance work: the woff2 in `dist/assets`, `document.fonts` in Chromium)
 - [x] (added 2026-10-09, item 15) The speaker palette provides one tint per speaker index, wraps around, and meets AA in both themes
+- [ ] (discovered, review 2026-10-09) The tokens provide a type scale: `fontSizes` (at least `small`, `body`, `title`, in ascending order), `fontWeights` (`regular`, `medium`, `semibold` = the font's 400/500/600), `lineHeights` (`body` and a `reading` height for the transcript), plus `breakpoints`
+- [ ] (discovered, review 2026-10-09) Non-text contrast (WCAG 1.4.11, ≥ 3:1) holds in both themes for the `Switch` track and thumb when unchecked and for the `Slider` thumb against its surroundings (measured in `contrast.test.ts`)
+- [ ] (discovered, review 2026-10-09) The `DropdownMenu` item's keyboard indicator is visible: either a highlight measured at ≥ 3:1 or the shared focus ring
 
 ## Acceptance criteria
 
@@ -132,3 +135,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: the user confirmed in Chromium that `document.fonts.load('16px "IBM Plex Sans"')` resolves to the loaded self-hosted face (and to `[]` for an undeclared family), so the typeface acceptance (shipped in `dist/assets`, loaded in the browser) is met.
 - 2026-10-09: the user confirmed in the browser that the header theme toggle cycles system → light → dark → system, repaints the page and keeps the choice across a reload.
 - 2026-10-09: the browser check of the dialog's Tab-key focus cycle (Tab/Shift+Tab stay inside and wrap, Escape cancels) is carried over to item 14 at the user's request, because no `ConfirmDialog` is rendered in the app before item 14's cancel and delete; added there as an acceptance criterion. `flake.nix` reformat (alejandra style, from the user's editor) committed on its own at the user's request.
+- 2026-10-09: review by the root agent: not merge-ready; status back to `in-progress`. Three discovered test-list items added — the type scale and breakpoints listed in the Proposal but absent; non-text contrast (WCAG 1.4.11) for the unchecked `Switch` track and thumb and the `Slider` thumb (measured by the reviewer at 1.44 / 1.44 / 1.00–1.44 light and 1.71 / 1.41 / 1.21–1.71 dark); the `DropdownMenu` item's keyboard indicator (`outline: none` plus a `surface`-on-`surfaceRaised` fill, 1.07 light, 1.12 dark). The parent checkbox of the per-component item is ticked (all ten sub-items were done). A doc change to `docs/conventions/frontend.md` (rem-only lengths and the `conventions.test.ts` check) is due, committed only after the user approves it.
