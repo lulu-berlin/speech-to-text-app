@@ -10,14 +10,18 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.path
 import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
+import stt.audio.AudioJoiner
+import stt.audio.FfmpegAudioJoiner
 import stt.config.Config
 import stt.db.AudioRepository
+import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.engine.processingEngine
+import stt.process.ProcessRunner
 import java.io.File
 
 /**
@@ -36,6 +40,9 @@ fun Application.sttApp(config: Config) {
         provide<AudioRepository> { AudioRepository(resolve()) }
         provide<QueueStateRepository> { QueueStateRepository(resolve()) }
         provide<SegmentRepository> { SegmentRepository(resolve()) }
+        provide<ChunkRepository> { ChunkRepository(resolve()) }
+        provide<JoinedAudioCache> { JoinedAudioCache(resolve()) }
+        provide<AudioJoiner> { FfmpegAudioJoiner(resolve(), resolve(), resolve()) }
         require(DependencyKey<Database>())
     }
     processingEngine(config)
@@ -44,6 +51,7 @@ fun Application.sttApp(config: Config) {
     taskCommandRoutes()
     queueRoutes()
     transcriptRoutes()
+    audioRoutes()
     uploadRoutes(config)
     val staticDir = config.staticDir
     routing {
