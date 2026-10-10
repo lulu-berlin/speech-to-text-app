@@ -6,6 +6,7 @@ import { getTurns } from '../../shared/api/client';
 import type { Segment, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
+import { Button } from '../../shared/ui/Button';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
@@ -60,6 +61,11 @@ const Segment = styled.button<{ $active: boolean }>`
   font: inherit;
   cursor: pointer;
   ${focusRing}
+`;
+
+const TranscriptRegion = styled.div`
+  max-height: 60vh;
+  overflow-y: auto;
 `;
 
 export function TaskTranscriptView() {
@@ -130,6 +136,41 @@ export function TaskTranscriptView() {
   );
   const activeSegment = segmentAtTime(segmentsInOrder, currentTimeMs);
 
+  // Follow mode (item 10): while the playhead moves and the user has not scrolled by hand,
+  // the active segment is kept in view. A hand scroll stops following; "Back to playing
+  // position" resumes it.
+  const [following, setFollowing] = useState(true);
+  const transcriptRegionRef = useRef<HTMLDivElement>(null);
+  // True right after we scroll the active segment ourselves, so the scroll event that
+  // programmatic follow fires is not mistaken for the user's hand (cleared on the next
+  // macrotask, by which a hand scroll would arrive separately).
+  const holdOffFollowScrollRef = useRef(false);
+
+  useEffect(() => {
+    if (!following || activeSegment === null) {
+      return;
+    }
+    // The active segment is where the highlight is; scroll it into the reader's sight.
+    const active = transcriptRegionRef.current?.querySelector('[data-active]');
+    if (active === null || active === undefined) {
+      return;
+    }
+    holdOffFollowScrollRef.current = true;
+    active.scrollIntoView({ block: 'nearest' });
+    setTimeout(() => {
+      holdOffFollowScrollRef.current = false;
+    }, 0);
+  }, [following, activeSegment]);
+
+  // A scroll while the playhead is not moving is the user scrolling by hand. Our own
+  // programmatic follow scroll is held off, so it does not unwind following.
+  const handleScroll = () => {
+    if (holdOffFollowScrollRef.current) {
+      return;
+    }
+    setFollowing(false);
+  };
+
   if (task === undefined) {
     return (
       <Page>
@@ -171,35 +212,47 @@ export function TaskTranscriptView() {
         {turnsBySpeaker === null ? (
           <Text>Loading…</Text>
         ) : (
-          <Stack gap="md">
-            {turnsBySpeaker.map(({ turn, speaker }, index) => (
-              <Stack key={index} gap="xs">
-                <TurnText>
-                  <Timestamp>
-                    {formatTime(turn.startMs)} – {formatTime(turn.endMs)}
-                  </Timestamp>{' '}
-                  {speaker !== undefined ? (
-                    <SpeakerName $color={speakerTint(tints, speaker.speakerId)}>
-                      {speaker.speaker}
-                    </SpeakerName>
-                  ) : null}{' '}
-                  {turn.segments.map((segment) => (
-                    <span key={`${segment.startMs}-${segment.endMs}`}>
-                      <Segment
-                        $active={segment === activeSegment}
-                        data-active={segment === activeSegment || undefined}
-                        onClick={() => seekTo(segment.startMs)}
-                      >
-                        {segment.text}
-                      </Segment>{' '}
-                    </span>
-                  ))}
-                </TurnText>
-              </Stack>
-            ))}
-          </Stack>
+          <TranscriptRegion
+            ref={transcriptRegionRef}
+            role="region"
+            aria-label="Transcript"
+            onScroll={handleScroll}
+          >
+            <Stack gap="md">
+              {turnsBySpeaker.map(({ turn, speaker }, index) => (
+                <Stack key={index} gap="xs">
+                  <TurnText>
+                    <Timestamp>
+                      {formatTime(turn.startMs)} – {formatTime(turn.endMs)}
+                    </Timestamp>{' '}
+                    {speaker !== undefined ? (
+                      <SpeakerName $color={speakerTint(tints, speaker.speakerId)}>
+                        {speaker.speaker}
+                      </SpeakerName>
+                    ) : null}{' '}
+                    {turn.segments.map((segment) => (
+                      <span key={`${segment.startMs}-${segment.endMs}`}>
+                        <Segment
+                          $active={segment === activeSegment}
+                          data-active={segment === activeSegment || undefined}
+                          onClick={() => seekTo(segment.startMs)}
+                        >
+                          {segment.text}
+                        </Segment>{' '}
+                      </span>
+                    ))}
+                  </TurnText>
+                </Stack>
+              ))}
+            </Stack>
+          </TranscriptRegion>
         )}
       </Stack>
+      {!following ? (
+        <Button type="button" onClick={() => setFollowing(true)}>
+          Back to playing position
+        </Button>
+      ) : null}
     </Page>
   );
 }

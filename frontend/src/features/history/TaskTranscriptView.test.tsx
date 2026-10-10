@@ -121,6 +121,42 @@ describe('the transcript view', () => {
       'Thanks for joining us today.',
     );
   });
+
+  it('keeps the highlighted segment in view while playing, stops on a hand scroll, and resumes', async () => {
+    // jsdom has no scrollIntoView; the component calls it, so stub it on the prototype.
+    Element.prototype.scrollIntoView = vi.fn();
+    const scrollIntoView = vi.spyOn(
+      Element.prototype as never,
+      'scrollIntoView',
+    ) as unknown as ReturnType<typeof vi.fn>;
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const region = screen.getByRole('region', { name: /transcript/i });
+
+    // While playing, the active segment is scrolled into view (follow mode).
+    audio.currentTime = 1.0;
+    fireEvent(audio, new Event('timeupdate'));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    // A hand scroll stops following: a "Back to playing position" button appears. (The
+    // programmatic follow-scroll's hold-off clears on a macrotask, so the test waits a tick
+    // for a hand scroll to arrive on its own, as it would in a browser.)
+    const { promise: tick, resolve: resolveTick } = Promise.withResolvers<void>();
+    setTimeout(resolveTick, 0);
+    await tick;
+    fireEvent.scroll(region);
+    expect(screen.getByRole('button', { name: /back to playing position/i })).toBeInTheDocument();
+
+    // While stopped, playback no longer scrolls.
+    scrollIntoView.mockClear();
+    audio.currentTime = 6.0;
+    fireEvent(audio, new Event('timeupdate'));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    // "Back to playing position" resumes following and scrolls to the current segment.
+    fireEvent.click(screen.getByRole('button', { name: /back to playing position/i }));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
 });
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
