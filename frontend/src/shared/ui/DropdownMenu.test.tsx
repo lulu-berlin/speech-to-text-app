@@ -1,6 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { asRgb } from '../../test/dom';
+import { asRgb, styleRules } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { lightTheme } from '../theme/theme';
 import { Button } from './Button';
@@ -63,5 +63,32 @@ describe('the dropdown menu', () => {
       asRgb(lightTheme.colors.danger),
     );
     styled.unmount();
+  });
+
+  it('shows the shared focus ring on a keyboard-selected item', async () => {
+    const { unmount } = renderThemed(
+      <DropdownMenu
+        trigger={<Button variant="secondary">Actions</Button>}
+        items={[{ label: 'Pause' }, { label: 'Resume' }]}
+      />,
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Actions' }), { button: 0 });
+    const menu = await screen.findByRole('menu');
+
+    // ArrowDown moves the Radix roving focus to the first item.
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    const item = screen.getByRole('menuitem', { name: 'Pause' });
+    expect(item).toHaveFocus();
+    const itemClass = item.getAttribute('class') ?? '';
+
+    // The item's own :focus-visible rule carries the shared focus ring token.
+    const scope = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
+    const focusRule = scope.find(
+      (rule) =>
+        rule.selectorText.includes(':focus-visible') &&
+        itemClass.split(' ').some((part) => rule.selectorText.includes(part)),
+    );
+    expect(focusRule?.style.boxShadow).toContain(lightTheme.colors.focusRing);
+    unmount();
   });
 });
