@@ -35,6 +35,41 @@ export interface ThemeTokens {
     // speaker's name is shown in it (item 15). Chosen for contrast, AA in both themes.
     speakerTints: readonly string[];
   };
+  // The stenographer illustration (item 17): one entry per color of the artwork, all 32
+  // collapses to 30 (skin and browns); the component renders every shape from these so the
+  // mascot follows the theme. Decorative, so no contrast requirement is measured.
+  illustration: {
+    backdropFrom: string;
+    backdropTo: string;
+    desk: string;
+    deskDeep: string;
+    deskRim: string;
+    chairBack: string;
+    chairSeat: string;
+    machineTop: string;
+    machineFrom: string;
+    machineTo: string;
+    machineMetal: string;
+    machineMetalSoft: string;
+    machineAccent: string;
+    key: string;
+    keyFlash: string;
+    ink: string;
+    inkSoft: string;
+    skin: string;
+    skinShade: string;
+    skinHighlight: string;
+    accentPurple: string;
+    accentPurpleSoft: string;
+    accentPink: string;
+    accentYellow: string;
+    accentTeal: string;
+    accentTealDeep: string;
+    accentBlue: string;
+    lampGlow: string;
+    lampHot: string;
+    cheek: string;
+  };
   // Lengths are rem so they follow the reader's font size (no raw px outside the tokens;
   // even here there is none — see src/conventions.test.ts).
   spacing: {
@@ -56,6 +91,10 @@ export interface ThemeTokens {
     switchHeight: string;
     switchThumb: string;
     sliderThumb: string;
+    // The stenographer animation's sizes (item 17): the header instance and the
+    // empty-state instance (32-40 px and 120-160 px respectively at 16 px roots).
+    stenoHeader: string;
+    stenoEmpty: string;
   };
   radii: {
     dialog: string;
@@ -130,6 +169,8 @@ const baseTokens = {
     switchHeight: '1.5rem',
     switchThumb: '1.25rem',
     sliderThumb: '1.25rem',
+    stenoHeader: '2.25rem',
+    stenoEmpty: '8.75rem',
   },
   radii: {
     dialog: '0.5rem',
@@ -202,6 +243,38 @@ export const lightTheme: ThemeTokens = {
     },
     speakerTints: lightSpeakerTints,
   },
+  illustration: {
+    backdropFrom: '#FFF6E9',
+    backdropTo: '#FFDDE8',
+    desk: '#C98B5E',
+    deskDeep: '#A86E45',
+    deskRim: '#DDA477',
+    chairBack: '#E17055',
+    chairSeat: '#F0846A',
+    machineTop: '#5A6B85',
+    machineFrom: '#4A5A75',
+    machineTo: '#323F55',
+    machineMetal: '#9AA9B4',
+    machineMetalSoft: '#B2BEC3',
+    machineAccent: '#55EFC4',
+    key: '#F5F6FA',
+    keyFlash: '#C9D3DC',
+    ink: '#2D1B3D',
+    inkSoft: '#4A3560',
+    skin: '#E8A87C',
+    skinShade: '#CC8962',
+    skinHighlight: '#F7D6C0',
+    accentPurple: '#6C5CE7',
+    accentPurpleSoft: '#A29BFE',
+    accentPink: '#E84393',
+    accentYellow: '#FDCB6E',
+    accentTeal: '#00B894',
+    accentTealDeep: '#00A383',
+    accentBlue: '#0984E3',
+    lampGlow: '#FFEAA7',
+    lampHot: '#FFF6D6',
+    cheek: '#FF7675',
+  },
   shadows: {
     card: '0 0.0625rem 0.125rem rgba(16, 24, 40, 0.08)',
   },
@@ -235,6 +308,41 @@ export const darkTheme: ThemeTokens = {
       gone: { background: '#22252a', text: '#9aa2ad' },
     },
     speakerTints: darkSpeakerTints,
+  },
+  illustration: {
+    // The backdrop follows the surface family so the piece sits in dark mode (item 17).
+    backdropFrom: '#23272e',
+    backdropTo: '#1b1e23',
+    desk: '#8a5a38',
+    deskDeep: '#6e4526',
+    deskRim: '#9c6c42',
+    chairBack: '#b0503f',
+    chairSeat: '#cd6b54',
+    machineTop: '#45536c',
+    machineFrom: '#3b4860',
+    machineTo: '#2e3950',
+    machineMetal: '#798690',
+    machineMetalSoft: '#8b98a2',
+    machineAccent: '#3fd9b0',
+    key: '#d9dee6',
+    keyFlash: '#97a3b0',
+    // The ink sits on the dark backdrop, so the hair lifts instead of merging with it.
+    ink: '#45355f',
+    inkSoft: '#6a5790',
+    skin: '#f0b48c',
+    skinShade: '#cf8a5e',
+    skinHighlight: '#ffdcc6',
+    accentPurple: '#8f7fed',
+    accentPurpleSoft: '#b3a9ff',
+    accentPink: '#f0579f',
+    accentYellow: '#ffd485',
+    accentTeal: '#26c99c',
+    accentTealDeep: '#1fb58c',
+    accentBlue: '#3f9df5',
+    // The lamp's warm light stays warm in both themes.
+    lampGlow: '#FFEAA7',
+    lampHot: '#FFF6D6',
+    cheek: '#ff8a87',
   },
   shadows: {
     card: '0 0.0625rem 0.25rem rgba(0, 0, 0, 0.4)',

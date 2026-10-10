@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { render } from '@testing-library/react';
+import { ThemeProvider } from 'styled-components';
 import { required, styleRules } from '../../test/dom';
 import { renderThemed } from '../../test/render';
+import { lightTheme } from '../theme/theme';
 import { StenographerAnimation } from './StenographerAnimation';
 
 describe('the stenographer animation', () => {
@@ -31,5 +34,25 @@ describe('the stenographer animation', () => {
     for (const element of outside) {
       expect(getComputedStyle(element).opacity).not.toBe('0');
     }
+  });
+
+  it('takes its colors from the illustration tokens: changing a token changes the rendered color', () => {
+    const theme = {
+      ...lightTheme,
+      illustration: { ...lightTheme.illustration, accentTeal: '#123456', backdropFrom: '#abcdef' },
+    };
+    const { container } = render(
+      <ThemeProvider theme={theme}>
+        <StenographerAnimation />
+      </ThemeProvider>,
+    );
+
+    // A shape that carries accentTeal (the torso) renders the changed value.
+    const torso = [...container.querySelectorAll('[fill="#123456"]')];
+    expect(torso.length).toBeGreaterThan(0);
+
+    // The backdrop gradient's first stop renders the changed value.
+    const backdrop = required(container.querySelector('stop'));
+    expect(backdrop.getAttribute('stop-color')).toBe('#abcdef');
   });
 });
