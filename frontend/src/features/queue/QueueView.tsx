@@ -101,6 +101,7 @@ export function QueueView() {
         <Stack gap="md">
           <Field label="Language" htmlFor="language">
             <SearchableSelect
+              id="language"
               label="Language"
               options={LANGUAGE_OPTIONS}
               value={language}
