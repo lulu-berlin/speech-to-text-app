@@ -4,7 +4,7 @@ import { HistoryView } from '../features/history/HistoryView';
 import { TaskTranscriptView } from '../features/history/TaskTranscriptView';
 import { QueueView } from '../features/queue/QueueView';
 import plexSansUrl from '../shared/theme/fonts/ibm-plex-sans-latin-wght-normal.woff2?url';
-import { themeFor } from '../shared/theme/theme';
+import { resolveTheme, useThemeMode } from '../shared/theme/themeMode';
 import { usePrefersDark } from '../shared/theme/usePrefersDark';
 import { AppHeader } from './AppHeader';
 import { ConnectionContext } from './ConnectionContext';
@@ -42,13 +42,14 @@ const Main = styled.main`
 `;
 
 export function App() {
-  const theme = themeFor(usePrefersDark());
+  const [themeMode, cycleMode] = useThemeMode();
+  const theme = resolveTheme(themeMode, usePrefersDark());
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
       <ConnectionContext.Provider>
         <Shell>
-          <AppHeader />
+          <AppHeader themeMode={themeMode} onCycleThemeMode={cycleMode} />
           <Main>
             <Routes>
               <Route path="/" element={<Navigate to="/queue" replace />} />

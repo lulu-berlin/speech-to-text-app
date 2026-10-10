@@ -1,9 +1,13 @@
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { NavLink } from 'react-router';
 import styled from 'styled-components';
+import type { ThemeMode } from '../shared/theme/themeMode';
+import { IconButton } from '../shared/ui/IconButton';
+import { Tooltip } from '../shared/ui/Tooltip';
 import { ConnectionContext } from './ConnectionContext';
 
-// The product name, navigation between the views, and the live connection indicator.
-// Item 17 adds the stenographer animation here.
+// The product name, navigation between the views, the live connection indicator and the
+// theme control. Item 17 adds the stenographer animation here.
 const Header = styled.header`
   display: flex;
   align-items: baseline;
@@ -38,13 +42,31 @@ const Indicator = styled.span`
   color: ${(props) => props.theme.colors.text};
 `;
 
+// The mode icon and the control's accessible name (also the tooltip text).
+const THEME_ICON = {
+  auto: Monitor,
+  light: Sun,
+  dark: Moon,
+} as const;
+
+const THEME_LABEL = {
+  auto: 'Theme: system',
+  light: 'Theme: light',
+  dark: 'Theme: dark',
+} as const;
+
 const CONNECTION_LABEL = {
   connecting: 'Connecting',
   live: 'Live',
   reconnecting: 'Reconnecting',
 } as const;
 
-export function AppHeader() {
+export interface AppHeaderProps {
+  themeMode: ThemeMode;
+  onCycleThemeMode: () => void;
+}
+
+export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
   const connection = ConnectionContext.useSelector((state) => state.value);
   return (
     <Header>
@@ -54,6 +76,13 @@ export function AppHeader() {
         <NavItem to="/history">History</NavItem>
       </Nav>
       <Indicator>{CONNECTION_LABEL[connection]}</Indicator>
+      <Tooltip label={THEME_LABEL[themeMode]}>
+        <IconButton
+          icon={THEME_ICON[themeMode]}
+          label={THEME_LABEL[themeMode]}
+          onClick={onCycleThemeMode}
+        />
+      </Tooltip>
     </Header>
   );
 }

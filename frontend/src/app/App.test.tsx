@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { asRgb } from '../test/dom';
@@ -91,5 +91,52 @@ describe('the app root', () => {
     // The self-hosted font comes first; the system stack is the fallback.
     expect(lightTheme.fontFamilies.sans).toMatch(/^"IBM Plex Sans", system-ui, /);
     expect(lightTheme.fontFamilies.sans.endsWith('sans-serif')).toBe(true);
+  });
+
+  it('cycles the theme control through auto, light and dark, storing the choice', () => {
+    localStorage.clear();
+    const listeners: (() => void)[] = [];
+    const media = {
+      matches: false,
+      media: '(prefers-color-scheme: dark)',
+      addEventListener: vi.fn((_event: string, listener: () => void) => listeners.push(listener)),
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => media),
+    );
+    const { unmount } = renderAt('/queue');
+    const background = () => getComputedStyle(screen.getByRole('main')).backgroundColor;
+
+    // No stored choice: the OS decides (light).
+    expect(background()).toBe(asRgb(lightTheme.colors.background));
+
+    // auto → light: stored, and it overrides the OS.
+    fireEvent.click(screen.getByRole('button', { name: 'Theme: system' }));
+    expect(localStorage.getItem('stt-theme-mode')).toBe('light');
+    act(() => {
+      media.matches = true;
+      listeners.forEach((listener) => listener());
+    });
+    expect(background()).toBe(asRgb(lightTheme.colors.background));
+
+    // light → dark: stored and applied.
+    fireEvent.click(screen.getByRole('button', { name: 'Theme: light' }));
+    expect(localStorage.getItem('stt-theme-mode')).toBe('dark');
+    expect(background()).toBe(asRgb(darkTheme.colors.background));
+
+    // dark → auto: the stored choice is cleared and the OS rules again.
+    fireEvent.click(screen.getByRole('button', { name: 'Theme: dark' }));
+    expect(localStorage.getItem('stt-theme-mode')).toBeNull();
+    expect(background()).toBe(asRgb(darkTheme.colors.background));
+    act(() => {
+      media.matches = false;
+      listeners.forEach((listener) => listener());
+    });
+    expect(background()).toBe(asRgb(lightTheme.colors.background));
+
+    unmount();
+    vi.unstubAllGlobals();
   });
 });
