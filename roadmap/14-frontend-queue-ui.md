@@ -55,7 +55,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Pressing resume on a paused task calls the resume endpoint
 - [x] Cancel asks for confirmation for a running or started paused task and not for a queued one; confirming calls the cancel endpoint
 - [x] Delete always asks for confirmation; confirming calls the delete endpoint and the task leaves the list
-- [ ] Controls for disallowed transitions are not offered (e.g. no resume on a queued task)
+- [x] Controls for disallowed transitions are not offered (e.g. no resume on a queued task)
 - [ ] Dragging a task, or using the row menu's move actions, sends the full ordered id list to `PUT /api/queue/order`
 - [ ] A rejected reorder restores the server order and shows the error message
 - [ ] The queue pause switch calls pause/resume and reflects the queue state
@@ -94,3 +94,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
   - `comboboxMachine` (shared/state): closed/open with query and active index in context; SearchableSelect keeps the option list as props; replaces its three `useState`s.
   - `toggleMachine` (shared/state): the advanced options panel toggle.
   - Remaining `useState` in the queue feature: only the four controlled-input values (language, speakers, speakerCount, maxSpeakers), as the ruling exempts them.
+- 2026-10-10 (workspace, cycle 12): `Test: controls for disallowed transitions are not offered (e.g. no resume on a queued task)`. **Green on the first run — no red to report**: the `isAllowedCommand` gating (docs/api/task-transitions.json) was already built by cycles 8–11, so the test locks in the invariant (same precedent as the design system's focus-ring cycle): RUNNING and QUEUED rows offer pause and cancel but no resume; a PAUSED row (via `task-updated`) offers resume and cancel but no pause. 1 file / 77 tests, `tsc --noEmit`, `vite build`, prettier `--check` clean.
