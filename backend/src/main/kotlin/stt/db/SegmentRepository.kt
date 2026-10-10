@@ -4,6 +4,7 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
@@ -168,7 +169,13 @@ class SegmentRepository(
             members.firstOrNull { it in merged }?.let {
                 return@writeTransaction MergeOutcome.Invalid("speaker $it is already merged into another speaker")
             }
-            SpeakerMergeTable.batchInsert(members.filter { it != into }, shouldReturnGeneratedValues = false) { member ->
+            val folded = members.filter { it != into }
+            // A folded member may itself be the survivor of an earlier merge: its merged speakers follow it into
+            // [into], so the mapping stays flat (user decision 2026-10-10) and one lookup still resolves a speaker.
+            SpeakerMergeTable.update({ (SpeakerMergeTable.taskId eq taskId) and (SpeakerMergeTable.intoId inList folded) }) {
+                it[intoId] = into
+            }
+            SpeakerMergeTable.batchInsert(folded, shouldReturnGeneratedValues = false) { member ->
                 this[SpeakerMergeTable.taskId] = taskId
                 this[SpeakerMergeTable.mergedId] = member
                 this[SpeakerMergeTable.intoId] = into
