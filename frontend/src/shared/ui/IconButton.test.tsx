@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { Moon } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
-import { asRgb, px, required } from '../../test/dom';
+import { asRgb, px, required, styleRules } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { lightTheme } from '../theme/theme';
 import { IconButton } from './IconButton';
@@ -24,9 +24,7 @@ describe('the icon button', () => {
     expect(getComputedStyle(off).color).toBe(asRgb(lightTheme.colors.textMuted));
 
     // The state declarations carry the secondary button tokens and the focus ring.
-    const rules = [...document.styleSheets]
-      .flatMap((sheet) => [...sheet.cssRules])
-      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
+    const rules = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
     expect(
       rules.some(
         (rule) =>

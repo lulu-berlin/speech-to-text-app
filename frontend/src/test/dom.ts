@@ -9,6 +9,13 @@ export function required(element: Element | null | undefined): Element {
   return element;
 }
 
+// The CSS rules styled-components injected into the document. jsdom can neither apply
+// pseudo-classes (`:hover`, `:focus-visible`) nor evaluate media queries, so state
+// declarations are asserted at this level.
+export function styleRules(): CSSRule[] {
+  return [...document.styleSheets].flatMap((sheet) => [...sheet.cssRules]);
+}
+
 // jsdom reports colours as rgb(), so a token is converted the same way.
 export function asRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);

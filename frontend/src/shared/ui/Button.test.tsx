@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { asRgb } from '../../test/dom';
+import { asRgb, styleRules } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { AA_TEXT, contrast } from '../../test/wcag';
 import { darkTheme, lightTheme } from '../theme/theme';
@@ -76,9 +76,7 @@ describe('the button', () => {
 
     // The hover, active and focus-visible declarations carry the state tokens: jsdom cannot
     // apply pseudo-classes, so the emitted rules are read instead.
-    const rules = [...document.styleSheets]
-      .flatMap((sheet) => [...sheet.cssRules])
-      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
+    const rules = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
     const hasHover = (color: string) =>
       rules.some(
         (rule) => rule.selectorText.includes(':hover') && rule.style.backgroundColor === color,
