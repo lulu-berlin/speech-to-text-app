@@ -10,3 +10,11 @@ export const PageHeading = styled.h2`
 export const Text = styled.p`
   color: ${(props) => props.theme.colors.text};
 `;
+
+// A secondary line under a title (a task's date and duration, a card's error): small and
+// muted, without the paragraph margin.
+export const MetaText = styled(Text)`
+  margin: 0;
+  color: ${(props) => props.theme.colors.textMuted};
+  font-size: ${(props) => props.theme.fontSizes.small};
+`;
