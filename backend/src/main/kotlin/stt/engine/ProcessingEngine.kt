@@ -91,8 +91,9 @@ class ProcessingEngine internal constructor(
     private val pauseGate = PauseGate()
 
     /**
-     * The started task the worker is waiting to resume (item 19): set while it is paused, cleared when it
-     * is picked again, so the resumed task wins over any task queued ahead of it.
+     * The started task the worker is waiting to resume: a started PAUSED task blocks the worker, so this is
+     * set while it is paused and cleared when it is picked again, letting the resumed task win over any
+     * task queued ahead of it.
      */
     private var waitingOn: Long? = null
 
@@ -191,7 +192,8 @@ class ProcessingEngine internal constructor(
                 publish(id)
             } else {
                 // A pause across a restart: there is no runner. The worker, which is waiting for this
-                // task (item 19), picks it up directly and moves it to RUNNING itself, as for any task.
+                // task because a started PAUSED task blocks the queue, picks it up directly and moves it
+                // to RUNNING itself, as for any task.
                 wake()
             }
             processControl.resume()
@@ -276,7 +278,7 @@ class ProcessingEngine internal constructor(
 
     /**
      * The task to run next. Nothing while the queue is paused; and while a started task is paused, nothing
-     * else either (item 19: the paused one is the only task that may resume, so the worker waits for it
+     * else either (a started PAUSED task is the only task that may resume, so the worker waits for it
      * instead of competing with it). Otherwise the QUEUED task with the lowest `queue_position` — or the
      * just-resumed task first, even when another task is waiting ahead of it in the queue.
      */
