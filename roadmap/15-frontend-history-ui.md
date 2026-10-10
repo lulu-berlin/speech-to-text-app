@@ -50,7 +50,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Opening a completed task shows its speaker turns with timestamps and each speaker's name with its own tint
 - [x] A speakers-off transcript is shown without speaker labels
 - [x] Each download button links to the transcript in its format
-- [ ] The audio player points at the task's audio endpoint; with `hasAudio` false no player is rendered and a note explains why
+- [x] The audio player points at the task's audio endpoint; with `hasAudio` false no player is rendered and a note explains why
 - [ ] While the audio plays, the segment containing the current time is highlighted; in a gap between segments none is; seeking moves the highlight
 - [ ] Clicking a segment seeks the player to its start and plays
 - [ ] While playing, the highlighted segment is kept in view; scrolling by hand stops following and "Back to playing position" resumes it
