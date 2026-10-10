@@ -12,6 +12,7 @@
     "format": "prettier --write . ../.prettierrc"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "1.1.23",
     "@xstate/react": "6.1.0",
     "lucide-react": "1.48.0",
     "react": "^19.3.0",

@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
+import { Button } from './Button';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -11,7 +12,17 @@ export interface ConfirmDialogProps {
   children: ReactNode;
 }
 
-const Dialog = styled.dialog`
+const Overlay = styled(Dialog.Overlay)`
+  position: fixed;
+  inset: 0;
+  background: ${(props) => props.theme.colors.overlay};
+`;
+
+const Panel = styled(Dialog.Content)`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   padding: ${(props) => props.theme.spacing.lg};
   border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
   border-radius: ${(props) => props.theme.radii.dialog};
@@ -19,12 +30,12 @@ const Dialog = styled.dialog`
   color: ${(props) => props.theme.colors.text};
 `;
 
-const Title = styled.h2`
+const Title = styled(Dialog.Title)`
   margin: 0 0 ${(props) => props.theme.spacing.md};
   font-size: ${(props) => props.theme.fontSizes.title};
 `;
 
-const Body = styled.p`
+const Body = styled(Dialog.Description)`
   margin: 0 0 ${(props) => props.theme.spacing.lg};
 `;
 
@@ -34,22 +45,10 @@ const Actions = styled.div`
   gap: ${(props) => props.theme.spacing.sm};
 `;
 
-const Button = styled.button`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
-  border-radius: ${(props) => props.theme.radii.button};
-  background: ${(props) => props.theme.colors.background};
-  color: ${(props) => props.theme.colors.text};
-  cursor: pointer;
-`;
-
-const ConfirmButton = styled(Button)`
-  border-color: ${(props) => props.theme.colors.accent};
-  color: ${(props) => props.theme.colors.accent};
-`;
-
-// A native <dialog>: confirm runs the action, cancel and Escape do not. Escape closes the
-// dialog with an empty returnValue, so only "confirm" runs the action.
+// The confirmation dialog, on Radix's dialog so focus is trapped and restored (ADR 0033).
+// Only the confirm button runs the action; Escape and Cancel call onCancel, and the parent
+// closes the dialog through the controlled `open` prop (a confirm close is a plain button
+// click, so it never routes through onOpenChange).
 export function ConfirmDialog({
   open,
   title,
@@ -58,38 +57,28 @@ export function ConfirmDialog({
   onCancel,
   children,
 }: ConfirmDialogProps) {
-  const ref = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (dialog === null) {
-      return;
-    }
-    if (open && !dialog.open) {
-      dialog.showModal();
-    }
-    if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
-
   return (
-    <Dialog
-      ref={ref}
-      onClose={(event) =>
-        event.currentTarget.returnValue === 'confirm' ? onConfirm() : onCancel()
-      }
+    <Dialog.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onCancel();
+        }
+      }}
     >
-      <Title>{title}</Title>
-      <Body>{children}</Body>
-      <Actions>
-        <Button type="button" onClick={() => ref.current?.close('cancel')}>
-          Cancel
-        </Button>
-        <ConfirmButton type="button" onClick={() => ref.current?.close('confirm')}>
-          {confirmLabel}
-        </ConfirmButton>
-      </Actions>
-    </Dialog>
+      <Dialog.Portal>
+        <Overlay />
+        <Panel>
+          <Title>{title}</Title>
+          <Body>{children}</Body>
+          <Actions>
+            <Button variant="secondary" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button onClick={onConfirm}>{confirmLabel}</Button>
+          </Actions>
+        </Panel>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
