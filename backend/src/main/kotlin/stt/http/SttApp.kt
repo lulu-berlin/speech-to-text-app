@@ -52,6 +52,7 @@ fun Application.sttApp(config: Config) {
     queueRoutes()
     transcriptRoutes()
     audioRoutes()
+    eventsRoutes()
     uploadRoutes(config)
     val staticDir = config.staticDir
     routing {
