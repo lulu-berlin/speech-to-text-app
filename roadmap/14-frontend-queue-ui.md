@@ -49,7 +49,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Each uploading file shows its upload progress
 - [x] An upload error stays on that file's row: unsupported format, invalid input, and a duplicate with a link to the existing task (queue row if pending, transcript if finished)
 - [x] A new task appears in the queue list after upload
-- [ ] A `task-progress` event updates that task's two progress bars; the diarization bar shows its stage and is hidden when diarization does not apply
+- [x] A `task-progress` event updates that task's two progress bars; the diarization bar shows its stage and is hidden when diarization does not apply
 - [ ] A `task-updated` event updates that task's status and phase
 - [ ] Pressing pause on a running task calls the pause endpoint and shows it as paused
 - [ ] Pressing resume on a paused task calls the resume endpoint
