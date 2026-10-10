@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { getTurns } from '../../shared/api/client';
@@ -10,6 +10,7 @@ import { Button } from '../../shared/ui/Button';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
+import { useTaskCommand } from './useTaskCommand';
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -85,6 +86,8 @@ const TranscriptRegion = styled.div`
 export function TaskTranscriptView() {
   const { taskId } = useParams();
   const id = Number(taskId);
+  const navigate = useNavigate();
+  const runCommand = useTaskCommand();
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const connection = ConnectionContext.useSelector((state) => state.value);
   const task = tasks.find((candidate) => candidate.id === id);
@@ -238,7 +241,16 @@ export function TaskTranscriptView() {
           {task.error !== null ? <Text>Error: {task.error}</Text> : null}
           {audioBlock}
           <Row gap="sm">
-            <Button type="button">Retry</Button>
+            <Button
+              type="button"
+              onClick={() =>
+                runCommand('retry', task, () => {
+                  navigate('/queue');
+                })
+              }
+            >
+              Retry
+            </Button>
             <Button type="button" variant="danger">
               Delete
             </Button>
