@@ -37,14 +37,22 @@ internal class SseServer(
     fun command(
         method: String,
         path: String,
-    ): Int {
-        val request =
+    ): Int = send(HttpRequest.newBuilder(URI("$base$path")).method(method, HttpRequest.BodyPublishers.noBody()))
+
+    /** One REST command with a JSON [body]; its status, e.g. `command("PUT", "/api/tasks/1/speakers/0", """{…}""")`. */
+    fun command(
+        method: String,
+        path: String,
+        body: String,
+    ): Int =
+        send(
             HttpRequest
                 .newBuilder(URI("$base$path"))
-                .method(method, HttpRequest.BodyPublishers.noBody())
-                .build()
-        return http.send(request, HttpResponse.BodyHandlers.discarding()).statusCode()
-    }
+                .header("Content-Type", "application/json")
+                .method(method, HttpRequest.BodyPublishers.ofString(body)),
+        )
+
+    private fun send(request: HttpRequest.Builder): Int = http.send(request.build(), HttpResponse.BodyHandlers.discarding()).statusCode()
 
     /** Opens the events stream; the returned reader is closed with the server. */
     fun connectEvents(): SseTestReader {

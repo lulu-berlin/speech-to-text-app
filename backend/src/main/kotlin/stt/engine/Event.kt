@@ -1,6 +1,7 @@
 package stt.engine
 
 import stt.db.DiarizationStage
+import stt.db.Speaker
 import stt.db.StoredTask
 
 /**
@@ -38,5 +39,11 @@ sealed interface Event {
     data class QueueUpdated(
         val paused: Boolean,
         val taskIds: List<Long>,
+    ) : Event
+
+    /** A speaker of the task was renamed or had its name reset; item 22's `speakers-renamed` event. */
+    data class SpeakersRenamed(
+        val id: Long,
+        val speakers: List<Speaker>,
     ) : Event
 }

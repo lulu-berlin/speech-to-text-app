@@ -107,6 +107,7 @@ private suspend fun Event.sseName(): String =
         is Event.TaskProgress -> "task-progress"
         is Event.TaskDeleted -> "task-deleted"
         is Event.QueueUpdated -> "queue-updated"
+        is Event.SpeakersRenamed -> "speakers-renamed"
     }
 
 /** The event's `data:` JSON; the update event re-reads the task so its derived fields are current. */
@@ -129,11 +130,22 @@ private suspend fun Event.sseData(tasks: TaskRepository): String =
         is Event.QueueUpdated -> {
             SseJson.encodeToString(QueueJson(paused, taskIds))
         }
+
+        is Event.SpeakersRenamed -> {
+            SseJson.encodeToString(SpeakersEventJson(id, speakers.map { SpeakerJson(it.speakerId, it.speaker) }))
+        }
     }
 
 @Serializable
 private data class DeletedJson(
     val id: Long,
+)
+
+/** The payload of `speakers-renamed` (item 22, `docs/api/speakers-renamed.json`): the task and its speakers. */
+@Serializable
+data class SpeakersEventJson(
+    val id: Long,
+    val speakers: List<SpeakerJson>,
 )
 
 /** One SSE frame; [data] is a single line (kotlinx serialization writes no newlines). */

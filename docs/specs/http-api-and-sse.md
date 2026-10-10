@@ -111,6 +111,7 @@ The JSON shapes the frontend builds against.
   - `task-progress` → `{ "id", "transcriptionProgress", "diarizationStage", "diarizationProgress" }`
   - `queue-updated` → Queue
   - `task-deleted` → `{ "id" }`
+  - `speakers-renamed` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored rename or name reset, the task's speakers as stored; a rejected rename emits nothing
 - **Error codes:**
 
   | Status | Codes |

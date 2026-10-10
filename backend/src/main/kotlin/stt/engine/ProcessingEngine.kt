@@ -27,6 +27,7 @@ import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.DiarizationStage
 import stt.db.QueueStateRepository
+import stt.db.RenameOutcome
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.StoredTask
@@ -221,6 +222,21 @@ class ProcessingEngine internal constructor(
         queueUpdated()
         wake()
         return TaskCommandOutcome.Accepted
+    }
+
+    /**
+     * Renames speaker [speakerId] of task [id] to [name] (item 22) and, only once the row is stored, publishes
+     * the task's speakers as read back from the database, so the event never shows a name that was not
+     * stored. A refused rename ([RenameOutcome.DuplicateName]) stores and publishes nothing.
+     */
+    suspend fun renameSpeaker(
+        id: Long,
+        speakerId: Int,
+        name: String,
+    ): RenameOutcome {
+        val outcome = segments.renameSpeaker(id, speakerId, name)
+        if (outcome == RenameOutcome.Renamed) _events.emit(Event.SpeakersRenamed(id, segments.findSpeakers(id)))
+        return outcome
     }
 
     /**
