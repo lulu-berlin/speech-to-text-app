@@ -86,6 +86,7 @@ export function TaskTranscriptView() {
   const { taskId } = useParams();
   const id = Number(taskId);
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
+  const connection = ConnectionContext.useSelector((state) => state.value);
   const task = tasks.find((candidate) => candidate.id === id);
   const [turns, setTurns] = useState<Turns | null>(null);
 
@@ -185,11 +186,22 @@ export function TaskTranscriptView() {
     setFollowing(false);
   };
 
+  // Until the first snapshot lands, "no such task" just means the store has not loaded yet;
+  // only once the connection is live is an absent id a missing task (deleted or never made).
   if (task === undefined) {
     return (
       <Page>
-        <Title>Transcript</Title>
-        <Text>Loading…</Text>
+        {connection === 'live' ? (
+          <Stack gap="md">
+            <Title>Task not found</Title>
+            <Text>The task does not exist or was deleted.</Text>
+          </Stack>
+        ) : (
+          <Stack gap="md">
+            <Title>Transcript</Title>
+            <Text>Loading…</Text>
+          </Stack>
+        )}
       </Page>
     );
   }
