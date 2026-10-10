@@ -10,6 +10,7 @@ import {
 } from '../shared/api/fixtures';
 import { asRgb, px, required, styleRules } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
+import { controllableEventStream } from '../test/eventStream';
 import { server } from '../test/server';
 import { App } from './App';
 
@@ -270,33 +271,6 @@ function elementsWithoutFocusRing(): string[] {
       (element) =>
         `${element.tagName.toLowerCase()} "${element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''}"`,
     );
-}
-
-// A live /api/events stream that opens with snapshot.json and sends what the test pushes.
-function controllableEventStream() {
-  const encoder = new TextEncoder();
-  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
-  const events = {
-    send(name: string, data: unknown) {
-      controller?.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
-    },
-  };
-  server.use(
-    http.get(
-      '/api/events',
-      () =>
-        new HttpResponse(
-          new ReadableStream<Uint8Array>({
-            start(streamController) {
-              controller = streamController;
-              events.send('snapshot', snapshotFixture);
-            },
-          }),
-          { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } },
-        ),
-    ),
-  );
-  return events;
 }
 
 describe('keyboard focus', () => {
