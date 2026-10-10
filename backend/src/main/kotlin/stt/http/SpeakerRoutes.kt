@@ -17,7 +17,8 @@ import stt.db.SegmentRepository
  * (user decision 2026-10-10), so a name with leading or trailing whitespace, an empty one, one longer than
  * [MAX_SPEAKER_NAME] characters, or one with a control character anywhere answers `400 invalid-speaker-name` and
  * changes nothing; a name another speaker of the task already has, in any letter case, answers
- * `409 duplicate-speaker-name`.
+ * `409 duplicate-speaker-name`. `{ "speaker": null }` resets the name to the default `"Speaker N"`
+ * (N = speakerId + 1, item 09's rule), which is checked for duplicates like any other name.
  */
 fun Application.speakerRoutes() {
     val segments: SegmentRepository by dependencies
@@ -25,14 +26,15 @@ fun Application.speakerRoutes() {
         put("/api/tasks/{id}/speakers/{speakerId}") {
             val id = call.parameters["id"]!!.toLong()
             val speakerId = call.parameters["speakerId"]!!.toInt()
-            val name = call.receive<RenameSpeakerRequest>().speaker
-            if (!isValidSpeakerName(name)) {
+            val requested = call.receive<RenameSpeakerRequest>().speaker
+            if (requested != null && !isValidSpeakerName(requested)) {
                 return@put call.respondError(
                     HttpStatusCode.BadRequest,
                     "invalid-speaker-name",
                     "speaker must be 1–$MAX_SPEAKER_NAME characters, without leading or trailing whitespace or control characters",
                 )
             }
+            val name = requested ?: "Speaker ${speakerId + 1}"
             when (val outcome = segments.renameSpeaker(id, speakerId, name)) {
                 RenameOutcome.Renamed -> {
                     call.respond(SpeakersJson(segments.findSpeakers(id).map { SpeakerJson(it.speakerId, it.speaker) }))
@@ -57,10 +59,10 @@ private const val MAX_SPEAKER_NAME = 40
 private fun isValidSpeakerName(name: String): Boolean =
     name.length in 1..MAX_SPEAKER_NAME && name == name.trim() && name.none(Char::isISOControl)
 
-/** The body of `PUT /api/tasks/{id}/speakers/{speakerId}`. */
+/** The body of `PUT /api/tasks/{id}/speakers/{speakerId}`; a null [speaker] resets the name to its default. */
 @Serializable
 private data class RenameSpeakerRequest(
-    val speaker: String,
+    val speaker: String?,
 )
 
 /** The body of the speaker endpoints' `200` (item 22, `docs/api/speakers.json`): the task's speakers by `speakerId`. */

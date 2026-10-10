@@ -102,6 +102,33 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("a COMPLETED task with speakers 0, 1 and 2, speaker 1 renamed to Alice (queue paused)") {
+            `when`("speaker 1's name is reset, and speaker 2's name is reset while speaker 0 is named \"Speaker 3\"") {
+                then("a reset stores \"Speaker N\" (N = speakerId + 1) again; a default name another speaker has answers 409") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), threeSegments, speakerIds = listOf(0, 1, 2))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.rename(id, speakerId = 1, "Alice").status shouldBe HttpStatusCode.OK
+
+                        // `{ "speaker": null }` is the reset: the server writes the default name (item 09's rule).
+                        val reset = client.rename(id, speakerId = 1, null)
+                        reset.status shouldBe HttpStatusCode.OK
+                        Json.parseToJsonElement(reset.bodyAsText()) shouldBe
+                            Json.parseToJsonElement("""{ "speakers": ${speakers("Speaker 1", "Speaker 2", "Speaker 3")} }""")
+                        client.speakersOf(id) shouldBe speakers("Speaker 1", "Speaker 2", "Speaker 3")
+
+                        // The default name is checked like any other: speaker 0 now holds "Speaker 3".
+                        client.rename(id, speakerId = 2, "Carol").status shouldBe HttpStatusCode.OK
+                        client.rename(id, speakerId = 0, "Speaker 3").status shouldBe HttpStatusCode.OK
+                        client.rename(id, speakerId = 2, null).shouldBeError(HttpStatusCode.Conflict, "duplicate-speaker-name")
+                        client.speakersOf(id) shouldBe speakers("Speaker 3", "Speaker 2", "Carol")
+                    }
+                }
+            }
+        }
     })
 
 /** Two segments of a task, one per speaker once `storeSpeakers(listOf(0, 1))` has run. */
@@ -141,11 +168,11 @@ private suspend fun seed(
         id
     }
 
-/** `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": name }`. */
+/** `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": name }`; a null [name] is the reset. */
 private suspend fun HttpClient.rename(
     id: Long,
     speakerId: Int,
-    name: String,
+    name: String?,
 ): HttpResponse =
     put("/api/tasks/$id/speakers/$speakerId") {
         contentType(ContentType.Application.Json)
