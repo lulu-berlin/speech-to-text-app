@@ -338,9 +338,8 @@ describe('the transcript view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     dialog = screen.getByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-    await waitFor(
-      () => expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
-      { timeout: NAVIGATION_TIMEOUT_MS },
+1: @ours
+2: @ours
     );
     expect(deleted).toEqual([4]);
   });
