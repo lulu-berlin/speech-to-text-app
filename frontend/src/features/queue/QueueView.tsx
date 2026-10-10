@@ -6,7 +6,7 @@ import { uploadTask } from '../../shared/api/client';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
-import type { Task } from '../../shared/api/types';
+import type { Task, TaskPhase } from '../../shared/api/types';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
 import { focusRing } from '../../shared/ui/focusRing';
@@ -15,7 +15,7 @@ import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
-import { Page, Stack } from '../../shared/ui/layout';
+import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { isSupportedFormat } from './uploadValidation';
 
@@ -102,6 +102,18 @@ const RowName = styled.span`
 
 const RowStatus = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
+`;
+
+// The phase a task is in, as a text label next to its status (none while queued).
+const PHASE_LABELS: Record<NonNullable<TaskPhase>, string> = {
+  CHUNKING: 'Chunking',
+  TRANSCRIBING: 'Transcribing',
+  DIARIZING: 'Diarizing',
+};
+
+const RowPhase = styled.span`
+  color: ${(props) => props.theme.colors.textMuted};
+  font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
 const RowError = styled.span`
@@ -398,7 +410,10 @@ export function QueueView() {
                 <Stack gap="sm">
                   <RowContent>
                     <RowName>{task.filename}</RowName>
-                    <StatusBadge status={task.status} />
+                    <Row>
+                      {task.phase !== null ? <RowPhase>{PHASE_LABELS[task.phase]}</RowPhase> : null}
+                      <StatusBadge status={task.status} />
+                    </Row>
                   </RowContent>
                   <ProgressBar value={task.transcriptionProgress} label="Transcription" />
                   {task.diarizationProgress !== null ? (

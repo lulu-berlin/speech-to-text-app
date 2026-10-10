@@ -8,6 +8,7 @@ import {
   errorInvalidLanguage,
   queue as queueFixture,
   snapshot as snapshotFixture,
+  taskPaused,
   taskQueued,
 } from '../../shared/api/fixtures';
 import { server } from '../../test/server';
@@ -341,6 +342,27 @@ describe('the queue list', () => {
     expect(
       within(lecture).queryByRole('progressbar', { name: 'Speaker diarization' }),
     ).not.toBeInTheDocument();
+  });
+
+  it("updates a task's status and phase from task-updated events", async () => {
+    const events = controllableEventStream();
+
+    renderQueue();
+
+    // From the snapshot: task 5 is RUNNING while transcribing; task 7 is QUEUED and has
+    // no phase yet, so it shows no phase label.
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    const memo = screen.getByText('memo.wav').closest('li') as HTMLElement;
+    expect(within(lecture).getByText('RUNNING')).toBeInTheDocument();
+    expect(within(lecture).getByText('Transcribing')).toBeInTheDocument();
+    expect(within(memo).getByText('QUEUED')).toBeInTheDocument();
+    expect(within(memo).queryByText(/Chunking|Transcribing|Diarizing/)).not.toBeInTheDocument();
+
+    // task.paused.json is task 7 (memo.wav) paused while transcribing.
+    events.send('task-updated', taskPaused);
+    await waitFor(() => expect(within(memo).getByText('PAUSED')).toBeInTheDocument());
+    expect(within(memo).getByText('Transcribing')).toBeInTheDocument();
   });
 });
 
