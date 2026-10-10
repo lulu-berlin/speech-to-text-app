@@ -147,92 +147,71 @@ function flashFor(illustration: ThemeTokens['illustration']): Keyframes {
   return frames;
 }
 
-const StyledSvg = styled.svg<{ $size: StenographerSize; $typing: boolean }>`
+const StyledSvg = styled.svg<{ $size: StenographerSize }>`
   display: block;
   width: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
   height: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
 
+  // The sound waves exist only at their hidden base; the words are visible by default
+  // (no opacity rule). So the resting and reduced-motion frames are one and the same:
+  // a static pose with the words and no waves.
   & .wave {
     opacity: 0;
-    animation: ${wave} 1.5s ease-out infinite;
-  }
-  & .head {
-    transform-box: view-box;
-    // The artwork's bob pivot (200, 168) of the 400 box, as percentages of the cropped
-    // 293-box (x: 200/293, y: 168/293) so the head still nods around the neck.
-    transform-origin: 68.3% 57.3%;
-    animation: ${bob} 2.6s ease-in-out infinite;
-  }
-  & .eye {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: ${blink} 4s infinite;
-  }
-  & .arm-l {
-    animation: ${drift} 2.8s ease-in-out infinite;
-  }
-  & .arm-r {
-    animation: ${drift} 3.2s ease-in-out infinite;
-  }
-  & .f,
-  & .thumb {
-    transform-box: fill-box;
-    transform-origin: 50% 0;
-    animation: ${press} 0.5s ease-in-out infinite;
   }
   & .keys rect {
     fill: ${(props) => props.theme.illustration.key};
-    // The key flash is theme-dependent, so the keyframes come from a function
-    // interpolation (styled-components requires the css helper to interpolate keyframes
-    // inside one), and each theme animates its own hashed keyframes.
-    animation: ${(props) => css`
-      ${flashFor(props.theme.illustration)} 0.9s steps(1) infinite
-    `};
-  }
-  & .word {
-    opacity: 0;
-    animation: ${rise} 3s ease-out infinite;
-  }
-  & .lamp-glow {
-    animation: ${hum} 3s ease-in-out infinite;
-  }
-  & .spark {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: ${twinkle} 2.2s ease-in-out infinite;
   }
 
-  // Resting (nothing running): the whole piece freezes on the static pose — the typing
-  // stops and the idle motion is off, so the pause reads clearly; the sound waves are
-  // hidden and the finished words stay visible. The freeze needs !important: a plain
-  // .cls * (0,1,0) loses the cascade to the animation rules like .cls .keys rect
-  // (0,2,1), so in a real browser the actions would keep running (found 2026-10-10 while
-  // the user watched a resting mascot that still typed). Same guard as the
-  // reduced-motion fallback below.
-  ${(props) =>
-    props.$typing
-      ? ''
-      : css`
-          & * {
-            animation: none !important;
-          }
-          & .word {
-            opacity: 1;
-          }
-          & .wave {
-            opacity: 0;
-          }
-        `}
-
-  // The artwork's reduced-motion fallback: the same static frame as the resting pose
-  // (words visible, waves hidden), still scoped to this component (the star rule can
-  // never reach the app around it).
-  @media (prefers-reduced-motion: reduce) {
-    & * {
-      animation: none !important;
+  // While a task runs — and only then — the artwork's nine animations play. They are
+  // gated behind the is-typing class and a prefers-reduced-motion: no-preference block,
+  // so resting or a reduced-motion preference leave no animation rule at all: nothing
+  // to override and no cascade fight (no !important). The key flash is theme-dependent,
+  // so its keyframes come from a function interpolation (styled-components requires the
+  // css helper to interpolate keyframes inside one).
+  @media (prefers-reduced-motion: no-preference) {
+    &.is-typing .wave {
+      animation: ${wave} 1.5s ease-out infinite;
     }
-    & .word {
-      opacity: 1;
+    &.is-typing .head {
+      transform-box: view-box;
+      // The artwork's bob pivot (200, 168) of the 400 box, as percentages of the
+      // cropped 293-box (x: 200/293, y: 168/293) so the head still nods around the neck.
+      transform-origin: 68.3% 57.3%;
+      animation: ${bob} 2.6s ease-in-out infinite;
+    }
+    &.is-typing .eye {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: ${blink} 4s infinite;
+    }
+    &.is-typing .arm-l {
+      animation: ${drift} 2.8s ease-in-out infinite;
+    }
+    &.is-typing .arm-r {
+      animation: ${drift} 3.2s ease-in-out infinite;
+    }
+    &.is-typing .f,
+    &.is-typing .thumb {
+      transform-box: fill-box;
+      transform-origin: 50% 0;
+      animation: ${press} 0.5s ease-in-out infinite;
+    }
+    &.is-typing .keys rect {
+      animation: ${(props) => css`
+        ${flashFor(props.theme.illustration)} 0.9s steps(1) infinite
+      `};
+    }
+    &.is-typing .word {
+      opacity: 0;
+      animation: ${rise} 3s ease-out infinite;
+    }
+    &.is-typing .lamp-glow {
+      animation: ${hum} 3s ease-in-out infinite;
+    }
+    &.is-typing .spark {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: ${twinkle} 2.2s ease-in-out infinite;
     }
   }
 `;
@@ -261,7 +240,12 @@ export function StenographerAnimation({
   const uid = useId().replace(/:/g, '');
   const defId = (name: string) => `${uid}-${name}`;
   return (
-    <StyledSvg viewBox="55 61 293 293" $size={size} $typing={typing} aria-hidden="true">
+    <StyledSvg
+      viewBox="55 61 293 293"
+      $size={size}
+      className={typing ? 'is-typing' : undefined}
+      aria-hidden="true"
+    >
       <defs>
         <radialGradient id={defId('bg')} cx="50%" cy="40%" r="60%">
           <stop offset="0%" stopColor={i.backdropFrom} />

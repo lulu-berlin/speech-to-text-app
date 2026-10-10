@@ -1,55 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { styleRules } from '../../test/dom';
+import { allStyleRules, styleRules } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { StenographerAnimation } from './StenographerAnimation';
 
-// The typing state is observable through the wrapper's styles: while a task runs every
-// part animates; resting, the whole piece freezes (no idle motion), with the words
-// visible and the sound waves hidden. styled-components keeps a rendered component's
-// rules in the sheet even after unmount, so this test lives in its own file where the
-// document starts fresh and the resting rules cannot leak in from earlier renders.
-function restingRule(): CSSStyleRule | undefined {
-  return styleRules()
-    .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-    .find(
-      (rule) =>
-        rule.selectorText.endsWith(' *') && rule.cssText.includes('animation: none !important'),
-    );
+// The typing state is a class on the svg: while a task runs the wrapper's animation
+// rules match (`is-typing`); resting, no rule matches, so the piece is static by
+// construction — no overrides to fight the cascade. The animation rules also sit inside
+// a prefers-reduced-motion: no-preference block, so a reduced-motion preference
+// disables them the same way. styled-components keeps a rendered component's rules in
+// the sheet even after unmount, so this test lives in its own file where the document
+// starts fresh.
+function animatedRules(): CSSStyleRule[] {
+  return allStyleRules().filter(
+    (rule): rule is CSSStyleRule =>
+      rule instanceof CSSStyleRule &&
+      rule.style.animation !== '' &&
+      rule.style.animation !== 'none',
+  );
 }
 
 describe('the stenographer typing state', () => {
-  it('types while typing is set and rests otherwise: the gate freezes everything, hides the waves and keeps the words', () => {
+  it('types while typing is set and rests otherwise: the is-typing class gates every animation rule', () => {
     const typed = renderThemed(<StenographerAnimation typing />);
-    // A fresh document: with typing on, no resting rule exists.
-    expect(restingRule()).toBeUndefined();
+    expect(typed.container.querySelector('svg')!.getAttribute('class')).toContain('is-typing');
+    const rules = animatedRules();
+    expect(rules.length).toBeGreaterThanOrEqual(9);
+    // Every animation requires the typing class and the no-preference media block, so
+    // resting and reduced motion have no matching animation at all.
+    for (const rule of rules) {
+      expect(rule.selectorText).toContain('.is-typing');
+    }
+    expect(
+      styleRules().some(
+        (rule): rule is CSSMediaRule =>
+          rule instanceof CSSMediaRule && rule.conditionText.includes('no-preference'),
+      ),
+    ).toBe(true);
     typed.unmount();
 
     const resting = renderThemed(<StenographerAnimation typing={false} />);
-    const rules = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
-    // The resting gate freezes every element and must be `!important`: a plain `.cls *`
-    // (0,1,0) loses the cascade to the animation rules (e.g. `.cls .keys rect`, 0,2,1),
-    // which real browsers obey but jsdom's cascade does not — so the assertion pins the
-    // guard itself, the part that makes the freeze hold everywhere.
-    const rest = restingRule();
-    expect(rest).toBeDefined();
-    expect(rest!.cssText).toContain('animation: none !important');
-    // The words stay visible at rest; the sound waves stay hidden (no rule makes them
-    // visible, and the explicit resting rule keeps them at their hidden base).
+    const svg = resting.container.querySelector('svg')!;
+    expect(svg.getAttribute('class')).not.toContain('is-typing');
+    // The static frame: any rule that hides the words is gated behind is-typing (so the
+    // words are visible at rest), and the waves stay at their hidden base.
+    const cssRules = allStyleRules().filter(
+      (rule): rule is CSSStyleRule => rule instanceof CSSStyleRule,
+    );
+    for (const rule of cssRules) {
+      if (rule.selectorText.includes('.word') && rule.cssText.includes('opacity: 0')) {
+        expect(rule.selectorText).toContain('.is-typing');
+      }
+    }
     expect(
-      rules.some(
-        (rule) => rule.selectorText.endsWith(' .word') && rule.cssText.includes('opacity: 1'),
-      ),
-    ).toBe(true);
-    expect(
-      rules.some(
+      cssRules.some(
         (rule) => rule.selectorText.endsWith(' .wave') && rule.cssText.includes('opacity: 0'),
       ),
     ).toBe(true);
-    expect(
-      rules.some(
-        (rule) => rule.selectorText.includes('.wave') && rule.cssText.includes('opacity: 1'),
-      ),
-    ).toBe(false);
     resting.unmount();
   });
 });

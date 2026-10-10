@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { ThemeProvider } from 'styled-components';
-import { asRgb, required, styleRules } from '../../test/dom';
+import { allStyleRules, asRgb, required, styleRules } from '../../test/dom';
 import { renderThemed } from '../../test/render';
 import { darkTheme, lightTheme } from '../theme/theme';
 import { StenographerAnimation } from './StenographerAnimation';
@@ -20,13 +20,14 @@ describe('the stenographer animation', () => {
     expect(required(container.querySelector('svg'))).toBeDefined();
 
     // The artwork's rules are nested under the component's class: the sheet holds a
-    // scoped `.genclass .word` rule, never a bare `.word` or `.head` selector.
+    // scoped `.genclass .wave` rule, never a bare `.word`, `.head` or `.wave` selector.
     const rules = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
-    const scopedWord = rules.find((rule) => rule.selectorText.endsWith(' .word'));
-    expect(scopedWord).toBeDefined();
-    expect(scopedWord!.cssText).toContain('opacity: 0');
-    expect(rules.some((rule) => rule.selectorText === '.word')).toBe(false);
-    expect(rules.some((rule) => rule.selectorText === '.head')).toBe(false);
+    const scopedWave = rules.find((rule) => rule.selectorText.endsWith(' .wave'));
+    expect(scopedWave).toBeDefined();
+    expect(scopedWave!.cssText).toContain('opacity: 0');
+    for (const bare of ['.word', '.head', '.wave']) {
+      expect(rules.some((rule) => rule.selectorText === bare)).toBe(false);
+    }
 
     // The outside elements carry no style from the component.
     const outside = [...container.querySelectorAll('div')];
@@ -60,18 +61,19 @@ describe('the stenographer animation', () => {
     const { container } = renderThemed(<StenographerAnimation />);
 
     // jsdom cannot run animations, so the wiring is asserted: each scoped rule that
-    // declares an animation references a keyframes rule the wrapper emitted.
+    // declares an animation references a keyframes rule the wrapper emitted. The
+    // animation rules live inside the no-preference media block, hence the nested view.
     const keyframeNames = new Set(
       styleRules()
         .filter((rule): rule is CSSKeyframesRule => rule instanceof CSSKeyframesRule)
         .map((rule) => rule.name),
     );
-    const animatedRules = styleRules()
+    const animatedRules = allStyleRules()
       .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
       .filter(
         (rule) =>
           rule.style.animation !== '' &&
-          // The resting gate and the media fallback freeze parts with `animation: none`;
+          // The resting and reduced-motion states freeze parts with `animation: none`;
           // those rules are not "animated parts".
           rule.style.animation !== 'none',
       );
@@ -97,50 +99,42 @@ describe('the stenographer animation', () => {
     expect(styleOf('.arm-l .f1')).toContain('animation-delay: -0.1s');
   });
 
-  it('shows the static frame under reduced motion: the fallback block is empty of animations and scoped to the component', () => {
-    renderThemed(<StenographerAnimation />);
+  it('shows the static frame under reduced motion: every animation rule sits inside a no-preference block and needs the typing class', () => {
+    renderThemed(<StenographerAnimation typing />);
 
-    // The component class, taken from a scoped rule the wrapper emits.
-    const rules = styleRules().filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
-    const componentClass = rules
-      .find((rule) => rule.selectorText.endsWith(' .word'))!
-      .selectorText.split(' ')[0];
-
-    // jsdom cannot evaluate media queries, so the emitted block is asserted.
-    const media = styleRules().filter(
-      (rule): rule is CSSMediaRule =>
-        rule instanceof CSSMediaRule && rule.conditionText.includes('prefers-reduced-motion'),
+    // jsdom cannot evaluate media queries, so the emitted rules are asserted: the only
+    // rules that declare an animation are the is-typing rules inside the
+    // prefers-reduced-motion: no-preference block — under `reduce` (and at rest) no
+    // rule applies, so nothing animates and no override is needed.
+    const animated = allStyleRules().filter(
+      (rule): rule is CSSStyleRule =>
+        rule instanceof CSSStyleRule &&
+        rule.style.animation !== '' &&
+        rule.style.animation !== 'none',
     );
-    expect(media.length).toBeGreaterThan(0);
-    const mediaRules = media.flatMap((block) => [...block.cssRules]);
-    const selectors = mediaRules
-      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-      .map((rule) => rule.selectorText);
-
-    // Nothing animates, and the `*` is scoped to the component's class.
-    const stop = selectors.find((selector) => selector.endsWith(' *'));
-    expect(stop).toBe(`${componentClass} *`);
+    expect(animated.length).toBeGreaterThanOrEqual(9);
     expect(
-      mediaRules
-        .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-        .find((rule) => rule.selectorText === stop)!.cssText,
-    ).toContain('animation: none !important');
+      styleRules().filter(
+        (rule): rule is CSSStyleRule =>
+          rule instanceof CSSStyleRule &&
+          rule.style.animation !== '' &&
+          rule.style.animation !== 'none',
+      ),
+    ).toEqual([]);
 
-    // The words are visible in the static frame; the waves are not.
-    const visible = mediaRules
-      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-      .find((rule) => rule.selectorText.includes('.word'));
-    expect(visible?.cssText).toContain('opacity: 1');
-    // The static frame matches the resting pose: the sound waves are not made visible.
-    expect(
-      mediaRules
-        .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-        .some((rule) => rule.selectorText.includes('.wave')),
-    ).toBe(false);
-
-    // Every rule of the block stays inside the component.
-    for (const selector of selectors) {
-      expect(selector.startsWith(`${componentClass} `)).toBe(true);
+    const gated = new Set(
+      styleRules()
+        .filter(
+          (rule): rule is CSSMediaRule =>
+            rule instanceof CSSMediaRule && rule.conditionText.includes('no-preference'),
+        )
+        .flatMap((block) =>
+          [...block.cssRules].filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule),
+        ),
+    );
+    for (const rule of animated) {
+      expect(gated.has(rule)).toBe(true);
+      expect(rule.selectorText).toContain('.is-typing');
     }
   });
 
@@ -205,10 +199,10 @@ describe('the stenographer animation', () => {
       const classes = svg.getAttribute('class')!.split(' ');
       const rule = classes
         .flatMap((cls) =>
-          styleRules().filter(
+          allStyleRules().filter(
             (candidate): candidate is CSSStyleRule =>
               candidate instanceof CSSStyleRule &&
-              candidate.selectorText === `.${cls} .keys rect` &&
+              candidate.selectorText === `.${cls}.is-typing .keys rect` &&
               candidate.style.animation !== 'none',
           ),
         )
