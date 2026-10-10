@@ -176,4 +176,34 @@ describe('the history list', () => {
     expect(deleted).toEqual([3]);
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
+
+  it('adds a task to the list when it finishes while the history view is open', async () => {
+    // Mock addition: the snapshot holds only pending tasks, then task-updated events finish
+    // two of them, so a live finish appears in the open list.
+    const pendingSnapshot = {
+      tasks: [
+        { ...taskRunning, id: 6, finishedAt: null },
+        { ...taskQueued, id: 7, finishedAt: null },
+      ],
+      queue: { paused: false, taskIds: [6, 7] },
+    };
+    const completed = { ...taskCompleted, id: 6, finishedAt: 200 };
+    const failed = { ...taskFailed, id: 7, finishedAt: 100 };
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          ['snapshot', pendingSnapshot],
+          ['task-updated', completed],
+          ['task-updated', failed],
+        ]),
+      ),
+    );
+    await renderHistory();
+
+    // task-updated to COMPLETED and FAILED lands in the open list, newest first.
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('interview.mp3');
+    expect(rows[1]).toHaveTextContent('call.ogg');
+  });
 });
