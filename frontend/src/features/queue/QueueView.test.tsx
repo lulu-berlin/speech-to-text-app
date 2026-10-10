@@ -9,7 +9,6 @@ import {
   errorDuplicateAudio,
   errorInvalidLanguage,
   queue as queueFixture,
-  snapshot as snapshotFixture,
   taskCanceled,
   taskCompleted,
   taskFailed,
@@ -17,6 +16,7 @@ import {
   taskQueued,
   taskRunning,
 } from '../../shared/api/fixtures';
+import { controllableEventStream } from '../../test/controllableEventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
@@ -63,38 +63,6 @@ function stubRowLayout() {
   return () => {
     Element.prototype.getBoundingClientRect = original;
   };
-}
-
-// A live /api/events stream for one test: it opens with the snapshot
-// (docs/api/snapshot.json), then sends each event the test pushes, so the test can check
-// one state before the next event arrives.
-function controllableEventStream() {
-  const encoder = new TextEncoder();
-  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
-  const events = {
-    send(name: string, data: unknown) {
-      if (controller === undefined) {
-        throw new Error('the event stream is not connected yet');
-      }
-      controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
-    },
-  };
-  server.use(
-    http.get(
-      '/api/events',
-      () =>
-        new HttpResponse(
-          new ReadableStream<Uint8Array>({
-            start(streamController) {
-              controller = streamController;
-              events.send('snapshot', snapshotFixture);
-            },
-          }),
-          { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } },
-        ),
-    ),
-  );
-  return events;
 }
 
 describe('the queue view upload options', () => {
