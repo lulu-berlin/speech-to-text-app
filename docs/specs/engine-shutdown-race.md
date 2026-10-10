@@ -1,7 +1,7 @@
-# 26 — Engine start/stop race (flaky DatabaseDependencySpec)
+# Engine start/stop race (flaky DatabaseDependencySpec)
 
-Status: in-review
-Depends on: [11](../docs/specs/processing-engine.md) (done)
+Status: done (roadmap item 26, merged 2026-10-10)
+Depends on: [11 — Processing engine](processing-engine.md)
 
 ## Goal
 
@@ -38,7 +38,7 @@ Consequences, all probe-verified:
 
 **Eager engine creation (option A).** `EngineModule.kt` adds `require(DependencyKey<ProcessingEngine>())` inside the `dependencies {}` block, so DI resolves the engine during `ApplicationModulesLoaded` (like `Database`, ADR 0017) and `startApplication()` returns only after the engine exists and its worker launched. DI's cleanup then always finds the engine completed and runs `engineJob.cancelAndJoin()` before the `Database` closes. Cost is engine creation at startup — pure wiring, the CAM++ model loads lazily on first diarization (probe-verified). Rejected: a shutdown hook on an earlier DI resource (couples to registration order); a suspend module (`suspend fun Application.processingEngine()`) resolving inline (same guarantee, but `sttApp`, `Main.kt` and every test `application {}` block go suspend).
 
-Recorded as [ADR 0038](../docs/decisions/0038-engine-created-at-startup.md) in the merge.
+Recorded as [ADR 0039](../decisions/0039-engine-created-at-startup.md) (renumbered from 0038 at the merge, because `main` already owned ADR 0038) in the merge.
 
 ## Test list (written with the user; Canon TDD step 1 — approved 2026-10-10)
 
@@ -59,7 +59,8 @@ Out of scope, noted only:
 ## Open questions
 
 - ~~Which fix (after the diagnosis)?~~ Settled 2026-10-10: eager engine creation (option A), above.
-- Does the sqlite-jdbc drift get its own item? (Open; not part of this item.)
+- Does the sqlite-jdbc drift get its own item? → **Item 27** (drafted 2026-10-10): pin the
+  sqlite-jdbc version so the resolved artifact matches the catalog.
 
 ## Acceptance criteria
 
@@ -71,9 +72,10 @@ Out of scope, noted only:
 ## Approval log
 
 - 2026-10-10: drafted by the root agent from the user's failing `nix build .` log and item 17's agent's analysis. At the user's request, the investigation, the consultation (spec and test list) and the fix are delegated to the workspace `workspaces/26-engine-shutdown-race`. The approval lines are recorded in the worktree's copy and reach `main` with the merge.
-- 2026-10-10: diagnosis proven (probes + Ktor 3.6.0 sources; evidence above); fix decision (eager engine creation, option A) and test list X1–X5 written with the user and approved; status `draft` → `spec-approved`. ADR 0038 accompanies the fix.
+- 2026-10-10: diagnosis proven (probes + Ktor 3.6.0 sources; evidence above); fix decision (eager engine creation, option A) and test list X1–X5 written with the user and approved; status `draft` → `spec-approved`. ADR 0039 accompanies the fix.
 - 2026-10-10: worktree `workspaces/26-engine-shutdown-race` started (branch `roadmap/26-engine-shutdown-race`); status → `in-progress`. Canon TDD begins at X1.
-- 2026-10-10: X1 cycle — Test commit `fdee4bf` (deterministic red: engine worker escapes with `SQLException: database connection closed`), Fix commit `87f7160` (+ ADR 0038; engine created at startup via DI `require`). `gradle check` green. Note: the fully gated reproduction cannot run unchanged post-fix (gating the engine's creation would block startup); the permanent `EngineShutdownRaceSpec` asserts the fix's invariant and the red was demonstrated pre-fix. X1 ticked.
+- 2026-10-10: X1 cycle — Test commit `fdee4bf` (deterministic red: engine worker escapes with `SQLException: database connection closed`), Fix commit `87f7160` (+ ADR 0039; engine created at startup via DI `require`). `gradle check` green. Note: the fully gated reproduction cannot run unchanged post-fix (gating the engine's creation would block startup); the permanent `EngineShutdownRaceSpec` asserts the fix's invariant and the red was demonstrated pre-fix. X1 ticked.
 - 2026-10-10: X2 cycle — `EngineShutdownNormalStopSpec` (stop joins a live worker before `Database.close()`) in commit `14983e6`. X3/X4 pass unchanged; X5 green: `gradle check --rerun-tasks` and `gradle integrationTest --rerun-tasks` (real processes via the devenv fixtures). All list items ticked. Acceptance on the user's side: `nix build .` and the diff review.
 - 2026-10-10: full clean `gradle check --rerun-tasks` — 188 unit tests, 0 failures; `gradle integrationTest --rerun-tasks` green; new specs stable across repeat runs. Status → `in-review`.
 - 2026-10-10 (post-review hardening): added `verifyCleanStop` and applied it to every `testApplication` spec (no-escape + `Database`-closed assertions, commits `524c654`, `b06a143`); `EngineShutdownRaceSpec` rewritten to state the DI mid-creation teardown invariant. `gradle check --rerun-tasks` (188 tests) and `gradle integrationTest --rerun-tasks` green after the change.
+- 2026-10-10: merged into `main` (head `bca2641`) after the user approved the diff and `nix build .` passed. The branch's ADR was renumbered 0038 → 0039 at the merge because `main` already owned ADR 0038 (frontend state machines, 2026-10-10). The sqlite-jdbc drift follow-up moved to roadmap item 27. Spec and final test list moved here from `roadmap/26-engine-shutdown-race.md`.
