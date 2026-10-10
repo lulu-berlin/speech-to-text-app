@@ -16,6 +16,15 @@ export function styleRules(): CSSRule[] {
   return [...document.styleSheets].flatMap((sheet) => [...sheet.cssRules]);
 }
 
+// The rules including those nested inside @media blocks: the stenographer's animation
+// rules live under `prefers-reduced-motion: no-preference`, so its tests need the
+// nested view.
+export function allStyleRules(): CSSRule[] {
+  return styleRules().flatMap((rule) =>
+    rule instanceof CSSMediaRule ? [...rule.cssRules] : [rule],
+  );
+}
+
 // jsdom reports colours as rgb(), so a token is converted the same way.
 export function asRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
