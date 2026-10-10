@@ -31,6 +31,11 @@ const RowPhase = styled.span`
   font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
+// The inline error of a failed action (item 17), cleared by the next action.
+const RowActionError = styled.span`
+  color: ${(props) => props.theme.colors.danger};
+`;
+
 // The per-task command controls, in display order. A control is offered only when
 // docs/api/task-transitions.json allows its command for the task's status.
 const CONTROLS: {
@@ -156,6 +161,13 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
             />
           </Row>
         </RowContent>
+        {action.matches({ ready: 'failed' }) ? (
+          <RowActionError>
+            {action.context.error instanceof Error
+              ? action.context.error.message
+              : String(action.context.error)}
+          </RowActionError>
+        ) : null}
         <ProgressBar value={task.transcriptionProgress} label="Transcription" />
         {task.diarizationProgress !== null ? (
           <DiarizationProgressBar
