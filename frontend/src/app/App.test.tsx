@@ -8,7 +8,7 @@ import {
   snapshot as snapshotFixture,
   taskCompleted,
 } from '../shared/api/fixtures';
-import { asRgb, px, required, stateRulesFor } from '../test/dom';
+import { asRgb, mediaRulesFor, px, required, stateRulesFor } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { controllableEventStream } from '../test/eventStream';
 import { server } from '../test/server';
@@ -330,4 +330,43 @@ describe('keyboard focus', () => {
     // The walk renders six views in turn, so it gets an explicit budget beyond vitest's
     // 5 s default for a loaded host (item 25, user's call).
   }, 15_000);
+});
+
+describe('the phone layout', () => {
+  it('keeps every view within a phone width: the header wraps onto two lines, row controls wrap, and long filenames break', async () => {
+    const phone = `(max-width: ${lightTheme.breakpoints.sm})`;
+
+    // The header: below the small breakpoint it wraps, and the navigation, connection
+    // indicator and theme control take a line of their own under the mascot and title.
+    // jsdom cannot evaluate media queries, so the emitted rules are asserted.
+    const queue = renderAt('/queue');
+    await screen.findByText('Live');
+    const header = required(screen.getByRole('banner')) as HTMLElement;
+    expect(mediaRulesFor(header, phone).map((rule) => rule.style.flexWrap)).toContain('wrap');
+    const controls = required(screen.getByRole('navigation').parentElement) as HTMLElement;
+    expect(controls).not.toBe(header);
+    expect(controls).toContainElement(screen.getByText('Live'));
+    expect(controls).toContainElement(screen.getByRole('button', { name: /^Theme:/ }));
+    expect(mediaRulesFor(controls, phone).map((rule) => rule.style.flexBasis)).toContain('100%');
+
+    // A queue row: its controls line wraps, and the filename can shrink and break.
+    const badge = screen.getByText('RUNNING');
+    expect(getComputedStyle(required(badge.parentElement)).flexWrap).toBe('wrap');
+    const rowName = screen.getByText('lecture.m4a');
+    expect(getComputedStyle(rowName).overflowWrap).toBe('anywhere');
+    expect(getComputedStyle(rowName).minWidth).toBe('0px');
+    queue.unmount();
+
+    // A History card's title link breaks and can shrink beside the badge.
+    const history = renderAt('/history');
+    const cardLink = await screen.findByRole('link', { name: 'interview.mp3' });
+    expect(getComputedStyle(cardLink).overflowWrap).toBe('anywhere');
+    expect(getComputedStyle(cardLink).minWidth).toBe('0px');
+    history.unmount();
+
+    // The transcript's heading (the filename) breaks too.
+    renderAt('/history/3');
+    const heading = await screen.findByRole('heading', { level: 2, name: 'interview.mp3' });
+    expect(getComputedStyle(heading).overflowWrap).toBe('anywhere');
+  });
 });

@@ -24,7 +24,10 @@ const Filename = styled.span`
   font-weight: ${(props) => props.theme.fontWeights.medium};
 `;
 
+// The card's title link: it can shrink beside the badge and breaks anywhere (item 25).
 const TaskLink = styled(Link)`
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: inherit;
   text-decoration: none;
 
