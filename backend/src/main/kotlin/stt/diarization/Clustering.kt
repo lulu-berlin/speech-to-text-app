@@ -129,34 +129,33 @@ internal suspend fun upgmaMerges(
         return 1.0 - dot
     }
 
+    /** The nearest active cluster of [x] and its distance: the first minimum over the active list, so the chain
+     *  is deterministic for a given input. */
+    fun nearestOf(x: Int): Pair<Int, Double> {
+        var nn = -1
+        var best = Double.POSITIVE_INFINITY
+        for (y in active) {
+            if (y == x) continue
+            val dist = distance(x, y)
+            if (nn < 0 || dist < best) {
+                nn = y
+                best = dist
+            }
+        }
+        return nn to best
+    }
+
     val merges = ArrayList<Merge>(maxOf(n - 1, 0))
     val chain = ArrayList<Int>()
     while (active.size > 1) {
         if (chain.isEmpty()) chain.add(active[0])
         val c = chain.last()
-        var nn = -1
-        var best = Double.POSITIVE_INFINITY
-        for (x in active) { // first minimum over the active list, so the chain is deterministic for a given input
-            if (x == c) continue
-            val dist = distance(c, x)
-            if (nn < 0 || dist < best) {
-                nn = x
-                best = dist
-            }
-        }
+        val (nn, best) = nearestOf(c)
         if (chain.size >= 2 && chain[chain.size - 2] == nn) {
             val p = chain.last()
             val q = chain[chain.size - 2]
-            var back = -1
-            var backBest = Double.POSITIVE_INFINITY
-            for (x in active) { // a merge needs mutual nearest neighbors (the global closest pair is always mutual)
-                if (x == q) continue
-                val dist = distance(q, x)
-                if (back < 0 || dist < backBest) {
-                    back = x
-                    backBest = dist
-                }
-            }
+            // A merge needs mutual nearest neighbors (the global closest pair is always mutual);restart otherwise.
+            val (back, _) = nearestOf(q)
             if (back != p) {
                 chain.clear()
                 continue
