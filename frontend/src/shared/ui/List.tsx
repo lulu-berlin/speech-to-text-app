@@ -13,9 +13,12 @@ const ListBase = styled.ul`
 `;
 
 export interface ListProps {
+  // The accessible name of the list; the queue view has two lists (uploads, pending
+  // tasks), so each state which is which.
+  label?: string;
   children: ReactNode;
 }
 
-export function List({ children }: ListProps) {
-  return <ListBase>{children}</ListBase>;
+export function List({ label, children }: ListProps) {
+  return <ListBase aria-label={label}>{children}</ListBase>;
 }
