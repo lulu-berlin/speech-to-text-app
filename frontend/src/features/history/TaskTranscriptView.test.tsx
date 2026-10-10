@@ -747,6 +747,45 @@ describe('the themed player', () => {
   });
 });
 
+describe('times past one hour', () => {
+  it('read as h:mm:ss like the player, in the turn gutter and on the status page', async () => {
+    // A turn that starts 3661000 ms in = 1:01:01.
+    const longTurns = {
+      speakers: [{ speakerId: 0, speaker: 'Speaker 1' }],
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 3661000,
+          endMs: 3700000,
+          segments: [{ startMs: 3661000, endMs: 3700000, text: 'A long turn.' }],
+        },
+      ],
+    };
+    server.use(http.get('/api/tasks/3/turns', () => HttpResponse.json(longTurns)));
+    await renderTranscript('3');
+    expect(await screen.findByText('A long turn.')).toBeInTheDocument();
+    expect(screen.getByText('1:01:01')).toBeInTheDocument();
+    expect(screen.queryByText('61:01')).not.toBeInTheDocument();
+
+    // The status page's "at" time reads the same way: transcribedUntilMs 3661000 → 1:01:01.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskFailed, id: 4, transcribedUntilMs: 3661000 }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('4');
+    expect(await screen.findByText(/failed while transcribing at 1:01:01/i)).toBeInTheDocument();
+  });
+});
+
 describe('the reading column', () => {
   it('is one centred 70ch column: header, player, downloads, then the turns with the start time in a left gutter and the speaker above the text', async () => {
     await renderTranscript('3'); // task 3 is COMPLETED; turns.json has three turns.

@@ -18,7 +18,7 @@ import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { deleteTaskMachine } from './deleteTaskMachine';
-import { formatTaskMeta, formatTime } from './formatTask';
+import { formatDuration, formatTaskMeta } from './formatTask';
 import { TranscriptTurns } from './TranscriptTurns';
 import { useTaskCommand } from './useTaskCommand';
 import { AudioPlayer } from './AudioPlayer';
@@ -308,7 +308,7 @@ const runCommand = useTaskCommand();
   if (FINISHED_ISSUES.has(task.status)) {
     const outcome = task.status === 'FAILED' ? 'Failed' : 'Canceled';
     const progress =
-      task.transcribedUntilMs !== null ? ` at ${formatTime(task.transcribedUntilMs)}` : '';
+      task.transcribedUntilMs !== null ? ` at ${formatDuration(task.transcribedUntilMs)}` : '';
     return (
       <Page measure="reading">
         <Stack gap="md">
