@@ -161,4 +161,42 @@ class ProcessingEngineRestartSpec :
                 }
             }
         }
+        given("a task that was PAUSED when the app stopped") {
+            `when`("a new engine starts") {
+                then("the task stays PAUSED, and resumes only on an explicit resume, rerunning its interrupted chunk") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val chunks = ChunkRepository(db)
+                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
+                        SegmentRepository(db).completeChunk(
+                            task,
+                            chunkIdx = 0,
+                            segments =
+                                listOf(
+                                    Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
+                                ),
+                        )
+                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(task)) }
+                        fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L)
+                        fixture.tasks.setStatus(task, TaskStatus.PAUSED)
+                        fixture.tasks.setPhase(task, TaskPhase.TRANSCRIBING)
+
+                        fixture.engine.start()
+                        pumpUntil(200.milliseconds) { statusOf(fixture, task) == TaskStatus.RUNNING }
+                        statusOf(fixture, task) shouldBe TaskStatus.PAUSED
+                        phaseOf(fixture, task) shouldBe TaskPhase.TRANSCRIBING
+                        fixture.transcriber.audioFiles.shouldBeEmpty()
+
+                        // Only an explicit resume continues it: chunk 0 is skipped and the interrupted chunk
+                        // rerun (its segments were never committed).
+                        fixture.engine.resumeTask(task) shouldBe TaskCommandOutcome.Accepted
+                        pumpUntil(2.seconds) { statusOf(fixture, task) == TaskStatus.COMPLETED }
+                        statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
+                        fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-1.flac")
+                        chunks.findByTask(task).map { it.status } shouldBe listOf(ChunkStatus.DONE, ChunkStatus.DONE)
+                    }
+                }
+            }
+        }
     })
