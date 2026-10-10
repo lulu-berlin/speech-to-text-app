@@ -53,4 +53,9 @@ describe.each([
     // The checked switch thumb, and the slider thumb over the filled range.
     expect(contrast(colors.surfaceRaised, colors.accent)).toBeGreaterThanOrEqual(AA_NON_TEXT);
   });
+
+  it('muted text keeps AA on the accent tint (the drop zone while dragging)', () => {
+    // The same wash as the active status background; the drop zone's muted text sits on it.
+    expect(contrast(colors.textMuted, colors.accentTint)).toBeGreaterThanOrEqual(AA_TEXT);
+  });
 });
