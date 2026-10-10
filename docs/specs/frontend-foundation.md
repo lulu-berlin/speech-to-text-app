@@ -90,7 +90,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - Running against the real backend is checked in item 21.
 - All test-list items ticked and green; user approved the diff.
 
-## Mock additions to settle with item 12
+## Mock additions to settle with item 12 — settled 2026-10-10
 The user allowed additions to the mocks (2026-10-09) if each states why, so it can be settled with the backend (item 12's route tests, item 21's end-to-end check). Each is marked "Mock addition" in `frontend/src/shared/api/`.
 - **New examples `docs/api/task.paused.json` (id 7) and `docs/api/task.canceled.json` (id 5).** No example had status PAUSED or CANCELED, which the pause and cancel commands return. Listed in `docs/api/README.md`'s Shapes table; item 12's route tests should check them like the other Task examples.
 - **Task command responses** (`POST /api/tasks/{id}/pause|resume|cancel|retry`): the requested task (from `snapshot.json`) with its status set to the command's `to` in `task-transitions.json`. The backend returns the real, updated task; the previous answer (the unchanged example of the target status, whose filename and progress belonged to that other task) renamed rows in the queue view (item 14). For an id the snapshot does not hold, the fallback stays the example of the target status with the URL's id.
