@@ -91,11 +91,14 @@ export interface ThemeTokens {
     switchHeight: string;
     switchThumb: string;
     sliderThumb: string;
-    // The stenographer animation's sizes (item 17): the header instance and the
+// The stenographer animation's sizes (item 17): the header instance and the
     // empty-state instance. The artwork is cropped to its drawing (no margin), so the
     // header reads clearly at 120 px; the empty-state instance is 140 px.
     stenoHeader: string;
     stenoEmpty: string;
+    // The transcript's scroll region (item 15): tall enough to read, short enough that
+    // the player stays on screen while the transcript follows playback.
+    transcriptMaxHeight: string;
   };
   radii: {
     dialog: string;
@@ -170,8 +173,9 @@ const baseTokens = {
     switchHeight: '1.5rem',
     switchThumb: '1.25rem',
     sliderThumb: '1.25rem',
-    stenoHeader: '7.5rem',
+stenoHeader: '7.5rem',
     stenoEmpty: '8.75rem',
+    transcriptMaxHeight: '60vh',
   },
   radii: {
     dialog: '0.5rem',

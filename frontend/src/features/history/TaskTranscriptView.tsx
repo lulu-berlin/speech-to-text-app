@@ -78,7 +78,7 @@ const Segment = styled.button<{ $active: boolean }>`
 `;
 
 const TranscriptRegion = styled.div`
-  max-height: 60vh;
+  max-height: ${(props) => props.theme.sizes.transcriptMaxHeight};
   overflow-y: auto;
 `;
 
