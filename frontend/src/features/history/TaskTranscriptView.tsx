@@ -66,11 +66,13 @@ export function TaskTranscriptView() {
   const theme = useTheme();
   const tints = theme.colors.speakerTints;
   const turnsBySpeaker = useMemo(() => {
-    if (turns === null || task?.speakersMode === 'off') {
+    if (turns === null) {
       return null;
     }
+    // For speakers off, the turns carry speakerId null and the speakers list is empty, so
+    // the lookup yields undefined and no name (nor tint) is rendered.
     return turns.turns.map((turn) => ({ turn, speaker: turns.speakers[turn.speakerId ?? 0] }));
-  }, [turns, task?.speakersMode]);
+  }, [turns]);
 
   if (task === undefined) {
     return (
@@ -95,9 +97,11 @@ export function TaskTranscriptView() {
                   <Timestamp>
                     {formatTime(turn.startMs)} – {formatTime(turn.endMs)}
                   </Timestamp>{' '}
-                  <SpeakerName $color={speakerTint(tints, speaker?.speakerId ?? 0)}>
-                    {speaker?.speaker ?? ''}
-                  </SpeakerName>{' '}
+                  {speaker !== undefined ? (
+                    <SpeakerName $color={speakerTint(tints, speaker.speakerId)}>
+                      {speaker.speaker}
+                    </SpeakerName>
+                  ) : null}{' '}
                   {turn.text}
                 </TurnText>
               </Stack>
