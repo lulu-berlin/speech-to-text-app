@@ -19,6 +19,35 @@ export type DiarizationStage = 'EMBEDDING' | 'CLUSTERING' | null;
 
 export type SpeakerMode = 'auto' | 'off' | 'fixed';
 
+// Item 12 contract: one speaker of GET /api/tasks/{id}/turns (docs/api/turns.json).
+export interface TurnSpeaker {
+  speakerId: number;
+  speaker: string;
+}
+
+// Item 12 contract: one spoken segment of a turn (docs/api/turns.json).
+export interface Segment {
+  startMs: number;
+  endMs: number;
+  text: string;
+}
+
+// Item 12 contract: one speaker turn (docs/api/turns.json); times are on the /audio
+// timeline. `speakerId` is null when speakers are off (one turn per segment).
+export interface Turn {
+  speakerId: number | null;
+  startMs: number;
+  endMs: number;
+  text: string;
+  segments: Segment[];
+}
+
+// Item 12 contract: GET /api/tasks/{id}/turns (docs/api/turns.json).
+export interface Turns {
+  speakers: TurnSpeaker[];
+  turns: Turn[];
+}
+
 // Item 12 contract: Task (docs/api/task.*.json).
 export interface Task {
   id: number;

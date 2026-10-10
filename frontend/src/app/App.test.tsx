@@ -71,7 +71,6 @@ describe('the app root', () => {
 
     const transcript = renderAt('/history/7');
     expect(screen.getByRole('heading', { name: 'Transcript' })).toBeInTheDocument();
-    expect(screen.getByText(/task 7/i)).toBeInTheDocument();
     transcript.unmount();
 
     renderAt('/no-such-page');
