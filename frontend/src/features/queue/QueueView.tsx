@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import styled from 'styled-components';
+import type { ReactNode } from 'react';
+import { css, styled } from 'styled-components';
 import { languages } from '../../shared/api/fixtures';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Page, Stack } from '../../shared/ui/layout';
@@ -21,33 +22,33 @@ function isSpeakersChoice(value: string): value is SpeakersChoice {
   return (SPEAKERS_CHOICES as readonly string[]).includes(value);
 }
 
-const FieldLabel = styled.label`
-  color: ${(props) => props.theme.colors.textMuted};
-  font-size: ${(props) => props.theme.fontSizes.small};
+// The shared look of the panel's text controls (selects and number inputs).
+const controlStyle = css`
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
+  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.radii.button};
+  background: ${(props) => props.theme.colors.surface};
+  color: ${(props) => props.theme.colors.text};
+  font: inherit;
 `;
 
-const Field = styled.div`
+const FieldBase = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.xs};
 `;
 
+const FieldLabel = styled.label`
+  color: ${(props) => props.theme.colors.textMuted};
+  font-size: ${(props) => props.theme.fontSizes.small};
+`;
+
 const Select = styled.select`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
-  border-radius: ${(props) => props.theme.radii.button};
-  background: ${(props) => props.theme.colors.surface};
-  color: ${(props) => props.theme.colors.text};
-  font: inherit;
+  ${controlStyle}
 `;
 
 const NumberInput = styled.input`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
-  border-radius: ${(props) => props.theme.radii.button};
-  background: ${(props) => props.theme.colors.surface};
-  color: ${(props) => props.theme.colors.text};
-  font: inherit;
+  ${controlStyle}
 `;
 
 const AdvancedToggle = styled.button`
@@ -59,6 +60,22 @@ const AdvancedToggle = styled.button`
   font: inherit;
   cursor: pointer;
 `;
+
+interface FieldProps {
+  label: string;
+  htmlFor: string;
+  children: ReactNode;
+}
+
+// A labelled control of the upload options panel.
+function Field({ label, htmlFor, children }: FieldProps) {
+  return (
+    <FieldBase>
+      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
+      {children}
+    </FieldBase>
+  );
+}
 
 // The count inputs accept 1–20 only (item 12 contract): anything else is clamped, and a
 // non-numeric value keeps the previous one.
@@ -82,8 +99,7 @@ export function QueueView() {
       <Stack gap="lg">
         <PageHeading>Queue</PageHeading>
         <Stack gap="md">
-          <Field>
-            <FieldLabel htmlFor="language">Language</FieldLabel>
+          <Field label="Language" htmlFor="language">
             <SearchableSelect
               label="Language"
               options={LANGUAGE_OPTIONS}
@@ -91,8 +107,7 @@ export function QueueView() {
               onChange={setLanguage}
             />
           </Field>
-          <Field>
-            <FieldLabel htmlFor="speakers">Speakers</FieldLabel>
+          <Field label="Speakers" htmlFor="speakers">
             <Select
               id="speakers"
               value={speakers}
@@ -109,8 +124,7 @@ export function QueueView() {
             </Select>
           </Field>
           {speakers === 'fixed' ? (
-            <Field>
-              <FieldLabel htmlFor="speaker-count">Speaker count</FieldLabel>
+            <Field label="Speaker count" htmlFor="speaker-count">
               <NumberInput
                 id="speaker-count"
                 type="number"
@@ -129,8 +143,7 @@ export function QueueView() {
             Advanced
           </AdvancedToggle>
           {advancedOpen ? (
-            <Field>
-              <FieldLabel htmlFor="max-speakers">Max speakers</FieldLabel>
+            <Field label="Max speakers" htmlFor="max-speakers">
               <NumberInput
                 id="max-speakers"
                 type="number"
