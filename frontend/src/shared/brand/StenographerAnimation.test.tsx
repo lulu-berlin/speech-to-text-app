@@ -179,4 +179,12 @@ describe('the stenographer animation', () => {
       }
     }
   });
+
+  it('is decorative everywhere: the svg carries aria-hidden and no role or label of its own', () => {
+    const { container } = renderThemed(<StenographerAnimation />);
+    const svg = required(container.querySelector('svg'));
+    expect(svg.getAttribute('aria-hidden')).toBe('true');
+    expect(svg.hasAttribute('role')).toBe(false);
+    expect(svg.hasAttribute('aria-label')).toBe(false);
+  });
 });
