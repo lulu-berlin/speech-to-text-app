@@ -5,7 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../app/App';
 import { lightTheme } from '../../shared/theme/theme';
 import { eventStreamResponse } from '../../shared/api/handlers';
-import { taskCanceled, taskCompleted, taskFailed } from '../../shared/api/fixtures';
+import {
+  error as errorFixture,
+  taskCanceled,
+  taskCompleted,
+  taskFailed,
+  turns as turnsFixture,
+} from '../../shared/api/fixtures';
 import { server } from '../../test/server';
 
 function renderTranscript(taskId: string) {
@@ -344,6 +350,56 @@ describe('the transcript view', () => {
       expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument(),
     );
     expect(deleted).toEqual([3]);
+  });
+
+  it('renames a speaker from the speakers panel: every turn shows the new name; a rejected name keeps the old one', async () => {
+    // Mock addition (item 22): the rename stores names like the backend (starting from the
+    // turns.json speakers) and answers them in speakers.json's shape, or 409
+    // duplicate-speaker-name for a name another speaker has; error.json stands in for the
+    // 409 body, with its code changed.
+    const sent: { speakerId: number; body: unknown }[] = [];
+    let stored = turnsFixture.speakers;
+    server.use(
+      http.put('/api/tasks/:id/speakers/:speakerId', async ({ params, request }) => {
+        const speakerId = Number(params.speakerId);
+        const body = (await request.json()) as { speaker: string };
+        sent.push({ speakerId, body });
+        const others = stored.filter((s) => s.speakerId !== speakerId);
+        if (others.some((s) => s.speaker.toLowerCase() === body.speaker.toLowerCase())) {
+          return HttpResponse.json(
+            { ...errorFixture, error: 'duplicate-speaker-name' },
+            { status: 409 },
+          );
+        }
+        stored = stored.map((s) =>
+          s.speakerId === speakerId ? { ...s, speaker: body.speaker } : s,
+        );
+        return HttpResponse.json({ speakers: stored });
+      }),
+    );
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json: speaker 0 speaks twice.
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+
+    // The panel trims before sending (user decision 2026-10-10); Enter saves.
+    const first = within(panel).getByRole('textbox', { name: 'Name of speaker 1' });
+    expect(first).toHaveValue('Speaker 1');
+    fireEvent.change(first, { target: { value: '  Alice  ' } });
+    fireEvent.keyDown(first, { key: 'Enter' });
+
+    // Both of speaker 0's turns now carry the new name.
+    await waitFor(() => expect(within(transcript).getAllByText('Alice')).toHaveLength(2));
+    expect(within(transcript).queryByText('Speaker 1')).not.toBeInTheDocument();
+    expect(sent).toEqual([{ speakerId: 0, body: { speaker: 'Alice' } }]);
+    expect(first).toHaveValue('Alice');
+
+    // A rejected name (blur saves too) keeps the previous one and shows the error.
+    const second = within(panel).getByRole('textbox', { name: 'Name of speaker 2' });
+    fireEvent.change(second, { target: { value: 'alice' } });
+    fireEvent.blur(second);
+    expect(await within(panel).findByText(errorFixture.message)).toBeInTheDocument();
+    expect(second).toHaveValue('Speaker 2');
+    expect(within(transcript).getByText('Speaker 2')).toBeInTheDocument();
   });
 });
 

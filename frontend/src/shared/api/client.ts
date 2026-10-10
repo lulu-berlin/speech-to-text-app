@@ -5,6 +5,7 @@ import type {
   ServerEvent,
   StreamEvent,
   Snapshot,
+  Speakers,
   Task,
   TaskList,
   TaskProgress,
@@ -44,6 +45,21 @@ export async function getTask(id: number): Promise<Task> {
 export async function getTurns(id: number): Promise<Turns> {
   const response = await fetch(`/api/tasks/${id}/turns`);
   return json<Turns>(response);
+}
+
+// Item 22 contract: PUT /api/tasks/{id}/speakers/{speakerId} with { speaker } -> 200 Speakers;
+// a null name resets it to "Speaker N". The server stores the name as sent, so callers trim.
+export async function renameSpeaker(
+  id: number,
+  speakerId: number,
+  speaker: string | null,
+): Promise<Speakers> {
+  const response = await fetch(`/api/tasks/${id}/speakers/${speakerId}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ speaker }),
+  });
+  return json<Speakers>(response);
 }
 
 // The upload options of one file (item 12 contract): language from docs/api/languages.json,

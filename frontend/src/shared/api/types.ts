@@ -48,6 +48,12 @@ export interface Turns {
   turns: Turn[];
 }
 
+// Item 22 contract: the 200 of the speaker endpoints (docs/api/speakers.json): the task's
+// effective speakers, those not merged into another, by speakerId.
+export interface Speakers {
+  speakers: TurnSpeaker[];
+}
+
 // Item 12 contract: Task (docs/api/task.*.json).
 export interface Task {
   id: number;
