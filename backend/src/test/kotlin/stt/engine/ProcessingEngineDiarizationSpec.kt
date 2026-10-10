@@ -234,4 +234,45 @@ class ProcessingEngineDiarizationSpec :
                 }
             }
         }
+
+        given("a task whose diarization is in progress when the queue is paused") {
+            `when`("the queue is paused and then resumed") {
+                then("the diarization stops at the pause gate and resumes from there") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "task.wav",
+                                queuePosition = 0,
+                                createdAt = 1,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        fixture.transcriber.segmentsByTask =
+                            mapOf(task to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
+                        val release = CompletableDeferred<Unit>()
+                        fixture.diarizer.hold = release
+
+                        fixture.engine.start()
+                        fixture.diarizer.entered.receive() shouldBe task
+                        phaseOf(fixture, task) shouldBe TaskPhase.DIARIZING
+
+                        // A queue pause is not a task pause: the task keeps RUNNING, but its diarization
+                        // must stop at the engine's gate until the queue resumes.
+                        fixture.engine.pauseQueue()
+                        statusOf(fixture, task) shouldBe TaskStatus.RUNNING
+                        release.complete(Unit)
+
+                        pumpUntil(200.milliseconds) { fixture.diarizer.passedGate }
+                        fixture.diarizer.passedGate shouldBe false
+
+                        fixture.engine.resumeQueue()
+                        pumpUntil(2.seconds) { fixture.diarizer.passedGate }
+                        fixture.diarizer.passedGate shouldBe true
+                        fixture.completed.receive() shouldBe task
+                    }
+                }
+            }
+        }
     })
