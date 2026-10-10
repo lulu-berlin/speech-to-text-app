@@ -41,7 +41,11 @@ describe('the typed API client', () => {
       http.post('/api/tasks', () => HttpResponse.json(errorDuplicateAudio, { status: 409 })),
     );
 
-    const request = uploadTask(new File(['x'], 'memo.wav'));
+    const request = uploadTask(new File(['x'], 'memo.wav'), {
+      language: 'auto',
+      speakers: 'auto',
+      maxSpeakers: 8,
+    });
     await expect(request).rejects.toBeInstanceOf(ApiError);
     await expect(request).rejects.toMatchObject({ code: 'duplicate-audio', taskId: 3 });
   });

@@ -1,7 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { taskQueued } from '../../shared/api/fixtures';
+import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
 import { QueueView } from './QueueView';
@@ -16,6 +19,12 @@ function renderQueue() {
       </ConnectionContext.Provider>
     </ThemedProviders>,
   );
+}
+
+// Reads one text field out of a multipart body (the upload options fields).
+function multipartField(body: string, name: string): string {
+  const match = body.match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)\\r\\n`));
+  return match?.[1] ?? '';
 }
 
 describe('the queue view upload options', () => {
@@ -57,5 +66,104 @@ describe('the queue view upload options', () => {
     expect(max).toHaveValue(1);
     fireEvent.change(max, { target: { value: '25' } });
     expect(max).toHaveValue(20);
+  });
+});
+
+describe('the queue view upload flow', () => {
+  it('uploads dropped files one at a time in drop order, each with the batch options', async () => {
+    // jsdom + MSW cannot parse an XHR FormData body (mswjs/interceptors#684), so the
+    // handler reads the raw multipart text. jsdom drops the file's content, but the
+    // file's Content-Type header survives and identifies which file the request carries.
+    const arrivals: Array<{
+      contentType: string;
+      language: string;
+      speakers: string;
+      maxSpeakers: string;
+    }> = [];
+    const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+
+    // The handler records each upload's file and options, and holds the response until
+    // the test releases it, so the test can see that the next file does not start while
+    // the previous one is still uploading.
+    server.use(
+      http.post('/api/tasks', async ({ request }) => {
+        const body = await request.text();
+        arrivals.push({
+          contentType: body.match(/Content-Type: ([^\r]+)/)?.[1] ?? '',
+          language: multipartField(body, 'language'),
+          speakers: multipartField(body, 'speakers'),
+          maxSpeakers: multipartField(body, 'maxSpeakers'),
+        });
+        await gate;
+        return HttpResponse.json(taskQueued, { status: 201 });
+      }),
+    );
+
+    renderQueue();
+
+    // The batch options: language de, speakers fixed 3, max speakers 10.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Language' }));
+    fireEvent.mouseDown(
+      within(screen.getByRole('listbox', { name: 'Language' })).getByRole('option', {
+        name: 'german (de)',
+      }),
+    );
+    fireEvent.change(screen.getByLabelText('Speakers'), { target: { value: 'fixed' } });
+    fireEvent.change(screen.getByLabelText('Speaker count'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+    fireEvent.change(screen.getByLabelText('Max speakers'), { target: { value: '10' } });
+
+    // Drop three files in order, each with a distinct content type so the requests can
+    // be told apart (jsdom has no DataTransfer, so the drop carries a minimal double
+    // with just the files; the component only reads dataTransfer.files).
+    const files = [
+      new File(['x'], 'a.mp3', { type: 'audio/mpeg' }),
+      new File(['x'], 'b.wav', { type: 'audio/wav' }),
+      new File(['x'], 'c.ogg', { type: 'audio/ogg' }),
+    ];
+    fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+
+    // The first file starts immediately, with the batch options.
+    await waitFor(() => expect(arrivals).toHaveLength(1));
+    expect(arrivals[0]).toEqual({
+      contentType: 'audio/mpeg',
+      language: 'de',
+      speakers: '3',
+      maxSpeakers: '10',
+    });
+
+    // The rows appear in drop order, and only the first file is uploading.
+    const rows = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('a.mp3'),
+      expect.stringContaining('b.wav'),
+      expect.stringContaining('c.ogg'),
+    ]);
+    expect(rows[0]?.textContent).toContain('uploading');
+    expect(rows[1]?.textContent).toContain('queued');
+    expect(rows[2]?.textContent).toContain('queued');
+
+    // The next file does not start while the first is still uploading.
+    const { promise: pause, resolve: resume } = Promise.withResolvers<void>();
+    setTimeout(resume, 50);
+    await pause;
+    expect(arrivals).toHaveLength(1);
+
+    // Releasing the first response lets the second start, then the third.
+    release();
+    await waitFor(() => expect(arrivals).toHaveLength(2));
+    expect(arrivals[1]).toEqual({
+      contentType: 'audio/wav',
+      language: 'de',
+      speakers: '3',
+      maxSpeakers: '10',
+    });
+    await waitFor(() => expect(arrivals).toHaveLength(3));
+    expect(arrivals[2]).toEqual({
+      contentType: 'audio/ogg',
+      language: 'de',
+      speakers: '3',
+      maxSpeakers: '10',
+    });
   });
 });
