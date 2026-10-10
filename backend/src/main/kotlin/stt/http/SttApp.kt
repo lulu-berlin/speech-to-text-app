@@ -59,6 +59,7 @@ fun Application.sttApp(config: Config) {
     taskCommandRoutes()
     queueRoutes()
     transcriptRoutes()
+    speakerRoutes()
     audioRoutes()
     eventsRoutes()
     uploadRoutes(config)
