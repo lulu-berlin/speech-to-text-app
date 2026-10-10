@@ -20,3 +20,21 @@ export const ProgressFill = styled.div<{ $value: number }>`
   width: ${(props) => props.$value * 100}%;
   background: ${(props) => props.theme.colors.accent};
 `;
+
+// The row a bar's track sits in: the track grows, the value (a percentage or a stage
+// label) hugs the right edge, in the small muted text style (item 25).
+export const ProgressRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.sm};
+
+  ${ProgressTrack} {
+    flex-grow: 1;
+  }
+`;
+
+export const ProgressValue = styled.span`
+  color: ${(props) => props.theme.colors.textMuted};
+  font-size: ${(props) => props.theme.fontSizes.small};
+  white-space: nowrap;
+`;
