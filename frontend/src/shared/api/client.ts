@@ -8,6 +8,7 @@ import type {
   Task,
   TaskList,
   TaskProgress,
+  Turns,
 } from './types';
 
 const json = async <T>(response: Response): Promise<T> => {
@@ -30,6 +31,12 @@ export async function listTasks(): Promise<TaskList> {
 export async function getTask(id: number): Promise<Task> {
   const response = await fetch(`/api/tasks/${id}`);
   return json<Task>(response);
+}
+
+// Item 12 contract: GET /api/tasks/{id}/turns (docs/api/turns.json).
+export async function getTurns(id: number): Promise<Turns> {
+  const response = await fetch(`/api/tasks/${id}/turns`);
+  return json<Turns>(response);
 }
 
 // Item 12 contract: POST /api/tasks, multipart with a `file` field.
