@@ -245,4 +245,48 @@ describe('the history list', () => {
     expect(screen.getByText('interview.mp3')).toBeInTheDocument();
     expect(confirmClicks).toBe(1);
   });
+
+  it('shows the task finish date and its duration in each row', async () => {
+    // Mock addition: finished tasks with known finishedAt/durationMs, so the fixed (UTC,
+    // non-locale) rendering is asserted exactly, plus a finished task with durationMs null.
+    const dateSnapshot = {
+      tasks: [
+        {
+          ...taskCompleted,
+          id: 3,
+          filename: 'interview.mp3',
+          finishedAt: 1791537645000,
+          durationMs: 1185000,
+        },
+        {
+          ...taskCompleted,
+          id: 4,
+          filename: 'call.ogg',
+          finishedAt: 1791537000000,
+          durationMs: null,
+        },
+        {
+          ...taskCompleted,
+          id: 5,
+          filename: 'lecture.m4a',
+          finishedAt: 1791537680000,
+          durationMs: 3661000,
+        },
+      ],
+      queue: { paused: false, taskIds: [] },
+    };
+    server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', dateSnapshot]])));
+    await renderHistory();
+
+    // finishedAt 1791537645000 -> "Oct 9, 2026"; durationMs 1185000 -> "19:45" (mm:ss).
+    expect(rowOf('interview.mp3')).toHaveTextContent('Oct 9, 2026 · 19:45');
+
+    // durationMs null: the date shows, the duration does not.
+    const noDuration = rowOf('call.ogg');
+    expect(noDuration).toHaveTextContent('Oct 9, 2026');
+    expect(noDuration).not.toHaveTextContent('·');
+
+    // One hour and up: h:mm:ss. 3661000 ms -> 1:01:01.
+    expect(rowOf('lecture.m4a')).toHaveTextContent('Oct 9, 2026 · 1:01:01');
+  });
 });
