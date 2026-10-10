@@ -218,7 +218,7 @@ export interface StenographerAnimationProps {
 }
 
 // The brand mascot (item 17): a seated stenographer at a steno machine on a warm backdrop.
-// Inlined from docs/oracle of item 17's artwork (stenographer.svg): every color comes from
+// Inlined from the artwork in src/shared/brand/stenographer.svg: every color comes from
 // the theme's illustration tokens, so the piece follows light and dark mode. Decorative
 // everywhere it appears (the product name or the empty state's text carries the meaning),
 // so it is aria-hidden and carries no role or accessible name of its own.
