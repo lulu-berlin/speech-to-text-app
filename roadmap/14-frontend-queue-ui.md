@@ -7,7 +7,7 @@ Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/spec
 Let the user upload many audio files and manage the work queue from the browser: see live status and progress, pause/resume/cancel/delete individual tasks, reorder the queue, and pause the whole queue.
 
 ## Already decided
-- [Item 24 design system](24-visual-design.md) ([ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md)): the Queue view is built with its tokens and primitives (Button, StatusBadge, ProgressBar, EmptyState, List/ListRow, DropdownMenu, Switch, ConfirmDialog, Page/Stack/Row), not with ad-hoc styles; item 25 does the final visual pass (comfortable rows, phase as a text label, empty state with guidance).
+- [Item 24 design system](../docs/specs/design-system.md) ([ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md)): the Queue view is built with its tokens and primitives (Button, StatusBadge, ProgressBar, EmptyState, List/ListRow, DropdownMenu, Switch, ConfirmDialog, Page/Stack/Row), not with ad-hoc styles; item 25 does the final visual pass (comfortable rows, phase as a text label, empty state with guidance).
 - [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
 - [ADR 0004 — Chunked transcription, SIGSTOP pause](../docs/decisions/0004-chunked-transcription-sigstop-pause.md): pause/resume semantics the UI exposes.
 - [ADR 0007 — SSE live updates](../docs/decisions/0007-sse-live-updates.md): status/progress arrive via SSE; commands go via REST.
