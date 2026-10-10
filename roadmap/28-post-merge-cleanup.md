@@ -1,6 +1,6 @@
 # 28 — Post-merge cleanup refactors
 
-Status: spec-approved
+Status: in-progress
 Depends on: —
 
 ## Goal
