@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import { Pause, Play, X } from 'lucide-react';
 import { useState } from 'react';
 import { styled } from 'styled-components';
@@ -15,6 +16,14 @@ import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { Row, Stack } from '../../shared/ui/layout';
 import { RowContent, RowName } from './rowParts';
+
+// The per-task command controls, in display order. A control is offered only when
+// docs/api/task-transitions.json allows its command for the task's status.
+const CONTROLS: { command: TaskCommand; icon: LucideIcon; verb: string }[] = [
+  { command: 'pause', icon: Pause, verb: 'Pause' },
+  { command: 'resume', icon: Play, verb: 'Resume' },
+  { command: 'cancel', icon: X, verb: 'Cancel' },
+];
 
 // The phase a task is in, as a text label next to its status (none while queued).
 const PHASE_LABELS: Record<NonNullable<TaskPhase>, string> = {
@@ -69,27 +78,22 @@ export function TaskRow({ task }: TaskRowProps) {
           <Row>
             {task.phase !== null ? <RowPhase>{PHASE_LABELS[task.phase]}</RowPhase> : null}
             <StatusBadge status={task.status} />
-            {isAllowedCommand('pause', task.status) ? (
-              <IconButton
-                icon={Pause}
-                label={`Pause ${task.filename}`}
-                onClick={() => run('pause')}
-              />
-            ) : null}
-            {isAllowedCommand('resume', task.status) ? (
-              <IconButton
-                icon={Play}
-                label={`Resume ${task.filename}`}
-                onClick={() => run('resume')}
-              />
-            ) : null}
-            {isAllowedCommand('cancel', task.status) ? (
-              <IconButton
-                icon={X}
-                label={`Cancel ${task.filename}`}
-                onClick={() => (confirmCancel ? setCancelOpen(true) : run('cancel'))}
-              />
-            ) : null}
+            {CONTROLS.filter(({ command }) => isAllowedCommand(command, task.status)).map(
+              ({ command, icon, verb }) => (
+                <IconButton
+                  key={command}
+                  icon={icon}
+                  label={`${verb} ${task.filename}`}
+                  onClick={() => {
+                    if (command === 'cancel' && confirmCancel) {
+                      setCancelOpen(true);
+                    } else {
+                      run(command);
+                    }
+                  }}
+                />
+              ),
+            )}
           </Row>
         </RowContent>
         <ProgressBar value={task.transcriptionProgress} label="Transcription" />
