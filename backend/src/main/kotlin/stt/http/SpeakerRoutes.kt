@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
 import stt.db.defaultSpeakerName
+import stt.engine.ProcessingEngine
 
 /**
  * Renaming a task's speakers (item 22): `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }`
@@ -19,9 +20,11 @@ import stt.db.defaultSpeakerName
  * [MAX_SPEAKER_NAME] characters, or one with a control character anywhere answers `400 invalid-speaker-name` and
  * changes nothing; a name another speaker of the task already has, in any letter case, answers
  * `409 duplicate-speaker-name`. `{ "speaker": null }` resets the name to the default `"Speaker N"`
- * (N = speakerId + 1, item 09's rule), which is checked for duplicates like any other name.
+ * (N = speakerId + 1, item 09's rule), which is checked for duplicates like any other name. A stored rename or
+ * reset goes through the engine, which publishes `speakers-renamed` after the write (item 11's event flow).
  */
 fun Application.speakerRoutes() {
+    val engine: ProcessingEngine by dependencies
     val segments: SegmentRepository by dependencies
     routing {
         put("/api/tasks/{id}/speakers/{speakerId}") {
@@ -36,7 +39,7 @@ fun Application.speakerRoutes() {
                 )
             }
             val name = requested ?: defaultSpeakerName(speakerId)
-            when (val outcome = segments.renameSpeaker(id, speakerId, name)) {
+            when (val outcome = engine.renameSpeaker(id, speakerId, name)) {
                 RenameOutcome.Renamed -> {
                     call.respond(SpeakersJson(segments.findSpeakers(id).map { SpeakerJson(it.speakerId, it.speaker) }))
                 }

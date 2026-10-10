@@ -129,6 +129,37 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("a COMPLETED task with speakers 0 and 1, and an SSE client (queue paused, real server)") {
+            `when`("a rename is rejected, then speaker 1 is renamed to Alice, then its name is reset") {
+                then("each stored rename and reset emits speakers-renamed with the task's stored names; the rejected one emits nothing") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), twoSegments, speakerIds = listOf(0, 1))
+
+                    SseServer({ sttApp(stt.config.testConfig(dataDir)) }).use { server ->
+                        val events = server.connectEvents()
+                        events.readEvent().first shouldBe "snapshot"
+
+                        // Rejected (untrimmed): nothing is stored, so nothing is emitted; the next frame is the
+                        // stored rename's, and its names can only come from reading the stored row.
+                        server.command("PUT", "/api/tasks/$id/speakers/1", """{ "speaker": " Alice" }""") shouldBe 400
+                        server.command("PUT", "/api/tasks/$id/speakers/1", """{ "speaker": "Alice" }""") shouldBe 200
+                        val (renamedName, renamedData) = events.readEvent()
+                        renamedName shouldBe "speakers-renamed"
+                        val renamed = Json.parseToJsonElement(renamedData).jsonObject
+                        renamed shouldHaveShapeOf apiExample("speakers-renamed.json")
+                        renamed shouldBe Json.parseToJsonElement("""{ "id": $id, "speakers": ${speakers("Speaker 1", "Alice")} }""")
+
+                        // A name reset is a rename too (the spec's Events bullet).
+                        server.command("PUT", "/api/tasks/$id/speakers/1", """{ "speaker": null }""") shouldBe 200
+                        val (resetName, resetData) = events.readEvent()
+                        resetName shouldBe "speakers-renamed"
+                        Json.parseToJsonElement(resetData) shouldBe
+                            Json.parseToJsonElement("""{ "id": $id, "speakers": ${speakers("Speaker 1", "Speaker 2")} }""")
+                    }
+                }
+            }
+        }
     })
 
 /** Two segments of a task, one per speaker once `storeSpeakers(listOf(0, 1))` has run. */
