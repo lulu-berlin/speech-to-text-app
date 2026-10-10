@@ -1,5 +1,6 @@
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import styled from 'styled-components';
+import { focusRing } from './focusRing';
 
 const Root = styled(SliderPrimitive.Root)`
   display: flex;
@@ -32,11 +33,7 @@ const Thumb = styled(SliderPrimitive.Thumb)`
   border-radius: ${(props) => props.theme.radii.pill};
   background: ${(props) => props.theme.colors.surfaceRaised};
 
-  &:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 ${(props) => props.theme.borderWidths.ring}
-      ${(props) => props.theme.colors.focusRing};
-  }
+  ${focusRing}
 
   &[data-disabled] {
     cursor: default;
