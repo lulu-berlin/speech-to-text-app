@@ -1,6 +1,6 @@
 # 12 — HTTP API and SSE
 
-Status: spec-approved
+Status: in-progress
 Depends on: [10](../docs/specs/output-formats.md) (done), [11](../docs/specs/processing-engine.md) (done)
 
 ## Goal
