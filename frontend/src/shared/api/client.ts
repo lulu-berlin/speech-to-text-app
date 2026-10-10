@@ -116,6 +116,12 @@ export async function reorderQueue(taskIds: number[]): Promise<Queue> {
   return json<Queue>(response);
 }
 
+// Item 12 contract: POST /api/queue/pause|resume -> 200 Queue.
+export async function setQueuePaused(paused: boolean): Promise<Queue> {
+  const response = await fetch(`/api/queue/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
+  return json<Queue>(response);
+}
+
 // Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when
 // the connection drops. EventSource retries a dropped connection by itself, but gives up
 // for good on an HTTP error, so this opens a new stream in that case. Returns a function

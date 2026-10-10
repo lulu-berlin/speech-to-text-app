@@ -680,6 +680,36 @@ describe('the queue reorder', () => {
   });
 });
 
+describe('the queue pause', () => {
+  it('pauses and resumes the queue with the switch, reflecting the queue state', async () => {
+    const calls: string[] = [];
+    server.use(
+      http.post('/api/queue/pause', () => {
+        calls.push('pause');
+        return HttpResponse.json({ paused: true, taskIds: queueFixture.taskIds });
+      }),
+      http.post('/api/queue/resume', () => {
+        calls.push('resume');
+        return HttpResponse.json({ paused: false, taskIds: queueFixture.taskIds });
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    const toggle = screen.getByRole('switch', { name: 'Pause the queue' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
+    expect(calls).toEqual(['pause']);
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'));
+    expect(calls).toEqual(['pause', 'resume']);
+  });
+});
+
 describe('upload errors', () => {
   it("keeps each error on its file's row: unsupported format, invalid input, and a duplicate with a link", async () => {
     // The three files that reach the server answer differently; the rejected file (a.txt)
