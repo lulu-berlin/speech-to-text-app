@@ -25,7 +25,7 @@ src/
 - All design values live in `src/shared/theme/theme.ts` as tokens: colors, spacing, typography, radii.
 - `ThemeProvider` at the app root; components consume tokens via themed `styled` components or `useTheme`.
 - No inline `style={}` props, no literal colors or sizes in components. New tokens go into `theme.ts`, not into components.
-- Exception: `StenographerAnimation.tsx` sets per-element `animation-delay`/`animation-duration` via JSX `style` ([ADR 0038](../decisions/0038-stenographer-timing-in-jsx.md)).
+- Exception: `StenographerAnimation.tsx` sets per-element `animation-delay`/`animation-duration` via JSX `style` ([ADR 0040](../decisions/0040-stenographer-timing-in-jsx.md)).
 - Lengths in the tokens are `rem`, never `px` (not even in `theme.ts`), so sizes follow the reader's font size; color roles are plain `#rrggbb` so their contrast can be measured (only the overlay and shadow values carry alpha).
 - `src/conventions.test.ts` (part of `pnpm test`) enforces this: it fails on any literal color (hex, `rgb()`, `hsl()`) or length (`px`, `rem`, `em`, `ex`, `ch`, `vh`, `vw`, `vmin`, `vmax`) in `src/` outside the token modules in `src/shared/theme/` and the tests, and on raw `px` everywhere, the token modules included. A new value goes into the tokens.
 
