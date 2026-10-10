@@ -102,4 +102,32 @@ class ProcessingEngineRetrySpec :
                 }
             }
         }
+
+        given("a task that completed") {
+            `when`("it is retried") {
+                then("the retry is refused and nothing changes") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe task
+                        val completed =
+                            fixture.tasks
+                                .find(task)
+                                ?.task
+                                .shouldNotBeNull()
+
+                        fixture.engine.retryTask(task) shouldBe TaskCommandOutcome.Illegal(TaskStatus.COMPLETED, TaskStatus.QUEUED)
+
+                        val after =
+                            fixture.tasks
+                                .find(task)
+                                ?.task
+                                .shouldNotBeNull()
+                        after.status shouldBe TaskStatus.COMPLETED
+                        after.queuePosition shouldBe completed.queuePosition
+                    }
+                }
+            }
+        }
     })
