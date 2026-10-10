@@ -287,6 +287,40 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("cycle 8's task with speakers 0, 1 and 2 (queue paused)") {
+            `when`("merges are requested with into outside the group, one speaker, and members or into already merged") {
+                then("each answers 400 invalid-merge and stores nothing; only the valid merge takes effect") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+
+                        // `into` must be one of the group, and the group must name at least two speakers.
+                        for ((group, into) in listOf(listOf(0, 1) to 2, listOf(1) to 1, listOf(1, 1) to 1)) {
+                            withClue("group $group into $into") {
+                                client.merge(id, group, into).shouldBeError(HttpStatusCode.BadRequest, "invalid-merge")
+                            }
+                        }
+                        client.speakersOf(id) shouldBe speakers("Speaker 1", "Speaker 2", "Speaker 3")
+
+                        client.merge(id, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+
+                        // Speaker 1 is now merged into 0: it can be neither a member nor the survivor of another merge.
+                        for ((group, into) in listOf(listOf(1, 2) to 2, listOf(2, 1) to 1)) {
+                            withClue("group $group into $into") {
+                                client.merge(id, group, into).shouldBeError(HttpStatusCode.BadRequest, "invalid-merge")
+                            }
+                        }
+                        client.speakersOf(id) shouldBe
+                            Json.parseToJsonElement(
+                                """[ { "speakerId": 0, "speaker": "Speaker 1" }, { "speakerId": 2, "speaker": "Speaker 3" } ]""",
+                            )
+                    }
+                }
+            }
+        }
     })
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */

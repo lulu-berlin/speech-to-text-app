@@ -105,7 +105,7 @@ The JSON shapes the frontend builds against.
   - Text ([ADR 0030](../decisions/0030-trimmed-segment-text-in-all-outputs.md)): every segment `text` is trimmed; a turn's `text` is its segments' non-blank trimmed texts joined with single spaces (a blank segment must not leave a double space, user decision 2026-10-10).
 - **Speakers** (added 2026-10-10, item 22): `{ "speakers": [{ "speakerId", "speaker" }] }`, the task's speakers ordered by `speakerId` ([`docs/api/speakers.json`](../api/speakers.json)).
   - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is stored as sent; clients trim it first (user decision 2026-10-10). Leading or trailing whitespace, empty, longer than 40 characters, or a control character anywhere → `400 invalid-speaker-name`, nothing changes. A name another speaker of the task already has, compared case-insensitively and including speakers hidden by a merge → `409 duplicate-speaker-name`; a speaker's own current name is no duplicate (user decisions 2026-10-10). `{ "speaker": null }` resets the name to `"Speaker N"` (N = `speakerId` + 1), written by the server and checked for duplicates like any other name.
-  - `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }` folds every other member of `group` into `into`, which keeps its id and name; the answer is the task's effective speakers. No segment row is rewritten: the merge is a mapping resolved when the transcript is read, so it can be undone. The downloads (txt, srt, vtt) label a merged speaker's segments with the survivor's name, in the survivor's turns.
+  - `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }` folds every other member of `group` into `into`, which keeps its id and name; the answer is the task's effective speakers. No segment row is rewritten: the merge is a mapping resolved when the transcript is read, so it can be undone. The downloads (txt, srt, vtt) label a merged speaker's segments with the survivor's name, in the survivor's turns. `into` not in `group`, a group naming fewer than two speakers, or a member (or `into`) already merged into another speaker → `400 invalid-merge`, nothing changes.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task
@@ -117,7 +117,7 @@ The JSON shapes the frontend builds against.
 
   | Status | Codes |
   | ------ | ----- |
-  | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format`, `invalid-speaker-name` (item 22) |
+  | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format`, `invalid-speaker-name`, `invalid-merge` (item 22) |
   | `404` | `not-found` (unknown task), `no-audio` (task without stored chunks) |
   | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns or transcript of a task that is not COMPLETED), `duplicate-speaker-name` (item 22) |
   | `500` | `internal` |
