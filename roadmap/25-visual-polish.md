@@ -68,7 +68,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Screenshots at phone and desktop widths, light and dark, are captured for item 21's approval; the Queue's empty state offers the upload action
 - [x] The transcription bar shows a percentage and the diarization bar its stage label (cycle 1, 2026-10-10; refactor approved: the diarization aria text now matches the visible within-stage label)
 - [ ] With reduced motion requested, no non-essential animation runs
-- [ ] Keyboard focus is visible in every view
+- [x] Keyboard focus is visible in every view (cycle 8, 2026-10-10; the native audio element goes with the themed player)
 - [ ] The existing view and machine tests stay green
 - [ ] (discovered, confirmed 2026-10-10) The upload row's progress bar has a visible width at desktop and phone widths (it sits beside the filename as a flex item with no width of its own, so it collapses to its border)
 - [ ] (discovered, confirmed 2026-10-10) The drop zone shows a distinct drag-over state while files are dragged over it (in the Proposal, missing from the list)
