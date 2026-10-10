@@ -1,8 +1,11 @@
 package stt.db
 
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.io.readByteArray
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -35,6 +38,41 @@ internal suspend fun <T> Database.withSpooledUpload(
     } finally {
         withContext(NonCancellable + Dispatchers.IO) { Files.deleteIfExists(file) }
     }
+}
+
+/**
+ * Spools a multipart part's [ByteReadChannel] (item 12's upload route) into a temp file, reading in windows of
+ * [SPOOL_WINDOW_BYTES] — never the whole part at once — and computing size and sha256 on the way, so no full
+ * in-memory copy of the upload exists. Unlike [withSpooledUpload] the caller owns the temp file: it is moved
+ * into the task's work directory on commit, or deleted when the request is rejected.
+ */
+internal suspend fun Database.spoolChannel(source: ByteReadChannel): SpooledUpload {
+    val file = withContext(Dispatchers.IO) { Files.createTempFile(tmpDir, "upload-", ".part") }
+    try {
+        return withContext(Dispatchers.IO) { spool(source, file) }
+    } catch (e: Throwable) {
+        withContext(NonCancellable + Dispatchers.IO) { Files.deleteIfExists(file) }
+        throw e
+    }
+}
+
+private suspend fun spool(
+    source: ByteReadChannel,
+    file: Path,
+): SpooledUpload {
+    val digest = MessageDigest.getInstance("SHA-256")
+    var sizeBytes = 0L
+    Files.newOutputStream(file).use { out ->
+        while (true) {
+            // At most one window is in memory; the next read waits for more of the part (or EOF).
+            val bytes = source.readRemaining(SPOOL_WINDOW_BYTES.toLong()).readByteArray()
+            if (bytes.isEmpty()) break
+            digest.update(bytes)
+            out.write(bytes)
+            sizeBytes += bytes.size
+        }
+    }
+    return SpooledUpload(file, sizeBytes, HexFormat.of().formatHex(digest.digest()))
 }
 
 private fun spool(

@@ -47,28 +47,58 @@ class TaskRepository(
     suspend fun createFromUpload(
         task: Task,
         upload: InputStream,
-    ): Long =
-        db.withSpooledUpload(upload) { spooled ->
-            val taskId =
-                db.writeTransaction {
-                    insertTaskRow(task).also { taskId -> insertAudioRow(taskId, spooled) }
-                }
-            // Committed: the task's original must reach its work directory even if the caller is canceled now.
-            try {
-                moveToOriginal(taskId, spooled.file)
-            } catch (e: Exception) {
-                // The task row is committed by now; undo it, even for a canceled caller, so a rejected
-                // upload leaves nothing behind: NonCancellable for the same reason the move uses it.
-                withContext(NonCancellable) {
-                    runCatching {
-                        db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq taskId } }
-                        deleteWorkDir(taskId)
-                    }.onFailure { e.addSuppressed(it) }
-                }
-                throw e
+    ): Long = (createFromUploadOrDuplicate(task, upload) as UploadOutcome.Created).id
+
+    /**
+     * Spools [upload] once and decides with the spool's own digest: when [duplicateTaskId] finds a task
+     * holding the same bytes, nothing is stored and [UploadOutcome.Duplicate] reports it; otherwise the task
+     * is committed from the spool. The spool is deleted unless committed, whichever branch runs. No full
+     * in-memory copy of the upload exists.
+     */
+    suspend fun createFromUploadOrDuplicate(
+        task: Task,
+        upload: InputStream,
+        duplicateTaskId: suspend (String) -> Long? = { null },
+    ): UploadOutcome = db.withSpooledUpload(upload) { spooled -> commitOrDuplicate(task, spooled, duplicateTaskId) }
+
+    private suspend fun commitOrDuplicate(
+        task: Task,
+        spooled: SpooledUpload,
+        duplicateTaskId: suspend (String) -> Long?,
+    ): UploadOutcome =
+        duplicateTaskId(spooled.sha256)?.let { UploadOutcome.Duplicate(it, spooled.sha256, spooled.sizeBytes) }
+            ?: UploadOutcome.Created(createFromSpooled(task, spooled), spooled.sha256, spooled.sizeBytes)
+
+    /**
+     * Inserts [task] and its audio metadata from the spooled bytes, then moves the original into the task's
+     * work directory. Runs under NonCancellable on Dispatchers.IO, so a canceled caller still gets its
+     * original, and the whole move is on one filesystem (same data directory), so the rename is atomic.
+     * Item 12's upload route calls this after spooling the part's channel itself ([Database.spoolChannel]).
+     */
+    internal suspend fun createFromSpooled(
+        task: Task,
+        spooled: SpooledUpload,
+    ): Long {
+        val taskId =
+            db.writeTransaction {
+                insertTaskRow(task).also { taskId -> insertAudioRow(taskId, spooled) }
             }
-            taskId
+        // Committed: the task's original must reach its work directory even if the caller is canceled now.
+        try {
+            moveToOriginal(taskId, spooled.file)
+        } catch (e: Exception) {
+            // The task row is committed by now; undo it, even for a canceled caller, so a rejected
+            // upload leaves nothing behind: NonCancellable for the same reason the move uses it.
+            withContext(NonCancellable) {
+                runCatching {
+                    db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq taskId } }
+                    deleteWorkDir(taskId)
+                }.onFailure { e.addSuppressed(it) }
+            }
+            throw e
         }
+        return taskId
+    }
 
     /**
      * Creates the task's work directory and moves the committed upload's spool file into it as the
