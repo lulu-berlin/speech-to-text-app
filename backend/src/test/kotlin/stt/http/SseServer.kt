@@ -54,6 +54,22 @@ internal class SseServer(
 
     private fun send(request: HttpRequest.Builder): Int = http.send(request.build(), HttpResponse.BodyHandlers.discarding()).statusCode()
 
+    /** One REST request with an optional JSON [body]; its status and response text. */
+    fun request(
+        method: String,
+        path: String,
+        body: String? = null,
+    ): Pair<Int, String> {
+        val builder = HttpRequest.newBuilder(URI("$base$path"))
+        if (body == null) {
+            builder.method(method, HttpRequest.BodyPublishers.noBody())
+        } else {
+            builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(body))
+        }
+        val response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString())
+        return response.statusCode() to response.body()
+    }
+
     /** Opens the events stream; the returned reader is closed with the server. */
     fun connectEvents(): SseTestReader {
         val body =

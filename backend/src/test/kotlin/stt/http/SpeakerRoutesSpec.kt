@@ -350,6 +350,46 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("cycle 8's task with speaker 1 named Bob, and an SSE client (queue paused, real server)") {
+            `when`("{0, 1} is merged into 0 and then all merges are reset") {
+                then("the speakers, turns and downloads are as before the merge, and the reset emits speakers-merged") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+                    val allSpeakers =
+                        """[ { "speakerId": 0, "speaker": "Speaker 1" }, { "speakerId": 1, "speaker": "Bob" }, """ +
+                            """{ "speakerId": 2, "speaker": "Speaker 3" } ]"""
+
+                    SseServer({ sttApp(stt.config.testConfig(dataDir)) }).use { server ->
+                        val events = server.connectEvents()
+                        events.readEvent().first shouldBe "snapshot"
+                        server.command("PUT", "/api/tasks/$id/speakers/1", """{ "speaker": "Bob" }""") shouldBe 200
+                        events.readEvent().first shouldBe "speakers-renamed"
+
+                        // The originals, read before any merge.
+                        val formats = listOf("txt", "srt", "vtt")
+                        val turnsBefore = server.request("GET", "/api/tasks/$id/turns")
+                        val downloadsBefore = formats.map { server.request("GET", "/api/tasks/$id/transcript?format=$it") }
+
+                        server.command("POST", "/api/tasks/$id/speakers/merge", """{ "group": [0, 1], "into": 0 }""") shouldBe 200
+                        events.readEvent().first shouldBe "speakers-merged"
+
+                        // The reset answers every speaker again, the hidden one with the name it had (Bob) …
+                        val (status, body) = server.request("DELETE", "/api/tasks/$id/speakers/merges")
+                        status shouldBe 200
+                        Json.parseToJsonElement(body) shouldBe Json.parseToJsonElement("""{ "speakers": $allSpeakers }""")
+                        // … and emits speakers-merged with them, after the mapping is gone.
+                        val (name, data) = events.readEvent()
+                        name shouldBe "speakers-merged"
+                        Json.parseToJsonElement(data) shouldBe Json.parseToJsonElement("""{ "id": $id, "speakers": $allSpeakers }""")
+
+                        // Turns and downloads are exactly as they were before the merge.
+                        server.request("GET", "/api/tasks/$id/turns") shouldBe turnsBefore
+                        formats.map { server.request("GET", "/api/tasks/$id/transcript?format=$it") } shouldBe downloadsBefore
+                    }
+                }
+            }
+        }
     })
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */

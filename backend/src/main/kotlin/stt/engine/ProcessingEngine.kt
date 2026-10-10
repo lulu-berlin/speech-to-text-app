@@ -256,6 +256,15 @@ class ProcessingEngine internal constructor(
     }
 
     /**
+     * Undoes every merge of task [id] (item 22) and, once the mapping is gone, publishes the task's speakers — all
+     * of them again — as `speakers-merged`, since its turns change as a merge's do.
+     */
+    suspend fun resetMerges(id: Long) {
+        segments.resetMerges(id)
+        _events.emit(Event.SpeakersMerged(id, segments.findDiarized(id).speakers))
+    }
+
+    /**
      * Removes the task's cached joined FLAC (`$STT_DATA_DIR/tmp/<id>.flac`, item 12's `/audio` cache), best
      * effort: the file lives outside the database, and a failure to remove it only wastes disk until the next
      * startup empties `tmp/` (the spec's cache lifecycle).
