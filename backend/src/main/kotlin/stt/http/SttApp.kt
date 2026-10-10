@@ -14,6 +14,7 @@ import stt.config.Config
 import stt.db.AudioRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
+import stt.db.SegmentRepository
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.engine.processingEngine
@@ -34,6 +35,7 @@ fun Application.sttApp(config: Config) {
         provide<TaskRepository> { TaskRepository(resolve(), resolve()) }
         provide<AudioRepository> { AudioRepository(resolve()) }
         provide<QueueStateRepository> { QueueStateRepository(resolve()) }
+        provide<SegmentRepository> { SegmentRepository(resolve()) }
         require(DependencyKey<Database>())
     }
     processingEngine(config)
@@ -41,6 +43,7 @@ fun Application.sttApp(config: Config) {
     taskRoutes()
     taskCommandRoutes()
     queueRoutes()
+    transcriptRoutes()
     uploadRoutes(config)
     val staticDir = config.staticDir
     routing {
