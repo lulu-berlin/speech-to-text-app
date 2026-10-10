@@ -22,7 +22,9 @@ class DatabaseDependencySpec :
                         application { sttApp(stt.config.testConfig(dataDir)) }
                         startApplication()
                         Files.exists(dbFile).shouldBeTrue()
-                        application.dependencies.resolve<Database>().connection.metaData.url
+                        application.dependencies
+                            .resolve<Database>()
+                            .connection.metaData.url
                             .shouldBe("jdbc:sqlite:$dbFile")
                     }
 
@@ -36,8 +38,9 @@ class DatabaseDependencySpec :
                                 sttApp(stt.config.testConfig(moduleDataDir))
                             }
                             startApplication()
-                            overrideRef = application.dependencies
-                                .resolve<Database>()
+                            overrideRef =
+                                application.dependencies
+                                    .resolve<Database>()
                         }
                     } finally {
                         override.close()
@@ -55,8 +58,9 @@ class DatabaseDependencySpec :
                     verifyCleanStop {
                         application { sttApp(stt.config.testConfig(tempdir("stt-data").toPath())) }
                         startApplication()
-                        db = application.dependencies
-                            .resolve<Database>()
+                        db =
+                            application.dependencies
+                                .resolve<Database>()
                         db.connection.isClosed.shouldBeFalse()
                     }
 

@@ -25,8 +25,9 @@ internal fun verifyCleanStop(block: suspend ApplicationTestBuilder.() -> Unit) {
 
     testApplication(CoroutineExceptionHandler { _, _ -> escaped.set(true) }) {
         block()
-        db = application.dependencies
-            .resolve<Database>()
+        db =
+            application.dependencies
+                .resolve<Database>()
     }
 
     escaped.get().shouldBeFalse()
