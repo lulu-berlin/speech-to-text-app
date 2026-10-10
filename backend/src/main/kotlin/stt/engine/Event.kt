@@ -21,4 +21,9 @@ sealed interface Event {
         val diarizationStage: DiarizationStage?,
         val diarizationProgress: Double?,
     ) : Event
+
+    /** The task's row, and everything cascading with it, was deleted; item 12's `task-deleted` event. */
+    data class TaskDeleted(
+        val id: Long,
+    ) : Event
 }

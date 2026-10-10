@@ -47,6 +47,8 @@ internal class EngineFixture(
     val failed: ReceiveChannel<Long>,
     /** The task-progress events, in order. */
     val progress: ReceiveChannel<Event.TaskProgress>,
+    /** Every event, in order, unforked. */
+    val events: ReceiveChannel<Event>,
 )
 
 /**
@@ -83,8 +85,10 @@ internal fun TestScope.engineUnderTest(
     val completed = Channel<Long>(Channel.UNLIMITED)
     val failed = Channel<Long>(Channel.UNLIMITED)
     val progress = Channel<Event.TaskProgress>(Channel.UNLIMITED)
+    val events = Channel<Event>(Channel.UNLIMITED)
     backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
         engine.events.collect { event ->
+            events.send(event)
             when (event) {
                 is Event.TaskUpdated -> {
                     when (event.task.task.status) {
@@ -96,6 +100,10 @@ internal fun TestScope.engineUnderTest(
 
                 is Event.TaskProgress -> {
                     progress.send(event)
+                }
+
+                else -> {
+                    Unit
                 }
             }
         }
@@ -112,6 +120,7 @@ internal fun TestScope.engineUnderTest(
         completed,
         failed,
         progress,
+        events,
     )
 }
 

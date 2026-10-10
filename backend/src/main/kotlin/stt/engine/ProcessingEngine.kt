@@ -188,6 +188,22 @@ class ProcessingEngine internal constructor(
         }
 
     /**
+     * Deletes the task's row — its segments, speakers, chunks, chunk audio and metadata all cascade — and
+     * only then publishes the deletion, so nothing referring to the id can re-appear after the event. Item
+     * 12's `DELETE` cancels a pending task through the engine first and awaits that cancel before calling
+     * this.
+     */
+    suspend fun deleteTask(id: Long): TaskCommandOutcome {
+        if (tasks.find(id) == null) return TaskCommandOutcome.Unknown
+        withContext(NonCancellable) {
+            tasks.delete(id)
+            _events.emit(Event.TaskDeleted(id))
+        }
+        wake()
+        return TaskCommandOutcome.Accepted
+    }
+
+    /**
      * Retries a FAILED or CANCELED task: it is queued at the end with its error cleared and runs again
      * like after a restart — the stored plan is reused, DONE chunks are skipped, the interrupted chunk is
      * rerun and diarization replaces the stored speakers (item 09). A COMPLETED task cannot be retried
