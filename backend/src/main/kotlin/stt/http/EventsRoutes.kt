@@ -132,7 +132,7 @@ private suspend fun Event.sseData(tasks: TaskRepository): String =
         }
 
         is Event.SpeakersRenamed -> {
-            SseJson.encodeToString(SpeakersEventJson(id, speakers.map { SpeakerJson(it.speakerId, it.speaker) }))
+            SseJson.encodeToString(SpeakersEventJson(id, speakers.map { it.toJson() }))
         }
     }
 
