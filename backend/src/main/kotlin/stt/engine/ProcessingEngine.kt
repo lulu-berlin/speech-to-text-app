@@ -227,8 +227,9 @@ class ProcessingEngine internal constructor(
 
     /**
      * Renames speaker [speakerId] of task [id] to [name] (item 22) and, only once the row is stored, publishes
-     * the task's speakers as read back from the database, so the event never shows a name that was not
-     * stored. A refused rename ([RenameOutcome.DuplicateName]) stores and publishes nothing.
+     * the task's effective speakers as read back through its merges, so the event never shows a name that was
+     * not stored, nor a speaker hidden by a merge. A refused rename ([RenameOutcome.DuplicateName]) stores and
+     * publishes nothing.
      */
     suspend fun renameSpeaker(
         id: Long,
@@ -236,7 +237,7 @@ class ProcessingEngine internal constructor(
         name: String,
     ): RenameOutcome {
         val outcome = segments.renameSpeaker(id, speakerId, name)
-        if (outcome == RenameOutcome.Renamed) _events.emit(Event.SpeakersRenamed(id, segments.findSpeakers(id)))
+        if (outcome == RenameOutcome.Renamed) _events.emit(Event.SpeakersRenamed(id, segments.findDiarized(id).speakers))
         return outcome
     }
 

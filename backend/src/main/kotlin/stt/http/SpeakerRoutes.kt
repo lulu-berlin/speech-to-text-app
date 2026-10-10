@@ -61,7 +61,7 @@ fun Application.speakerRoutes() {
             val name = requested ?: defaultSpeakerName(speakerId)
             when (val outcome = engine.renameSpeaker(id, speakerId, name)) {
                 RenameOutcome.Renamed -> {
-                    call.respond(SpeakersJson(segments.findSpeakers(id).map { it.toJson() }))
+                    call.respondSpeakers(segments, id)
                 }
 
                 is RenameOutcome.DuplicateName -> {

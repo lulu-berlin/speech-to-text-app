@@ -468,6 +468,31 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("cycle 8's task with {0, 1} merged into 0, and an SSE client (queue paused, real server)") {
+            `when`("speaker 0 is renamed to Alice") {
+                then("the 200 and the speakers-renamed payload list only the effective speakers") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+                    val effective = """[ { "speakerId": 0, "speaker": "Alice" }, { "speakerId": 2, "speaker": "Speaker 3" } ]"""
+
+                    SseServer({ sttApp(stt.config.testConfig(dataDir)) }).use { server ->
+                        val events = server.connectEvents()
+                        events.readEvent().first shouldBe "snapshot"
+                        server.command("POST", "/api/tasks/$id/speakers/merge", """{ "group": [0, 1], "into": 0 }""") shouldBe 200
+                        events.readEvent().first shouldBe "speakers-merged"
+
+                        // The contract's "200 with the task's effective speakers": the hidden speaker 1 is not listed.
+                        val (status, body) = server.request("PUT", "/api/tasks/$id/speakers/0", """{ "speaker": "Alice" }""")
+                        status shouldBe 200
+                        Json.parseToJsonElement(body) shouldBe Json.parseToJsonElement("""{ "speakers": $effective }""")
+                        val (name, data) = events.readEvent()
+                        name shouldBe "speakers-renamed"
+                        Json.parseToJsonElement(data) shouldBe Json.parseToJsonElement("""{ "id": $id, "speakers": $effective }""")
+                    }
+                }
+            }
+        }
     })
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */

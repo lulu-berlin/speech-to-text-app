@@ -113,7 +113,7 @@ The JSON shapes the frontend builds against.
   - `task-progress` → `{ "id", "transcriptionProgress", "diarizationStage", "diarizationProgress" }`
   - `queue-updated` → Queue
   - `task-deleted` → `{ "id" }`
-  - `speakers-renamed` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored rename or name reset, the task's speakers as stored; a rejected rename emits nothing
+  - `speakers-renamed` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored rename or name reset, the task's effective speakers as stored; a rejected rename emits nothing
   - `speakers-merged` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored merge or a reset of all merges, the task's effective speakers; a rejected merge emits nothing. Turns can join or split along a former boundary, so a client showing the task's transcript refetches `/turns`
 - **Error codes:**
 
