@@ -282,15 +282,19 @@ class TaskRepository(
             it[TasksTable.finishedAt] = finishedAt
         }
 
+    /** Writes [body] to task [id]'s row only while [condition] holds, inside the caller's transaction. */
+    private fun updateTaskIfRow(
+        id: Long,
+        condition: Op<Boolean>,
+        body: TasksTable.(UpdateStatement) -> Unit,
+    ): Boolean = TasksTable.update({ (TasksTable.id eq id) and condition }) { body(it) } > 0
+
     /** Writes [body] to task [id]'s row only while [condition] holds; returns whether the row was written. */
     private suspend fun updateTaskIf(
         id: Long,
         condition: Op<Boolean>,
         body: TasksTable.(UpdateStatement) -> Unit,
-    ): Boolean =
-        db.writeTransaction {
-            TasksTable.update({ (TasksTable.id eq id) and condition }) { body(it) } > 0
-        }
+    ): Boolean = db.writeTransaction { updateTaskIfRow(id, condition, body) }
 
     /**
      * Restart recovery (ADR 0004): marks every RUNNING task QUEUED again, keeping its `queue_position`,
@@ -303,6 +307,32 @@ class TaskRepository(
             TasksTable.update({ TasksTable.status eq TaskStatus.RUNNING }) {
                 it[TasksTable.status] = TaskStatus.QUEUED
                 it[TasksTable.phase] = null
+            }
+        }
+
+    /**
+     * Retries a FAILED or CANCELED task: it is queued again at the end — one position after the highest
+     * queued position today — and its error, `finished_at` and phase are cleared (item 12's contract), all
+     * in one transaction so the position cannot collide. The engine checks item 04's table first, so a
+     * COMPLETED task is never retried. Returns whether the row was written.
+     */
+    suspend fun retryIfPossible(id: Long): Boolean =
+        db.writeTransaction {
+            val last =
+                TasksTable
+                    .selectAll()
+                    .where { TasksTable.queuePosition.isNotNull() }
+                    .orderBy(TasksTable.queuePosition to SortOrder.DESC)
+                    .limit(1)
+                    .singleOrNull()
+                    ?.get(TasksTable.queuePosition)
+                    ?: -1
+            updateTaskIfRow(id, TasksTable.status inList listOf(TaskStatus.FAILED, TaskStatus.CANCELED)) {
+                it[TasksTable.status] = TaskStatus.QUEUED
+                it[TasksTable.error] = null
+                it[TasksTable.finishedAt] = null
+                it[TasksTable.phase] = null
+                it[TasksTable.queuePosition] = last + 1
             }
         }
 
