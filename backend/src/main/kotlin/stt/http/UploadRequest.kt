@@ -117,30 +117,23 @@ internal class UploadRequest(
     }
 }
 
-/** The extensions the upload accepts, checked case-insensitively; the content type is ignored (item 12). */
-internal val ALLOWED_EXTENSIONS: Set<String> =
-    setOf(
-        "mp3",
-        "wav",
-        "flac",
-        "ogg",
-        "oga",
-        "opus",
-        "m4a",
-        "aac",
-        "wma",
-        "aif",
-        "aiff",
-        "amr",
-        "webm",
-        "mp4",
-        "m4v",
-        "mov",
-        "mkv",
-        "mka",
-        "3gp",
-    )
-private const val ALLOWED_EXTENSIONS_LIST = "mp3 wav flac ogg oga opus m4a aac wma aif aiff amr webm mp4 m4v mov mkv mka 3gp"
+/**
+ * The extensions the upload accepts, checked case-insensitively; the content type is ignored (item 12).
+ * Packaged under `src/main/resources` in the contract file's order (parity: AllowedExtensionsContractSpec).
+ */
+internal val ALLOWED_EXTENSIONS: List<String> =
+    Json
+        .parseToJsonElement(
+            Thread
+                .currentThread()
+                .contextClassLoader
+                .getResource("allowed-extensions.json")!!
+                .readText(),
+        ).jsonArray
+        .map { it.jsonPrimitive.content }
+
+/** The allowed extensions, space-joined in the contract file's order, for the rejection message. */
+private val ALLOWED_EXTENSIONS_LIST = ALLOWED_EXTENSIONS.joinToString(" ")
 
 /** The upper bound for a fixed speaker count and for `maxSpeakers` (item 12). */
 private const val MAX_SPEAKERS = 20

@@ -66,3 +66,12 @@ int main(void) {
 EOF
 gcc -o /tmp/langs /tmp/langs.c -L"$L" -lwhisper -Wl,-rpath,"$L" && /tmp/langs > docs/api/languages.json
 ```
+
+## Upload allow-list
+
+`allowed-extensions.json` is contract data, not a response: the extensions an upload accepts, checked case-insensitively (the content type is ignored).
+
+- The queue's upload validation reads it; any other extension is rejected client-side before any request (item 14).
+- The upload route validates the file's extension against a packaged copy of it (`400 unsupported-format` otherwise, item 12), pinned to this file by `AllowedExtensionsContractSpec` (item 28).
+
+The order of the array is meaningful: it is also the order the backend's rejection message lists the allowed extensions. An extension belongs in the list only when whisper.cpp / ffmpeg on this project's stack can actually decode it.
