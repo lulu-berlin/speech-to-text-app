@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { asRgb, px } from '../test/dom';
+import { asRgb, px, required } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { App } from './App';
 
@@ -17,6 +17,22 @@ describe('the app root', () => {
   it('renders the page title', () => {
     renderAt('/queue');
     expect(screen.getByRole('heading', { name: 'Speech-to-Text' })).toBeInTheDocument();
+  });
+
+  it('shows the stenographer animation next to the product name at the header size', () => {
+    renderAt('/queue');
+
+    const title = screen.getByRole('heading', { name: 'Speech-to-Text' });
+    const header = required(title.closest('header'));
+    const steno = required(header.querySelector('svg'));
+
+    // The mascot sits directly before the product name.
+    expect(steno.nextElementSibling).toBe(title);
+
+    // And it renders at the header size (32-40 px at 16 px roots).
+    const style = getComputedStyle(steno);
+    expect(style.width).toBe(px(lightTheme.sizes.stenoHeader));
+    expect(style.height).toBe(px(lightTheme.sizes.stenoHeader));
   });
 
   it('redirects / to /queue, shows the history and transcript views, and a not-found view otherwise', () => {
