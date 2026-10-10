@@ -1,5 +1,12 @@
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { useMachine } from '@xstate/react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent, ReactNode } from 'react';
 import { Link } from 'react-router';
 import { css, styled } from 'styled-components';
@@ -16,8 +23,9 @@ import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { toggleMachine } from '../../shared/state/toggleMachine';
+import { reorderMachine } from './reorderMachine';
 import { RowContent, RowName } from './rowParts';
-import { TaskRow } from './TaskRow';
+import { SortableTaskRow } from './SortableTaskRow';
 import { uploadBatchMachine } from './uploadBatchMachine';
 import type { UploadRow } from './uploadBatchMachine';
 import { isSupportedFormat } from './uploadValidation';
@@ -181,7 +189,20 @@ export function QueueView() {
   const [maxSpeakers, setMaxSpeakers] = useState(8);
   const [advanced, sendAdvanced] = useMachine(toggleMachine);
   const [upload, sendToUploader] = useMachine(uploadBatchMachine);
+  const [reorder, sendReorder] = useMachine(reorderMachine, {
+    input: { order: queue?.taskIds ?? [] },
+  });
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Follow the live queue while no reorder is in flight: a new upload or a removal
+  // reconciles into the displayed order (the machine ignores SYNC while sending).
+  useEffect(() => {
+    sendReorder({ type: 'SYNC', order: queue?.taskIds ?? [] });
+  }, [queue, sendReorder]);
 
   const enqueue = (files: File[]) => {
     const options: UploadOptions = {
@@ -204,10 +225,20 @@ export function QueueView() {
     event.target.value = '';
   };
 
-  // The pending tasks (QUEUED, RUNNING, PAUSED) in queue order (docs/api/queue.json). A
-  // task that left the queue (canceled, finished) stays out even if its id lingers in the
-  // queue-updated event for a moment, so its row leaves at once.
-  const pendingTasks = (queue?.taskIds ?? [])
+  // A dropped drag moves the active task to the position of the one it landed on.
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (over === null || active.id === over.id) {
+      return;
+    }
+    const id = Number(active.id);
+    sendReorder({ type: 'MOVE', id, to: reorder.context.order.indexOf(Number(over.id)) });
+  };
+
+  // The pending tasks (QUEUED, RUNNING, PAUSED) in displayed order (the reorder machine
+  // owns the order; docs/api/queue.json feeds it). A task that left the queue (canceled,
+  // finished) stays out even if its id lingers in the queue-updated event for a moment,
+  // so its row leaves at once.
+  const pendingTasks = reorder.context.order
     .map((id) => tasks.find((task) => task.id === id))
     .filter(
       (task): task is Task =>
@@ -304,11 +335,21 @@ export function QueueView() {
           </List>
         ) : null}
         {pendingTasks.length > 0 ? (
-          <List label="Pending tasks">
-            {pendingTasks.map((task) => (
-              <TaskRow key={task.id} task={task} />
-            ))}
-          </List>
+          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+            <SortableContext items={reorder.context.order} strategy={verticalListSortingStrategy}>
+              <List label="Pending tasks">
+                {pendingTasks.map((task, index) => (
+                  <SortableTaskRow
+                    key={task.id}
+                    task={task}
+                    index={index}
+                    count={pendingTasks.length}
+                    onMoveTask={(id, to) => sendReorder({ type: 'MOVE', id, to })}
+                  />
+                ))}
+              </List>
+            </SortableContext>
+          </DndContext>
         ) : null}
       </Stack>
     </Page>
