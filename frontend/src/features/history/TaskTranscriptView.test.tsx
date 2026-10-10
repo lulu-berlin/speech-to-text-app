@@ -39,6 +39,19 @@ describe('the transcript view', () => {
     // A turn's timestamp is shown (as a time of day label).
     expect(screen.getByText(/00:00/)).toBeInTheDocument();
   });
+
+  it('shows a speakers-off transcript without speaker labels', async () => {
+    await renderTranscript('4'); // task 4 is FAILED with speakersMode "off" (id 4).
+
+    // The turn text (docs/api/turns.speakers-off.json) is visible.
+    expect(await screen.findByText('Remember to buy milk.')).toBeInTheDocument();
+    expect(screen.getByText('And call the dentist on Monday.')).toBeInTheDocument();
+
+    // No speaker name is shown; the timestamps still are.
+    expect(screen.queryByText('Speaker 1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Speaker/)).not.toBeInTheDocument();
+    expect(screen.getByText(/00:00/)).toBeInTheDocument();
+  });
 });
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
