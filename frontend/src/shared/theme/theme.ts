@@ -52,6 +52,7 @@ export interface ThemeTokens {
     switchWidth: string;
     switchHeight: string;
     switchThumb: string;
+    sliderThumb: string;
   };
   radii: {
     dialog: string;
@@ -109,6 +110,7 @@ const baseTokens = {
     switchWidth: '2.75rem',
     switchHeight: '1.5rem',
     switchThumb: '1.25rem',
+    sliderThumb: '1.25rem',
   },
   radii: {
     dialog: '0.5rem',
