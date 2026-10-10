@@ -3,10 +3,11 @@ import { useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { getTurns } from '../../shared/api/client';
-import type { Turn, Turns } from '../../shared/api/types';
+import type { Segment, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
 import { speakerTint } from '../../shared/theme/speakerPalette';
+import { segmentAtTime } from './segmentTiming';
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -50,6 +51,11 @@ const Timestamp = styled.span`
   font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
+const Segment = styled.span<{ $active: boolean }>`
+  background: ${(props) => (props.$active ? props.theme.colors.accent : 'transparent')};
+  color: ${(props) => (props.$active ? props.theme.colors.accentText : 'inherit')};
+`;
+
 export function TaskTranscriptView() {
   const { taskId } = useParams();
   const id = Number(taskId);
@@ -91,6 +97,17 @@ export function TaskTranscriptView() {
     return turns.turns.map((turn) => ({ turn, speaker: turns.speakers[turn.speakerId ?? 0] }));
   }, [turns]);
 
+  // The playhead on the /audio timeline in milliseconds (item 8): updated from the audio
+  // element's timeupdate and seeked events; drives the playback highlight.
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
+
+  // All segments in time order, so the highlight can be a binary search over the starts.
+  const segmentsInOrder = useMemo(
+    () => (turns === null ? [] : turns.turns.map((turn) => turn.segments).flat()),
+    [turns],
+  );
+  const activeSegment = segmentAtTime(segmentsInOrder, currentTimeMs);
+
   if (task === undefined) {
     return (
       <Page>
@@ -120,6 +137,8 @@ export function TaskTranscriptView() {
             controls
             src={`/api/tasks/${id}/audio`}
             aria-label={task?.filename !== undefined ? `Audio for ${task.filename}` : 'Audio'}
+            onTimeUpdate={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
+            onSeeked={(event) => setCurrentTimeMs(event.currentTarget.currentTime * 1000)}
           >
             Your browser does not support the audio element.
           </audio>
@@ -141,7 +160,16 @@ export function TaskTranscriptView() {
                       {speaker.speaker}
                     </SpeakerName>
                   ) : null}{' '}
-                  {turn.text}
+                  {turn.segments.map((segment) => (
+                    <span key={`${segment.startMs}-${segment.endMs}`}>
+                      <Segment
+                        $active={segment === activeSegment}
+                        data-active={segment === activeSegment || undefined}
+                      >
+                        {segment.text}
+                      </Segment>{' '}
+                    </span>
+                  ))}
                 </TurnText>
               </Stack>
             ))}
