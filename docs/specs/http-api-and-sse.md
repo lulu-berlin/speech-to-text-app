@@ -104,7 +104,7 @@ The JSON shapes the frontend builds against.
   - With speakers `off`: `speakers` is empty, and there is one turn per segment with `speakerId: null`.
   - Text ([ADR 0030](../decisions/0030-trimmed-segment-text-in-all-outputs.md)): every segment `text` is trimmed; a turn's `text` is its segments' non-blank trimmed texts joined with single spaces (a blank segment must not leave a double space, user decision 2026-10-10).
 - **Speakers** (added 2026-10-10, item 22): `{ "speakers": [{ "speakerId", "speaker" }] }`, the task's speakers ordered by `speakerId` ([`docs/api/speakers.json`](../api/speakers.json)).
-  - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is stored as sent; clients trim it first (user decision 2026-10-10). Leading or trailing whitespace, empty, longer than 40 characters, or a control character anywhere → `400 invalid-speaker-name`, nothing changes.
+  - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is stored as sent; clients trim it first (user decision 2026-10-10). Leading or trailing whitespace, empty, longer than 40 characters, or a control character anywhere → `400 invalid-speaker-name`, nothing changes. A name another speaker of the task already has, compared case-insensitively and including speakers hidden by a merge → `409 duplicate-speaker-name`; a speaker's own current name is no duplicate (user decisions 2026-10-10).
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task
@@ -117,7 +117,7 @@ The JSON shapes the frontend builds against.
   | ------ | ----- |
   | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format`, `invalid-speaker-name` (item 22) |
   | `404` | `not-found` (unknown task), `no-audio` (task without stored chunks) |
-  | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns or transcript of a task that is not COMPLETED) |
+  | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns or transcript of a task that is not COMPLETED), `duplicate-speaker-name` (item 22) |
   | `500` | `internal` |
 - **Mock additions from item 13** (added 2026-10-09): the frontend workspace added [`docs/api/task.paused.json`](../api/task.paused.json) and [`docs/api/task.canceled.json`](../api/task.canceled.json), because no example had those statuses, and it recorded where its mocks must deviate from this contract. That list is the "Mock additions to settle with item 12" section of [the frontend foundation spec](frontend-foundation.md); this item's route tests adopt the two examples and settle each deviation (item 21 verifies the rest end to end).
 - **Task transition table** (added 2026-10-09, item 13 consultation): [`docs/api/task-transitions.json`](../api/task-transitions.json) lists the allowed status transitions and, for each command endpoint, the statuses it accepts. The frontend reads it to offer only allowed commands; the backend checks that its `TaskStatus` table equals it (item 11). A command outside the table still answers `409 illegal-transition`.
