@@ -67,7 +67,7 @@ fun Application.transcriptRoutes() {
                 val speakers = segments.findSpeakers(id)
                 call.respond(
                     TurnsJson(
-                        speakers = speakers.map { SpeakerJson(it.speakerId, it.speaker) },
+                        speakers = speakers.map { it.toJson() },
                         turns =
                             speakerTurns(stored, speakers).map { turn ->
                                 TurnJson(

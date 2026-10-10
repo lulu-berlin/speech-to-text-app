@@ -10,6 +10,7 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
+import stt.db.Speaker
 import stt.db.defaultSpeakerName
 import stt.engine.ProcessingEngine
 
@@ -41,7 +42,7 @@ fun Application.speakerRoutes() {
             val name = requested ?: defaultSpeakerName(speakerId)
             when (val outcome = engine.renameSpeaker(id, speakerId, name)) {
                 RenameOutcome.Renamed -> {
-                    call.respond(SpeakersJson(segments.findSpeakers(id).map { SpeakerJson(it.speakerId, it.speaker) }))
+                    call.respond(SpeakersJson(segments.findSpeakers(id).map { it.toJson() }))
                 }
 
                 is RenameOutcome.DuplicateName -> {
@@ -81,3 +82,5 @@ data class SpeakerJson(
     val speakerId: Int,
     val speaker: String,
 )
+
+fun Speaker.toJson(): SpeakerJson = SpeakerJson(speakerId, speaker)
