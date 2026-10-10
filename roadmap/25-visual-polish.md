@@ -1,7 +1,7 @@
 # 25 — Visual polish pass
 
 Status: spec-approved
-Depends on: [24](24-visual-design.md), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md)
+Depends on: [24](../docs/specs/design-system.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md)
 
 ## Goal
 

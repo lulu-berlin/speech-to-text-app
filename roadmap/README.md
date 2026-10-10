@@ -56,7 +56,7 @@ graph TD
   12 --> 22
   15 --> 22
   09 --> 23[23 faster clustering ✓]:::done
-  13 --> 24[24 design system]
+  13 --> 24[24 design system ✓]:::done
   24 --> 14
   24 --> 15
   24 --> 17
@@ -93,5 +93,5 @@ graph TD
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | spec-approved | 12, 13, 14, 15, 22, 25 |
 | [22 — Rename and merge a task's speakers](22-speaker-rename.md) | spec-approved | 09, 10, 12, 15 |
 | [23 — Faster speaker clustering](../docs/specs/faster-clustering.md) | done | 09 |
-| [24 — Design system: tokens and primitives](24-visual-design.md) | spec-approved | 13 |
+| [24 — Design system: tokens and primitives](../docs/specs/design-system.md) | done | 13 |
 | [25 — Visual polish pass](25-visual-polish.md) | spec-approved | 24, 14, 15 |

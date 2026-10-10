@@ -1,7 +1,7 @@
 # 17 — Branding: stenographer animation
 
 Status: spec-approved
-Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](24-visual-design.md)
+Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
 
 ## Goal
 
