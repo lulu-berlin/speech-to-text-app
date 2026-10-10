@@ -1,7 +1,7 @@
 # 25 — Visual polish pass
 
 Status: spec-approved
-Depends on: [24](../docs/specs/design-system.md) (done), [14](14-frontend-queue-ui.md), [15](15-frontend-history-ui.md)
+Depends on: [24](../docs/specs/design-system.md) (done), [14](14-frontend-queue-ui.md), [15](../docs/specs/frontend-history-ui.md) (done)
 
 ## Goal
 
@@ -25,7 +25,7 @@ Make the finished app look deliberate: apply item 24's tokens and primitives to 
   - **the phase (CHUNKING / TRANSCRIBING / DIARIZING) is a text label** beside the progress bars, not a separate step indicator or icon;
   - upload area and drag-over state;
   - **the transcript is a centred reading column** with a maximum measure (~70 characters): a header block with the task's name, date and duration, then the audio player and the download buttons, then the turns; comfortable line height and turn spacing, clear speaker labels and timestamps, and the playing-segment highlight;
-    - The history rows already show the date and duration once item 15 merges (added there 2026-10-10); this item restyles them, it does not add them.
+    - The history rows already show the date and duration (added by item 15, merged 2026-10-10); this item restyles them, it does not add them.
   - **History is a list of cards** (filename, status, date, duration; FAILED cards show the error), which are touch-friendly and read well on a phone; the date and duration land with item 15 (2026-10-10), this item makes the cards look finished;
   - **empty, loading and error states for every view**: an empty state is one line of guidance plus the primary action (e.g. "No tasks yet — drop audio files here, or click to choose them"); loading shows the stenographer (item 17, which replaces the spinners and skeletons); an error is informative rather than raw.
 - **Responsive**: usable from a narrow phone width to a wide desktop; no horizontal overflow; controls reachable; the queue's rows and the history's cards stack on a narrow screen.
