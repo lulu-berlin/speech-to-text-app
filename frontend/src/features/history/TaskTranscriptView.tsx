@@ -17,6 +17,7 @@ import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
+import { SpeakersPanel } from './SpeakersPanel';
 
 function formatTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -384,6 +385,17 @@ export function TaskTranscriptView() {
           </Button>
         </Row>
         {audioBlock}
+        {turns !== null && turns.speakers.length > 0 ? (
+          // Item 22: the panel edits the effective speakers; a stored change replaces the
+          // speakers the turns are labelled with (turns reference them by speakerId).
+          <SpeakersPanel
+            taskId={id}
+            speakers={turns.speakers}
+            onSpeakersChanged={(speakers) =>
+              setTurns((previous) => (previous === null ? previous : { ...previous, speakers }))
+            }
+          />
+        ) : null}
         {turnsBySpeaker === null ? (
           <Text>Loading…</Text>
         ) : (

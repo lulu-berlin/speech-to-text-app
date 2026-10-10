@@ -13,6 +13,7 @@ import {
   turns as turnsFixture,
   turnsSpeakersOff as turnsSpeakersOffFixture,
   error as errorFixture,
+  speakers as speakersFixture,
   taskTransitions,
 } from './fixtures';
 
@@ -122,6 +123,20 @@ export const handlers = [
     }
     const fixture = task.speakersMode === 'off' ? turnsSpeakersOffFixture : turnsFixture;
     return HttpResponse.json(fixture);
+  }),
+
+  // Rename a speaker: PUT /api/tasks/{id}/speakers/{speakerId} -> 200 speakers.json.
+  // Mock addition (item 22): speakers.json with the requested speaker's name set to the sent
+  // one (or "Speaker N" for a reset), because the response shows the stored name.
+  http.put('/api/tasks/:id/speakers/:speakerId', async ({ params, request }) => {
+    const speakerId = Number(params.speakerId);
+    const body = (await request.json()) as { speaker: string | null };
+    const name = body.speaker ?? `Speaker ${speakerId + 1}`;
+    return HttpResponse.json({
+      speakers: speakersFixture.speakers.map((speaker) =>
+        speaker.speakerId === speakerId ? { ...speaker, speaker: name } : speaker,
+      ),
+    });
   }),
 
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
