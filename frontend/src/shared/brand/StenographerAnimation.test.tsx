@@ -135,4 +135,42 @@ describe('the stenographer animation', () => {
       expect(selector.startsWith(`${componentClass} `)).toBe(true);
     }
   });
+
+  it('keeps the defs per instance: two components on one page have disjoint ids and self-resolving references', () => {
+    const { container } = renderThemed(
+      <>
+        <StenographerAnimation />
+        <StenographerAnimation />
+      </>,
+    );
+
+    const svgs = [...container.querySelectorAll('svg')];
+    expect(svgs).toHaveLength(2);
+    const instances = svgs.map((svg) => {
+      const ids = new Set([...svg.querySelectorAll('[id]')].map((element) => element.id));
+      const references = [...svg.querySelectorAll('[fill^="url(#"], [clip-path^="url(#"]')].map(
+        (element) => {
+          const value = element.getAttribute('fill') ?? element.getAttribute('clip-path') ?? '';
+          return value.slice(5, -1);
+        },
+      );
+      return { ids, references };
+    });
+
+    // The two instances share no def id.
+    expect(instances).toHaveLength(2);
+    const first = instances[0]!;
+    const second = instances[1]!;
+    for (const id of first.ids) {
+      expect(second.ids.has(id)).toBe(false);
+    }
+
+    // Every reference resolves within its own instance.
+    for (const instance of instances) {
+      expect(instance.references.length).toBeGreaterThan(0);
+      for (const reference of instance.references) {
+        expect(instance.ids.has(reference)).toBe(true);
+      }
+    }
+  });
 });
