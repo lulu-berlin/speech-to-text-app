@@ -4,10 +4,10 @@ import { HistoryView } from '../features/history/HistoryView';
 import { TaskTranscriptView } from '../features/history/TaskTranscriptView';
 import { QueueView } from '../features/queue/QueueView';
 import plexSansUrl from '../shared/theme/fonts/ibm-plex-sans-latin-wght-normal.woff2?url';
-import { StenographerAnimation } from '../shared/brand/StenographerAnimation';
 import { resolveTheme, useThemeMode } from '../shared/theme/themeMode';
 import { usePrefersDark } from '../shared/theme/usePrefersDark';
 import { AppHeader } from './AppHeader';
+import { ConnectingRegion } from './ConnectingRegion';
 import { ConnectionContext } from './ConnectionContext';
 import { NotFoundView } from './NotFoundView';
 
@@ -46,37 +46,6 @@ const Main = styled.main`
   color: ${(props) => props.theme.colors.text};
 `;
 
-// The demo loading region (item 17): until the first snapshot arrives the app shell
-// waits with the mascot and a short label — the pattern items 14/15 copy for their
-// loading regions when they switch from skeletons to the stenographer.
-const ConnectingRegion = styled.section`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: ${(props) => props.theme.spacing.sm};
-  padding: ${(props) => props.theme.spacing.xl};
-`;
-
-const ConnectingLabel = styled.p`
-  margin: 0;
-  color: ${(props) => props.theme.colors.textMuted};
-`;
-
-// Reads the live flag from the connection machine inside the provider (the demo loading
-// region of item 17): nothing renders once the first snapshot has landed.
-function ConnectingGate() {
-  const live = ConnectionContext.useSelector((state) => state.value === 'live');
-  if (live) {
-    return null;
-  }
-  return (
-    <ConnectingRegion>
-      <StenographerAnimation size="empty" />
-      <ConnectingLabel>Connecting…</ConnectingLabel>
-    </ConnectingRegion>
-  );
-}
-
 export function App() {
   const [themeMode, cycleMode] = useThemeMode();
   const theme = resolveTheme(themeMode, usePrefersDark());
@@ -86,7 +55,7 @@ export function App() {
       <ConnectionContext.Provider>
         <Shell>
           <AppHeader themeMode={themeMode} onCycleThemeMode={cycleMode} />
-          <ConnectingGate />
+          <ConnectingRegion />
           <Main>
             <Routes>
               <Route path="/" element={<Navigate to="/queue" replace />} />
