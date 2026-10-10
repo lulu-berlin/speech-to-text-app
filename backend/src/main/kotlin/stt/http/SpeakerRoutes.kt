@@ -42,7 +42,8 @@ fun Application.speakerRoutes() {
         put("/api/tasks/{id}/speakers/{speakerId}") {
             val id = call.completedTaskOrError(tasks, "speakers to rename")?.id ?: return@put
             val speakerId = call.parameters["speakerId"]?.toIntOrNull()
-            if (speakerId == null || segments.findSpeakers(id).none { it.speakerId == speakerId }) {
+            // Only a shown speaker can be renamed: one hidden by a merge answers 404 too (user decision 2026-10-10).
+            if (speakerId == null || segments.findDiarized(id).speakers.none { it.speakerId == speakerId }) {
                 return@put call.respondError(
                     HttpStatusCode.NotFound,
                     "not-found",
