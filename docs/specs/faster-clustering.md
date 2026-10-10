@@ -9,7 +9,7 @@ Make speaker clustering fast and light enough for long recordings without changi
 
 ## Already decided
 
-- [Item 09 spec](../docs/specs/diarization.md): UPGMA (average linkage) on cosine distance, ported 1:1 from the oracle (`O(n²)` memory for the distance matrix, `O(n³)` time). Measured: 1000 segments 0.68 s / 8 MiB, 3000 segments 11.4 s / 69 MiB. The spec says to revisit this, with its own decision, if performance becomes an issue.
+- [Item 09 spec](diarization.md): UPGMA (average linkage) on cosine distance, ported 1:1 from the oracle (`O(n²)` memory for the distance matrix, `O(n³)` time). Measured: 1000 segments 0.68 s / 8 MiB, 3000 segments 11.4 s / 69 MiB. The spec says to revisit this, with its own decision, if performance becomes an issue.
 - User decision (item 10/11 consultation, 2026-10-09): optimize now, as its own item in parallel with item 11, and measure the accuracy impact.
 - [ADR 0027](../decisions/0027-auto-speaker-count-allows-one-speaker.md), [ADR 0032](../decisions/0032-speaker-distance-threshold-for-campplus.md): the speaker-count rules and the threshold apply to the merge heights. They are unchanged by this item.
 - The distance stays `1 − a·b` computed in double on L2-normalized embeddings (item 09), whatever computes it.
