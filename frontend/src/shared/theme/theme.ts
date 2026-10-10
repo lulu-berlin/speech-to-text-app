@@ -67,6 +67,9 @@ export interface ThemeTokens {
   fontSizes: {
     title: string;
   };
+  fontWeights: {
+    semibold: number;
+  };
   iconSizes: {
     sm: string;
     md: string;
@@ -105,6 +108,9 @@ const baseTokens = {
   },
   fontSizes: {
     title: '1.5rem',
+  },
+  fontWeights: {
+    semibold: 600,
   },
   iconSizes: {
     sm: '1rem',
