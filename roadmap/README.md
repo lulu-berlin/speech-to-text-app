@@ -65,6 +65,7 @@ graph TD
   15 --> 25
   11 --> 26[26 engine shutdown race ✓]:::done
   27[27 pin sqlite-jdbc ✓]:::done
+  28[28 post-merge cleanup]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -99,3 +100,4 @@ graph TD
 | [25 — Visual polish pass](25-visual-polish.md) | spec-approved | 24, 14, 15 |
 | [26 — Engine start/stop race (flaky DatabaseDependencySpec)](../docs/specs/engine-shutdown-race.md) | done | 11 |
 | [27 — Pin the sqlite-jdbc version](../docs/specs/sqlite-jdbc-pin.md) | done | — |
+| [28 — Post-merge cleanup refactors](28-post-merge-cleanup.md) | spec-approved | — |
