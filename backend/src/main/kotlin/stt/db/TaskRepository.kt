@@ -3,6 +3,7 @@ package stt.db
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
@@ -10,10 +11,12 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNotNull
+import org.jetbrains.exposed.v1.core.max
 import org.jetbrains.exposed.v1.core.statements.UpdateStatement
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
 import stt.queue.TaskStatus
@@ -105,6 +108,38 @@ class TaskRepository(
                 .where { TasksTable.id eq id }
                 .singleOrNull()
                 ?.toStoredTask()
+        }
+
+    /**
+     * The task with the facts the API reports beside its row ([TaskDetails]), read in one transaction so they
+     * agree with each other. Every task is created with its upload's `audio` row ([createFromUpload]), so a
+     * task is read together with it.
+     */
+    suspend fun details(id: Long): TaskDetails? =
+        db.readTransaction {
+            TasksTable
+                .join(AudioTable, JoinType.INNER, TasksTable.id, AudioTable.taskId)
+                .selectAll()
+                .where { TasksTable.id eq id }
+                .singleOrNull()
+                ?.let { row ->
+                    val lastSegmentEnd = SegmentsTable.endMs.max()
+                    TaskDetails(
+                        id = id,
+                        task = row.toTask(),
+                        sizeBytes = row[AudioTable.sizeBytes],
+                        hasAudio =
+                            !ChunkAudioTable
+                                .select(ChunkAudioTable.taskId)
+                                .where { ChunkAudioTable.taskId eq id }
+                                .empty(),
+                        transcribedUntilMs =
+                            SegmentsTable
+                                .select(lastSegmentEnd)
+                                .where { SegmentsTable.taskId eq id }
+                                .single()[lastSegmentEnd],
+                    )
+                }
         }
 
     /** All tasks in creation (id) order; reads only `tasks`, never audio. */
