@@ -1,6 +1,6 @@
 # 22 — Rename and merge a task's speakers
 
-Status: spec-approved
+Status: in-progress
 Depends on: [09](../docs/specs/diarization.md) (done), [10](../docs/specs/output-formats.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [15](../docs/specs/frontend-history-ui.md) (done)
 
 ## Goal
