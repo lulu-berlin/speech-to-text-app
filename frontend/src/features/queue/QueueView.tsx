@@ -196,27 +196,16 @@ export function QueueView() {
     setRows((current) => [
       ...current,
       ...files.map((file) => {
-        if (!isSupportedFormat(file.name)) {
-          // Item 12 contract: the extension allow-list is checked client-side, so an
-          // unsupported file never uploads.
-          return {
-            id: ++nextRowId.current,
-            file,
-            options,
-            status: 'error' as const,
-            progress: 0,
-            error: 'Unsupported file format',
-            taskId: undefined,
-            duplicateTaskId: undefined,
-          };
-        }
+        // Item 12 contract: the extension allow-list is checked client-side, so an
+        // unsupported file never uploads.
+        const supported = isSupportedFormat(file.name);
         return {
           id: ++nextRowId.current,
           file,
           options,
-          status: 'queued' as const,
+          status: supported ? ('queued' as const) : ('error' as const),
           progress: 0,
-          error: null,
+          error: supported ? null : 'Unsupported file format',
           taskId: undefined,
           duplicateTaskId: undefined,
         };
