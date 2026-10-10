@@ -17,7 +17,7 @@ import { MetaText } from '../../shared/ui/typography';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
-
+import { formatTaskMeta } from './formatTask';
 
 const Filename = styled.span`
   color: ${(props) => props.theme.colors.text};
