@@ -11,6 +11,7 @@ import io.ktor.server.request.path
 import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
 import stt.config.Config
+import stt.db.AudioRepository
 import stt.db.Database
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
@@ -30,6 +31,7 @@ fun Application.sttApp(config: Config) {
         provide<Database> { Database.open(config.dataDir) }
         provide<TaskWorkDirectories> { TaskWorkDirectories(config.dataDir) }
         provide<TaskRepository> { TaskRepository(resolve(), resolve()) }
+        provide<AudioRepository> { AudioRepository(resolve()) }
         require(DependencyKey<Database>())
     }
     processingEngine(config)

@@ -17,6 +17,16 @@ class AudioRepository(
                 .singleOrNull()
                 ?.let { row -> AudioMetadata(row[AudioTable.sizeBytes], row[AudioTable.sha256]) }
         }
+
+    /** The task that already uploaded these bytes, if any; the unique `sha256` makes this unambiguous (item 12). */
+    suspend fun taskIdOfSha256(sha256: String): Long? =
+        db.readTransaction {
+            AudioTable
+                .selectAll()
+                .where { AudioTable.sha256 eq sha256 }
+                .singleOrNull()
+                ?.get(AudioTable.taskId)
+        }
 }
 
 /** Inside the current transaction: inserts [taskId]'s `audio` row; a duplicate sha256 is rejected here (UNIQUE). */
