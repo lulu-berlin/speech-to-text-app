@@ -1,6 +1,6 @@
 # 14 — Frontend queue UI
 
-Status: spec-approved
+Status: in-progress
 Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
 
 ## Goal
