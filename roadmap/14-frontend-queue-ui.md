@@ -51,9 +51,9 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A new task appears in the queue list after upload
 - [x] A `task-progress` event updates that task's two progress bars; the diarization bar shows its stage and is hidden when diarization does not apply
 - [x] A `task-updated` event updates that task's status and phase
-- [ ] Pressing pause on a running task calls the pause endpoint and shows it as paused
+- [x] Pressing pause on a running task calls the pause endpoint and shows it as paused
 - [x] Pressing resume on a paused task calls the resume endpoint
-- [ ] Cancel asks for confirmation for a running or started paused task and not for a queued one; confirming calls the cancel endpoint
+- [x] Cancel asks for confirmation for a running or started paused task and not for a queued one; confirming calls the cancel endpoint
 - [ ] Delete always asks for confirmation; confirming calls the delete endpoint and the task leaves the list
 - [ ] Controls for disallowed transitions are not offered (e.g. no resume on a queued task)
 - [ ] Dragging a task, or using the row menu's move actions, sends the full ordered id list to `PUT /api/queue/order`
