@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import {
+  errorDuplicateAudio,
+  errorInvalidLanguage,
   queue as queueFixture,
   snapshot as snapshotFixture,
   taskQueued,
@@ -278,5 +280,78 @@ describe('the queue list', () => {
       expect.stringContaining('a.mp3'),
     ]);
     expect(within(rows[2] as HTMLElement).getByText('QUEUED')).toBeInTheDocument();
+  });
+});
+
+describe('upload errors', () => {
+  it("keeps each error on its file's row: unsupported format, invalid input, and a duplicate with a link", async () => {
+    // The three files that reach the server answer differently; the rejected file (a.txt)
+    // must never reach it. The file's multipart Content-Type identifies it (jsdom drops
+    // the content and the filename; see the drop-order test).
+    const seen: string[] = [];
+    server.use(
+      http.post('/api/tasks', async ({ request }) => {
+        const body = await request.text();
+        const contentType = body.match(/Content-Type: ([^\r]+)/)?.[1] ?? '';
+        seen.push(contentType);
+        if (contentType === 'audio/ogg') {
+          // c.ogg duplicates completed task 3 (interview.mp3, COMPLETED in the snapshot).
+          return HttpResponse.json(errorDuplicateAudio, { status: 409 });
+        }
+        if (contentType === 'audio/wav') {
+          // d.wav duplicates running task 5 (lecture.m4a, RUNNING in the snapshot).
+          return HttpResponse.json({ ...errorDuplicateAudio, taskId: 5 }, { status: 409 });
+        }
+        return HttpResponse.json(errorInvalidLanguage, { status: 400 });
+      }),
+    );
+
+    renderQueue();
+
+    const files = [
+      new File(['x'], 'a.txt', { type: 'text/plain' }),
+      new File(['x'], 'b.mp3', { type: 'audio/mpeg' }),
+      new File(['x'], 'c.ogg', { type: 'audio/ogg' }),
+      new File(['x'], 'd.wav', { type: 'audio/wav' }),
+    ];
+    fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+
+    const uploads = screen.getByRole('list', { name: 'Uploads' });
+    const rowFor = (filename: string) =>
+      within(uploads)
+        .getAllByRole('listitem')
+        .find((row) => row.textContent?.includes(filename));
+
+    // The unsupported file is rejected before any upload.
+    await waitFor(() =>
+      expect(
+        within(rowFor('a.txt') as HTMLElement).getByText('Unsupported file format'),
+      ).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(seen.length).toBe(3));
+
+    // A server 400 stays on that file's row.
+    expect(
+      within(rowFor('b.mp3') as HTMLElement).getByText('Unsupported language'),
+    ).toBeInTheDocument();
+
+    // A duplicate of a finished task links to its transcript.
+    expect(
+      within(rowFor('c.ogg') as HTMLElement).getByText(/Already uploaded/),
+    ).toBeInTheDocument();
+    expect(
+      within(rowFor('c.ogg') as HTMLElement).getByRole('link', { name: 'open' }),
+    ).toHaveAttribute('href', '/history/3');
+
+    // A duplicate of a pending task links to its queue row.
+    expect(
+      within(rowFor('d.wav') as HTMLElement).getByText(/Already uploaded/),
+    ).toBeInTheDocument();
+    expect(
+      within(rowFor('d.wav') as HTMLElement).getByRole('link', { name: 'open' }),
+    ).toHaveAttribute('href', '/queue');
+
+    // Only the three supported files reached the server, in drop order.
+    expect(seen).toEqual(['audio/mpeg', 'audio/ogg', 'audio/wav']);
   });
 });

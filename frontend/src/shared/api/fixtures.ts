@@ -18,6 +18,7 @@ export { default as turns } from '../../../../docs/api/turns.json';
 export { default as turnsSpeakersOff } from '../../../../docs/api/turns.speakers-off.json';
 export { default as error } from '../../../../docs/api/error.json';
 export { default as errorDuplicateAudio } from '../../../../docs/api/error.duplicate-audio.json';
+export { default as errorInvalidLanguage } from '../../../../docs/api/error.invalid-language.json';
 export { default as taskTransitions } from '../../../../docs/api/task-transitions.json';
 export { default as languages } from '../../../../docs/api/languages.json';
 
