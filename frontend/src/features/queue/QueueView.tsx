@@ -113,6 +113,11 @@ const RowError = styled.span`
   color: ${(props) => props.theme.colors.danger};
 `;
 
+const ReorderError = styled.p`
+  margin: 0;
+  color: ${(props) => props.theme.colors.danger};
+`;
+
 interface FieldProps {
   label: string;
   htmlFor: string;
@@ -350,6 +355,9 @@ export function QueueView() {
               </List>
             </SortableContext>
           </DndContext>
+        ) : null}
+        {reorder.context.error !== null ? (
+          <ReorderError>{reorder.context.error}</ReorderError>
         ) : null}
       </Stack>
     </Page>

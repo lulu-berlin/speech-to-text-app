@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import {
+  error as errorFixture,
   errorDuplicateAudio,
   errorInvalidLanguage,
   queue as queueFixture,
@@ -642,6 +643,37 @@ describe('the queue reorder', () => {
     );
     const menuRows = screen.getAllByRole('listitem');
     expect(menuRows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('lecture.m4a'),
+      expect.stringContaining('memo.wav'),
+    ]);
+  });
+
+  it('restores the server order and shows the error when a reorder is rejected', async () => {
+    const ordered: number[][] = [];
+    server.use(
+      http.put('/api/queue/order', async ({ request }) => {
+        const body = (await request.json()) as { taskIds: number[] };
+        ordered.push(body.taskIds);
+        // 409 reorder-mismatch: docs/api has no example for it, so error.json stands in.
+        return HttpResponse.json(errorFixture, { status: 409 });
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Actions for memo.wav' }), {
+      button: 0,
+    });
+    await screen.findByRole('menu');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to top' }));
+
+    // The server rejected the new order: the rows fall back to the old order and the
+    // error message is shown.
+    await waitFor(() => expect(ordered).toEqual([[7, 5]]));
+    await screen.findByText('Task 42 does not exist');
+    const rows = screen.getAllByRole('listitem');
+    expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining('lecture.m4a'),
       expect.stringContaining('memo.wav'),
     ]);

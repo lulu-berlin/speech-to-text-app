@@ -29,7 +29,8 @@ export const reorderMachine = setup({
   },
   actions: {
     // Follow the server's queue while idle: keep the known ids in their current order,
-    // append new ones, drop removed ones.
+    // append new ones, drop removed ones. A fresh queue state also clears a reorder
+    // error (item 14).
     reconcile: assign({
       order: ({ context, event }) => {
         if (event.type !== 'SYNC') {
@@ -39,6 +40,7 @@ export const reorderMachine = setup({
         const added = event.order.filter((id) => !context.order.includes(id));
         return [...known, ...added];
       },
+      error: null,
     }),
     applyMove: assign({
       order: ({ context, event }) => {
