@@ -18,7 +18,7 @@ import {
 } from '../../shared/api/fixtures';
 import { controllableEventStream } from '../../test/controllableEventStream';
 import { lightTheme } from '../../shared/theme/theme';
-import { px, required, styleRules } from '../../test/dom';
+import { mediaRulesFor, px, required } from '../../test/dom';
 import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
@@ -397,20 +397,9 @@ describe('the queue list', () => {
     ).toBeInTheDocument();
 
     // Below the small breakpoint the row's top line becomes a column: the filename on its
-    // own line, the phase, status and controls on the line below, left-aligned. jsdom
-    // cannot evaluate media queries, so the emitted rule is asserted.
+    // own line, the phase, status and controls on the line below, left-aligned.
     const topLine = required(screen.getByText('lecture.m4a').parentElement);
-    const narrowRules = styleRules()
-      .filter(
-        (rule): rule is CSSMediaRule =>
-          rule instanceof CSSMediaRule &&
-          rule.conditionText === `(max-width: ${lightTheme.breakpoints.sm})`,
-      )
-      .flatMap((rule) => [...rule.cssRules])
-      .filter(
-        (rule): rule is CSSStyleRule =>
-          rule instanceof CSSStyleRule && topLine.matches(rule.selectorText),
-      );
+    const narrowRules = mediaRulesFor(topLine, `(max-width: ${lightTheme.breakpoints.sm})`);
     expect(narrowRules.map((rule) => rule.style.flexDirection)).toContain('column');
     expect(narrowRules.map((rule) => rule.style.alignItems)).toContain('flex-start');
   });

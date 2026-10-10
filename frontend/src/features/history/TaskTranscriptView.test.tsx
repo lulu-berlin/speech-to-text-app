@@ -13,7 +13,7 @@ import {
   turns as turnsFixture,
 } from '../../shared/api/fixtures';
 import { controllableEventStream } from '../../test/controllableEventStream';
-import { px, required, styleRules } from '../../test/dom';
+import { mediaRulesFor, px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
 
 function renderTranscript(taskId: string) {
@@ -801,19 +801,8 @@ describe('the reading column', () => {
     expect(getComputedStyle(text).lineHeight).toBe(String(lightTheme.lineHeights.reading));
     expect(getComputedStyle(required(row.parentElement)).gap).toBe(lightTheme.spacing.lg);
 
-    // On a phone the gutter folds: one column, the time above the speaker. jsdom cannot
-    // evaluate media queries, so the emitted rule is asserted.
-    const narrow = styleRules()
-      .filter(
-        (rule): rule is CSSMediaRule =>
-          rule instanceof CSSMediaRule &&
-          rule.conditionText === `(max-width: ${lightTheme.breakpoints.sm})`,
-      )
-      .flatMap((rule) => [...rule.cssRules])
-      .filter(
-        (rule): rule is CSSStyleRule =>
-          rule instanceof CSSStyleRule && row.matches(rule.selectorText),
-      );
+    // On a phone the gutter folds: one column, the time above the speaker.
+    const narrow = mediaRulesFor(row, `(max-width: ${lightTheme.breakpoints.sm})`);
     expect(narrow.map((rule) => rule.style.gridTemplateColumns)).toContain('1fr');
   });
 });
