@@ -57,23 +57,24 @@ class SegmentRepository(
     }
 
     /** The task's segments in (`chunk_idx`, `seq`) order; `seq` restarts in every chunk. */
-    suspend fun findByTask(taskId: Long): List<Segment> =
-        db.readTransaction {
-            SegmentsTable
-                .selectAll()
-                .where { SegmentsTable.taskId eq taskId }
-                .orderBy(SegmentsTable.chunkIdx to SortOrder.ASC, SegmentsTable.seq to SortOrder.ASC)
-                .map { row ->
-                    Segment(
-                        chunkIdx = row[SegmentsTable.chunkIdx],
-                        seq = row[SegmentsTable.seq],
-                        startMs = row[SegmentsTable.startMs],
-                        endMs = row[SegmentsTable.endMs],
-                        text = row[SegmentsTable.text],
-                        speakerId = row[SegmentsTable.speakerId],
-                    )
-                }
-        }
+    suspend fun findByTask(taskId: Long): List<Segment> = db.readTransaction { selectSegments(taskId) }
+
+    /** The task's segments in (`chunk_idx`, `seq`) order; runs inside the caller's transaction. */
+    private fun selectSegments(taskId: Long): List<Segment> =
+        SegmentsTable
+            .selectAll()
+            .where { SegmentsTable.taskId eq taskId }
+            .orderBy(SegmentsTable.chunkIdx to SortOrder.ASC, SegmentsTable.seq to SortOrder.ASC)
+            .map { row ->
+                Segment(
+                    chunkIdx = row[SegmentsTable.chunkIdx],
+                    seq = row[SegmentsTable.seq],
+                    startMs = row[SegmentsTable.startMs],
+                    endMs = row[SegmentsTable.endMs],
+                    text = row[SegmentsTable.text],
+                    speakerId = row[SegmentsTable.speakerId],
+                )
+            }
 
     /**
      * Stores the speaker of every segment of the task in one transaction (item 09, ADR 0028): one [Speaker] per
@@ -126,12 +127,7 @@ class SegmentRepository(
         name: String,
     ): RenameOutcome =
         db.writeTransaction {
-            val clash =
-                SpeakersTable
-                    .selectAll()
-                    .where { SpeakersTable.taskId eq taskId }
-                    .map { it.toSpeaker() }
-                    .firstOrNull { it.speakerId != speakerId && it.speaker.equals(name, ignoreCase = true) }
+            val clash = selectSpeakers(taskId).firstOrNull { it.speakerId != speakerId && it.speaker.equals(name, ignoreCase = true) }
             if (clash != null) return@writeTransaction RenameOutcome.DuplicateName(clash)
             val updated =
                 SpeakersTable.update({ (SpeakersTable.taskId eq taskId) and (SpeakersTable.speakerId eq speakerId) }) {
@@ -142,14 +138,15 @@ class SegmentRepository(
         }
 
     /** The task's speakers in `speaker_id` order. */
-    suspend fun findSpeakers(taskId: Long): List<Speaker> =
-        db.readTransaction {
-            SpeakersTable
-                .selectAll()
-                .where { SpeakersTable.taskId eq taskId }
-                .orderBy(SpeakersTable.speakerId to SortOrder.ASC)
-                .map { it.toSpeaker() }
-        }
+    suspend fun findSpeakers(taskId: Long): List<Speaker> = db.readTransaction { selectSpeakers(taskId) }
+
+    /** The task's speakers in `speaker_id` order; runs inside the caller's transaction. */
+    private fun selectSpeakers(taskId: Long): List<Speaker> =
+        SpeakersTable
+            .selectAll()
+            .where { SpeakersTable.taskId eq taskId }
+            .orderBy(SpeakersTable.speakerId to SortOrder.ASC)
+            .map { it.toSpeaker() }
 
     /**
      * Folds every speaker of [group] except [into] into [into] (item 22): one `speaker_merge` row each, in one write
@@ -182,28 +179,8 @@ class SegmentRepository(
                     .selectAll()
                     .where { SpeakerMergeTable.taskId eq taskId }
                     .associate { it[SpeakerMergeTable.mergedId] to it[SpeakerMergeTable.intoId] }
-            val segments =
-                SegmentsTable
-                    .selectAll()
-                    .where { SegmentsTable.taskId eq taskId }
-                    .orderBy(SegmentsTable.chunkIdx to SortOrder.ASC, SegmentsTable.seq to SortOrder.ASC)
-                    .map { row ->
-                        Segment(
-                            chunkIdx = row[SegmentsTable.chunkIdx],
-                            seq = row[SegmentsTable.seq],
-                            startMs = row[SegmentsTable.startMs],
-                            endMs = row[SegmentsTable.endMs],
-                            text = row[SegmentsTable.text],
-                            speakerId = row[SegmentsTable.speakerId]?.let { intoOf[it] ?: it },
-                        )
-                    }
-            val speakers =
-                SpeakersTable
-                    .selectAll()
-                    .where { SpeakersTable.taskId eq taskId }
-                    .orderBy(SpeakersTable.speakerId to SortOrder.ASC)
-                    .map { it.toSpeaker() }
-                    .filter { it.speakerId !in intoOf }
+            val segments = selectSegments(taskId).map { it.copy(speakerId = it.speakerId?.let { id -> intoOf[id] ?: id }) }
+            val speakers = selectSpeakers(taskId).filter { it.speakerId !in intoOf }
             DiarizedRead(segments, speakers)
         }
 }
