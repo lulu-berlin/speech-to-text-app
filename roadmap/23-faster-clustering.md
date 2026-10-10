@@ -1,6 +1,6 @@
 # 23 — Faster speaker clustering
 
-Status: in-progress
+Status: in-review
 Depends on: [09](../docs/specs/diarization.md) (done)
 
 ## Goal
@@ -52,7 +52,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Ties are resolved reproducibly for a given input (the exact pair is not required to match the old implementation)
 - [x] Clustering still pauses and cancels between merges and reports progress per merge
 - [x] Clustering allocates no distance matrix: peak memory stays well under the `O(n²)` matrix size at 3000 segments
-- [ ] All item 09 tests stay green, Integration included (1089 → 1188 → 1089, threshold pairs)
+- [x] All item 09 tests stay green, Integration included (1089 → 1188 → 1089, threshold pairs)
 
 ## Acceptance criteria
 
@@ -69,3 +69,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09 (cycle 2, test-list item 2, label differential): red — `gradle test --tests 'stt.diarization.ClusteringSpec'` with a temporary, uncommitted mutation `merges.take(n - speakerCount).dropLast(1)` in `naiveClusterSegments`: "expected:<[0, 1, 2, 3]> but was:<[0, 1, 2, 1]>" (seed 11, n 4, k null). Green on arrival: the new `ClusteringSpec` block compares `clusterSegments` with `naiveClusterSegments` on four random L2-normalized 512-d matrices (n = 4, 9, 20, 36; fixed seeds; no exact ties in random double data) for auto and fixed k = 2, 3, 7 (k clamps where n is smaller). `gradle check` (133 unit tests) green.
 - 2026-10-09 (cycle 4, test-list items 6 + 1 + 5, the switch): red — `gradle test --tests 'stt.diarization.ClusteringSpec'`, the new memory test against the matrix implementation: "peak 82 MiB vs 22 MiB bound — 82.0 should be < 22.0". Green (ADR 0036): `upgmaMerges` replaced by the nearest-neighbor chain — no matrix;each cluster keeps its members' mean vector and distances are `1 − vA·vB` in double on demand, mutual-nearest-neighbor check, merges sorted by height (stable), pair orientation `i < j`, cancellation/gate checked before every merge, progress per merge unchanged. Items 1 and 5 ride on existing tests: the hand-computed 4-point merges and the pause/cancel/progress contract stay green (both must, or the switch failed;both did). The memory bound is half the matrix (14 MiB measured vs 68.7 MiB matrix;the third-of-matrix bound flaked at 22 MiB against the 22.9 bound under full-suite ambient heap, so the guard is set at half). `gradle check` (134 unit tests) green.
 - 2026-10-10 (cycle 5, test-list item 4, tie reproducibility): red — `gradle test --tests 'stt.diarization.ClusteringSpec'` with a temporary, uncommitted mutation `merges.shuffled().sortedWith(...)` in `upgmaMerges` (shuffling before the stable height sort, so only tie-run order changes): the new "tie-heavy matrix" test fails — "Element differ at index: [0, 1]" — because two runs resolve the tied 0.2 merges differently (two existing tie-order tests break too, also expected under the mutation). Green on arrival: `upgmaMerges(tiedMatrix()).shouldBe(upgmaMerges(tiedMatrix()))` — the chain's first-minimum scan plus the stable sort make every merge sequence deterministic for a given input. `gradle check` (134 unit tests) green.
+- 2026-10-10 (final, test-list item 7): the throwaway benchmark spec and its `/tmp` outputs are deleted (only ADR 0036 keeps the numbers). `gradle integrationTest` green on the chain: 0 failures;in particular LibriSpeechDiarizationSpec (1089 → 1188 → 1089 → `[0, 0, 1, 1, 0, 0]`) and SpeakerThresholdSpec (all 289 whole-clip and 5 s-excerpt pairs on the right side of 0.5448) pass, so the two item-09 fixture acceptances and the threshold rules are unchanged by the switch. Status set to `in-review`;all 7 test-list items ticked.
