@@ -177,6 +177,18 @@ const StyledSvg = styled.svg<{ $size: StenographerSize }>`
     transform-origin: center;
     animation: stt-twinkle 2.2s ease-in-out infinite;
   }
+
+  // The artwork's reduced-motion fallback: a static frame, still scoped to this
+  // component (the star rule can never reach the app around it).
+  @media (prefers-reduced-motion: reduce) {
+    & * {
+      animation: none !important;
+    }
+    & .word,
+    & .wave {
+      opacity: 1;
+    }
+  }
 `;
 
 export interface StenographerAnimationProps {
