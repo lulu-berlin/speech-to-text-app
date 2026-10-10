@@ -36,6 +36,11 @@ function renderHistory() {
   return screen.findByText('Live');
 }
 
+// The finished-task row carrying a file name; a test queries its controls with `within`.
+function rowOf(filename: string) {
+  return screen.getAllByRole('listitem').find((row) => row.textContent?.includes(filename))!;
+}
+
 describe('the history list', () => {
   it('shows completed, failed and canceled tasks, newest first, and no pending ones', async () => {
     server.use(http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])));
@@ -124,9 +129,6 @@ describe('the history list', () => {
     );
     await renderHistory();
 
-    const rowOf = (filename: string) =>
-      screen.getAllByRole('listitem').find((row) => row.textContent?.includes(filename))!;
-
     // task-transitions.json allows retry from FAILED and CANCELED, not from COMPLETED.
     expect(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(within(rowOf('lecture.m4a')).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
@@ -154,9 +156,6 @@ describe('the history list', () => {
       }),
     );
     await renderHistory();
-
-    const rowOf = (filename: string) =>
-      screen.getAllByRole('listitem').find((row) => row.textContent?.includes(filename))!;
 
     // Delete is offered on every finished task; it first asks.
     fireEvent.click(within(rowOf('interview.mp3')).getByRole('button', { name: 'Delete' }));
