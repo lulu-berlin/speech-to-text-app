@@ -50,12 +50,11 @@ const Option = styled.li<{ $active: boolean }>`
   border-radius: ${(props) => props.theme.radii.button};
   color: ${(props) => props.theme.colors.text};
   cursor: pointer;
+  background: ${(props) => (props.$active ? props.theme.colors.surface : 'transparent')};
 
   &[aria-selected='true'] {
     font-weight: ${(props) => props.theme.fontWeights.medium};
   }
-
-  ${(props) => (props.$active ? `background: ${props.theme.colors.surface};` : '')}
 `;
 
 const Wrap = styled.div`
