@@ -17,6 +17,8 @@ import {
   taskRunning,
 } from '../../shared/api/fixtures';
 import { controllableEventStream } from '../../test/controllableEventStream';
+import { lightTheme } from '../../shared/theme/theme';
+import { required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
@@ -338,6 +340,42 @@ describe('the queue list', () => {
       expect.stringContaining('a.mp3'),
     ]);
     expect(within(rows[2] as HTMLElement).getByText('QUEUED')).toBeInTheDocument();
+  });
+
+  it('shows the status badge, the phase label and both progress bars on a row, and stacks the row on a narrow screen', async () => {
+    controllableEventStream();
+
+    renderQueue();
+
+    // The running task's row (docs/api/snapshot.json: RUNNING, TRANSCRIBING, 42%,
+    // diarization not started) carries the exact status, the phase label and both bars.
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    expect(within(lecture).getByText('RUNNING')).toBeInTheDocument();
+    expect(within(lecture).getByText('Transcribing')).toBeInTheDocument();
+    expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toBeInTheDocument();
+    expect(within(lecture).getByText('42%')).toBeInTheDocument();
+    expect(
+      within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
+    ).toBeInTheDocument();
+
+    // Below the small breakpoint the row's top line becomes a column: the filename on its
+    // own line, the phase, status and controls on the line below, left-aligned. jsdom
+    // cannot evaluate media queries, so the emitted rule is asserted.
+    const topLine = required(screen.getByText('lecture.m4a').parentElement);
+    const narrowRules = styleRules()
+      .filter(
+        (rule): rule is CSSMediaRule =>
+          rule instanceof CSSMediaRule &&
+          rule.conditionText === `(max-width: ${lightTheme.breakpoints.sm})`,
+      )
+      .flatMap((rule) => [...rule.cssRules])
+      .filter(
+        (rule): rule is CSSStyleRule =>
+          rule instanceof CSSStyleRule && topLine.matches(rule.selectorText),
+      );
+    expect(narrowRules.map((rule) => rule.style.flexDirection)).toContain('column');
+    expect(narrowRules.map((rule) => rule.style.alignItems)).toContain('flex-start');
   });
 
   it("updates a task's two progress bars from task-progress events; the diarization bar shows its stage and hides when diarization does not apply", async () => {
