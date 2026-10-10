@@ -16,6 +16,7 @@ import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.Speaker
 import stt.db.SpeakersMode
+import stt.db.TaskDetails
 import stt.db.TaskRepository
 import stt.diarization.speakerTurns
 import stt.outputs.downloadFileName
@@ -38,15 +39,8 @@ fun Application.transcriptRoutes() {
     val segments: SegmentRepository by dependencies
     routing {
         get("/api/tasks/{id}/transcript") {
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.notFound()
-            val details = tasks.details(id) ?: return@get call.notFound()
-            if (details.task.status != TaskStatus.COMPLETED) {
-                return@get call.respondError(
-                    HttpStatusCode.Conflict,
-                    "not-completed",
-                    "Task $id is ${details.task.status}; only COMPLETED tasks have a transcript",
-                )
-            }
+            val details = call.completedTaskOrError(tasks, "a transcript") ?: return@get
+            val id = details.id
             val requested = call.request.queryParameters["format"]
             val format =
                 TRANSCRIPT_FORMATS[requested] ?: return@get call.respondError(
@@ -64,15 +58,8 @@ fun Application.transcriptRoutes() {
         }
 
         get("/api/tasks/{id}/turns") {
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.notFound()
-            val details = tasks.details(id) ?: return@get call.notFound()
-            if (details.task.status != TaskStatus.COMPLETED) {
-                return@get call.respondError(
-                    HttpStatusCode.Conflict,
-                    "not-completed",
-                    "Task $id is ${details.task.status}; only COMPLETED tasks have turns",
-                )
-            }
+            val details = call.completedTaskOrError(tasks, "turns") ?: return@get
+            val id = details.id
             val stored = segments.findByTask(id)
             if (details.task.speakersMode == SpeakersMode.OFF) {
                 call.respond(TurnsJson(speakers = emptyList(), turns = stored.map { it.toNullSpeakerTurn() }))
@@ -99,6 +86,30 @@ fun Application.transcriptRoutes() {
 }
 
 private suspend fun RoutingCall.notFound() = respondError(HttpStatusCode.NotFound, "not-found", "Task ${parameters["id"]} does not exist")
+
+/**
+ * The route's task when it exists and is COMPLETED; otherwise responds `404 not-found` (missing or non-numeric
+ * id, unknown task) or `409 not-completed` (naming what only a COMPLETED task has) and returns null.
+ */
+private suspend fun RoutingCall.completedTaskOrError(
+    tasks: TaskRepository,
+    what: String,
+): TaskDetails? {
+    val details = parameters["id"]?.toLongOrNull()?.let { tasks.details(it) }
+    if (details == null) {
+        notFound()
+        return null
+    }
+    if (details.task.status != TaskStatus.COMPLETED) {
+        respondError(
+            HttpStatusCode.Conflict,
+            "not-completed",
+            "Task ${details.id} is ${details.task.status}; only COMPLETED tasks have $what",
+        )
+        return null
+    }
+    return details
+}
 
 /** A speakers-off segment as its own turn (item 12's contract): no speaker, the trimmed text (ADR 0030). */
 private fun Segment.toNullSpeakerTurn(): TurnJson {
