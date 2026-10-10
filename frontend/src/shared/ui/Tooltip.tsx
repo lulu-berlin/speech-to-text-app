@@ -1,14 +1,11 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
+import { floatingPanel } from './floatingPanel';
 
 const Content = styled(TooltipPrimitive.Content)`
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
-  border-radius: ${(props) => props.theme.radii.card};
-  background: ${(props) => props.theme.colors.surfaceRaised};
-  color: ${(props) => props.theme.colors.text};
-  box-shadow: ${(props) => props.theme.shadows.card};
+  ${floatingPanel}
 `;
 
 export interface TooltipProps {
