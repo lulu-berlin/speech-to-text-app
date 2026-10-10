@@ -7,6 +7,7 @@ import { languages } from '../../shared/api/fixtures';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
+import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
@@ -129,6 +130,8 @@ interface UploadRow {
   file: File;
   options: UploadOptions;
   status: 'queued' | 'uploading' | 'done' | 'error';
+  // Upload progress 0..1 while uploading (bytes sent).
+  progress: number;
   error: string | null;
 }
 
@@ -156,6 +159,7 @@ export function QueueView() {
         file,
         options,
         status: 'queued' as const,
+        progress: 0,
         error: null,
       })),
     ]);
@@ -187,7 +191,12 @@ export function QueueView() {
     setRows((current) =>
       current.map((row) => (row.id === next.id ? { ...row, status: 'uploading' } : row)),
     );
-    uploadTask(next.file, next.options)
+    uploadTask(next.file, next.options, (sentBytes, totalBytes) => {
+      const fraction = totalBytes > 0 ? sentBytes / totalBytes : 0;
+      setRows((current) =>
+        current.map((row) => (row.id === next.id ? { ...row, progress: fraction } : row)),
+      );
+    })
       .then(() => {
         setRows((current) =>
           current.map((row) => (row.id === next.id ? { ...row, status: 'done' } : row)),
@@ -276,7 +285,11 @@ export function QueueView() {
               <ListRow key={row.id}>
                 <RowContent>
                   <RowName>{row.file.name}</RowName>
-                  <RowStatus>{row.status}</RowStatus>
+                  {row.status === 'uploading' ? (
+                    <ProgressBar value={row.progress} label={`Uploading ${row.file.name}`} />
+                  ) : (
+                    <RowStatus>{row.status}</RowStatus>
+                  )}
                 </RowContent>
               </ListRow>
             ))}

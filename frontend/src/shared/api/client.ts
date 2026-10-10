@@ -56,8 +56,12 @@ export interface UploadOptions {
 
 // Item 12 contract: POST /api/tasks, multipart with a `file` field and the batch options.
 // XMLHttpRequest, because fetch has no upload progress (item 14); this stays the only
-// place that talks to POST /api/tasks.
-export function uploadTask(file: File, options: UploadOptions): Promise<Task> {
+// place that talks to POST /api/tasks. `onProgress` reports uploaded bytes while sending.
+export function uploadTask(
+  file: File,
+  options: UploadOptions,
+  onProgress?: (sentBytes: number, totalBytes: number) => void,
+): Promise<Task> {
   const { promise, resolve, reject } = Promise.withResolvers<Task>();
   const form = new FormData();
   form.append('file', file);
@@ -67,6 +71,11 @@ export function uploadTask(file: File, options: UploadOptions): Promise<Task> {
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/tasks');
   xhr.responseType = 'json';
+  xhr.upload.onprogress = (event) => {
+    if (event.lengthComputable && onProgress !== undefined) {
+      onProgress(event.loaded, event.total);
+    }
+  };
   xhr.onload = () => {
     if (xhr.status >= 200 && xhr.status < 300) {
       resolve(xhr.response as Task);

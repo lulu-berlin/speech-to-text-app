@@ -1,8 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
-import { ConnectionContext } from '../../app/ConnectionContext';
+import { describe, expect, it, vi } from 'vitest';
 import { taskQueued } from '../../shared/api/fixtures';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
@@ -12,11 +11,9 @@ import { QueueView } from './QueueView';
 function renderQueue() {
   return render(
     <ThemedProviders>
-      <ConnectionContext.Provider>
-        <MemoryRouter>
-          <QueueView />
-        </MemoryRouter>
-      </ConnectionContext.Provider>
+      <MemoryRouter>
+        <QueueView />
+      </MemoryRouter>
     </ThemedProviders>,
   );
 }
@@ -132,14 +129,15 @@ describe('the queue view upload flow', () => {
       maxSpeakers: '10',
     });
 
-    // The rows appear in drop order, and only the first file is uploading.
+    // The rows appear in drop order; only the first file is uploading (it alone has a
+    // progress bar), the others are queued.
     const rows = within(screen.getByRole('list')).getAllByRole('listitem');
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining('a.mp3'),
       expect.stringContaining('b.wav'),
       expect.stringContaining('c.ogg'),
     ]);
-    expect(rows[0]?.textContent).toContain('uploading');
+    expect(within(rows[0] as HTMLElement).getByRole('progressbar')).toBeInTheDocument();
     expect(rows[1]?.textContent).toContain('queued');
     expect(rows[2]?.textContent).toContain('queued');
 
@@ -165,5 +163,52 @@ describe('the queue view upload flow', () => {
       speakers: '3',
       maxSpeakers: '10',
     });
+  });
+
+  it("shows each uploading file's upload progress on its row", async () => {
+    const { promise: proceed, resolve: release } = Promise.withResolvers<void>();
+
+    // jsdom + MSW fire no XHR upload progress events, so the test swaps in a fake XHR
+    // that simulates the browser: 50% sent, then (once released) 100% and a 201 response.
+    class FakeXhr {
+      upload = {
+        onprogress: null as
+          ((event: { lengthComputable: true; loaded: number; total: number }) => void) | null,
+      };
+      responseType = '';
+      status = 0;
+      response: unknown = null;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      open(): void {}
+      send(): void {
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 });
+        void proceed.then(() => {
+          this.upload.onprogress?.({ lengthComputable: true, loaded: 10, total: 10 });
+          this.status = 201;
+          this.response = taskQueued;
+          this.onload?.();
+        });
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    try {
+      renderQueue();
+
+      const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
+      fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+
+      // The uploading file's row shows its progress.
+      const progress = await screen.findByRole('progressbar', { name: /a\.mp3/i });
+      expect(progress).toHaveAttribute('aria-valuenow', '50');
+
+      // Once the upload completes, the progress bar leaves the row.
+      release();
+      await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+      expect(screen.getByText('a.mp3')).toBeInTheDocument();
+      expect(screen.getByText('done')).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
