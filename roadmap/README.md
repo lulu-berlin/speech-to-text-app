@@ -39,7 +39,7 @@ graph TD
   02 --> 13[13 frontend foundation ✓]:::done
   12 -. spec only .-> 13
   13 --> 14[14 frontend queue UI]
-  13 --> 15[15 frontend history UI]
+  13 --> 15[15 frontend history UI ✓]:::done
   02 --> 16[16 Nix flake package]
   14 --> 16
   15 --> 16
@@ -86,7 +86,7 @@ graph TD
 | [12 — HTTP API and SSE](12-http-api-and-sse.md) | spec-approved | 10, 11 |
 | [13 — Frontend foundation](../docs/specs/frontend-foundation.md) | done | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](14-frontend-queue-ui.md) | spec-approved | 13, 24 |
-| [15 — Frontend history UI](15-frontend-history-ui.md) | spec-approved | 13, 24 |
+| [15 — Frontend history UI](../docs/specs/frontend-history-ui.md) | done | 13, 24 |
 | [16 — Nix flake package](16-nix-flake-package.md) | spec-approved | 02, 14, 15, 17, 21 |
 | [17 — Branding: stenographer typing animation](../docs/specs/branding-stenographer-animation.md) | done | 13, 24 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |

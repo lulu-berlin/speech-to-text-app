@@ -1,16 +1,16 @@
-# 15 — Frontend history UI
+# Frontend history UI
 
-Status: in-review
-Depends on: [13](../docs/specs/frontend-foundation.md) (done), [24](../docs/specs/design-system.md) (done)
+Status: done (roadmap item 15, merged 2026-10-10)
+Depends on: [13 — Frontend foundation](frontend-foundation.md), [24 — Design system](design-system.md)
 
 ## Goal
 Let the user browse past transcriptions: find a finished task, read its transcript with speakers and timestamps, follow it during playback with the played segment highlighted, jump around by clicking, download it in every format, listen to the task's audio, see why a task failed or was cancelled, and retry or delete it.
 
 ## Already decided
-- [Item 24 design system](../docs/specs/design-system.md) ([ADR 0033](../docs/decisions/0033-design-system-tokens-radix-plex.md)): the History and transcript views are built with its tokens and primitives (Card, StatusBadge, Button, ConfirmDialog, Slider for the seek bar, Page/Stack/Row, EmptyState, Skeleton); item 25 does the final visual pass (History as cards, the transcript as a centred reading column).
-- [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
-- [ADR 0024 — Audio storage](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks (16 kHz mono, not the original upload); a task cancelled or failed before chunking has none.
-- [ADR 0029](../docs/decisions/0029-contract-first-frontend-shared-api-examples.md), [ADR 0031](../docs/decisions/0031-frontend-routing-react-router-state-xstate.md): built against item 12's contract with MSW mocks; routes `/history` and `/history/:taskId`; commands through item 13's command machine.
+- [Item 24 design system](design-system.md) ([ADR 0033](../decisions/0033-design-system-tokens-radix-plex.md)): the History and transcript views are built with its tokens and primitives (Card, StatusBadge, Button, ConfirmDialog, Slider for the seek bar, Page/Stack/Row, EmptyState, Skeleton); item 25 does the final visual pass (History as cards, the transcript as a centred reading column).
+- [ADR 0001 — Stack and monorepo](../decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components.
+- [ADR 0024 — Audio storage](../decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): `GET /api/tasks/{id}/audio` serves one FLAC joined from the stored chunks (16 kHz mono, not the original upload); a task cancelled or failed before chunking has none.
+- [ADR 0029](../decisions/0029-contract-first-frontend-shared-api-examples.md), [ADR 0031](../decisions/0031-frontend-routing-react-router-state-xstate.md): built against item 12's contract with MSW mocks; routes `/history` and `/history/:taskId`; commands through item 13's command machine.
 - Item 12's contract: `GET /api/tasks/{id}/turns` returns the task's speakers (`speakerId`, stored name `speaker`) and item 09's turns referencing them by `speakerId` (ADR 0028); turn and segment times are on the `/audio` timeline; `/audio` supports Range; Task carries `phase`, `transcribedUntilMs`, `error` and `hasAudio`; `DELETE /api/tasks/{id}`; `task-deleted` removes a task; `/turns` and downloads answer `409 not-completed` unless COMPLETED.
 - FAILED and CANCELED tasks can be retried (`POST /api/tasks/{id}/retry`, item 11).
 - Decided in the item 14 consultation: **delete is offered in History too, always with confirmation**; it frees the file's `sha256`, so the same file can be uploaded again.
@@ -19,7 +19,7 @@ Let the user browse past transcriptions: find a finished task, read its transcri
 - **History list** of finished tasks (COMPLETED, FAILED, CANCELED), newest first, with filename, status, date and duration; FAILED tasks show their error. **A filename search box and a status filter** (all / completed / failed / canceled), both client-side over the task list the app already holds (decided 2026-10-09; no backend search). The list updates live: a task that finishes appears, a retried one leaves, a deleted one disappears.
 - **Transcript view** for a COMPLETED task (`/history/:taskId`):
   - speaker turns with timestamps from `/turns`; each speaker's name shown with **a subtle per-speaker tint** from a speaker palette (tokens added to item 24, light and dark, AA-checked; speaker N uses palette entry N mod palette size); speakers-off transcripts show no labels;
-  - download buttons for the three formats: txt, srt and vtt (`GET /api/tasks/{id}/transcript?format=...`); json was dropped ([ADR 0035](../docs/decisions/0035-no-json-download.md));
+  - download buttons for the three formats: txt, srt and vtt (`GET /api/tasks/{id}/transcript?format=...`); json was dropped ([ADR 0035](../decisions/0035-no-json-download.md));
   - the audio player sourced from `/audio`, with a seek bar (item 24's Slider);
   - **playback highlight**: while the audio plays, the segment whose `[startMs, endMs)` contains the current time is highlighted inside its turn; nothing in a gap between segments; it follows seeking and pausing;
   - **click-to-seek**: clicking a segment (or a turn's timestamp) seeks the player to its start **and plays** (decided 2026-10-09);
@@ -75,7 +75,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 - 2026-10-09: consultation answers approved: client-side filename search and status filter; click-to-seek seeks and plays; follow mode until the user scrolls; new Task field `hasAudio` (item 12 contract and `docs/api/` updated); a status page for failed/canceled tasks; speakers shown with a per-speaker tint (a speaker palette added to item 24); delete in History, always confirmed (item 14 consultation). Test list not yet approved.
 - 2026-10-09: test list (15 items) approved by the user; status `spec-approved`.
-- 2026-10-09: item 10 consultation: the transcript downloads are txt, srt and vtt only ([ADR 0035](../docs/decisions/0035-no-json-download.md)); their speaker labels are the stored names ([ADR 0034](../docs/decisions/0034-speaker-labels-are-stored-names.md)), so a renamed speaker shows in the downloads without any work here.
+- 2026-10-09: item 10 consultation: the transcript downloads are txt, srt and vtt only ([ADR 0035](../decisions/0035-no-json-download.md)); their speaker labels are the stored names ([ADR 0034](../decisions/0034-speaker-labels-are-stored-names.md)), so a renamed speaker shows in the downloads without any work here.
 - 2026-10-10 (workspace, cycle 1, `5017a04`): `Test: the history list shows finished tasks newest first, no pending ones`. Red: `Unable to find an accessible element with the role "listitem"` (the placeholder view). Green: `HistoryView` reads the tasks from `ConnectionContext`, keeps COMPLETED/FAILED/CANCELED, sorts by `finishedAt` descending, renders `List`/`ListRow` cards. Mock addition: a test snapshot with a COMPLETED (3), FAILED (4), CANCELED (5), RUNNING (6) and QUEUED (7) task (`snapshot.json` has no CANCELED task). Test infrastructure: the worktree has no `node_modules`, so the untracked `frontend/node_modules` is a symlink to item 14's worktree install.
 - 2026-10-10 (workspace, cycle 2, `ab49e33`): `Test: the filename search and status filter narrow the history list`. Red: `getByRole('textbox', { name: /search/i })` found no element. Green: a search input and a status `select` (all/completed/failed/canceled), client-side; the test then queries `searchbox`, the role `<input type="search">` exposes.
 - 2026-10-10 (workspace, cycle 3, `22dddb0`): `Test: a failed task shows its error message in the history list`. No red: green on the first run, because cycle 1's row already rendered `error`; the test locks the behavior in.
@@ -101,3 +101,13 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-10 (workspace, cycle 19, `ced7209`): `Test: deleting from the detail view always confirms and returns to the history list`. Red (run before any code): `Unable to find an accessible element with the role "dialog"` (the status page's Delete button was inert, and the transcript had none). Green (decision B, 2026-10-10): status page and transcript views both own the shared `deleteDialog` via `deleteTaskMachine` (request/confirm/cancel), the Delete button is offered in both, and on `done` the view navigates to `/history`; deletions outside the status flow also render an inline failure. Full suite 88/88, tsc, prettier and `vite build` green.
 - 2026-10-10 (root review): the native `<audio controls>` player is accepted as the seek/playback control; item 24's `Slider` is not used as the seek bar. The question of which seek bar to use is reopened on item 25 (recorded there). No code change here; recorded for the record.
 - 2026-10-10 (workspace, cycle 20 = root-review item, `190622d`): `Test: a history row shows the task's finish date and its duration`. Red (run before any code): `Error: expect(element).toHaveTextContent()` — the row had no date or duration. Green: `HistoryRow` renders a muted metadata line — the finish date as a fixed UTC representation with hard-coded month names (e.g. `Oct 9, 2026`; never the reader's locale) and the duration as `mm:ss` under an hour, `h:mm:ss` from one hour on, nothing when `durationMs` is null. Test data: a snapshot of three finished tasks with known `finishedAt`/`durationMs` (and a distinct filename each, since the first draft spread `taskCompleted` and rendered three "interview.mp3" rows — found and fixed in the red run). Full suite 89/89, tsc, prettier and `vite build` green.
+- 2026-10-10: merged into `main` (head `c17b250`) after the user approved the diff. Per the
+  user's decision, the transcript's playback presentation (highlight following the playhead, clicking a
+  segment to seek and play, follow mode and "Back to playing position", and the download links) is
+  verified by this item's 101-test jsdom suite, and its real-backend browser acceptance is deferred to
+  item 21 (the contract delegates the final check against the running backend there; `dev:mock`
+  deliberately serves no audio or download bytes). Item 21 should also watch the follow-mode
+  hold-off (`setTimeout(0)` after the follow `scrollIntoView`) for a spurious stop after the first
+  programmatic scroll. The native `<audio controls>` player is the accepted seek/playback control;
+  the Slider-seek-bar question is open on item 25. Spec and final test list moved here from
+  `roadmap/15-frontend-history-ui.md`.
