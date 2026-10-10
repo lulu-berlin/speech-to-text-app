@@ -544,6 +544,31 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("cycle 8's task with speaker 1 named Bob, then {0, 1} merged into 0 (queue paused)") {
+            `when`("speaker 2 is renamed to the hidden speaker's name, in any case") {
+                then("409 duplicate-speaker-name, so resetting all merges shows Bob only once") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.rename(id, speakerId = 1, "Bob").status shouldBe HttpStatusCode.OK
+                        client.merge(id, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+
+                        // Bob is hidden but still a speaker of the task (user decision 2026-10-10: every speaker counts).
+                        for (taken in listOf("Bob", "bob")) {
+                            withClue(taken) {
+                                client.rename(id, speakerId = 2, taken).shouldBeError(HttpStatusCode.Conflict, "duplicate-speaker-name")
+                            }
+                        }
+
+                        client.delete("/api/tasks/$id/speakers/merges").status shouldBe HttpStatusCode.OK
+                        client.speakersOf(id) shouldBe speakers("Speaker 1", "Bob", "Speaker 3")
+                    }
+                }
+            }
+        }
     })
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */
