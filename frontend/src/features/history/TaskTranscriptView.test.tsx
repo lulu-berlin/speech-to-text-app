@@ -658,6 +658,33 @@ describe('the transcript error states', () => {
   });
 });
 
+describe('the transcript header block', () => {
+  it("shows the task's name as the heading and its finish date and duration under it", async () => {
+    // finishedAt 1791537645000 -> "Oct 9, 2026" (UTC); durationMs 1185000 -> "19:45" (mm:ss),
+    // the History card's format.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskCompleted, id: 3, finishedAt: 1791537645000, durationMs: 1185000 }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('3');
+
+    const heading = await screen.findByRole('heading', { level: 2, name: 'interview.mp3' });
+    const meta = screen.getByText('Oct 9, 2026 · 19:45');
+    expect(heading.nextElementSibling).toBe(meta);
+    expect(getComputedStyle(meta).color).toBe(asRgb(lightTheme.colors.textMuted));
+    expect(screen.queryByRole('heading', { name: 'Transcript' })).not.toBeInTheDocument();
+  });
+});
+
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
 function asRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);

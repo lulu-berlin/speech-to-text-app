@@ -18,6 +18,9 @@ import { turnsMachine } from './turnsMachine';
 import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
+import { deleteTaskMachine } from './deleteTaskMachine';
+import { formatDuration, formatFinishDate } from './formatTask';
+import { useTaskCommand } from './useTaskCommand';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
 import { SpeakersPanel } from './SpeakersPanel';
@@ -62,6 +65,14 @@ const DownloadLink = styled.a`
 
 const Title = styled(PageHeading)`
   margin: 0;
+`;
+
+// The header block's second line: the finish date and the duration, muted, in the History
+// card's format (item 25).
+const HeaderMeta = styled(Text)`
+  margin: 0;
+  color: ${(props) => props.theme.colors.textMuted};
+  font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
 const NoAudioNote = styled(Text)`
@@ -371,7 +382,17 @@ const runCommand = useTaskCommand();
   return (
     <Page>
       <Stack gap="md">
-        <Title>Transcript</Title>
+        <Stack gap="xs">
+          <Title>{task.filename}</Title>
+          <HeaderMeta>
+            {[
+              task.finishedAt !== null ? formatFinishDate(task.finishedAt) : null,
+              task.durationMs !== null ? formatDuration(task.durationMs) : null,
+            ]
+              .filter((part) => part !== null)
+              .join(' · ')}
+          </HeaderMeta>
+        </Stack>
         <Row gap="sm">
           {DOWNLOAD_FORMATS.map((format) => (
             <DownloadLink

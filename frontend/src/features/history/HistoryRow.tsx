@@ -15,6 +15,7 @@ import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
 
+
 const Filename = styled.span`
   color: ${(props) => props.theme.colors.text};
   font-weight: ${(props) => props.theme.fontWeights.medium};
@@ -38,26 +39,6 @@ const TaskLink = styled(Link)`
 
   ${focusRing}
 `;
-
-// The fixed month names and UTC rendering of the finish date, so the text is the same for
-// every user (a toLocaleDateString would follow the reader's locale).
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function formatFinishDate(finishedAtMs: number): string {
-  const date = new Date(finishedAtMs);
-  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
-}
-
-// The task duration: mm:ss under an hour, h:mm:ss from one hour on.
-function formatDuration(durationMs: number): string {
-  const totalSeconds = Math.floor(durationMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const padded = (value: number) => String(value).padStart(2, '0');
-  return hours > 0
-    ? `${hours}:${padded(minutes)}:${padded(seconds)}`
-    : `${padded(minutes)}:${padded(seconds)}`;
-}
 
 // One finished task in the history list. Retry runs through commandMachine and delete
 // through confirmActionMachine, so the sending/done/failed state and any inline error live
