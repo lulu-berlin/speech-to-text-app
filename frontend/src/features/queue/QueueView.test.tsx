@@ -391,6 +391,37 @@ describe('task controls', () => {
     await waitFor(() => expect(within(lecture).getByText('PAUSED')).toBeInTheDocument());
     expect(paused).toEqual(['5']);
   });
+
+  it('resumes a paused task: the resume control calls the resume endpoint', async () => {
+    const events = controllableEventStream();
+    const resumes: string[] = [];
+    server.use(
+      http.post('/api/tasks/:id/resume', ({ params }) => {
+        resumes.push(String(params.id));
+        // The revised command mock answers with the requested task, resumed: memo.wav
+        // (task 7) is QUEUED.
+        return HttpResponse.json(taskQueued);
+      }),
+    );
+
+    renderQueue();
+
+    // Pause task 7 first: resume is offered only while the task is paused.
+    await screen.findByText('memo.wav');
+    const memo = screen.getByText('memo.wav').closest('li') as HTMLElement;
+    events.send('task-updated', taskPaused);
+    await waitFor(() =>
+      expect(within(memo).getByRole('button', { name: 'Resume memo.wav' })).toBeInTheDocument(),
+    );
+    expect(within(memo).getByText('PAUSED')).toBeInTheDocument();
+
+    fireEvent.click(within(memo).getByRole('button', { name: 'Resume memo.wav' }));
+
+    // The command's response puts the task back to QUEUED; the resume control disappears.
+    await waitFor(() => expect(within(memo).getByText('QUEUED')).toBeInTheDocument());
+    expect(within(memo).queryByRole('button', { name: 'Resume memo.wav' })).not.toBeInTheDocument();
+    expect(resumes).toEqual(['7']);
+  });
 });
 
 describe('upload errors', () => {
