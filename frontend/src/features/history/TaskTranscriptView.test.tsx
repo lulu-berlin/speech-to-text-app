@@ -619,6 +619,45 @@ describe('the transcript loading states', () => {
   });
 });
 
+describe('the transcript error states', () => {
+  it('shows the error callout with the server detail when the turns fail to load, and retries in place', async () => {
+    // The first turns request fails with the contract's error body; the retry succeeds.
+    let requests = 0;
+    server.use(
+      http.get('/api/tasks/:id/turns', () => {
+        requests += 1;
+        return requests === 1
+          ? HttpResponse.json(errorFixture, { status: 404 })
+          : HttpResponse.json(turnsFixture);
+      }),
+    );
+    await renderTranscript('3');
+
+    // The callout: a plain title, then the server's message as a muted detail line, on the
+    // surface fill with a danger bar on its left, announced as an alert.
+    const callout = await screen.findByRole('alert');
+    const title = within(callout).getByText("Couldn't load the transcript");
+    expect(getComputedStyle(title).color).toBe(asRgb(lightTheme.colors.text));
+    const detail = within(callout).getByText('Task 42 does not exist');
+    expect(getComputedStyle(detail).color).toBe(asRgb(lightTheme.colors.textMuted));
+    const box = getComputedStyle(callout);
+    expect(box.backgroundColor).toBe(asRgb(lightTheme.colors.surface));
+    expect(box.borderLeftColor).toBe(asRgb(lightTheme.colors.danger));
+    expect(box.borderLeftWidth).toBe(px(lightTheme.borderWidths.ring));
+    expect(required(callout.querySelector('svg')).closest('[aria-hidden="true"]')).not.toBeNull();
+
+    // The known parts stay; no loading mascot lingers in place of the turns.
+    expect(screen.getByRole('link', { name: 'Download transcript (txt)' })).toBeInTheDocument();
+    expect(screen.queryByText('Loading transcript…')).not.toBeInTheDocument();
+
+    // Retry refetches in place: the turns arrive and the callout leaves.
+    fireEvent.click(within(callout).getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Good morning.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(requests).toBe(2);
+  });
+});
+
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.
 function asRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
