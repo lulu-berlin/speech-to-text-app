@@ -103,6 +103,26 @@ const EmptyZoneContent = styled.span`
   gap: ${(props) => props.theme.spacing.sm};
 `;
 
+// What the drop zone says: "Release to upload" while files are over it; otherwise the
+// empty state's guidance (with the mascot above it) or the compact line. The mascot stays
+// while dragging over the empty state.
+function DropZoneContent({ empty, over }: { empty: boolean; over: boolean }) {
+  const label = over
+    ? 'Release to upload'
+    : empty
+      ? 'No tasks yet — drop audio files here, or click to choose them'
+      : 'Drop audio files here or click to choose';
+  if (!empty) {
+    return label;
+  }
+  return (
+    <EmptyZoneContent>
+      <StenographerAnimation size="empty" />
+      {label}
+    </EmptyZoneContent>
+  );
+}
+
 const RowStatus = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
 `;
@@ -401,18 +421,7 @@ export function QueueView() {
           onDragEnter={() => sendDropZone({ type: 'ENTER' })}
           onDragLeave={() => sendDropZone({ type: 'LEAVE' })}
         >
-          {empty ? (
-            <EmptyZoneContent>
-              <StenographerAnimation size="empty" />
-              {dragOver
-                ? 'Release to upload'
-                : 'No tasks yet — drop audio files here, or click to choose them'}
-            </EmptyZoneContent>
-          ) : dragOver ? (
-            'Release to upload'
-          ) : (
-            'Drop audio files here or click to choose'
-          )}
+          <DropZoneContent empty={empty} over={dragOver} />
         </DropZone>
         <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
         {visibleRows.length > 0 ? (
