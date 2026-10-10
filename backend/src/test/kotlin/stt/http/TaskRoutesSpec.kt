@@ -21,6 +21,7 @@ import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -28,11 +29,15 @@ import stt.db.AudioRepository
 import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
+import stt.db.Segment
+import stt.db.SegmentRepository
 import stt.db.SpeakersMode
+import stt.db.TaskPhase
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.db.sha256Hex
+import stt.queue.TaskStatus
 import java.io.File
 
 class TaskRoutesSpec :
@@ -122,6 +127,73 @@ class TaskRoutesSpec :
                             AudioRepository(db).metadata(id)!!.sha256.shouldBe(expectedSha256)
                             ChunkRepository(db).findByTask(id).shouldBeEmpty()
                         }
+                    }
+                }
+            }
+        }
+
+        given("tasks in the lifecycle states, with and without stored segments (queue paused)") {
+            `when`("requesting each") {
+                then(
+                    "FAILED and CANCELED keep the phase they stopped in; transcribedUntilMs is the end of the last segment (null without segments); QUEUED and COMPLETED have no phase",
+                ) {
+                    val dataDir = tempdir("stt-data").toPath()
+
+                    suspend fun seed(
+                        name: String,
+                        status: TaskStatus,
+                        phase: TaskPhase?,
+                        segmentEnds: List<Long>,
+                    ): Long =
+                        Database.open(dataDir).use { db ->
+                            QueueStateRepository(db).setPaused(true)
+                            val workDirectories = TaskWorkDirectories(dataDir)
+                            val tasks = TaskRepository(db, workDirectories)
+                            val id =
+                                tasks.createFromUpload(
+                                    queuedTask(name, createdAt = 1).copy(
+                                        queuePosition = null,
+                                        status = status,
+                                        phase = phase,
+                                        finishedAt = if (status == TaskStatus.QUEUED) null else 1_000,
+                                    ),
+                                    "$name bytes".toByteArray().inputStream(),
+                                )
+                            if (segmentEnds.isNotEmpty()) {
+                                SegmentRepository(db).insertAll(
+                                    id,
+                                    segmentEnds.mapIndexed { index, end ->
+                                        val start = if (index == 0) 0L else segmentEnds[index - 1]
+                                        Segment(index, 0, start, end, "text", speakerId = null)
+                                    },
+                                )
+                            }
+                            id
+                        }
+                    val failed = seed("failed.wav", TaskStatus.FAILED, TaskPhase.TRANSCRIBING, listOf(1_000, 2_500))
+                    val canceled = seed("canceled.wav", TaskStatus.CANCELED, TaskPhase.CHUNKING, emptyList())
+                    val queued = seed("queued.wav", TaskStatus.QUEUED, null, emptyList())
+                    val completed = seed("completed.wav", TaskStatus.COMPLETED, null, listOf(800))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+
+                        suspend fun phaseAndTranscribedUntilOf(id: Long): Pair<String?, Long?> {
+                            val body = Json.parseToJsonElement(client.get("/api/tasks/$id").bodyAsText()).jsonObject
+                            val phase = body.getValue("phase").jsonPrimitive.contentOrNull
+                            val until =
+                                body
+                                    .getValue("transcribedUntilMs")
+                                    .jsonPrimitive.contentOrNull
+                                    ?.toLong()
+                            return phase to until
+                        }
+
+                        // Hand-derived: the last stored segment's end, or null without segments.
+                        phaseAndTranscribedUntilOf(failed) shouldBe ("TRANSCRIBING" to 2_500)
+                        phaseAndTranscribedUntilOf(canceled) shouldBe ("CHUNKING" to null)
+                        phaseAndTranscribedUntilOf(queued) shouldBe (null to null)
+                        phaseAndTranscribedUntilOf(completed) shouldBe (null to 800)
                     }
                 }
             }
