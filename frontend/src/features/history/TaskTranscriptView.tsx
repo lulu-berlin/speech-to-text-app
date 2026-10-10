@@ -13,8 +13,8 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
+import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
-import { useTaskCommand } from './useTaskCommand';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
 
@@ -92,11 +92,44 @@ const TranscriptRegion = styled.div`
   overflow-y: auto;
 `;
 
+// The status page's Retry: runs through commandMachine (the one command mechanism, item
+// 28), so on done the returned task updates the store and the view returns to the queue.
+// Its own component because the machine input needs the loaded task's status, which the
+// parent does not have before the first snapshot (useMachine fixes the input at mount).
+function RetryButton({ task }: { task: Task }) {
+  const connection = ConnectionContext.useActorRef();
+  const navigate = useNavigate();
+  const [retryState, retrySend, retryActor] = useMachine(commandMachine, {
+    input: { command: 'retry', taskId: task.id, status: task.status },
+  });
+
+  useEffect(() => {
+    if (retryState.matches('done') && retryState.context.task !== null) {
+      connection.send({ type: 'task-updated', task: retryState.context.task });
+      navigate('/queue');
+    }
+  }, [retryState, connection, navigate]);
+
+  return (
+    <Button
+      type="button"
+      onClick={() => {
+        if (retryState.matches('failed') || retryState.matches('done')) {
+          retryActor.stop();
+          retryActor.start();
+        }
+        retrySend({ type: 'START' });
+      }}
+    >
+      Retry
+    </Button>
+  );
+}
+
 export function TaskTranscriptView() {
   const { taskId } = useParams();
   const id = Number(taskId);
   const navigate = useNavigate();
-  const runCommand = useTaskCommand();
   // The visible form of a command/delete refusal (the typed ApiError's message).
   const errorText = (error: unknown) => (error instanceof ApiError ? error.message : String(error));
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
@@ -298,16 +331,7 @@ export function TaskTranscriptView() {
           {task.error !== null ? <Text>Error: {task.error}</Text> : null}
           {audioBlock}
           <Row gap="sm">
-            <Button
-              type="button"
-              onClick={() =>
-                runCommand('retry', task, () => {
-                  navigate('/queue');
-                })
-              }
-            >
-              Retry
-            </Button>
+            <RetryButton task={task} />
             <Button
               type="button"
               variant="danger"
