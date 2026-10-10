@@ -62,6 +62,23 @@ export async function renameSpeaker(
   return json<Speakers>(response);
 }
 
+// Item 22 contract: POST /api/tasks/{id}/speakers/merge with { group, into } -> 200 Speakers
+// (the effective speakers); 400 invalid-merge for a group the server refuses.
+export async function mergeSpeakers(id: number, group: number[], into: number): Promise<Speakers> {
+  const response = await fetch(`/api/tasks/${id}/speakers/merge`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ group, into }),
+  });
+  return json<Speakers>(response);
+}
+
+// Item 22 contract: DELETE /api/tasks/{id}/speakers/merges ("Reset all merges") -> 200 Speakers.
+export async function resetMerges(id: number): Promise<Speakers> {
+  const response = await fetch(`/api/tasks/${id}/speakers/merges`, { method: 'DELETE' });
+  return json<Speakers>(response);
+}
+
 // The upload options of one file (item 12 contract): language from docs/api/languages.json,
 // speakers auto|off|<n> (1–20), maxSpeakers 1–20.
 export interface UploadOptions {

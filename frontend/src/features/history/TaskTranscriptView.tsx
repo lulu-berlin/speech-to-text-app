@@ -182,7 +182,11 @@ export function TaskTranscriptView() {
     }
     // For speakers off, the turns carry speakerId null and the speakers list is empty, so
     // the lookup yields undefined and no name (nor tint) is rendered.
-    return turns.turns.map((turn) => ({ turn, speaker: turns.speakers[turn.speakerId ?? 0] }));
+    // By speakerId, not list position: after a merge the effective speakers skip merged ids.
+    return turns.turns.map((turn) => ({
+      turn,
+      speaker: turns.speakers.find((speaker) => speaker.speakerId === turn.speakerId),
+    }));
   }, [turns]);
 
   // The playhead on the /audio timeline in milliseconds (item 8): updated from the audio
@@ -391,9 +395,19 @@ export function TaskTranscriptView() {
           <SpeakersPanel
             taskId={id}
             speakers={turns.speakers}
+            hasMerges={turns.hasMerges}
             onSpeakersChanged={(speakers) =>
               setTurns((previous) => (previous === null ? previous : { ...previous, speakers }))
             }
+            // A merge or a reset joins or splits turns, so the turns are read again.
+            onMergesChanged={() => {
+              getTurns(id)
+                .then(setTurns)
+                .catch(() => {
+                  /* A failed reload keeps the transcript as it was; the next event or visit
+                     reads it again. */
+                });
+            }}
           />
         ) : null}
         {turnsBySpeaker === null ? (

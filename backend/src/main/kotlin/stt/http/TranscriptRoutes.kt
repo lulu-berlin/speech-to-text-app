@@ -71,13 +71,15 @@ fun Application.transcriptRoutes() {
             val details = call.completedTaskOrError(tasks, "turns") ?: return@get
             val id = details.id
             if (details.task.speakersMode == SpeakersMode.OFF) {
-                call.respond(TurnsJson(speakers = emptyList(), turns = segments.findByTask(id).map { it.toNullSpeakerTurn() }))
+                val turns = segments.findByTask(id).map { it.toNullSpeakerTurn() }
+                call.respond(TurnsJson(speakers = emptyList(), hasMerges = false, turns = turns))
             } else {
                 // Item 22: the effective speakers and the segments as merged; speakerTurns itself is unchanged.
                 val diarized = segments.findDiarized(id)
                 call.respond(
                     TurnsJson(
                         speakers = diarized.speakers.map { it.toJson() },
+                        hasMerges = diarized.hasMerges,
                         turns =
                             speakerTurns(diarized.segments, diarized.speakers).map { turn ->
                                 TurnJson(
@@ -131,6 +133,8 @@ private fun Segment.toNullSpeakerTurn(): TurnJson {
 @Serializable
 data class TurnsJson(
     val speakers: List<SpeakerJson>,
+    // Item 22: whether the task has a merge to undo ("Reset all merges"); false with speakers off.
+    val hasMerges: Boolean,
     val turns: List<TurnJson>,
 )
 
