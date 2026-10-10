@@ -371,7 +371,7 @@ describe('the queue list', () => {
     );
     expect(
       within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
-    ).toHaveAttribute('aria-valuetext', 'Clustering 70%');
+    ).toHaveAttribute('aria-valuetext', 'Clustering 40%');
 
     // When diarization does not apply, its bar disappears; transcription keeps updating.
     events.send('task-progress', {

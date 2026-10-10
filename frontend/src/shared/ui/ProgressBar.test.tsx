@@ -33,12 +33,12 @@ describe('the progress bars', () => {
 
     const embedding = required(diarization[0]);
     expect(embedding).toHaveAttribute('aria-valuenow', '20');
-    expect(embedding).toHaveAttribute('aria-valuetext', 'Embedding 20%');
+    expect(embedding).toHaveAttribute('aria-valuetext', 'Embedding 40%');
     expect(getComputedStyle(required(embedding.firstElementChild)).width).toBe('20%');
 
     const clustering = required(diarization[1]);
     expect(clustering).toHaveAttribute('aria-valuenow', '70');
-    expect(clustering).toHaveAttribute('aria-valuetext', 'Clustering 70%');
+    expect(clustering).toHaveAttribute('aria-valuetext', 'Clustering 40%');
     expect(getComputedStyle(required(clustering.firstElementChild)).width).toBe('70%');
 
     const pending = required(diarization[2]);

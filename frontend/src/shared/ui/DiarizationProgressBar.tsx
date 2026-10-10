@@ -26,13 +26,14 @@ export interface DiarizationProgressBarProps {
 
 // The two-stage diarization bar (item 11's contract): embedding fills the left half of the
 // track, clustering the right half. The value puts the stage progress on that half. Next
-// to the track the active stage label with its within-stage percentage (item 25; the
-// percentage restarts per stage, so the aria value text keeps the merged view for the bar
-// role while the visible text counts within the stage).
+// to the track the active stage label with its within-stage percentage (item 25); the aria
+// value text carries the same within-stage wording, since the merged percentage restarts
+// per stage and would mislead.
 export function DiarizationProgressBar({ stage, progress }: DiarizationProgressBarProps) {
   const stageIndex = stage === 'CLUSTERING' ? 1 : 0;
   const value = (stageIndex + progress) / 2;
   const percent = Math.round(value * 100);
+  const stageLabel = stage === null ? null : STAGE_LABELS[stage];
   const stagePercent = Math.round(progress * 100);
   return (
     <ProgressRow>
@@ -42,14 +43,14 @@ export function DiarizationProgressBar({ stage, progress }: DiarizationProgressB
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent}
-        aria-valuetext={stage === null ? undefined : `${STAGE_LABELS[stage]} ${percent}%`}
+        aria-valuetext={stageLabel === null ? undefined : `${stageLabel} ${stagePercent}%`}
       >
         <ProgressFill $value={value} />
         <ProgressDivider />
       </ProgressTrack>
-      {stage !== null ? (
+      {stageLabel !== null ? (
         <ProgressValue>
-          {STAGE_LABELS[stage]} {stagePercent}%
+          {stageLabel} {stagePercent}%
         </ProgressValue>
       ) : null}
     </ProgressRow>
