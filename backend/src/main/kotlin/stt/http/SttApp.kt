@@ -13,6 +13,7 @@ import io.ktor.server.routing.routing
 import stt.config.Config
 import stt.db.AudioRepository
 import stt.db.Database
+import stt.db.QueueStateRepository
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.engine.processingEngine
@@ -32,12 +33,14 @@ fun Application.sttApp(config: Config) {
         provide<TaskWorkDirectories> { TaskWorkDirectories(config.dataDir) }
         provide<TaskRepository> { TaskRepository(resolve(), resolve()) }
         provide<AudioRepository> { AudioRepository(resolve()) }
+        provide<QueueStateRepository> { QueueStateRepository(resolve()) }
         require(DependencyKey<Database>())
     }
     processingEngine(config)
     healthRoutes()
     taskRoutes()
     taskCommandRoutes()
+    queueRoutes()
     uploadRoutes(config)
     val staticDir = config.staticDir
     routing {
