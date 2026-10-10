@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { App } from '../../app/App';
 import { eventStreamResponse } from '../../shared/api/handlers';
 import {
+  error as errorFixture,
   taskCanceled,
   taskCompleted,
   taskFailed,
@@ -205,5 +206,43 @@ describe('the history list', () => {
     const rows = screen.getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('interview.mp3');
     expect(rows[1]).toHaveTextContent('call.ogg');
+  });
+
+  it('shows an inline error when a retry is refused', async () => {
+    // Mock addition: the retry handler answers 409 with error.json, standing in for a
+    // refused command (there is no 409 illegal-transition example in docs/api/).
+    server.use(
+      http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])),
+      http.post('/api/tasks/:id/retry', () => HttpResponse.json(errorFixture, { status: 409 })),
+    );
+    await renderHistory();
+
+    fireEvent.click(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' }));
+
+    // The refusal surfaces inline; the task stays in the list.
+    expect(await screen.findByText(/Task 42 does not exist/)).toBeInTheDocument();
+    expect(rowOf('call.ogg')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('shows an inline error when a delete is refused', async () => {
+    let confirmClicks = 0;
+    // Mock addition: the delete handler answers 409 with error.json, standing in for a
+    // refused delete.
+    server.use(
+      http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])),
+      http.delete('/api/tasks/:id', () => HttpResponse.json(errorFixture, { status: 409 })),
+    );
+    await renderHistory();
+
+    fireEvent.click(within(rowOf('interview.mp3')).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    confirmClicks += 1;
+
+    // The refusal surfaces inline and the dialog closes; the task stays in the list.
+    expect(await screen.findByText(/Task 42 does not exist/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('interview.mp3')).toBeInTheDocument();
+    expect(confirmClicks).toBe(1);
   });
 });
