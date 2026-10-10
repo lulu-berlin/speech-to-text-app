@@ -26,7 +26,7 @@ import stt.transcribe.ChunkTranscriber
 /**
  * The processing engine's feature module (ADR 0013): registers the [ProcessingEngine] with Ktor DI over the real
  * ffmpeg, whisper-cli and CAM++ implementations, and starts its worker with the application. Needs the
- * [Database] and [TaskWorkDirectories] the application provides.
+ * [Database], [TaskWorkDirectories] and [TaskRepository] the application provides.
  */
 fun Application.processingEngine(config: Config) {
     // The application-level scope (AGENTS.md): a SupervisorJob under the application's job, so one failed
@@ -44,7 +44,7 @@ fun Application.processingEngine(config: Config) {
             ProcessingEngine(
                 scope = engineScope,
                 config = config,
-                tasks = TaskRepository(db, workDirectories),
+                tasks = resolve<TaskRepository>(),
                 chunks = ChunkRepository(db),
                 segments = SegmentRepository(db),
                 queueState = QueueStateRepository(db),
