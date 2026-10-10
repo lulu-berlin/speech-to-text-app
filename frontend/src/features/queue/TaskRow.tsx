@@ -16,6 +16,7 @@ import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { Row, Stack } from '../../shared/ui/layout';
+import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { rowActionMachine } from './rowActionMachine';
 import { RowContent, RowName } from './rowParts';
 
@@ -70,6 +71,11 @@ export interface TaskRowProps {
 export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProps }: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
   const [action, send] = useMachine(rowActionMachine, { input: { taskId: task.id } });
+  // Delete runs through the shared dialog-action machine (item 28): the menu item opens
+  // its dialog, done removes the task from the live state.
+  const [deleteState, deleteSend, deleteActor] = useMachine(confirmActionMachine, {
+    input: { taskId: task.id },
+  });
 
   // Work would be lost when cancelling a running task or a paused task that has started;
   // a queued or never-started paused task is cancelled directly (its chunks were never
@@ -77,18 +83,19 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
   const confirmCancel =
     task.status === 'RUNNING' || (task.status === 'PAUSED' && task.startedAt !== null);
 
-  // A finished action updates the live state: a delete removes the task, any command
-  // applies its returned task (both are idempotent with the server's own events).
+  // A finished command applies its returned task to the live state (idempotent with the
+  // server's own events); a finished delete removes the task.
   useEffect(() => {
-    if (!action.matches('done')) {
-      return;
-    }
-    if (action.context.action === 'delete') {
-      connection.send({ type: 'task-deleted', id: action.context.taskId });
-    } else if (action.context.task !== null) {
+    if (action.matches('done') && action.context.task !== null) {
       connection.send({ type: 'task-updated', task: action.context.task });
     }
   }, [action, connection]);
+
+  useEffect(() => {
+    if (deleteState.matches('done')) {
+      connection.send({ type: 'task-deleted', id: task.id });
+    }
+  }, [deleteState, connection, task.id]);
 
   const confirmingAction = action.matches('confirming') ? action.context.action : null;
 
@@ -117,8 +124,15 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
     {
       label: 'Delete',
       danger: true,
-      onSelect: () =>
-        send({ type: 'ACTIVATE', action: 'delete', status: task.status, confirm: true }),
+      onSelect: () => {
+        // A failed or done delete machine cannot answer REQUEST from its idle state, so
+        // restart it first (the same reset the history flows do).
+        if (deleteState.matches('failed') || deleteState.matches('done')) {
+          deleteActor.stop();
+          deleteActor.start();
+        }
+        deleteSend({ type: 'REQUEST' });
+      },
     },
   ];
 
@@ -168,6 +182,13 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
               : String(action.context.error)}
           </RowActionError>
         ) : null}
+        {deleteState.matches('failed') ? (
+          <RowActionError>
+            {deleteState.context.error instanceof Error
+              ? deleteState.context.error.message
+              : String(deleteState.context.error)}
+          </RowActionError>
+        ) : null}
         <ProgressBar value={task.transcriptionProgress} label="Transcription" />
         {task.diarizationProgress !== null ? (
           <DiarizationProgressBar
@@ -186,11 +207,11 @@ export function TaskRow({ task, index, count, onMoveTask, rowRef, dragHandleProp
         Stops the task; it can be retried from History.
       </ConfirmDialog>
       <ConfirmDialog
-        open={confirmingAction === 'delete'}
+        open={deleteState.matches('confirming') || deleteState.matches('running')}
         title={`Delete ${task.filename}?`}
         confirmLabel="Delete task"
-        onConfirm={() => send({ type: 'CONFIRM' })}
-        onCancel={() => send({ type: 'DISMISS' })}
+        onConfirm={() => deleteSend({ type: 'CONFIRM' })}
+        onCancel={() => deleteSend({ type: 'CANCEL' })}
       >
         Removes the task, its transcript and audio for good.
       </ConfirmDialog>

@@ -13,7 +13,7 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { segmentAtTime } from './segmentTiming';
-import { deleteTaskMachine } from './deleteTaskMachine';
+import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { useTaskCommand } from './useTaskCommand';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
@@ -105,9 +105,9 @@ export function TaskTranscriptView() {
   const [turns, setTurns] = useState<Turns | null>(null);
 
   // Delete from the detail view (status page and transcript), always confirmed (decision B,
-  // 2026-10-10): the flow lives in deleteTaskMachine; on success the view returns to the
+  // 2026-10-10): the flow lives in confirmActionMachine; on success the view returns to the
   // history list. The same machine serves both branches via one shared dialog.
-  const [deleteState, deleteSend, deleteActor] = useMachine(deleteTaskMachine, {
+  const [deleteState, deleteSend, deleteActor] = useMachine(confirmActionMachine, {
     input: { taskId: id },
   });
   useEffect(() => {
@@ -236,10 +236,10 @@ export function TaskTranscriptView() {
   }
 
   // The shared delete confirmation, opened by the Delete button in either branch. The
-  // dialog's open/closed lives in deleteTaskMachine (confirming/sending), not React state.
+  // dialog's open/closed lives in confirmActionMachine (confirming/running), not React state.
   const deleteDialog = (
     <ConfirmDialog
-      open={deleteState.matches('confirming') || deleteState.matches('sending')}
+      open={deleteState.matches('confirming') || deleteState.matches('running')}
       title="Delete task?"
       confirmLabel="Delete"
       onConfirm={() => deleteSend({ type: 'CONFIRM' })}
