@@ -9,6 +9,7 @@ import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.queue.TaskStatus
 import stt.transcribe.WhisperSegment
+import kotlin.time.Duration.Companion.milliseconds
 
 class ProcessingEngineEventsSpec :
     BehaviorSpec({
@@ -63,8 +64,43 @@ class ProcessingEngineEventsSpec :
                             )
                         // The deletion is the one event after the row (and everything cascading) is gone.
                         events.filterIsInstance<Event.TaskDeleted>().map { it.id } shouldBe listOf(task)
-                        events.last().shouldBeInstanceOf<Event.TaskDeleted>()
+                        // The deletion is followed only by the queue-updated (the task left the queue).
+                        events.last().shouldBeInstanceOf<Event.QueueUpdated>()
                         fixture.tasks.find(task) shouldBe null
+                    }
+                }
+            }
+        }
+
+        given("a queue with two tasks, exercised through pause, reorder, completion and deletion") {
+            `when`("the queue changes") {
+                then("a queue-updated is emitted after each membership change, matching the database") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+
+                        // pause, reorder behind the worker's back, then resume: every membership or
+                        // order change while the queue is paused is still reported.
+                        fixture.engine.pauseQueue()
+                        fixture.engine.start()
+                        fixture.engine.reorderQueue(listOf(second, first))
+                        fixture.engine.resumeQueue()
+                        fixture.completed.receive() shouldBe second
+                        fixture.completed.receive() shouldBe first
+                        // Let the worker finish the last completion's queue event and the collector catch up.
+                        pumpUntil(200.milliseconds) { false }
+
+                        val updates = drain(fixture.events).filterIsInstance<Event.QueueUpdated>()
+                        updates.map { it.taskIds } shouldBe
+                            listOf(
+                                listOf(first, second), // paused
+                                listOf(second, first), // reordered, still paused
+                                listOf(second, first), // resumed
+                                listOf(first), // second completed and left
+                                emptyList(), // first completed and left
+                            )
+                        updates.map { it.paused } shouldBe listOf(true, true, false, false, false)
                     }
                 }
             }
