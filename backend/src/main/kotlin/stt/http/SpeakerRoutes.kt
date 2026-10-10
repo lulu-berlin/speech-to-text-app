@@ -5,6 +5,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.RoutingCall
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
@@ -68,7 +69,7 @@ fun Application.speakerRoutes() {
             val request = call.receive<MergeSpeakersRequest>()
             when (val outcome = engine.mergeSpeakers(id, request.group, request.into)) {
                 MergeOutcome.Merged -> {
-                    call.respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
+                    call.respondSpeakers(segments, id)
                 }
 
                 is MergeOutcome.Invalid -> {
@@ -80,10 +81,16 @@ fun Application.speakerRoutes() {
         delete("/api/tasks/{id}/speakers/merges") {
             val id = call.parameters["id"]!!.toLong()
             engine.resetMerges(id)
-            call.respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
+            call.respondSpeakers(segments, id)
         }
     }
 }
+
+/** Answers `200` with the task's effective speakers (`docs/api/speakers.json`), read through its merges. */
+private suspend fun RoutingCall.respondSpeakers(
+    segments: SegmentRepository,
+    id: Long,
+) = respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
 
 /** The longest speaker name (item 22). */
 private const val MAX_SPEAKER_NAME = 40
