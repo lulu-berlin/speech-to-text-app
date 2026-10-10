@@ -401,6 +401,85 @@ describe('the transcript view', () => {
     expect(second).toHaveValue('Speaker 2');
     expect(within(transcript).getByText('Speaker 2')).toBeInTheDocument();
   });
+
+  it('merges a group into a chosen survivor after a confirmation, and "Reset all merges" undoes it', async () => {
+    // Mock addition (item 22): the merge and reset endpoints switch /turns between turns.json
+    // and the turns merged by hand ({0, 1} into 0: one turn of speaker 0 over all four
+    // segments, hasMerges true), as the backend's read path does.
+    const merged = {
+      speakers: [turnsFixture.speakers[0]!],
+      hasMerges: true,
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 0,
+          endMs: 14250,
+          text: turnsFixture.turns.map((turn) => turn.text).join(' '),
+          segments: turnsFixture.turns.flatMap((turn) => turn.segments),
+        },
+      ],
+    };
+    let isMerged = false;
+    const posted: unknown[] = [];
+    let resets = 0;
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json(isMerged ? merged : { ...turnsFixture, hasMerges: false }),
+      ),
+      http.post('/api/tasks/:id/speakers/merge', async ({ request }) => {
+        posted.push(await request.json());
+        isMerged = true;
+        return HttpResponse.json({ speakers: merged.speakers });
+      }),
+      http.delete('/api/tasks/:id/speakers/merges', () => {
+        resets += 1;
+        isMerged = false;
+        return HttpResponse.json({ speakers: turnsFixture.speakers });
+      }),
+    );
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json has speakers 0 and 1.
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    // Nothing to undo yet.
+    expect(
+      within(panel).queryByRole('button', { name: 'Reset all merges' }),
+    ).not.toBeInTheDocument();
+
+    // Pick the group and the survivor; the confirmation quotes the spec's wording.
+    fireEvent.click(within(panel).getByRole('button', { name: 'Merge speakers…' }));
+    fireEvent.click(within(panel).getByRole('checkbox', { name: 'Speaker 1' }));
+    fireEvent.click(within(panel).getByRole('checkbox', { name: 'Speaker 2' }));
+    fireEvent.change(within(panel).getByRole('combobox', { name: 'Keep' }), {
+      target: { value: '0' },
+    });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Merge' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Merge Speaker 2 into Speaker 1? Their turns join Speaker 1; you can undo this.',
+    );
+
+    // Cancel sends nothing; only a confirmed merge is sent.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    expect(posted).toEqual([]);
+    fireEvent.click(within(panel).getByRole('button', { name: 'Merge' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Merge' }));
+
+    // Speaker 2's turn joins Speaker 1's: one turn, one label; Reset all merges appears.
+    await waitFor(() => expect(within(transcript).getAllByText('Speaker 1')).toHaveLength(1));
+    expect(posted).toEqual([{ group: [0, 1], into: 0 }]);
+    expect(within(transcript).queryByText('Speaker 2')).not.toBeInTheDocument();
+    expect(
+      within(panel).queryByRole('textbox', { name: 'Name of speaker 2' }),
+    ).not.toBeInTheDocument();
+
+    // Reset all merges brings the speaker and its turn back, and has nothing left to undo.
+    fireEvent.click(await within(panel).findByRole('button', { name: 'Reset all merges' }));
+    expect(await within(transcript).findByText('Speaker 2')).toBeInTheDocument();
+    expect(within(transcript).getAllByText('Speaker 1')).toHaveLength(2);
+    expect(resets).toBe(1);
+    expect(
+      within(panel).queryByRole('button', { name: 'Reset all merges' }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 // jsdom reports colours as rgb(); mirror the helper used by the other tests.

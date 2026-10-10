@@ -202,7 +202,7 @@ class SegmentRepository(
             val intoOf = selectMerges(taskId)
             val segments = selectSegments(taskId).map { it.copy(speakerId = it.speakerId?.let { id -> intoOf[id] ?: id }) }
             val speakers = selectSpeakers(taskId).filter { it.speakerId !in intoOf }
-            DiarizedRead(segments, speakers)
+            DiarizedRead(segments, speakers, hasMerges = intoOf.isNotEmpty())
         }
 
     /** The task's merge mapping, merged speaker id → the id it was merged into; runs inside the caller's transaction. */

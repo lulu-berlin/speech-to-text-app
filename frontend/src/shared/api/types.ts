@@ -45,6 +45,8 @@ export interface Turn {
 // Item 12 contract: GET /api/tasks/{id}/turns (docs/api/turns.json).
 export interface Turns {
   speakers: TurnSpeaker[];
+  // Item 22: whether the task has a merge to undo ("Reset all merges"); false with speakers off.
+  hasMerges: boolean;
   turns: Turn[];
 }
 

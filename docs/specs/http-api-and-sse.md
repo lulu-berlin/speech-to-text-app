@@ -96,7 +96,8 @@ The JSON shapes the frontend builds against.
   - queue pause/resume/order → `200` Queue;
   - delete → `204` without a body;
   - rename a speaker, merge speakers, reset all merges → `200` Speakers (item 22).
-- **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
+- **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "hasMerges": boolean, "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
+  - `hasMerges` (added 2026-10-10, item 22): whether the task has a merge that "Reset all merges" can undo; `false` with speakers `off`.
   - `speakers` are the task's **effective** speakers (item 22): its rows of the `speakers` table (ADR 0028) except those merged into another speaker, ordered by `speakerId`: `speakerId` the 0-based number, `speaker` the stored name (`"Speaker N"`, N = `speakerId` + 1, until renamed). A rename changes only the name here, never the turns, which reference their speaker by `speakerId`. A merged speaker's segments carry the `speakerId` of the speaker it was merged into, so its turns join that speaker's neighbouring turns.
   - `turns` are item 09's `speaker_turns`: consecutive segments with the same `speakerId` form one turn. A turn names its speaker only by `speakerId`; the UI shows the name from `speakers`.
   - Only for COMPLETED tasks; any other status → `409 not-completed`.

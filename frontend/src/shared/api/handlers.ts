@@ -139,6 +139,13 @@ export const handlers = [
     });
   }),
 
+  // Merge speakers: POST /api/tasks/{id}/speakers/merge -> 200 speakers.json, and reset all
+  // merges: DELETE /api/tasks/{id}/speakers/merges -> 200 speakers.json. Mock addition
+  // (item 22): the examples unchanged; GET /turns stays turns.json, so dev:mock shows the
+  // flow but not joined turns (that needs the backend, item 21).
+  http.post('/api/tasks/:id/speakers/merge', () => HttpResponse.json(speakersFixture)),
+  http.delete('/api/tasks/:id/speakers/merges', () => HttpResponse.json(speakersFixture)),
+
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
 
   // Events: GET /api/events, the SSE stream. The first event of every connection is the

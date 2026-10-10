@@ -83,6 +83,7 @@ class TurnsSpec :
                             Json.parseToJsonElement(
                                 """
                                 {
+                                  "hasMerges": false,
                                   "speakers": [
                                     { "speakerId": 0, "speaker": "Speaker 1" },
                                     { "speakerId": 1, "speaker": "Speaker 2" }
@@ -133,6 +134,7 @@ class TurnsSpec :
                             Json.parseToJsonElement(
                                 """
                                 {
+                                  "hasMerges": false,
                                   "speakers": [],
                                   "turns": [
                                     {
@@ -178,6 +180,7 @@ class TurnsSpec :
                             Json.parseToJsonElement(
                                 """
                                 {
+                                  "hasMerges": false,
                                   "speakers": [ { "speakerId": 0, "speaker": "Speaker 1" } ],
                                   "turns": [
                                     {

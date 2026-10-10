@@ -220,6 +220,7 @@ class SpeakerRoutesSpec :
                             Json.parseToJsonElement(
                                 """
                                 {
+                                  "hasMerges": true,
                                   "speakers": [
                                     { "speakerId": 0, "speaker": "Alice" },
                                     { "speakerId": 2, "speaker": "Speaker 3" }
@@ -515,6 +516,7 @@ class SpeakerRoutesSpec :
                             Json.parseToJsonElement(
                                 """
                                 {
+                                  "hasMerges": true,
                                   "speakers": [ { "speakerId": 2, "speaker": "Speaker 3" } ],
                                   "turns": [
                                     {
