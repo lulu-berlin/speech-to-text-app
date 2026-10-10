@@ -107,7 +107,7 @@ Known differences from the contract, no example to serve:
 - `GET /api/tasks/{id}/turns` returns turns for any known task (by its `speakersMode`), not `409 not-completed` for a task that is not COMPLETED: `error.json`'s code is `not-found`, and there is no `not-completed` example.
 - `DELETE /api/tasks/{id}` answers `204` for any id, also unknown ones (the backend answers `404`).
 - The `404` for an unknown task id serves `error.json` verbatim, so its message names task 42 whatever the id.
-- `POST /api/tasks` always returns `task.queued.json` (id 7), which already exists in `snapshot.json`.
+- `POST /api/tasks` answers with `task.queued.json` under a **fresh** id (starting at 100, above the example ids), never one the state already knows. The mock stream sends no task-updated for it, so the uploaded task's row stays in the upload list until the backend (item 21) actually confirms the task in the queue (item 18 review). The queued example's other fields (filename memo.wav) belong to the example, not to the uploaded file.
 
 ## Approval log
 - 2026-10-09: consultation answers approved: react-router; XState v5 + `@xstate/react` for client actions with server state applied as received ([ADR 0031](../decisions/0031-frontend-routing-react-router-state-xstate.md)); transition table shared as `docs/api/task-transitions.json`; light and dark following the OS; calm, document-like look; English only; `pnpm dev:mock`; native `<dialog>`. Test list not yet approved.

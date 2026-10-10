@@ -140,6 +140,30 @@ describe('the queue view upload options', () => {
 });
 
 describe('the queue view upload flow', () => {
+  it('keeps a finished upload row until the backend confirms the task', async () => {
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
+    fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+
+    // The upload completes; the mock's fresh id is not in the live state and the mock
+    // stream never announces it, so the row stays in the upload list instead of
+    // vanishing (the task leaves it only once the backend confirms it in the queue).
+    await waitFor(() => expect(screen.getByText('done')).toBeInTheDocument());
+    expect(
+      within(screen.getByRole('list', { name: 'Uploads' })).getByText('a.mp3'),
+    ).toBeInTheDocument();
+
+    // The pending list is unchanged.
+    const rows = within(screen.getByRole('list', { name: 'Pending tasks' })).getAllByRole(
+      'listitem',
+    );
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('lecture.m4a'),
+      expect.stringContaining('memo.wav'),
+    ]);
+  });
   it('uploads dropped files one at a time in drop order, each with the batch options', async () => {
     // jsdom + MSW cannot parse an XHR FormData body (mswjs/interceptors#684), so the
     // handler reads the raw multipart text. jsdom drops the file's content, but the

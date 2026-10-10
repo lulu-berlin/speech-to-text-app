@@ -50,10 +50,20 @@ export function eventStreamResponse(
   });
 }
 
+// The next id the mock hands an upload. It starts above every example id (the snapshot
+// holds 5, 7, 3, 4), so an uploaded task never collides with a task the state already
+// knows: the upload row leaves only when the stream actually announces that task, and
+// the dev-mode stream sends no such event — the row stays in the upload list until a
+// reload, mirroring "the backend has not confirmed the task yet" (item 18 review).
+let nextTaskId = 100;
+
 export const handlers = [
-  // Upload: POST /api/tasks -> 201 Task (task.queued.json). The 409 duplicate-audio path
-  // (error.duplicate-audio.json) is exercised by a per-test override in client.test.ts.
-  http.post('/api/tasks', () => HttpResponse.json(taskQueuedFixture, { status: 201 })),
+  // Upload: POST /api/tasks -> 201 Task (task.queued.json, with a fresh id). The 409
+  // duplicate-audio path (error.duplicate-audio.json) is exercised by a per-test
+  // override in client.test.ts.
+  http.post('/api/tasks', () =>
+    HttpResponse.json({ ...taskQueuedFixture, id: nextTaskId++ }, { status: 201 }),
+  ),
 
   // List tasks: GET /api/tasks (task-list.json).
   http.get('/api/tasks', () => HttpResponse.json(taskListFixture)),
