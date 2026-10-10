@@ -1,6 +1,7 @@
 package stt.engine
 
 import io.ktor.server.application.Application
+import io.ktor.server.plugins.di.DependencyKey
 import io.ktor.server.plugins.di.dependencies
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +60,9 @@ fun Application.processingEngine(config: Config) {
             // Database it depends on. DI's cleanup is a blocking callback, hence the bridge.
             runBlocking { engineJob.cancelAndJoin() }
         }
+        // The engine is part of startup, like the Database (ADR 0017/0038): DI resolves it here, so
+        // ApplicationModulesLoaded creates it and its cleanup exists before any stop can close the Database.
+        require(DependencyKey<ProcessingEngine>())
     }
     // The worker runs from startup: it recovers what a crash left RUNNING, then takes the queue.
     launch { dependencies.resolve<ProcessingEngine>().start() }
