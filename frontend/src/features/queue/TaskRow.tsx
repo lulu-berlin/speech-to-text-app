@@ -1,4 +1,4 @@
-import { Pause } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import { styled } from 'styled-components';
 import { createActor } from 'xstate';
 import { ConnectionContext } from '../../app/ConnectionContext';
@@ -65,6 +65,13 @@ export function TaskRow({ task }: TaskRowProps) {
                 icon={Pause}
                 label={`Pause ${task.filename}`}
                 onClick={() => run('pause')}
+              />
+            ) : null}
+            {isAllowedCommand('resume', task.status) ? (
+              <IconButton
+                icon={Play}
+                label={`Resume ${task.filename}`}
+                onClick={() => run('resume')}
               />
             ) : null}
           </Row>
