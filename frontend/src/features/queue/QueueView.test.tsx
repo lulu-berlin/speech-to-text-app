@@ -2,7 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { taskQueued } from '../../shared/api/fixtures';
+import { ConnectionContext } from '../../app/ConnectionContext';
+import {
+  queue as queueFixture,
+  snapshot as snapshotFixture,
+  taskQueued,
+} from '../../shared/api/fixtures';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
@@ -11,9 +16,11 @@ import { QueueView } from './QueueView';
 function renderQueue() {
   return render(
     <ThemedProviders>
-      <MemoryRouter>
-        <QueueView />
-      </MemoryRouter>
+      <ConnectionContext.Provider>
+        <MemoryRouter>
+          <QueueView />
+        </MemoryRouter>
+      </ConnectionContext.Provider>
     </ThemedProviders>,
   );
 }
@@ -131,7 +138,7 @@ describe('the queue view upload flow', () => {
 
     // The rows appear in drop order; only the first file is uploading (it alone has a
     // progress bar), the others are queued.
-    const rows = within(screen.getByRole('list')).getAllByRole('listitem');
+    const rows = within(screen.getByRole('list', { name: 'Uploads' })).getAllByRole('listitem');
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining('a.mp3'),
       expect.stringContaining('b.wav'),
@@ -186,7 +193,9 @@ describe('the queue view upload flow', () => {
         void proceed.then(() => {
           this.upload.onprogress?.({ lengthComputable: true, loaded: 10, total: 10 });
           this.status = 201;
-          this.response = taskQueued;
+          // A fresh id: the snapshot already holds task 7, and a done row leaves once
+          // its task is in the live state.
+          this.response = { ...taskQueued, id: 99 };
           this.onload?.();
         });
       }
@@ -210,5 +219,64 @@ describe('the queue view upload flow', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('the queue list', () => {
+  it('shows a new task in the queue list after its upload', async () => {
+    const newTask = { ...taskQueued, id: 99, filename: 'a.mp3' };
+    const newQueue = { ...queueFixture, taskIds: [...queueFixture.taskIds, 99] };
+    const { promise: announce, resolve: releaseAnnounce } = Promise.withResolvers<void>();
+
+    // The real backend announces a new upload on the stream (task-updated plus the queue
+    // change) only after the task exists, so the mock sends the snapshot first and holds
+    // the announcement until the test has completed the upload.
+    server.use(
+      http.post('/api/tasks', () => HttpResponse.json(newTask, { status: 201 })),
+      http.get('/api/events', () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(`event: snapshot\ndata: ${JSON.stringify(snapshotFixture)}\n\n`),
+            );
+            void announce.then(() => {
+              controller.enqueue(
+                encoder.encode(`event: task-updated\ndata: ${JSON.stringify(newTask)}\n\n`),
+              );
+              controller.enqueue(
+                encoder.encode(`event: queue-updated\ndata: ${JSON.stringify(newQueue)}\n\n`),
+              );
+            });
+          },
+        });
+        return new HttpResponse(stream, {
+          headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+        });
+      }),
+    );
+
+    renderQueue();
+
+    // The snapshot's pending tasks are listed in queue order.
+    await screen.findByText('lecture.m4a');
+    expect(screen.getByText('memo.wav')).toBeInTheDocument();
+
+    // Upload a file; it completes while the announcement is still held.
+    const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
+    fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+    await waitFor(() => expect(screen.getByText('done')).toBeInTheDocument());
+
+    // The announcement arrives: the task joins the queue list at the end, and its upload
+    // row leaves (the task is now in the queue).
+    releaseAnnounce();
+    await waitFor(() => expect(screen.queryByText('done')).not.toBeInTheDocument());
+    const rows = screen.getAllByRole('listitem');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('lecture.m4a'),
+      expect.stringContaining('memo.wav'),
+      expect.stringContaining('a.mp3'),
+    ]);
+    expect(within(rows[2] as HTMLElement).getByText('QUEUED')).toBeInTheDocument();
   });
 });

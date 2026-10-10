@@ -4,11 +4,14 @@ import { css, styled } from 'styled-components';
 import { uploadTask } from '../../shared/api/client';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
+import type { Task } from '../../shared/api/types';
+import { ConnectionContext } from '../../app/ConnectionContext';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
+import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { Page, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 
@@ -133,9 +136,12 @@ interface UploadRow {
   // Upload progress 0..1 while uploading (bytes sent).
   progress: number;
   error: string | null;
+  // The task a successful upload created; the row leaves once it is in the live state.
+  taskId?: number;
 }
 
 export function QueueView() {
+  const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
   const [language, setLanguage] = useState(languages.default);
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
   const [speakerCount, setSpeakerCount] = useState(2);
@@ -177,6 +183,25 @@ export function QueueView() {
     event.target.value = '';
   };
 
+  // The pending tasks (QUEUED, RUNNING, PAUSED) in queue order (docs/api/queue.json).
+  const pendingTasks = (queue?.taskIds ?? [])
+    .map((id) => tasks.find((task) => task.id === id))
+    .filter((task): task is Task => task !== undefined);
+
+  // A successful upload row leaves once its task is in the live state (the server
+  // announces a new upload with task-updated; item 13's machine adds it).
+  useEffect(() => {
+    setRows((current) => {
+      const remaining = current.filter(
+        (row) =>
+          row.status !== 'done' ||
+          row.taskId === undefined ||
+          !tasks.some((task) => task.id === row.taskId),
+      );
+      return remaining.length === current.length ? current : remaining;
+    });
+  }, [tasks]);
+
   // The uploader: while no upload is running, start the first queued row. When it
   // finishes (done or error), the effect runs again and starts the next one.
   useEffect(() => {
@@ -197,9 +222,11 @@ export function QueueView() {
         current.map((row) => (row.id === next.id ? { ...row, progress: fraction } : row)),
       );
     })
-      .then(() => {
+      .then((task) => {
         setRows((current) =>
-          current.map((row) => (row.id === next.id ? { ...row, status: 'done' } : row)),
+          current.map((row) =>
+            row.id === next.id ? { ...row, status: 'done', taskId: task.id } : row,
+          ),
         );
       })
       .catch((error: unknown) => {
@@ -280,7 +307,7 @@ export function QueueView() {
         </DropZone>
         <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
         {rows.length > 0 ? (
-          <List>
+          <List label="Uploads">
             {rows.map((row) => (
               <ListRow key={row.id}>
                 <RowContent>
@@ -290,6 +317,18 @@ export function QueueView() {
                   ) : (
                     <RowStatus>{row.status}</RowStatus>
                   )}
+                </RowContent>
+              </ListRow>
+            ))}
+          </List>
+        ) : null}
+        {pendingTasks.length > 0 ? (
+          <List label="Pending tasks">
+            {pendingTasks.map((task) => (
+              <ListRow key={task.id}>
+                <RowContent>
+                  <RowName>{task.filename}</RowName>
+                  <StatusBadge status={task.status} />
                 </RowContent>
               </ListRow>
             ))}
