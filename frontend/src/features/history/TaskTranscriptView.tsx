@@ -3,7 +3,7 @@ import { useMachine } from '@xstate/react';
 import { Link, useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
-import { ApiError } from '../../shared/api/types';
+import { errorMessage } from '../../shared/api/types';
 import type { Segment, Task, TaskPhase, Turn } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading, Text } from '../../shared/ui/typography';
@@ -133,8 +133,12 @@ export function TaskTranscriptView() {
   const { taskId } = useParams();
   const id = Number(taskId);
   const navigate = useNavigate();
+<<<<<<< HEAD
   // The visible form of a command/delete refusal (the typed ApiError's message).
   const errorText = (error: unknown) => (error instanceof ApiError ? error.message : String(error));
+=======
+  const runCommand = useTaskCommand();
+>>>>>>> 606a77ac (Refactor: one errorMessage helper for the transcript view; drop HistoryRow's dead errorText)
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const connection = ConnectionContext.useSelector((state) => state.value);
   const task = tasks.find((candidate) => candidate.id === id);
@@ -354,7 +358,7 @@ export function TaskTranscriptView() {
             </Button>
           </Row>
           {deleteState.matches('failed') ? (
-            <Text>Delete failed: {errorText(deleteState.context.error)}</Text>
+            <Text>Delete failed: {errorMessage(deleteState.context.error)}</Text>
           ) : null}
         </Stack>
         {deleteDialog}
