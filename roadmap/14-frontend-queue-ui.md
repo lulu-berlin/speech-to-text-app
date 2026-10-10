@@ -46,7 +46,7 @@ None.
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 - [x] Dropping several files uploads them one at a time in drop order, each with the batch's current options
 - [x] The language select offers the codes from `docs/api/languages.json` and defaults to `auto`; speakers and max speakers accept only 1–20
-- [ ] Each uploading file shows its upload progress
+- [x] Each uploading file shows its upload progress
 - [ ] An upload error stays on that file's row: unsupported format, invalid input, and a duplicate with a link to the existing task (queue row if pending, transcript if finished)
 - [ ] A new task appears in the queue list after upload
 - [ ] A `task-progress` event updates that task's two progress bars; the diarization bar shows its stage and is hidden when diarization does not apply
