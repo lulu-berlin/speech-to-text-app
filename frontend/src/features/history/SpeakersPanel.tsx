@@ -167,19 +167,30 @@ function SpeakerNameField({ taskId, speaker, onSpeakersChanged }: SpeakerNameFie
 
   return (
     <Stack gap="xs">
-      <input
-        type="text"
-        aria-label={`Name of speaker ${speaker.speakerId + 1}`}
-        value={state.context.draft}
-        disabled={state.matches('sending')}
-        onChange={(event) => send({ type: 'EDIT', value: event.target.value })}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            send({ type: 'SAVE' });
-          }
-        }}
-        onBlur={() => send({ type: 'SAVE' })}
-      />
+      <Row gap="sm">
+        <input
+          type="text"
+          aria-label={`Name of speaker ${speaker.speakerId + 1}`}
+          value={state.context.draft}
+          disabled={state.matches('sending')}
+          onChange={(event) => send({ type: 'EDIT', value: event.target.value })}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              send({ type: 'SAVE' });
+            }
+          }}
+          onBlur={() => send({ type: 'SAVE' })}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          aria-label={`Reset name of speaker ${speaker.speakerId + 1}`}
+          disabled={state.matches('sending')}
+          onClick={() => send({ type: 'RESET' })}
+        >
+          Reset name
+        </Button>
+      </Row>
       {state.context.error !== null ? <ErrorText>{state.context.error.message}</ErrorText> : null}
     </Stack>
   );
