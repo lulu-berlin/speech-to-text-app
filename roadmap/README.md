@@ -55,7 +55,7 @@ graph TD
   09 --> 22[22 speaker rename]
   12 --> 22
   15 --> 22
-  09 --> 23[23 faster clustering]
+  09 --> 23[23 faster clustering ✓]:::done
   13 --> 24[24 design system]
   24 --> 14
   24 --> 15
@@ -92,6 +92,6 @@ graph TD
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | spec-approved | 12, 13, 14, 15, 22, 25 |
 | [22 — Rename and merge a task's speakers](22-speaker-rename.md) | spec-approved | 09, 10, 12, 15 |
-| [23 — Faster speaker clustering](23-faster-clustering.md) | spec-approved | 09 |
+| [23 — Faster speaker clustering](../docs/specs/faster-clustering.md) | done | 09 |
 | [24 — Design system: tokens and primitives](24-visual-design.md) | spec-approved | 13 |
 | [25 — Visual polish pass](25-visual-polish.md) | spec-approved | 24, 14, 15 |
