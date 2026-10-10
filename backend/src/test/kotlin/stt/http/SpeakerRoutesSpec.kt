@@ -493,6 +493,57 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("cycle 8's task with {0, 1} merged into 0 (queue paused)") {
+            `when`("the survivor 0 is merged with 2 into 2") {
+                then("speaker 1 follows its survivor into 2: one speaker, one turn, and a flat mapping") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.merge(id, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+
+                        // Allowed and re-pointed (user decision 2026-10-10): 0 absorbed 1, so both now read as 2.
+                        val merged = client.merge(id, group = listOf(0, 2), into = 2)
+                        merged.status shouldBe HttpStatusCode.OK
+                        Json.parseToJsonElement(merged.bodyAsText()) shouldBe
+                            Json.parseToJsonElement("""{ "speakers": [ { "speakerId": 2, "speaker": "Speaker 3" } ] }""")
+
+                        // Derived by hand: every segment reads as speaker 2's, so the four form one turn.
+                        client.turnsOf(id) shouldBe
+                            Json.parseToJsonElement(
+                                """
+                                {
+                                  "speakers": [ { "speakerId": 2, "speaker": "Speaker 3" } ],
+                                  "turns": [
+                                    {
+                                      "speakerId": 2, "startMs": 0, "endMs": 4000, "text": "Hello. Hi. Hey. Bye.",
+                                      "segments": [
+                                        { "startMs": 0, "endMs": 1000, "text": "Hello." },
+                                        { "startMs": 1000, "endMs": 2000, "text": "Hi." },
+                                        { "startMs": 2000, "endMs": 3000, "text": "Hey." },
+                                        { "startMs": 3000, "endMs": 4000, "text": "Bye." }
+                                      ]
+                                    }
+                                  ]
+                                }
+                                """.trimIndent(),
+                            )
+                    }
+
+                    // The stored mapping is flat: no into_id is itself a merged_id.
+                    Database.open(dataDir).use { db ->
+                        val rows = ArrayList<Pair<Int, Int>>()
+                        val query = "SELECT merged_id, into_id FROM speaker_merge WHERE task_id = $id ORDER BY merged_id"
+                        db.connection.createStatement().use { statement ->
+                            statement.executeQuery(query).use { while (it.next()) rows += it.getInt(1) to it.getInt(2) }
+                        }
+                        rows shouldBe listOf(0 to 2, 1 to 2)
+                    }
+                }
+            }
+        }
     })
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */
