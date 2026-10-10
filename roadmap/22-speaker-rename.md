@@ -17,7 +17,7 @@ Let the user give a finished transcription's speakers real names ("Speaker 1" �
 - [ADR 0029 — Contract-first frontend](../docs/decisions/0029-contract-first-frontend-shared-api-examples.md): new endpoints and events extend item 12's contract and its `docs/api/` examples.
 - [ADR 0034 — Speaker labels are the stored names](../docs/decisions/0034-speaker-labels-are-stored-names.md): txt/srt/vtt already print the stored name, so a rename and a merge change the downloads with no work in item 10's renderers themselves.
 - Item 12's contract: `GET /api/tasks/{id}/turns` returns `speakers` (`speakerId`, `speaker`) and turns that reference them by `speakerId`.
-- User decisions (2026-10-09): a name is trimmed, 1–40 characters, no control characters; two speakers of one task may **not** share a name; a "Reset name" action restores `"Speaker N"`; only COMPLETED tasks can be renamed or merged; **merging is part of this item** ([ADR 0028](../docs/decisions/0028-speakers-table-and-segment-speaker-id.md) made the speaker a table for exactly this); merging uses a **mapping, not a segment rewrite**; the transcript is edited through a **speakers panel**; a merge is confirmed in a dialog and can be undone with **"Reset all merges"**.
+- User decisions (2026-10-09): a name is trimmed, 1–40 characters, no control characters (amended 2026-10-10: the **client** trims; the API rejects a name with leading or trailing whitespace); two speakers of one task may **not** share a name; a "Reset name" action restores `"Speaker N"`; only COMPLETED tasks can be renamed or merged; **merging is part of this item** ([ADR 0028](../docs/decisions/0028-speakers-table-and-segment-speaker-id.md) made the speaker a table for exactly this); merging uses a **mapping, not a segment rewrite**; the transcript is edited through a **speakers panel**; a merge is confirmed in a dialog and can be undone with **"Reset all merges"**.
 
 ## Proposal (approved 2026-10-09)
 
@@ -35,11 +35,11 @@ Let the user give a finished transcription's speakers real names ("Speaker 1" �
 
     | Status | Codes |
     | ------ | ----- |
-    | `400` | `invalid-speaker-name` (not trimmed-empty, longer than 40, or a control character), `invalid-merge` (`into` not in `group`, or fewer than two speakers, or `into` already merged) |
+    | `400` | `invalid-speaker-name` (empty, longer than 40 characters, leading or trailing whitespace, or a control character anywhere; the name is stored as sent, never trimmed by the server — amended 2026-10-10), `invalid-merge` (`into` not in `group`, or fewer than two speakers, or `into` already merged) |
     | `404` | `not-found` (unknown task or speaker) |
     | `409` | `not-completed` (task not COMPLETED), `duplicate-speaker-name` |
 - **Events** (item 11's `SharedFlow<Event>`): `speakers-renamed` → `{ id, speakers }` after a rename or a name reset; `speakers-merged` → `{ id, speakers }` after a merge or a reset-all. Both are emitted after the write; for `speakers-merged` the client **refetches `/turns`** for the open task, because turns can join across the former boundary.
-- **UI** (item 15's transcript view): a **speakers panel** above the transcript lists every effective speaker with an editable name field (saved on Enter or blur), a "Reset name" action, and a "Merge into…" action that picks the group and the survivor and confirms ("Merge Speaker 2 and Speaker 3 into Speaker 1? Their turns join Speaker 1; you can undo this."). A rejected name or merge shows the error and keeps the previous state. A merge that can be undone shows the panel's **"Reset all merges"** action.
+- **UI** (item 15's transcript view): a **speakers panel** above the transcript lists every effective speaker with an editable name field (saved on Enter or blur, **trimmed by the panel before it is sent**, amended 2026-10-10), a "Reset name" action, and a "Merge into…" action that picks the group and the survivor and confirms ("Merge Speaker 2 and Speaker 3 into Speaker 1? Their turns join Speaker 1; you can undo this."). A rejected name or merge shows the error and keeps the previous state. A merge that can be undone shows the panel's **"Reset all merges"** action.
 - **Knock-ons to record when this item starts** (both are done specs):
   - item 09's spec: `speakerTurns` is unchanged, but the segments it receives are now resolved by the read path; note it in that spec's Approval log.
   - item 10's spec: `renderTxt`/`cues` unchanged for the same reason; note it.
@@ -48,7 +48,7 @@ Let the user give a finished transcription's speakers real names ("Speaker 1" �
 
 ## Open questions (answered 2026-10-09)
 
-- Name rules? → **Trimmed, 1–40 characters, no control characters.**
+- Name rules? → **Trimmed, 1–40 characters, no control characters.** Amended 2026-10-10: **the client trims**; the API accepts only an already-trimmed name (leading or trailing whitespace → `400 invalid-speaker-name`) and rejects a control character anywhere.
 - Two speakers with the same name? → **Rejected** (`409 duplicate-speaker-name`).
 - Back to "Speaker N"? → **A "Reset name" action**; the server writes `"Speaker N"`.
 - Which tasks? → **COMPLETED only**; others `409 not-completed`.
@@ -66,7 +66,7 @@ None.
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [x] Renaming a speaker updates one `speakers` row and nothing else (no segment changes, other speakers unchanged)
-- [x] A name is trimmed; empty, longer than 40 characters, or containing a control character is rejected with 400 `invalid-speaker-name`
+- [x] A name with leading or trailing whitespace, an empty name, a name longer than 40 characters, or a name containing a control character anywhere is rejected with 400 `invalid-speaker-name`; a valid name is stored as sent (amended 2026-10-10: the client trims, the server does not)
 - [ ] A name another speaker of the same task already has is rejected with 409 `duplicate-speaker-name`
 - [ ] Renaming or merging on a task that is not COMPLETED returns 409 `not-completed`; an unknown task or speaker returns 404
 - [ ] Resetting a name stores `"Speaker N"` again
@@ -94,6 +94,8 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-10 (workspace, cycle 1): red — `gradle test --tests 'stt.db.SegmentRepositorySpec'`: compilation failed, "Unresolved reference 'renameSpeaker'" (`SegmentRepositorySpec.kt:204`). Fixture: task with three segments stored as `[0, 1, 0]` plus another task with speaker 1; a rename of speaker 1 to `Alice` must change only that row (segments read back identically, speaker 0 and the other task untouched).
 - 2026-10-10: no refactoring after cycle 1 (user). Item 2 confirmed as the next test.
 - 2026-10-10 (workspace, cycle 2, test-list item 2): new `SpeakerRoutesSpec` — a COMPLETED task with speakers 0 and 1 behind a paused queue; `PUT /api/tasks/{id}/speakers/1` with `""`, `"   "`, 41 × `A`, `"Al\tice"` and `"Bob\u007F"` (tab and DEL where trimming leaves them) must each answer `400 invalid-speaker-name` with the `error.json` shape and leave the stored names; 40 × `A` answers `200` shaped like the new `docs/api/speakers.json`; `"  Alice  "` answers `200` with speakers `Speaker 1`, `Alice`, and `/turns` agrees. Red: `expected:<400 Bad Request> but was:<404 Not Found>` (no route; item 02's bare 404). Green: new `http/SpeakerRoutes.kt` (`PUT /api/tasks/{id}/speakers/{speakerId}`: trim, 1–40 characters, `Char.isISOControl` rejected, then `renameSpeaker` and `200 { speakers }`), registered in `sttApp`. Contract extended in the same commit: `docs/api/speakers.json`, its README row, and item 12's contract section (Speakers bullet, route response, `invalid-speaker-name`). Status and existence guards (item 4) and the `null` reset (item 5) are left to their cycles: until then a non-numeric id or an unknown speaker answers `500 internal`.
+- 2026-10-10 (cycle 2 checkpoint, user decisions): refactor approved — `SpeakerJson` moved next to `SpeakersJson` in `SpeakerRoutes.kt` (`Refactor:` commit). Spec change: trimming moves to the client; the API stores a name as sent and rejects leading or trailing whitespace, empty, over 40 characters, or a control character anywhere (one code, `400 invalid-speaker-name`; no ADR, recorded here and in item 12's contract). This invalidates cycle 2's `"  Alice  "` → `Alice` expectation, so test-list item 2 is amended, unticked, and reworked now as cycle 3, before item 3; the panel (item 13) trims before sending.
+- 2026-10-10 (workspace, cycle 3, amended test-list item 2): `SpeakerRoutesSpec` amended to the new rule — the rejected names now include `"  Alice  "`, `" Alice"`, `"Alice "` and `"\tAlice"` besides cycle 2's `""`, `"   "`, 41 × `A`, `"Al\tice"`, `"Bob\u007F"`; the valid `"Alice Smith"` (inner space) must be stored and returned exactly as sent. Red: `expected:<400 Bad Request> but was:<200 OK>` at the first padded name, `"  Alice  "` (the two names before it were already rejected). Green: the route no longer trims; `isValidSpeakerName(name)` = 1–40 characters, `name == name.trim()`, no `Char.isISOControl`; the 400 message names the untrimmed case. `gradle check` green.
 - 2026-10-09: item drafted at the user's request; the feature was announced in item 09's consultation (ADR 0028).
 - 2026-10-09: consultation answers approved: names trimmed, 1–40 characters, no control characters; duplicate names rejected; a "Reset name" action restores `"Speaker N"`; COMPLETED tasks only; **merging included**, as a group merge `{ group, into }`; made reversible with a **mapping table and no segment rewrite**, resolved in one place at read time; undo is **"Reset all merges"**; editing through a **speakers panel**. Test list not yet approved.
 - 2026-10-09: test list (15 items) approved by the user; `{"speaker": null}` confirmed as the name reset; status `spec-approved`.

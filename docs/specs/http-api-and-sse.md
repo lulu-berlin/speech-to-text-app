@@ -104,7 +104,7 @@ The JSON shapes the frontend builds against.
   - With speakers `off`: `speakers` is empty, and there is one turn per segment with `speakerId: null`.
   - Text ([ADR 0030](../decisions/0030-trimmed-segment-text-in-all-outputs.md)): every segment `text` is trimmed; a turn's `text` is its segments' non-blank trimmed texts joined with single spaces (a blank segment must not leave a double space, user decision 2026-10-10).
 - **Speakers** (added 2026-10-10, item 22): `{ "speakers": [{ "speakerId", "speaker" }] }`, the task's speakers ordered by `speakerId` ([`docs/api/speakers.json`](../api/speakers.json)).
-  - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is trimmed; empty after trimming, longer than 40 characters, or containing a control character → `400 invalid-speaker-name`, nothing changes.
+  - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is stored as sent; clients trim it first (user decision 2026-10-10). Leading or trailing whitespace, empty, longer than 40 characters, or a control character anywhere → `400 invalid-speaker-name`, nothing changes.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task

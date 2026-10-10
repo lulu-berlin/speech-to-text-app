@@ -12,9 +12,10 @@ import stt.db.SegmentRepository
 
 /**
  * Renaming a task's speakers (item 22): `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }`
- * stores the trimmed name and answers `200` with the task's speakers (`docs/api/speakers.json`). A name that is
- * empty after trimming, longer than [MAX_SPEAKER_NAME] characters, or contains a control character answers
- * `400 invalid-speaker-name` and changes nothing.
+ * stores the name as sent and answers `200` with the task's speakers (`docs/api/speakers.json`). Clients trim
+ * (user decision 2026-10-10), so a name with leading or trailing whitespace, an empty one, one longer than
+ * [MAX_SPEAKER_NAME] characters, or one with a control character anywhere answers `400 invalid-speaker-name` and
+ * changes nothing.
  */
 fun Application.speakerRoutes() {
     val segments: SegmentRepository by dependencies
@@ -22,24 +23,26 @@ fun Application.speakerRoutes() {
         put("/api/tasks/{id}/speakers/{speakerId}") {
             val id = call.parameters["id"]!!.toLong()
             val speakerId = call.parameters["speakerId"]!!.toInt()
-            val name =
-                storedSpeakerName(call.receive<RenameSpeakerRequest>().speaker) ?: return@put call.respondError(
+            val name = call.receive<RenameSpeakerRequest>().speaker
+            if (!isValidSpeakerName(name)) {
+                return@put call.respondError(
                     HttpStatusCode.BadRequest,
                     "invalid-speaker-name",
-                    "speaker must be 1–$MAX_SPEAKER_NAME characters after trimming, without control characters",
+                    "speaker must be 1–$MAX_SPEAKER_NAME characters, without leading or trailing whitespace or control characters",
                 )
+            }
             segments.renameSpeaker(id, speakerId, name)
             call.respond(SpeakersJson(segments.findSpeakers(id).map { SpeakerJson(it.speakerId, it.speaker) }))
         }
     }
 }
 
-/** The longest speaker name, counted after trimming (item 22). */
+/** The longest speaker name (item 22). */
 private const val MAX_SPEAKER_NAME = 40
 
-/** The name as stored: [requested] trimmed, 1–[MAX_SPEAKER_NAME] characters, no control character; null when invalid. */
-private fun storedSpeakerName(requested: String): String? =
-    requested.trim().takeIf { it.length in 1..MAX_SPEAKER_NAME && it.none(Char::isISOControl) }
+/** Whether [name] can be stored as sent: already trimmed, 1–[MAX_SPEAKER_NAME] characters, no control character. */
+private fun isValidSpeakerName(name: String): Boolean =
+    name.length in 1..MAX_SPEAKER_NAME && name == name.trim() && name.none(Char::isISOControl)
 
 /** The body of `PUT /api/tasks/{id}/speakers/{speakerId}`. */
 @Serializable
