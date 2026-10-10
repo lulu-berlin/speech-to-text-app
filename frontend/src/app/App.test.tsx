@@ -8,7 +8,7 @@ import {
   snapshot as snapshotFixture,
   taskCompleted,
 } from '../shared/api/fixtures';
-import { asRgb, px, required, styleRules } from '../test/dom';
+import { asRgb, px, required, stateRulesFor } from '../test/dom';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { controllableEventStream } from '../test/eventStream';
 import { server } from '../test/server';
@@ -250,23 +250,19 @@ describe('the not-found pages', () => {
 });
 
 // The focusable elements of the document that no `:focus-visible` rule gives the focus
-// ring token. jsdom cannot apply `:focus-visible`, so each element is matched against
-// the emitted rules' selectors with the pseudo-class removed. Hidden elements (the file
-// input) are skipped.
+// ring token. Hidden elements (the file input) are skipped.
 function elementsWithoutFocusRing(): string[] {
-  const ringSelectors = styleRules()
-    .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule)
-    .filter((rule) => rule.style.boxShadow.includes(lightTheme.colors.focusRing))
-    .flatMap((rule) => rule.selectorText.split(','))
-    .filter((selector) => selector.includes(':focus-visible'))
-    .map((selector) => selector.replace(':focus-visible', '').trim())
-    .filter((selector) => selector !== '');
   const focusable = document.querySelectorAll<HTMLElement>(
     'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
   );
   return [...focusable]
     .filter((element) => element.closest('[hidden]') === null)
-    .filter((element) => !ringSelectors.some((selector) => element.matches(selector)))
+    .filter(
+      (element) =>
+        !stateRulesFor(element, ':focus-visible').some((rule) =>
+          rule.style.boxShadow.includes(lightTheme.colors.focusRing),
+        ),
+    )
     .map(
       (element) =>
         `${element.tagName.toLowerCase()} "${element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''}"`,
