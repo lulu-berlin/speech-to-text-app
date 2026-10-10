@@ -1,6 +1,6 @@
 # 27 — Pin the sqlite-jdbc version
 
-Status: spec-approved
+Status: in-progress
 Depends on: —
 
 ## Goal
