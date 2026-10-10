@@ -1,6 +1,6 @@
 # 0007 — Server-Sent Events for live updates
 
-Status: accepted · Date: 2026-10-05
+Status: accepted, SSE implementation amended by [0041](0041-sse-without-ktor-plugin.md) · Date: 2026-10-05
 
 ## Context
 The UI shows queue state, task status, and progress that change while tasks run. Updates only flow from server to browser; user commands (upload, pause, resume, cancel, reorder) are discrete requests.

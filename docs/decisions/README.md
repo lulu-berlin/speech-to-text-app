@@ -46,3 +46,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0038 | [UI state transitions and form-submission flows are machines; controlled input values may stay `useState`](0038-ui-state-transitions-are-machines.md) | accepted | 2026-10-10 |
 | 0039 | [The processing engine is created when the application starts](0039-engine-created-at-startup.md) | accepted | 2026-10-10 |
 | 0040 | [Stenographer animation timing lives on the elements (JSX `style`)](0040-stenographer-timing-in-jsx.md) | accepted | 2026-10-10 |
+| 0041 | [SSE without the Ktor plugin](0041-sse-without-ktor-plugin.md) | accepted, amends 0007 | 2026-10-10 |
