@@ -1,12 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { appLive } from './helpers/ui';
-
-// The quote of the JFK sample, as two phrases (the model's punctuation is not pinned).
-const QUOTE = [
-  /ask not what your country can do for you/i,
-  /ask what you can do for your country/i,
-];
+import { JFK_QUOTE, openTranscript } from './helpers/ui';
 
 // What each format must look like for task 1 (jfk-a.wav: one voice → one speaker named
 // "Speaker 1" → one turn from 0 ms, under a minute). The formats follow the oracle's
@@ -35,9 +29,7 @@ const FORMATS = [
 test('the txt, srt and vtt downloads have the expected contents and content types', async ({
   page,
 }) => {
-  await appLive(page);
-  await page.getByRole('link', { name: 'History' }).click();
-  await page.getByRole('link', { name: 'jfk-a.wav' }).click();
+  await openTranscript(page, 'jfk-a.wav');
   await expect(page).toHaveURL(/\/history\/1$/);
 
   for (const { format, contentType, shape } of FORMATS) {
@@ -52,7 +44,7 @@ test('the txt, srt and vtt downloads have the expected contents and content type
       expect(file.suggestedFilename()).toBe(`jfk-a.${format}`);
       const body = await readFile(await file.path(), 'utf8');
       expect(body).toMatch(shape);
-      for (const phrase of QUOTE) {
+      for (const phrase of JFK_QUOTE) {
         expect(body).toMatch(phrase);
       }
     });
