@@ -11,11 +11,14 @@ repositories {
     mavenCentral()
 }
 
-// sqlite-jdbc is forced at the catalog version (ADR 0042): flyway-database-nc-sqlite once resolved a
-// newer version over the catalog pin via highest-wins. The catalog stays the single source of truth —
-// change the version in gradle/libs.versions.toml, not here.
+// Forced at the catalog version (ADR 0042): flyway-database-nc-sqlite once resolved a
+// newer sqlite-jdbc over the catalog pin via highest-wins; onnxruntime is pinned down to 1.29.0
+// because 1.30.0's native lib segfaults (roadmap item 30) and a transitive must never pull it
+// back up. The catalog stays the single source of truth — change the version in
+// gradle/libs.versions.toml, not here.
 configurations.configureEach {
     resolutionStrategy.force(libs.sqlite.jdbc)
+    resolutionStrategy.force(libs.onnxruntime)
 }
 
 // Custom configuration: ktlint CLI for the formatting check (ADR 0015).
