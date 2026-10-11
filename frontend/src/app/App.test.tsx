@@ -29,9 +29,7 @@ function renderAt(path: string) {
 // The header's mascot (item 31): the artwork is the header svg; it swaps between the
 // animated mascot and the small static logo depending on the shell's placeholder count.
 function headerMascot(): SVGElement {
-  return required(
-    required(screen.getByRole('banner')).querySelector('svg'),
-  ) as SVGElement;
+  return required(required(screen.getByRole('banner')).querySelector('svg')) as SVGElement;
 }
 
 function headerMascotSize(): string {
