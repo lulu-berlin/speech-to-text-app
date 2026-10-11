@@ -68,7 +68,7 @@ graph TD
   28[28 post-merge cleanup ✓]:::done
   29[29 backend bug fixes ✓]:::done
   30[30 diarization crash ✓]:::done
-  17 --> 31[31 header and navigation polish]
+  17 --> 31[31 header and navigation polish ✓]:::done
   25 --> 31
   21 --> 31
   11 --> 32[32 settings: device selection]
@@ -116,7 +116,7 @@ graph TD
 | [28 — Post-merge cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [29 — Post-merge bug fixes: engine wake, seek bar, audio join, SSE disconnect](../docs/specs/post-merge-bug-fixes.md) | done | — |
 | [30 — Diarization crash on the user's machine (ONNX Runtime recursion)](../docs/specs/onnxruntime-pin.md) | done | — |
-| [31 — Header and navigation polish](31-header-and-navigation-polish.md) | spec-approved | 17, 25, 21 |
+| [31 — Header and navigation polish](../docs/specs/header-and-navigation-polish.md) | done | 17, 25, 21 |
 | [32 — Settings page: device, threads and upload defaults](32-settings-page-device-selection.md) | spec-approved | 11, 12, 13, 21 |
 | [33 — Gradle bootstrap for developers without Nix](33-gradle-bootstrap-without-nix.md) | spec-approved | 16, 34 |
 | [34 — Dev mode: frontend and backend with one command](../docs/specs/dev-mode.md) | done | — |
