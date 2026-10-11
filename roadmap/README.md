@@ -45,7 +45,7 @@ graph TD
   15 --> 16
   17 --> 16
   20[20 cleanup refactors ✓]:::done
-  12 --> 21[21 frontend-backend end-to-end]
+  12 --> 21[21 frontend-backend end-to-end ✓]:::done
   14 --> 21
   15 --> 21
   22 --> 21
@@ -106,7 +106,7 @@ graph TD
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | spec-approved | 16 |
 | [20 — Cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
-| [21 — Frontend–backend end-to-end check](21-frontend-backend-end-to-end.md) | spec-approved | 12, 13, 14, 15, 22, 25 |
+| [21 — Frontend–backend end-to-end check](../docs/specs/frontend-backend-end-to-end.md) | done | 12, 13, 14, 15, 22, 25 |
 | [22 — Rename and merge a task's speakers](../docs/specs/speaker-rename.md) | done | 09, 10, 12, 15 |
 | [23 — Faster speaker clustering](../docs/specs/faster-clustering.md) | done | 09 |
 | [24 — Design system: tokens and primitives](../docs/specs/design-system.md) | done | 13 |
