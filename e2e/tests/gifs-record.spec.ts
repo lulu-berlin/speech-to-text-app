@@ -1,7 +1,7 @@
 import { mkdirSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { MERGE_CLIP, PLAYBACK_CLIP, SHOT_CLIP, SHOT_UPLOAD_CLIP } from '../lib/backend.mjs';
+import { CANCEL_CLIP, MERGE_CLIP, SHOT_CLIP, SHOT_UPLOAD_CLIP } from '../lib/backend.mjs';
 import {
   DESKTOP_VIEWPORT,
   appLive,
@@ -23,11 +23,13 @@ const RECORDINGS_DIR = join('screenshots', 'recordings');
 // scrollIntoView({ block: 'nearest' }) (which scrolls the page too whenever the target
 // is not wholly on screen), and "Back to playing position" appears right under the
 // region. So the player, the region and that button's spot must all fit the viewport,
-// while the region stays shorter than the long clip's transcript. Measured at 1280 px
-// wide: the region starts 222 px below the player's top, the transcript is 490 px tall,
-// the button is 42 px. At 720 px the region is 432 px (58 px to scroll); with 16 px
-// above the player that leaves 8 px under the button.
-const PLAYBACK_VIEWPORT = { width: 1280, height: 720 };
+// while the region stays far shorter than the transcript. Measured at 1280 px wide: the
+// region starts 222 px below the player's top and the button is 42 px. At 760 px the
+// region is 456 px; with the button's spot plus a 24 px margin under the region
+// (BUTTON_SPOT) the player's top lands 16 px down — the margins absorb small layout
+// differences between machines.
+const PLAYBACK_VIEWPORT = { width: 1280, height: 760 };
+const BUTTON_SPOT = 66;
 // The recordings are watched as GIFs: the flows pause between steps so a viewer can
 // follow them (machine speed was too fast and jumpy — user, 2026-10-11).
 const VIEWER_PAUSE = 1_500;
@@ -110,26 +112,28 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
   // click on the last visible segment seeks there and plays on, and as the highlight
   // passes the region's bottom edge following scrolls the region (not the page — the
   // player stays in view; its own scroll does not stop following). A slow hand scroll
-  // stops following until "Back to playing position" resumes it.
-  const playbackUrl = await transcriptUrl(browser, PLAYBACK_CLIP);
+  // stops following until "Back to playing position" resumes it. The clip is the ~220 s
+  // loop: its transcript overflows the region by hundreds of pixels on any machine (the
+  // ~132 s playback clip's overflowed by 58 px here and by under 50 on the user's).
+  const playbackUrl = await transcriptUrl(browser, CANCEL_CLIP);
   await recordFlow(browser, 'gif-playback-follow.webm', PLAYBACK_VIEWPORT, async (page) => {
     await page.goto(playbackUrl);
     const region = page.getByRole('region', { name: 'Transcript' });
     await expect(region.getByRole('button').first()).toBeVisible();
     expect(
-      await region.evaluate((element) => element.scrollHeight > element.clientHeight + 50),
+      await region.evaluate((element) => element.scrollHeight > element.clientHeight + 200),
     ).toBe(true);
     const back = page.getByRole('button', { name: 'Back to playing position' });
     const times = page.getByText(/^\d\d:\d\d \/ \d\d:\d\d$/);
-    // Frame it: the region's bottom 50 px above the viewport's bottom (the button's spot
-    // and a margin), which puts the whole player above it. The page ends only 24 px under
-    // the region, too short to scroll that far, so the body gets bottom padding — it lies
-    // below the frame, and without it Playwright scrolled the page to reach the button.
+    // Frame it: the region's bottom BUTTON_SPOT above the viewport's bottom, which puts
+    // the whole player above it. The page ends only 24 px under the region, too short to
+    // scroll that far, so the body gets bottom padding — it lies below the frame, and
+    // without it Playwright scrolled the page to reach the button.
     await page.evaluate(() => {
-      document.body.style.paddingBottom = '60px';
+      document.body.style.paddingBottom = '100px';
     });
     await region.evaluate((element) => element.scrollIntoView({ block: 'end' }));
-    await page.evaluate(() => window.scrollBy(0, 50));
+    await page.evaluate((spot) => window.scrollBy(0, spot), BUTTON_SPOT);
     const seekBar = page.getByRole('slider', { name: 'Seek' });
     expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
     const framedAt = await page.evaluate(() => window.scrollY);
