@@ -51,7 +51,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 
 - [ ] On a machine with only a recent JVM (no Nix, no devenv, no Docker): a fresh clone, `./gradlew run` — the wrapper (gradlew at the root, Gradle version = flake's) downloads the tools and assets from `versions.json` with SHA-256 verification, builds the backend and the frontend, and serves the app on `http://localhost:8080`
 - [ ] The same, twice from cold: the second `./gradlew run` reuses the cached downloads (offline in the sense of no re-download); the checksums stay verified
-- [ ] `versions.json` matches the flake; after changing a pinned version in the flake without regenerating, the Nix-side check and `./gradlew checkVersions` both fail; after regenerating both pass
+- [x] `versions.json` matches the flake; after changing a pinned version in the flake without regenerating, the Nix-side check and `./gradlew checkVersions` both fail; after regenerating both pass
 - [ ] The Gradle-managed whisper-cli is 1.8.4 and behaves like the Nix-built one: a short clip completes with the same transcript and output formats as under the devenv (the item-21 e2e flows run against the `./gradlew run` app)
 - [ ] The Gradle-managed ffmpeg (8.1 branch) decodes the same uploads as the Nix ffmpeg; chunking and joining work in the `./gradlew run` app
 - [ ] `./gradlew dev` starts the frontend (HMR) and the backend through item 34's `dev-run.sh`; editing a backend source file rebuilds and restarts, and a running task resumes across the restart
