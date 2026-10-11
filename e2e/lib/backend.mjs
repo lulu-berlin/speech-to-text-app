@@ -115,7 +115,7 @@ export function checkPreconditions() {
   if (!process.env.TEST_JFK_WAV) {
     throw new Error('TEST_JFK_WAV is unset — run inside the devenv shell (devenv.nix sets it)');
   }
-  if (!existsSync(join(frontendDist, 'index.html'))) {
+  if (!process.env.E2E_BACKEND_CMD && !existsSync(join(frontendDist, 'index.html'))) {
     throw new Error(
       `no built frontend at ${frontendDist} — build it first: pnpm --dir frontend install && pnpm --dir frontend build`,
     );
@@ -247,8 +247,36 @@ export function killGroup(pid) {
 // whisper model — the suite transcribes with it (decided 2026-10-09), overriding the
 // production STT_WHISPER_MODEL with the devenv's TEST_WHISPER_TINY_EN_MODEL. `dataDir`
 // is accepted so the restart test can bring the same data back up on the same port.
+//
+// By default the backend is `gradle --no-daemon run` in backend/. Item 16's acceptance
+// boots the packaged app instead: set E2E_BACKEND_CMD to the wrapper path (e.g.
+// ./result/bin/stt-app, resolved against the repo root) and the suite drives that
+// binary. Its wrapper serves the bundled frontend and defaults the models, but a
+// user-set STT_WHISPER_MODEL (the tiny model) and STT_DATA_DIR still win, so the
+// journey is identical.
 export async function startBackend({ port, dataDir }) {
   checkPreconditions();
+  const backendCmd = process.env.E2E_BACKEND_CMD;
+  if (backendCmd) {
+    const child = spawn(backendCmd, [], {
+      cwd: repoRoot,
+      detached: true, // own session + process group: a group kill reaches the wrapper and the app JVM
+      env: {
+        ...process.env,
+        STT_DATA_DIR: dataDir,
+        STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,
+        STT_PORT: String(port),
+      },
+      stdio: ['ignore', 'inherit', 'inherit'],
+    });
+    try {
+      await waitForHealth(port);
+    } catch (error) {
+      killGroup(child.pid);
+      throw error;
+    }
+    return { pid: child.pid };
+  }
   const child = spawn('gradle', ['--no-daemon', 'run', '--console=plain'], {
     cwd: backendDir,
     detached: true, // own session + process group: a group kill reaches gradle and the app JVM
