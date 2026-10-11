@@ -1,6 +1,6 @@
 # 30 — Diarization crash on the user's machine (ONNX Runtime recursion)
 
-Status: spec-approved
+Status: in-progress
 Depends on: —
 
 ## Goal
