@@ -7,6 +7,20 @@ plugins {
 group = "stt"
 version = "0.1.0-SNAPSHOT"
 
+// Roadmap item 33: the app's bytecode targets the flake-pinned JDK 21 (versions.json)
+// no matter which recent JVM runs Gradle; `./gradlew run` boots the app on a
+// toolchain-resolved JDK 21 (foojay for humans). In devenv and the Nix build the
+// Gradle JVM is already 21, so nothing changes there (ADR 0036).
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
+}
+
 repositories {
     mavenCentral()
 }
