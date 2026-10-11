@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
@@ -43,6 +43,18 @@ const PENDING: ReadonlySet<Task['status']> = new Set(['QUEUED', 'RUNNING', 'PAUS
 
 // The transcript download formats (item 10, ADR 0035): txt, srt, vtt.
 const DOWNLOAD_FORMATS = ['txt', 'srt', 'vtt'] as const;
+
+// The scroll keys (item 36): the keys a browser turns into scrolling for the focused
+// scroll container — the transcript region, when focus is on one of its segments.
+const SCROLL_KEYS: Record<string, true> = {
+  PageUp: true,
+  PageDown: true,
+  ' ': true,
+  ArrowUp: true,
+  ArrowDown: true,
+  ArrowLeft: true,
+  ArrowRight: true,
+};
 
 const DownloadLink = styled.a`
   color: ${(props) => props.theme.colors.accent};
@@ -205,10 +217,10 @@ export function TaskTranscriptView() {
   const [followMode, followModeSend] = useMachine(followModeMachine);
   const following = followMode.matches('following');
   const transcriptRegionRef = useRef<HTMLDivElement>(null);
-  // True right after we scroll the active segment ourselves, so the scroll event that
-  // programmatic follow fires is not mistaken for the user's hand (cleared on the next
-  // macrotask, by which a hand scroll would arrive separately).
-  const holdOffFollowScrollRef = useRef(false);
+  // Where the region stood when a pointer press started: a press that ends with the region
+  // scrolled is a drag on its scrollbar (item 36); a plain press or a selection that does
+  // not scroll leaves following alone.
+  const dragStartScrollRef = useRef<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (!following || activeSegment === null) {
@@ -219,20 +231,60 @@ export function TaskTranscriptView() {
     if (active === null || active === undefined) {
       return;
     }
-    holdOffFollowScrollRef.current = true;
     active.scrollIntoView({ block: 'nearest' });
-    setTimeout(() => {
-      holdOffFollowScrollRef.current = false;
-    }, 0);
   }, [following, activeSegment]);
 
-  // A scroll while the playhead is not moving is the user scrolling by hand. Our own
-  // programmatic follow scroll is held off, so it does not unwind following.
-  const handleScroll = () => {
-    if (holdOffFollowScrollRef.current) {
+  // A hand scroll is input that scrolls the region (item 36, decided 2026-10-11): wheel,
+  // touch, the scroll keys, or a scrollbar drag. A bare scroll event is never input
+  // evidence — the view's own follow scroll fires one too, so listening for it would stop
+  // following on its own (the hold-off race). Input detection needs no hold-off timer.
+  const sendScrolled = () => {
+    followModeSend({ type: 'SCROLLED' });
+  };
+
+  const handleWheel = () => {
+    sendScrolled();
+  };
+
+  const handleTouchMove = () => {
+    sendScrolled();
+  };
+
+  // The scroll keys' default is the browser scrolling the focused scroll container. A key
+  // press whose default is already handled (Enter/Space on a segment button, which seek
+  // instead of scrolling) is not scroll input.
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented) {
       return;
     }
-    followModeSend({ type: 'SCROLLED' });
+    if (SCROLL_KEYS[event.key] === true) {
+      sendScrolled();
+    }
+  };
+
+  // A scrollbar drag scrolls the region while the button is held, so a pointer move that
+  // finds a changed scroll position means the user dragged it (or a selection drag
+  // scrolled) — following stops then, not on the press itself, which may be a click.
+  const handlePointerDown = () => {
+    const region = transcriptRegionRef.current;
+    dragStartScrollRef.current =
+      region === null ? null : { top: region.scrollTop, left: region.scrollLeft };
+  };
+
+  const handlePointerMove = () => {
+    const start = dragStartScrollRef.current;
+    const region = transcriptRegionRef.current;
+    if (start === null || region === null) {
+      return;
+    }
+    if (region.scrollTop !== start.top || region.scrollLeft !== start.left) {
+      dragStartScrollRef.current = null;
+      sendScrolled();
+    }
+  };
+
+  const handlePointerEnd = () => {
+    dragStartScrollRef.current = null;
   };
 
   // Until the first snapshot lands, "no such task" just means the store has not loaded yet,
@@ -410,7 +462,13 @@ export function TaskTranscriptView() {
             ref={transcriptRegionRef}
             role="region"
             aria-label="Transcript"
-            onScroll={handleScroll}
+            onWheel={handleWheel}
+            onTouchMove={handleTouchMove}
+            onKeyDown={handleKeyDown}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerEnd}
+            onPointerCancel={handlePointerEnd}
           >
             <TranscriptTurns
               turnsBySpeaker={turnsBySpeaker}
