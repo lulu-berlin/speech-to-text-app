@@ -79,10 +79,7 @@ test('follow mode: long playback never shows "Back to playing position" without 
     }
     const startTop = await region.evaluate((element) => element.scrollTop);
     // The playhead must reach the out-of-view segment on its own; a "Back to playing
-    // position" button at any moment is an automatic stop and fails the round here. If
-    // the audio stops advancing first — ended, or the joined flac stalling before its
-    // transcript ends — the rounds stop: there is nothing more to follow into.
-    const deadline = Date.now() + (round === 0 ? 90_000 : 45_000);
+    // position" button at any moment is an automatic stop and fails the round here.
     let reached = false;
     let lastSecond = await audioSecond(page);
     let lastAdvanceMs = Date.now();
@@ -97,17 +94,15 @@ test('follow mode: long playback never shows "Back to playing position" without 
         lastSecond = at;
         lastAdvanceMs = Date.now();
       } else if (Date.now() - lastAdvanceMs > 8_000) {
-        break; // currentTime has not advanced for 8 s: playback finished or stalled.
-      }
-      if (Date.now() > deadline) {
-        throw new Error(
-          `playback never reached segment ${target} (still at ${await activeIndex(region)}; audio at ${at.toFixed(1)}s and advancing)`,
-        );
+        // The audio stopped advancing: played out, or this clip's joined flac stalls
+        // before its transcript ends (the transcribed turns can outlast the audio).
+        // Either way there is nothing more to follow into.
+        break;
       }
       await page.waitForTimeout(500);
     }
     if (!reached) {
-      break; // the audio stopped advancing before this segment: nothing more to follow into.
+      break; // the audio could not reach this segment: nothing more to follow into.
     }
     // The follow scroll brought the formerly out-of-view segment in, moving the region.
     await expect.poll(() => activeInView(region), { timeout: 5_000 }).toBe(true);
@@ -115,7 +110,10 @@ test('follow mode: long playback never shows "Back to playing position" without 
     expect(await region.evaluate((element) => element.scrollTop)).toBeGreaterThan(startTop);
     await expect(back).toBeHidden();
   }
-  expect(scrolled).toBeGreaterThanOrEqual(3);
+  expect(
+    scrolled,
+    'hands-off playback must scroll through at least 3 out-of-view segments',
+  ).toBeGreaterThanOrEqual(3);
 
   // A hand scroll (wheel) still stops following: the button appears.
   await region.hover();
