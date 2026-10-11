@@ -10,21 +10,29 @@ import io.ktor.server.response.respondTextWriter
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.utils.io.ClosedByteChannelException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
 import stt.engine.Event
 import java.io.Writer
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /**
  * The live events stream (ADR 0007, ADR 0038): `GET /api/events` speaks SSE by hand over Ktor's streaming
  * writer — every frame is `event: <name>\ndata: <json>\n\n`, flushed after each event, `Cache-Control:
  * no-cache`. The first frame is always `snapshot` (all tasks + the queue), so applying every event twice is
- * harmless and a reconnect needs no refetch; `task-updated` carries the full task. A subscriber that goes
- * away (a closed tab) ends its own stream quietly; the others are unaffected.
+ * harmless and a reconnect needs no refetch; `task-updated` carries the full task. After 5 s of silence the
+ * stream carries a `heartbeat` (ADR 0044), so a client can tell an idle server from a lost one. A subscriber
+ * that goes away (a closed tab) ends its own stream quietly; the others are unaffected.
  */
 fun Application.eventsRoutes() {
     val stream: EventStream by dependencies
@@ -49,10 +57,17 @@ fun Application.eventsRoutes() {
                     )
                     flush()
                     try {
-                        pumpEvents(stream.events) { engineEvent ->
-                            writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
-                            flush()
-                        }
+                        pumpEvents(
+                            stream.events,
+                            writeFrame = { engineEvent ->
+                                writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
+                                flush()
+                            },
+                            writeHeartbeat = {
+                                writeEvent("heartbeat", "{}")
+                                flush()
+                            },
+                        )
                     } catch (_: FellBehindException) {
                         // Deliberate end of the stream; nothing more to write.
                     }
@@ -65,21 +80,52 @@ fun Application.eventsRoutes() {
     }
 }
 
+/** The silence after which a stream gets a `heartbeat` event (ADR 0044). */
+internal val HEARTBEAT_AFTER = 5.seconds
+
 /**
- * Writes every event of [events] to [writeFrame]. A missing sequence number means this subscriber's buffer
- * overflowed and events were dropped for it (user decision 2026-10-10): pumping throws [FellBehindException]
- * and the SSE response ends, so EventSource reconnects and the snapshot makes the client whole again.
+ * Writes every event of [events] to [writeFrame], and calls [writeHeartbeat] whenever nothing was written for
+ * [HEARTBEAT_AFTER] (ADR 0044). The two never write at the same time, and the pump ends when [events] does. A
+ * missing sequence number means this subscriber's buffer overflowed and events were dropped for it (user
+ * decision 2026-10-10): pumping throws [FellBehindException] and the SSE response ends, so EventSource
+ * reconnects and the snapshot makes the client whole again.
  */
 internal suspend fun pumpEvents(
     events: Flow<Pair<Long, Event>>,
     writeFrame: suspend (Event) -> Unit,
-) {
+    writeHeartbeat: suspend () -> Unit = {},
+) = coroutineScope {
+    // One response, two writers: each write holds the lock and records when it happened. The heartbeat waits
+    // out the rest of the silence instead of receiving with a timeout, so no event is ever lost to a cancel.
+    val writing = Mutex()
+    var lastWrite = TimeSource.Monotonic.markNow()
+    val heartbeats =
+        launch {
+            while (true) {
+                val wait =
+                    writing.withLock {
+                        val left = HEARTBEAT_AFTER - lastWrite.elapsedNow()
+                        if (left.isPositive()) {
+                            left
+                        } else {
+                            writeHeartbeat()
+                            lastWrite = TimeSource.Monotonic.markNow()
+                            HEARTBEAT_AFTER
+                        }
+                    }
+                delay(wait)
+            }
+        }
     var lastSeen = -1L
     events.collect { (sequence, engineEvent) ->
         if (lastSeen != -1L && sequence != lastSeen + 1) throw FellBehindException()
-        writeFrame(engineEvent)
+        writing.withLock {
+            writeFrame(engineEvent)
+            lastWrite = TimeSource.Monotonic.markNow()
+        }
         lastSeen = sequence
     }
+    heartbeats.cancel()
 }
 
 /** Signals that this subscriber lost events and the SSE response must end. */

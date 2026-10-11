@@ -78,7 +78,7 @@ internal class SseServer(
                     HttpRequest.newBuilder(URI("$base/api/events")).GET().build(),
                     HttpResponse.BodyHandlers.ofInputStream(),
                 ).body()
-        return SseTestReader(body.bufferedReader()).also { streams += it }
+        return SseTestReader(body).also { streams += it }
     }
 
     override fun close() {
