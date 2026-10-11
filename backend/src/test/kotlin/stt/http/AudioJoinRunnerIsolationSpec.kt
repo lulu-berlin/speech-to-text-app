@@ -11,6 +11,8 @@ import io.ktor.http.contentType
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -61,6 +63,36 @@ class AudioJoinRunnerIsolationSpec :
                             } finally {
                                 engineRun.cancelAndJoin()
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        given("two COMPLETED tasks with stored chunk audio") {
+            `when`("their audio is requested simultaneously") {
+                then("both joins succeed: 200 audio/flac each") {
+                    val dataDir = tempdir("stt-join-concurrent").toPath()
+                    val idA = seedCompletedTaskWithChunks(dataDir, "done-a")
+                    val idB = seedCompletedTaskWithChunks(dataDir, "done-b")
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        startApplication()
+
+                        // Each join runs its own fresh ProcessRunner (item 37): neither may contend with the
+                        // other, or one would answer 500 "A run is already in flight".
+                        val responses =
+                            coroutineScope {
+                                listOf(idA, idB)
+                                    .map { id -> async { client.get("/api/tasks/$id/audio") } }
+                                    .awaitAll()
+                            }
+                        responses.forEach { response ->
+                            response.status shouldBe HttpStatusCode.OK
+                            response.contentType()?.withoutParameters() shouldBe ContentType.parse("audio/flac")
+                            val body = response.bodyAsBytes()
+                            String(body, 0, 4, Charsets.UTF_8) shouldBe "fLaC"
                         }
                     }
                 }
