@@ -30,8 +30,9 @@ class ChunkTranscription(
         outputPrefix: Path,
         prompt: String?,
         onProgress: (Double) -> Unit = {},
+        onGpuUnavailable: suspend () -> Unit = {},
     ) {
-        val whisperSegments = transcriber.transcribe(settings, audio, outputPrefix, prompt, onProgress)
+        val whisperSegments = transcriber.transcribe(settings, audio, outputPrefix, prompt, onProgress, onGpuUnavailable)
         segments.completeChunk(taskId, chunk.idx, chunkSegments(chunk.idx, chunk.startMs, whisperSegments))
         withContext(Dispatchers.IO) {
             deleteBestEffort(audio)

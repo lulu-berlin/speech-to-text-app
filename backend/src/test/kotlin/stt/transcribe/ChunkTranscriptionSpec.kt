@@ -65,7 +65,10 @@ class ChunkTranscriptionSpec :
 
                         val reported = mutableListOf<Double>()
                         withTimeout(30.seconds) {
-                            transcription.transcribe(taskId, CHUNK_1, TEST_SETTINGS, flac, prefix, prompt = null) { reported += it }
+                            transcription.transcribe(taskId, CHUNK_1, TEST_SETTINGS, flac, prefix, prompt = null, onProgress = {
+                                reported +=
+                                    it
+                            })
                         }
 
                         reported.shouldBe(listOf(0.27, 1.0))

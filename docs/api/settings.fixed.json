@@ -5,5 +5,6 @@
   "speakersMode": "fixed",
   "speakersCount": 3,
   "maxSpeakers": 12,
+  "deviceFallback": null,
   "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"]
 }

@@ -53,4 +53,35 @@ class ProcessingEngineSettingsSpec :
                 }
             }
         }
+
+        given("settings stored as GPU 1 with 6 threads, a machine where GPU 1 is unavailable, and two queued tasks") {
+            `when`("the engine runs them") {
+                then(
+                    "the first task's first run reports it, the device is stored as CPU with a notice naming GPU 1, and every later run asks for the CPU",
+                ) {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val settings = SettingsRepository(db)
+                        settings.update(settings.get().copy(device = Device.Gpu(1), threads = 6))
+                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", 0, 1)
+                        val second = enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", 1, 2)
+                        fixture.chunker.chunkCount = 2
+                        fixture.transcriber.gpuUnavailable = true
+
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe first
+                        fixture.completed.receive() shouldBe second
+
+                        // By hand: only the first run asks for GPU 1; the switch keeps the thread count.
+                        fixture.transcriber.settings.map { it.device to it.threads } shouldBe
+                            listOf(Device.Gpu(1) to 6, Device.Cpu to 6, Device.Cpu to 6, Device.Cpu to 6)
+                        val stored = settings.get()
+                        (stored.device to stored.deviceFallback) shouldBe (Device.Cpu to Device.Gpu(1))
+                        stored.threads shouldBe 6
+                        val published = drain(fixture.events).filterIsInstance<Event.SettingsUpdated>().map { it.settings }
+                        published shouldBe listOf(stored)
+                    }
+                }
+            }
+        }
     })

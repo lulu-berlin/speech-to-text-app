@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory
 import stt.audio.Chunker
 import stt.audio.PcmDecoder
 import stt.config.Config
+import stt.config.Device
+import stt.config.dbValue
 import stt.db.Chunk
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
@@ -483,6 +485,9 @@ class ProcessingEngine internal constructor(
         // whisper's -pp lines arrive on a non-suspending callback, so the chunks run in a child coroutine
         // and report over a channel, which this coroutine drains, persists and publishes in order.
         val reports = Channel<TranscriptionReport?>(Channel.UNLIMITED)
+        // The run's device until whisper-cli reports a chosen GPU unusable (item 32): then the device is stored as
+        // CPU with a notice naming the GPU, published, and the rest of this run asks for the CPU.
+        var current = run
         coroutineScope {
             launch {
                 for (chunk in stored) {
@@ -492,11 +497,19 @@ class ProcessingEngine internal constructor(
                     transcription.transcribe(
                         taskId = id,
                         chunk = chunk,
-                        settings = settingsFor(task, run),
+                        settings = settingsFor(task, current),
                         audio = audio,
                         outputPrefix = workDir.resolve("chunk-${chunk.idx}"),
                         prompt = resumePrompt(segments, id, chunk.idx),
                         onProgress = { fraction -> reports.trySend(TranscriptionReport(chunk.idx, fraction)) },
+                        onGpuUnavailable = {
+                            val gpu = current.device
+                            if (gpu is Device.Gpu) {
+                                logger.warn("Task {}: {} is unavailable, it ran on the CPU; the device is now CPU", id, gpu.dbValue())
+                                current = current.copy(device = Device.Cpu)
+                                _events.emit(Event.SettingsUpdated(settings.fallBackToCpu(gpu)))
+                            }
+                        },
                     )
                 }
                 // The null report is the terminator: everything before it has been sent.

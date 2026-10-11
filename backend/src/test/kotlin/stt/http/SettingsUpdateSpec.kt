@@ -47,7 +47,7 @@ class SettingsUpdateSpec :
                         // By hand: the written fields, plus the choices cpu, auto and the two reported GPUs.
                         val expected =
                             Json.parseToJsonElement(
-                                """{ "device": "gpu:1", "threads": 6, "defaultLanguage": "de", "speakersMode": "fixed", "speakersCount": 3, "maxSpeakers": 12, "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"] }""",
+                                """{ "device": "gpu:1", "threads": 6, "defaultLanguage": "de", "speakersMode": "fixed", "speakersCount": 3, "maxSpeakers": 12, "deviceFallback": null, "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"] }""",
                             )
                         answered shouldBe expected
 
@@ -57,7 +57,7 @@ class SettingsUpdateSpec :
                         event shouldHaveShapeOf eventExamples
                         event shouldBe
                             Json.parseToJsonElement(
-                                """{ "device": "gpu:1", "threads": 6, "defaultLanguage": "de", "speakersMode": "fixed", "speakersCount": 3, "maxSpeakers": 12 }""",
+                                """{ "device": "gpu:1", "threads": 6, "defaultLanguage": "de", "speakersMode": "fixed", "speakersCount": 3, "maxSpeakers": 12, "deviceFallback": null }""",
                             )
 
                         val (getStatus, getBody) = server.request("GET", "/api/settings")

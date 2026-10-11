@@ -3,6 +3,7 @@ package stt.transcribe
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.withTimeout
 import stt.Integration
@@ -111,6 +112,46 @@ class ChunkTranscriberSpec :
                         error.message.shouldContain(json.toString())
                         error.message.shouldContain(saving.joinToString("\n"))
                     }
+                }
+            }
+        }
+
+        given("a whisper-cli that prints `no GPU found` and still transcribes, as 1.9.2 does on the CPU when no GPU is usable") {
+            `when`("a chunk is transcribed with GPU 1 chosen, with the CPU chosen, and with auto") {
+                then("only the GPU 1 run reports the GPU as unavailable; all three return the segment") {
+                    val workDir = tempdir("stt-transcribe").toPath()
+                    val json = workDir.resolve("chunk-2.json")
+                    // Recorded from whisper-cli 1.9.2 with `--device 1` on a machine without a GPU: exit 0, JSON written.
+                    val stderr =
+                        listOf(
+                            "whisper_init_with_params_no_state: use gpu    = 1",
+                            "whisper_init_with_params_no_state: gpu_device = 1",
+                            "whisper_backend_init_gpu: device 0: CPU (type: 0)",
+                            "whisper_backend_init_gpu: no GPU found",
+                            "output_json: saving output to '$json'",
+                        )
+                    val output = """{"segments": [{"start": 0.0, "end": 7.94, "text": " And so my fellow Americans"}]}"""
+                    val whisperCli = fakeWhisperCli(workDir, stderr, exitCode = 0, writes = json to output)
+                    val transcriber = ChunkTranscriber(ProcessRunner(), whisperCli.toString())
+
+                    val reports =
+                        listOf(Device.Gpu(1), Device.Cpu, Device.Auto).map { device ->
+                            var unavailable = 0
+                            val segments =
+                                withTimeout(30.seconds) {
+                                    transcriber.transcribe(
+                                        TEST_SETTINGS.copy(device = device),
+                                        workDir.resolve("chunk-2.flac"),
+                                        workDir.resolve("chunk-2"),
+                                        prompt = null,
+                                        onGpuUnavailable = { unavailable++ },
+                                    )
+                                }
+                            segments.map { it.text } shouldBe listOf(" And so my fellow Americans")
+                            unavailable
+                        }
+
+                    reports shouldBe listOf(1, 0, 0)
                 }
             }
         }

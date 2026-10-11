@@ -1,7 +1,9 @@
 package stt.db
 
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.jdbc.upsert
+import stt.config.Device
 import stt.config.dbValue
 import stt.config.parseStoredDevice
 
@@ -23,6 +25,7 @@ class SettingsRepository(
                 speakersMode = SpeakersMode.fromDbValue(row[SettingsTable.speakersMode]),
                 speakersCount = row[SettingsTable.speakersCount],
                 defaultMaxSpeakers = row[SettingsTable.maxSpeakers],
+                deviceFallback = row[SettingsTable.deviceFallback]?.let { parseStoredDevice(it) },
             )
         }
 
@@ -37,7 +40,28 @@ class SettingsRepository(
                 it[SettingsTable.speakersMode] = settings.speakersMode.dbValue
                 it[SettingsTable.speakersCount] = settings.speakersCount
                 it[SettingsTable.maxSpeakers] = settings.defaultMaxSpeakers
+                it[SettingsTable.deviceFallback] = settings.deviceFallback?.dbValue()
             }
         }
+    }
+
+    /**
+     * The engine found the chosen [gpu] unusable (item 32): stores the device as CPU and the notice naming [gpu] in one
+     * write, leaving every other setting as it is, and returns the settings as they are now.
+     */
+    suspend fun fallBackToCpu(gpu: Device.Gpu): Settings {
+        db.writeTransaction {
+            SettingsTable.update {
+                it[SettingsTable.device] = Device.Cpu.dbValue()
+                it[SettingsTable.deviceFallback] = gpu.dbValue()
+            }
+        }
+        return get()
+    }
+
+    /** Clears the CPU-fallback notice (item 32's dismiss) and returns the settings as they are now. */
+    suspend fun dismissDeviceFallback(): Settings {
+        db.writeTransaction { SettingsTable.update { it[SettingsTable.deviceFallback] = null } }
+        return get()
     }
 }
