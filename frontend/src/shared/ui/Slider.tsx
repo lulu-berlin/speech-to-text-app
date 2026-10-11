@@ -2,7 +2,10 @@ import * as SliderPrimitive from '@radix-ui/react-slider';
 import styled from 'styled-components';
 import { focusRing } from './focusRing';
 
+// The root is the thumb's positioning context: Radix places the thumb absolutely at a
+// percentage of the nearest positioned ancestor, which must be the slider itself.
 const Root = styled(SliderPrimitive.Root)`
+  position: relative;
   display: flex;
   align-items: center;
   cursor: pointer;
