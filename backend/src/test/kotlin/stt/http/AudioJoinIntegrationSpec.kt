@@ -79,6 +79,52 @@ class AudioJoinIntegrationSpec :
                 }
             }
         }
+
+        given("a task whose first chunk ends early — its file declares more samples than it contains") {
+            `when`("the real FfmpegAudioJoiner joins it with a following chunk") {
+                then("the joined header matches the decodable content, and the tail chunk's audio is all still there") {
+                    val runner = ProcessRunner()
+                    val dataDir = tempdir("stt-join-trunc").toPath()
+                    val target = dataDir.resolve("joined-trunc.flac")
+                    // Chunk 0 declares 1 s (16 000 samples) but is cut to 70% of its bytes, so only its first
+                    // frames are decodable (a truncated tail: how a stored chunk could end early). Chunk 1 is
+                    // a full 0.5 s sine — 8 000 samples at 16 kHz, by hand.
+                    val truncated =
+                        dataDir.resolve("chunk-0.flac").also { file ->
+                            val full = sineFlac(dataDir, "chunk-0-full", "440", "1.0")
+                            val bytes = Files.readAllBytes(full)
+                            Files.write(file, bytes.copyOf(bytes.size * 7 / 10))
+                        }
+                    val firstSamples = decodeSamples(runner, dataDir.resolve("first.raw"), truncated)
+                    val tail = sineFlac(dataDir, "chunk-1", "880", "0.5")
+                    Database.open(dataDir).use { db ->
+                        val workDirectories = TaskWorkDirectories(dataDir)
+                        val id =
+                            TaskRepository(db, workDirectories).createFromUpload(
+                                queuedTask("join-trunc.wav", createdAt = 1).copy(queuePosition = 0),
+                                "audio".toByteArray().inputStream(),
+                            )
+                        ChunkRepository(db).storePlan(
+                            id,
+                            listOf(
+                                ExportedChunk(PlannedChunk(0L, 500L), truncated),
+                                ExportedChunk(PlannedChunk(500L, 1_000L), tail),
+                            ),
+                        )
+                        FfmpegAudioJoiner(runner, ChunkRepository(db), workDirectories).join(id, target)
+                    }
+
+                    // The tail chunk's audio is all still there: the joined content is the decodable part of
+                    // the truncated chunk plus the full 0.5 s that followed it.
+                    val decoded = decodeSamples(runner, dataDir.resolve("joined.raw"), target)
+                    decoded shouldBe firstSamples + 8_000L
+                    // The header a player reads must agree with what decoding actually yields — nothing
+                    // declared beyond the frames, which is what a "waits for audio that never comes" stall
+                    // needs. (The pre-ADR-0045 `-c copy` join kept the first chunk's declared length instead.)
+                    ffprobe(runner, target, "stream=duration_ts").single().toLong() shouldBe decoded
+                }
+            }
+        }
     })
 
 /**
@@ -106,6 +152,34 @@ private suspend fun joinTwoSineChunks(dataDir: Path): Path {
         FfmpegAudioJoiner(ChunkRepository(db), workDirectories).join(id, target)
     }
     return target
+}
+
+/**
+ * Decodes [file] to raw s16le and returns its sample count — what a player really gets out of the file,
+ * independent of what any header declares (the first scenario uses the same decode to check the join).
+ */
+private suspend fun decodeSamples(
+    runner: ProcessRunner,
+    raw: Path,
+    file: Path,
+): Long {
+    val result =
+        runner.run(
+            listOf(
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                file.toString(),
+                "-f",
+                "s16le",
+                raw.toString(),
+            ),
+        )
+    result.expectSuccess("decode $file")
+    return Files.size(raw) / 2
 }
 
 /** One ffprobe `-show_entries` query on [file]'s audio stream: one value per line. */
