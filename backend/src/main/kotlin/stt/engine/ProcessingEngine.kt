@@ -485,8 +485,7 @@ class ProcessingEngine internal constructor(
         // whisper's -pp lines arrive on a non-suspending callback, so the chunks run in a child coroutine
         // and report over a channel, which this coroutine drains, persists and publishes in order.
         val reports = Channel<TranscriptionReport?>(Channel.UNLIMITED)
-        // The run's device until whisper-cli reports a chosen GPU unusable (item 32): then the device is stored as
-        // CPU with a notice naming the GPU, published, and the rest of this run asks for the CPU.
+        // The run's settings; they switch to the CPU if whisper-cli reports the chosen GPU unusable (item 32).
         var current = run
         coroutineScope {
             launch {
@@ -502,14 +501,7 @@ class ProcessingEngine internal constructor(
                         outputPrefix = workDir.resolve("chunk-${chunk.idx}"),
                         prompt = resumePrompt(segments, id, chunk.idx),
                         onProgress = { fraction -> reports.trySend(TranscriptionReport(chunk.idx, fraction)) },
-                        onGpuUnavailable = {
-                            val gpu = current.device
-                            if (gpu is Device.Gpu) {
-                                logger.warn("Task {}: {} is unavailable, it ran on the CPU; the device is now CPU", id, gpu.dbValue())
-                                current = current.copy(device = Device.Cpu)
-                                _events.emit(Event.SettingsUpdated(settings.fallBackToCpu(gpu)))
-                            }
-                        },
+                        onGpuUnavailable = { current = fallBackToCpu(id, current) },
                     )
                 }
                 // The null report is the terminator: everything before it has been sent.
@@ -753,6 +745,21 @@ class ProcessingEngine internal constructor(
         withContext(Dispatchers.IO) {
             Files.newOutputStream(target).use { chunks.copyFlacTo(id, idx, it) }
         }
+    }
+
+    /**
+     * whisper-cli could not use the GPU [run] chose and ran task [id] on the CPU (item 32): stores the device as CPU
+     * with a notice naming the GPU, logs and publishes it, and returns the settings for the rest of the run. A run
+     * that chose no GPU has nothing to fall back from and keeps its settings.
+     */
+    private suspend fun fallBackToCpu(
+        id: Long,
+        run: Settings,
+    ): Settings {
+        val gpu = run.device as? Device.Gpu ?: return run
+        logger.warn("Task {}: {} is unavailable, it ran on the CPU; the device is now CPU", id, gpu.dbValue())
+        _events.emit(Event.SettingsUpdated(settings.fallBackToCpu(gpu)))
+        return run.copy(device = Device.Cpu)
     }
 
     /** Persists the change, then publishes the task as it now is. */
