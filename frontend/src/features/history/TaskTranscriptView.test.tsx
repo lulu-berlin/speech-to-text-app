@@ -248,10 +248,10 @@ describe('the transcript view', () => {
     fireEvent(audio, new Event('timeupdate'));
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
 
-    // Browsers fire the scroll event of that programmatic follow scroll in the rendering
-    // step after the effect's setTimeout(0) hold-off has cleared (item 36; in 40 Chromium
-    // trials the event arrived after the flag was cleared 21 times). Deliver the view's
-    // own scroll event late on purpose: following must hold through it.
+    // The old mechanism cleared a setTimeout(0) hold-off flag and then read the view's
+    // scroll event as the user's hand — a race the browser lost in 21 of 40 Chromium
+    // trials (item 36): the scroll event arrived after the flag was cleared. Reproduce
+    // that timing (scroll event after the next macrotask) on purpose: following holds.
     const { promise: tick, resolve: resolveTick } = Promise.withResolvers<void>();
     setTimeout(resolveTick, 0);
     await tick;
@@ -260,6 +260,30 @@ describe('the transcript view', () => {
     expect(
       screen.queryByRole('button', { name: /back to playing position/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('holds following through many consecutive follow scrolls while playing', async () => {
+    const scrollIntoView = stubScrollIntoView();
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const region = screen.getByRole('region', { name: /transcript/i });
+
+    // The playhead moves across several segments, each one a follow scroll; after every
+    // scroll the scroll event arrives late, as it does in a browser. Following must hold
+    // through all of them (item 36).
+    const followCues = [1.0, 6.0, 10.0]; // inside [0,2100), [5800,9100) and [9600,14250).
+    for (const cueSeconds of followCues) {
+      audio.currentTime = cueSeconds;
+      fireEvent(audio, new Event('timeupdate'));
+      const { promise: tick, resolve: resolveTick } = Promise.withResolvers<void>();
+      setTimeout(resolveTick, 0);
+      await tick;
+      fireEvent.scroll(region);
+      expect(scrollIntoView).toHaveBeenCalled();
+      expect(
+        screen.queryByRole('button', { name: /back to playing position/i }),
+      ).not.toBeInTheDocument();
+    }
   });
 
   it('keeps the playing segment visible below the sticky header: the active segment carries a top scroll margin the size of the compact header', async () => {
