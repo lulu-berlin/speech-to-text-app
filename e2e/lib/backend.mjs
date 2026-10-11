@@ -52,6 +52,9 @@ export function checkPreconditions() {
       'STT_SPEAKER_MODEL is unset — run inside the devenv shell (devenv.nix sets it)',
     );
   }
+  if (!process.env.TEST_JFK_WAV) {
+    throw new Error('TEST_JFK_WAV is unset — run inside the devenv shell (devenv.nix sets it)');
+  }
   if (!existsSync(join(frontendDist, 'index.html'))) {
     throw new Error(
       `no built frontend at ${frontendDist} — build it first: pnpm --dir frontend install && pnpm --dir frontend build`,
