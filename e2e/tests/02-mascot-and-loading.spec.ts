@@ -16,9 +16,10 @@ test('shell, loading and empty regions show the mascot, resting while nothing ru
   // reconnecting immediately — the hold is what makes the label observable). Once let
   // go, the stream errors; while the route stays up every retry is still aborted, so the
   // region shows the mascot above "Reconnecting…". With the route gone, a retry
-  // succeeds and the app goes live. (A live stream dropped by an idle connection cannot
-  // be observed from the browser: the backend sends no keepalives, so an offline toggle
-  // leaves a quiet stream looking connected; item 13's restart exercises that drop.)
+  // succeeds and the app goes live. (Silent live drops are already covered by the app
+  // itself since item 29: the backend heartbeats every 5 s and the client's 15 s idle
+  // watchdog reconnects — ADR 0044 — while item 13's restart exercises the live drop
+  // against the real process.)
   const firstStream = Promise.withResolvers<void>();
   await page.route('**/api/events', async (route) => {
     try {
