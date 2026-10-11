@@ -1,6 +1,6 @@
 package stt.config
 
-/** Compute device for whisper-cli, from `STT_DEVICE` (port of oracle `parse_device`). */
+/** Compute device for whisper-cli (port of oracle `parse_device`), stored in the settings (roadmap item 32). */
 sealed interface Device {
     /** whisper-cli picks the first GPU. */
     data object Auto : Device
@@ -13,10 +13,7 @@ sealed interface Device {
     ) : Device
 }
 
-/**
- * The device in its stored and wire form (roadmap item 32): `auto`, `cpu`, or `gpu:<index>`; the old
- * `STT_DEVICE` spellings `gpu` and a bare index are written as `gpu:<index>` wherever a device is stored.
- */
+/** The device in its stored and wire form (roadmap item 32): `auto`, `cpu`, or `gpu:<index>`. */
 fun Device.dbValue(): String =
     when (this) {
         Device.Auto -> "auto"

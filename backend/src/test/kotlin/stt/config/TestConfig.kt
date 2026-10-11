@@ -1,5 +1,7 @@
 package stt.config
 
+import stt.db.Database
+import stt.db.SettingsRepository
 import java.nio.file.Path
 
 /** A non-empty STT_DATA_DIR value for tests that only need configuration to load. */
@@ -33,3 +35,14 @@ internal fun testConfig(
  * reads it (`Integration` tests only). STT_DATA_DIR is required by [Config] but unused here.
  */
 internal fun realSpeakerModelPath(): Path = Config.fromEnv(System.getenv() + ("STT_DATA_DIR" to TEST_DATA_DIR)).speakerModel
+
+/**
+ * Stores CPU as the device in [dataDir]'s settings, as the Settings page would (item 32), so a spec that runs the real
+ * whisper-cli transcribes on the CPU whatever GPU the machine has. Call it before the application opens [dataDir].
+ */
+internal suspend fun storeCpuDevice(dataDir: Path) {
+    Database.open(dataDir).use { db ->
+        val settings = SettingsRepository(db)
+        settings.update(settings.get().copy(device = Device.Cpu))
+    }
+}

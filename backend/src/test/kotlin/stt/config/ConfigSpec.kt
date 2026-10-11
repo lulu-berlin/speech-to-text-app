@@ -98,45 +98,12 @@ class ConfigSpec :
             }
         }
 
-        given("STT_DEVICE values") {
+        given("STT_DEVICE and STT_THREADS set to values that used to stop startup") {
             `when`("configuration is loaded") {
-                then("auto, cpu, gpu and 3 load as Auto, Cpu, Gpu(0), Gpu(3); unset defaults to Auto; invalid values are rejected") {
-                    // Oracle parse_device: auto, cpu, gpu (= GPU 0), or a GPU index N.
-                    val expected =
-                        mapOf(
-                            "auto" to Device.Auto,
-                            "cpu" to Device.Cpu,
-                            "gpu" to Device.Gpu(0),
-                            "3" to Device.Gpu(3),
-                        )
-                    for ((raw, device) in expected) {
-                        Config.fromEnv(TEST_REQUIRED_ENV + ("STT_DEVICE" to raw)).device.shouldBe(device)
-                    }
-                    // Unset: the oracle's default, auto.
-                    Config.fromEnv(TEST_REQUIRED_ENV).device.shouldBe(Device.Auto)
+                then("it loads exactly as without them: the device and thread count live only in the stored settings (item 32)") {
+                    val withOldVariables = TEST_REQUIRED_ENV + ("STT_DEVICE" to "tpu") + ("STT_THREADS" to "four")
 
-                    // Oracle parse_device rejects non-integers and negative indexes; empty is set-but-invalid.
-                    for (bad in listOf("tpu", "-1", "1.5", "")) {
-                        val error = shouldThrow<IllegalArgumentException> { Config.fromEnv(TEST_REQUIRED_ENV + ("STT_DEVICE" to bad)) }
-                        error.message.shouldContain("STT_DEVICE")
-                        error.message.shouldContain("\"$bad\"")
-                    }
-                }
-            }
-        }
-
-        given("STT_THREADS values") {
-            `when`("configuration is loaded") {
-                then("4 loads as 4 and unset leaves threads unset; invalid values are rejected") {
-                    Config.fromEnv(TEST_REQUIRED_ENV + ("STT_THREADS" to "4")).threads.shouldBe(4)
-                    Config.fromEnv(TEST_REQUIRED_ENV).threads.shouldBe(null)
-
-                    // A thread count must be an integer >= 1; empty is set-but-invalid.
-                    for (bad in listOf("", "0", "-2", "four", "1.5")) {
-                        val error = shouldThrow<IllegalArgumentException> { Config.fromEnv(TEST_REQUIRED_ENV + ("STT_THREADS" to bad)) }
-                        error.message.shouldContain("STT_THREADS")
-                        error.message.shouldContain("\"$bad\"")
-                    }
+                    Config.fromEnv(withOldVariables).shouldBe(Config.fromEnv(TEST_REQUIRED_ENV))
                 }
             }
         }
