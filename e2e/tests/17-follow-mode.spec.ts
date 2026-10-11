@@ -43,6 +43,19 @@ test('follow mode: long playback never shows "Back to playing position" without 
     true,
   );
 
+  // There is out-of-view content for following to scroll into: with the region at the
+  // top, the transcript's last segment starts below the visible box.
+  expect(
+    await region.evaluate((element) => {
+      const last = [...element.querySelectorAll('[role="button"]')].at(-1);
+      if (last === undefined) {
+        return false;
+      }
+      const box = element.getBoundingClientRect();
+      return last.getBoundingClientRect().top > box.bottom - 1;
+    }),
+  ).toBe(true);
+
   // The transcript's opening renders inside the region's box, so following does not need
   // to scroll until the playhead passes the fold. Seek past it first (the slider's
   // PageUp jumps 10 s, as in the playback journey), then play through the part of the
@@ -54,19 +67,31 @@ test('follow mode: long playback never shows "Back to playing position" without 
     await page.keyboard.press('PageUp');
   }
   await expect.poll(() => activeIndex(region)).toBeGreaterThan(0);
+  // The seek moved the playhead into transcript that was out of view; the follow scroll
+  // brought the active segment into the visible box (the region is off its top).
+  await expect.poll(() => activeInView(region)).toBe(true);
+  expect(await region.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Play' }).click();
 
-  // Sample ~30 s of playback: on every sample the button stays hidden while the region
-  // actually scrolls. The distinct scrollTop count proves several follow scrolls took
-  // place (the view was not sitting still), and the highlight stays in view throughout.
+  // Playback must genuinely run: the time label moves on.
+  const times = page.getByText(/^\d\d:\d\d \/ \d\d:\d\d$/);
+  const started = await times.textContent();
+  await expect.poll(() => times.textContent(), { timeout: 10_000 }).not.toBe(started);
+
+  // Sample 45 s of playback past the fold: on every sample the button stays hidden and
+  // the active segment is fully in view. The playhead crosses ~5 px of transcript per
+  // second, so once following stops the segment leaves the view within a couple of
+  // samples — this window is a tight net for any spontaneous stop, whatever the clip's
+  // segment lengths are. The scrollTop range also proves following really scrolled
+  // during the window (the view was not sitting still).
   const scrollTops = new Set<number>();
-  for (let sample = 0; sample < 30; sample += 1) {
+  for (let sample = 0; sample < 45; sample += 1) {
     await expect(back).toBeHidden();
     scrollTops.add(await region.evaluate((element) => element.scrollTop));
     await expect.poll(() => activeInView(region)).toBe(true);
     await page.waitForTimeout(1_000);
   }
-  expect(scrollTops.size).toBeGreaterThanOrEqual(5);
+  expect(Math.max(...scrollTops)).toBeGreaterThan(Math.min(...scrollTops));
   await expect(back).toBeHidden();
 
   // A hand scroll (wheel) still stops following: the button appears.
