@@ -18,7 +18,7 @@ Status: done (roadmap item 01, merged 2026-10-05)
 
 - `languages.javascript.enable` + `languages.javascript.npm.enable`: node + npm (devenv's default Node package from the pinned nixpkgs).
 - `languages.kotlin` (JDK 21, Gradle), `languages.typescript` (global `tsc`), packages `git`, `whisper-cpp` with `vulkanSupport = true`, `ffmpeg`, `vulkan-tools`, `sqlite`, `curl`, `jq` (manual API/SSE smoke checks).
-- ONNX Runtime: no Nix setup. The native library bundled in `com.microsoft.onnxruntime:onnxruntime` (pinned to 1.29.0, ADR 0043) loads under the devenv JDK without `LD_LIBRARY_PATH`, because the JVM already maps libstdc++ (loading verified on 1.30.0 in 2026-10-05, re-verified on the pin by the Integration suite). Fallback if it ever fails: `pkgs.onnxruntime` + `-Donnxruntime.native.path`.
+- ONNX Runtime: no Nix setup. The native library bundled in `com.microsoft.onnxruntime:onnxruntime` (pinned to 1.31.0, ADR 0043) loads under the devenv JDK without `LD_LIBRARY_PATH`, because the JVM already maps libstdc++ (loading verified on 1.30.0 in 2026-10-05, re-verified on the pin by the Integration suite). Fallback if it ever fails: `pkgs.onnxruntime` + `-Donnxruntime.native.path`.
 - [`nix/models.nix`](../../nix/models.nix): `fetchurl` of both models with the hashes from ADR 0003 / ADR 0008, imported by `devenv.nix` and exported as `STT_WHISPER_MODEL` and `STT_SPEAKER_MODEL`. Reused by the flake (roadmap item 16).
 - No template boilerplate: no `env.GREET`, `scripts.hello`, `enterShell` greeting, or commented-out template sections.
 - `enterTest` (run by `devenv test`) holds the automated checks below; the expected model hashes are written out in the test, independent of `nix/models.nix`.

@@ -20,6 +20,7 @@ completion, so the bug is ORT × machine, not application code.
 | 1.28.0 | broken — suite red, byte-identical numbers to 1.27.0 | not tested (moot) |
 | 1.29.0 | good — suite green | yes, exit 139 |
 | 1.30.0 | good — suite green | yes, exit 139 |
+| 1.31.0 | good — suite green | **not tested yet (pending the user's machine run)** |
 
 The embedding breakage is gross, not borderline: same-speaker cosine 0.2427 falls below a
 different-speaker cosine 0.4376, 63 of 72 same-speaker pairs land above the 0.5448 threshold
@@ -55,10 +56,12 @@ change plus: `backend/deps.json` regeneration (the nixpkgs Gradle lockfile, ADR 
 Integration suite on `gradle integrationTest` (real CAM++ and whisper models), and a real-model
 diarization run on the user's machine (the crash is machine-specific; the sandbox cannot verify it).
 
-As of 2026-10-11 the pin stands at 1.29.0 because it is the newest version with green embedding
-behavior; the item is NOT resolved (1.29.0 still crashes on the user's machine). `SpeakerModel.
-sessionOptions` additionally runs sequential with one inter-op thread as defense-in-depth: ORT's
-parallel inter-op scheduler is never entered, at no cost to this single-forward-pass model.
+As of 2026-10-11 the pin stands at 1.31.0 (released after the crashing line; sandbox-verified
+embedding-green — the first candidate since 1.30.0; the user's machine run is pending). If 1.31.0
+still crashes, the fix remains open: confirm the CPU discriminator (clearcpuid experiment), then
+build-without-offending-path or upstream. `SpeakerModel.sessionOptions` additionally runs sequential
+with one inter-op thread as defense-in-depth: ORT's parallel inter-op scheduler is never entered, at
+no cost to this single-forward-pass model.
 
 ## Consequences
 
