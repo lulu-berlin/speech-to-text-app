@@ -18,6 +18,10 @@ SERVER_PID=""
 # the backend's build files; build/ itself is ignored so our own output never retriggers.
 WATCH=(src build.gradle.kts settings.gradle.kts)
 
+# Shutdown grace: poll the JVM every quarter second, KILL it after 5 seconds.
+SHUTDOWN_STEPS=20
+SHUTDOWN_STEP_S=0.25
+
 start_server() {
   if [ -x "$DIST_BIN" ]; then
     echo "[dev-run] starting $DIST_BIN"
@@ -33,9 +37,9 @@ stop_server() {
   # TERM the JVM: Ktor shuts down gracefully; engine subprocesses (whisper-cli) either
   # finish or die on their broken stdout pipe. KILL after the grace period.
   kill -TERM "$SERVER_PID" 2>/dev/null || true
-  for _ in $(seq 1 20); do
+  for _ in $(seq 1 "$SHUTDOWN_STEPS"); do
     kill -0 "$SERVER_PID" 2>/dev/null || break
-    sleep 0.25
+    sleep "$SHUTDOWN_STEP_S"
   done
   kill -KILL "$SERVER_PID" 2>/dev/null || true
   wait "$SERVER_PID" 2>/dev/null || true
