@@ -1,4 +1,4 @@
-# 32 — Settings page: processing device selection
+# 32 — Settings page: device, threads and upload defaults
 
 Status: draft
 Depends on: [11](../docs/specs/processing-engine.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [13](../docs/specs/frontend-foundation.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
@@ -27,32 +27,43 @@ To be settled in the consultation. Starting points:
 - **Applies to**: the next task the engine starts; a running task keeps its device.
 - **UI**: a Settings view (new route, e.g. `/settings`, reached from the navigation) with a device select and a short explanation; saving shows confirmation or the error inline.
 
-## Open questions
+## Open questions (answered 2026-10-11)
 
-- Precedence between the stored setting and `STT_DEVICE`: does the environment variable still override (useful for the Docker/Nix deployments, items 16 and 19), act only as the initial default, or go away?
-- How to enumerate the GPUs: parse whisper-cli's device listing at startup, query the Vulkan devices, or let the user enter an index?
-- When the device changes: the next task only, or also a running one (restart its current chunk)?
-- Which other settings belong on the page now — `STT_THREADS`, the default upload language and speaker options — or only the device in this item?
-- Does a failing device (e.g. GPU chosen but unavailable) fall back to CPU with a notice, or fail the task with a readable error?
-- Order with items 16/19: the Nix and Docker deployments set the device through the environment; does this item come before them so their configs document the new behavior?
+- `STT_DEVICE`? → **Removed.** The device lives only in the database and is configured through the Settings page or the API; startup no longer reads `STT_DEVICE` (AGENTS.md and items 16/19 drop it).
+- How are GPUs found? → **Ask whisper-cli at startup**: the backend runs whisper-cli's device probe once and parses the devices it reports; the Settings page offers CPU, auto and those devices.
+- When does a change apply? → **The next task** the engine starts; a running task keeps its device.
+- Scope? → **Device + threads + upload defaults**: the device, the thread count (today `STT_THREADS`, whisper-cli and ONNX intra-op), and the upload form's defaults — language and speakers mode (`auto` / `off` / a number).
+- Chosen GPU unavailable when a task runs? → **Fall back to the CPU with a notice**, and the stored device setting **is switched to CPU**, so using the GPU again requires opting back in on the Settings page.
+
+## Remaining open questions
+
+- `STT_THREADS`: removed like `STT_DEVICE` (the setting is the only source), or kept as an environment override? Proposed: removed, for one source of truth.
+- `maxSpeakers` default: also a setting next to the speakers mode, or stays 8?
+- How is the CPU-fallback notice shown: a banner on the Queue for that task, an entry on the task (its `error`-like field), or both?
 
 ## Test list (written with the user; Canon TDD step 1)
 
-To be written with the user. Expected scope:
+Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- The device setting is stored in the database and survives a restart; the engine uses it for the next task's whisper-cli flags.
-- `GET /api/settings` lists the stored setting and the available devices; `PUT` validates (unknown device → 400) and stores; both match their `docs/api/` examples.
-- The decided precedence between `STT_DEVICE` and the stored setting holds.
-- A settings change is announced on `/api/events`.
-- The Settings view shows the current device, saves a new choice, and shows an error when the save is rejected.
-- A running task keeps its device (or the decided behavior).
+- [ ] Settings (device, threads, default language, default speakers mode) are stored in the database, have defaults on a fresh database, and survive a restart
+- [ ] At startup the backend asks whisper-cli for its devices; `GET /api/settings` returns the stored settings and the available devices (CPU, auto, and each reported GPU) and matches its `docs/api/` example
+- [ ] `PUT /api/settings` validates (an unknown device, threads < 1, a language not in `languages.json`, an invalid speakers mode → 400 with the matching code) and stores; the response and a `settings-updated` event carry the new settings
+- [ ] The engine uses the stored device and thread count for the next task's whisper-cli flags (and the thread count for the speaker model); a running task keeps its device
+- [ ] `STT_DEVICE` (and, if decided, `STT_THREADS`) is no longer read; startup works without it
+- [ ] A chosen GPU that is unavailable when a task runs: the task completes on the CPU, the user sees a notice, and the stored device is now CPU
+- [ ] The upload form starts with the stored default language and speakers mode
+- [ ] The Settings page (a new route, reached from the navigation) shows the current settings and the available devices, saves a change, shows the rejection inline, and follows a `settings-updated` from another tab
+- [ ] (e2e, ADR 0046) Against the real backend: change the device and the defaults on the Settings page, restart the backend, the choices are kept; the upload form uses the new defaults; a task runs with the stored device
+- [ ] (must not break) All suites and the contract-shape checks stay green
 
 ## Acceptance criteria
 
 - The user switches between CPU and a GPU in the app, restarts, and the choice is kept; transcription runs on the chosen device.
 - Contract, examples and route tests agree.
+- The e2e test passes on the user's machine (ADR 0046).
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
 
 - 2026-10-11: drafted by the root agent from the user's request (a settings page to choose CPU vs which GPU, persisted in the database for future runs).
+- 2026-10-11: consultation answers (STT_DEVICE removed; GPUs from whisper-cli at startup; next task only; scope device + threads + default language + default speakers mode; unavailable GPU → CPU with a notice and the setting switched to CPU) and the proposed test list incl. its e2e test (ADR 0046). Remaining: STT_THREADS, maxSpeakers default, the notice's form; test list approval.
