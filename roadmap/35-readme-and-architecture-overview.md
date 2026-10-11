@@ -1,6 +1,6 @@
 # 35 — README and architecture overview
 
-Status: spec-approved
+Status: in-progress
 Depends on: [21](../docs/specs/frontend-backend-end-to-end.md) (its screenshot set and `e2e/` suite)
 
 ## Goal
