@@ -42,6 +42,9 @@ export default async function globalSetup() {
     { args: ['-ss', '7', '-t', '4'], file: FIXTURE_CLIPS[12] }, // 7-11s, item 12
     { args: ['-t', '7'], file: FIXTURE_CLIPS[13] }, // 0-7s, item 13
     { args: ['-ss', '4', '-t', '7'], file: FIXTURE_CLIPS[14] }, // 4-11s, item 13
+    { args: ['-stream_loop', '7'], file: FIXTURE_CLIPS[16] }, // ~77s, screenshots
+    { args: ['-t', '4'], file: FIXTURE_CLIPS[17] }, // 0-4s, screenshots' upload-in-flight
+    { args: ['-t', '5'], file: FIXTURE_CLIPS[18] }, // 0-5s, screenshots' second running seed
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);

@@ -49,6 +49,9 @@ export const FIXTURE_CLIPS = [
   'jfk-i.wav', // 0-7s
   'jfk-j.wav', // 4-11s
   'broken-2.wav',
+  'jfk-k.wav', // the sample looped 7x, ~77s
+  'jfk-l.wav', // 0-4s
+  'jfk-m.wav', // 0-5s
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -65,6 +68,10 @@ export const RESTART_CLIPS = [FIXTURE_CLIPS[13], FIXTURE_CLIPS[14]]; // 0-7s, 4-
 // The history test's own undecodable fixture — the cancel test's broken.wav is already
 // a FAILED task by the time this file runs, so a second upload would be 409.
 export const BROKEN2_CLIP = FIXTURE_CLIPS[15];
+// The screenshot test's own long seed (unique bytes; it cancels the task mid-run, so
+// the queue is left unpaused and the clip never reaches COMPLETED).
+export const SHOT_CLIP = FIXTURE_CLIPS[16];
+export const SHOT_UPLOAD_CLIP = FIXTURE_CLIPS[17];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
