@@ -1,7 +1,7 @@
 # 19 — Docker image and docker-compose setup
 
 Status: spec-approved
-Depends on: [16](16-nix-flake-package.md)
+Depends on: [16](../docs/specs/nix-flake-package.md)
 
 ## Goal
 

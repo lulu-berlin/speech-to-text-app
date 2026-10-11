@@ -102,7 +102,7 @@ graph TD
 | [13 — Frontend foundation](../docs/specs/frontend-foundation.md) | done | 02, 12 (spec-approved only) |
 | [14 — Frontend queue UI](../docs/specs/frontend-queue-ui.md) | done | 13, 24 |
 | [15 — Frontend history UI](../docs/specs/frontend-history-ui.md) | done | 13, 24 |
-| [16 — Nix flake package](16-nix-flake-package.md) | spec-approved | 02, 14, 15, 17, 21 |
+| [16 — Nix flake package](../docs/specs/nix-flake-package.md) | done | 02, 14, 15, 17, 21 |
 | [17 — Branding: stenographer typing animation](../docs/specs/branding-stenographer-animation.md) | done | 13, 24 |
 | [18 — Audio storage: originals in the work directory, chunks as FLAC](../docs/specs/audio-storage.md) | done | 03 |
 | [19 — Docker image and docker-compose setup](19-docker-image-and-compose.md) | spec-approved | 16 |
