@@ -1,6 +1,6 @@
 # 32 — Settings page: device, threads and upload defaults
 
-Status: spec-approved
+Status: in-progress
 Depends on: [11](../docs/specs/processing-engine.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [13](../docs/specs/frontend-foundation.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
