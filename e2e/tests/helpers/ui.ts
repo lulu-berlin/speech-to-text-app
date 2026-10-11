@@ -1,5 +1,6 @@
+import { join } from 'node:path';
 import { expect, type Locator, type Page } from '@playwright/test';
-import { appUrl } from '../../lib/backend.mjs';
+import { appUrl, loadState } from '../../lib/backend.mjs';
 
 // The two widths the spec fixes: phone ~390 px, desktop ~1280 px.
 export const PHONE_VIEWPORT = { width: 390, height: 844 };
@@ -43,6 +44,21 @@ export async function expectLiveQueue(page: Page) {
 // structure. One locator with a comma union: whichever shape matches this label wins.
 export function mascotAbove(page: Page, label: string): Locator {
   return page.locator(`svg + p:has-text("${label}"), span:has-text("${label}") > svg`);
+}
+
+// Loads the app and waits for the event stream: the header indicator reads "Live".
+export async function appLive(page: Page) {
+  await page.goto(appUrl('/'));
+  await expect(page.getByText('Live', { exact: true })).toBeVisible();
+}
+
+// Uploads the named fixture clips through the queue's file input (the drop zone).
+export async function uploadClips(page: Page, names: string[]) {
+  const { fixturesDir } = loadState();
+  await page.setInputFiles(
+    'input[type="file"]',
+    names.map((name) => join(fixturesDir, name)),
+  );
 }
 
 // The positions of the first list item containing each name, in DOM order — the pending
