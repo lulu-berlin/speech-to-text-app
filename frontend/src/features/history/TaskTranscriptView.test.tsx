@@ -354,6 +354,32 @@ describe('the transcript view', () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
+  it('resumes following from "Back to playing position" and scrolls to the playing segment', async () => {
+    const scrollIntoView = stubScrollIntoView();
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const region = screen.getByRole('region', { name: /transcript/i });
+
+    // Play, then a wheel stops following.
+    audio.currentTime = 1.0;
+    fireEvent(audio, new Event('timeupdate'));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    fireEvent.wheel(region);
+    expect(backButton()).toBeInTheDocument();
+
+    // While stopped, the playhead keeps moving — the highlight follows the playhead even
+    // when the view is not scrolling — so the playing segment on resume is not the old one.
+    audio.currentTime = 6.0;
+    fireEvent(audio, new Event('timeupdate'));
+
+    // Resuming follows again and scrolls to the segment the playhead is in now.
+    fireEvent.click(required(backButton()));
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    expect(required(document.querySelector('[data-active]')).textContent).toContain(
+      'Happy to be here.',
+    );
+  });
+
   it('keeps the playing segment visible below the sticky header: the active segment carries a top scroll margin the size of the compact header', async () => {
     stubScrollIntoView();
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
