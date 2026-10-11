@@ -97,22 +97,14 @@ class AudioJoinIntegrationSpec :
                         }
                     val firstSamples = decodeSamples(runner, dataDir.resolve("first.raw"), truncated)
                     val tail = sineFlac(dataDir, "chunk-1", "880", "0.5")
-                    Database.open(dataDir).use { db ->
-                        val workDirectories = TaskWorkDirectories(dataDir)
-                        val id =
-                            TaskRepository(db, workDirectories).createFromUpload(
-                                queuedTask("join-trunc.wav", createdAt = 1).copy(queuePosition = 0),
-                                "audio".toByteArray().inputStream(),
-                            )
-                        ChunkRepository(db).storePlan(
-                            id,
-                            listOf(
-                                ExportedChunk(PlannedChunk(0L, 500L), truncated),
-                                ExportedChunk(PlannedChunk(500L, 1_000L), tail),
-                            ),
-                        )
-                        FfmpegAudioJoiner(runner, ChunkRepository(db), workDirectories).join(id, target)
-                    }
+                    joinStoredChunks(
+                        dataDir,
+                        target,
+                        listOf(
+                            PlannedChunk(0L, 500L) to truncated,
+                            PlannedChunk(500L, 1_000L) to tail,
+                        ),
+                    )
 
                     // The tail chunk's audio is all still there: the joined content is the decodable part of
                     // the truncated chunk plus the full 0.5 s that followed it.
@@ -132,9 +124,27 @@ class AudioJoinIntegrationSpec :
  * them with the real [FfmpegAudioJoiner] (which runs its own ProcessRunner per join, item 37); returns the joined file.
  */
 private suspend fun joinTwoSineChunks(dataDir: Path): Path {
-    val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
-    val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
     val target = dataDir.resolve("joined.flac")
+    joinStoredChunks(
+        dataDir,
+        target,
+        listOf(
+            PlannedChunk(0L, 300L) to sineFlac(dataDir, "chunk-0", "440", "0.3"),
+            PlannedChunk(300L, 800L) to sineFlac(dataDir, "chunk-1", "880", "0.5"),
+        ),
+    )
+    return target
+}
+
+/**
+ * Stores [chunks] (each a planned range with its FLAC file) for a new task in [dataDir] and joins them with the
+ * real [FfmpegAudioJoiner] into [target].
+ */
+private suspend fun joinStoredChunks(
+    dataDir: Path,
+    target: Path,
+    chunks: List<Pair<PlannedChunk, Path>>,
+) {
     Database.open(dataDir).use { db ->
         val workDirectories = TaskWorkDirectories(dataDir)
         val id =
@@ -144,14 +154,10 @@ private suspend fun joinTwoSineChunks(dataDir: Path): Path {
             )
         ChunkRepository(db).storePlan(
             id,
-            listOf(
-                ExportedChunk(PlannedChunk(0L, 300L), chunk0),
-                ExportedChunk(PlannedChunk(300L, 800L), chunk1),
-            ),
+            chunks.map { (planned, file) -> ExportedChunk(planned, file) },
         )
         FfmpegAudioJoiner(ChunkRepository(db), workDirectories).join(id, target)
     }
-    return target
 }
 
 /**
