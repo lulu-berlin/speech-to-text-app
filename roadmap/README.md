@@ -66,6 +66,8 @@ graph TD
   11 --> 26[26 engine shutdown race ✓]:::done
   27[27 pin sqlite-jdbc ✓]:::done
   28[28 post-merge cleanup ✓]:::done
+  29[29 backend bug fixes]
+  30[30 diarization crash]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -101,3 +103,5 @@ graph TD
 | [26 — Engine start/stop race (flaky DatabaseDependencySpec)](../docs/specs/engine-shutdown-race.md) | done | 11 |
 | [27 — Pin the sqlite-jdbc version](../docs/specs/sqlite-jdbc-pin.md) | done | — |
 | [28 — Post-merge cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
+| [29 — Post-merge bug fixes: engine wake, seek bar, audio join, SSE disconnect](29-post-merge-bug-fixes.md) | spec-approved | — |
+| [30 — Diarization crash on the user's machine (ONNX Runtime recursion)](30-diarization-crash-ort-recursion.md) | draft | — |
