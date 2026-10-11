@@ -22,10 +22,12 @@ import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
+import stt.db.SettingsRepository
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.engine.processingEngine
 import stt.process.ProcessRunner
+import stt.transcribe.GpuDevice
 import java.io.File
 
 /**
@@ -33,9 +35,13 @@ import java.io.File
  * registered with Ktor DI, feature modules are loaded. `dependencies {}` installs
  * the DI plugin itself, so a test may provide overrides before calling this.
  * The Database is required, so DI opens it at startup rather than on first use
- * (ADR 0017); DI closes it when the application stops.
+ * (ADR 0017); DI closes it when the application stops. [gpus] are the GPUs the
+ * startup device probe reported (item 32; `main` runs the probe), offered by `GET /api/settings`.
  */
-fun Application.sttApp(config: Config) {
+fun Application.sttApp(
+    config: Config,
+    gpus: List<GpuDevice> = emptyList(),
+) {
     install(ContentNegotiation) { json() }
     internalErrorHandler()
     // The events bridge runs for the application's lifetime (ADR 0007/0038): a scope under the app's job.
@@ -46,6 +52,7 @@ fun Application.sttApp(config: Config) {
         provide<TaskRepository> { TaskRepository(resolve(), resolve()) }
         provide<AudioRepository> { AudioRepository(resolve()) }
         provide<QueueStateRepository> { QueueStateRepository(resolve()) }
+        provide<SettingsRepository> { SettingsRepository(resolve()) }
         provide<SegmentRepository> { SegmentRepository(resolve()) }
         provide<ChunkRepository> { ChunkRepository(resolve()) }
         provide<JoinedAudioCache> { JoinedAudioCache(resolve()) }
@@ -63,6 +70,7 @@ fun Application.sttApp(config: Config) {
     audioRoutes()
     eventsRoutes()
     uploadRoutes(config)
+    settingsRoutes(gpus)
     val staticDir = config.staticDir
     routing {
         if (staticDir != null) {
