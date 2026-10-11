@@ -54,8 +54,9 @@ export const FIXTURE_CLIPS = [
   'jfk-l.wav', // 0-4s
   'jfk-m.wav', // 0-5s
   'jfk-n.wav', // the sample looped 8x, ~88s
-  'jfk-o.wav', // 5-7s, the contract check (item 16)
+'jfk-o.wav', // 5-7s, the contract check (item 16)
   'jfk-p.wav', // 1-8s, item 32's settings e2e
+  'jfk-follow.wav', // the sample looped 6x, ~66s (item 36)
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -85,6 +86,10 @@ export const HEADER_CLIP = FIXTURE_CLIPS[19];
 // The settings e2e's own trim (unique bytes; 1-8s, so it runs quickly once the queue
 // reaches it — item 32, ADR 0046).
 export const SETTINGS_CLIP = FIXTURE_CLIPS[21];
+// Item 36's follow-mode journey's own long clip (unique bytes — the playback test's
+// jfk-long.wav is already a finished task by the time this file runs, and the backend
+// deduplicates by content sha256, so re-uploading it would answer 409).
+export const FOLLOW_CLIP = FIXTURE_CLIPS[22];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
