@@ -218,5 +218,30 @@
       program = pkgs.lib.getExe self.packages.${system}.default;
       meta.description = "Start the Speech-to-Text app";
     };
+
+    # ADR 0036: the devenv's nixpkgs input is the flake's locked nixpkgs. `nix flake
+    # check` fails when the revs drift; `devenv update` rewrites devenv.lock to
+    # devenv.yaml's url. devenv.yaml is written as JSON on purpose, so the check is a
+    # plain jq read (JSON is a subset of YAML; devenv's parser accepts it). The check
+    # reads only flake.lock and devenv.yaml, so a nixpkgs bump or a devenv.yaml edit
+    # (not the parts' sources) rebuilds it.
+    checks.x86_64-linux.devenv-pin-sync = pkgs.runCommand "devenv-pin-sync" { } ''
+      flakeRev=$(
+        ${pkgs.jq}/bin/jq -r '.nodes.nixpkgs.locked.rev' ${./flake.lock}
+      )
+      devenvRev=$(
+        ${pkgs.jq}/bin/jq -r '.inputs.nixpkgs.url | split("/")[-1]' ${./devenv.yaml}
+      )
+      if [ -z "$devenvRev" ]; then
+        echo "devenv-pin-sync: devenv.yaml input \"nixpkgs\" must be a github:NixOS/nixpkgs/<rev> url" >&2
+        exit 1
+      fi
+      if [ "$flakeRev" != "$devenvRev" ]; then
+        echo "devenv-pin-sync: devenv.yaml pins nixpkgs $devenvRev but flake.lock has $flakeRev" >&2
+        echo "run '\''devenv update'\'' (or fix devenv.yaml) and re-enter the shell" >&2
+        exit 1
+      fi
+      echo "$flakeRev" > $out
+    '';
   };
 }
