@@ -242,14 +242,6 @@ export function TaskTranscriptView() {
     followModeSend({ type: 'SCROLLED' });
   };
 
-  const handleWheel = () => {
-    sendScrolled();
-  };
-
-  const handleTouchMove = () => {
-    sendScrolled();
-  };
-
   // The scroll keys' default is the browser scrolling the focused scroll container. A key
   // press whose default is already handled (Enter/Space on a segment button, which seek
   // instead of scrolling) is not scroll input.
@@ -462,8 +454,8 @@ export function TaskTranscriptView() {
             ref={transcriptRegionRef}
             role="region"
             aria-label="Transcript"
-            onWheel={handleWheel}
-            onTouchMove={handleTouchMove}
+            onWheel={sendScrolled}
+            onTouchMove={sendScrolled}
             onKeyDown={handleKeyDown}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
