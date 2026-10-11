@@ -3,7 +3,7 @@
 # bin/stt-app (bin/speech-to-text-app before item 16): a java wrapper that defaults
 # STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended), defaults
 # both models from nix/models.nix (a user-set value wins), and puts the pinned
-# whisper-cli 1.8.4 (Vulkan), ffmpeg, setsid and coreutils first on PATH (ADR 0047).
+# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
 # Nix evaluation happens on the user's machine - this file is unverified here.
 {
   description = "Speech-to-Text app (backend + bundled frontend, roadmap item 16)";
@@ -182,13 +182,14 @@
           # suite swaps in the tiny whisper model).
           # --prefix PATH: the backend runs whisper-cli, ffmpeg and setsid by name (ADR 0047);
           # the package's own tools come first, so a caller's PATH (e.g. the devenv's
-          # whisper-cli) cannot replace them.
+          # whisper-cli) cannot replace them. ffmpeg_8, not nixpkgs' default ffmpeg (9.0 at
+          # the locked rev): item 33's Gradle bootstrap syncs ffmpeg to the 8.1 branch.
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
             --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
             --set-default STT_WHISPER_MODEL ${models.whisper} \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
-            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg pkgs.util-linux pkgs.coreutils]} \
+            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg_8 pkgs.util-linux pkgs.coreutils]} \
             --set CLASSPATH "$CP" \
             --add-flags "stt.MainKt"
           runHook postInstall
