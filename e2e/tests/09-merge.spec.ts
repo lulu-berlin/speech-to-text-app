@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MERGE_CLIP } from '../lib/backend.mjs';
-import { appLive, uploadClips } from './helpers/ui';
+import { uploadAndOpen } from './helpers/ui';
 
 // The speaker labels of the transcript's turns, in order.
 async function turnSpeakers(page: Page): Promise<string[]> {
@@ -16,12 +16,7 @@ test('merging two speakers joins their turns, the merge is stored, and "Reset al
   page,
 }) => {
   test.setTimeout(240_000);
-  await appLive(page);
-  await uploadClips(page, [MERGE_CLIP]);
-  const notice = page.getByText(`${MERGE_CLIP} transcribed`);
-  await expect(notice).toBeVisible({ timeout: 180_000 });
-  await notice.getByRole('link', { name: 'open' }).click();
-  await expect(page.getByRole('heading', { name: MERGE_CLIP })).toBeVisible();
+  await uploadAndOpen(page, MERGE_CLIP);
   await expect.poll(() => turnSpeakers(page)).toEqual(['Speaker 1', 'Speaker 2', 'Speaker 1']);
 
   // Merge Speaker 2 into Speaker 1 through the form and its confirmation dialog.

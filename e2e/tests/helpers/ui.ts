@@ -76,6 +76,17 @@ export async function openTranscript(page: Page, filename: string) {
   await expect(page.getByRole('heading', { name: filename })).toBeVisible();
 }
 
+// Uploads one clip, waits until its finish notice says it is transcribed, and opens its
+// transcript from that notice.
+export async function uploadAndOpen(page: Page, clip: string) {
+  await appLive(page);
+  await uploadClips(page, [clip]);
+  const notice = page.getByText(`${clip} transcribed`);
+  await expect(notice).toBeVisible({ timeout: 240_000 });
+  await notice.getByRole('link', { name: 'open' }).click();
+  await expect(page.getByRole('heading', { name: clip })).toBeVisible();
+}
+
 // The text of each turn labelled with `speaker` in the transcript: the speaker's name sits
 // in a span right above the turn's text paragraph.
 export function turnTextOf(page: Page, speaker: string): Locator {
