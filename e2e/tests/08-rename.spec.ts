@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { openTranscript } from './helpers/ui';
+import { openTranscript, turnTextOf } from './helpers/ui';
 
 // The rename runs on task 2 (jfk-b.wav, the queue journey's second clip: one voice → one
 // speaker, default name "Speaker 1"), so task 1 keeps its default name for the transcript
@@ -18,14 +18,14 @@ test('a renamed speaker shows in the transcript, survives a reload, and labels a
   // Saved on Enter: the turn label follows the stored name.
   await nameField.fill(NEW_NAME);
   await nameField.press('Enter');
-  await expect(page.locator(`span:text-is("${NEW_NAME}") + p`)).toHaveCount(1);
-  await expect(page.locator('span:text-is("Speaker 1") + p')).toHaveCount(0);
+  await expect(turnTextOf(page, NEW_NAME)).toHaveCount(1);
+  await expect(turnTextOf(page, 'Speaker 1')).toHaveCount(0);
 
   // Stored on the server, not just in the page: after a reload the field and the turn label
   // still carry the new name.
   await page.reload();
   await expect(nameField).toHaveValue(NEW_NAME);
-  await expect(page.locator(`span:text-is("${NEW_NAME}") + p`)).toHaveCount(1);
+  await expect(turnTextOf(page, NEW_NAME)).toHaveCount(1);
 
   // A fresh download is labelled with the stored name (ADR 0034).
   const download = page.waitForEvent('download');

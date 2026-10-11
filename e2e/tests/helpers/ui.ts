@@ -76,6 +76,12 @@ export async function openTranscript(page: Page, filename: string) {
   await expect(page.getByRole('heading', { name: filename })).toBeVisible();
 }
 
+// The text of each turn labelled with `speaker` in the transcript: the speaker's name sits
+// in a span right above the turn's text paragraph.
+export function turnTextOf(page: Page, speaker: string): Locator {
+  return page.locator(`span:text-is("${speaker}") + p`);
+}
+
 // The positions of the first list item containing each name, in DOM order — the pending
 // queue's order (and the upload list's order while uploads are in flight). A missing
 // name is -1, so a poller can distinguish "not yet rendered".

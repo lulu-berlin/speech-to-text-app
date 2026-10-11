@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { JFK_QUOTE, openTranscript } from './helpers/ui';
+import { JFK_QUOTE, openTranscript, turnTextOf } from './helpers/ui';
 
 // The journey's first completed clip: item 3 uploaded jfk-a.wav first on this run's fresh
 // backend, so it is task 1 — the full 11 s JFK sample, one voice.
@@ -17,7 +17,7 @@ test('a completed clip opens its transcript with the expected turn and speaker l
   // One voice → one speaker → one turn. Speaker 0's default name follows the rule
   // "Speaker {speakerId + 1}", so the turn is labelled "Speaker 1"; its text, right below
   // the label, carries the known quote across the turn's segments.
-  const turnText = page.locator('span:text-is("Speaker 1") + p');
+  const turnText = turnTextOf(page, 'Speaker 1');
   await expect(turnText).toHaveCount(1);
   for (const phrase of JFK_QUOTE) {
     await expect(turnText).toContainText(phrase);
