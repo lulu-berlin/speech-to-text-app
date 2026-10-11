@@ -32,7 +32,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] A clip longer than the current stall point plays through to its end: `currentTime` reaches (about) the duration and `ended` fires, in the app
 - [ ] Seeking past the former stall point plays there (the file is seekable over its whole range: a Range request near the end returns audio, not a stall)
 - [ ] The served `/audio` file's duration matches the task's (within a small tolerance); the player does not report a longer duration than the file carries
-- [ ] A chunk whose decoded stream ends early (a short or truncated tail) joins without stalling the rest of the file
+- [x] A chunk whose decoded stream ends early (a short or truncated tail) joins without stalling the rest of the file
 - [ ] (e2e, ADR 0046) Against the real backend: the long clip plays past the former stall point — `17-follow-mode.spec.ts`'s audio-stall guard (or its replacement) no longer has to forgive the stall; playback advances past ~90 s of the 14× clip
 - [ ] (must not break) The audio tests and the playback e2e journey stay green
 
@@ -44,3 +44,5 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 ## Approval log
 
 - 2026-10-11: filed from the item 36 workspace's findings; consultation: two backend items (item 37 + this one). Test list approved; status `spec-approved`.
+- 2026-10-11 (workspace checkpoint, reproduction): on current main the stall does **not** reproduce in the sandbox (real backend, built frontend, store Chromium): the 14× clip plays 0 → 153 s continuously with `duration` 154, seeks to 120/130 decode, the served file's header (154 s) equals its decodable samples (2 464 000), the real `17-follow-mode.spec.ts` is green, and instrumented rounds reach segments at 83/98/116/131 s with the stall guard never firing. A truncated-tail chunk (declares 1 s, holds ~0.29 s) joins, under the current re-encode, into a file whose header equals its content; under the pre-ADR-0045 `-c copy` join the same chunks declare 16 000 samples while decoding 12 608 — the observed item-36 signature (declared ~154 s, stuck at ~90 s, `ended` never fires). Conclusion (confirmed by the user): item 29's ADR 0045 re-encode already fixed this item's bug; the approved list is now a regression-pin suite, backend items first.
+- 2026-10-11 (workspace, cycle 1, test-list item 4): green on arrival (regression pin). New `AudioJoinIntegrationSpec` scenario: a task whose first chunk ends early (declared 1 s, bytes cut to 70%, ~4 608 decodable samples) joins with a full 0.5 s tail into one file whose header equals its decodable content (T + 8 000 samples) — both assertions fail under the `-c copy` analog (16 000 vs 12 608). Approved refactor after the cycle: `joinStoredChunks` helper shared by both join scenarios. `gradle ktlintCheck` + `gradle integrationTest --tests stt.http.AudioJoinIntegrationSpec` green; committed `Test:` + `Refactor:` on the branch.
