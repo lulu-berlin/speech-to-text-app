@@ -287,6 +287,30 @@ describe('the transcript view', () => {
     }
   });
 
+  it('stops following on a wheel over the region: a hand scroll, even mid-follow', async () => {
+    const scrollIntoView = stubScrollIntoView();
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const region = screen.getByRole('region', { name: /transcript/i });
+
+    // The playhead is moving; the follow effect has fired (so following is active) when
+    // the wheel lands on the region mid-follow.
+    audio.currentTime = 1.0;
+    fireEvent(audio, new Event('timeupdate'));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    audio.currentTime = 6.0;
+    fireEvent(audio, new Event('timeupdate'));
+
+    fireEvent.wheel(region);
+    expect(screen.getByRole('button', { name: /back to playing position/i })).toBeInTheDocument();
+
+    // Stopped stays stopped: the advancing playhead no longer triggers follow scrolls.
+    scrollIntoView.mockClear();
+    audio.currentTime = 10.0;
+    fireEvent(audio, new Event('timeupdate'));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
   it('keeps the playing segment visible below the sticky header: the active segment carries a top scroll margin the size of the compact header', async () => {
     stubScrollIntoView();
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
