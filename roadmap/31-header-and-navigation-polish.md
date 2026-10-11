@@ -45,7 +45,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 
 - [x] The header stays at the top while the page scrolls (sticky, token background and bottom border) on Queue, History and the transcript
 - [x] At the top of a page the header shows the full-size mascot; once the page scrolls it shrinks to the compact size with an animated transition (instant under reduced motion), and grows back when scrolled to the top; the compact mascot keeps its typing/resting animation
-- [ ] Navigation links show a background pill on hover and a filled pill on the active link, from tokens, with a token transition; the keyboard focus ring stays visible
+- [x] Navigation links show a background pill on hover and a filled pill on the active link, from tokens, with a token transition; the keyboard focus ring stays visible
 - [ ] The header mascot (or the static logo) is a link to `/` with an accessible name; clicking it or pressing Enter lands on `/queue`
 - [ ] While an empty, loading or connecting placeholder shows the mascot, the header shows the small static logo instead; otherwise the header shows the animated mascot — never two animated mascots on screen
 - [ ] The transcript's follow mode keeps the playing segment visible below the sticky header
