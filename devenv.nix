@@ -78,7 +78,11 @@ in
       cwd = "frontend";
     };
     backend = {
-      exec = "gradle run";
+      # Dev runner (roadmap item 34): `gradle installDist` then start the installed
+      # server; rebuilds and restarts it when sources change, keeping the last working
+      # server on a build error. Not `gradle run`: the server must not run a second
+      # Gradle invocation alongside the continuous build.
+      exec = "bash dev-run.sh";
       cwd = "backend";
     };
   };
