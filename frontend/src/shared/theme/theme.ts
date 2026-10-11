@@ -136,6 +136,9 @@ export interface ThemeTokens {
     // The header shrinking to its compact size and growing back on scroll (item 31).
     shrinkDuration: string;
     shrinkEasing: string;
+    // The navigation pill's hover and state transitions (item 31).
+    navDuration: string;
+    navEasing: string;
   };
   // The type scale: sizes ascend, weights are the font's 400/500/600, line heights are
   // unitless (WCAG 1.4.12 asks for at least 1.5; the transcript reads more loosely).
@@ -245,6 +248,8 @@ const baseTokens = {
     slideEasing: 'ease-out',
     shrinkDuration: '0.2s',
     shrinkEasing: 'ease-out',
+    navDuration: '0.15s',
+    navEasing: 'ease-out',
   },
 };
 

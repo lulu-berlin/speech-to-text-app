@@ -66,11 +66,27 @@ const Nav = styled.nav`
 `;
 
 const NavItem = styled(NavLink)`
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
+  border-radius: ${(props) => props.theme.radii.pill};
   color: ${(props) => props.theme.colors.accent};
   text-decoration: none;
 
+  // The background pill (item 31): a soft surface pill behind a link on hover, filled
+  // for the active link. The transition is gated behind no-preference, so reduced
+  // motion switches states instantly; the keyboard focus ring stays as everywhere.
+  @media (prefers-reduced-motion: no-preference) {
+    transition-property: background-color, color;
+    transition-duration: ${(props) => props.theme.motion.navDuration};
+    transition-timing-function: ${(props) => props.theme.motion.navEasing};
+  }
+
+  &:hover {
+    background: ${(props) => props.theme.colors.surface};
+  }
+
   &.active {
-    text-decoration: underline;
+    background: ${(props) => props.theme.colors.accent};
+    color: ${(props) => props.theme.colors.accentText};
   }
 
   ${focusRing}
