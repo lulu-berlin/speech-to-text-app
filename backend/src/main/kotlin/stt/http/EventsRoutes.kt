@@ -162,6 +162,7 @@ private suspend fun Event.sseName(): String =
         is Event.QueueUpdated -> "queue-updated"
         is Event.SpeakersRenamed -> "speakers-renamed"
         is Event.SpeakersMerged -> "speakers-merged"
+        is Event.SettingsUpdated -> "settings-updated"
     }
 
 /** The event's `data:` JSON; the update event re-reads the task so its derived fields are current. */
@@ -191,6 +192,10 @@ private suspend fun Event.sseData(tasks: TaskRepository): String =
 
         is Event.SpeakersMerged -> {
             SseJson.encodeToString(SpeakersEventJson(id, speakers.map { it.toJson() }))
+        }
+
+        is Event.SettingsUpdated -> {
+            SseJson.encodeToString(settings.toEventJson())
         }
     }
 

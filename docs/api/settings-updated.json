@@ -1,0 +1,8 @@
+{
+  "device": "gpu:1",
+  "threads": 6,
+  "defaultLanguage": "de",
+  "speakersMode": "fixed",
+  "speakersCount": 3,
+  "maxSpeakers": 12
+}

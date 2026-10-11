@@ -135,11 +135,11 @@ internal val ALLOWED_EXTENSIONS: List<String> =
 /** The allowed extensions, space-joined in the contract file's order, for the rejection message. */
 private val ALLOWED_EXTENSIONS_LIST = ALLOWED_EXTENSIONS.joinToString(" ")
 
-/** The upper bound for a fixed speaker count and for `maxSpeakers` (item 12). */
-private const val MAX_SPEAKERS = 20
+/** The upper bound for a fixed speaker count and for `maxSpeakers` (item 12; the settings' defaults too, item 32). */
+internal const val MAX_SPEAKERS = 20
 
 /** The language codes of `docs/api/languages.json`, packaged under `src/main/resources` (parity: LanguagesContractSpec). */
-private val LANGUAGES: Set<String> =
+internal val LANGUAGES: Set<String> =
     Json
         .parseToJsonElement(
             Thread
