@@ -132,6 +132,17 @@ class ProcessingEngine internal constructor(
     }
 
     /**
+     * A new upload was committed as a QUEUED task ([id]): publishes the task and the queue, so clients add it
+     * to their queue list (item 13's contract: a `task-updated` for an unknown id is a new task), then wakes
+     * the worker. Published before the wake, so the QUEUED update always precedes the worker's RUNNING one.
+     */
+    suspend fun taskCreated(id: Long) {
+        publish(id)
+        queueUpdated()
+        wake()
+    }
+
+    /**
      * Pauses the queue: no further task starts until [resumeQueue], and the process of a task already
      * running is frozen (SIGSTOP; a no-op when no process is in flight).
      */

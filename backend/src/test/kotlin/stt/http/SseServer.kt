@@ -70,6 +70,25 @@ internal class SseServer(
         return response.statusCode() to response.body()
     }
 
+    /** One upload to `POST /api/tasks`: a multipart body with only the `file` part; its status and response text. */
+    fun upload(
+        fileName: String,
+        bytes: ByteArray,
+    ): Pair<Int, String> {
+        val boundary = "stt-test-boundary"
+        val head =
+            "--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n" +
+                "Content-Type: application/octet-stream\r\n\r\n"
+        val body = head.toByteArray() + bytes + "\r\n--$boundary--\r\n".toByteArray()
+        val request =
+            HttpRequest
+                .newBuilder(URI("$base/api/tasks"))
+                .header("Content-Type", "multipart/form-data; boundary=$boundary")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
+        val response = http.send(request.build(), HttpResponse.BodyHandlers.ofString())
+        return response.statusCode() to response.body()
+    }
+
     /** Opens one events stream (one per call, like one browser tab each); every reader is closed with the server. */
     fun connectEvents(): SseTestReader {
         val body =
