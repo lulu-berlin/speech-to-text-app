@@ -15,6 +15,9 @@ internal class FakeTranscriber : Transcriber {
     /** The audio file of every call, in call order. */
     val audioFiles = mutableListOf<Path>()
 
+    /** The whisper-cli settings of every call, in call order (item 32: device and threads per run). */
+    val settings = mutableListOf<WhisperSettings>()
+
     /** The audio file of every call, as the call starts, so a test can wait for the worker to be inside one. */
     val entered = Channel<Path>(Channel.UNLIMITED)
 
@@ -56,6 +59,7 @@ internal class FakeTranscriber : Transcriber {
     ): List<WhisperSegment> =
         probe.around {
             audioFiles.add(audio)
+            this.settings.add(settings)
             entered.send(audio)
             try {
                 if (audioFiles.size >= holdFrom) hold?.await()

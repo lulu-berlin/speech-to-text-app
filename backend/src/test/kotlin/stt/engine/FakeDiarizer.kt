@@ -24,14 +24,19 @@ internal class FakeDiarizer : Diarizer {
     /** The whole-file PCM of every call, in order. */
     val pcms = mutableListOf<FloatArray>()
 
+    /** The speaker-model thread count of every call, in order (item 32). */
+    val threads = mutableListOf<Int?>()
+
     override suspend fun diarize(
         task: StoredTask,
         gate: PauseGate,
         pcm: FloatArray,
+        threads: Int?,
         onStage: (DiarizationStage) -> Unit,
         onProgress: (Double) -> Unit,
     ) {
         diarized.add(task.id)
+        this.threads.add(threads)
         pcms.add(pcm)
         entered.send(task.id)
         hold?.await()

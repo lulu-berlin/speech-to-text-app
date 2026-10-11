@@ -16,6 +16,7 @@ import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
+import stt.db.SettingsRepository
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.diarization.SpeakerDiarizer
@@ -35,7 +36,7 @@ fun Application.processingEngine(config: Config) {
     dependencies {
         // One runner for every external process: it is single-flight (ADR 0020) and is the engine's pause control.
         provide<ProcessRunner> { ProcessRunner() }
-        provide<SpeakerDiarizer> { SpeakerDiarizer(config.speakerModel, config.threads, SegmentRepository(resolve())) }
+        provide<SpeakerDiarizer> { SpeakerDiarizer(config.speakerModel, SegmentRepository(resolve())) }
         provide<ProcessingEngine> {
             val db: Database = resolve()
             val workDirectories: TaskWorkDirectories = resolve()
@@ -47,6 +48,7 @@ fun Application.processingEngine(config: Config) {
                 chunks = ChunkRepository(db),
                 segments = SegmentRepository(db),
                 queueState = QueueStateRepository(db),
+                settings = resolve<SettingsRepository>(),
                 workDirectories = workDirectories,
                 chunker = AudioChunker(runner),
                 transcriber = ChunkTranscriber(runner),
