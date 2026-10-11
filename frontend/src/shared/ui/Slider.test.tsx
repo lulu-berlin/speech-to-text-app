@@ -43,4 +43,18 @@ describe('the slider', () => {
     const disabled = screen.getByRole('slider', { name: 'Off' });
     expect(disabled).toHaveAttribute('aria-disabled', 'true');
   });
+
+  it("is its thumb's positioning context, so the thumb travels within the slider's own track", () => {
+    renderThemed(<Slider value={40} max={100} onChange={() => undefined} label="Seek" />);
+
+    // Radix places the thumb's wrapper with `position: absolute` and `left: <value>%`, measured
+    // against the nearest positioned ancestor. The slider's root must be that ancestor;
+    // otherwise the percentage resolves against something wider up the page (item 29: the
+    // thumb spanned the page width while the fill stayed in the bar). jsdom does no layout,
+    // so the rule is checked on the computed styles.
+    const wrapper = required(screen.getByRole('slider', { name: 'Seek' }).parentElement);
+    expect(getComputedStyle(wrapper).position).toBe('absolute');
+    const root = required(wrapper.parentElement);
+    expect(getComputedStyle(root).position).toBe('relative');
+  });
 });
