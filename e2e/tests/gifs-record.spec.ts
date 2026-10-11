@@ -292,8 +292,9 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await expect(back).toBeHidden();
       expect(await pageScrollY()).toBe(framedAt);
       expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
-      // Run the playback to its end, so the video closes on the last highlighted
-      // segment (user: "never shows the last segment highlighted").
+      // Run the playback to its end — the audio's own end, not just the last segment's
+      // start — so the video closes on the last highlighted segment with the player at
+      // its full duration (user: "it would be nice to see it getting to the end").
       const lastIndex = await region.evaluate(
         (element) => element.querySelectorAll('[role="button"]').length - 1,
       );
@@ -308,6 +309,12 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
           { timeout: 60_000 },
         )
         .toBe(lastIndex);
+      await expect
+        .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.ended), {
+          timeout: 60_000,
+        })
+        .toBe(true);
+      await expect.poll(activeInView).toBe(true);
       await expect(back).toBeHidden();
       expect(await pageScrollY()).toBe(framedAt);
       await page.waitForTimeout(1_500);
