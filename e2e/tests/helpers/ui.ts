@@ -61,6 +61,21 @@ export async function uploadClips(page: Page, names: string[]) {
   );
 }
 
+// The quote of the JFK sample, as two phrases (the model's punctuation is not pinned).
+export const JFK_QUOTE = [
+  /ask not what your country can do for you/i,
+  /ask what you can do for your country/i,
+];
+
+// Opens a completed task's transcript from History by its filename; the transcript page
+// shows the filename as its heading.
+export async function openTranscript(page: Page, filename: string) {
+  await appLive(page);
+  await page.getByRole('link', { name: 'History' }).click();
+  await page.getByRole('link', { name: filename }).click();
+  await expect(page.getByRole('heading', { name: filename })).toBeVisible();
+}
+
 // The positions of the first list item containing each name, in DOM order — the pending
 // queue's order (and the upload list's order while uploads are in flight). A missing
 // name is -1, so a poller can distinguish "not yet rendered".
