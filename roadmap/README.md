@@ -112,5 +112,5 @@ graph TD
 | [28 — Post-merge cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [29 — Post-merge bug fixes: engine wake, seek bar, audio join, SSE disconnect](../docs/specs/post-merge-bug-fixes.md) | done | — |
 | [30 — Diarization crash on the user's machine (ONNX Runtime recursion)](../docs/specs/onnxruntime-pin.md) | done | — |
-| [31 — Header and navigation polish](31-header-and-navigation-polish.md) | draft | 17, 25, 21 |
-| [32 — Settings page: device, threads and upload defaults](32-settings-page-device-selection.md) | draft | 11, 12, 13, 21 |
+| [31 — Header and navigation polish](31-header-and-navigation-polish.md) | spec-approved | 17, 25, 21 |
+| [32 — Settings page: device, threads and upload defaults](32-settings-page-device-selection.md) | spec-approved | 11, 12, 13, 21 |
