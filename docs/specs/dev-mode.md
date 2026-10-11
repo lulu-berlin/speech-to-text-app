@@ -1,6 +1,6 @@
-# 34 — Dev mode: frontend and backend with one command
+# Dev mode: frontend and backend with one command
 
-Status: in-review
+Status: done (roadmap item 34, merged 2026-10-11)
 Depends on: —
 
 ## Goal
@@ -12,8 +12,8 @@ One command in the devenv shell starts the whole app for development: the Vite d
 - User requests (2026-10-11): an easy way to run the whole app in dev mode, frontend and backend; hot reload is a bonus.
 - **The command (user, 2026-10-11):** `devenv up` (devenv processes); item 33 adds `./gradlew dev` for users without Nix on top of this item.
 - Today: `pnpm dev` (Vite, proxies `/api` to `http://localhost:8080`) and `gradle run` with `STT_DATA_DIR` set, in two terminals (AGENTS.md § Commands).
-- [ADR 0046](../docs/decisions/0046-every-feature-has-an-e2e-test.md): developer tooling, not an app feature: exempt from its own Playwright test.
-- [ADR 0010](../docs/decisions/0010-development-toolchain.md): any tool this needs comes from `devenv.nix`.
+- [ADR 0046](../decisions/0046-every-feature-has-an-e2e-test.md): developer tooling, not an app feature: exempt from its own Playwright test.
+- [ADR 0010](../decisions/0010-development-toolchain.md): any tool this needs comes from `devenv.nix`.
 
 ## Proposal
 
@@ -73,3 +73,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-11: consultation answers: restart on change (no Ktor auto-reload); running tasks resume through restart recovery; no browser opening. Proposed test list (8 items). Remaining: test list approval.
 - 2026-10-11: test list approved by the user; status `spec-approved`.
 - 2026-10-11: all test-list items green (two discovered items appended and confirmed with the user: the stop hint, and the SIGTERM-interruption fix in `ProcessRunner`); status `in-review`.
+- 2026-10-11: merged into `main` (head `cb4039b1`) after the user approved the diff. Dev mode is `devenv up`: a frontend process (`pnpm install && pnpm dev`, Vite HMR proxying `/api`) and a backend process (`backend/dev-run.sh` — `gradle installDist`, restart on source change, keep the last working server on a compile error), dev data in `.devenv/state/stt`. Discovered in-cycle and approved: the stop hint, and SIGTERM (exit 143) surfacing as an interruption in `ProcessRunner` so an in-flight task resumes instead of failing. Spec and final test list moved here from `roadmap/34-dev-mode.md`.
