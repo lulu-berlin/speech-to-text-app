@@ -5,6 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
+import stt.config.Device
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSegment
 import stt.transcribe.WhisperSettings
@@ -48,6 +49,9 @@ internal class FakeTranscriber : Transcriber {
     /** When set, the next call throws it instead of returning, like a failing whisper-cli run; then it is cleared. */
     var failNext: Throwable? = null
 
+    /** When set, every call with a GPU chosen reports it unavailable, like whisper-cli on a machine without that GPU (item 32). */
+    var gpuUnavailable = false
+
     val probe = ConcurrencyProbe()
 
     override suspend fun transcribe(
@@ -56,6 +60,7 @@ internal class FakeTranscriber : Transcriber {
         outputPrefix: Path,
         prompt: String?,
         onProgress: (Double) -> Unit,
+        onGpuUnavailable: suspend () -> Unit,
     ): List<WhisperSegment> =
         probe.around {
             audioFiles.add(audio)
@@ -78,6 +83,7 @@ internal class FakeTranscriber : Transcriber {
                 throw failure
             }
             progressScript.forEach(onProgress)
+            if (gpuUnavailable && settings.device is Device.Gpu) onGpuUnavailable()
             segmentsByTask[taskIdOf(audio.parent)].orEmpty()
         }
 }

@@ -5,6 +5,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
@@ -18,7 +19,7 @@ import stt.db.SpeakersMode
 import stt.engine.ProcessingEngine
 import stt.transcribe.GpuDevice
 
-/** The body of `GET /api/settings` and the `200` of `PUT /api/settings` (item 32's contract, `docs/api/settings*.json`). */
+/** The body of `GET /api/settings` and the `200` of the settings writes (item 32's contract, `docs/api/settings*.json`). */
 @Serializable
 data class SettingsJson(
     val device: String,
@@ -27,12 +28,25 @@ data class SettingsJson(
     val speakersMode: String,
     val speakersCount: Int?,
     val maxSpeakers: Int,
+    val deviceFallback: String?,
     val availableDevices: List<String>,
 )
 
-/** The body of `PUT /api/settings` and the `settings-updated` payload (item 32, `docs/api/settings-updated*.json`). */
+/** The `settings-updated` payload (item 32, `docs/api/settings-updated*.json`): the settings without the device choices. */
 @Serializable
 data class SettingsEventJson(
+    val device: String,
+    val threads: Int?,
+    val defaultLanguage: String,
+    val speakersMode: String,
+    val speakersCount: Int?,
+    val maxSpeakers: Int,
+    val deviceFallback: String?,
+)
+
+/** The body of `PUT /api/settings` (item 32): the settings the user sets — the fallback notice is not one of them. */
+@Serializable
+data class SettingsRequest(
     val device: String,
     val threads: Int?,
     val defaultLanguage: String,
@@ -42,8 +56,9 @@ data class SettingsEventJson(
 )
 
 /**
- * The settings endpoints (item 32): read them with the GPUs the startup probe reported as choices, or write them
- * as a whole — validated in contract order, stored, answered and published as `settings-updated`.
+ * The settings endpoints (item 32): read them with the GPUs the startup probe reported as choices; write them as a
+ * whole — validated in contract order, stored (which clears the CPU-fallback notice), answered and published as
+ * `settings-updated`; or dismiss the CPU-fallback notice, answered and published the same way.
  */
 fun Application.settingsRoutes(gpus: List<GpuDevice>) {
     val settings: SettingsRepository by dependencies
@@ -54,7 +69,7 @@ fun Application.settingsRoutes(gpus: List<GpuDevice>) {
         }
 
         put("/api/settings") {
-            when (val request = call.receive<SettingsEventJson>().validate()) {
+            when (val request = call.receive<SettingsRequest>().validate()) {
                 is Validated.Rejected -> {
                     call.respondError(HttpStatusCode.BadRequest, request.code, request.message)
                 }
@@ -65,6 +80,12 @@ fun Application.settingsRoutes(gpus: List<GpuDevice>) {
                     call.respond(request.settings.toJson(gpus))
                 }
             }
+        }
+
+        delete("/api/settings/device-fallback") {
+            val dismissed = settings.dismissDeviceFallback()
+            engine.settingsUpdated(dismissed)
+            call.respond(dismissed.toJson(gpus))
         }
     }
 }
@@ -82,7 +103,7 @@ private sealed interface Validated {
 }
 
 /** Validates in contract order: device, threads, language, speakers, max speakers; the first failure wins. */
-private fun SettingsEventJson.validate(): Validated {
+private fun SettingsRequest.validate(): Validated {
     val parsedDevice =
         runCatching { parseStoredDevice(device) }.getOrNull()
             ?: return Validated.Rejected(
@@ -119,6 +140,7 @@ internal fun Settings.toJson(gpus: List<GpuDevice>): SettingsJson =
         speakersMode = speakersMode.dbValue,
         speakersCount = speakersCount,
         maxSpeakers = defaultMaxSpeakers,
+        deviceFallback = deviceFallback?.dbValue(),
         availableDevices = listOf(Device.Cpu.dbValue(), Device.Auto.dbValue()) + gpus.map { Device.Gpu(it.index).dbValue() },
     )
 
@@ -131,4 +153,5 @@ internal fun Settings.toEventJson(): SettingsEventJson =
         speakersMode = speakersMode.dbValue,
         speakersCount = speakersCount,
         maxSpeakers = defaultMaxSpeakers,
+        deviceFallback = deviceFallback?.dbValue(),
     )

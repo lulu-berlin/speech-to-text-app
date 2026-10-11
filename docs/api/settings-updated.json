@@ -4,5 +4,6 @@
   "defaultLanguage": "de",
   "speakersMode": "fixed",
   "speakersCount": 3,
-  "maxSpeakers": 12
+  "maxSpeakers": 12,
+  "deviceFallback": null
 }

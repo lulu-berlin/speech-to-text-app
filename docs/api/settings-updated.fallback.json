@@ -1,0 +1,9 @@
+{
+  "device": "cpu",
+  "threads": null,
+  "defaultLanguage": "auto",
+  "speakersMode": "auto",
+  "speakersCount": null,
+  "maxSpeakers": 8,
+  "deviceFallback": "gpu:1"
+}
