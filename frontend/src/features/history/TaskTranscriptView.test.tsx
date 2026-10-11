@@ -25,6 +25,14 @@ function renderTranscript(taskId: string) {
   return screen.findByText('Live');
 }
 
+// jsdom has no scrollIntoView, which the follow scroll calls; a test that wants to observe
+// follow scrolls (or one that just needs the call to not throw) stubs it. The prototype
+// assignment and the spy are the same stub, so the call sites share it.
+function stubScrollIntoView(): Mock {
+  Element.prototype.scrollIntoView = vi.fn();
+  return vi.spyOn(Element.prototype as never, 'scrollIntoView') as unknown as Mock;
+}
+
 // A navigation renders a whole other view; under a loaded test run that can take longer than
 // Testing Library's 1 s default (seen with two suites in parallel), so the waits that follow a
 // navigation get more time. The assertion is unchanged; a view that never arrives still fails.
@@ -202,12 +210,7 @@ describe('the transcript view', () => {
   });
 
   it('keeps the highlighted segment in view while playing, stops on a hand scroll, and resumes', async () => {
-    // jsdom has no scrollIntoView; the component calls it, so stub it on the prototype.
-    Element.prototype.scrollIntoView = vi.fn();
-    const scrollIntoView = vi.spyOn(
-      Element.prototype as never,
-      'scrollIntoView',
-    ) as unknown as ReturnType<typeof vi.fn>;
+    const scrollIntoView = stubScrollIntoView();
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
     const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
     const region = screen.getByRole('region', { name: /transcript/i });
@@ -235,12 +238,7 @@ describe('the transcript view', () => {
   });
 
   it('holds following when its own scroll event arrives after the next macrotask (the hold-off race)', async () => {
-    // jsdom has no scrollIntoView; the component calls it, so stub it on the prototype.
-    Element.prototype.scrollIntoView = vi.fn();
-    const scrollIntoView = vi.spyOn(
-      Element.prototype as never,
-      'scrollIntoView',
-    ) as unknown as Mock;
+    const scrollIntoView = stubScrollIntoView();
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
     const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
     const region = screen.getByRole('region', { name: /transcript/i });
@@ -265,7 +263,7 @@ describe('the transcript view', () => {
   });
 
   it('keeps the playing segment visible below the sticky header: the active segment carries a top scroll margin the size of the compact header', async () => {
-    Element.prototype.scrollIntoView = vi.fn();
+    stubScrollIntoView();
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
     const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
 
