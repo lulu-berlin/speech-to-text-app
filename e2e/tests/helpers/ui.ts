@@ -44,3 +44,11 @@ export async function expectLiveQueue(page: Page) {
 export function mascotAbove(page: Page, label: string): Locator {
   return page.locator(`svg + p:has-text("${label}"), span:has-text("${label}") > svg`);
 }
+
+// The positions of the first list item containing each name, in DOM order — the pending
+// queue's order (and the upload list's order while uploads are in flight). A missing
+// name is -1, so a poller can distinguish "not yet rendered".
+export async function rowOrder(page: Page, names: string[]): Promise<number[]> {
+  const items = await page.getByRole('listitem').allTextContents();
+  return names.map((name) => items.findIndex((text) => text.includes(name)));
+}

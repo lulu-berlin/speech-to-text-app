@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  FIXTURE_CLIPS,
   checkPreconditions,
   choosePort,
   loadState,
@@ -19,10 +20,12 @@ export default async function globalSetup() {
   checkPreconditions();
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-'));
   const fixturesDir = mkdtempSync(join(tmpdir(), 'stt-e2e-fixtures-'));
-  // The journey's clips: the committed LibriSpeech sample plus two distinct trims of it.
-  // The backend rejects duplicate audio by content sha256, so the queued tasks need
-  // different bytes; the trims are still real speech for the tiny model.
-  copyFileSync(process.env.TEST_JFK_WAV, join(fixturesDir, 'jfk-a.wav'));
+  // The journey's clips: the committed LibriSpeech sample (FIXTURE_CLIPS[0]) plus two
+  // distinct trims of it. The backend rejects duplicate audio by content sha256, so the
+  // queued tasks need different bytes; the trims are still real speech for the tiny
+  // model.
+  const [clipA, clipB, clipC] = FIXTURE_CLIPS;
+  copyFileSync(process.env.TEST_JFK_WAV, join(fixturesDir, clipA));
   execFileSync('ffmpeg', [
     '-y',
     '-loglevel',
@@ -31,7 +34,7 @@ export default async function globalSetup() {
     process.env.TEST_JFK_WAV,
     '-t',
     '6',
-    join(fixturesDir, 'jfk-b.wav'),
+    join(fixturesDir, clipB),
   ]);
   execFileSync('ffmpeg', [
     '-y',
@@ -43,7 +46,7 @@ export default async function globalSetup() {
     '7',
     '-i',
     process.env.TEST_JFK_WAV,
-    join(fixturesDir, 'jfk-c.wav'),
+    join(fixturesDir, clipC),
   ]);
   const port = await choosePort();
   saveState({ port, dataDir, fixturesDir });
