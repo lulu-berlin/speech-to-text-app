@@ -272,14 +272,15 @@ describe('the transcript view', () => {
     // scroll the scroll event arrives late, as it does in a browser. Following must hold
     // through all of them (item 36).
     const followCues = [1.0, 6.0, 10.0]; // inside [0,2100), [5800,9100) and [9600,14250).
-    for (const cueSeconds of followCues) {
+    for (const [index, cueSeconds] of followCues.entries()) {
       audio.currentTime = cueSeconds;
       fireEvent(audio, new Event('timeupdate'));
       const { promise: tick, resolve: resolveTick } = Promise.withResolvers<void>();
       setTimeout(resolveTick, 0);
       await tick;
       fireEvent.scroll(region);
-      expect(scrollIntoView).toHaveBeenCalled();
+      // Each cue is its own follow scroll: the call count grows one per cue.
+      expect(scrollIntoView).toHaveBeenCalledTimes(index + 1);
       expect(
         screen.queryByRole('button', { name: /back to playing position/i }),
       ).not.toBeInTheDocument();
