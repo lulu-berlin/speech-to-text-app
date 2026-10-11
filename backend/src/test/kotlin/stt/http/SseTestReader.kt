@@ -11,8 +11,14 @@ import java.util.concurrent.TimeUnit
  */
 internal class SseTestReader(
     private val reader: BufferedReader,
-) {
+) : AutoCloseable {
     private val pool = Executors.newSingleThreadExecutor()
+
+    /** Drops this subscriber's connection, as a closed browser tab does. */
+    override fun close() {
+        reader.close()
+        pool.shutdownNow()
+    }
 
     fun readEvent(): Pair<String, String> {
         var name: String? = null

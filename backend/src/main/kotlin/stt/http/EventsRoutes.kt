@@ -9,6 +9,7 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respondTextWriter
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.utils.io.ClosedByteChannelException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.Serializable
@@ -22,7 +23,8 @@ import java.io.Writer
  * The live events stream (ADR 0007, ADR 0038): `GET /api/events` speaks SSE by hand over Ktor's streaming
  * writer — every frame is `event: <name>\ndata: <json>\n\n`, flushed after each event, `Cache-Control:
  * no-cache`. The first frame is always `snapshot` (all tasks + the queue), so applying every event twice is
- * harmless and a reconnect needs no refetch; `task-updated` carries the full task.
+ * harmless and a reconnect needs no refetch; `task-updated` carries the full task. A subscriber that goes
+ * away (a closed tab) ends its own stream quietly; the others are unaffected.
  */
 fun Application.eventsRoutes() {
     val stream: EventStream by dependencies
@@ -31,28 +33,33 @@ fun Application.eventsRoutes() {
     routing {
         get("/api/events") {
             call.response.header(HttpHeaders.CacheControl, "no-cache")
-            call.respondTextWriter(
-                contentType = ContentType("text", "event-stream"),
-                status = HttpStatusCode.OK,
-            ) {
-                writeEvent(
-                    "snapshot",
-                    SseJson.encodeToString(
-                        SnapshotJson(
-                            tasks = tasks.listDetails().map { it.toJson() },
-                            queue = QueueJson(paused = queueState.isPaused(), taskIds = tasks.pendingOrderedIds()),
+            try {
+                call.respondTextWriter(
+                    contentType = ContentType("text", "event-stream"),
+                    status = HttpStatusCode.OK,
+                ) {
+                    writeEvent(
+                        "snapshot",
+                        SseJson.encodeToString(
+                            SnapshotJson(
+                                tasks = tasks.listDetails().map { it.toJson() },
+                                queue = QueueJson(paused = queueState.isPaused(), taskIds = tasks.pendingOrderedIds()),
+                            ),
                         ),
-                    ),
-                )
-                flush()
-                try {
-                    pumpEvents(stream.events) { engineEvent ->
-                        writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
-                        flush()
+                    )
+                    flush()
+                    try {
+                        pumpEvents(stream.events) { engineEvent ->
+                            writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
+                            flush()
+                        }
+                    } catch (_: FellBehindException) {
+                        // Deliberate end of the stream; nothing more to write.
                     }
-                } catch (_: FellBehindException) {
-                    // Deliberate end of the stream; nothing more to write.
                 }
+            } catch (_: ClosedByteChannelException) {
+                // The subscriber disconnected (item 29): an ordinary end for SSE, not an error. Caught around the
+                // whole response because the writer's own closing flush hits the same closed channel.
             }
         }
     }
