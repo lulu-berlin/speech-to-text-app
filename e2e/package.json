@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "prettier --check . && playwright test",
+    "record:gifs": "playwright test --config=playwright.gifs.config.ts",
     "format": "prettier --write ."
   },
   "devDependencies": {
