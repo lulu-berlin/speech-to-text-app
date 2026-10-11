@@ -1,12 +1,13 @@
 # Minimal flake building both parts (roadmap item 02, decision 7; ADR 0014 as amended
-# by ADR 0016). The app wrapper (bin/speech-to-text-app) ships in item 02 (ADR 0016);
+# by ADR 0016). The app wrapper ships in item 02 (ADR 0016) as bin/speech-to-text-app,
+# renamed to bin/stt-app in roadmap item 16;
 # since item 03 it refuses to start without STT_DATA_DIR (ADR 0017: one stderr line,
 # non-zero exit, no default); since item 08 it defaults STT_SPEAKER_MODEL to the pinned
 # CAM++ model from nix/models.nix (ADR 0003; a user-set value wins). Full STT_* env
 # wiring, models, and nix run . are finished in roadmap item 16.
 # Nix evaluation happens on the user's machine - this file is unverified here.
 {
-  description = "Speech-to-Text app (backend + frontend build check, roadmap item 02)";
+  description = "Speech-to-Text app (backend + bundled frontend, roadmap item 16)";
 
   inputs = {
     # Shared-with-devenv pin question is roadmap item 16's open question (ADR 0014).
@@ -128,7 +129,7 @@
     packages.x86_64-linux = {
       inherit backend frontend;
 
-      # `nix build .` builds both parts and provides bin/speech-to-text-app, which
+      # `nix build .` builds both parts and provides bin/stt-app, which
       # starts the backend serving the bundled frontend. A real derivation (not
       # symlinkJoin) so the wrapper can hard-code the store paths via makeWrapper.
       default = pkgs.stdenv.mkDerivation {
@@ -155,8 +156,8 @@
           # sign below, so the wrapper (not Nix) expands the variable.
           # --set-default STT_SPEAKER_MODEL: the pinned CAM++ model (nix/models.nix, ADR 0003)
           # unless the user sets one; item 16 may revisit this with the rest of the model wiring.
-          makeWrapper ${pkgs.jre}/bin/java $out/bin/speech-to-text-app \
-            --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then echo "speech-to-text-app: STT_DATA_DIR must be set to the data directory (it holds stt.db)" >&2; exit 1; fi' \
+          makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
+            --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then echo "stt-app: STT_DATA_DIR must be set to the data directory (it holds stt.db)" >&2; exit 1; fi' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
             --set CLASSPATH "$CP" \
