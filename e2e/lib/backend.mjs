@@ -52,6 +52,7 @@ export const FIXTURE_CLIPS = [
   'jfk-k.wav', // the sample looped 7x, ~77s
   'jfk-l.wav', // 0-4s
   'jfk-m.wav', // 0-5s
+  'jfk-n.wav', // the sample looped 8x, ~88s
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -72,6 +73,9 @@ export const BROKEN2_CLIP = FIXTURE_CLIPS[15];
 // the queue is left unpaused and the clip never reaches COMPLETED).
 export const SHOT_CLIP = FIXTURE_CLIPS[16];
 export const SHOT_UPLOAD_CLIP = FIXTURE_CLIPS[17];
+// The header/navigation test's own long clip (unique bytes; looped, so its transcript
+// scrolls in a short viewport — item 31).
+export const HEADER_CLIP = FIXTURE_CLIPS[19];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
