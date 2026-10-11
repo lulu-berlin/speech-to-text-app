@@ -229,6 +229,7 @@ class ProcessingEngine internal constructor(
         withContext(NonCancellable) {
             tasks.delete(id)
             deleteCachedAudio(id)
+            removeWorkDir(id)
             _events.emit(Event.TaskDeleted(id))
         }
         queueUpdated()
@@ -672,6 +673,19 @@ class ProcessingEngine internal constructor(
             deleteTree(dir)
         } catch (e: Exception) {
             logger.warn("Could not remove the completed task's work directory {}: {}", dir, e.toString())
+        }
+    }
+
+    /**
+     * Removes the deleted task's work directory; best effort like the cached audio, so a failed removal
+     * only leaves a directory the startup sweep removes (the sweep's orphan rule, item 15).
+     */
+    private suspend fun removeWorkDir(id: Long) {
+        val dir = workDirectories.workDir(id)
+        try {
+            deleteTree(dir)
+        } catch (e: Exception) {
+            logger.warn("Could not remove deleted task $id's work directory {}: {}", dir, e.toString())
         }
     }
 
