@@ -1,5 +1,6 @@
 package stt.process
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -81,6 +82,13 @@ class ProcessRunner internal constructor(
                 // A cancel that landed during spawn surfaces here, where the failure path kills the tree.
                 ensureActive()
                 val exitCode = awaitExit(process)
+                // A SIGTERM death (exit 143 = 128 + 15) is an interruption, not a failure: shutdown or an
+                // external TERM killed the tree while the caller waited (roadmap item 34, discovered).
+                // Surface it as a cancellation so the engine leaves the task RUNNING for restart recovery
+                // (ADR 0004) instead of recording FAILED — this covers whisper-cli and ffmpeg alike.
+                if (exitCode == 143) {
+                    throw CancellationException("process was terminated by SIGTERM (exit 143)")
+                }
                 ProcessResult(exitCode, stdout.await(), stderr.await())
             } catch (e: Throwable) {
                 // Any failure, not only cancellation: a callback that throws after the direct child

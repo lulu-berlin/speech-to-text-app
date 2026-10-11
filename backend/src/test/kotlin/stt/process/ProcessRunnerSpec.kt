@@ -71,6 +71,24 @@ class ProcessRunnerSpec :
             }
         }
 
+        given("a process killed by SIGTERM (exit 143, as on a shutdown)") {
+            `when`("running it") {
+                then("run surfaces the interruption as a cancellation, so a shutdown never looks like a task failure") {
+                    // Roadmap item 34 (discovered): stopping `devenv up` TERMs the process tree while the server
+                    // is still running; the engine maps CancellationException to "leave RUNNING", so restart
+                    // recovery (ADR 0004) resumes whisper and ffmpeg runs instead of failing the task.
+                    val exception =
+                        withTimeout(10.seconds) {
+                            shouldThrow<CancellationException> {
+                                ProcessRunner().run(listOf("sh", "-c", "kill -TERM \$\$"))
+                            }
+                        }
+
+                    exception.message.shouldContain("143")
+                }
+            }
+        }
+
         given("a command that writes two stderr lines") {
             `when`("running it with an onStderrLine callback") {
                 then("each stderr line reaches the callback in order") {
