@@ -56,6 +56,13 @@ const SegmentButton = styled.span<{ $active: boolean }>`
   background: ${(props) => (props.$active ? props.theme.colors.accent : 'transparent')};
   color: ${(props) => (props.$active ? props.theme.colors.accentText : 'inherit')};
   cursor: pointer;
+  // Follow mode (item 31): the active segment is scrolled into view while playing, and
+  // the browser honors the target's scroll margin for every scrolled ancestor, so this
+  // top margin — the compact header's height, the compact mascot plus the border —
+  // keeps the playing segment clear of the sticky header.
+  scroll-margin-top: calc(
+    ${(props) => props.theme.sizes.stenoCompact} + ${(props) => props.theme.borderWidths.thin}
+  );
   ${focusRing}
 `;
 
