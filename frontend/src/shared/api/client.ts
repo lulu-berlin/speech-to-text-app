@@ -5,6 +5,7 @@ import type {
   ServerEvent,
   StreamEvent,
   Settings,
+  SettingsUpdate,
   Snapshot,
   Speakers,
   Task,
@@ -52,6 +53,13 @@ export async function getTurns(id: number): Promise<Turns> {
 // devices to choose from.
 export async function getSettings(): Promise<Settings> {
   const response = await fetch('/api/settings');
+  return json<Settings>(response);
+}
+
+// Item 32 contract: DELETE /api/settings/device-fallback -> 200 Settings, the CPU-fallback
+// notice cleared.
+export async function dismissDeviceFallback(): Promise<Settings> {
+  const response = await fetch('/api/settings/device-fallback', { method: 'DELETE' });
   return json<Settings>(response);
 }
 
@@ -212,6 +220,10 @@ export function subscribeToEvents(
       type: 'speakers-merged',
       id,
       speakers,
+    }));
+    listen<SettingsUpdate>('settings-updated', (settings) => ({
+      type: 'settings-updated',
+      settings,
     }));
     next.addEventListener('heartbeat', watch);
     next.addEventListener('error', () => {
