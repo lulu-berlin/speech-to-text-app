@@ -194,8 +194,18 @@
             --add-flags "stt.MainKt"
           runHook postInstall
         '';
-        meta.description = "Speech-to-Text app (backend + bundled frontend)";
+        meta = {
+          description = "Speech-to-Text app (backend + bundled frontend)";
+          mainProgram = "stt-app";
+        };
       };
+    };
+
+    # `nix run .` starts bin/stt-app (named by meta.mainProgram), on http://localhost:8080.
+    apps.x86_64-linux.default = {
+      type = "app";
+      program = pkgs.lib.getExe self.packages.${system}.default;
+      meta.description = "Start the Speech-to-Text app";
     };
   };
 }
