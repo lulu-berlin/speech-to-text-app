@@ -113,7 +113,10 @@ export type ServerEvent =
   // Item 22 (docs/api/speakers-renamed.json, speakers-merged.json): the task's effective
   // speakers after a stored rename, or after a merge or reset of all merges.
   | { type: 'speakers-renamed'; id: number; speakers: TurnSpeaker[] }
-  | { type: 'speakers-merged'; id: number; speakers: TurnSpeaker[] };
+  | { type: 'speakers-merged'; id: number; speakers: TurnSpeaker[] }
+  // Item 32 (docs/api/settings-updated*.json): the stored settings after a write, a dismissed
+  // CPU-fallback notice, or the engine's switch of an unusable GPU to the CPU.
+  | { type: 'settings-updated'; settings: SettingsUpdate };
 
 // What the event stream reports: a server event, or `disconnected` when the connection
 // dropped. `closed` is true when EventSource gave up (an HTTP error) and will not retry,
@@ -133,6 +136,9 @@ export interface Settings {
   deviceFallback: string | null;
   availableDevices: string[];
 }
+
+// The settings as the settings-updated event carries them: without the device choices.
+export type SettingsUpdate = Omit<Settings, 'availableDevices'>;
 
 // Error body: { error, message } plus taskId for duplicate-audio only.
 export interface ApiErrorBody {

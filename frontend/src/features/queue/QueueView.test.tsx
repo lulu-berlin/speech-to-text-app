@@ -22,7 +22,9 @@ import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
+import settingsFallback from '../../../../docs/api/settings.fallback.json';
 import settingsFixed from '../../../../docs/api/settings.fixed.json';
+import settingsUpdatedFallback from '../../../../docs/api/settings-updated.fallback.json';
 import { QueueView } from './QueueView';
 
 function renderQueue() {
@@ -123,6 +125,40 @@ describe('the queue view upload defaults', () => {
     expect(screen.getByLabelText('Speaker count')).toHaveValue(3);
     fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
     expect(screen.getByLabelText('Max speakers')).toHaveValue(12);
+  });
+});
+
+describe('the queue view CPU-fallback banner', () => {
+  it('names the unavailable GPU and the switch to the CPU until it is dismissed', async () => {
+    // settings.fallback.json: the device is cpu and the notice names gpu:1 (item 32).
+    let dismissals = 0;
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFallback)),
+      http.delete('/api/settings/device-fallback', () => {
+        dismissals += 1;
+        return HttpResponse.json({ ...settingsFallback, deviceFallback: null });
+      }),
+    );
+    renderQueue();
+
+    const banner = await screen.findByRole('alert');
+    expect(banner).toHaveTextContent('GPU 1 was unavailable');
+    expect(banner).toHaveTextContent('CPU');
+
+    fireEvent.click(within(banner).getByRole('button', { name: 'Dismiss' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(dismissals).toBe(1);
+  });
+
+  it('appears when a settings-updated event brings a notice, without a reload', async () => {
+    const events = controllableEventStream();
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    // settings-updated.fallback.json: the engine switched gpu:1 to the CPU.
+    events.send('settings-updated', settingsUpdatedFallback);
+    expect(await screen.findByRole('alert')).toHaveTextContent('GPU 1 was unavailable');
   });
 });
 
