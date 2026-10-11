@@ -120,6 +120,20 @@ export type ServerEvent =
 // so the machine has to reconnect itself.
 export type StreamEvent = ServerEvent | { type: 'disconnected'; closed: boolean };
 
+// Item 32 contract: the stored settings (docs/api/settings*.json). `device` and the entries of
+// `availableDevices` share one value space: `auto`, `cpu` or `gpu:<index>`. `deviceFallback`
+// names the GPU the engine switched to the CPU (the Queue's banner), null without a notice.
+export interface Settings {
+  device: string;
+  threads: number | null;
+  defaultLanguage: string;
+  speakersMode: SpeakerMode;
+  speakersCount: number | null;
+  maxSpeakers: number;
+  deviceFallback: string | null;
+  availableDevices: string[];
+}
+
 // Error body: { error, message } plus taskId for duplicate-audio only.
 export interface ApiErrorBody {
   error: string;

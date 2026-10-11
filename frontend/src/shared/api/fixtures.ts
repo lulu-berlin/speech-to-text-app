@@ -23,6 +23,9 @@ export { default as errorDuplicateAudio } from '../../../../docs/api/error.dupli
 export { default as errorInvalidLanguage } from '../../../../docs/api/error.invalid-language.json';
 export { default as taskTransitions } from '../../../../docs/api/task-transitions.json';
 export { default as languages } from '../../../../docs/api/languages.json';
+export { default as settings } from '../../../../docs/api/settings.json';
+export { default as settingsFixed } from '../../../../docs/api/settings.fixed.json';
+export { default as settingsFallback } from '../../../../docs/api/settings.fallback.json';
 
 import type { Task } from './types';
 import taskQueuedExample from '../../../../docs/api/task.queued.json';

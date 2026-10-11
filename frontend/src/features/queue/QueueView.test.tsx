@@ -22,6 +22,7 @@ import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
+import settingsFixed from '../../../../docs/api/settings.fixed.json';
 import { QueueView } from './QueueView';
 
 function renderQueue() {
@@ -106,6 +107,22 @@ describe('the queue view upload options', () => {
     expect(max).toHaveValue(1);
     fireEvent.change(max, { target: { value: '25' } });
     expect(max).toHaveValue(20);
+  });
+});
+
+describe('the queue view upload defaults', () => {
+  it('starts the upload options with the stored default language, speakers mode and max speakers', async () => {
+    // settings.fixed.json: German, 3 fixed speakers, 12 max speakers (item 32).
+    server.use(http.get('/api/settings', () => HttpResponse.json(settingsFixed)));
+    renderQueue();
+
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('german'),
+    );
+    expect(screen.getByLabelText('Speakers')).toHaveValue('fixed');
+    expect(screen.getByLabelText('Speaker count')).toHaveValue(3);
+    fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+    expect(screen.getByLabelText('Max speakers')).toHaveValue(12);
   });
 });
 

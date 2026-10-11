@@ -4,6 +4,7 @@ import type {
   Queue,
   ServerEvent,
   StreamEvent,
+  Settings,
   Snapshot,
   Speakers,
   Task,
@@ -45,6 +46,13 @@ export async function getTask(id: number): Promise<Task> {
 export async function getTurns(id: number): Promise<Turns> {
   const response = await fetch(`/api/tasks/${id}/turns`);
   return json<Turns>(response);
+}
+
+// Item 32 contract: GET /api/settings (docs/api/settings.json): the stored settings and the
+// devices to choose from.
+export async function getSettings(): Promise<Settings> {
+  const response = await fetch('/api/settings');
+  return json<Settings>(response);
 }
 
 // Item 22 contract: PUT /api/tasks/{id}/speakers/{speakerId} with { speaker } -> 200 Speakers;
