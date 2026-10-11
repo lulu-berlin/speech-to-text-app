@@ -36,7 +36,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A hand scroll (wheel) still stops following and shows "Back to playing position"
 - [x] A hand scroll by dragging the scrollbar / keyboard still stops following
 - [x] "Back to playing position" resumes following and scrolls to the playing segment
-- [ ] (e2e, ADR 0046) Against the real backend: a long transcript plays through many follow scrolls and "Back to playing position" never appears without a hand scroll; a hand scroll still shows it
+- [x] (e2e, ADR 0046) Against the real backend: a long transcript plays through many follow scrolls and "Back to playing position" never appears without a hand scroll; a hand scroll still shows it
 - [x] (must not break) Existing transcript view tests and the e2e playback journey stay green
 
 ## Acceptance criteria
