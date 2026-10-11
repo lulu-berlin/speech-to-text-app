@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { BROKEN_CLIP, REORDER_CLIPS, appUrl } from '../lib/backend.mjs';
+import { BROKEN2_CLIP, HISTORY_CLIPS, appUrl } from '../lib/backend.mjs';
 import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
 
-// This test's own uploads (REORDER_CLIPS' trims, unique bytes; BROKEN_CLIP fails in
-// CHUNKING). The shared suite has already finished more tasks by the time this file
-// runs, so the list's total is not pinned — its shape and order are.
-const FIRST_CLIP = REORDER_CLIPS[0]; // 0-2s
-const SECOND_CLIP = REORDER_CLIPS[1]; // 2-4s
+// This test's own uploads: two trims no other test uses (the shared run finishes the
+// common clips before this file runs) plus BROKEN2_CLIP, which fails in CHUNKING. The
+// shared suite has finished more tasks by then, so the list's total is not pinned —
+// its shape, order and contents are.
+const FIRST_CLIP = HISTORY_CLIPS[0]; // 0-7s
+const SECOND_CLIP = HISTORY_CLIPS[1]; // 4-11s
 
 test('the history list shows finished tasks newest first with status, finish date and duration', async ({
   page,
@@ -21,9 +22,9 @@ test('the history list shows finished tasks newest first with status, finish dat
   await expect(page.getByText(`${SECOND_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
 
   // A FAILED card with a stored error.
-  await uploadClips(page, [BROKEN_CLIP]);
+  await uploadClips(page, [BROKEN2_CLIP]);
   await goTo(page, 'History');
-  const failed = rowOf(page, BROKEN_CLIP);
+  const failed = rowOf(page, BROKEN2_CLIP);
   await expect(failed.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 60_000 });
 
   // The whole list, once: the suite's finished tasks plus this test's three uploads.
@@ -59,7 +60,7 @@ test('the history list shows finished tasks newest first with status, finish dat
   expect(times).toEqual([...times].sort((a, b) => b - a));
 
   // The FAILED card shows its stored error and no duration.
-  const failedId = await taskIdOf(page, BROKEN_CLIP);
+  const failedId = await taskIdOf(page, BROKEN2_CLIP);
   const stored = await (await page.request.get(appUrl(`/api/tasks/${failedId}`))).json();
   await expect(failed).toContainText(stored.error);
   await expect(

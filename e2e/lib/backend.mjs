@@ -3,12 +3,12 @@
 // backend pid) lives in .e2e-state.json so global setup, the tests and the teardown all
 // see the same process.
 //
-// The backend runs as `gradle --no-daemon run`: with the daemon, the app's JVM would be
-// a child of the daemon (outside this process group), and killing this harness would
-// orphan the server. --no-daemon keeps gradle and the app JVM under one session, so a
-// group kill reaches both.
+// The backend runs as `gradle --no-daemon run`. Even so, gradle 8.14 forks a single-use
+// daemon JVM that actually launches the app's JVM, and that daemon is outside the group
+// of the gradle launcher pid the harness holds — so stops find and kill the app JVM by
+// its arguments (appJvmPid), not by the group alone.
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +44,11 @@ export const FIXTURE_CLIPS = [
   'jfk-cancel.wav',
   'broken.wav',
   'jfk-delete.wav',
+  'jfk-g.wav', // 0-3s
+  'jfk-h.wav', // 7-11s
+  'jfk-i.wav', // 0-7s
+  'jfk-j.wav', // 4-11s
+  'broken-2.wav',
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -52,6 +57,14 @@ export const MERGE_CLIP = FIXTURE_CLIPS[7];
 export const CANCEL_CLIP = FIXTURE_CLIPS[8];
 export const BROKEN_CLIP = FIXTURE_CLIPS[9];
 export const DELETE_CLIP = FIXTURE_CLIPS[10];
+// The history and restart tests' own trims (unique bytes, so they still upload when the
+// shared run's clips are finished tasks) — four trims partition the sample, two per
+// test, so 12's uploads cannot be 13's already-finished tasks.
+export const HISTORY_CLIPS = [FIXTURE_CLIPS[11], FIXTURE_CLIPS[12]]; // 0-3s, 7-11s
+export const RESTART_CLIPS = [FIXTURE_CLIPS[13], FIXTURE_CLIPS[14]]; // 0-7s, 4-11s
+// The history test's own undecodable fixture — the cancel test's broken.wav is already
+// a FAILED task by the time this file runs, so a second upload would be 409.
+export const BROKEN2_CLIP = FIXTURE_CLIPS[15];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
@@ -148,6 +161,69 @@ export async function waitForHealth(port, { down = false, timeoutMs = 600_000 } 
   }
 }
 
+// The app JVM `gradle run` actually runs lives under the single-use daemon gradle forks
+// (its launcher process is already gone by the time a stop happens), so a group kill of
+// the launcher pid can miss it. The JVM is identifiable by its own args instead: every
+// run passes the same class name and the data directory.
+function appJvmPid(dataDir) {
+  // No `ps` binary in this environment (it is a bash builtin), so read /proc directly.
+  const needles = ['stt.MainKt', dataDir];
+  for (const entry of readdirSync('/proc')) {
+    if (!/^\d+$/.test(entry)) continue;
+    try {
+      const cmdline = readFileSync(`/proc/${entry}/cmdline`, 'utf8').replaceAll('\0', ' ');
+      if (needles.every((n) => cmdline.includes(n))) return Number(entry);
+    } catch {
+      // the process exited while we listed it
+    }
+  }
+  return null;
+}
+
+// The ancestors of the app JVM — its gradle daemon and the launcher JVM — started out
+// in this harness's process group but are long reparented by the time a stop happens,
+// so a group kill misses them. Walk the live ppid chain from the app JVM up to init.
+function jvmAncestors(appPid) {
+  const chain = [];
+  let pid = appPid;
+  for (let guard = 0; pid > 1 && guard < 16; guard++) {
+    chain.push(pid);
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+      const rightmostParen = stat.lastIndexOf(')');
+      const fields = stat.slice(rightmostParen + 2).split(/\s+/);
+      pid = Number(fields[1]);
+    } catch {
+      break; // exited while walking
+    }
+  }
+  return chain;
+}
+
+// Stops a backend running on [port]. `gradle run` launches through two JVMs — a
+// launcher and a single-use daemon — that are outside this harness's process group by
+// now; find the app JVM by its args and SIGKILL the whole chain, so nothing survives to
+// hold the port or linger.
+export async function stopBackend(pid, port, dataDir) {
+  const jvm = appJvmPid(dataDir);
+  if (jvm !== null) {
+    for (const chainPid of jvmAncestors(jvm)) {
+      try {
+        process.kill(chainPid, 'SIGTERM');
+      } catch {
+        // already gone
+      }
+    }
+    try {
+      process.kill(jvm, 'SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+  killGroup(pid);
+  await waitForHealth(port, { down: true, timeoutMs: 60_000 });
+}
+
 export function killGroup(pid) {
   try {
     process.kill(-pid, 'SIGTERM');
@@ -181,9 +257,4 @@ export async function startBackend({ port, dataDir }) {
     throw error;
   }
   return { pid: child.pid };
-}
-
-export async function stopBackend(pid, port) {
-  killGroup(pid);
-  await waitForHealth(port, { down: true, timeoutMs: 60_000 });
 }
