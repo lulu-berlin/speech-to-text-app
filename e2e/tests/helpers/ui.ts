@@ -100,3 +100,21 @@ export async function rowOrder(page: Page, names: string[]): Promise<number[]> {
   const items = await page.getByRole('listitem').allTextContents();
   return names.map((name) => items.findIndex((text) => text.includes(name)));
 }
+
+// A History card (or queue row) by its filename.
+export function rowOf(page: Page, filename: string): Locator {
+  return page.getByRole('listitem').filter({ hasText: filename });
+}
+
+// The task id behind a History card, from its link to the transcript.
+export async function taskIdOf(page: Page, filename: string): Promise<string> {
+  const href = await rowOf(page, filename)
+    .getByRole('link', { name: filename })
+    .getAttribute('href');
+  return href?.split('/').pop() ?? '';
+}
+
+// Switches view through the header navigation (finish notices carry their own links).
+export async function goTo(page: Page, view: 'Queue' | 'History') {
+  await page.getByRole('navigation').getByRole('link', { name: view }).click();
+}
