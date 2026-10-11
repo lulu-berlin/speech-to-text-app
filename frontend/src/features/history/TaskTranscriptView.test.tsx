@@ -33,6 +33,10 @@ function stubScrollIntoView(): Mock {
   return vi.spyOn(Element.prototype as never, 'scrollIntoView') as unknown as Mock;
 }
 
+// "Back to playing position" is the stopped state's control: present when following has
+// stopped, absent while it holds; clicking it resumes following.
+const backButton = () => screen.queryByRole('button', { name: /back to playing position/i });
+
 // A navigation renders a whole other view; under a loaded test run that can take longer than
 // Testing Library's 1 s default (seen with two suites in parallel), so the waits that follow a
 // navigation get more time. The assertion is unchanged; a view that never arrives still fails.
@@ -224,7 +228,7 @@ describe('the transcript view', () => {
     // over the region is a hand scroll (item 36); a bare scroll event is not the user
     // scrolling — the view's own follow scroll fires one too — so it never stops following.
     fireEvent.wheel(region);
-    expect(screen.getByRole('button', { name: /back to playing position/i })).toBeInTheDocument();
+    expect(backButton()).toBeInTheDocument();
 
     // While stopped, playback no longer scrolls.
     scrollIntoView.mockClear();
@@ -233,7 +237,7 @@ describe('the transcript view', () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
 
     // "Back to playing position" resumes following and scrolls to the current segment.
-    fireEvent.click(screen.getByRole('button', { name: /back to playing position/i }));
+    fireEvent.click(required(backButton()));
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
@@ -257,9 +261,7 @@ describe('the transcript view', () => {
     await tick;
     fireEvent.scroll(region);
 
-    expect(
-      screen.queryByRole('button', { name: /back to playing position/i }),
-    ).not.toBeInTheDocument();
+    expect(backButton()).not.toBeInTheDocument();
   });
 
   it('holds following through many consecutive follow scrolls while playing', async () => {
@@ -281,9 +283,7 @@ describe('the transcript view', () => {
       fireEvent.scroll(region);
       // Each cue is its own follow scroll: the call count grows one per cue.
       expect(scrollIntoView).toHaveBeenCalledTimes(index + 1);
-      expect(
-        screen.queryByRole('button', { name: /back to playing position/i }),
-      ).not.toBeInTheDocument();
+      expect(backButton()).not.toBeInTheDocument();
     }
   });
 
@@ -302,7 +302,7 @@ describe('the transcript view', () => {
     fireEvent(audio, new Event('timeupdate'));
 
     fireEvent.wheel(region);
-    expect(screen.getByRole('button', { name: /back to playing position/i })).toBeInTheDocument();
+    expect(backButton()).toBeInTheDocument();
 
     // Stopped stays stopped: the advancing playhead no longer triggers follow scrolls.
     scrollIntoView.mockClear();
@@ -316,9 +316,8 @@ describe('the transcript view', () => {
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
     const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
     const region = screen.getByRole('region', { name: /transcript/i });
-    const backButton = () => screen.queryByRole('button', { name: /back to playing position/i });
     const returnToFollowing = () => {
-      fireEvent.click(screen.getByRole('button', { name: /back to playing position/i }));
+      fireEvent.click(required(backButton()));
       expect(backButton()).not.toBeInTheDocument();
     };
 
