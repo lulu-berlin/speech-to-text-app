@@ -28,30 +28,39 @@ To be settled in the consultation. Starting points:
 - **Mascot as a home link**: the header mascot is wrapped in a link to `/` with an accessible name (e.g. "Speech-to-Text home"); the mascot itself stays decorative (`aria-hidden`), the link carries the name.
 - **One mascot at a time**: when a page shows a placeholder mascot (empty, loading, connecting), the header shows no mascot (or a static/small brand mark — open question); otherwise the header shows it. The decision lives in one place (a shell-level state, ADR 0038), not in each view.
 
-## Open questions
+## Open questions (answered 2026-10-11)
 
-- With a placeholder on screen, does the header hide the mascot entirely, or show a small static mark in its place (keeping the home link)?
-- Header height: the header mascot is 7.5rem today (item 17's legibility decision); is that too tall for a sticky header — shrink on scroll, or a smaller fixed size?
-- Navigation transition style: underline slide, background pill, or color fade?
-- Order with item 21: item 21 captures the visual-acceptance screenshots. Should item 21 depend on this item (screenshots of the final shell), or does this item re-capture after 21?
+- While a placeholder shows the mascot, what does the header show? → **A small static logo** (the artwork's still frame) that stays the home link; the animated mascot appears only once, in the placeholder.
+- Header height for a sticky header? → **Shrink on scroll**: full size (7.5rem) at the top of the page, compact once the page scrolls, and **the shrinking is animated**. Reduced motion is respected as everywhere: the shrink transition runs under `prefers-reduced-motion: no-preference` and the size switches instantly otherwise. Being compact is not a reason to stop the mascot's own animation — the small header mascot types and rests exactly like the large one (user clarification, 2026-10-11).
+- Navigation style? → **Background pill**: a soft surface pill behind a link on hover, filled for the active link, with a token transition.
+- Order with item 21? → **21 first**; this item depends on 21's `e2e/` suite (ADR 0046) and captures the new shell in its own e2e test.
+
+## Remaining open questions
+
+None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-To be written with the user. Expected scope:
+Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- The header stays at the top while the page scrolls (sticky positioning and a token background), on Queue, History and the transcript.
-- Navigation links show hover/focus/active states from tokens; the transition is skipped with reduced motion.
-- Clicking the header mascot (or pressing Enter on its link) navigates to `/` → `/queue`; the link has an accessible name.
-- When an empty, loading or connecting placeholder shows the mascot, the header does not show it (per the decided rule); otherwise the header does.
-- The transcript's follow mode keeps the active segment visible below the sticky header.
-- Existing view tests stay green; the design-value convention check stays green.
+- [ ] The header stays at the top while the page scrolls (sticky, token background and bottom border) on Queue, History and the transcript
+- [ ] At the top of a page the header shows the full-size mascot; once the page scrolls it shrinks to the compact size with an animated transition (instant under reduced motion), and grows back when scrolled to the top; the compact mascot keeps its typing/resting animation
+- [ ] Navigation links show a background pill on hover and a filled pill on the active link, from tokens, with a token transition; the keyboard focus ring stays visible
+- [ ] The header mascot (or the static logo) is a link to `/` with an accessible name; clicking it or pressing Enter lands on `/queue`
+- [ ] While an empty, loading or connecting placeholder shows the mascot, the header shows the small static logo instead; otherwise the header shows the animated mascot — never two animated mascots on screen
+- [ ] The transcript's follow mode keeps the playing segment visible below the sticky header
+- [ ] (e2e, ADR 0046) Against the real backend: scrolling a long transcript keeps the header in view and shrinks it; the nav pill follows the route; the mascot link returns to the queue; on the empty queue the header shows the static logo and the placeholder the animated mascot — with screenshots (light/dark, phone/desktop) of the new shell
+- [ ] (must not break) Existing view tests, the design-value convention check and the reduced-motion scan stay green
 
 ## Acceptance criteria
 
 - The four requested behaviors work in the browser, light and dark, at phone and desktop widths.
 - No literal colors or sizes; reduced motion respected.
+- The e2e test passes on the user's machine (ADR 0046).
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
 
 - 2026-10-11: drafted by the root agent from the user's request (sticky header, nicer navigation with a hover transition, mascot links to `/`, mascot never in two places at once).
+- 2026-10-11: consultation answers (static logo while a placeholder shows the mascot; shrink on scroll, animated; background-pill navigation; item 21 first) and the proposed test list incl. its e2e test (ADR 0046). Remaining: test list approval.
+- 2026-10-11: reduced motion clarified by the user: respected as everywhere (the shrink animates only under `no-preference`); shrinking is not a reason to reduce the mascot's own motion.
