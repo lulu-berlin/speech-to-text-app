@@ -5,6 +5,7 @@ import type {
   ServerEvent,
   StreamEvent,
   Settings,
+  SettingsNotice,
   SettingsUpdate,
   Snapshot,
   Speakers,
@@ -60,6 +61,17 @@ export async function getSettings(): Promise<Settings> {
 // notice cleared.
 export async function dismissDeviceFallback(): Promise<Settings> {
   const response = await fetch('/api/settings/device-fallback', { method: 'DELETE' });
+  return json<Settings>(response);
+}
+
+// Item 32 contract: PUT /api/settings with the settings as a whole -> 200 Settings,
+// or 400 with the matching error code for the first invalid field.
+export async function saveSettings(settings: SettingsUpdate): Promise<Settings> {
+  const response = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
   return json<Settings>(response);
 }
 
@@ -221,7 +233,7 @@ export function subscribeToEvents(
       id,
       speakers,
     }));
-    listen<SettingsUpdate>('settings-updated', (settings) => ({
+    listen<SettingsNotice>('settings-updated', (settings) => ({
       type: 'settings-updated',
       settings,
     }));

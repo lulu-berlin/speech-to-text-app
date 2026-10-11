@@ -164,6 +164,7 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
         <Nav>
           <NavItem to="/queue">Queue</NavItem>
           <NavItem to="/history">History</NavItem>
+          <NavItem to="/settings">Settings</NavItem>
         </Nav>
         <Indicator>{CONNECTION_LABEL[connection]}</Indicator>
         <Tooltip label={THEME_LABEL[themeMode]}>

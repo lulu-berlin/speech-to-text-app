@@ -116,7 +116,7 @@ export type ServerEvent =
   | { type: 'speakers-merged'; id: number; speakers: TurnSpeaker[] }
   // Item 32 (docs/api/settings-updated*.json): the stored settings after a write, a dismissed
   // CPU-fallback notice, or the engine's switch of an unusable GPU to the CPU.
-  | { type: 'settings-updated'; settings: SettingsUpdate };
+  | { type: 'settings-updated'; settings: SettingsNotice };
 
 // What the event stream reports: a server event, or `disconnected` when the connection
 // dropped. `closed` is true when EventSource gave up (an HTTP error) and will not retry,
@@ -137,8 +137,13 @@ export interface Settings {
   availableDevices: string[];
 }
 
-// The settings as the settings-updated event carries them: without the device choices.
-export type SettingsUpdate = Omit<Settings, 'availableDevices'>;
+// What a settings write (PUT /api/settings) sends: the settings without the device
+// choices and without the fallback notice, which the write clears (item 32's contract).
+export type SettingsUpdate = Omit<Settings, 'availableDevices' | 'deviceFallback'>;
+
+// What the settings-updated event carries: every field of the settings except the device
+// choices — the fallback notice can change live, and belongs here.
+export type SettingsNotice = Omit<Settings, 'availableDevices'>;
 
 // Error body: { error, message } plus taskId for duplicate-audio only.
 export interface ApiErrorBody {
