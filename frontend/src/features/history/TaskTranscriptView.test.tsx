@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { App } from '../../app/App';
 import { lightTheme } from '../../shared/theme/theme';
 import { eventStreamResponse } from '../../shared/api/handlers';
@@ -217,13 +217,10 @@ describe('the transcript view', () => {
     fireEvent(audio, new Event('timeupdate'));
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
 
-    // A hand scroll stops following: a "Back to playing position" button appears. (The
-    // programmatic follow-scroll's hold-off clears on a macrotask, so the test waits a tick
-    // for a hand scroll to arrive on its own, as it would in a browser.)
-    const { promise: tick, resolve: resolveTick } = Promise.withResolvers<void>();
-    setTimeout(resolveTick, 0);
-    await tick;
-    fireEvent.scroll(region);
+    // A hand scroll stops following: a "Back to playing position" button appears. A wheel
+    // over the region is a hand scroll (item 36); a bare scroll event is not the user
+    // scrolling — the view's own follow scroll fires one too — so it never stops following.
+    fireEvent.wheel(region);
     expect(screen.getByRole('button', { name: /back to playing position/i })).toBeInTheDocument();
 
     // While stopped, playback no longer scrolls.
@@ -235,6 +232,36 @@ describe('the transcript view', () => {
     // "Back to playing position" resumes following and scrolls to the current segment.
     fireEvent.click(screen.getByRole('button', { name: /back to playing position/i }));
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds following when its own scroll event arrives after the next macrotask (the hold-off race)', async () => {
+    // jsdom has no scrollIntoView; the component calls it, so stub it on the prototype.
+    Element.prototype.scrollIntoView = vi.fn();
+    const scrollIntoView = vi.spyOn(
+      Element.prototype as never,
+      'scrollIntoView',
+    ) as unknown as Mock;
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const region = screen.getByRole('region', { name: /transcript/i });
+
+    // The playhead moves; the follow effect scrolls the active segment into view.
+    audio.currentTime = 1.0;
+    fireEvent(audio, new Event('timeupdate'));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+    // Browsers fire the scroll event of that programmatic follow scroll in the rendering
+    // step after the effect's setTimeout(0) hold-off has cleared (item 36; in 40 Chromium
+    // trials the event arrived after the flag was cleared 21 times). Deliver the view's
+    // own scroll event late on purpose: following must hold through it.
+    const { promise: tick, resolve: resolveTick } = Promise.withResolvers<void>();
+    setTimeout(resolveTick, 0);
+    await tick;
+    fireEvent.scroll(region);
+
+    expect(
+      screen.queryByRole('button', { name: /back to playing position/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the playing segment visible below the sticky header: the active segment carries a top scroll margin the size of the compact header', async () => {

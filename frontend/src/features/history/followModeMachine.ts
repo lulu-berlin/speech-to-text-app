@@ -2,8 +2,9 @@ import { setup } from 'xstate';
 
 // Follow mode (item 10, ADR 0038): while following, the transcript keeps the active
 // segment in view as the playhead moves; the user scrolling by hand stops following, and
-// "Back to playing position" resumes it. The scroll event fired by the view's own follow
-// scroll is suppressed at the call site (a ref), so SCROLLED only arrives for hand scrolls.
+// "Back to playing position" resumes it. SCROLLED is only sent for input evidence (wheel,
+// touch, the scroll keys, a scrollbar drag — item 36); a bare scroll event is never one,
+// so the view's own follow scroll cannot stop following.
 export const followModeMachine = setup({
   types: {
     context: {} as Record<string, never>,
