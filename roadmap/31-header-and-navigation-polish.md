@@ -47,7 +47,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] At the top of a page the header shows the full-size mascot; once the page scrolls it shrinks to the compact size with an animated transition (instant under reduced motion), and grows back when scrolled to the top; the compact mascot keeps its typing/resting animation
 - [x] Navigation links show a background pill on hover and a filled pill on the active link, from tokens, with a token transition; the keyboard focus ring stays visible
 - [x] The header mascot (or the static logo) is a link to `/` with an accessible name; clicking it or pressing Enter lands on `/queue`
-- [ ] While an empty, loading or connecting placeholder shows the mascot, the header shows the small static logo instead; otherwise the header shows the animated mascot — never two animated mascots on screen
+- [x] While an empty, loading or connecting placeholder shows the mascot, the header shows the small static logo instead; otherwise the header shows the animated mascot — never two animated mascots on screen
 - [ ] The transcript's follow mode keeps the playing segment visible below the sticky header
 - [ ] (e2e, ADR 0046) Against the real backend: scrolling a long transcript keeps the header in view and shrinks it; the nav pill follows the route; the mascot link returns to the queue; on the empty queue the header shows the static logo and the placeholder the animated mascot — with screenshots (light/dark, phone/desktop) of the new shell
 - [ ] (must not break) Existing view tests, the design-value convention check and the reduced-motion scan stay green
