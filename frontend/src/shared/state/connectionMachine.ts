@@ -3,7 +3,7 @@
 // stream drops, until the next snapshot. Server state is applied as received.
 import { assign, fromCallback, setup } from 'xstate';
 import { subscribeToEvents } from '../api/client';
-import type { Queue, SettingsUpdate, StreamEvent, Task, TurnSpeaker } from '../api/types';
+import type { Queue, SettingsNotice, StreamEvent, Task, TurnSpeaker } from '../api/types';
 import { isAllowedTransition } from './transitions';
 
 // The latest speakers event of a task (item 22): its effective speakers, and whether it was
@@ -19,7 +19,7 @@ export interface ConnectionContext {
   speakerChanges: Record<number, SpeakerChange>;
   // The latest settings-updated event (item 32), null until one arrives; views holding the
   // settings they fetched apply it.
-  settingsUpdate: SettingsUpdate | null;
+  settingsUpdate: SettingsNotice | null;
 }
 
 export const connectionMachine = setup({

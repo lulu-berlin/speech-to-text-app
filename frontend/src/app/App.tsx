@@ -4,6 +4,7 @@ import styled, { createGlobalStyle, ThemeProvider } from 'styled-components';
 import { HistoryView } from '../features/history/HistoryView';
 import { TaskTranscriptView } from '../features/history/TaskTranscriptView';
 import { QueueView } from '../features/queue/QueueView';
+import { SettingsView } from '../features/settings/SettingsView';
 import { PlaceholderMascotContext } from '../shared/brand/PlaceholderMascot';
 import plexSansUrl from '../shared/theme/fonts/ibm-plex-sans-latin-wght-normal.woff2?url';
 import { resolveTheme, useThemeMode } from '../shared/theme/themeMode';
@@ -75,6 +76,7 @@ export function App() {
               <Routes>
                 <Route path="/" element={<Navigate to="/queue" replace />} />
                 <Route path="/queue" element={<QueueView />} />
+                <Route path="/settings" element={<SettingsView />} />
                 <Route path="/history" element={<HistoryView />} />
                 <Route path="/history/:taskId" element={<TaskTranscriptView />} />
                 <Route path="*" element={<NotFoundView />} />
