@@ -1,4 +1,6 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
+import { useEffect } from 'react';
+import { useMachine } from '@xstate/react';
 import { NavLink } from 'react-router';
 import styled from 'styled-components';
 import { StenographerAnimation } from '../shared/brand/StenographerAnimation';
@@ -7,6 +9,7 @@ import { IconButton } from '../shared/ui/IconButton';
 import { focusRing } from '../shared/ui/focusRing';
 import { Tooltip } from '../shared/ui/Tooltip';
 import { ConnectionContext } from './ConnectionContext';
+import { headerScrollMachine } from './headerScrollMachine';
 
 // The brand mascot, product name, navigation between the views, the live connection
 // indicator and the theme control. The mascot types while a task runs (item 17); it is
@@ -107,9 +110,19 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
   const running = ConnectionContext.useSelector((state) =>
     state.context.tasks.some((task) => task.status === 'RUNNING'),
   );
+  // The mascot is full-size at the top of the page and compact once the page scrolls
+  // (item 31); the window scroll drives the machine, one SCROLLED/AT_TOP per scroll.
+  const [scroll, sendScroll] = useMachine(headerScrollMachine);
+  const compact = scroll.matches('compact');
+  useEffect(() => {
+    const onScroll = () => sendScroll({ type: window.scrollY > 0 ? 'SCROLLED' : 'AT_TOP' });
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [sendScroll]);
   return (
     <Header>
-      <StenographerAnimation typing={running} />
+      <StenographerAnimation typing={running} size={compact ? 'compact' : 'header'} />
       <Title>Speech-to-Text</Title>
       <HeaderControls>
         <Nav>

@@ -103,8 +103,11 @@ export interface ThemeTokens {
     sliderThumb: string;
     // The stenographer animation's sizes (item 17): the header instance and the
     // empty-state instance. The artwork is cropped to its drawing (no margin), so the
-    // header reads clearly at 120 px; the empty-state instance is 140 px.
+    // header reads clearly at 120 px; the empty-state instance is 140 px. The compact
+    // size is the header's once the page scrolls (item 31); the small static logo in
+    // the header while a placeholder shows the mascot uses it too.
     stenoHeader: string;
+    stenoCompact: string;
     stenoEmpty: string;
     // The transcript's scroll region (item 15): tall enough to read, short enough that
     // the player stays on screen while the transcript follows playback.
@@ -130,6 +133,9 @@ export interface ThemeTokens {
     // A queue row sliding aside while another is dragged past it (item 25).
     slideDuration: string;
     slideEasing: string;
+    // The header shrinking to its compact size and growing back on scroll (item 31).
+    shrinkDuration: string;
+    shrinkEasing: string;
   };
   // The type scale: sizes ascend, weights are the font's 400/500/600, line heights are
   // unitless (WCAG 1.4.12 asks for at least 1.5; the transcript reads more loosely).
@@ -191,6 +197,7 @@ const baseTokens = {
     switchThumb: '1.25rem',
     sliderThumb: '1.25rem',
     stenoHeader: '7.5rem',
+    stenoCompact: '4rem',
     stenoEmpty: '8.75rem',
     transcriptMaxHeight: '60vh',
     listboxMaxHeight: '16rem',
@@ -236,6 +243,8 @@ const baseTokens = {
     pulseEasing: 'ease-in-out',
     slideDuration: '0.15s',
     slideEasing: 'ease-out',
+    shrinkDuration: '0.2s',
+    shrinkEasing: 'ease-out',
   },
 };
 

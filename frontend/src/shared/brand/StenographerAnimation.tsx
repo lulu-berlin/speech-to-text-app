@@ -5,7 +5,11 @@ import type { ThemeTokens } from '../theme/theme';
 
 // The artwork's style rules are nested under the component's own class (`&`), so the
 // generic class names (.word, .head) cannot reach elements outside the component.
-const STENO_SIZE_TOKEN = { header: 'stenoHeader', empty: 'stenoEmpty' } as const;
+const STENO_SIZE_TOKEN = {
+  header: 'stenoHeader',
+  compact: 'stenoCompact',
+  empty: 'stenoEmpty',
+} as const;
 
 export type StenographerSize = keyof typeof STENO_SIZE_TOKEN;
 
@@ -151,6 +155,15 @@ const StyledSvg = styled.svg<{ $size: StenographerSize }>`
   display: block;
   width: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
   height: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
+
+  // An instance whose size changes (the header shrinking on scroll, item 31) shrinks and
+  // grows with an animated transition under no-preference; under reduced motion the size
+  // switches instantly, so no rule applies.
+  @media (prefers-reduced-motion: no-preference) {
+    transition-property: width, height;
+    transition-duration: ${(props) => props.theme.motion.shrinkDuration};
+    transition-timing-function: ${(props) => props.theme.motion.shrinkEasing};
+  }
 
   // The sound waves exist only at their hidden base; the words are visible by default
   // (no opacity rule). So the resting and reduced-motion frames are one and the same:
