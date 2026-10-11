@@ -2,7 +2,7 @@
 
 Status: done (roadmap item 36, merged 2026-10-11)
 Depends on: [15 — History UI](frontend-history-ui.md) (done), [21 — Frontend–backend end-to-end](frontend-backend-end-to-end.md) (done; the `e2e/` suite, ADR 0046)
-Blocks: [35](35-readme-and-architecture-overview.md) (its playback GIF shows follow mode)
+Blocks: [35](../roadmap/35-readme-and-architecture-overview.md) (its playback GIF shows follow mode)
 
 ## Goal
 
