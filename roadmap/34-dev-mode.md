@@ -1,6 +1,6 @@
 # 34 — Dev mode: frontend and backend with one command
 
-Status: draft
+Status: spec-approved
 Depends on: —
 
 ## Goal
@@ -38,7 +38,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. devenv-level items are user-verified (ADR 0010):
+Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. devenv-level items are user-verified (ADR 0010):
 
 - [ ] `devenv up` starts the frontend dev server and the backend; the UI at the printed Vite URL loads the queue through the `/api` proxy
 - [ ] Editing a frontend component updates the open page through hot module reload, without a full page reload
@@ -59,3 +59,4 @@ Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are ap
 
 - 2026-10-11: drafted from the user's request; answered so far: `devenv up` here, `./gradlew dev` in item 33.
 - 2026-10-11: consultation answers: restart on change (no Ktor auto-reload); running tasks resume through restart recovery; no browser opening. Proposed test list (8 items). Remaining: test list approval.
+- 2026-10-11: test list approved by the user; status `spec-approved`.
