@@ -1,6 +1,6 @@
 # 33 — Gradle bootstrap for developers without Nix
 
-Status: draft
+Status: spec-approved
 Depends on: [16](16-nix-flake-package.md) (the flake is the version source), [34](34-dev-mode.md) (`./gradlew dev` reuses its dev setup)
 
 ## Goal
@@ -47,7 +47,7 @@ None. The test list below is proposed and needs approval.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. The item is a build/packaging item, so ADR 0046's Playwright rule does not apply (e2e runs of item 21 against the Gradle-built app are used as acceptance, not as a test-list item). Item 16's whisper-cpp pin must have landed (1.8.4) for this item to pass its Nix-side checks; Nix- and machine-level items are user-verified (ADR 0010):
+Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. The item is a build/packaging item, so ADR 0046's Playwright rule does not apply (e2e runs of item 21 against the Gradle-built app are used as acceptance, not as a test-list item). Item 16's whisper-cpp pin must have landed (1.8.4) for this item to pass its Nix-side checks; Nix- and machine-level items are user-verified (ADR 0010):
 
 - [ ] On a machine with only a recent JVM (no Nix, no devenv, no Docker): a fresh clone, `./gradlew run` — the wrapper (gradlew at the root, Gradle version = flake's) downloads the tools and assets from `versions.json` with SHA-256 verification, builds the backend and the frontend, and serves the app on `http://localhost:8080`
 - [ ] The same, twice from cold: the second `./gradlew run` reuses the cached downloads (offline in the sense of no re-download); the checksums stay verified
@@ -71,3 +71,4 @@ Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are ap
 
 - 2026-10-11: drafted from the user's requests; answered so far: three separate items (33/34/35), agent rules do not apply to the human-only path, prebuilt binaries, Linux + best-effort macOS, any Java + toolchain JDK 21, `./gradlew dev` here and `devenv up` in item 34.
 - 2026-10-11: consultation answers (whisper-cpp 1.8.4 pinned in both paths, prebuilt for Gradle and source-override for Nix; per-source sync precision; macOS best-effort with Homebrew setsid; cmd tools via PATH, no new env vars; user-run `update-versions`; foojay JDK; `./gradlew dev` reuses dev-run.sh). Proposed test list (9 items). Remaining: test list approval.
+- 2026-10-11: test list (9 items) approved by the user; status `spec-approved`.
