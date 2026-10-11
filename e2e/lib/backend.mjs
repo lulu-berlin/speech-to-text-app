@@ -21,10 +21,22 @@ export const frontendDist = join(repoRoot, 'frontend', 'dist');
 const STATE_FILE = join(e2eRoot, '.e2e-state.json');
 const healthUrl = (port) => `http://127.0.0.1:${port}/api/health`;
 
-// The journey's fixture clips in upload order (global-setup.mjs creates them from
-// TEST_JFK_WAV). Uploaded tasks are deduplicated by content sha256, so the queue needs
-// three distinct files: the full sample plus two different trims.
-export const FIXTURE_CLIPS = ['jfk-a.wav', 'jfk-b.wav', 'jfk-c.wav'];
+// The journey's fixture clips (global-setup.mjs creates them from TEST_JFK_WAV: the
+// full sample plus five distinct trims). Uploaded tasks are deduplicated by content
+// sha256, and every test shares one backend per run — so each test that uploads needs
+// its own bytes, or the second upload of the same content answers 409 duplicate-audio
+// (the delete test re-uploads by design). QUEUE_CLIPS feeds the queue journey, the
+// reorder test uses REORDER_CLIPS.
+export const FIXTURE_CLIPS = [
+  'jfk-a.wav',
+  'jfk-b.wav',
+  'jfk-c.wav',
+  'jfk-d.wav',
+  'jfk-e.wav',
+  'jfk-f.wav',
+];
+export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
+export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
 
 export function loadState() {
   if (!existsSync(STATE_FILE)) {

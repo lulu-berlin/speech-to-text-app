@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { FIXTURE_CLIPS, appUrl, loadState } from '../lib/backend.mjs';
+import { QUEUE_CLIPS, appUrl, loadState } from '../lib/backend.mjs';
 import { expectLiveQueue, rowOrder } from './helpers/ui';
 
 // A task's pending row by its filename.
@@ -17,12 +17,12 @@ test('uploads several clips, queues them in order, and shows status, phase and b
   const { fixturesDir } = loadState();
   await page.setInputFiles(
     'input[type="file"]',
-    FIXTURE_CLIPS.map((name) => join(fixturesDir, name)),
+    QUEUE_CLIPS.map((name) => join(fixturesDir, name)),
   );
 
   // The dropped files are worked through one at a time, so the queue gets them in order;
   // the pending list keeps that order.
-  await expect.poll(async () => rowOrder(page, FIXTURE_CLIPS)).toEqual([0, 1, 2]);
+  await expect.poll(async () => rowOrder(page, QUEUE_CLIPS)).toEqual([0, 1, 2]);
 
   // While the first clip runs, the second still waits: the engine walks the queue in
   // order. The running row shows its status badge, one of the three phase labels, and
