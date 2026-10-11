@@ -3,8 +3,6 @@ package stt.diarization
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import stt.Integration
-import stt.config.Config
-import stt.config.TEST_DATA_DIR
 import stt.config.realSpeakerModelPath
 
 class SpeakerModelSpec :
@@ -28,17 +26,14 @@ class SpeakerModelSpec :
                 }
             }
         }
-        given("the CAM++ model at \$STT_SPEAKER_MODEL, with STT_THREADS set to 4 or unset") {
+        given("the CAM++ model at \$STT_SPEAKER_MODEL, with the settings' thread count 4 or unset") {
             `when`("loading the model") {
-                then("the session loads with the configured intra-op threads; without STT_THREADS it uses ONNX Runtime's default") {
+                then("the session loads with 4 intra-op threads, or with ONNX Runtime's default when unset") {
                     // SessionOptions has no read-back for the thread count in onnxruntime's Java API (probed:
                     // javap shows setIntraOpNumThreads only), so the observable contract is a real session that
-                    // accepts the configured options: both loads below must succeed.
-                    val env = System.getenv() + ("STT_DATA_DIR" to TEST_DATA_DIR)
-                    listOf(true, false).forEach { withThreads ->
-                        val config = Config.fromEnv(if (withThreads) env + ("STT_THREADS" to "4") else env)
-
-                        SpeakerModel.load(config.speakerModel, config.threads).use { model ->
+                    // accepts the options: both loads below must succeed.
+                    listOf(4, null).forEach { threads ->
+                        SpeakerModel.load(realSpeakerModelPath(), threads).use { model ->
                             model.metadata.shouldBe(
                                 SpeakerModelMetadata(
                                     outputDim = 512,

@@ -18,8 +18,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import stt.Integration
 import stt.config.Config
-import stt.config.Device
 import stt.config.realSpeakerModelPath
+import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
@@ -45,7 +45,8 @@ class UploadEngineWakeSpec :
                 then("the task runs to COMPLETED without any pause/resume or other engine signal") {
                     val (whisperModel, jfk) = transcriptFixtures()
                     val dataDir = tempdir("stt-upload-wake").toPath()
-                    val config = Config(dataDir, realSpeakerModelPath(), whisperModel, device = Device.Cpu)
+                    val config = Config(dataDir, realSpeakerModelPath(), whisperModel)
+                    storeCpuDevice(dataDir)
                     val clip = Files.readAllBytes(jfk)
 
                     testApplication {

@@ -6,9 +6,9 @@ import stt.config.Device
 
 class DeviceArgsSpec :
     BehaviorSpec({
-        given("STT_DEVICE values") {
+        given("the devices a setting can name") {
             `when`("the device is turned into whisper-cli flags") {
-                then("auto adds no flag, cpu adds --no-gpu, gpu adds --device 0, 3 adds --device 3") {
+                then("auto adds no flag, cpu adds --no-gpu, GPU 0 adds --device 0, GPU 3 adds --device 3") {
                     // Oracle device_args: auto → [], cpu → --no-gpu, gpu → --device 0, N → --device N.
                     val expected =
                         mapOf(

@@ -9,8 +9,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import stt.Integration
 import stt.config.Config
-import stt.config.Device
 import stt.config.realSpeakerModelPath
+import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
@@ -39,8 +39,9 @@ class EventsIntegrationSpec :
                             ByteArrayInputStream(Files.readAllBytes(jfk)),
                         )
                     }
+                    storeCpuDevice(dataDir)
 
-                    SseServer({ sttApp(Config(dataDir, realSpeakerModelPath(), whisperModel, device = Device.Cpu)) })
+                    SseServer({ sttApp(Config(dataDir, realSpeakerModelPath(), whisperModel)) })
                         .use { server ->
                             val events = server.connectEvents()
 

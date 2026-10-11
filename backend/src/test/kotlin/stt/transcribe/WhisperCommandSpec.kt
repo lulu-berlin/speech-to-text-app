@@ -7,7 +7,7 @@ import java.nio.file.Path
 
 class WhisperCommandSpec :
     BehaviorSpec({
-        given("a chunk to transcribe, with and without STT_THREADS and a previous chunk's tail") {
+        given("a chunk to transcribe, with and without a thread count in the settings and a previous chunk's tail") {
             `when`("the whisper-cli command is built") {
                 then("it includes -t only when threads are configured and --prompt only when a previous tail exists") {
                     val model = Path.of("/models/ggml-tiny.en.bin")

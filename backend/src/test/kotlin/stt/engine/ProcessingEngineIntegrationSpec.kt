@@ -12,8 +12,8 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.delay
 import stt.Integration
 import stt.config.Config
-import stt.config.Device
 import stt.config.realSpeakerModelPath
+import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.SegmentRepository
 import stt.db.TaskRepository
@@ -38,7 +38,8 @@ class ProcessingEngineIntegrationSpec :
                 then("both reach COMPLETED with labelled segments, and the speaker model is loaded once") {
                     val (whisperModel, jfk) = transcriptFixtures()
                     val dataDir = tempdir("stt-e2e").toPath()
-                    val config = Config(dataDir, realSpeakerModelPath(), whisperModel, device = Device.Cpu)
+                    val config = Config(dataDir, realSpeakerModelPath(), whisperModel)
+                    storeCpuDevice(dataDir)
                     val clip = Files.readAllBytes(jfk)
                     // Uploads are deduplicated by content, so the second one is the same clip with zero bytes appended
                     // after its WAV data chunk: different bytes, the same decoded audio.
