@@ -1,6 +1,6 @@
 # 0017 — Database location, data directory, and connection contract
 
-Status: accepted · Date: 2026-10-06 · Amended: 2026-10-06 (item 03 review rounds 1 and 2), 2026-10-07 (ADR 0024)
+Status: accepted · Date: 2026-10-06 · Amended: 2026-10-06 (item 03 review rounds 1 and 2), 2026-10-07 (ADR 0024), 2026-10-11 (roadmap item 16)
 
 ## Context
 Item 03 fixes the SQLite schema (ADR 0006: Exposed + Flyway + SQLite via the xerial JDBC driver). The database file needs a location, and the config rules (conventions, `docs/conventions/backend.md`) require invalid values to fail fast at startup with an error naming the variable — never a silent fallback. `STT_STATIC_DIR` has a meaningful unset behavior (disabled + warning), but a data directory has no safe implicit default: any fallback location silently creates a fresh, empty, cwd-dependent database.
@@ -14,7 +14,7 @@ Item 03 fixes the SQLite schema (ADR 0006: Exposed + Flyway + SQLite via the xer
 - **Migrations run with foreign keys off (amended in review round 1).** Flyway migrates on its own connection, before the `Database` is returned, with SQLite's default `foreign_keys = OFF`. This is deliberate: SQLite's documented table-rebuild procedure for schema changes (create new table, copy, drop old, rename) requires foreign keys off.
 - **Temp directory (amended in review round 1).** `$STT_DATA_DIR/tmp` holds upload spool files (ADR 0018; since ADR 0024 a committed upload's spool is moved to `$STT_DATA_DIR/work/<task-id>/source`); it is created on open and its stale entries (left by a crash) are removed on open.
 - Fail-fast database errors surface at boot: `gradle run` exits non-zero with a clear message; no lazy first-use failure.
-- **Packaged app (amended in review round 1).** The flake's `bin/speech-to-text-app` wrapper checks `STT_DATA_DIR` before starting the JVM: unset or empty prints one line to stderr naming `STT_DATA_DIR` and exits non-zero, instead of an uncaught JVM stack trace. There is no default value.
+- **Packaged app (amended in review round 1; amended by roadmap item 16, 2026-10-11).** The flake's wrapper, `bin/stt-app` (named `bin/speech-to-text-app` before item 16), defaults an unset or empty `STT_DATA_DIR` to `${XDG_DATA_HOME:-$HOME/.local/share}/stt-app` and creates it before starting the JVM: the packaged app is started by end users, who expect it to run without configuration, and the location is fixed and documented rather than cwd-dependent. `Config.fromEnv()` keeps the no-default rule, so `gradle run` and every other unpackaged start still fail fast without `STT_DATA_DIR`.
 
 ## Consequences
 - No implicit database location: boot is the failure point, not the first query.

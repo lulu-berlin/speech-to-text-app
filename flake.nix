@@ -1,8 +1,9 @@
 # Minimal flake building both parts (roadmap item 02, decision 7; ADR 0014 as amended
 # by ADR 0016). The app wrapper ships in item 02 (ADR 0016) as bin/speech-to-text-app,
 # renamed to bin/stt-app in roadmap item 16;
-# since item 03 it refuses to start without STT_DATA_DIR (ADR 0017: one stderr line,
-# non-zero exit, no default); since item 08 it defaults STT_SPEAKER_MODEL to the pinned
+# from item 03 it refused to start without STT_DATA_DIR (ADR 0017); since item 16 it
+# defaults STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended);
+# since item 08 it defaults STT_SPEAKER_MODEL to the pinned
 # CAM++ model from nix/models.nix (ADR 0003; a user-set value wins). Full STT_* env
 # wiring, models, and nix run . are finished in roadmap item 16.
 # Nix evaluation happens on the user's machine - this file is unverified here.
@@ -151,13 +152,14 @@
           # --set, not --set-default: the -default form silently keeps a
           # set-but-empty variable (devenv exports an empty CLASSPATH),
           # and the packaged app always needs its own jars and frontend.
-          # --run: STT_DATA_DIR has no default (ADR 0017); unset or empty fails with one
-          # stderr line instead of a JVM stack trace. The doubled quotes escape the dollar
-          # sign below, so the wrapper (not Nix) expands the variable.
+          # --run: STT_DATA_DIR unset or empty defaults to the XDG data home's stt-app
+          # directory (roadmap item 16, amending ADR 0017 for the packaged app), which the
+          # wrapper creates. The doubled quotes escape the dollar signs below, so the
+          # wrapper (not Nix) expands the variables.
           # --set-default STT_SPEAKER_MODEL: the pinned CAM++ model (nix/models.nix, ADR 0003)
           # unless the user sets one; item 16 may revisit this with the rest of the model wiring.
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
-            --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then echo "stt-app: STT_DATA_DIR must be set to the data directory (it holds stt.db)" >&2; exit 1; fi' \
+            --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
             --set CLASSPATH "$CP" \
