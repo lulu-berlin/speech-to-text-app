@@ -66,7 +66,7 @@ Run backend commands from `backend/`, frontend commands from `frontend/`.
 
 Root (devenv):
 
-- `devenv up` — start the whole app for development: the frontend (`pnpm dev`, Vite dev server with HMR on port 5173, proxying `/api` to the backend) and the backend (`gradle run`, Ktor on 8080; `STT_DATA_DIR` comes from the devenv shell). No browser opens; the Vite URL and both processes' logs are printed. Stop with Ctrl-C or `devenv down`. Dev data (`stt.db`, uploads) lives in `.devenv/state/stt`, a fixed, git-ignored location that survives restarts. Changes to `devenv.nix` need `direnv reload` to take effect.
+- `devenv up` — start the whole app for development: the frontend (`pnpm dev`, Vite dev server with HMR on port 5173, proxying `/api` to the backend) and the backend (`gradle run`, Ktor on 8080; `STT_DATA_DIR` comes from the devenv shell). No browser opens; the Vite URL and both processes' logs are printed. Stop with Ctrl-C, then `q` to confirm — or `devenv down`. Dev data (`stt.db`, uploads) lives in `.devenv/state/stt`, a fixed, git-ignored location that survives restarts. Changes to `devenv.nix` need `direnv reload` to take effect.
 
 Backend (Gradle 8.14 via devenv, no wrapper — ADR 0014):
 
