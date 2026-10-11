@@ -1,0 +1,9 @@
+{
+  "device": "auto",
+  "threads": null,
+  "defaultLanguage": "auto",
+  "speakersMode": "auto",
+  "speakersCount": null,
+  "maxSpeakers": 8,
+  "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"]
+}
