@@ -90,6 +90,14 @@ None.
   it); `docker compose up -d` started a fresh container; task 1 was still `COMPLETED` and its
   transcript intact (the volume holds the only copy, ADR 0024). No refactoring suggested.
 
+- 2026-10-11 (cycle 5, green, user-verified): no code change. A ~70 s clip (ffmpeg
+  `-stream_loop 6`, distinct bytes from the test-4 fixture) was interrupted mid-transcription
+  by `docker compose stop`; `docker compose start` resumed it (item 11's recovery: first poll
+  `RUNNING`, completed after a few minutes of CPU transcription — an early "stuck forever"
+  reading was just slowness, ruled out by an advancing poll) and the transcript carries the
+  phrase once per loop, split across two speakers. The `docker compose ps` scare in between
+  was a stopped container hiding from `ps` (no `-a`) — not a crash. No refactoring suggested.
+
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
@@ -100,7 +108,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - [x] `GET /api/health` answers `{"status":"ok"}` and the compose healthcheck reports the service healthy
 - [x] Data survives `docker compose down` and `up`: a finished transcription is still in the history
 - [x] Uploading a short clip in the containerized app completes with a transcript
-- [ ] A task interrupted by `docker compose stop` resumes after `docker compose start` (item 11's restart recovery)
+- [x] A task interrupted by `docker compose stop` resumes after `docker compose start` (item 11's restart recovery)
 - [ ] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
 - [ ] The container runs as a non-root user and writes only to `/data`
 - [ ] The image contains only the flake closure's files (plus the init)
