@@ -746,6 +746,95 @@ describe('the themed player', () => {
     );
     expect(within(player).getByText('00:05 / 19:45')).toBeInTheDocument();
   });
+
+  it('follows a drag on the seek bar without seeking, and seeks once when the drag is released', async () => {
+    // durationMs 1185000 -> total "19:45" and a seek bar of 1185 seconds.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskCompleted, id: 3, durationMs: 1185000 }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('3');
+    await screen.findByText('Good morning.');
+
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const seek = within(player).getByRole('slider', { name: 'Seek' });
+
+    // The audio plays and the playhead advances while the user drags.
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    fireEvent(audio, new Event('play'));
+    audio.currentTime = 6.0; // 6000 ms, inside turn 2 [5800,9100)
+    fireEvent(audio, new Event('timeupdate'));
+    expect(seek).toHaveAttribute('aria-valuenow', '6');
+
+    // jsdom has no pointer capture, and Radix maps clientX to a value via the slider's
+    // bounding rect (the ResizeObserver stub in test/setup.ts is the same category of
+    // stub). The slider is 1185 px wide, so 1 px = 1 second; capture works per element.
+    const captured = new Set<Element>();
+    const proto = HTMLElement.prototype;
+    const originalSetPointerCapture = proto.setPointerCapture;
+    const originalHasPointerCapture = proto.hasPointerCapture;
+    const originalReleasePointerCapture = proto.releasePointerCapture;
+    proto.setPointerCapture = function (this: Element) {
+      captured.add(this);
+    };
+    proto.hasPointerCapture = function (this: Element) {
+      return captured.has(this);
+    };
+    proto.releasePointerCapture = function (this: Element) {
+      captured.delete(this);
+    };
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1185,
+      height: 8,
+      x: 0,
+      y: 0,
+    } as DOMRect);
+    try {
+      // Radix binds its pointer handlers on the slider's root span (the thumb's parent's
+      // parent — the layout in Slider.test.tsx); a pointer-down there starts a slide, as
+      // on the track. Drag from 4 s to 5 s: a drag tick is not a seek, and the thumb
+      // follows the drag, not the moving playhead.
+      const root = required(required(seek.parentElement).parentElement);
+      fireEvent.pointerDown(root, { pointerId: 7, clientX: 4 });
+      fireEvent.pointerMove(root, { pointerId: 7, clientX: 5 });
+      expect(audio.currentTime).toBe(6.0);
+
+      // Still dragging: the playhead keeps advancing, but the thumb stays on the draft
+      // position and the audio is not seeked.
+      audio.currentTime = 6.4;
+      fireEvent(audio, new Event('timeupdate'));
+      expect(seek).toHaveAttribute('aria-valuenow', '5');
+      expect(audio.currentTime).toBe(6.4);
+
+      // Releasing seeks exactly once, to the released position: 5000 ms, inside
+      // [2400,5200); the highlight and the time label follow.
+      fireEvent.pointerUp(root, { pointerId: 7, clientX: 5 });
+      expect(audio.currentTime).toBe(5);
+      expect(seek).toHaveAttribute('aria-valuenow', '5');
+      expect(document.querySelector('[data-active]')?.textContent).toContain(
+        'Thanks for joining us today.',
+      );
+      expect(within(player).getByText('00:05 / 19:45')).toBeInTheDocument();
+    } finally {
+      proto.setPointerCapture = originalSetPointerCapture;
+      proto.hasPointerCapture = originalHasPointerCapture;
+      proto.releasePointerCapture = originalReleasePointerCapture;
+      vi.restoreAllMocks();
+    }
+  });
 });
 
 describe('times past one hour', () => {

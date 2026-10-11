@@ -171,13 +171,14 @@ export function TaskTranscriptView() {
   const currentTimeMs = playback.context.currentTimeMs;
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Moves the audio and the playhead to `ms`: the player's seek bar and click-to-seek.
+  // Moves the audio and the playhead to `ms`: the player's seek bar (on release) and
+  // click-to-seek. The machine's SEEK also ends any drag draft.
   const seek = (ms: number) => {
     const audio = audioRef.current;
     if (audio === null) {
       return;
     }
-    playbackSend({ type: 'PLAYHEAD', ms });
+    playbackSend({ type: 'SEEK', ms });
     audio.currentTime = ms / 1000;
   };
 
@@ -291,10 +292,12 @@ export function TaskTranscriptView() {
       filename={task.filename}
       durationMs={task.durationMs ?? 0}
       currentTimeMs={currentTimeMs}
+      dragMs={playback.context.dragMs}
       playing={playback.matches('playing')}
       audioRef={audioRef}
       onPlayhead={(ms) => playbackSend({ type: 'PLAYHEAD', ms })}
       onSeek={seek}
+      onDrag={(ms) => playbackSend({ type: 'DRAG', ms })}
       onPlayingChange={(playing) => playbackSend({ type: playing ? 'PLAYED' : 'PAUSED' })}
     />
   ) : (
