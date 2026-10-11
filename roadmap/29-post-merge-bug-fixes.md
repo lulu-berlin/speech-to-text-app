@@ -35,7 +35,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Closing the client mid-stream ends the SSE response quietly — no unhandled exception logged, no response error (fix 4)
 - [ ] (added 2026-10-11, from item 21's cycle-2 finding, user-confirmed) A silent idle network partition is detected: the backend emits SSE keepalive comment frames while the stream is idle (item 12's route; not a contract change — comments are transparent to EventSource), and the frontend treats N seconds without any event as a dropped stream (reconnecting → first snapshot heals; the connection machine, item 13/17). Today the app shows "Live" against an unreachable server forever.
 - [x] (discovered 2026-10-11, confirmed at the cycle-2 refactor checkpoint) The playback machine keeps the seek bar's draft while dragging, as pure logic: DRAG sets it, PLAYHEAD does not clear it, SEEK clears it and moves the playhead (ADR 0031)
-- [x] (discovered 2026-10-11 in cycle 3, pending confirmation) The real join names its output format: the cache's temporary target is `….flac.part`, from which ffmpeg cannot infer a muxer, so the route 500'd even with a work directory (pinned by the fix-3 test, which cannot pass without it)
+- [x] (discovered 2026-10-11 in cycle 3, confirmed at its refactor checkpoint) The real join names its output format: the cache's temporary target is `….flac.part`, from which ffmpeg cannot infer a muxer, so the route 500'd even with a work directory (pinned by the fix-3 test, which cannot pass without it)
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` stay green; the existing upload/join/SSE/player tests pass unchanged where their scenario overlaps
 
 ## Acceptance criteria
