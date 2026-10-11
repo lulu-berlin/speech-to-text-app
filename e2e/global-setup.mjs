@@ -47,6 +47,7 @@ export default async function globalSetup() {
     { args: ['-t', '5'], file: FIXTURE_CLIPS[18] }, // 0-5s, screenshots' second running seed
     { args: ['-stream_loop', '8'], file: FIXTURE_CLIPS[19] }, // ~88s, the header/nav e2e (item 31)
     { args: ['-ss', '5', '-t', '2'], file: FIXTURE_CLIPS[20] }, // 5-7s, item 14's contract check
+    { args: ['-ss', '1', '-t', '7'], file: FIXTURE_CLIPS[21] }, // 1-8s, the settings e2e (item 32)
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);

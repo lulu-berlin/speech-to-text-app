@@ -55,6 +55,7 @@ export const FIXTURE_CLIPS = [
   'jfk-m.wav', // 0-5s
   'jfk-n.wav', // the sample looped 8x, ~88s
   'jfk-o.wav', // 5-7s, the contract check (item 16)
+  'jfk-p.wav', // 1-8s, item 32's settings e2e
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -81,6 +82,9 @@ export const SHOT_UPLOAD_CLIP = FIXTURE_CLIPS[17];
 // The header/navigation test's own long clip (unique bytes; looped, so its transcript
 // scrolls in a short viewport — item 31).
 export const HEADER_CLIP = FIXTURE_CLIPS[19];
+// The settings e2e's own trim (unique bytes; 1-8s, so it runs quickly once the queue
+// reaches it — item 32, ADR 0046).
+export const SETTINGS_CLIP = FIXTURE_CLIPS[21];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
