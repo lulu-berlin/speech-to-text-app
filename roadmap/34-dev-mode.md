@@ -1,6 +1,6 @@
 # 34 — Dev mode: frontend and backend with one command
 
-Status: in-progress
+Status: in-review
 Depends on: —
 
 ## Goal
@@ -54,7 +54,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
       Scenario (user-run): with `devenv up` running, `ls .devenv/state/stt/` (worktree root) shows `stt.db`; `git check-ignore .devenv/state/stt/stt.db` matches (and `git status` stays clean). Stop everything (Ctrl-C then `q`), then `devenv up` again. Expect: the page loads, History still shows the tasks completed in earlier runs, and queue/paused state survives.
 - [x] Stopping `devenv up` stops both halves and leaves no whisper-cli or ffmpeg processes behind
       Scenario (user-run): with `devenv up` running and a task transcribing (whisper-cli is live), stop with Ctrl-C then `q`. Expect: the TUI exits and both halves stop; after a few seconds `pgrep -af 'whisper|ffmpeg|stt-backend'` prints nothing, and ports 5173/8080 are free (`ss -ltn` shows no listeners on them). Then `devenv up` again: it starts cleanly and the interrupted task resumes (as in item 5).
-- [ ] (must not break) `gradle check`, `pnpm test`, `gradle run` and `pnpm dev` work as before
+- [x] (must not break) `gradle check`, `pnpm test`, `gradle run` and `pnpm dev` work as before
       Scenario (user-run): in `workspaces/34-dev-mode` (devenv shell), stop `devenv up` first so ports 5173/8080 are free. `cd backend && gradle check` → BUILD SUCCESSFUL (ktlint formatting gate + all unit tests); `cd frontend && pnpm test` → vitest run and prettier check pass; `cd backend && gradle run` still starts the Ktor server (STT_DATA_DIR and models from the shell; the startup log shows the listening port; Ctrl-C to stop); `cd frontend && pnpm dev` still serves the Vite dev server (Ctrl-C to stop). None of the item-34 changes (devenv processes, dev runner, ProcessRunner SIGTERM mapping) affect these commands.
 - [x] (discovered) A task transcribing when `devenv up` is stopped resumes on the next start — whisper killed by the shutdown (exit 143) is an interruption, not a failure
       Scenario (user-run): with `devenv up` running and a task transcribing, stop with Ctrl-C then `q`, then `devenv up` again. Expect: the task is still in the queue and resumes — its status goes RUNNING again and it eventually completes; it does NOT land FAILED with "whisper-cli failed … exit 143". (Discovered 2026-10-11 by item 7: the stop TERMed whisper-cli while the server was shutting down; the app recorded the interrupted run as FAILED instead of leaving the task RUNNING for item 11 recovery. Fixed in ProcessRunner: a SIGTERM death (exit 143) surfaces as a CancellationException — covering whisper-cli and the ffmpeg runs of chunking and diarization alike — so runTask leaves the task RUNNING.)
@@ -72,3 +72,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-11: drafted from the user's request; answered so far: `devenv up` here, `./gradlew dev` in item 33.
 - 2026-10-11: consultation answers: restart on change (no Ktor auto-reload); running tasks resume through restart recovery; no browser opening. Proposed test list (8 items). Remaining: test list approval.
 - 2026-10-11: test list approved by the user; status `spec-approved`.
+- 2026-10-11: all test-list items green (two discovered items appended and confirmed with the user: the stop hint, and the SIGTERM-interruption fix in `ProcessRunner`); status `in-review`.
