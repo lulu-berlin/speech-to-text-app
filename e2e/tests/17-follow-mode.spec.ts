@@ -43,9 +43,18 @@ test('follow mode: long playback never shows "Back to playing position" without 
     true,
   );
 
-  // Play from the start; the highlight follows the moving playhead.
-  await page.getByRole('button', { name: 'Play' }).click();
+  // The transcript's opening renders inside the region's box, so following does not need
+  // to scroll until the playhead passes the fold. Seek past it first (the slider's
+  // PageUp jumps 10 s, as in the playback journey), then play through the part of the
+  // transcript where keeping the active segment in view takes real scrolling every
+  // segment or two.
+  const seekBar = page.getByRole('slider', { name: 'Seek' });
+  await seekBar.focus();
+  for (let press = 0; press < 7; press += 1) {
+    await page.keyboard.press('PageUp');
+  }
   await expect.poll(() => activeIndex(region)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Play' }).click();
 
   // Sample ~30 s of playback: on every sample the button stays hidden while the region
   // actually scrolls. The distinct scrollTop count proves several follow scrolls took
