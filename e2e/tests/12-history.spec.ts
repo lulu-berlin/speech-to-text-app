@@ -1,0 +1,77 @@
+import { expect, test } from '@playwright/test';
+import { BROKEN_CLIP, REORDER_CLIPS, appUrl } from '../lib/backend.mjs';
+import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
+
+// This test's own uploads (REORDER_CLIPS' trims, unique bytes; BROKEN_CLIP fails in
+// CHUNKING). The shared suite has already finished more tasks by the time this file
+// runs, so the list's total is not pinned — its shape and order are.
+const FIRST_CLIP = REORDER_CLIPS[0]; // 0-2s
+const SECOND_CLIP = REORDER_CLIPS[1]; // 2-4s
+
+test('the history list shows finished tasks newest first with status, finish date and duration', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+
+  // Two completed cards, in upload order: the second finishes after the first.
+  await appLive(page);
+  await uploadClips(page, [FIRST_CLIP]);
+  await expect(page.getByText(`${FIRST_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await uploadClips(page, [SECOND_CLIP]);
+  await expect(page.getByText(`${SECOND_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+
+  // A FAILED card with a stored error.
+  await uploadClips(page, [BROKEN_CLIP]);
+  await goTo(page, 'History');
+  const failed = rowOf(page, BROKEN_CLIP);
+  await expect(failed.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 60_000 });
+
+  // The whole list, once: the suite's finished tasks plus this test's three uploads.
+  // Every card's meta line reads "<Mon> <d>, <yyyy>" — the fixed-UTC date — and
+  // carries the duration "mm:ss" (or "h:mm:ss") exactly when the task knows it.
+  const items = page.getByRole('listitem');
+  await expect(items).not.toHaveCount(0);
+  const cards = await items.all();
+  const names = await Promise.all(cards.map((card) => card.textContent()));
+  for (const card of cards) {
+    const meta = card
+      .locator('p')
+      .filter({ hasText: /, 20\d\d/ })
+      .first();
+    await expect(meta).toHaveText(/^\w{3} \d{1,2}, \d{4}( · \d{1,2}:\d{2})?$/);
+  }
+
+  // Card order is newest first: the ids behind the cards' transcript links, in card
+  // order, exactly the backend's finishedAt descending. (A same-again id is fine here:
+  // the delete test can reuse rowids; the shape of the order is what is pinned.)
+  const cardIds = [];
+  for (const card of cards) {
+    const href = await card.getByRole('link').first().getAttribute('href');
+    cardIds.push(Number(href?.split('/').pop() ?? '0'));
+  }
+  const taskList = await (await page.request.get(appUrl('/api/tasks'))).json();
+  const finishedAt: Record<number, number> = Object.fromEntries(
+    taskList.tasks
+      .filter((task) => task.finishedAt !== null)
+      .map((task) => [task.id, task.finishedAt]),
+  );
+  const times = cardIds.map((id) => finishedAt[id] ?? -1);
+  expect(times).toEqual([...times].sort((a, b) => b - a));
+
+  // The FAILED card shows its stored error and no duration.
+  const failedId = await taskIdOf(page, BROKEN_CLIP);
+  const stored = await (await page.request.get(appUrl(`/api/tasks/${failedId}`))).json();
+  await expect(failed).toContainText(stored.error);
+  await expect(
+    failed
+      .locator('p')
+      .filter({ hasText: /, 20\d\d/ })
+      .first(),
+  ).toHaveText(/^\w{3} \d{1,2}, \d{4}$/);
+
+  // The test's own two cards are completed, and the later-finishing second upload
+  // sits above the first (newest first).
+  const positionOf = (filename: string) => names.findIndex((text) => text?.includes(filename));
+  expect(positionOf(SECOND_CLIP)).toBeGreaterThanOrEqual(0);
+  expect(positionOf(SECOND_CLIP)).toBeLessThan(positionOf(FIRST_CLIP));
+});
