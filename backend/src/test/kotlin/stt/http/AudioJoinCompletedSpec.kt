@@ -14,18 +14,14 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import stt.Integration
 import stt.audio.ExportedChunk
-import stt.audio.FFMPEG
 import stt.audio.PlannedChunk
-import stt.audio.expectSuccess
+import stt.audio.sineFlac
 import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
-import stt.process.ProcessRunner
 import stt.queue.TaskStatus
-import java.nio.file.Files
-import java.nio.file.Path
 
 /**
  * Item 29, fix 3: a COMPLETED task's work directory is gone (item 11 removes it), but its chunk FLACs
@@ -40,38 +36,6 @@ class AudioJoinCompletedSpec :
             `when`("its audio is requested") {
                 then("200 audio/flac serves the joined FLAC, and a Range answers 206") {
                     val dataDir = tempdir("stt-join-completed").toPath()
-                    val runner = ProcessRunner()
-
-                    suspend fun sineFlac(
-                        dir: Path,
-                        name: String,
-                        frequency: String,
-                        seconds: String,
-                    ): Path {
-                        val file = dir.resolve("$name.flac")
-                        runner
-                            .run(
-                                FFMPEG +
-                                    listOf(
-                                        "-y",
-                                        "-loglevel",
-                                        "error",
-                                        "-f",
-                                        "lavfi",
-                                        "-i",
-                                        "sine=frequency=$frequency:duration=$seconds",
-                                        "-ar",
-                                        "16000",
-                                        "-ac",
-                                        "1",
-                                        "-c:a",
-                                        "flac",
-                                        file.toString(),
-                                    ),
-                            ).expectSuccess("generate $name")
-                        return file
-                    }
-
                     val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
                     val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
 
