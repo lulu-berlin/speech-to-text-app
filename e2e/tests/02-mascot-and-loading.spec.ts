@@ -1,19 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { appUrl } from '../lib/backend.mjs';
-
-// The mascot (item 17): the stenographer SVG. It is decorative (aria-hidden, no role),
-// so it is found by the artwork's fixed viewBox. It appears in the header, and every
-// loading region and empty state renders it above its label or title.
-const MASCOT = 'svg[viewBox="55 61 293 293"]';
-
-// The mascot directly above a region's label. Two layouts: the loading regions and the
-// History empty state put the label in a paragraph right after the mascot (`svg + p`),
-// the queue drop zone's zone span contains the label text with the mascot as its direct
-// child. Playwright's xpath chaining supports only `..`, so these CSS forms carry the
-// structure. One locator with a comma union: whichever shape matches this label wins.
-function mascotAbove(page: Page, label: string) {
-  return page.locator(`svg + p:has-text("${label}"), span:has-text("${label}") > svg`);
-}
+import { MASCOT, mascotAbove } from './helpers/ui';
 
 test('shell, loading and empty regions show the mascot, resting while nothing runs', async ({
   page,
