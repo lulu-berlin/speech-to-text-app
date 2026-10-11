@@ -85,6 +85,11 @@ None.
   The task list is `{"tasks": […]}` — the first handout's bare-array jq was wrong, corrected
   to `.tasks | map({id, filename, status})`. No refactoring suggested.
 
+- 2026-10-11 (cycle 3, green, user-verified): no code change. `docker compose down` removed
+  container and network but kept the volume `stt-data` (as designed — only `down -v` deletes
+  it); `docker compose up -d` started a fresh container; task 1 was still `COMPLETED` and its
+  transcript intact (the volume holds the only copy, ADR 0024). No refactoring suggested.
+
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
@@ -93,7 +98,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 
 - [x] From a fresh clone with only Docker installed, the documented command builds the image and starts the app on `http://localhost:8080`
 - [x] `GET /api/health` answers `{"status":"ok"}` and the compose healthcheck reports the service healthy
-- [ ] Data survives `docker compose down` and `up`: a finished transcription is still in the history
+- [x] Data survives `docker compose down` and `up`: a finished transcription is still in the history
 - [x] Uploading a short clip in the containerized app completes with a transcript
 - [ ] A task interrupted by `docker compose stop` resumes after `docker compose start` (item 11's restart recovery)
 - [ ] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
