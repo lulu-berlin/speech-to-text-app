@@ -1,6 +1,6 @@
 # 36 — Follow mode stops by itself (hold-off race)
 
-Status: spec-approved
+Status: in-progress
 Depends on: [15](../docs/specs/frontend-history-ui.md) (done), [21](../docs/specs/frontend-backend-end-to-end.md) (done; the `e2e/` suite, ADR 0046)
 Blocks: [35](35-readme-and-architecture-overview.md) (its playback GIF shows follow mode)
 
