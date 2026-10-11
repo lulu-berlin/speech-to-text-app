@@ -1,6 +1,6 @@
 # 33 — Gradle bootstrap for developers without Nix
 
-Status: spec-approved
+Status: in-progress
 Depends on: [16](../docs/specs/nix-flake-package.md) (the flake is the version source), [34](../docs/specs/dev-mode.md) (`./gradlew dev` reuses its dev setup)
 
 ## Goal
