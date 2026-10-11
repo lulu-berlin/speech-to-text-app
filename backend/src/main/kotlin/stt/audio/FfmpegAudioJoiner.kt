@@ -20,9 +20,14 @@ import java.nio.file.Path
  * its chunks are still in the database and its audio must still join. Only the joiner's own scratch is
  * removed afterwards, never the directory — it may be an active task's; the startup sweep removes an empty
  * one left behind for a finished task.
+ *
+ * The join runs its own fresh [ProcessRunner], one per call (item 37): the joiner serves an HTTP request,
+ * not an engine task, so it must not claim the engine's single-flight runner (ADR 0020) — a join would
+ * otherwise answer 500 "A run is already in flight" whenever the engine held the runner, and two concurrent
+ * joins would collide with each other. A per-join runner keeps every join independent, with the same
+ * cancellation cleanup (the tree is killed when the request is cancelled).
  */
 class FfmpegAudioJoiner(
-    private val runner: ProcessRunner,
     private val chunks: ChunkRepository,
     private val workDirectories: TaskWorkDirectories,
 ) : AudioJoiner {
@@ -44,7 +49,9 @@ class FfmpegAudioJoiner(
         Files.write(listFile, inputs.map { "file '${it.fileName}'" })
         try {
             val result =
-                runner.run(
+                // Item 37: a fresh runner per join — this run must never contend with the engine's
+                // single-flight runner or with another join's (see the class doc).
+                ProcessRunner().run(
                     FFMPEG +
                         listOf(
                             "-y",

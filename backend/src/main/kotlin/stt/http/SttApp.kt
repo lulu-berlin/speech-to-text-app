@@ -56,7 +56,9 @@ fun Application.sttApp(
         provide<SegmentRepository> { SegmentRepository(resolve()) }
         provide<ChunkRepository> { ChunkRepository(resolve()) }
         provide<JoinedAudioCache> { JoinedAudioCache(resolve()) }
-        provide<AudioJoiner> { FfmpegAudioJoiner(resolve(), resolve(), resolve()) }
+        // The joiner makes its own ProcessRunner per join (item 37): it must never share the engine's
+        // single-flight runner, which would answer 500 while a task transcribes.
+        provide<AudioJoiner> { FfmpegAudioJoiner(resolve(), resolve()) }
         provide<EventStream> { NumberedEventStream(resolve(), eventsScope) }
         require(DependencyKey<Database>())
     }

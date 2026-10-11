@@ -36,7 +36,7 @@ class AudioJoinIntegrationSpec :
                 then("one FLAC of the combined duration is produced") {
                     val runner = ProcessRunner()
                     val dataDir = tempdir("stt-join").toPath()
-                    val target = joinTwoSineChunks(dataDir, runner)
+                    val target = joinTwoSineChunks(dataDir)
 
                     target.exists().shouldBeTrue()
                     String(Files.readAllBytes(target), 0, 4, Charsets.UTF_8) shouldBe "fLaC"
@@ -69,7 +69,7 @@ class AudioJoinIntegrationSpec :
             `when`("a player reads the joined file's header and its frames' timestamps") {
                 then("the header declares the full 0.8 s and the timestamps keep increasing across the chunk boundary") {
                     val runner = ProcessRunner()
-                    val joined = joinTwoSineChunks(tempdir("stt-join-seek").toPath(), runner)
+                    val joined = joinTwoSineChunks(tempdir("stt-join-seek").toPath())
 
                     // What a browser seeks with (item 29, ADR 0045): the header's total sample count, and each
                     // frame's own position. 0.8 s × 16 kHz = 12 800 samples, by hand.
@@ -83,11 +83,10 @@ class AudioJoinIntegrationSpec :
 
 /**
  * Stores two sine-wave chunk FLACs (0.3 s at 440 Hz, then 0.5 s at 880 Hz) for a new task in [dataDir] and joins
- * them with the real [FfmpegAudioJoiner]; returns the joined file.
+ * them with the real [FfmpegAudioJoiner] (which runs its own ProcessRunner per join, item 37); returns the joined file.
  */
 private suspend fun joinTwoSineChunks(
     dataDir: Path,
-    runner: ProcessRunner,
 ): Path {
     val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
     val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
@@ -106,7 +105,7 @@ private suspend fun joinTwoSineChunks(
                 ExportedChunk(PlannedChunk(300L, 800L), chunk1),
             ),
         )
-        FfmpegAudioJoiner(runner, ChunkRepository(db), workDirectories).join(id, target)
+        FfmpegAudioJoiner(ChunkRepository(db), workDirectories).join(id, target)
     }
     return target
 }
