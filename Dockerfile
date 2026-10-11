@@ -74,6 +74,10 @@ ENV PATH=/usr/local/bin:/bin \
 
 EXPOSE 8080
 
+# The stt user from /etc/passwd above; /data (volume) and /home/stt are its own, the
+# store is read-only, so the app can write only to /data (STT_DATA_DIR) and scratch.
+USER 1000:1000
+
 # docker-init (compose init: true) is PID 1 and execs this generated shim, which
 # execs the wrapper, which execs the JVM — one process chain, signals pass through.
 ENTRYPOINT ["/entrypoint.sh"]
