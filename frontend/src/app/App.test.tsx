@@ -456,6 +456,57 @@ describe('the shrinking header', () => {
   });
 });
 
+describe('the navigation pills', () => {
+  it('shows the active link as a filled pill and a soft pill on hover, with a gated token transition and the focus ring kept', async () => {
+    renderAt('/queue');
+    await screen.findByText('Live');
+    const queueLink = screen.getByRole('link', { name: 'Queue' });
+    const historyLink = screen.getByRole('link', { name: 'History' });
+
+    // The active link is a filled pill: the accent fill with the accent text on it, the
+    // pill radius and spacing padding, all tokens.
+    const active = getComputedStyle(queueLink);
+    expect(active.backgroundColor).toBe(asRgb(lightTheme.colors.accent));
+    expect(active.color).toBe(asRgb(lightTheme.colors.accentText));
+    expect(active.borderRadius).toBe(lightTheme.radii.pill);
+    expect(active.paddingTop).toBe(px(lightTheme.spacing.xs));
+    expect(active.paddingLeft).toBe(px(lightTheme.spacing.sm));
+
+    // Hover (jsdom cannot apply :hover, so the emitted rule is checked): a soft surface
+    // pill behind the link, same radius.
+    const hover = stateRulesFor(historyLink, ':hover');
+    expect(hover.map((rule) => rule.style.backgroundColor)).toContain(
+      asRgb(lightTheme.colors.surface),
+    );
+
+    // The pill transitions with the motion tokens, declared only inside the
+    // no-preference block (instant under reduced motion).
+    const pill = mediaRulesFor(historyLink, '(prefers-reduced-motion: no-preference)');
+    expect(pill.flatMap((rule) => rule.style.transitionProperty.split(','))).toEqual(
+      expect.arrayContaining(['background-color', 'color']),
+    );
+    expect(pill.map((rule) => rule.style.transitionDuration)).toContain(
+      lightTheme.motion.navDuration,
+    );
+    expect(pill.map((rule) => rule.style.transitionTimingFunction)).toContain(
+      lightTheme.motion.navEasing,
+    );
+    const ungated = styleRules().filter(
+      (rule): rule is CSSStyleRule =>
+        rule instanceof CSSStyleRule &&
+        historyLink.matches(rule.selectorText) &&
+        rule.style.transition !== '',
+    );
+    expect(ungated).toEqual([]);
+
+    // The keyboard focus ring stays on the pill (the walk covers both links too).
+    const focus = stateRulesFor(historyLink, ':focus-visible');
+    expect(
+      focus.some((rule) => rule.style.boxShadow.includes(lightTheme.colors.focusRing)),
+    ).toBe(true);
+  });
+});
+
 describe('reduced motion', () => {
   it('runs no animation or transition outside a prefers-reduced-motion gate', async () => {
     // A running task makes the header's mascot type, so its animation rules land in the
