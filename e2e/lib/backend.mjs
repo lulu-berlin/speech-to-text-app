@@ -21,6 +21,11 @@ export const frontendDist = join(repoRoot, 'frontend', 'dist');
 const STATE_FILE = join(e2eRoot, '.e2e-state.json');
 const healthUrl = (port) => `http://127.0.0.1:${port}/api/health`;
 
+// The journey's fixture clips in upload order (global-setup.mjs creates them from
+// TEST_JFK_WAV). Uploaded tasks are deduplicated by content sha256, so the queue needs
+// three distinct files: the full sample plus two different trims.
+export const FIXTURE_CLIPS = ['jfk-a.wav', 'jfk-b.wav', 'jfk-c.wav'];
+
 export function loadState() {
   if (!existsSync(STATE_FILE)) {
     throw new Error(
