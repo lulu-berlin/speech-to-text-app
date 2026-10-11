@@ -1,8 +1,9 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { useMachine } from '@xstate/react';
 import { Link, NavLink } from 'react-router';
 import styled from 'styled-components';
+import { PlaceholderMascotContext } from '../shared/brand/PlaceholderMascot';
 import { StenographerAnimation } from '../shared/brand/StenographerAnimation';
 import type { ThemeMode } from '../shared/theme/themeMode';
 import { IconButton } from '../shared/ui/IconButton';
@@ -144,10 +145,19 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, [sendScroll]);
+  // The one-mascot rule (item 31): while a placeholder mascot is on screen (empty,
+  // loading or connecting), the header shows the small static logo instead — compact,
+  // never typing; otherwise the animated mascot, which types while a task runs and
+  // shrinks on scroll. The decision lives here, from the shell's single count.
+  const placeholderOnScreen = (useContext(PlaceholderMascotContext)?.count ?? 0) > 0;
   return (
     <Header>
       <HomeLink to="/" aria-label="Speech-to-Text home">
-        <StenographerAnimation typing={running} size={compact ? 'compact' : 'header'} />
+        {placeholderOnScreen ? (
+          <StenographerAnimation size="compact" />
+        ) : (
+          <StenographerAnimation typing={running} size={compact ? 'compact' : 'header'} />
+        )}
       </HomeLink>
       <Title>Speech-to-Text</Title>
       <HeaderControls>
