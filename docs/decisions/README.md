@@ -56,4 +56,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0044 | [SSE heartbeat event and client inactivity watchdog](0044-sse-heartbeat-and-client-watchdog.md) | accepted, extends item 12's event list | 2026-10-11 |
 
 | 0045 | [The joined playback FLAC is re-encoded (losslessly)](0045-joined-playback-flac-reencoded.md) | accepted, amends 0024's playback join | 2026-10-11 |
+| 0046 | [Every app feature has an end-to-end test](0046-every-feature-has-an-e2e-test.md) | accepted | 2026-10-11 |
 
