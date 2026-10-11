@@ -5,6 +5,7 @@
 
 import { http, HttpResponse } from 'msw';
 import {
+  heartbeat as heartbeatFixture,
   snapshot as snapshotFixture,
   taskList as taskListFixture,
   taskQueued as taskQueuedFixture,
@@ -22,6 +23,9 @@ export interface EventStreamOptions {
   retryMs?: number;
   // End the stream after the events, as when the connection drops.
   end?: boolean;
+  // Send a `heartbeat` this often while the stream is open, as the server does when idle
+  // (ADR 0044); without it the client's watchdog would treat the stream as dropped.
+  heartbeatMs?: number;
 }
 
 // A text/event-stream response that sends the given named events in order, then stays open
@@ -30,20 +34,32 @@ export interface EventStreamOptions {
 // directly (the msw docs' alternative SSE approach).
 export function eventStreamResponse(
   events: [name: string, data: unknown][],
-  { retryMs, end = false }: EventStreamOptions = {},
+  { retryMs, end = false, heartbeatMs }: EventStreamOptions = {},
 ): Response {
   const encoder = new TextEncoder();
+  const frame = (name: string, data: unknown) =>
+    encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+  let heartbeats: ReturnType<typeof setInterval> | undefined;
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       if (retryMs !== undefined) {
         controller.enqueue(encoder.encode(`retry: ${retryMs}\n\n`));
       }
       for (const [name, data] of events) {
-        controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+        controller.enqueue(frame(name, data));
       }
       if (end) {
         controller.close();
+      } else if (heartbeatMs !== undefined) {
+        heartbeats = setInterval(
+          () => controller.enqueue(frame('heartbeat', heartbeatFixture)),
+          heartbeatMs,
+        );
       }
+    },
+    // The client closed the stream (EventSource.close aborts the request).
+    cancel() {
+      clearInterval(heartbeats);
     },
   });
   return new HttpResponse(stream, {
@@ -149,6 +165,8 @@ export const handlers = [
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
 
   // Events: GET /api/events, the SSE stream. The first event of every connection is the
-  // snapshot.
-  http.get('/api/events', () => eventStreamResponse([['snapshot', snapshotFixture]])),
+  // snapshot; a heartbeat every 5 s keeps the client's watchdog from reconnecting (ADR 0044).
+  http.get('/api/events', () =>
+    eventStreamResponse([['snapshot', snapshotFixture]], { heartbeatMs: 5000 }),
+  ),
 ];

@@ -38,6 +38,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] (fix 5, frontend; amended 2026-10-11) The connection treats 15 s without any event, heartbeats included, as a dropped stream: it goes to `reconnecting`, opens a fresh stream, and the next snapshot makes it `live` again; while heartbeats keep arriving it stays `live`
 - [x] (discovered 2026-10-11, confirmed at the cycle-2 refactor checkpoint) The playback machine keeps the seek bar's draft while dragging, as pure logic: DRAG sets it, PLAYHEAD does not clear it, SEEK clears it and moves the playhead (ADR 0031)
 - [x] (discovered 2026-10-11 in cycle 3, confirmed at its refactor checkpoint) The real join names its output format: the cache's temporary target is `….flac.part`, from which ffmpeg cannot infer a muxer, so the route 500'd even with a work directory (pinned by the fix-3 test, which cannot pass without it)
+- [x] (discovered 2026-10-11 in the watchdog cycle, confirmed at its checkpoint) The mock `/api/events` stream (`pnpm dev:mock`) sends `heartbeat` (docs/api/heartbeat.json) every 5 s, so the watchdog does not cycle the mock UI through `reconnecting` every 15 s. Mock tooling, no automated test (user decision); checked in the browser under `dev:mock`
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` stay green; the existing upload/join/SSE/player tests pass unchanged where their scenario overlaps
 
 ## Acceptance criteria

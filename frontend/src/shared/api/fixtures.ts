@@ -14,6 +14,7 @@ export { default as taskCanceled } from '../../../../docs/api/task.canceled.json
 export { default as queue } from '../../../../docs/api/queue.json';
 export { default as taskProgress } from '../../../../docs/api/task-progress.json';
 export { default as taskDeleted } from '../../../../docs/api/task-deleted.json';
+export { default as heartbeat } from '../../../../docs/api/heartbeat.json';
 export { default as turns } from '../../../../docs/api/turns.json';
 export { default as turnsSpeakersOff } from '../../../../docs/api/turns.speakers-off.json';
 export { default as speakers } from '../../../../docs/api/speakers.json';
