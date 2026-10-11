@@ -31,6 +31,7 @@ import stt.db.QueueStateRepository
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
 import stt.db.Settings
+import stt.db.SettingsRepository
 import stt.db.SpeakersMode
 import stt.db.StoredTask
 import stt.db.TaskPhase
@@ -65,6 +66,8 @@ class ProcessingEngine internal constructor(
     private val chunks: ChunkRepository,
     private val segments: SegmentRepository,
     private val queueState: QueueStateRepository,
+    /** Read once per task as it starts (item 32): its device and thread count hold for the whole run. */
+    private val settings: SettingsRepository,
     private val workDirectories: TaskWorkDirectories,
     private val chunker: Chunker,
     private val transcriber: Transcriber,
@@ -411,14 +414,17 @@ class ProcessingEngine internal constructor(
         val id = task.id
         // Refused when the task stopped being QUEUED after the worker picked it (a cancel won the race).
         if (!tasks.setRunningIfQueued(id, now())) return
+        // The settings as the task starts (item 32): every chunk and the diarization of this run use them, so a
+        // change applies from the next task the engine starts and a running (or paused) task keeps its device.
+        val run = settings.get()
         // The work directory is scratch; a task whose terminal status (item 15) cleaned it up must get it
         // back before it writes chunk copies and decoded PCM again.
         withContext(Dispatchers.IO) { Files.createDirectories(workDirectories.workDir(id)) }
         publish(id)
         try {
             chunkAudio(id)
-            transcribeChunks(id, task)
-            diarize(id, task)
+            transcribeChunks(id, task, run)
+            diarize(id, task, run)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -468,6 +474,7 @@ class ProcessingEngine internal constructor(
     private suspend fun transcribeChunks(
         id: Long,
         task: StoredTask,
+        run: Settings,
     ) {
         tasks.setPhase(id, TaskPhase.TRANSCRIBING)
         publish(id)
@@ -485,7 +492,7 @@ class ProcessingEngine internal constructor(
                     transcription.transcribe(
                         taskId = id,
                         chunk = chunk,
-                        settings = settingsFor(task),
+                        settings = settingsFor(task, run),
                         audio = audio,
                         outputPrefix = workDir.resolve("chunk-${chunk.idx}"),
                         prompt = resumePrompt(segments, id, chunk.idx),
@@ -535,6 +542,7 @@ class ProcessingEngine internal constructor(
     private suspend fun diarize(
         id: Long,
         task: StoredTask,
+        run: Settings,
     ) {
         if (task.task.speakersMode == SpeakersMode.OFF || segments.findByTask(id).isEmpty()) return
         tasks.setPhase(id, TaskPhase.DIARIZING)
@@ -551,6 +559,7 @@ class ProcessingEngine internal constructor(
                     task,
                     pauseGate,
                     pcm,
+                    run.threads,
                     onStage = { stage.value = it },
                     onProgress = { value -> reports.trySend(DiarizationReport(stage.value, value)) },
                 )
@@ -738,13 +747,16 @@ class ProcessingEngine internal constructor(
         tasks.find(id)?.let { _events.emit(Event.TaskUpdated(it)) }
     }
 
-    private fun settingsFor(task: StoredTask) =
-        WhisperSettings(
-            model = config.whisperModel,
-            language = task.task.language,
-            threads = config.threads,
-            device = config.device,
-        )
+    /** whisper-cli's settings for one run of [task]: its language, and the device and threads of the [run]'s settings. */
+    private fun settingsFor(
+        task: StoredTask,
+        run: Settings,
+    ) = WhisperSettings(
+        model = config.whisperModel,
+        language = task.task.language,
+        threads = run.threads,
+        device = run.device,
+    )
 
     private fun now(): Long = System.currentTimeMillis()
 
