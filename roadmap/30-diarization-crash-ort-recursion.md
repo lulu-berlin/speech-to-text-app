@@ -32,7 +32,7 @@ To be consulted with the user (2026-10-11): hypothesis first, version pin as fal
 
 Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] The speaker session is configured sequentially: `SpeakerModel.sessionOptions` sets sequential execution and a single inter-op thread (intra-op still honors `STT_THREADS`); the engine's Integration specs (real CAM++ model: `ProcessingEngineIntegrationSpec`, `LibriSpeechDiarizationSpec`) stay green in the sandbox
+- [x] The speaker session is configured sequentially: `SpeakerModel.sessionOptions` sets sequential execution and a single inter-op thread (intra-op still honors `STT_THREADS`); the engine's Integration specs (real CAM++ model: `ProcessingEngineIntegrationSpec`, `LibriSpeechDiarizationSpec`) stay green in the sandbox
 - [ ] The user's machine: a full upload → transcription → diarization → COMPLETED run with speakers on completes twice in a row (the original crash reproduced every time before the fix; acceptance is the user's, the sandbox cannot reproduce)
 - [ ] (only if cycle 1 fails on the user's machine) ONNX Runtime is pinned to the fallback version; `dependencyInsight` shows the pin; the suites stay green; `deps.json` regenerates with the user
 
@@ -46,3 +46,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 
 - 2026-10-11: drafted by the root agent from the user's crash evidence (`coredumpctl info` backtrace showing the ORT recursion).
 - 2026-10-11: consultation with the user: sequential execution + single inter-op thread first (keeps intra-op on `STT_THREADS`); pinned downgrade (1.29.x, then 1.27.x) as the fallback if the user's machine still crashes. Test list (3 items) approved; status → `spec-approved`.
+- 2026-10-11: cycle 1 in the sandbox: `SpeakerModel.sessionOptions` now sets `ExecutionMode.SEQUENTIAL` + `setInterOpNumThreads(1)` (introspected the 1.30.0 jar: enum constants are `SEQUENTIAL`/`PARALLEL`, the C++ name `ORT_SEQUENTIAL` does not exist in Java; no read-back for any of the options). `gradle check` and `gradle integrationTest` green (293 tests, 0 failures; ProcessingEngineIntegrationSpec, LibriSpeechDiarizationSpec, SpeakerModelSpec, AudioJoinIntegrationSpec all executed with real models). User chose: no new unit test — suite + comments are the record. Test-list item 1 ticked. Pending: the user's machine run (item 2).
