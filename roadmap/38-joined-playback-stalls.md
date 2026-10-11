@@ -1,6 +1,6 @@
 # 38 — Joined playback stalls at ~90 s of a long clip
 
-Status: spec-approved
+Status: in-progress
 Depends on: [15](../docs/specs/frontend-history-ui.md) (done; the transcript player's `/audio` join)
 Blocks: [35](../docs/specs/readme-and-architecture.md) (its playback GIF)
 
