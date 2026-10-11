@@ -25,12 +25,17 @@ export interface AudioPlayerProps {
   // The /audio timeline's length (the task's decoded duration).
   durationMs: number;
   currentTimeMs: number;
+  // The seek bar's draft position in ms while the user drags it (null when not dragging);
+  // the bar shows this instead of the playhead so they cannot fight (item 29).
+  dragMs: number | null;
   playing: boolean;
   audioRef: RefObject<HTMLAudioElement | null>;
   // The playhead moved (playback, or a seek in the browser).
   onPlayhead: (ms: number) => void;
-  // The seek bar asks to move the audio to `ms`.
+  // The seek bar was released at `ms`: move the audio there.
   onSeek: (ms: number) => void;
+  // The user is dragging the seek bar towards `ms`; nothing is seeked yet.
+  onDrag: (ms: number) => void;
   // The audio element started or stopped playing.
   onPlayingChange: (playing: boolean) => void;
 }
@@ -43,10 +48,12 @@ export function AudioPlayer({
   filename,
   durationMs,
   currentTimeMs,
+  dragMs,
   playing,
   audioRef,
   onPlayhead,
   onSeek,
+  onDrag,
   onPlayingChange,
 }: AudioPlayerProps) {
   const toggle = () => {
@@ -78,9 +85,10 @@ export function AudioPlayer({
       />
       <Stack gap="sm">
         <Slider
-          value={Math.floor(currentTimeMs / 1000)}
+          value={Math.floor((dragMs ?? currentTimeMs) / 1000)}
           max={Math.floor(durationMs / 1000)}
-          onChange={(seconds) => onSeek(seconds * 1000)}
+          onChange={(seconds) => onDrag(seconds * 1000)}
+          onCommit={(seconds) => onSeek(seconds * 1000)}
           label="Seek"
         />
         <ControlsRow gap="sm">

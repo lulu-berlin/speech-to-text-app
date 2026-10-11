@@ -44,6 +44,9 @@ export interface SliderProps {
   value: number;
   max: number;
   onChange: (value: number) => void;
+  // The value committed when the interaction ends (pointer released, key pressed): a drag's
+  // intermediate onChange ticks are drafts, not decisions (item 29's seek bar).
+  onCommit?: (value: number) => void;
   // Accessible name (lands on the thumb, which is Radix's slider role); the seek bar in
   // item 15 names the task.
   label: string;
@@ -53,7 +56,7 @@ export interface SliderProps {
 // The audio seek bar (item 15), on Radix's slider: a single thumb, arrow-key stepping and
 // the slider role with the value exposed through aria. Radix places the range and thumb;
 // the track and the thumb's looks come from the tokens.
-export function Slider({ value, max, onChange, label, disabled }: SliderProps) {
+export function Slider({ value, max, onChange, onCommit, label, disabled }: SliderProps) {
   return (
     <Root
       value={[value]}
@@ -64,6 +67,12 @@ export function Slider({ value, max, onChange, label, disabled }: SliderProps) {
         const [next] = values;
         if (next !== undefined) {
           onChange(next);
+        }
+      }}
+      onValueCommit={(values) => {
+        const [next] = values;
+        if (next !== undefined) {
+          onCommit?.(next);
         }
       }}
     >
