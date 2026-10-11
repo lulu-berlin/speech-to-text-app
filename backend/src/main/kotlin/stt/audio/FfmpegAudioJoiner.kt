@@ -10,9 +10,11 @@ import java.nio.file.Path
 
 /**
  * The real [AudioJoiner]: materializes each stored chunk FLAC into the task's work directory and joins them
- * with ffmpeg's concat demuxer (`-c copy`, no re-encode; ADR 0024) into [target]. The double-quoted input
- * names keep the concat list safe regardless of the chunk names (`-safe 0` is for absolute paths; these are
- * relative to the list file, in the same work directory).
+ * with ffmpeg's concat demuxer into [target], re-encoding to FLAC (ADR 0045, amending ADR 0024's `-c copy`).
+ * The re-encode is lossless, and it is what makes the file seekable: a copied concat keeps the first chunk's
+ * length in its header and restarts the frames' positions at every chunk. The double-quoted input names keep
+ * the concat list safe regardless of the chunk names (`-safe 0` is for absolute paths; these are relative to
+ * the list file, in the same work directory).
  *
  * The work directory is created when missing (item 29): a COMPLETED task's was removed by the engine, but
  * its chunks are still in the database and its audio must still join. Only the joiner's own scratch is
@@ -54,8 +56,8 @@ class FfmpegAudioJoiner(
                             "0",
                             "-i",
                             listFile.toString(),
-                            "-c",
-                            "copy",
+                            "-c:a",
+                            "flac",
                             // The output format is named, not inferred: the cache hands over a temporary
                             // `….flac.part` name, from which ffmpeg cannot pick a muxer (item 29).
                             "-f",
