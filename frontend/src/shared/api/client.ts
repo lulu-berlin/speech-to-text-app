@@ -157,21 +157,38 @@ export async function setQueuePaused(paused: boolean): Promise<Queue> {
 
 // Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when
 // the connection drops. EventSource retries a dropped connection by itself, but gives up
-// for good on an HTTP error, so this opens a new stream in that case. Returns a function
+// for good on an HTTP error, so this opens a new stream in that case. The server sends a
+// `heartbeat` after 5 s of silence (ADR 0044), so idleMs without any event means the
+// connection is lost although EventSource has not noticed (a silent network partition):
+// the stream is closed, reported as `disconnected`, and opened anew. Returns a function
 // that closes the stream and cancels any pending reconnect.
 export function subscribeToEvents(
   onEvent: (event: StreamEvent) => void,
   reconnectMs = 1000,
+  idleMs = 15_000,
 ): () => void {
   let source: EventSource | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
 
   const open = () => {
     const next = new EventSource('/api/events');
     source = next;
+    // Every event restarts the watchdog, so it only fires on a stream that stayed silent.
+    const watch = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        next.close();
+        onEvent({ type: 'disconnected', closed: true });
+        reconnectTimer = setTimeout(open, reconnectMs);
+      }, idleMs);
+    };
     const listen = <T>(name: ServerEvent['type'], toEvent: (data: T) => ServerEvent) => {
-      next.addEventListener(name, (message) => onEvent(toEvent(JSON.parse(message.data) as T)));
+      next.addEventListener(name, (message) => {
+        watch();
+        onEvent(toEvent(JSON.parse(message.data) as T));
+      });
     };
     listen<Snapshot>('snapshot', (snapshot) => ({ type: 'snapshot', snapshot }));
     listen<Task>('task-updated', (task) => ({ type: 'task-updated', task }));
@@ -188,20 +205,24 @@ export function subscribeToEvents(
       id,
       speakers,
     }));
+    next.addEventListener('heartbeat', watch);
     next.addEventListener('error', () => {
       const closed = next.readyState === EventSource.CLOSED;
       onEvent({ type: 'disconnected', closed });
       if (closed && !stopped) {
+        clearTimeout(idleTimer);
         next.close();
         reconnectTimer = setTimeout(open, reconnectMs);
       }
     });
+    watch();
   };
 
   open();
   return () => {
     stopped = true;
     clearTimeout(reconnectTimer);
+    clearTimeout(idleTimer);
     source?.close();
   };
 }
