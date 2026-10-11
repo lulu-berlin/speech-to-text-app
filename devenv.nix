@@ -70,7 +70,7 @@ in
     frontend = {
       # `pnpm install` makes a fresh worktree self-sufficient; up to date it takes a second.
       # The echo is the stop hint (item 34, discovered): the devenv TUI itself gives none.
-      exec = "echo 'Stop: press q or Ctrl-C to quit devenv and stop both processes (or `devenv down`)' && pnpm install && pnpm dev";
+      exec = "echo 'Stop: press Ctrl-C then q (confirm) to quit devenv and stop both processes (or run `devenv down`)' && pnpm install && pnpm dev";
       cwd = "frontend";
     };
     backend = {

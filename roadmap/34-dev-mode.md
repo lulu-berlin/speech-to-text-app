@@ -49,8 +49,8 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] Dev data lives in a fixed, git-ignored directory and survives `devenv up` restarts
 - [ ] Stopping `devenv up` stops both halves and leaves no whisper-cli or ffmpeg processes behind
 - [ ] (must not break) `gradle check`, `pnpm test`, `gradle run` and `pnpm dev` work as before
-- [ ] (discovered) The `devenv up` output shows a stop hint: the frontend's first printed line is "Stop: press q or Ctrl-C to quit devenv and stop both processes (or `devenv down`)"; pressing `q` (or Ctrl-C and confirm) stops both
-      Scenario (user-run): in `workspaces/34-dev-mode` with the hint in place, `devenv up`. Expect: the frontend process's first log line is the stop hint. Press `q`: devenv exits and both processes stop — no guessing about how to quit. (Discovered 2026-10-11: the running TUI gave no stop hint and the user didn't know how to stop it; confirmed with the user to print one.)
+- [ ] (discovered) The `devenv up` output shows a stop hint: the frontend's first printed line is "Stop: press Ctrl-C then q (confirm) to quit devenv and stop both processes (or run `devenv down`)"; pressing Ctrl-C then q stops both
+      Scenario (user-run): in `workspaces/34-dev-mode` with the hint in place, `devenv up`. Expect: the frontend process's first log line (under the `frontend` label in the devenv TUI) is the stop hint. Press Ctrl-C then `q`: devenv exits and both processes stop — no guessing about how to quit. (Discovered 2026-10-11: the running TUI gave no stop hint and the user didn't know how to stop it; confirmed with the user to print one; wording corrected after the user found `q` alone does nothing — Ctrl-C first, then q confirms.)
 
 ## Acceptance criteria
 
