@@ -24,11 +24,11 @@ Deliver the app as a Nix flake derivation that runs backend, database, frontend 
 Starting point (delivered by item 02): `flake.nix` builds `packages.x86_64-linux.{backend,frontend,default}`; `default` (`stt-app`) provides `bin/speech-to-text-app` (a `makeWrapper` around `java` with `CLASSPATH` + `STT_STATIC_DIR=$out/share/stt-app/static`); the Nix build runs `gradle check`; nixpkgs is pinned in `flake.lock`.
 
 Item 16 extends the `default` package with:
-- `whisper-cpp` with `vulkanSupport = true` (the engine item 07 drives; the direct-GPU path on a Linux host with a Vulkan driver);
+- `whisper-cpp` with `vulkanSupport = true` (the engine item 07 drives; the direct-GPU path on a Linux host with a Vulkan driver), pinned to the `v1.8.4` tag by a source override (decided in item 33's consultation, 2026-10-11: the Gradle bootstrap's prebuild is 1.8.4, so both paths run one version);
 - `ffmpeg`;
 - `coreutils` and `util-linux` (for `kill -s STOP|CONT` and `setsid`, ADR 0020);
 - the models from `nix/models.nix` (whisper `large-v3-turbo-q5_0` and the CAM++ speaker model);
-- the wrapper additionally sets the remaining `STT_*` variables (`STT_WHISPER_CLI`, `STT_FFMPEG`, `STT_WHISPER_MODEL`, `STT_SPEAKER_MODEL`, …), defaults `STT_DATA_DIR` to `${XDG_DATA_HOME:-$HOME/.local/share}/stt-app`, creates it, and starts the JVM;
+- the wrapper puts whisper-cli, ffmpeg, `setsid` and coreutils first on `PATH` (the backend runs them by name; `STT_WHISPER_CLI` and `STT_FFMPEG` are withdrawn, [ADR 0047](../docs/decisions/0047-external-tools-resolved-from-path.md)), sets the remaining `STT_*` variables (`STT_WHISPER_MODEL`, `STT_SPEAKER_MODEL`, `STT_STATIC_DIR`), defaults `STT_DATA_DIR` to `${XDG_DATA_HOME:-$HOME/.local/share}/stt-app`, creates it, and starts the JVM;
 - `apps.default` so `nix run .` starts the app on `http://localhost:8080`.
 - **Shared pin (ADR 0036):** devenv takes the flake's locked nixpkgs input; the exact wiring is settled at the first checkpoint (devenv is itself a flake input of the repo).
 - SQLite is embedded via the JDBC driver; there is no separate DB service.

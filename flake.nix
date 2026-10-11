@@ -1,11 +1,9 @@
-# Minimal flake building both parts (roadmap item 02, decision 7; ADR 0014 as amended
-# by ADR 0016). The app wrapper ships in item 02 (ADR 0016) as bin/speech-to-text-app,
-# renamed to bin/stt-app in roadmap item 16;
-# from item 03 it refused to start without STT_DATA_DIR (ADR 0017); since item 16 it
-# defaults STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended);
-# since item 08 it defaults STT_SPEAKER_MODEL to the pinned
-# CAM++ model from nix/models.nix (ADR 0003; a user-set value wins). Full STT_* env
-# wiring, models, and nix run . are finished in roadmap item 16.
+# The app as a Nix flake package (roadmap item 16; item 02 started it, ADR 0014 as
+# amended by ADR 0016). `nix build .` builds the backend and the frontend and provides
+# bin/stt-app (bin/speech-to-text-app before item 16): a java wrapper that defaults
+# STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended), defaults
+# both models from nix/models.nix (a user-set value wins), and puts the pinned
+# whisper-cli 1.8.4 (Vulkan), ffmpeg, setsid and coreutils first on PATH (ADR 0047).
 # Nix evaluation happens on the user's machine - this file is unverified here.
 {
   description = "Speech-to-Text app (backend + bundled frontend, roadmap item 16)";
@@ -23,6 +21,29 @@
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
     models = import ./nix/models.nix {inherit pkgs;};
+
+    # whisper-cli pinned to the 1.8.4 tag (item 33 consultation, 2026-10-11): the Gradle
+    # bootstrap downloads the jiang1997 1.8.4 prebuild, so both paths run one version.
+    # Vulkan is the GPU path on any Linux host with a Vulkan driver. nixpkgs' recipe is
+    # for 1.9.2, and two of its parts differ at 1.8.4: the install check also runs
+    # parakeet-cli, which 1.8.4 does not have, and its WHISPER_COMMON_FFMPEG option is
+    # still named WHISPER_FFMPEG there, so the flag is a no-op and whisper-cli is built
+    # without ffmpeg libs (it reads the backend's FLAC chunks through its bundled
+    # miniaudio). The source hash is the NAR hash of the v1.8.4 tarball.
+    whisperCpp = (pkgs.whisper-cpp.override {vulkanSupport = true;}).overrideAttrs {
+      version = "1.8.4";
+      src = pkgs.fetchFromGitHub {
+        owner = "ggml-org";
+        repo = "whisper.cpp";
+        tag = "v1.8.4";
+        hash = "sha256-YCuWKDKlrhbx+t3t2kDpAwuKt4rkipDsOXO6uqIU/W0=";
+      };
+      installCheckPhase = ''
+        runHook preInstallCheck
+        "$out/bin/whisper-cli" --help >/dev/null
+        runHook postInstallCheck
+      '';
+    };
 
     backend = pkgs.stdenv.mkDerivation (finalAttrs: {
       pname = "stt-backend";
@@ -156,12 +177,18 @@
           # directory (roadmap item 16, amending ADR 0017 for the packaged app), which the
           # wrapper creates. The doubled quotes escape the dollar signs below, so the
           # wrapper (not Nix) expands the variables.
-          # --set-default STT_SPEAKER_MODEL: the pinned CAM++ model (nix/models.nix, ADR 0003)
-          # unless the user sets one; item 16 may revisit this with the rest of the model wiring.
+          # --set-default for the models: the pinned whisper model (ADR 0008) and CAM++
+          # model (ADR 0003) from nix/models.nix unless the user sets one (item 21's e2e
+          # suite swaps in the tiny whisper model).
+          # --prefix PATH: the backend runs whisper-cli, ffmpeg and setsid by name (ADR 0047);
+          # the package's own tools come first, so a caller's PATH (e.g. the devenv's
+          # whisper-cli) cannot replace them.
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
             --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
+            --set-default STT_WHISPER_MODEL ${models.whisper} \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
+            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg pkgs.util-linux pkgs.coreutils]} \
             --set CLASSPATH "$CP" \
             --add-flags "stt.MainKt"
           runHook postInstall
