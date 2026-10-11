@@ -59,8 +59,10 @@ describe('the app root', () => {
     const header = required(title.closest('header'));
     const steno = required(header.querySelector('svg'));
 
-    // The mascot sits directly before the product name.
-    expect(steno.nextElementSibling).toBe(title);
+    // The mascot, inside its home link (item 31), sits directly before the product name.
+    const home = required(header.querySelector('a'));
+    expect(home).toContainElement(steno);
+    expect(home.nextElementSibling).toBe(title);
 
     // And it renders at the header size (the cropped artwork fills the box).
     const style = getComputedStyle(steno);
@@ -504,6 +506,33 @@ describe('the navigation pills', () => {
     expect(
       focus.some((rule) => rule.style.boxShadow.includes(lightTheme.colors.focusRing)),
     ).toBe(true);
+  });
+});
+
+describe('the mascot home link', () => {
+  it('links the header mascot to / with an accessible name, and clicking it lands on the queue', async () => {
+    renderAt('/history');
+    await screen.findByText('Live');
+
+    const home = screen.getByRole('link', { name: 'Speech-to-Text home' });
+    expect(home).toHaveAttribute('href', '/');
+
+    // The mascot stays decorative inside it: the link carries the name.
+    const mascot = required(home.querySelector('svg'));
+    expect(mascot.getAttribute('aria-hidden')).toBe('true');
+    expect(home).toContainElement(mascot);
+
+    // The keyboard focus ring stays on the link (the walk covers it too).
+    const focus = stateRulesFor(home, ':focus-visible');
+    expect(focus.some((rule) => rule.style.boxShadow.includes(lightTheme.colors.focusRing))).toBe(
+      true,
+    );
+
+    // A click on the mascot lands on the queue. Pressing Enter on the focused link is
+    // the anchor's native activation (jsdom synthesizes no click for it, so the real
+    // keyboard path is exercised in the e2e suite, item 7).
+    fireEvent.click(home);
+    expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument();
   });
 });
 

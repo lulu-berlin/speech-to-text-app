@@ -1,7 +1,7 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useEffect } from 'react';
 import { useMachine } from '@xstate/react';
-import { NavLink } from 'react-router';
+import { Link, NavLink } from 'react-router';
 import styled from 'styled-components';
 import { StenographerAnimation } from '../shared/brand/StenographerAnimation';
 import type { ThemeMode } from '../shared/theme/themeMode';
@@ -58,6 +58,14 @@ const Title = styled.h1`
   margin: 0;
   color: ${(props) => props.theme.colors.text};
   font-size: ${(props) => props.theme.fontSizes.title};
+`;
+
+// The mascot's home link (item 31): clicking the mascot goes to / (which redirects to
+// the queue). Block, so the artwork fills it edge to edge like before; the link carries
+// the accessible name — the mascot itself stays decorative (aria-hidden).
+const HomeLink = styled(Link)`
+  display: block;
+  ${focusRing}
 `;
 
 const Nav = styled.nav`
@@ -138,7 +146,9 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
   }, [sendScroll]);
   return (
     <Header>
-      <StenographerAnimation typing={running} size={compact ? 'compact' : 'header'} />
+      <HomeLink to="/" aria-label="Speech-to-Text home">
+        <StenographerAnimation typing={running} size={compact ? 'compact' : 'header'} />
+      </HomeLink>
       <Title>Speech-to-Text</Title>
       <HeaderControls>
         <Nav>
