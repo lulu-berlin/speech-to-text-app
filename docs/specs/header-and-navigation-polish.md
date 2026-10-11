@@ -1,7 +1,7 @@
-# 31 — Header and navigation polish
+# Header and navigation polish
 
-Status: in-review
-Depends on: [17](../docs/specs/branding-stenographer-animation.md) (done), [25](../docs/specs/visual-polish.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
+Status: done (roadmap item 31, merged 2026-10-11)
+Depends on: [17 — Branding: stenographer typing animation](branding-stenographer-animation.md) (done), [25 — Visual polish](visual-polish.md) (done), [21 — Frontend–backend end-to-end](frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
 
@@ -9,9 +9,9 @@ Make the app shell feel finished: the header stays in view, the navigation looks
 
 ## Already decided
 
-- [ADR 0046 — Every app feature has an end-to-end test](../docs/decisions/0046-every-feature-has-an-e2e-test.md): this item's test list includes at least one Playwright e2e test in `e2e/`, run by the user against the real backend.
-- [ADR 0033 — Design system](../docs/decisions/0033-design-system-tokens-radix-plex.md) and the [frontend conventions](../docs/conventions/frontend.md): tokens only, no literal colors or sizes; `prefers-reduced-motion` respected.
-- [ADR 0038 — UI state transitions are machines](../docs/decisions/0038-ui-state-transitions-are-machines.md).
+- [ADR 0046 — Every app feature has an end-to-end test](../decisions/0046-every-feature-has-an-e2e-test.md): this item's test list includes at least one Playwright e2e test in `e2e/`, run by the user against the real backend.
+- [ADR 0033 — Design system](../decisions/0033-design-system-tokens-radix-plex.md) and the [frontend conventions](../conventions/frontend.md): tokens only, no literal colors or sizes; `prefers-reduced-motion` respected.
+- [ADR 0038 — UI state transitions are machines](../decisions/0038-ui-state-transitions-are-machines.md).
 - Item 17 placed the mascot in the header (`AppHeader`, 7.5rem, typing while a task runs) and as the loading/empty indicator (`EmptyState`, `LoadingState`, the Queue's empty drop zone, `ConnectingRegion`). Today both can be on screen at once — for example the header mascot above the Queue's empty-state mascot.
 - User requests (2026-10-11):
   - the header is sticky: it does not scroll away;
@@ -65,3 +65,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-11: consultation answers (static logo while a placeholder shows the mascot; shrink on scroll, animated; background-pill navigation; item 21 first) and the proposed test list incl. its e2e test (ADR 0046). Remaining: test list approval.
 - 2026-10-11: reduced motion clarified by the user: respected as everywhere (the shrink animates only under `no-preference`); shrinking is not a reason to reduce the mascot's own motion.
 - 2026-10-11: test list (8 items, incl. the e2e test) approved by the user; status `spec-approved`. Starts when item 21 delivers the `e2e/` suite.
+- 2026-10-11: merged into `main` (head `8202c304`) after the user approved the diff. The header is sticky and shrinks to the compact size on scroll (animated under `prefers-reduced-motion: no-preference`; the compact mascot keeps typing); the navigation has background pills; the mascot is the home link; the one-mascot rule swaps the header to the compact resting mascot while a placeholder shows the artwork (user decision: the resting compact mascot IS the static logo — the unused `stenographer-still.svg` was deleted with its provenance entry). Follow mode clears the sticky header via `scroll-margin-top`. The shell e2e (item 31's own, `16-header-and-navigation.spec.ts`) captured the new shell screenshots. Spec and final test list moved here from `roadmap/31-header-and-navigation-polish.md`.
