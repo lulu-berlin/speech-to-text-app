@@ -777,23 +777,9 @@ describe('the themed player', () => {
     fireEvent(audio, new Event('timeupdate'));
     expect(seek).toHaveAttribute('aria-valuenow', '6');
 
-    // jsdom has no pointer capture, and Radix maps clientX to a value via the slider's
-    // bounding rect (the ResizeObserver stub in test/setup.ts is the same category of
-    // stub). The slider is 1185 px wide, so 1 px = 1 second; capture works per element.
-    const captured = new Set<Element>();
-    const proto = HTMLElement.prototype;
-    const originalSetPointerCapture = proto.setPointerCapture;
-    const originalHasPointerCapture = proto.hasPointerCapture;
-    const originalReleasePointerCapture = proto.releasePointerCapture;
-    proto.setPointerCapture = function (this: Element) {
-      captured.add(this);
-    };
-    proto.hasPointerCapture = function (this: Element) {
-      return captured.has(this);
-    };
-    proto.releasePointerCapture = function (this: Element) {
-      captured.delete(this);
-    };
+    // Radix maps clientX to a value via the slider's bounding rect (pointer capture is
+    // stubbed in test/setup.ts, like the ResizeObserver). The slider is 1185 px wide, so
+    // 1 px = 1 second.
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
       left: 0,
       top: 0,
@@ -829,9 +815,6 @@ describe('the themed player', () => {
       );
       expect(within(player).getByText('00:05 / 19:45')).toBeInTheDocument();
     } finally {
-      proto.setPointerCapture = originalSetPointerCapture;
-      proto.hasPointerCapture = originalHasPointerCapture;
-      proto.releasePointerCapture = originalReleasePointerCapture;
       vi.restoreAllMocks();
     }
   });

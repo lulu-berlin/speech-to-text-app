@@ -15,6 +15,21 @@ class ResizeObserverStub implements ResizeObserver {
 }
 globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver;
 
+// jsdom has no pointer capture. Radix's slider captures the pointer on the drag target at
+// pointer-down and releases it at pointer-up; the capture gates each pointer-move and the
+// release commit, so the drag tests need it tracked per element, like the browser's
+// per-(element, pointerId) capture.
+const capturedPointers = new WeakSet<Element>();
+Element.prototype.setPointerCapture = function (this: Element): void {
+  capturedPointers.add(this);
+};
+Element.prototype.hasPointerCapture = function (this: Element): boolean {
+  return capturedPointers.has(this);
+};
+Element.prototype.releasePointerCapture = function (this: Element): void {
+  capturedPointers.delete(this);
+};
+
 // jsdom has no scrollIntoView; the transcript's follow mode calls it. A no-op is enough —
 // the tests spy on it to assert the call, and browsers keep the real behavior.
 if (typeof Element.prototype.scrollIntoView !== 'function') {
