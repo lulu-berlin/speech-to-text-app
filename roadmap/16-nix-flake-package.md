@@ -49,7 +49,7 @@ Item 16 extends the `default` package with:
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Nix-level items are user-verified (ADR 0010):
 
 - [x] `nix build .` produces `result/bin/stt-app`
-- [ ] Starting `stt-app` with no `STT_DATA_DIR` set creates the default data directory and the database in it
+- [x] Starting `stt-app` with no `STT_DATA_DIR` set creates the default data directory and the database in it
 - [ ] `GET /api/health` on the started app returns `{"status":"ok"}`
 - [ ] The started app serves the frontend at `/`
 - [ ] The wrapper's `STT_*` variables point at existing files (whisper-cli, ffmpeg, both models, static dir)
@@ -71,3 +71,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: test list (8 items) approved by the user; status `spec-approved`.
 - 2026-10-09: Docker reinstated as item 19 after the user corrected the GPU claim (`docker run --gpus all`); a recipe that briefly replaced it was dropped. The GPU matrix lives in item 19.
 - 2026-10-11 (workspace, cycle 1 = item 1): first checkpoint — ADR 0036 wiring settled: `devenv.yaml` rev-pins the flake's locked nixpkgs (`github:NixOS/nixpkgs/494ce7f…`), and a `nix flake check` must guard the sync (lands with test 8). Wrapper renamed `bin/speech-to-text-app` → `bin/stt-app` (commit `edf2674`, no behavior change). User-verified green: `nix build . && test -x result/bin/stt-app`.
+- 2026-10-11 (workspace, cycle 2 = item 2): red (user): `env -u STT_DATA_DIR -u XDG_DATA_HOME HOME=$tmp ./result/bin/stt-app` → `stt-app: STT_DATA_DIR must be set …`, exit 1. Commit `4ce6dc7`: the wrapper defaults an unset/empty `STT_DATA_DIR` to `${XDG_DATA_HOME:-$HOME/.local/share}/stt-app` and creates it with the closure's coreutils `mkdir -p`; ADR 0017 amended (packaged app only; `Config.fromEnv()` keeps fail-fast); after-merge note in `docs/specs/database-schema.md`. Green (user, after `nix build .`): Flyway applied V1–V5 into `$tmp/.local/share/stt-app/stt.db`, "Responding at http://0.0.0.0:8080". No refactoring suggested.
