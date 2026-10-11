@@ -17,8 +17,9 @@ in
     (import ./nix/whisper-cpp.nix { inherit pkgs; })
     
     # Audio tooling: whisper-cpp already decodes any format via embedded FFmpeg,
-    # standalone ffmpeg is handy for trimming/merging audio before transcription
-    pkgs.ffmpeg
+    # standalone ffmpeg is handy for trimming/merging audio before transcription.
+    # ffmpeg_8, like the package (no drift; item 33's Gradle bootstrap syncs 8.1 too).
+    pkgs.ffmpeg_8
     
     # Diagnostics: `vulkaninfo --summary` verifies the GPU is visible to Vulkan
     pkgs.vulkan-tools
