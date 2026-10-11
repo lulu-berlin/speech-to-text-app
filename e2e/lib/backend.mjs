@@ -114,6 +114,16 @@ export async function choosePort() {
   });
 }
 
+// The files the backend keeps for a task outside the database: its cached joined FLAC
+// ($STT_DATA_DIR/tmp/<id>.flac, built on the first /audio request) and its work
+// directory. The restart test checks the same paths.
+export function cachedAudioPath(dataDir, taskId) {
+  return join(dataDir, 'tmp', `${taskId}.flac`);
+}
+export function workDirPath(dataDir, taskId) {
+  return join(dataDir, 'work', taskId);
+}
+
 // Waits until /api/health answers (startup) or, with `down: true`, until it stops
 // answering (shutdown, and the restart test's kill).
 export async function waitForHealth(port, { down = false, timeoutMs = 600_000 } = {}) {

@@ -1,32 +1,13 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { expect, test, type Locator, type Page } from '@playwright/test';
-import { BROKEN_CLIP, CANCEL_CLIP, appUrl, loadState } from '../lib/backend.mjs';
-import { appLive, uploadClips } from './helpers/ui';
+import { expect, test } from '@playwright/test';
+import { BROKEN_CLIP, CANCEL_CLIP, appUrl, loadState, workDirPath } from '../lib/backend.mjs';
+import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
 
 // The entries left in a task's work directory ($STT_DATA_DIR/work/<id>); none when the
 // directory is gone.
 function workDirEntries(id: string): string[] {
-  const dir = join(loadState().dataDir, 'work', id);
+  const dir = workDirPath(loadState().dataDir, id);
   return existsSync(dir) ? readdirSync(dir).sort() : [];
-}
-
-// A task's row: a pending row in the Queue, a finished card in History.
-function rowOf(page: Page, filename: string): Locator {
-  return page.getByRole('listitem').filter({ hasText: filename });
-}
-
-// The task id behind a History card, from its link to the transcript.
-async function taskIdOf(page: Page, filename: string): Promise<string> {
-  const href = await rowOf(page, filename)
-    .getByRole('link', { name: filename })
-    .getAttribute('href');
-  return href?.split('/').pop() ?? '';
-}
-
-// Switches view through the header navigation (finish notices carry their own links).
-async function goTo(page: Page, view: 'Queue' | 'History') {
-  await page.getByRole('navigation').getByRole('link', { name: view }).click();
 }
 
 test('cancelling a running task, retrying it, and retrying a failed one work through the UI', async ({
