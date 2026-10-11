@@ -6,6 +6,10 @@
 # whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
 # `docker-root` is the Docker image's root filesystem (roadmap item 19, see Dockerfile).
 # Nix evaluation happens on the user's machine - this file is unverified here.
+#
+# Roadmap item 33: the committed versions.json (the Gradle bootstrap's manifest) is
+# the render of the `versions` attrset below; apps.update-versions regenerates it and
+# checks.versions-sync fails `nix flake check` on drift.
 {
   description = "Speech-to-Text app (backend + bundled frontend, roadmap item 16)";
 
@@ -23,6 +27,27 @@
     pkgs = nixpkgs.legacyPackages.${system};
     models = import ./nix/models.nix {inherit pkgs;};
     whisperCpp = import ./nix/whisper-cpp.nix {inherit pkgs;};
+
+    # Version manifest for the human Gradle bootstrap (roadmap item 33): the same
+    # versions the flake builds with, rendered into the committed versions.json by the
+    # update-versions app below. Node/pnpm/gradle/jdk/ffmpeg come from this nixpkgs
+    # rev (ADR 0036), whisper-cpp and the prebuilt tool downloads from
+    # nix/versions.nix, the models from nix/models.nix (whose derivations are built
+    # from the same table). The versions-sync check fails when versions.json drifts.
+    versions = let
+      data = import ./nix/versions.nix;
+    in {
+      nixpkgsRev = nixpkgs.rev;
+      node = pkgs.nodejs.version;
+      pnpm = pkgs.pnpm_11.version;
+      gradle = pkgs.gradle.version;
+      jdk = pkgs.jre.version;
+      ffmpeg = pkgs.lib.versions.majorMinor pkgs.ffmpeg_8.version;
+      whisperCpp = data.whisperCppTag;
+      models = models.meta;
+      downloads = data.downloads;
+    };
+    versionsJson = pkgs.writeText "versions.json" (builtins.toJSON versions);
 
     # Each part's source holds only what its build reads: its own directory, docs/api (the
     # frontend imports the contract JSON, the backend's contract tests read it) and, for
@@ -278,5 +303,31 @@
       fi
       echo "$flakeRev" > $out
     '';
+
+    # Roadmap item 33: the committed versions.json must be exactly what the flake
+    # renders (nixpkgs-derived versions + nix/versions.nix + nix/models.nix). The
+    # check fails on any drift - a nixpkgs bump, a tag/version change, an edited
+    # hash - and the user regenerates with `nix run .#update-versions` (ADR 0010).
+    # Reads only the version inputs, so a non-version change does not rerun it.
+    checks.x86_64-linux.versions-sync = pkgs.runCommand "versions-sync" { } ''
+      ${pkgs.jq}/bin/jq -S . ${versionsJson} > expected.json
+      ${pkgs.jq}/bin/jq -S . ${./versions.json} > committed.json
+      if ! diff -u committed.json expected.json; then
+        echo "versions-sync: versions.json drifted from the flake's versions (a pinned version or hash changed)." >&2
+        echo "Run 'nix run .#update-versions' and commit the regenerated versions.json (and the wrapper, if the Gradle version changed)." >&2
+        exit 1
+      fi
+      echo ok > $out
+    '';
+
+    # Regenerates the committed versions.json from the flake's versions (ADR 0010: the
+    # user runs this; writes to the checkout the command is run from).
+    apps.x86_64-linux.update-versions = {
+      type = "app";
+      program = "${pkgs.writeShellScript "update-versions" ''
+        exec ${pkgs.jq}/bin/jq -S . ${versionsJson} > versions.json
+      ''}";
+      meta.description = "Regenerate the committed versions.json from the flake's versions";
+    };
   };
 }
