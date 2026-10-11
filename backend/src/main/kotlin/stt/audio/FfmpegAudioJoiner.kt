@@ -13,6 +13,11 @@ import java.nio.file.Path
  * with ffmpeg's concat demuxer (`-c copy`, no re-encode; ADR 0024) into [target]. The double-quoted input
  * names keep the concat list safe regardless of the chunk names (`-safe 0` is for absolute paths; these are
  * relative to the list file, in the same work directory).
+ *
+ * The work directory is created when missing (item 29): a COMPLETED task's was removed by the engine, but
+ * its chunks are still in the database and its audio must still join. Only the joiner's own scratch is
+ * removed afterwards, never the directory — it may be an active task's; the startup sweep removes an empty
+ * one left behind for a finished task.
  */
 class FfmpegAudioJoiner(
     private val runner: ProcessRunner,
@@ -24,6 +29,7 @@ class FfmpegAudioJoiner(
         target: Path,
     ) {
         val workDir = workDirectories.workDir(taskId)
+        withContext(Dispatchers.IO) { Files.createDirectories(workDir) }
         val inputs =
             chunks.findByTask(taskId).map { chunk ->
                 val file = workDir.resolve("join-${chunk.idx}.flac")
@@ -50,6 +56,10 @@ class FfmpegAudioJoiner(
                             listFile.toString(),
                             "-c",
                             "copy",
+                            // The output format is named, not inferred: the cache hands over a temporary
+                            // `….flac.part` name, from which ffmpeg cannot pick a muxer (item 29).
+                            "-f",
+                            "flac",
                             target.toString(),
                         ),
                 )
