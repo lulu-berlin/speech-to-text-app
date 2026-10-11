@@ -1,0 +1,21 @@
+# Build context for the Docker image (roadmap item 19): only what the flake
+# evaluates and builds. The builder runs `nix build .#stt-app`, whose evaluation
+# reads flake.nix, flake.lock, nix/ and backend/deps.json; the derivations' sources
+# are the fileset-filtered subsets backend/ + docs/api + .editorconfig (backend) and
+# frontend/ + docs/api (frontend).
+.git
+.direnv
+.devenv
+devenv.nix
+devenv.yaml
+devenv.lock
+.envrc
+workspaces
+e2e
+roadmap
+docs/*
+!docs/api
+**/node_modules
+**/dist
+**/.gradle
+*.db

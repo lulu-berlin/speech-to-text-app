@@ -3,8 +3,10 @@
 # bin/stt-app (bin/speech-to-text-app before item 16): a java wrapper that defaults
 # STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended), defaults
 # both models from nix/models.nix (a user-set value wins), and puts the pinned
-# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
-# Nix evaluation happens on the user's machine - this file is unverified here.
+# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047);
+# curl trails the list so the Docker image's healthcheck tool comes from the flake
+# (roadmap item 19). Nix evaluation happens on the user's machine - this file is
+# unverified here.
 {
   description = "Speech-to-Text app (backend + bundled frontend, roadmap item 16)";
 
@@ -137,7 +139,7 @@
       '';
     });
   in {
-    packages.x86_64-linux = {
+    packages.x86_64-linux = rec {
       inherit backend frontend;
 
       # `nix build .` builds both parts and provides bin/stt-app, which
@@ -173,12 +175,14 @@
           # the package's own tools come first, so a caller's PATH (e.g. the devenv's
           # whisper-cli) cannot replace them. ffmpeg_8, not nixpkgs' default ffmpeg (9.0 at
           # the locked rev): item 33's Gradle bootstrap syncs ffmpeg to the 8.1 branch.
+          # curl trails the list (no name collisions): item 19's Docker image needs a
+          # healthcheck tool from the flake, and this puts it in the package's closure.
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
             --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
             --set-default STT_WHISPER_MODEL ${models.whisper} \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
-            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg_8 pkgs.util-linux pkgs.coreutils]} \
+            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg_8 pkgs.util-linux pkgs.coreutils pkgs.curl]} \
             --set CLASSPATH "$CP" \
             --add-flags "stt.MainKt"
           runHook postInstall
@@ -188,6 +192,10 @@
           mainProgram = "stt-app";
         };
       };
+
+      # Alias so the documented `nix build .#stt-app` (roadmap item 19's Docker
+      # builder stage) names the package it builds explicitly.
+      stt-app = default;
     };
 
     # `nix run .` starts bin/stt-app (named by meta.mainProgram), on http://localhost:8080.
