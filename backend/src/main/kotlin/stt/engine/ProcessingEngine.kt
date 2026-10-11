@@ -30,6 +30,7 @@ import stt.db.MergeOutcome
 import stt.db.QueueStateRepository
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
+import stt.db.Settings
 import stt.db.SpeakersMode
 import stt.db.StoredTask
 import stt.db.TaskPhase
@@ -140,6 +141,13 @@ class ProcessingEngine internal constructor(
         publish(id)
         queueUpdated()
         wake()
+    }
+
+    /**
+     * The settings were stored (item 32, `PUT /api/settings`): publishes them, so open tabs follow.
+     */
+    suspend fun settingsUpdated(settings: Settings) {
+        _events.emit(Event.SettingsUpdated(settings))
     }
 
     /**

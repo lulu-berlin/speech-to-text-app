@@ -1,6 +1,7 @@
 package stt.engine
 
 import stt.db.DiarizationStage
+import stt.db.Settings
 import stt.db.Speaker
 import stt.db.StoredTask
 
@@ -51,5 +52,10 @@ sealed interface Event {
     data class SpeakersMerged(
         val id: Long,
         val speakers: List<Speaker>,
+    ) : Event
+
+    /** The settings were stored (`PUT /api/settings`); item 32's `settings-updated` event, so open tabs follow. */
+    data class SettingsUpdated(
+        val settings: Settings,
     ) : Event
 }

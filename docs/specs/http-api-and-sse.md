@@ -95,7 +95,7 @@ The JSON shapes the frontend builds against.
   - pause/resume/cancel/retry → `200` Task;
   - queue pause/resume/order → `200` Queue;
   - delete → `204` without a body;
-  - settings → `200` Settings (item 32);
+  - read or write the settings → `200` Settings (item 32);
   - rename a speaker, merge speakers, reset all merges → `200` Speakers (item 22).
 - **Turns** (`GET /api/tasks/{id}/turns`): `{ "speakers": [{ "speakerId", "speaker" }], "hasMerges": boolean, "turns": [{ "speakerId" | null, "startMs", "endMs", "text", "segments": [{ "startMs", "endMs", "text" }] }] }`.
   - `hasMerges` (added 2026-10-10, item 22): whether the task has a merge that "Reset all merges" can undo; `false` with speakers `off`.
@@ -109,9 +109,10 @@ The JSON shapes the frontend builds against.
   - `PUT /api/tasks/{id}/speakers/{speakerId}` with `{ "speaker": "<name>" }` renames one speaker. The name is stored as sent; clients trim it first (user decision 2026-10-10). Leading or trailing whitespace, empty, longer than 40 characters, or a control character anywhere → `400 invalid-speaker-name`, nothing changes. A name another speaker of the task already has, compared case-insensitively and including speakers hidden by a merge → `409 duplicate-speaker-name`; a speaker's own current name is no duplicate (user decisions 2026-10-10). `{ "speaker": null }` resets the name to `"Speaker N"` (N = `speakerId` + 1), written by the server and checked for duplicates like any other name. A speaker hidden by a merge cannot be renamed or reset (`404 not-found`); its name waits for "Reset all merges".
   - `POST /api/tasks/{id}/speakers/merge` with `{ "group": [<speakerId>, …], "into": <speakerId> }` folds every other member of `group` into `into`, which keeps its id and name; the answer is the task's effective speakers. No segment row is rewritten: the merge is a mapping resolved when the transcript is read, so it can be undone. The downloads (txt, srt, vtt) label a merged speaker's segments with the survivor's name, in the survivor's turns. A member that is itself the survivor of an earlier merge brings the speakers merged into it along (user decision 2026-10-10). `into` not in `group`, a group naming fewer than two speakers, or a member (or `into`) already merged into another speaker → `400 invalid-merge`, nothing changes.
   - `DELETE /api/tasks/{id}/speakers/merges` ("Reset all merges") removes every merge of the task; the answer is all its speakers again, each with the name its row kept, and the turns and downloads are as before the first merge.
-- **Settings** (added 2026-10-11, item 32): `GET /api/settings` → the stored settings and the devices the user can choose ([`docs/api/settings.json`](../api/settings.json)).
+- **Settings** (added 2026-10-11, item 32): `GET /api/settings` → the stored settings and the devices the user can choose ([`docs/api/settings.json`](../api/settings.json), [`settings.fixed.json`](../api/settings.fixed.json)).
   - `device` (`auto|cpu|gpu:<index>`), `threads` (number, or `null` = whisper-cli's and the speaker model's own default), `defaultLanguage` (string), `speakersMode` (`auto|off|fixed`), `speakersCount` (number, or `null` unless `fixed`), `maxSpeakers` (number): the settings as a whole — what the engine uses for the next task it starts (`device`, `threads`) and what the upload form starts with (`defaultLanguage`, `speakersMode`, `speakersCount`, `maxSpeakers`).
   - `availableDevices` (array of strings, `GET` only): `cpu` and `auto` always, then each GPU whisper-cli reported at startup as `gpu:<index>`. The setting and the list share one value space (`auto|cpu|gpu:<index>`), so the Settings page can render the choices.
+  - `PUT /api/settings` with the settings as a whole (the fields above without `availableDevices`) validates them in this order and stores them; it answers `200` with the new Settings and emits `settings-updated`. Rejections, nothing stored and nothing emitted: `device` not `auto`, `cpu` or `gpu:<index>` with an index `>= 0` → `400 invalid-device` (a well-formed GPU the probe did not report is accepted: whether it is usable is decided when a task runs); `threads` neither `null` nor `>= 1` → `400 invalid-threads`; `defaultLanguage` not in [`docs/api/languages.json`](../api/languages.json) → `400 invalid-language`; `speakersMode` not `auto|off|fixed`, or `speakersCount` not `1..20` with `fixed` or not `null` otherwise → `400 invalid-speakers`; `maxSpeakers` outside `1..20` → `400 invalid-max-speakers`.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
   - `task-updated` → Task. It also announces a new upload (stated 2026-10-11, item 29; the frontend contract of item 13 already relied on it): the created QUEUED task, followed by `queue-updated` listing it
@@ -121,11 +122,12 @@ The JSON shapes the frontend builds against.
   - `speakers-renamed` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored rename or name reset, the task's effective speakers as stored; a rejected rename emits nothing
   - `speakers-merged` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored merge or a reset of all merges, the task's effective speakers; a rejected merge emits nothing. Turns can join or split along a former boundary, so a client showing the task's transcript refetches `/turns`
   - `heartbeat` → `{}` (added 2026-10-11, item 29, [ADR 0044](../decisions/0044-sse-heartbeat-and-client-watchdog.md)): sent whenever the stream has been silent for 5 s; it carries no state. A client that receives no event at all for 15 s treats the stream as dropped, reconnects, and takes the next snapshot
+  - `settings-updated` → the settings without `availableDevices` (item 32, [`docs/api/settings-updated.json`](../api/settings-updated.json)): after a stored `PUT /api/settings`, so open tabs follow; a rejected write emits nothing
 - **Error codes:**
 
   | Status | Codes |
   | ------ | ----- |
-  | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format`, `invalid-speaker-name`, `invalid-merge` (item 22) |
+  | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format`, `invalid-speaker-name`, `invalid-merge` (item 22), `invalid-device`, `invalid-threads` (item 32) |
   | `404` | `not-found` (unknown task; unknown speaker of a task, item 22), `no-audio` (task without stored chunks) |
   | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns, transcript, or a speaker rename, merge or reset of a task that is not COMPLETED), `duplicate-speaker-name` (item 22) |
   | `500` | `internal` |

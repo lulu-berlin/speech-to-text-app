@@ -1,0 +1,4 @@
+{
+  "error": "invalid-device",
+  "message": "device must be auto, cpu, or gpu:<index> with an index >= 0, got \"tpu\""
+}
