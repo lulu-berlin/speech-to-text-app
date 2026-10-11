@@ -21,6 +21,21 @@ import {
 const RECORDINGS_DIR = join('screenshots', 'recordings');
 // The playback journey's short viewport (06-playback.spec.ts).
 const PLAYBACK_VIEWPORT = { width: 1280, height: 500 };
+// The recordings are watched as GIFs: the flows pause between steps so a viewer can
+// follow them (machine speed was too fast and jumpy — user, 2026-10-11).
+const VIEWER_PAUSE = 1_500;
+const STEP_PAUSE = 700;
+
+// Uploads a clip and waits for its transcript outside any recording, so a flow's video
+// starts on the finished transcript instead of the upload and the wait for it; returns
+// the transcript's URL.
+async function transcriptUrl(browser: Browser, clip: string): Promise<string> {
+  const page = await browser.newPage();
+  await uploadAndOpen(page, clip);
+  const url = page.url();
+  await page.close();
+  return url;
+}
 
 // One recording context per flow: the video finalizes when the context closes, so the
 // flow drives the page, the context closes, and the video is renamed to its stable name
@@ -83,36 +98,44 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
     await page.waitForTimeout(1_000);
   });
 
-  // Flow 2 — transcript playback with follow mode: playing advances the time and the
-  // highlight; seeking makes the highlight follow (scrolling into view, and following
-  // must hold through its own scroll), and a hand scroll stops following until "Back to
-  // playing position" resumes it. A short viewport, as in the playback journey: the
-  // transcript region (max-height 60vh) must be far shorter than the long clip's
-  // transcript, or following has nothing to scroll.
+  // Flow 2 — transcript playback with follow mode, at a viewer's pace: the player and
+  // the transcript fill the frame, playing advances the time and the highlight, a click
+  // on the last visible segment seeks there and plays on, and as the highlight passes the
+  // region's bottom edge following scrolls it back into view (its own scroll does not
+  // stop following). A slow hand scroll stops following until "Back to playing position"
+  // resumes it. A short viewport, as in the playback journey: the transcript region
+  // (max-height 60vh) must be far shorter than the long clip's transcript, or following
+  // has nothing to scroll.
+  const playbackUrl = await transcriptUrl(browser, PLAYBACK_CLIP);
   await recordFlow(browser, 'gif-playback-follow.webm', PLAYBACK_VIEWPORT, async (page) => {
-    await uploadAndOpen(page, PLAYBACK_CLIP);
+    await page.goto(playbackUrl);
     const region = page.getByRole('region', { name: 'Transcript' });
     await expect(region.getByRole('button').first()).toBeVisible();
     expect(
       await region.evaluate((element) => element.scrollHeight > element.clientHeight + 50),
     ).toBe(true);
     const back = page.getByRole('button', { name: 'Back to playing position' });
-    const seekBar = page.getByRole('slider', { name: 'Seek' });
     const times = page.getByText(/^\d\d:\d\d \/ \d\d:\d\d$/);
+    await page
+      .getByRole('slider', { name: 'Seek' })
+      .evaluate((element) => element.scrollIntoView({ block: 'start' }));
+    await page.waitForTimeout(VIEWER_PAUSE);
 
     await page.getByRole('button', { name: 'Play' }).click();
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
     const started = await times.textContent();
     await expect.poll(() => times.textContent(), { timeout: 10_000 }).not.toBe(started);
+    await page.waitForTimeout(STEP_PAUSE);
 
-    await seekBar.focus();
-    // As many presses as the playback journey uses: the seek lands far below the
-    // region's visible part, so following has to scroll.
-    for (let press = 0; press < 12; press += 1) {
-      await page.keyboard.press('PageUp');
-    }
-    // The highlight followed the seek: a later segment is the active one, its scroll
-    // (scrollTop > 0) kept it in view, and the follow's own scroll did not stop it.
+    const lastVisible = await region.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return [...element.querySelectorAll('[role="button"]')].findLastIndex((segment) => {
+        const rect = segment.getBoundingClientRect();
+        return rect.top >= box.top && rect.bottom <= box.bottom;
+      });
+    });
+    expect(lastVisible).toBeGreaterThan(0);
+    await region.getByRole('button').nth(lastVisible).click();
     await expect
       .poll(() =>
         region.evaluate((element) =>
@@ -121,6 +144,10 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
           ),
         ),
       )
+      .toBeGreaterThanOrEqual(lastVisible);
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+    await expect
+      .poll(() => region.evaluate((element) => element.scrollTop), { timeout: 30_000 })
       .toBeGreaterThan(0);
     await expect
       .poll(() =>
@@ -135,42 +162,20 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
         }),
       )
       .toBe(true);
-    const farDown = await region.evaluate((element) => element.scrollTop);
-    expect(farDown).toBeGreaterThan(0);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(4_000);
     await expect(back).toBeHidden();
 
-    await page.keyboard.press('Home');
-    await expect
-      .poll(() =>
-        region.evaluate((element) =>
-          [...element.querySelectorAll('[role="button"]')].findIndex((segment) =>
-            segment.hasAttribute('data-active'),
-          ),
-        ),
-      )
-      .toBe(0);
-    await expect
-      .poll(() =>
-        region.evaluate((element) => {
-          const active = element.querySelector('[data-active]');
-          if (active === null) {
-            return false;
-          }
-          const box = element.getBoundingClientRect();
-          const segment = active.getBoundingClientRect();
-          return segment.top >= box.top - 1 && segment.bottom <= box.bottom + 1;
-        }),
-      )
-      .toBe(true);
-    expect(await region.evaluate((element) => element.scrollTop)).toBeLessThan(farDown);
-    await page.waitForTimeout(1_500);
-    await expect(back).toBeHidden();
-
-    const atTop = await region.evaluate((element) => element.scrollTop === 0);
+    // A slow hand scroll up, no further than the region has scrolled: past its top the
+    // wheel would scroll the page instead and jump the frame to the header.
+    const handScroll = Math.min(await region.evaluate((element) => element.scrollTop), 150);
+    expect(handScroll).toBeGreaterThan(0);
     await region.hover();
-    await page.mouse.wheel(0, atTop ? 400 : -400);
+    for (let moved = 0; moved < handScroll; moved += 25) {
+      await page.mouse.wheel(0, -Math.min(25, handScroll - moved));
+      await page.waitForTimeout(100);
+    }
     await expect(back).toBeVisible();
+    await page.waitForTimeout(VIEWER_PAUSE);
     await back.click();
     await expect
       .poll(() =>
@@ -185,37 +190,49 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
         }),
       )
       .toBe(true);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(VIEWER_PAUSE);
     await expect(back).toBeHidden();
   });
 
   // Flow 3 — speaker rename and merge on item 09's two-speaker fixture, whose pinned
-  // labelling gives three turns: Speaker 1 → Speaker 2 → Speaker 1. Speaker 1 is renamed
-  // to Alice (saved on Enter, both of its turns follow), then Alice and Speaker 2 are
-  // merged, keeping Alice, so the three turns join into one and Speaker 2's field is gone.
+  // labelling gives three turns: Speaker 1 → Speaker 2 → Speaker 1. At a viewer's pace,
+  // Speaker 1 is renamed to Alice (typed, saved on Enter, both of its turns follow), then
+  // Alice and Speaker 2 are merged, keeping Alice, so the three turns join into one and
+  // Speaker 2's field is gone.
+  const mergeUrl = await transcriptUrl(browser, MERGE_CLIP);
   await recordFlow(browser, 'gif-speaker-rename-merge.webm', DESKTOP_VIEWPORT, async (page) => {
-    await uploadAndOpen(page, MERGE_CLIP);
+    await page.goto(mergeUrl);
     const nameField = page.getByRole('textbox', { name: 'Name of speaker 1' });
     await expect(nameField).toHaveValue('Speaker 1');
-    await nameField.fill('Alice');
+    await page.waitForTimeout(VIEWER_PAUSE);
+    await nameField.click();
+    await nameField.press('ControlOrMeta+a');
+    await nameField.pressSequentially('Alice', { delay: 150 });
+    await page.waitForTimeout(STEP_PAUSE);
     await nameField.press('Enter');
     await expect(turnTextOf(page, 'Alice')).toHaveCount(2);
     await expect(turnTextOf(page, 'Speaker 1')).toHaveCount(0);
     await expect(turnTextOf(page, 'Speaker 2')).toHaveCount(1);
+    await page.waitForTimeout(VIEWER_PAUSE);
 
     await page.getByRole('button', { name: 'Merge speakers…' }).click();
+    await page.waitForTimeout(STEP_PAUSE);
     await page.getByRole('checkbox', { name: 'Alice' }).check();
+    await page.waitForTimeout(STEP_PAUSE);
     await page.getByRole('checkbox', { name: 'Speaker 2' }).check();
+    await page.waitForTimeout(STEP_PAUSE);
     await page.getByRole('combobox', { name: 'Keep' }).selectOption({ label: 'Alice' });
+    await page.waitForTimeout(STEP_PAUSE);
     await page.getByRole('button', { name: 'Merge', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Merge speakers?' });
     await expect(dialog).toContainText('Merge Speaker 2 into Alice?');
+    await page.waitForTimeout(VIEWER_PAUSE);
     await dialog.getByRole('button', { name: 'Merge', exact: true }).click();
 
     await expect(page.getByRole('textbox', { name: 'Name of speaker 2' })).toHaveCount(0);
     await expect(turnTextOf(page, 'Alice')).toHaveCount(1);
     await expect(turnTextOf(page, 'Speaker 2')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Reset all merges' })).toBeVisible();
-    await page.waitForTimeout(1_000);
+    await page.waitForTimeout(2 * VIEWER_PAUSE);
   });
 });
