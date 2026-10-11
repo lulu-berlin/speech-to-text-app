@@ -48,3 +48,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 
 - 2026-10-11: drafted by item 35's workspace agent from the bug found while recording the playback GIF; the user chose to fix the app before recording follow mode.
 - 2026-10-11: consultation (root agent): mechanism → input-event detection (wheel, touch, keyboard, scrollbar drag); the item 31 ordering question resolved. Test list (7 items, incl. the e2e test) approved by the user; status `spec-approved`.
+- 2026-10-11: item 6 (e2e) green on the user's machine (full Playwright journey against the real backend, incl. `17-follow-mode.spec.ts`); all test-list items ticked.
