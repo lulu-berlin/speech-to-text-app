@@ -23,4 +23,8 @@ test('the row menu reorders the queue and the order survives a reload', async ({
   await page.reload();
   await expect(page.getByText('Live', { exact: true })).toBeVisible();
   await expect.poll(async () => rowOrder(page, REORDER_CLIPS)).toEqual([1, 0, 2]);
+
+  // Hand the queue back running, so no later test inherits this test's pause.
+  await pause.click();
+  await expect(pause).not.toBeChecked();
 });

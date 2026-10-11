@@ -42,12 +42,6 @@ test('playback: the highlight follows seeking and pausing, a click seeks and pla
 }) => {
   test.setTimeout(300_000);
   await appLive(page);
-  // An earlier test may leave the queue paused (the reorder test pauses it): run it.
-  const pause = page.getByRole('switch', { name: 'Pause the queue' });
-  if (await pause.isChecked()) {
-    await pause.click();
-  }
-  await expect(pause).not.toBeChecked();
   await uploadClips(page, [PLAYBACK_CLIP]);
   const notice = page.getByText(`${PLAYBACK_CLIP} transcribed`);
   await expect(notice).toBeVisible({ timeout: 240_000 });
