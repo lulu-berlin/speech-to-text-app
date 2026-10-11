@@ -1,6 +1,6 @@
 # 39 — devenv/doc drift: the playwright version comment (1.61.1 vs 1.63.0)
 
-Status: spec-approved
+Status: in-progress
 Depends on: [16](../docs/specs/nix-flake-package.md) (done; the downgrade update moved the devenv's playwright to 1.63.x)
 Blocks: —
 
