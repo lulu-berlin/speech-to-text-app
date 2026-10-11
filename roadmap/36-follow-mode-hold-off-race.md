@@ -32,7 +32,7 @@ While a transcript plays, follow mode keeps the playing segment in view until th
 Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user:
 
 - [x] Following holds through its own scroll even when the scroll event arrives after the next macrotask (the race reproduced deterministically in the component test)
-- [ ] Following holds through many consecutive follow scrolls while playing
+- [x] Following holds through many consecutive follow scrolls while playing
 - [ ] A hand scroll (wheel) still stops following and shows "Back to playing position"
 - [ ] A hand scroll by dragging the scrollbar / keyboard still stops following
 - [ ] "Back to playing position" resumes following and scrolls to the playing segment
