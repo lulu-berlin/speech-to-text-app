@@ -1,6 +1,6 @@
 # 30 — Diarization crash on the user's machine (ONNX Runtime recursion)
 
-Status: draft
+Status: spec-approved
 Depends on: —
 
 ## Goal
@@ -23,18 +23,18 @@ To be consulted with the user (2026-10-11): hypothesis first, version pin as fal
 2. **Version pin (cycle 2, if 1 fails)**: pin ONNX Runtime to an earlier stable (e.g. 1.29.x or 1.27.x) in the version catalog, `deps.json` regenerated with the user, suites green — mirroring the sqlite-jdbc item (ADR 0042 is the precedent for the pin rule; the version itself is an ORT fix for the recursion).
 3. If neither works: capture the native symbols (unstrip the jar's `.so`, `nm`/`addr2line` the three offsets) and report the exact function names upstream.
 
-## Open questions
+## Open questions (answered 2026-10-11)
 
-- Which session options exactly (execution mode; intra/inter thread caps)?
-- Version fallback target?
+- Which session options exactly? → `ExecutionMode.ORT_SEQUENTIAL` and `setInterOpNumThreads(1)` in `SpeakerModel.sessionOptions`, so ORT's parallel executor (the recursion's home) is never entered; intra-op threads stay driven by `STT_THREADS` as today.
+- Version fallback target? → Try 1.29.x first (a pinned downgrade, ADR 0042-style), then 1.27.x, decided at the checkpoint if cycle 1 fails; `deps.json` regenerates with the user.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-To be written with the user. Expected scope:
+Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- Session options set as decided; the engine's Integration suite (real CAM++ model) stays green in the sandbox.
-- The user's full run (upload → transcription → diarization → COMPLETED, twice) on their machine.
-- The version-pin path, if needed: `dependencyInsight` shows the pinned ORT; suites green; `deps.json` regenerated with the user.
+- [ ] The speaker session is configured sequentially: `SpeakerModel.sessionOptions` sets sequential execution and a single inter-op thread (intra-op still honors `STT_THREADS`); the engine's Integration specs (real CAM++ model: `ProcessingEngineIntegrationSpec`, `LibriSpeechDiarizationSpec`) stay green in the sandbox
+- [ ] The user's machine: a full upload → transcription → diarization → COMPLETED run with speakers on completes twice in a row (the original crash reproduced every time before the fix; acceptance is the user's, the sandbox cannot reproduce)
+- [ ] (only if cycle 1 fails on the user's machine) ONNX Runtime is pinned to the fallback version; `dependencyInsight` shows the pin; the suites stay green; `deps.json` regenerates with the user
 
 ## Acceptance criteria
 
@@ -45,3 +45,4 @@ To be written with the user. Expected scope:
 ## Approval log
 
 - 2026-10-11: drafted by the root agent from the user's crash evidence (`coredumpctl info` backtrace showing the ORT recursion).
+- 2026-10-11: consultation with the user: sequential execution + single inter-op thread first (keeps intra-op on `STT_THREADS`); pinned downgrade (1.29.x, then 1.27.x) as the fallback if the user's machine still crashes. Test list (3 items) approved; status → `spec-approved`.
