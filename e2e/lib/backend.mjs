@@ -54,7 +54,7 @@ export const FIXTURE_CLIPS = [
   'jfk-l.wav', // 0-4s
   'jfk-m.wav', // 0-5s
   'jfk-n.wav', // the sample looped 8x, ~88s
-'jfk-o.wav', // 5-7s, the contract check (item 16)
+  'jfk-o.wav', // 5-7s, the contract check (item 16)
   'jfk-p.wav', // 1-8s, item 32's settings e2e
   'jfk-follow.wav', // the sample looped 14x, ~154s (item 36)
 ];
