@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { FOLLOW_CLIP } from '../lib/backend.mjs';
 import { uploadAndOpen } from './helpers/ui';
 
@@ -40,6 +40,18 @@ async function nextOutOfViewSegment(region: Locator): Promise<number> {
   });
 }
 
+// Whether playback has run to the end of the audio (ended, or currentTime at the
+// duration). The transcribed turns can extend past the joined audio's tail, so a segment
+// the audio never reaches is not a failure of following — the rounds must stop then.
+async function playbackFinished(page: Page): Promise<boolean> {
+  return page
+    .locator('audio')
+    .evaluate(
+      (audio: HTMLAudioElement) =>
+        audio.ended || (audio.duration > 0 && audio.currentTime >= audio.duration - 0.05),
+    );
+}
+
 // Item 36, ADR 0046: real playback follows the moving playhead through many follow
 // scrolls and "Back to playing position" never appears without a hand scroll — the race
 // this item fixes made it appear on its own while recording item 35's playback GIF. A
@@ -72,19 +84,32 @@ test('follow mode: long playback never shows "Back to playing position" without 
     }
     const startTop = await region.evaluate((element) => element.scrollTop);
     // The playhead must reach the out-of-view segment on its own; a "Back to playing
-    // position" button at any moment is an automatic stop and fails the round here.
+    // position" button at any moment is an automatic stop and fails the round here. If
+    // playback finishes first — the joined audio can end before its last transcribed
+    // segment starts — the rounds stop: there is nothing left to follow into.
     const deadline = Date.now() + (round === 0 ? 90_000 : 45_000);
+    let reached = false;
     for (;;) {
       await expect(back).toBeHidden();
       if ((await activeIndex(region)) >= target) {
+        reached = true;
+        break;
+      }
+      if (await playbackFinished(page)) {
         break;
       }
       if (Date.now() > deadline) {
+        const position = await page
+          .locator('audio')
+          .evaluate((audio: HTMLAudioElement) => `${audio.currentTime}/${audio.duration}s`);
         throw new Error(
-          `playback never reached segment ${target} (still at ${await activeIndex(region)})`,
+          `playback never reached segment ${target} (still at ${await activeIndex(region)}; audio at ${position})`,
         );
       }
       await page.waitForTimeout(500);
+    }
+    if (!reached) {
+      break; // the audio ended before this segment: nothing more to follow into.
     }
     // The follow scroll brought the formerly out-of-view segment in, moving the region.
     await expect.poll(() => activeInView(region), { timeout: 5_000 }).toBe(true);
