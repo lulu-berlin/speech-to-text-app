@@ -31,12 +31,3 @@
 - **Used by**: `frontend/index.html` links it as `/src/shared/brand/favicon.svg`; Vite
   bundles it into `dist/assets/` on build (the `publicDir: 'mock'` setup copies no public
   directory).
-
-## `stenographer-still.svg`
-
-- **What**: a static image of the mascot for documentation: the artwork's static frame —
-  same drawing with the `<style>` block removed; the `role="img"`/`aria-label` are kept so
-  documents can reference it accessibly.
-- **Origin/derivation**: mechanically derived from `stenographer.svg` (item 17,
-  2026-10-10) by stripping the style block; same licence as the artwork.
-- **Used by**: documentation and release materials; not referenced by the app.
