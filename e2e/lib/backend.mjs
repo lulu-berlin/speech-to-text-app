@@ -57,6 +57,8 @@ export const FIXTURE_CLIPS = [
   'jfk-o.wav', // 5-7s, the contract check (item 16)
   'jfk-p.wav', // 1-8s, item 32's settings e2e
   'jfk-follow.wav', // the sample looped 14x, ~154s (item 36)
+  'jfk-q.wav', // 3-5s, item 37's completed player clip
+  'jfk-r.wav', // the sample looped 5x, ~55s, item 37's background transcription
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -90,6 +92,12 @@ export const SETTINGS_CLIP = FIXTURE_CLIPS[21];
 // jfk-long.wav is already a finished task by the time this file runs, and the backend
 // deduplicates by content sha256, so re-uploading it would answer 409).
 export const FOLLOW_CLIP = FIXTURE_CLIPS[22];
+// Item 37's audio-while-transcribing journey (ADR 0046): a short clip that completes
+// quickly, and a long loop that keeps the engine transcribing while the completed one's
+// player is checked. Unique bytes: FOLLOW_CLIP is item 36's loop, and the other trims
+// are other tests' clips, so these cannot answer 409.
+export const COMPLETED_PLAYER_CLIP = FIXTURE_CLIPS[23]; // 3-5s
+export const TRANSCRIBING_BACKGROUND_CLIP = FIXTURE_CLIPS[24]; // the sample looped 5x, ~55s
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
