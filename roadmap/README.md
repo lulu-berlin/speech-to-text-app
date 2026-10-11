@@ -77,7 +77,7 @@ graph TD
   21 --> 32
   16 --> 33[33 Gradle bootstrap without Nix]
   34 --> 33
-  34[34 dev mode]
+  34[34 dev mode ✓]:::done
   21 --> 35[35 README and architecture overview]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
@@ -119,5 +119,5 @@ graph TD
 | [31 — Header and navigation polish](31-header-and-navigation-polish.md) | spec-approved | 17, 25, 21 |
 | [32 — Settings page: device, threads and upload defaults](32-settings-page-device-selection.md) | spec-approved | 11, 12, 13, 21 |
 | [33 — Gradle bootstrap for developers without Nix](33-gradle-bootstrap-without-nix.md) | draft | 16, 34 |
-| [34 — Dev mode: frontend and backend with one command](34-dev-mode.md) | spec-approved | — |
+| [34 — Dev mode: frontend and backend with one command](../docs/specs/dev-mode.md) | done | — |
 | [35 — README and architecture overview](35-readme-and-architecture-overview.md) | spec-approved | 21 |
