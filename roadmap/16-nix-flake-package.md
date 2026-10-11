@@ -59,7 +59,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - [x] (discovered) The package's ffmpeg is the 8.1 branch (`ffmpeg_8`, 8.1.2 at the locked rev), the precision item 33 syncs at; the upload of item 6 still completes with it (confirmed 2026-10-11: nixpkgs' default `ffmpeg` is 9.0.1)
 - [ ] (discovered) The devenv's whisper-cli is the package's 1.8.4 Vulkan build (one shared `nix/whisper-cpp.nix`, like `nix/models.nix`); `docs/api/languages.json` and its backend copy record `whisperVersion` 1.8.4 (the language table of 1.8.4 and 1.9.2 is identical, compared from source) (confirmed 2026-10-11)
 - [ ] (discovered) Item 21's e2e suite can boot the packaged `stt-app` instead of `gradle run` and passes against it (the acceptance criterion "the packaged app passes item 21's end-to-end boot"; `e2e/lib/backend.mjs` hardcodes `gradle --no-daemon run`) (confirmed 2026-10-11)
-- [ ] (discovered, to confirm) A change outside `backend/` and `frontend/` (roadmap, docs, e2e, `devenv.nix`) does not rebuild the backend or the frontend (both derivations take `src = self`, so a roadmap-only commit cost a ~5 min rebuild in cycle 8)
+- [ ] (discovered) A change outside `backend/` and `frontend/` (roadmap, docs, e2e, `devenv.nix`) does not rebuild the backend or the frontend (both derivations take `src = self`, so a roadmap-only commit cost a ~5 min rebuild in cycle 8) (confirmed 2026-10-11)
 
 ## Acceptance criteria
 
