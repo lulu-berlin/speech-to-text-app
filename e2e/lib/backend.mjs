@@ -93,7 +93,9 @@ export async function waitForHealth(port, { down = false, timeoutMs = 600_000 } 
         `backend on :${port} ${down ? 'still answering after' : 'did not answer within'} ${timeoutMs} ms`,
       );
     }
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    const { promise, resolve } = Promise.withResolvers();
+    setTimeout(resolve, 300);
+    await promise;
   }
 }
 
