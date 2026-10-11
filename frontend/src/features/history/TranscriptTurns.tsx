@@ -48,14 +48,13 @@ const SpeakerName = styled.span<{ $color: string }>`
   font-weight: ${(props) => props.theme.fontWeights.medium};
 `;
 
-// A segment of a turn: a button that seeks the player to its start (item 9), highlighted
-// while the playhead is inside it.
-const SegmentButton = styled.button<{ $active: boolean }>`
-  border: none;
-  padding: 0;
+// A segment of a turn: inline text that seeks the player to its start (item 9), highlighted
+// while the playhead is inside it. An inline element with the button role, not a <button>:
+// a <button> is an inline-block box that wraps as a whole and centers its own lines, so a
+// turn would not read as one paragraph (item 29).
+const SegmentButton = styled.span<{ $active: boolean }>`
   background: ${(props) => (props.$active ? props.theme.colors.accent : 'transparent')};
   color: ${(props) => (props.$active ? props.theme.colors.accentText : 'inherit')};
-  font: inherit;
   cursor: pointer;
   ${focusRing}
 `;
@@ -93,9 +92,19 @@ export function TranscriptTurns({
                 {turn.segments.map((segment) => (
                   <span key={`${segment.startMs}-${segment.endMs}`}>
                     <SegmentButton
+                      role="button"
+                      tabIndex={0}
                       $active={segment === activeSegment}
                       data-active={segment === activeSegment || undefined}
                       onClick={() => onSegmentClick(segment.startMs)}
+                      onKeyDown={(event) => {
+                        // A native button's keys: Enter and Space activate, and Space must
+                        // not scroll the page.
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onSegmentClick(segment.startMs);
+                        }
+                      }}
                     >
                       {segment.text}
                     </SegmentButton>{' '}
