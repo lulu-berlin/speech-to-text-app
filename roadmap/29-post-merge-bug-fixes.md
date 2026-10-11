@@ -1,6 +1,6 @@
 # 29 — Post-merge bug fixes: engine wake, seek bar, audio join, SSE disconnect
 
-Status: spec-approved
+Status: in-progress
 Depends on: —
 
 ## Goal
