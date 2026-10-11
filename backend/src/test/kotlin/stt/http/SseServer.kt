@@ -31,7 +31,7 @@ internal class SseServer(
                     .port
             }
 
-    private var stream: InputStream? = null
+    private val streams = mutableListOf<SseTestReader>()
 
     /** One REST command with no body; its status, e.g. `command("POST", "/api/queue/pause")`. */
     fun command(
@@ -70,7 +70,7 @@ internal class SseServer(
         return response.statusCode() to response.body()
     }
 
-    /** Opens the events stream; the returned reader is closed with the server. */
+    /** Opens one events stream (one per call, like one browser tab each); every reader is closed with the server. */
     fun connectEvents(): SseTestReader {
         val body =
             http
@@ -78,12 +78,11 @@ internal class SseServer(
                     HttpRequest.newBuilder(URI("$base/api/events")).GET().build(),
                     HttpResponse.BodyHandlers.ofInputStream(),
                 ).body()
-        stream = body
-        return SseTestReader(body.bufferedReader())
+        return SseTestReader(body.bufferedReader()).also { streams += it }
     }
 
     override fun close() {
-        stream?.close()
+        streams.forEach { it.close() }
         server.stop(gracePeriodMillis = 100, timeoutMillis = 5_000)
     }
 }
