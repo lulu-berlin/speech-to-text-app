@@ -45,10 +45,21 @@
       '';
     };
 
+    # Each part's source holds only what its build reads: its own directory, docs/api (the
+    # frontend imports the contract JSON, the backend's contract tests read it) and, for
+    # ktlint, the root .editorconfig. A commit elsewhere (roadmap, docs, e2e, devenv) leaves
+    # both derivations unchanged, so it costs no rebuild. The paths are inside the flake's
+    # store copy, which holds git-tracked files only. toSource names the result `source`.
+    sourceOf = paths:
+      pkgs.lib.fileset.toSource {
+        root = ./.;
+        fileset = pkgs.lib.fileset.unions paths;
+      };
+
     backend = pkgs.stdenv.mkDerivation (finalAttrs: {
       pname = "stt-backend";
       version = "0.1.0-SNAPSHOT";
-      src = self;
+      src = sourceOf [./backend ./docs/api ./.editorconfig];
 
       # Directory sources unpack to `./source/` (stripHash of the store path);
       # nixpkgs cds into `$sourceRoot` after unpackPhase, so it must include the
@@ -106,7 +117,7 @@
     frontend = pkgs.stdenv.mkDerivation (finalAttrs: {
       pname = "stt-frontend";
       version = "0.1.0";
-      src = self;
+      src = sourceOf [./frontend ./docs/api];
 
       sourceRoot = "source/frontend";
 
