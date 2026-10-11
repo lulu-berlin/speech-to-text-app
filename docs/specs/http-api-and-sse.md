@@ -116,6 +116,7 @@ The JSON shapes the frontend builds against.
   - `task-deleted` → `{ "id" }`
   - `speakers-renamed` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored rename or name reset, the task's effective speakers as stored; a rejected rename emits nothing
   - `speakers-merged` → `{ "id", "speakers": [{ "speakerId", "speaker" }] }` (item 22): after a stored merge or a reset of all merges, the task's effective speakers; a rejected merge emits nothing. Turns can join or split along a former boundary, so a client showing the task's transcript refetches `/turns`
+  - `heartbeat` → `{}` (added 2026-10-11, item 29, [ADR 0044](../decisions/0044-sse-heartbeat-and-client-watchdog.md)): sent whenever the stream has been silent for 5 s; it carries no state. A client that receives no event at all for 15 s treats the stream as dropped, reconnects, and takes the next snapshot
 - **Error codes:**
 
   | Status | Codes |

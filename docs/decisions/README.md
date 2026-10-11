@@ -53,3 +53,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 
 | 0043 | [ONNX Runtime is pinned like sqlite-jdbc](0043-onnxruntime-pinned-like-sqlite-jdbc.md) | accepted, applies 0042 to onnxruntime | 2026-10-11 |
 
+| 0044 | [SSE heartbeat event and client inactivity watchdog](0044-sse-heartbeat-and-client-watchdog.md) | accepted, extends item 12's event list | 2026-10-11 |
+
