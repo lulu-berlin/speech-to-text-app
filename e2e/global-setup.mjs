@@ -8,8 +8,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   FIXTURE_CLIPS,
+  MERGE_CLIP,
+  MERGE_SOURCE_IDS,
   checkPreconditions,
   choosePort,
+  librispeechDir,
   loadState,
   saveState,
   startBackend,
@@ -48,6 +51,16 @@ export default async function globalSetup() {
       ]);
     }
   }
+  // The two-speaker recording: the three committed LibriSpeech clips back to back.
+  execFileSync('ffmpeg', [
+    '-y',
+    '-loglevel',
+    'error',
+    ...MERGE_SOURCE_IDS.flatMap((id) => ['-i', join(librispeechDir, `${id}.flac`)]),
+    '-filter_complex',
+    '[0:a][1:a][2:a]concat=n=3:v=0:a=1',
+    join(fixturesDir, MERGE_CLIP),
+  ]);
   const port = await choosePort();
   saveState({ port, dataDir, fixturesDir });
   const { pid } = await startBackend({ port, dataDir });
