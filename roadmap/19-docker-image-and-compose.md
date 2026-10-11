@@ -107,6 +107,18 @@ None.
   (PID 1) reaped the cancelled tree — ADR 0020's orphan case is covered in the container.
   No refactoring suggested.
 
+- 2026-10-11 (cycle 7, red then green, user-verified): **test 7 was red** — `Config.User` was
+  empty and `exec` ran `Uid: 0`: the runtime stage never got its `USER 1000:1000` directive
+  (the design and the rootfs user existed, the directive was missing), so tests 1–6 ran as
+  root. Commit `19a489f` adds the directive. The old volume held root-owned `stt.db` (created
+  by the root-run), so verification used `docker compose down -v` (volume recreated fresh from
+  the image's 1000-owned `/data`). Green: `Config.User` `1000:1000`, exec `Uid/Gid 1000
+  1000`, writable only `/data`, `/tmp` (JVM scratch) and `/home/stt`, `/etc` `/usr` `/bin`
+  `/nix/store` not writable, upload → `COMPLETED` with all state under `/data`
+  (`stt.db`, `-wal`, `-shm`, `tmp/`, `work/`). The 682 s `nix build` on the rebuild was the
+  one-time context-shape change from the cycle-1 refactor; Dockerfile-only edits are cached
+  now. No refactoring suggested.
+
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
@@ -119,7 +131,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - [x] Uploading a short clip in the containerized app completes with a transcript
 - [x] A task interrupted by `docker compose stop` resumes after `docker compose start` (item 11's restart recovery)
 - [x] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
-- [ ] The container runs as a non-root user and writes only to `/data`
+- [x] The container runs as a non-root user and writes only to `/data`
 - [ ] The image contains only the flake closure's files (plus the init)
 - [ ] On a host with an NVIDIA GPU and the container toolkit, `docker compose --profile gpu-nvidia up` uses the GPU (`STT_DEVICE=auto`, `nvidia-smi`-visible); on an Intel/AMD host, the `gpu-vulkan` profile uses `/dev/dri`
 
