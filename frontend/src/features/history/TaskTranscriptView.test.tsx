@@ -311,6 +311,50 @@ describe('the transcript view', () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
+  it('stops following on a scrollbar drag or the scroll keys, and only on input that scrolls', async () => {
+    const scrollIntoView = stubScrollIntoView();
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const region = screen.getByRole('region', { name: /transcript/i });
+    const backButton = () => screen.queryByRole('button', { name: /back to playing position/i });
+    const returnToFollowing = () => {
+      fireEvent.click(screen.getByRole('button', { name: /back to playing position/i }));
+      expect(backButton()).not.toBeInTheDocument();
+    };
+
+    // A plain key does not scroll, so it does not stop following.
+    audio.currentTime = 1.0;
+    fireEvent(audio, new Event('timeupdate'));
+    fireEvent.keyDown(region, { key: 'a' });
+    expect(backButton()).not.toBeInTheDocument();
+
+    // A scroll key stops following (keyboard hand scroll, item 36).
+    fireEvent.keyDown(region, { key: 'ArrowDown' });
+    expect(backButton()).toBeInTheDocument();
+    returnToFollowing();
+
+    // A pointer press that scrolled nothing is not a scroll — neither a click nor a press
+    // alone stops following.
+    fireEvent.pointerDown(region, { pointerId: 1, buttons: 1 });
+    fireEvent.pointerUp(region, { pointerId: 1, buttons: 1 });
+    expect(backButton()).not.toBeInTheDocument();
+
+    // A drag that scrolls the region is a scrollbar drag: the browser scrolls while the
+    // button is held, so the pointer move that finds the scrolled position stops following.
+    fireEvent.pointerDown(region, { pointerId: 2, buttons: 1 });
+    region.scrollTop = 100;
+    fireEvent.pointerMove(region, { pointerId: 2, buttons: 1 });
+    expect(backButton()).toBeInTheDocument();
+    fireEvent.pointerUp(region, { pointerId: 2, buttons: 1 });
+    expect(backButton()).toBeInTheDocument();
+
+    // Following is off; the playhead advancing no longer scrolls.
+    scrollIntoView.mockClear();
+    audio.currentTime = 6.0;
+    fireEvent(audio, new Event('timeupdate'));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
   it('keeps the playing segment visible below the sticky header: the active segment carries a top scroll margin the size of the compact header', async () => {
     stubScrollIntoView();
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
