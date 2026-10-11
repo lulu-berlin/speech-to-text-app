@@ -1,6 +1,6 @@
 # 29 — Post-merge bug fixes: engine wake, seek bar, audio join, SSE disconnect
 
-Status: in-progress
+Status: in-review
 Depends on: —
 
 ## Goal
@@ -39,7 +39,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] (discovered 2026-10-11, confirmed at the cycle-2 refactor checkpoint) The playback machine keeps the seek bar's draft while dragging, as pure logic: DRAG sets it, PLAYHEAD does not clear it, SEEK clears it and moves the playhead (ADR 0031)
 - [x] (discovered 2026-10-11 in cycle 3, confirmed at its refactor checkpoint) The real join names its output format: the cache's temporary target is `….flac.part`, from which ffmpeg cannot infer a muxer, so the route 500'd even with a work directory (pinned by the fix-3 test, which cannot pass without it)
 - [x] (discovered 2026-10-11 in the watchdog cycle, confirmed at its checkpoint) The mock `/api/events` stream (`pnpm dev:mock`) sends `heartbeat` (docs/api/heartbeat.json) every 5 s, so the watchdog does not cycle the mock UI through `reconnecting` every 15 s. Mock tooling, no automated test (user decision); checked in the browser under `dev:mock`
-- [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` stay green; the existing upload/join/SSE/player tests pass unchanged where their scenario overlaps
+- [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` stay green; the existing upload/join/SSE/player tests pass unchanged where their scenario overlaps
 
 ## Acceptance criteria
 
@@ -54,3 +54,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-11 (cycle-1 checkpoint, user-confirmed): fix 3's scratch location is the task's own work directory, recreated by the joiner with `Files.createDirectories` when missing; the joiner never deletes the directory (it may be an active task's), and the startup sweep removes an empty one left for a finished task. An owned dir under `tmp/` was rejected: the database open prunes `tmp/` children non-recursively and not best-effort, so a leftover directory could fail startup.
 - 2026-10-11 (workspace, before the keepalive cycles; user decision): the approved keepalive design could not work. SSE `:` comment lines are ignored by the standard and dispatch no event; the `eventsource` package the tests use creates its parser without `onComment`, as browsers do. A frontend watchdog would therefore never see the keepalives and would flap to `reconnecting` on every healthy idle stream. Options laid out: (A) a visible named `heartbeat` event (contract addition), (B) comments plus a REST health probe (no contract change, but blind to a dropped stream while REST works), (C) server-side comments only (does not meet the goal). The user chose (A). Fix 5 and the keepalive test-list item were rewritten as two items (backend heartbeat, frontend watchdog); new [ADR 0044](../docs/decisions/0044-sse-heartbeat-and-client-watchdog.md); `docs/api/heartbeat.json` and the HTTP API spec's event list gain the event. Item 21's e2e harness reads `/api/events` and must skip `heartbeat` frames on idle streams — to coordinate through the root agent.
 - 2026-10-11: the fix-5 amendment approved by the user as drafted (ADR 0044 accepted, the contract addition, the two test-list items). The backend heartbeat test runs on the real 5 s interval (about 11 s of waiting in `gradle test`), not an injected one.
+- 2026-10-11 (workspace): test list done; `Status: in-review`. Final gates on the branch head, rebased onto `main` at item 30 (`71765e36`): `gradle check` (ktlint + 246 unit tests) and `gradle integrationTest` green; frontend 152 tests, prettier, tsc and the vite build green. Existing tests were kept where their scenario overlaps; two test helpers changed for the new scenarios (`SseServer` holds one stream per subscriber, `SseTestReader` gains a closable connection and a per-line timeout) and `EventsOverflowSpec`'s names follow the `sendEvents` rename. Still open for the user's browser: the seek bar's feel, transcript audio playing for a finished task, the watchdog against a real server, and `dev:mock` staying Live past 15 s. For the root agent: item 21's harness must skip `heartbeat` frames on idle streams, and ADR 0043 is item 30's, so this item's ADR is 0044.
