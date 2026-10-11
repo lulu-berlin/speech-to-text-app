@@ -19,3 +19,8 @@ docs/*
 **/dist
 **/.gradle
 *.db
+# The Dockerfile and this file are sent as separate build metadata; the flake never
+# reads them. Keeping them out of COPY . . means editing the Dockerfile alone does
+# not invalidate the context layer and re-run the ~11-min nix build.
+Dockerfile
+.dockerignore
