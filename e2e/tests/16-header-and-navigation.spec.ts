@@ -122,14 +122,22 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   }
   await expect(page.getByText(`${HEADER_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
 
-  // The transcript: a short desktop viewport so the page scrolls. Scrolling down keeps
-  // the sticky header in view and shrinks its mascot to the compact size; it grows back
-  // at the top. The compact mascot keeps rest (nothing is running here), and the shrink
-  // transition is settled by the poll.
+  // The transcript: short viewports so the page itself scrolls (the window scroll
+  // drives the header's shrink; the transcript region scrolls internally otherwise).
+  // Scrolling down keeps the sticky header in view and shrinks its mascot to the
+  // compact size; it grows back at the top. The compact mascot keeps rest (nothing is
+  // running here), and the shrink transition is settled by the poll.
   await openTranscript(page, HEADER_CLIP);
+  // The heading renders before the turns load; only the region makes the page tall
+  // enough to scroll, so wait for it.
+  await expect(page.getByRole('region', { name: 'Transcript' })).toBeVisible();
   for (const width of ['desktop', 'phone'] as const) {
-    const viewport = width === 'desktop' ? { width: 1280, height: 600 } : PHONE_VIEWPORT;
+    const viewport =
+      width === 'desktop' ? { width: 1280, height: 600 } : { width: 390, height: 650 };
     await page.setViewportSize(viewport);
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight))
+      .toBe(true);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await expect.poll(headerMascotWidth).toBe(px(4));
     await expect(headerMascot).toBeInViewport();
