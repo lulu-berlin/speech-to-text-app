@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  BROKEN2_CLIP,
   BROKEN_CLIP,
   FIXTURE_CLIPS,
   MERGE_CLIP,
@@ -37,6 +38,10 @@ export default async function globalSetup() {
     { args: ['-stream_loop', '11'], file: FIXTURE_CLIPS[6] }, // the sample 12 times (~132 s)
     { args: ['-stream_loop', '19'], file: FIXTURE_CLIPS[8] }, // the sample 20 times (~220 s)
     { args: ['-ss', '6', '-t', '5'], file: FIXTURE_CLIPS[10] }, // 6-11s
+    { args: ['-t', '3'], file: FIXTURE_CLIPS[11] }, // 0-3s, item 12
+    { args: ['-ss', '7', '-t', '4'], file: FIXTURE_CLIPS[12] }, // 7-11s, item 12
+    { args: ['-t', '7'], file: FIXTURE_CLIPS[13] }, // 0-7s, item 13
+    { args: ['-ss', '4', '-t', '7'], file: FIXTURE_CLIPS[14] }, // 4-11s, item 13
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);
@@ -70,6 +75,10 @@ export default async function globalSetup() {
     join(fixturesDir, BROKEN_CLIP),
     "not audio — the e2e suite's undecodable fixture\n".repeat(256),
   );
+  writeFileSync(
+    join(fixturesDir, BROKEN2_CLIP),
+    "also not audio — the history test's own undecodable fixture\n".repeat(256),
+  );
   const port = await choosePort();
   saveState({ port, dataDir, fixturesDir });
   const { pid } = await startBackend({ port, dataDir });
@@ -78,7 +87,7 @@ export default async function globalSetup() {
 
   return async () => {
     const state = loadState();
-    await stopBackend(state.pid, state.port);
+    await stopBackend(state.pid, state.port, state.dataDir);
     rmSync(dataDir, { recursive: true, force: true });
     rmSync(fixturesDir, { recursive: true, force: true });
     console.log('e2e: backend stopped, data dir and fixtures removed');
