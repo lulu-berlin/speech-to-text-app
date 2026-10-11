@@ -44,8 +44,10 @@ in
     # E2E browser runtime (roadmap item 21): Chromium for `pnpm --dir e2e test`,
     # found through PLAYWRIGHT_BROWSERS_PATH below. e2e/'s @playwright/test stays
     # pinned to the playwright version THIS devenv provides (devenv's pkgs come from
-    # devenv.yaml's devenv-nixpkgs input — currently playwright 1.61.1, browser
-    # revisions 1228 — NOT from the flake's nixpkgs): the npm package and the farm
+    # the flake's shared nixpkgs pin — ADR 0036 — currently
+    # playwright 1.63.0, browser revisions 1243;
+    # e2e/check-playwright.mjs verifies comment, package.json and the realized store
+    # agree): the npm package and the farm
     # must agree on the browser revisions. Bump both together. Dev only — the flake's
     # build is untouched (ADR 0010).
     pkgs.playwright-driver
