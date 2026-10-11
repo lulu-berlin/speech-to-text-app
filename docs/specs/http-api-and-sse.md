@@ -110,7 +110,7 @@ The JSON shapes the frontend builds against.
   - `DELETE /api/tasks/{id}/speakers/merges` ("Reset all merges") removes every merge of the task; the answer is all its speakers again, each with the name its row kept, and the turns and downloads are as before the first merge.
 - **Events** (`event:` name → `data:` JSON):
   - `snapshot` → `{ "tasks": [Task], "queue": Queue }`
-  - `task-updated` → Task
+  - `task-updated` → Task. It also announces a new upload (stated 2026-10-11, item 29; the frontend contract of item 13 already relied on it): the created QUEUED task, followed by `queue-updated` listing it
   - `task-progress` → `{ "id", "transcriptionProgress", "diarizationStage", "diarizationProgress" }`
   - `queue-updated` → Queue
   - `task-deleted` → `{ "id" }`

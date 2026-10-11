@@ -25,8 +25,9 @@ import java.nio.file.Files
  * request is decided with the spool's own digest: the bytes are already known → `409 duplicate-audio` naming
  * the existing task (nothing stored); otherwise the task and its audio metadata are committed in one
  * transaction ([TaskRepository.createFromSpooled]) and the original moved into the task's work directory (no
- * audio bytes reach the database). A created task wakes the engine ([ProcessingEngine.wake]) so it is taken
- * without waiting for another command. Answers `201` with the created task.
+ * audio bytes reach the database). A created task is announced and taken at once ([ProcessingEngine.taskCreated]:
+ * `task-updated` and `queue-updated` on the events stream, then the worker is woken). Answers `201` with the
+ * created task.
  */
 fun Application.uploadRoutes(config: Config) {
     val tasks: TaskRepository by dependencies
@@ -93,10 +94,9 @@ fun Application.uploadRoutes(config: Config) {
                                     queuePosition = tasks.nextQueuePosition(),
                                 )
                             val id = tasks.createFromSpooled(task, file)
-                            // A new upload is an engine event: the worker suspends on its wake channel while
-                            // the queue is empty, so it must be woken here or the task stays QUEUED until the
-                            // next command (item 29).
-                            engine.wake()
+                            // A new upload is an engine event: clients learn of it only from the events stream,
+                            // and the worker suspends while the queue is empty, so it must be woken here (item 29).
+                            engine.taskCreated(id)
                             call.respond(HttpStatusCode.Created, tasks.details(id)!!.toJson())
                         }
                     }
