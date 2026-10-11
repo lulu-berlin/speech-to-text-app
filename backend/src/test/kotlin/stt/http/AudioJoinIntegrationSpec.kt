@@ -35,28 +35,8 @@ class AudioJoinIntegrationSpec :
             `when`("the real FfmpegAudioJoiner joins them") {
                 then("one FLAC of the combined duration is produced") {
                     val runner = ProcessRunner()
-
                     val dataDir = tempdir("stt-join").toPath()
-                    val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
-                    val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
-                    val target = dataDir.resolve("joined.flac")
-
-                    Database.open(dataDir).use { db ->
-                        val workDirectories = TaskWorkDirectories(dataDir)
-                        val id =
-                            TaskRepository(db, workDirectories).createFromUpload(
-                                queuedTask("join.wav", createdAt = 1).copy(queuePosition = 0),
-                                "audio".toByteArray().inputStream(),
-                            )
-                        ChunkRepository(db).storePlan(
-                            id,
-                            listOf(
-                                ExportedChunk(PlannedChunk(0L, 300L), chunk0),
-                                ExportedChunk(PlannedChunk(300L, 800L), chunk1),
-                            ),
-                        )
-                        FfmpegAudioJoiner(runner, ChunkRepository(db), workDirectories).join(id, target)
-                    }
+                    val target = joinTwoSineChunks(dataDir, runner)
 
                     target.exists().shouldBeTrue()
                     String(Files.readAllBytes(target), 0, 4, Charsets.UTF_8) shouldBe "fLaC"
