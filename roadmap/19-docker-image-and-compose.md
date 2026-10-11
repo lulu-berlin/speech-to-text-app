@@ -73,6 +73,11 @@ None.
   (`COPY . .`), so editing the Dockerfile re-runs the whole `nix build` inside Docker (another
   ~11 min); excluding them from the context is the refactor candidate.
 
+- 2026-10-11 (cycle 2, green, user-verified): no code change — the health route exists since
+  item 02, the compose healthcheck and the closure's curl were already in place; the red was
+  the pre-test-1 state (nothing started). `GET /api/health` answered `{"status":"ok"}` and
+  `docker compose ps` showed `Up (healthy)`. No refactoring suggested.
+
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
@@ -80,7 +85,7 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 ADR 0046 (every app feature gets an e2e test) is exempt and why: this item changes packaging only — no app feature or UI; the app's features are covered by item 21's e2e suite booting the packaged app, and a container image cannot be exercised by the UI e2e suite. The image's verification is the user-run Docker scenarios in this list.
 
 - [x] From a fresh clone with only Docker installed, the documented command builds the image and starts the app on `http://localhost:8080`
-- [ ] `GET /api/health` answers `{"status":"ok"}` and the compose healthcheck reports the service healthy
+- [x] `GET /api/health` answers `{"status":"ok"}` and the compose healthcheck reports the service healthy
 - [ ] Data survives `docker compose down` and `up`: a finished transcription is still in the history
 - [ ] Uploading a short clip in the containerized app completes with a transcript
 - [ ] A task interrupted by `docker compose stop` resumes after `docker compose start` (item 11's restart recovery)
