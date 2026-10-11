@@ -54,22 +54,30 @@ async function transcriptUrl(browser: Browser, clip: string): Promise<string> {
 // setup should not be seen calls `startShowing` when the scene is ready: everything
 // recorded before it is cut off (re-encoded with the devenv's ffmpeg, as global setup
 // prepares the fixtures).
-// The recordings are dark mode only (decided with the user), from the first frame: the
-// context prefers dark and the user's stored theme choice (themeMode.ts, key
-// stt-theme-mode) is seeded as dark before the app loads — clicking the theme button
-// instead would pass through light (its cycle is auto -> light -> dark).
+// The recordings are dark mode only (decided with the user), from the very first frame:
+// the context prefers dark, the stored theme choice (themeMode.ts, key stt-theme-mode)
+// is seeded as dark before the app loads, and the document canvas is dark too —
+// otherwise the app's first paint (before React mounts and applies the theme) is a
+// white flash in the recordings.
 async function recordFlow(
   browser: Browser,
   name: string,
   viewport: { width: number; height: number },
   drive: (page: Page, startShowing: () => void) => Promise<void>,
+  cutHeadMs = 0,
 ): Promise<string> {
   const context = await browser.newContext({
     viewport,
     colorScheme: 'dark',
     recordVideo: { dir: RECORDINGS_DIR, size: viewport },
   });
-  await context.addInitScript(() => localStorage.setItem('stt-theme-mode', 'dark'));
+  await context.addInitScript(() => {
+    localStorage.setItem('stt-theme-mode', 'dark');
+    // The app's pre-mount frames: paint the root with the dark theme's background token
+    // (darkTheme.colors.background) so the boot is dark instead of the white canvas
+    // flash; styled-components covers it once the app mounts (user, 2026-10-11).
+    document.documentElement.style.backgroundColor = '#14161a';
+  });
   const page = await context.newPage();
   const recordingStarted = Date.now();
   let showStarted = recordingStarted;
@@ -82,18 +90,23 @@ async function recordFlow(
   await context.close();
   const target = join(RECORDINGS_DIR, name);
   const recorded = await video!.path();
-  if (showStarted === recordingStarted) {
+  // A flow cuts its recording from the start (`cutHeadMs`, the app's boot and its white
+  // first paint, user 2026-10-11) or from when it calls `startShowing` (setup).
+  const cutMs = Math.max(cutHeadMs, showStarted - recordingStarted);
+  if (cutMs === 0) {
     renameSync(recorded, target);
   } else {
-    const cut = ((showStarted - recordingStarted) / 1000).toFixed(2);
+    const cut = (cutMs / 1000).toFixed(2);
+    // Output-side seek (after -i): the re-encode would otherwise occasionally start
+    // with a couple of white frames at the cut point.
     execFileSync('ffmpeg', [
       '-y',
       '-loglevel',
       'error',
-      '-ss',
-      cut,
       '-i',
       recorded,
+      '-ss',
+      cut,
       '-c:v',
       'libvpx',
       '-crf',
@@ -105,6 +118,29 @@ async function recordFlow(
     rmSync(recorded);
   }
   expect(statSync(target).size).toBeGreaterThan(0);
+  // No white flash: the first frame's average color must be dark (the app paints its
+  // pre-theme background before React mounts; the head cuts trim it, and this guard
+  // keeps the recordings honest — user, 2026-10-11).
+  const firstPixel = execFileSync(
+    'ffmpeg',
+    [
+      '-loglevel',
+      'error',
+      '-i',
+      target,
+      '-frames:v',
+      '1',
+      '-vf',
+      'scale=1:1,format=rgb24',
+      '-f',
+      'rawvideo',
+      '-',
+    ],
+    { maxBuffer: 1024 },
+  );
+  for (const channel of firstPixel) {
+    expect(channel).toBeLessThan(0x80);
+  }
   return target;
 }
 
@@ -115,28 +151,36 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
   // Flow 1 — upload and queue progress: a long seed runs (its transcription progress is
   // the queue at work), a second clip queues behind it, the seed is canceled, and the
   // mate transcribes to completion.
-  await recordFlow(browser, 'gif-upload-queue.webm', DESKTOP_VIEWPORT, async (page) => {
-    await appLive(page);
-    await uploadClips(page, [SHOT_CLIP]);
-    const running = rowOf(page, SHOT_CLIP);
-    await expect(running.getByText('RUNNING', { exact: true })).toBeVisible({ timeout: 120_000 });
-    await expect(running.getByText(/Chunking|Transcribing|Diarizing/)).toBeVisible();
-    await expect(running.getByRole('progressbar', { name: 'Transcription' })).toBeVisible();
-    await expect(running.getByText(/\d+%/)).toBeVisible();
+  await recordFlow(
+    browser,
+    'gif-upload-queue.webm',
+    DESKTOP_VIEWPORT,
+    async (page) => {
+      await appLive(page);
+      await uploadClips(page, [SHOT_CLIP]);
+      const running = rowOf(page, SHOT_CLIP);
+      await expect(running.getByText('RUNNING', { exact: true })).toBeVisible({ timeout: 120_000 });
+      await expect(running.getByText(/Chunking|Transcribing|Diarizing/)).toBeVisible();
+      await expect(running.getByRole('progressbar', { name: 'Transcription' })).toBeVisible();
+      await expect(running.getByText(/\d+%/)).toBeVisible();
 
-    await uploadClips(page, [SHOT_UPLOAD_CLIP]);
-    await expect(rowOf(page, SHOT_UPLOAD_CLIP).getByText('QUEUED', { exact: true })).toBeVisible();
+      await uploadClips(page, [SHOT_UPLOAD_CLIP]);
+      await expect(
+        rowOf(page, SHOT_UPLOAD_CLIP).getByText('QUEUED', { exact: true }),
+      ).toBeVisible();
 
-    await running.getByRole('button', { name: `Cancel ${SHOT_CLIP}` }).click();
-    await page
-      .getByRole('dialog', { name: `Cancel ${SHOT_CLIP}?` })
-      .getByRole('button', { name: 'Cancel task' })
-      .click();
-    await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible({
-      timeout: 240_000,
-    });
-    await page.waitForTimeout(1_000);
-  });
+      await running.getByRole('button', { name: `Cancel ${SHOT_CLIP}` }).click();
+      await page
+        .getByRole('dialog', { name: `Cancel ${SHOT_CLIP}?` })
+        .getByRole('button', { name: 'Cancel task' })
+        .click();
+      await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible({
+        timeout: 240_000,
+      });
+      await page.waitForTimeout(1_000);
+    },
+    600,
+  );
 
   // Flow 2 — transcript playback with follow mode. Setup, cut from the video: the player
   // and the transcript region are framed, and the playhead is put on a segment deep in
@@ -242,24 +286,11 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await expect(back).toBeHidden();
       expect(await pageScrollY()).toBe(framedAt);
       expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
-
-      // A slow hand scroll up by 150 px (the region has scrolled further than that, so the
-      // wheel never reaches its top and scrolls the page).
-      await region.hover();
-      for (let moved = 0; moved < 150; moved += 25) {
-        await page.mouse.wheel(0, -25);
-        await page.waitForTimeout(60);
-      }
-      await expect(back).toBeVisible();
-      await expect.poll(activeInView).toBe(false);
-      const backBox = (await back.boundingBox())!;
-      expect(backBox.y + backBox.height).toBeLessThanOrEqual(PLAYBACK_VIEWPORT.height);
-      await page.waitForTimeout(VIEWER_PAUSE);
-      await back.click();
-      await expect.poll(activeInView).toBe(true);
-      await page.waitForTimeout(VIEWER_PAUSE);
+      // The viewer sees following keep the highlight in view; hand scroll and "Back to
+      // playing position" are real, but reading as a glitch in a looped GIF, so the flow
+      // stops here (user, 2026-10-11).
+      await page.waitForTimeout(2_000);
       await expect(back).toBeHidden();
-      expect(await pageScrollY()).toBe(framedAt);
     },
   );
 
@@ -269,39 +300,45 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
   // Alice and Speaker 2 are merged, keeping Alice, so the three turns join into one and
   // Speaker 2's field is gone.
   const mergeUrl = await transcriptUrl(browser, MERGE_CLIP);
-  await recordFlow(browser, 'gif-speaker-rename-merge.webm', DESKTOP_VIEWPORT, async (page) => {
-    await page.goto(mergeUrl);
-    const nameField = page.getByRole('textbox', { name: 'Name of speaker 1' });
-    await expect(nameField).toHaveValue('Speaker 1');
-    await page.waitForTimeout(VIEWER_PAUSE);
-    await nameField.click();
-    await nameField.press('ControlOrMeta+a');
-    await nameField.pressSequentially('Alice', { delay: 150 });
-    await page.waitForTimeout(STEP_PAUSE);
-    await nameField.press('Enter');
-    await expect(turnTextOf(page, 'Alice')).toHaveCount(2);
-    await expect(turnTextOf(page, 'Speaker 1')).toHaveCount(0);
-    await expect(turnTextOf(page, 'Speaker 2')).toHaveCount(1);
-    await page.waitForTimeout(VIEWER_PAUSE);
+  await recordFlow(
+    browser,
+    'gif-speaker-rename-merge.webm',
+    DESKTOP_VIEWPORT,
+    async (page) => {
+      await page.goto(mergeUrl);
+      const nameField = page.getByRole('textbox', { name: 'Name of speaker 1' });
+      await expect(nameField).toHaveValue('Speaker 1');
+      await page.waitForTimeout(VIEWER_PAUSE);
+      await nameField.click();
+      await nameField.press('ControlOrMeta+a');
+      await nameField.pressSequentially('Alice', { delay: 150 });
+      await page.waitForTimeout(STEP_PAUSE);
+      await nameField.press('Enter');
+      await expect(turnTextOf(page, 'Alice')).toHaveCount(2);
+      await expect(turnTextOf(page, 'Speaker 1')).toHaveCount(0);
+      await expect(turnTextOf(page, 'Speaker 2')).toHaveCount(1);
+      await page.waitForTimeout(VIEWER_PAUSE);
 
-    await page.getByRole('button', { name: 'Merge speakers…' }).click();
-    await page.waitForTimeout(STEP_PAUSE);
-    await page.getByRole('checkbox', { name: 'Alice' }).check();
-    await page.waitForTimeout(STEP_PAUSE);
-    await page.getByRole('checkbox', { name: 'Speaker 2' }).check();
-    await page.waitForTimeout(STEP_PAUSE);
-    await page.getByRole('combobox', { name: 'Keep' }).selectOption({ label: 'Alice' });
-    await page.waitForTimeout(STEP_PAUSE);
-    await page.getByRole('button', { name: 'Merge', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Merge speakers?' });
-    await expect(dialog).toContainText('Merge Speaker 2 into Alice?');
-    await page.waitForTimeout(VIEWER_PAUSE);
-    await dialog.getByRole('button', { name: 'Merge', exact: true }).click();
+      await page.getByRole('button', { name: 'Merge speakers…' }).click();
+      await page.waitForTimeout(STEP_PAUSE);
+      await page.getByRole('checkbox', { name: 'Alice' }).check();
+      await page.waitForTimeout(STEP_PAUSE);
+      await page.getByRole('checkbox', { name: 'Speaker 2' }).check();
+      await page.waitForTimeout(STEP_PAUSE);
+      await page.getByRole('combobox', { name: 'Keep' }).selectOption({ label: 'Alice' });
+      await page.waitForTimeout(STEP_PAUSE);
+      await page.getByRole('button', { name: 'Merge', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Merge speakers?' });
+      await expect(dialog).toContainText('Merge Speaker 2 into Alice?');
+      await page.waitForTimeout(VIEWER_PAUSE);
+      await dialog.getByRole('button', { name: 'Merge', exact: true }).click();
 
-    await expect(page.getByRole('textbox', { name: 'Name of speaker 2' })).toHaveCount(0);
-    await expect(turnTextOf(page, 'Alice')).toHaveCount(1);
-    await expect(turnTextOf(page, 'Speaker 2')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Reset all merges' })).toBeVisible();
-    await page.waitForTimeout(2 * VIEWER_PAUSE);
-  });
+      await expect(page.getByRole('textbox', { name: 'Name of speaker 2' })).toHaveCount(0);
+      await expect(turnTextOf(page, 'Alice')).toHaveCount(1);
+      await expect(turnTextOf(page, 'Speaker 2')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Reset all merges' })).toBeVisible();
+      await page.waitForTimeout(2 * VIEWER_PAUSE);
+    },
+    1_000,
+  );
 });
