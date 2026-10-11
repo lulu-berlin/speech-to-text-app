@@ -42,7 +42,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 
 - [x] `devenv up` starts the frontend dev server and the backend; the UI at the printed Vite URL loads the queue through the `/api` proxy
       Scenario (user-run): in `workspaces/34-dev-mode`, `direnv allow` (fresh worktree state), free ports 5173/8080, then `devenv up`. Expect: `frontend` runs `pnpm dev` and prints `Local: http://localhost:5173/` (no browser opens); `backend` runs `gradle run` (Ktor on 8080, `STT_DATA_DIR` from the shell). Open `http://localhost:5173/`: the queue page renders the live state, and the network log shows `/api/events` (SSE) answered 200 through the proxy (backend log shows the connection). Stop with Ctrl-C / `devenv down`.
-- [ ] Editing a frontend component updates the open page through hot module reload, without a full page reload
+- [x] Editing a frontend component updates the open page through hot module reload, without a full page reload
       Scenario (user-run): with `devenv up` running and `http://localhost:5173/` open on the queue page, edit `frontend/src/app/AppHeader.tsx` — change `<Title>Speech-to-Text</Title>` to `Speech-to-Text (dev)` and save. Expect: the open page shows the new heading within ~1s without a full page reload (DevTools Network shows no new `document`/`index.html` request; the Live indicator and the SSE connection stay up). Revert the edit: the heading returns to `Speech-to-Text`.
 - [ ] Editing backend source rebuilds and restarts the backend; the next request is answered by the changed code, and the open page reconnects its live updates
 - [ ] A backend compile error is shown in the backend's log and the last working backend keeps running; fixing the error restarts it
