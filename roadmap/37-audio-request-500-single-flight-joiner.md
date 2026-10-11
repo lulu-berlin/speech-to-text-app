@@ -1,6 +1,6 @@
 # 37 — Audio request 500: the joiner shares the engine's single-flight runner
 
-Status: spec-approved
+Status: in-progress
 Depends on: [15](../docs/specs/frontend-history-ui.md) (done; the transcript player's `/audio` join)
 Blocks: [35](../docs/specs/readme-and-architecture.md) (its playback GIF opens transcripts while the queue may run)
 
