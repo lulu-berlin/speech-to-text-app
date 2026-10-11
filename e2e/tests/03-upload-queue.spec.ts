@@ -1,7 +1,6 @@
-import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { QUEUE_CLIPS, appUrl, loadState } from '../lib/backend.mjs';
-import { expectLiveQueue, rowOrder } from './helpers/ui';
+import { QUEUE_CLIPS } from '../lib/backend.mjs';
+import { appLive, expectLiveQueue, rowOrder, uploadClips } from './helpers/ui';
 
 // A task's pending row by its filename.
 function row(page: Page, filename: string): Locator {
@@ -11,14 +10,8 @@ function row(page: Page, filename: string): Locator {
 test('uploads several clips, queues them in order, and shows status, phase and both progress bars live', async ({
   page,
 }) => {
-  await page.goto(appUrl('/'));
-  await expect(page.getByText('Live', { exact: true })).toBeVisible();
-
-  const { fixturesDir } = loadState();
-  await page.setInputFiles(
-    'input[type="file"]',
-    QUEUE_CLIPS.map((name) => join(fixturesDir, name)),
-  );
+  await appLive(page);
+  await uploadClips(page, QUEUE_CLIPS);
 
   // The dropped files are worked through one at a time, so the queue gets them in order;
   // the pending list keeps that order.
