@@ -40,16 +40,11 @@ async function nextOutOfViewSegment(region: Locator): Promise<number> {
   });
 }
 
-// Whether playback has run to the end of the audio (ended, or currentTime at the
-// duration). The transcribed turns can extend past the joined audio's tail, so a segment
-// the audio never reaches is not a failure of following — the rounds must stop then.
-async function playbackFinished(page: Page): Promise<boolean> {
-  return page
-    .locator('audio')
-    .evaluate(
-      (audio: HTMLAudioElement) =>
-        audio.ended || (audio.duration > 0 && audio.currentTime >= audio.duration - 0.05),
-    );
+// The audio element's currentTime in seconds. The playhead's progress signal: when it
+// stops advancing the rounds must stop — the joined flac of this clip stalls before its
+// transcript ends, so a segment the audio never reaches is not a failure of following.
+async function audioSecond(page: Page): Promise<number> {
+  return page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime);
 }
 
 // Item 36, ADR 0046: real playback follows the moving playhead through many follow
@@ -85,31 +80,34 @@ test('follow mode: long playback never shows "Back to playing position" without 
     const startTop = await region.evaluate((element) => element.scrollTop);
     // The playhead must reach the out-of-view segment on its own; a "Back to playing
     // position" button at any moment is an automatic stop and fails the round here. If
-    // playback finishes first — the joined audio can end before its last transcribed
-    // segment starts — the rounds stop: there is nothing left to follow into.
+    // the audio stops advancing first — ended, or the joined flac stalling before its
+    // transcript ends — the rounds stop: there is nothing more to follow into.
     const deadline = Date.now() + (round === 0 ? 90_000 : 45_000);
     let reached = false;
+    let lastSecond = await audioSecond(page);
+    let lastAdvanceMs = Date.now();
     for (;;) {
       await expect(back).toBeHidden();
       if ((await activeIndex(region)) >= target) {
         reached = true;
         break;
       }
-      if (await playbackFinished(page)) {
-        break;
+      const at = await audioSecond(page);
+      if (at > lastSecond) {
+        lastSecond = at;
+        lastAdvanceMs = Date.now();
+      } else if (Date.now() - lastAdvanceMs > 8_000) {
+        break; // currentTime has not advanced for 8 s: playback finished or stalled.
       }
       if (Date.now() > deadline) {
-        const position = await page
-          .locator('audio')
-          .evaluate((audio: HTMLAudioElement) => `${audio.currentTime}/${audio.duration}s`);
         throw new Error(
-          `playback never reached segment ${target} (still at ${await activeIndex(region)}; audio at ${position})`,
+          `playback never reached segment ${target} (still at ${await activeIndex(region)}; audio at ${at.toFixed(1)}s and advancing)`,
         );
       }
       await page.waitForTimeout(500);
     }
     if (!reached) {
-      break; // the audio ended before this segment: nothing more to follow into.
+      break; // the audio stopped advancing before this segment: nothing more to follow into.
     }
     // The follow scroll brought the formerly out-of-view segment in, moving the region.
     await expect.poll(() => activeInView(region), { timeout: 5_000 }).toBe(true);
