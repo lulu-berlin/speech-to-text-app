@@ -12,10 +12,10 @@ repositories {
 }
 
 // Forced at the catalog version (ADR 0042): flyway-database-nc-sqlite once resolved a
-// newer sqlite-jdbc over the catalog pin via highest-wins; onnxruntime is pinned down to 1.29.0
-// because 1.30.0's native lib segfaults (roadmap item 30) and a transitive must never pull it
-// back up. The catalog stays the single source of truth — change the version in
-// gradle/libs.versions.toml, not here.
+// newer sqlite-jdbc over the catalog pin via highest-wins; onnxruntime is pinned at 1.31.0
+// because 1.29.0/1.30.0's native lib segfault on one machine (roadmap item 30; 1.26.0-1.28.0
+// rejected: degraded embeddings) and a transitive must never pull it back up. The catalog stays
+// the single source of truth — change the version in gradle/libs.versions.toml, not here.
 configurations.configureEach {
     resolutionStrategy.force(libs.sqlite.jdbc)
     resolutionStrategy.force(libs.onnxruntime)

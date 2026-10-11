@@ -12,10 +12,12 @@ exposed = "1.5.0"
 flyway = "13.9.0"
 sqlite-jdbc = "3.50.3.0"
 jna = "5.14.0"
-# ONNX Runtime pinned at 1.29.0 (roadmap item 30): 1.30.0's native lib segfaults with a stack
-# overflow on one machine (CPU-dispatched recursion; survived sequential execution + 1 inter-op
-# thread + STT_THREADS=1). Forced in build.gradle.kts per ADR 0042, like sqlite-jdbc.
-onnxruntime = "1.29.0"
+# ONNX Runtime pinned at 1.31.0 (roadmap item 30): 1.29.0 and 1.30.0 both segfault on one machine
+# with a native stack-overflow recursion (CPU-dispatched; survived sequential execution, 1 inter-op
+# thread, STT_THREADS=1, -Xint, -Xmx1g); 1.26.0-1.28.0 are rejected because their CAM++ embeddings
+# degrade everywhere (integration suite red). 1.31.0 is the next release after the crashing line,
+# with the same embedding computation. Forced in build.gradle.kts per ADR 0042, like sqlite-jdbc.
+onnxruntime = "1.31.0"
 
 [libraries]
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
