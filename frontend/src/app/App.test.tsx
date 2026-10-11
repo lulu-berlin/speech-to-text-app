@@ -26,6 +26,16 @@ function renderAt(path: string) {
   );
 }
 
+// The header's mascot (item 31): the artwork is the header svg; it swaps between the
+// animated mascot and the small static logo depending on the shell's placeholder count.
+function headerMascot(): Element {
+  return required(required(screen.getByRole('banner')).querySelector('svg'));
+}
+
+function headerMascotSize(): string {
+  return getComputedStyle(headerMascot()).width;
+}
+
 describe('the app root', () => {
   it('renders the page title', () => {
     renderAt('/queue');
@@ -416,18 +426,15 @@ describe('the shrinking header', () => {
     // The default snapshot has a running task, so the header's mascot types.
     renderAt('/queue');
     await screen.findByText('Live');
-    const header = required(screen.getByRole('banner')) as HTMLElement;
-    const mascot = required(header.querySelector('svg'));
-    const size = () => getComputedStyle(mascot).width;
 
     // At the top of the page the mascot is full-size and typing.
-    expect(size()).toBe(px(lightTheme.sizes.stenoHeader));
-    expect(mascot.getAttribute('class')).toContain('is-typing');
+    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoHeader));
+    expect(headerMascot().getAttribute('class')).toContain('is-typing');
 
     // The size change is animated: a transition on the mascot's width and height with
     // the motion tokens, declared only inside the no-preference block (instant under
     // reduced motion, like every animation).
-    const shrink = mediaRulesFor(mascot, '(prefers-reduced-motion: no-preference)');
+    const shrink = mediaRulesFor(headerMascot(), '(prefers-reduced-motion: no-preference)');
     expect(shrink.flatMap((rule) => rule.style.transitionProperty.split(','))).toEqual(
       expect.arrayContaining(['width', 'height']),
     );
@@ -440,7 +447,7 @@ describe('the shrinking header', () => {
     const ungated = styleRules().filter(
       (rule): rule is CSSStyleRule =>
         rule instanceof CSSStyleRule &&
-        mascot.matches(rule.selectorText) &&
+        headerMascot().matches(rule.selectorText) &&
         rule.style.transition !== '',
     );
     expect(ungated).toEqual([]);
@@ -448,13 +455,13 @@ describe('the shrinking header', () => {
     // Once the page scrolls the mascot shrinks to the compact size, still typing.
     Object.defineProperty(window, 'scrollY', { value: 200, configurable: true });
     fireEvent.scroll(window);
-    expect(size()).toBe(px(lightTheme.sizes.stenoCompact));
-    expect(mascot.getAttribute('class')).toContain('is-typing');
+    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoCompact));
+    expect(headerMascot().getAttribute('class')).toContain('is-typing');
 
     // Back at the top it grows to the full size again.
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
     fireEvent.scroll(window);
-    expect(size()).toBe(px(lightTheme.sizes.stenoHeader));
+    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoHeader));
 
     // jsdom's scrollY is a readonly prototype accessor; the own property shadows it and
     // is removed again, so later tests read the default.
@@ -543,20 +550,17 @@ describe('the mascot home link', () => {
 
 describe('the one-mascot rule', () => {
   it('shows the small static logo in the header while a placeholder shows the mascot, and the animated mascot otherwise — never two on screen', async () => {
-    const headerMascot = () => required(required(screen.getByRole('banner')).querySelector('svg'));
-    const size = () => getComputedStyle(headerMascot()).width;
-
     // While connecting, the shell's loading region shows the placeholder mascot, so the
     // header shows the small static logo: compact, resting, still the home link.
     const queue = renderAt('/queue');
-    expect(size()).toBe(px(lightTheme.sizes.stenoCompact));
+    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoCompact));
     expect(headerMascot().getAttribute('class')).not.toContain('is-typing');
     expect(headerMascot().closest('a')).toHaveAttribute('aria-label', 'Speech-to-Text home');
 
     // Once live with tasks there is no placeholder: the animated mascot returns at the
     // full size, typing while the running task runs.
     await screen.findByText('Live');
-    expect(size()).toBe(px(lightTheme.sizes.stenoHeader));
+    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoHeader));
     expect(headerMascot().getAttribute('class')).toContain('is-typing');
     queue.unmount();
 
@@ -572,7 +576,7 @@ describe('the one-mascot rule', () => {
     );
     const history = renderAt('/history');
     await screen.findByText('No transcripts yet');
-    expect(size()).toBe(px(lightTheme.sizes.stenoCompact));
+    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoCompact));
     expect(headerMascot().getAttribute('class')).not.toContain('is-typing');
     // The placeholder itself shows the mascot at the empty-state size.
     const placeholder = required(
