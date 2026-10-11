@@ -404,6 +404,58 @@ describe('the sticky header', () => {
   });
 });
 
+describe('the shrinking header', () => {
+  it('shows the full-size mascot at the top, shrinks to the compact size on scroll with a gated token transition, grows back at the top, and keeps typing while compact', async () => {
+    // The default snapshot has a running task, so the header's mascot types.
+    renderAt('/queue');
+    await screen.findByText('Live');
+    const header = required(screen.getByRole('banner')) as HTMLElement;
+    const mascot = required(header.querySelector('svg'));
+    const size = () => getComputedStyle(mascot).width;
+
+    // At the top of the page the mascot is full-size and typing.
+    expect(size()).toBe(px(lightTheme.sizes.stenoHeader));
+    expect(mascot.getAttribute('class')).toContain('is-typing');
+
+    // The size change is animated: a transition on the mascot's width and height with
+    // the motion tokens, declared only inside the no-preference block (instant under
+    // reduced motion, like every animation).
+    const shrink = mediaRulesFor(mascot, '(prefers-reduced-motion: no-preference)');
+    expect(shrink.flatMap((rule) => rule.style.transitionProperty.split(','))).toEqual(
+      expect.arrayContaining(['width', 'height']),
+    );
+    expect(shrink.map((rule) => rule.style.transitionDuration)).toContain(
+      lightTheme.motion.shrinkDuration,
+    );
+    expect(shrink.map((rule) => rule.style.transitionTimingFunction)).toContain(
+      lightTheme.motion.shrinkEasing,
+    );
+    const ungated = styleRules().filter(
+      (rule): rule is CSSStyleRule =>
+        rule instanceof CSSStyleRule &&
+        mascot.matches(rule.selectorText) &&
+        rule.style.transition !== '',
+    );
+    expect(ungated).toEqual([]);
+
+    // Once the page scrolls the mascot shrinks to the compact size, still typing.
+    Object.defineProperty(window, 'scrollY', { value: 200, configurable: true });
+    fireEvent.scroll(window);
+    expect(size()).toBe(px(lightTheme.sizes.stenoCompact));
+    expect(mascot.getAttribute('class')).toContain('is-typing');
+
+    // Back at the top it grows to the full size again.
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+    fireEvent.scroll(window);
+    expect(size()).toBe(px(lightTheme.sizes.stenoHeader));
+
+    // jsdom's scrollY is a readonly prototype accessor; the own property shadows it and
+    // is removed again, so later tests read the default.
+    const windowWithScrollShadow = window as { scrollY?: number };
+    delete windowWithScrollShadow.scrollY;
+  });
+});
+
 describe('reduced motion', () => {
   it('runs no animation or transition outside a prefers-reduced-motion gate', async () => {
     // A running task makes the header's mascot type, so its animation rules land in the
