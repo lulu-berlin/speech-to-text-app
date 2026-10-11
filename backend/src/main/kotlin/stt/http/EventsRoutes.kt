@@ -57,7 +57,7 @@ fun Application.eventsRoutes() {
                     )
                     flush()
                     try {
-                        pumpEvents(
+                        sendEvents(
                             stream.events,
                             writeFrame = { engineEvent ->
                                 writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
@@ -84,13 +84,13 @@ fun Application.eventsRoutes() {
 internal val HEARTBEAT_AFTER = 5.seconds
 
 /**
- * Writes every event of [events] to [writeFrame], and calls [writeHeartbeat] whenever nothing was written for
- * [HEARTBEAT_AFTER] (ADR 0044). The two never write at the same time, and the pump ends when [events] does. A
- * missing sequence number means this subscriber's buffer overflowed and events were dropped for it (user
- * decision 2026-10-10): pumping throws [FellBehindException] and the SSE response ends, so EventSource
- * reconnects and the snapshot makes the client whole again.
+ * Sends one subscriber its events: writes every event of [events] to [writeFrame], and calls [writeHeartbeat]
+ * whenever nothing was written for [HEARTBEAT_AFTER] (ADR 0044). The two never write at the same time, and
+ * sending ends when [events] does. A missing sequence number means this subscriber's buffer overflowed and
+ * events were dropped for it (user decision 2026-10-10): sending throws [FellBehindException] and the SSE
+ * response ends, so EventSource reconnects and the snapshot makes the client whole again.
  */
-internal suspend fun pumpEvents(
+internal suspend fun sendEvents(
     events: Flow<Pair<Long, Event>>,
     writeFrame: suspend (Event) -> Unit,
     writeHeartbeat: suspend () -> Unit = {},

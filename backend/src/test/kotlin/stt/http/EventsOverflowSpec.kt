@@ -9,10 +9,10 @@ import stt.engine.Event
 /**
  * A subscriber that fell behind must be disconnected instead of silently missing events, and a reconnect
  * starts with a fresh snapshot (user decision 2026-10-10), which [EventsSpec] pins for the connection. This
- * spec pins the rule itself: [pumpEvents] stops the stream at the first gap in the event sequence — the gap
+ * spec pins the rule itself: [sendEvents] stops the stream at the first gap in the event sequence — the gap
  * is exactly what a subscriber sees when the engine's `DROP_OLDEST` flow drops the events it could not keep
  * up with. (The DI override route collided with the app's own registration — `DuplicateDependencyException`,
- * logged 2026-10-10 — so the rule is tested at the pump, not through the request stack.)
+ * logged 2026-10-10 — so the rule is tested at [sendEvents], not through the request stack.)
  */
 class EventsOverflowSpec :
     BehaviorSpec({
@@ -31,11 +31,11 @@ class EventsOverflowSpec :
             }
 
         given("a stream whose sequence shows dropped events") {
-            `when`("it is pumped") {
-                then("the frames before the gap are written and the pump stops") {
+            `when`("its events are sent") {
+                then("the frames before the gap are written and sending stops") {
                     val frames = mutableListOf<String>()
                     shouldThrow<FellBehindException> {
-                        pumpEvents(
+                        sendEvents(
                             flow {
                                 // 0, 1, 2 delivered, then 100: as if 3..99 were dropped for this subscriber.
                                 for (sequence in listOf(0L, 1L, 2L, 100L)) {
@@ -51,10 +51,10 @@ class EventsOverflowSpec :
         }
 
         given("a contiguous stream") {
-            `when`("it is pumped") {
-                then("every frame is written and the pump runs to the end of the stream") {
+            `when`("its events are sent") {
+                then("every frame is written and sending runs to the end of the stream") {
                     val frames = mutableListOf<String>()
-                    pumpEvents(
+                    sendEvents(
                         flow {
                             for (sequence in 0L..3L) {
                                 emit(sequence to Event.QueueUpdated(paused = true, taskIds = emptyList()) as Event)
