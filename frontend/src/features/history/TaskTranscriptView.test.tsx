@@ -237,6 +237,26 @@ describe('the transcript view', () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the playing segment visible below the sticky header: the active segment carries a top scroll margin the size of the compact header', async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+
+    // While playing, follow mode scrolls the active segment; the browser honors the
+    // target's scroll margin for every scrolled ancestor, so the segment's top margin
+    // reserves the compact header's height (the compact mascot plus the border, all
+    // tokens) and keeps it clear of the sticky header (item 31).
+    audio.currentTime = 1.0;
+    fireEvent(audio, new Event('timeupdate'));
+    const active = required(document.querySelector('[data-active]'));
+    expect(getComputedStyle(active).scrollMarginTop).toBe(
+      `${
+        Number.parseFloat(lightTheme.sizes.stenoCompact) * 16 +
+        Number.parseFloat(lightTheme.borderWidths.thin) * 16
+      }px`,
+    );
+  });
+
   it('shows a status page for a failed task: what happened, error, retry, delete, no transcript', async () => {
     await renderTranscript('4'); // task 4 is FAILED in the snapshot (id 4).
 
