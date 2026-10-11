@@ -18,6 +18,13 @@ const Header = styled.header`
   align-items: center;
   gap: ${(props) => props.theme.spacing.lg};
   padding: 0 ${(props) => props.theme.spacing.lg} 0 0;
+  // The header stays at the top of the viewport while the content scrolls under it
+  // (item 31): sticky, raised above the page, on the page's token background so what
+  // passes beneath stays hidden.
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: ${(props) => props.theme.colors.background};
   border-bottom: ${(props) => props.theme.borderWidths.thin} solid
     ${(props) => props.theme.colors.border};
 

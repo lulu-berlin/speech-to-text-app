@@ -374,6 +374,36 @@ describe('the phone layout', () => {
   });
 });
 
+describe('the sticky header', () => {
+  it('stays at the top while the page scrolls: sticky above the content, on the token background and border, on Queue, History and the transcript', async () => {
+    const assertSticky = () => {
+      const header = required(document.querySelector('header')) as HTMLElement;
+      const style = getComputedStyle(header);
+      // The header does not scroll away, and it is raised above the page content, so
+      // what scrolls under it paints beneath; the token background hides it there.
+      expect(style.position).toBe('sticky');
+      expect(style.top).toBe('0px');
+      expect(style.zIndex).toBe('1');
+      expect(style.backgroundColor).toBe(asRgb(lightTheme.colors.background));
+      expect(style.borderBottomColor).toBe(asRgb(lightTheme.colors.border));
+    };
+
+    const queue = renderAt('/queue');
+    await screen.findByText('Live');
+    assertSticky();
+    queue.unmount();
+
+    const history = renderAt('/history');
+    await screen.findByRole('searchbox', { name: /search/i });
+    assertSticky();
+    history.unmount();
+
+    renderAt('/history/3');
+    await screen.findByText('Good morning.');
+    assertSticky();
+  });
+});
+
 describe('reduced motion', () => {
   it('runs no animation or transition outside a prefers-reduced-motion gate', async () => {
     // A running task makes the header's mascot type, so its animation rules land in the
