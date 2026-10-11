@@ -1,6 +1,6 @@
 # 36 — Follow mode stops by itself (hold-off race)
 
-Status: in-progress
+Status: in-review
 Depends on: [15](../docs/specs/frontend-history-ui.md) (done), [21](../docs/specs/frontend-backend-end-to-end.md) (done; the `e2e/` suite, ADR 0046)
 Blocks: [35](35-readme-and-architecture-overview.md) (its playback GIF shows follow mode)
 
@@ -37,7 +37,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] A hand scroll by dragging the scrollbar / keyboard still stops following
 - [x] "Back to playing position" resumes following and scrolls to the playing segment
 - [x] (e2e, ADR 0046) Against the real backend: a long transcript plays through many follow scrolls and "Back to playing position" never appears without a hand scroll; a hand scroll still shows it
-- [ ] (must not break) Existing transcript view tests and the e2e playback journey stay green
+- [x] (must not break) Existing transcript view tests and the e2e playback journey stay green
 
 ## Acceptance criteria
 
