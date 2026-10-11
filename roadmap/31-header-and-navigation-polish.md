@@ -1,7 +1,7 @@
 # 31 — Header and navigation polish
 
 Status: draft
-Depends on: [17](../docs/specs/branding-stenographer-animation.md) (done), [25](../docs/specs/visual-polish.md) (done)
+Depends on: [17](../docs/specs/branding-stenographer-animation.md) (done), [25](../docs/specs/visual-polish.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
 
@@ -9,6 +9,7 @@ Make the app shell feel finished: the header stays in view, the navigation looks
 
 ## Already decided
 
+- [ADR 0046 — Every app feature has an end-to-end test](../docs/decisions/0046-every-feature-has-an-e2e-test.md): this item's test list includes at least one Playwright e2e test in `e2e/`, run by the user against the real backend.
 - [ADR 0033 — Design system](../docs/decisions/0033-design-system-tokens-radix-plex.md) and the [frontend conventions](../docs/conventions/frontend.md): tokens only, no literal colors or sizes; `prefers-reduced-motion` respected.
 - [ADR 0038 — UI state transitions are machines](../docs/decisions/0038-ui-state-transitions-are-machines.md).
 - Item 17 placed the mascot in the header (`AppHeader`, 7.5rem, typing while a task runs) and as the loading/empty indicator (`EmptyState`, `LoadingState`, the Queue's empty drop zone, `ConnectingRegion`). Today both can be on screen at once — for example the header mascot above the Queue's empty-state mascot.

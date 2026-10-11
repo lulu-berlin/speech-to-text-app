@@ -57,6 +57,7 @@ Commits: one commit per green cycle (test + code, subject `Test: <scenario>`), o
 
 - Backend: Kotest (`BehaviorSpec`) + `kotlinx-coroutines-test` (`runTest`, virtual time for engine/queue tests). Tests that spawn real processes (from item 05 on) are tagged `Integration` (Kotest `Tag`, ADR 0021); they are excluded from `gradle test`/`gradle check` and run separately with `gradle integrationTest`. HTTP route tests use Ktor `testApplication`.
 - Frontend: Vitest + React Testing Library (jsdom) (+ MSW for API mocks from the first API item on).
+- End-to-end: Playwright in the top-level `e2e/` package against the real backend (item 21). Every item that adds or changes an app feature includes at least one e2e test of it in its test list and approval; build, packaging and refactor-only items are exempt and say why ([ADR 0046](docs/decisions/0046-every-feature-has-an-e2e-test.md)).
 - Formatting is part of the standard commands (ADR 0015): see [Commands](#commands).
 
 ## Commands

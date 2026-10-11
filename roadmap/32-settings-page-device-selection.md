@@ -1,7 +1,7 @@
 # 32 — Settings page: processing device selection
 
 Status: draft
-Depends on: [11](../docs/specs/processing-engine.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [13](../docs/specs/frontend-foundation.md) (done)
+Depends on: [11](../docs/specs/processing-engine.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [13](../docs/specs/frontend-foundation.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
 
@@ -9,6 +9,7 @@ Let the user choose in the app whether transcription runs on the CPU or on a spe
 
 ## Already decided
 
+- [ADR 0046 — Every app feature has an end-to-end test](../docs/decisions/0046-every-feature-has-an-e2e-test.md): this item's test list includes at least one Playwright e2e test in `e2e/`, run by the user against the real backend.
 - Today the device is configuration only: `STT_DEVICE` = `auto` (default) | `cpu` | `gpu` | a GPU index ≥ 0, parsed in `Config` into `Device` and turned into whisper-cli flags by `DeviceArgs` (none = first GPU, `--no-gpu` = CPU, `--device N` = GPU N). An invalid value stops startup.
 - The speaker model (CAM++, ONNX Runtime) runs on the CPU only; GPU diarization was considered and not pursued in item 30 (CUDA-only ORT GPU build, ~0.4 s per run).
 - Storage: SQLite with Flyway migrations ([ADR 0006](../docs/decisions/0006-exposed-flyway-kotest.md), [ADR 0019](../docs/decisions/0019-schema-ownership-and-evolution.md)); the API is contract-first with `docs/api/` examples ([ADR 0029](../docs/decisions/0029-contract-first-frontend-shared-api-examples.md)); UI flows are machines ([ADR 0038](../docs/decisions/0038-ui-state-transitions-are-machines.md)).
