@@ -30,6 +30,7 @@ import { TextButton } from '../../shared/ui/TextButton';
 import { PlaceholderMascot } from '../../shared/brand/PlaceholderMascot';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
+import { settingsMachine } from '../../shared/state/settingsMachine';
 import { toggleMachine } from '../../shared/state/toggleMachine';
 import { queuePauseMachine } from './queuePauseMachine';
 import { reorderMachine } from './reorderMachine';
@@ -230,6 +231,7 @@ export function QueueView() {
   const [maxSpeakers, setMaxSpeakers] = useState(8);
   const [advanced, sendAdvanced] = useMachine(toggleMachine);
   const [upload, sendToUploader] = useMachine(uploadBatchMachine);
+  const [settings] = useMachine(settingsMachine);
   const [reorder, sendReorder] = useMachine(reorderMachine, {
     input: { order: queue?.taskIds ?? [] },
   });
@@ -243,6 +245,25 @@ export function QueueView() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // The upload options start with the stored defaults (item 32): language, speakers mode
+  // and count, max speakers. Applied once, when the settings arrive; the user's later
+  // choices are this batch's, not the settings'. Until then (or if loading fails) the
+  // contract defaults above stand.
+  const stored = settings.context.settings;
+  const defaultsAppliedRef = useRef(false);
+  useEffect(() => {
+    if (stored === null || defaultsAppliedRef.current) {
+      return;
+    }
+    defaultsAppliedRef.current = true;
+    setLanguage(stored.defaultLanguage);
+    setSpeakers(stored.speakersMode);
+    if (stored.speakersCount !== null) {
+      setSpeakerCount(stored.speakersCount);
+    }
+    setMaxSpeakers(stored.maxSpeakers);
+  }, [stored]);
 
   // The pause POST answered: apply its queue to the live state (the server's own
   // queue-updated carries the same queue, so applying it twice is harmless).

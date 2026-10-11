@@ -16,6 +16,7 @@ import {
   error as errorFixture,
   speakers as speakersFixture,
   taskTransitions,
+  settings as settingsFixture,
 } from './fixtures';
 
 export interface EventStreamOptions {
@@ -161,6 +162,9 @@ export const handlers = [
   // flow but not joined turns (that needs the backend, item 21).
   http.post('/api/tasks/:id/speakers/merge', () => HttpResponse.json(speakersFixture)),
   http.delete('/api/tasks/:id/speakers/merges', () => HttpResponse.json(speakersFixture)),
+
+  // Settings: GET /api/settings -> 200 settings.json (item 32).
+  http.get('/api/settings', () => HttpResponse.json(settingsFixture)),
 
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
 
