@@ -2,11 +2,12 @@
 // STT_DATA_DIR for the whole run. globalSetup runs before the tests; the returned
 // function is the teardown, which Playwright calls after the run (it also runs when the
 // suite fails, so a stray backend cannot survive a broken run).
-import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  BROKEN_CLIP,
   FIXTURE_CLIPS,
   MERGE_CLIP,
   MERGE_SOURCE_IDS,
@@ -34,6 +35,7 @@ export default async function globalSetup() {
     { args: ['-ss', '2', '-t', '2'], file: FIXTURE_CLIPS[4] }, // 2-4s
     { args: ['-ss', '4', '-t', '2'], file: FIXTURE_CLIPS[5] }, // 4-6s
     { args: ['-stream_loop', '11'], file: FIXTURE_CLIPS[6] }, // the sample 12 times (~132 s)
+    { args: ['-stream_loop', '19'], file: FIXTURE_CLIPS[8] }, // the sample 20 times (~220 s)
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);
@@ -61,6 +63,12 @@ export default async function globalSetup() {
     '[0:a][1:a][2:a]concat=n=3:v=0:a=1',
     join(fixturesDir, MERGE_CLIP),
   ]);
+  // A .wav whose bytes are not audio: it passes the upload's extension check and fails
+  // when the engine decodes it (CHUNKING).
+  writeFileSync(
+    join(fixturesDir, BROKEN_CLIP),
+    "not audio — the e2e suite's undecodable fixture\n".repeat(256),
+  );
   const port = await choosePort();
   saveState({ port, dataDir, fixturesDir });
   const { pid } = await startBackend({ port, dataDir });
