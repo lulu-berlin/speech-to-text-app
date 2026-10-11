@@ -26,15 +26,28 @@ To be settled in the consultation. Starting points:
   - **Ktor auto-reload** (development mode + watch paths): faster, but reloads the application inside the running JVM, which must stop and restart the engine's `SupervisorJob` scope cleanly (item 26's start/stop race) and has known limits with module wiring.
 - AGENTS.md § Commands documents the command.
 
-## Open questions
+## Open questions (answered 2026-10-11)
 
-- Backend reload: restart on change (proposed baseline) or Ktor auto-reload?
-- What happens to a task running when the backend restarts in dev mode — rely on item 11's restart recovery (it resumes), as in production?
-- Should `devenv up` also open the browser?
+- Backend reload? → **Restart on change**: a continuous build and a backend restart when the build output changes (seconds per change); no Ktor auto-reload.
+- A task running during a dev restart? → resumes through item 11's restart recovery, as in production.
+- Open the browser? → **No**; `devenv up` prints the URL.
+
+## Remaining open questions
+
+None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-To be written in the consultation.
+Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. devenv-level items are user-verified (ADR 0010):
+
+- [ ] `devenv up` starts the frontend dev server and the backend; the UI at the printed Vite URL loads the queue through the `/api` proxy
+- [ ] Editing a frontend component updates the open page through hot module reload, without a full page reload
+- [ ] Editing backend source rebuilds and restarts the backend; the next request is answered by the changed code, and the open page reconnects its live updates
+- [ ] A backend compile error is shown in the backend's log and the last working backend keeps running; fixing the error restarts it
+- [ ] A task running when the backend restarts resumes after the restart
+- [ ] Dev data lives in a fixed, git-ignored directory and survives `devenv up` restarts
+- [ ] Stopping `devenv up` stops both halves and leaves no whisper-cli or ffmpeg processes behind
+- [ ] (must not break) `gradle check`, `pnpm test`, `gradle run` and `pnpm dev` work as before
 
 ## Acceptance criteria
 
@@ -45,3 +58,4 @@ To be written in the consultation.
 ## Approval log
 
 - 2026-10-11: drafted from the user's request; answered so far: `devenv up` here, `./gradlew dev` in item 33.
+- 2026-10-11: consultation answers: restart on change (no Ktor auto-reload); running tasks resume through restart recovery; no browser opening. Proposed test list (8 items). Remaining: test list approval.
