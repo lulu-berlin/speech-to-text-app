@@ -177,6 +177,30 @@ describe('the transcript view', () => {
     );
   });
 
+  it('flows the segments as one paragraph of text, each still a button that seeks on Enter and Space', async () => {
+    await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+
+    // A segment is inline text in its turn's paragraph, not a button box: a box (inline-block)
+    // wraps as a whole and centers its own lines, so lines started at different positions and a
+    // segment's last line was centered (item 29, user's browser review). jsdom does no layout,
+    // so the computed styles stand in for the line breaks.
+    const happy = screen.getByRole('button', { name: /Happy to be here\./ });
+    expect(getComputedStyle(happy).display).toBe('inline');
+    expect(getComputedStyle(happy).textAlign).not.toBe('center');
+
+    // It stays keyboard-operable like a button: focusable, and Enter and Space seek like a click
+    // (5800 ms and 2400 ms, the fixture's starts); Space does not scroll the page.
+    expect(happy.tabIndex).toBe(0);
+    fireEvent.keyDown(happy, { key: 'Enter' });
+    expect(audio.currentTime).toBe(5.8);
+    const thanks = screen.getByRole('button', { name: /Thanks for joining us today\./ });
+    const scrolled = fireEvent.keyDown(thanks, { key: ' ' });
+    expect(audio.currentTime).toBe(2.4);
+    expect(scrolled).toBe(false);
+  });
+
   it('keeps the highlighted segment in view while playing, stops on a hand scroll, and resumes', async () => {
     // jsdom has no scrollIntoView; the component calls it, so stub it on the prototype.
     Element.prototype.scrollIntoView = vi.fn();

@@ -42,6 +42,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] (found in the user's browser review 2026-10-11, approved) An upload through the HTTP API is announced on `/api/events`: a `task-updated` with the new QUEUED task, then a `queue-updated` whose `taskIds` include it (the queue list showed new uploads only after a page refresh)
 - [x] (found in the user's browser review 2026-10-11, approved) The seek bar's thumb travels within the slider's own track (it spanned the whole page while the progress fill stayed in the narrow bar: the slider root was not a positioned element)
 - [x] (found in the user's browser review 2026-10-11, approved) A joined FLAC declares its full duration and its timestamps keep increasing across chunk boundaries, so a browser can seek anywhere in it (in a 30-minute task, click-to-seek stopped working past about 5 minutes, the first chunk; [ADR 0045](../docs/decisions/0045-joined-playback-flac-reencoded.md))
+- [x] (found in the user's browser review 2026-10-11, approved) A turn's segments flow as one paragraph of text: every line starts at the paragraph's left edge and nothing is centered, while each segment stays a focusable button that seeks on click, `Enter` and `Space` (segments were `<button>` boxes: inline-block, centered text, each wrapping as a whole)
 - [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test` and `pnpm build` stay green; the existing upload/join/SSE/player tests pass unchanged where their scenario overlaps
 
 ## Acceptance criteria
