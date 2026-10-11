@@ -1,6 +1,6 @@
 # 0024 — Audio storage: original upload kept only until chunking, chunks stored as FLAC
 
-Status: accepted · Date: 2026-10-07 · Supersedes: [0005](0005-audio-as-sqlite-blob.md), [0018](0018-audio-payload-paged-blobs.md)
+Status: accepted, playback join amended by [0045](0045-joined-playback-flac-reencoded.md) · Date: 2026-10-07 · Supersedes: [0005](0005-audio-as-sqlite-blob.md), [0018](0018-audio-payload-paged-blobs.md)
 
 ## Context
 ADR 0005 stored the uploaded audio as a SQLite BLOB; ADR 0018 paged it into 1 MiB `audio_parts` rows and kept it after completion for history playback, so the database held every original upload in full. Processing only ever uses the audio as 16 kHz mono: whisper-cli transcribes ~5-minute chunks (ADR 0004), and the speaker model reads 16 kHz PCM (ADR 0003). Playback of speech does not need the original quality.
@@ -21,7 +21,7 @@ Duplicate detection (ADR 0018: `audio.sha256` UNIQUE) was considered on other in
 5. **Audio after chunking comes only from the stored chunks:**
    - Transcription (items 07/11): each chunk FLAC is written from the database to a file in the task's work directory for whisper-cli.
    - Diarization (items 08/09/11): the whole-file PCM is always rebuilt from the stored chunks — each FLAC decoded in `idx` order and concatenated — with or without a restart, so speaker labels do not depend on restarts. The PCM is therefore 16-bit-quantized, unlike the oracle's float32 decode of the original.
-   - Playback (items 12/15): `GET /api/tasks/{id}/audio` joins the task's chunks with ffmpeg's concat demuxer (`-c copy`, no re-encode) into one FLAC, served as `audio/flac`. Caching and HTTP Range support are decided in item 12.
+   - Playback (items 12/15): `GET /api/tasks/{id}/audio` joins the task's chunks with ffmpeg's concat demuxer (`-c copy`, no re-encode) into one FLAC, served as `audio/flac`. Caching and HTTP Range support are decided in item 12. *Amended by [ADR 0045](0045-joined-playback-flac-reencoded.md): the join re-encodes losslessly (`-c:a flac`), because a copied concat keeps the first chunk's length in the header and restarts frame positions at each chunk, which breaks seeking past the first chunk.*
 
 ## Consequences
 - Supersedes ADR 0005 and ADR 0018. Carried over from them: the `audio` metadata row, the strict `sha256` duplicate rule, spooling the upload before taking the write lock (ADR 0018); listings never read audio, temporary files are per task (ADR 0005).
