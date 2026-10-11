@@ -98,6 +98,15 @@ None.
   phrase once per loop, split across two speakers. The `docker compose ps` scare in between
   was a stopped container hiding from `ps` (no `-a`) — not a crash. No refactoring suggested.
 
+- 2026-10-11 (cycle 6, green, user-verified): no code change. A ~60 s clip (distinct bytes —
+  audio dedupes by sha256, 409 `duplicate-audio` on identical uploads) was cancelled mid-
+  transcription (`POST /api/tasks/3/cancel`); then `/proc/<pid>/stat` scans inside the container
+  (pure shell builtins — the image has no `ps`/`grep`/`find` on PATH, only `/bin/sh` and
+  `/usr/local/bin/curl`; the first draft's `bash -c` was wrong, `sh -c` is the entry point)
+  found no `Z`-state processes and no leftover `whisper-cli`/`ffmpeg` `cmdline`s: docker-init
+  (PID 1) reaped the cancelled tree — ADR 0020's orphan case is covered in the container.
+  No refactoring suggested.
+
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
@@ -109,7 +118,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - [x] Data survives `docker compose down` and `up`: a finished transcription is still in the history
 - [x] Uploading a short clip in the containerized app completes with a transcript
 - [x] A task interrupted by `docker compose stop` resumes after `docker compose start` (item 11's restart recovery)
-- [ ] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
+- [x] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
 - [ ] The container runs as a non-root user and writes only to `/data`
 - [ ] The image contains only the flake closure's files (plus the init)
 - [ ] On a host with an NVIDIA GPU and the container toolkit, `docker compose --profile gpu-nvidia up` uses the GPU (`STT_DEVICE=auto`, `nvidia-smi`-visible); on an Intel/AMD host, the `gpu-vulkan` profile uses `/dev/dri`
