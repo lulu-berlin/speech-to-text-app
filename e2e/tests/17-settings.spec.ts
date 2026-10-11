@@ -5,9 +5,9 @@ import { appLive, goTo, uploadClips } from './helpers/ui';
 // The settings journey (item 32, ADR 0046): change the device, the thread count and the
 // upload defaults on the Settings page; restart the backend on the same data directory —
 // the choices are kept and the upload form starts with the new defaults; a task runs
-// with the stored device. The device is set to the CPU (this suite's machines have no
-// GPU; the whisper-cli probe reports none, so CPU and Auto are the only choices), and
-// the thread count is set to 2, which whisper-cli logs as `-t 2`.
+// with the stored device. The device is set to the CPU (the suite must not assume a GPU:
+// probes may or may not report one), and the thread count is set to 2, which whisper-cli
+// logs as `-t 2`.
 test('the settings the user saves survive a restart and the queue runs with them', async ({
   page,
 }) => {
@@ -19,9 +19,13 @@ test('the settings the user saves survive a restart and the queue runs with them
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   const device = page.locator('#device');
   await expect(device).toHaveValue('auto');
+  // CPU and Auto are always offered; the probe's GPUs may be there too, formatted "GPU N".
   await expect
     .poll(async () => page.locator('#device option').allTextContents())
-    .toEqual(['CPU', 'Auto']);
+    .toEqual(expect.arrayContaining(['CPU', 'Auto']));
+  for (const text of await page.locator('#device option').allTextContents()) {
+    expect(text).toMatch(/^(CPU|Auto|GPU \d+)$/);
+  }
 
   // Save a change: CPU, 2 threads, German, 3 fixed speakers, max 12.
   await device.selectOption('cpu');

@@ -20,7 +20,7 @@ class ChunkTranscriber internal constructor(
      * Fails with [TranscriptionException] carrying the full stderr on a non-zero exit (with the exit code),
      * a missing JSON output, or a malformed one: whisper-cli prints its error anywhere in stderr (before ~70
      * usage lines on a bad argument) and exits 0 on unreadable audio without writing JSON. With a GPU chosen,
-     * whisper-cli 1.9.2 that cannot use it prints `no GPU found`, runs on the CPU and exits 0; that successful run
+     * whisper-cli (the pinned 1.8.4) that cannot use the GPU prints `no GPU found`, runs on the CPU and exits 0; that successful run
      * then calls [onGpuUnavailable] (item 32).
      */
     override suspend fun transcribe(
@@ -53,5 +53,5 @@ class ChunkTranscriber internal constructor(
     }
 }
 
-/** whisper-cli 1.9.2's line (libwhisper `%s: no GPU found`) when no GPU backend could be initialized. */
+/** whisper-cli's line when no GPU backend could be initialized (libwhisper `%s: no GPU found`; identical in 1.8.4 and 1.9.2). */
 private const val NO_GPU_LINE = "no GPU found"
