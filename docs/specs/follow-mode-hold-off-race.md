@@ -1,7 +1,7 @@
-# 36 — Follow mode stops by itself (hold-off race)
+# Follow mode stops by itself (hold-off race)
 
-Status: in-review
-Depends on: [15](../docs/specs/frontend-history-ui.md) (done), [21](../docs/specs/frontend-backend-end-to-end.md) (done; the `e2e/` suite, ADR 0046)
+Status: done (roadmap item 36, merged 2026-10-11)
+Depends on: [15 — History UI](frontend-history-ui.md) (done), [21 — Frontend–backend end-to-end](frontend-backend-end-to-end.md) (done; the `e2e/` suite, ADR 0046)
 Blocks: [35](35-readme-and-architecture-overview.md) (its playback GIF shows follow mode)
 
 ## Goal
@@ -13,7 +13,7 @@ While a transcript plays, follow mode keeps the playing segment in view until th
 - Found in item 35 (2026-10-11) while recording the playback GIF: "Back to playing position" appeared with no hand scroll, and the view stopped following. The user chose to fix the app before recording follow mode for the README.
 - Cause (`frontend/src/features/history/TaskTranscriptView.tsx`, the follow effect; `followModeMachine.ts`): the follow effect sets `holdOffFollowScrollRef`, calls `active.scrollIntoView({ block: 'nearest' })` and clears the hold-off in `setTimeout(…, 0)`. Browsers fire the `scroll` event in the next rendering step, which can come after that timer; `handleScroll` then sends `SCROLLED`, and `following` → `stopped`.
 - Evidence: a throwaway Chromium page mirroring that code (flag, `scrollIntoView` in a scrollable box, clear on `setTimeout(0)`) — in 40 trials the scroll event arrived after the flag was cleared **21 times**. The e2e check in `06-playback.spec.ts` ("following must hold through its own scroll") has passed by timing.
-- [ADR 0038](../docs/decisions/0038-ui-state-transitions-are-machines.md): follow mode stays a machine; [ADR 0046](../docs/decisions/0046-every-feature-has-an-e2e-test.md): the fix carries an e2e test.
+- [ADR 0038](../decisions/0038-ui-state-transitions-are-machines.md): follow mode stays a machine; [ADR 0046](../decisions/0046-every-feature-has-an-e2e-test.md): the fix carries an e2e test.
 - Item 31 (the sticky header) is merged before this item starts; its `scroll-margin-top` on the active segment changes where the follow scroll lands, and the fix must work with that offset in place — there is no ordering choice left.
 
 ## Proposal (settled in the consultation, 2026-10-11)
@@ -49,3 +49,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-11: drafted by item 35's workspace agent from the bug found while recording the playback GIF; the user chose to fix the app before recording follow mode.
 - 2026-10-11: consultation (root agent): mechanism → input-event detection (wheel, touch, keyboard, scrollbar drag); the item 31 ordering question resolved. Test list (7 items, incl. the e2e test) approved by the user; status `spec-approved`.
 - 2026-10-11: item 6 (e2e) green on the user's machine (full Playwright journey against the real backend, incl. `17-follow-mode.spec.ts`); all test-list items ticked.
+- 2026-10-11: merged into `main` (head `185ff394`) after the user approved the diff and confirmed the e2e green on their machine. The hold-off was replaced by input-event detection: wheel, touch, the scroll keys and a scrollbar drag (pointer-press with a moved region) stop following; bare scroll events never do, so the view's own follow scroll cannot stop it. Review-folded: the e2e fixture lines' indentation (the suite's prettier gate). Spec and final test list moved here from `roadmap/36-follow-mode-hold-off-race.md`.
