@@ -56,7 +56,7 @@ export const FIXTURE_CLIPS = [
   'jfk-n.wav', // the sample looped 8x, ~88s
 'jfk-o.wav', // 5-7s, the contract check (item 16)
   'jfk-p.wav', // 1-8s, item 32's settings e2e
-  'jfk-follow.wav', // the sample looped 6x, ~66s (item 36)
+  'jfk-follow.wav', // the sample looped 14x, ~154s (item 36)
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
