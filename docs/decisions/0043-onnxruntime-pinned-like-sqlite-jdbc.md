@@ -20,7 +20,7 @@ completion, so the bug is ORT × machine, not application code.
 | 1.28.0 | broken — suite red, byte-identical numbers to 1.27.0 | not tested (moot) |
 | 1.29.0 | good — suite green | yes, exit 139 |
 | 1.30.0 | good — suite green | yes, exit 139 |
-| 1.31.0 | good — suite green | **not tested yet (pending the user's machine run)** |
+| 1.31.0 | good — suite green | no — two consecutive runs to COMPLETED, and again after a restart |
 
 The embedding breakage is gross, not borderline: same-speaker cosine 0.2427 falls below a
 different-speaker cosine 0.4376, 63 of 72 same-speaker pairs land above the 0.5448 threshold
@@ -43,9 +43,9 @@ inlined; the traversal operates on a plain `std::vector` of 16-byte node records
 `{pointer, refcount}`. Infinite recursion means the per-node guards see inconsistent state on the
 user's CPU — the signature of a CPU-dispatched kernel corrupting adjacent memory earlier in the same
 run (which also explains why scheduling options, JIT off, and heap size are all irrelevant). The
-leading discriminator between the two machines is CPU feature dispatch: Zen 2 never selects AVX-512
-paths; a family-25 Zen 4/5 does. Pending confirmation: the user's exact CPU model/flags and a
-`clearcpuid` experiment.
+leading hypothesis for the difference between the two machines is CPU feature dispatch: Zen 2 never
+selects AVX-512 paths; a family-25 Zen 4/5 does. It was never confirmed (no CPU flags, no `clearcpuid`
+run): 1.31.0 made it unnecessary.
 
 ## Decision
 
@@ -56,26 +56,18 @@ change plus: `backend/deps.json` regeneration (the nixpkgs Gradle lockfile, ADR 
 Integration suite on `gradle integrationTest` (real CAM++ and whisper models), and a real-model
 diarization run on the user's machine (the crash is machine-specific; the sandbox cannot verify it).
 
-As of 2026-10-11 the pin stands at 1.31.0 (released after the crashing line; sandbox-verified
-embedding-green — the first candidate since 1.30.0; the user's machine run is pending). If 1.31.0
-still crashes, the fix remains open: confirm the CPU discriminator (clearcpuid experiment), then
-build-without-offending-path or upstream. `SpeakerModel.sessionOptions` additionally runs sequential
-with one inter-op thread as defense-in-depth: ORT's parallel inter-op scheduler is never entered, at
-no cost to this single-forward-pass model.
+As of 2026-10-11 the pin stands at 1.31.0, the release after the crashing line: embedding-green in the
+sandbox and crash-free on the user's machine (two consecutive diarization runs to COMPLETED, and again
+after a backend restart). `SpeakerModel.sessionOptions` additionally runs sequential with one inter-op
+thread as defense-in-depth: ORT's parallel inter-op scheduler is never entered, at no cost to this
+single-forward-pass model.
 
 ## Consequences
 
-- No transitive can pull ORT back up to a higher version; `gradle dependencyInsight` shows the catalog
-  version marked `(forced)`.
-- The pin stays at the newest embedding-green version until a release without the recursion has been
-  verified on the user's machine. Upgrading is deliberate and verified on both machines (embedding
-  behavior in the sandbox, crash on the user's machine).
+- No transitive can move ORT off the catalog version; `gradle dependencyInsight` shows it marked
+  `(forced)`.
+- 1.26.0–1.28.0 (degraded embeddings) and 1.29.0–1.30.0 (crash on the user's machine) must not come
+  back. Every bump is verified on both machines: embedding behavior in the sandbox, a real diarization
+  run on the user's machine.
 - The resolution, the catalog, and the runtime library agree; `backend/deps.json` changes with each
   bump.
-
-## Open
-
-The actual fix is still open: likely build-level (an ONNX Runtime built with the offending CPU path
-disabled) or upstream (microsoft/onnxruntime bug report with the offset evidence). The version pin is
-the containment measure that keeps the dependency reproducible while that is decided — and it is the
-mechanism that will carry the fix when a good version exists.
