@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "prettier --check . && playwright test",
+    "test": "node check-playwright.mjs && prettier --check . && playwright test",
     "record:gifs": "playwright test --config=playwright.gifs.config.ts",
     "format": "prettier --write ."
   },
