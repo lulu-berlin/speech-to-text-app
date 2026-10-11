@@ -12,7 +12,7 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Roadmap item 32, cycle 2: the startup device probe — [DeviceProbe] runs whisper-cli once and parses the GPUs it
- * reports on stderr (`%s: found GPU device N: <description> (type: …, cnt: …)`, libwhisper 1.9.2). The stand-ins
+ * reports on stderr (`%s: found GPU device N: <description> (type: …, cnt: …)`, libwhisper; identical in 1.8.4 and 1.9.2). The stand-ins
  * exit 1, as whisper-cli does after failing to read the probe's `/dev/null` input. CPU-only output and a missing
  * executable yield no GPU. Real subprocesses, hence Integration (ADR 0021).
  */

@@ -47,7 +47,7 @@ class DeviceProbe internal constructor(
     }
 }
 
-/** The marker of whisper-cli 1.9.2's per-GPU line, from libwhisper's `%s: found GPU device %zu: %s (type: %d, cnt: %d)`. */
+/** The marker of whisper-cli's per-GPU line, from libwhisper's `%s: found GPU device %zu: %s (type: %d, cnt: %d)` (identical in 1.8.4 and 1.9.2). */
 private const val GPU_LINE_MARKER = "found GPU device "
 
 /**
