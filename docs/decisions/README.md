@@ -51,3 +51,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 
 | 0042 | [Catalog versions are authoritative via `resolutionStrategy.force`](0042-catalog-versions-authoritative.md) | accepted, amends 0014 | 2026-10-10 |
 
+| 0043 | [ONNX Runtime is pinned like sqlite-jdbc](0043-onnxruntime-pinned-like-sqlite-jdbc.md) | accepted, applies 0042 to onnxruntime | 2026-10-11 |
+
