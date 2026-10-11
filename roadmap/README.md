@@ -67,7 +67,7 @@ graph TD
   27[27 pin sqlite-jdbc ✓]:::done
   28[28 post-merge cleanup ✓]:::done
   29[29 backend bug fixes]
-  30[30 diarization crash]
+  30[30 diarization crash ✓]:::done
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -104,4 +104,4 @@ graph TD
 | [27 — Pin the sqlite-jdbc version](../docs/specs/sqlite-jdbc-pin.md) | done | — |
 | [28 — Post-merge cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [29 — Post-merge bug fixes: engine wake, seek bar, audio join, SSE disconnect](29-post-merge-bug-fixes.md) | spec-approved | — |
-| [30 — Diarization crash on the user's machine (ONNX Runtime recursion)](30-diarization-crash-ort-recursion.md) | draft | — |
+| [30 — Diarization crash on the user's machine (ONNX Runtime recursion)](../docs/specs/onnxruntime-pin.md) | done | — |

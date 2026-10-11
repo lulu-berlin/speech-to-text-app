@@ -1,7 +1,7 @@
-# 30 — Diarization crash on the user's machine (ONNX Runtime recursion)
+# Diarization crash: ONNX Runtime pin
 
-Status: in-review
-Depends on: —
+Status: done (roadmap item 30, merged 2026-10-11)
+Depends on: none
 
 ## Goal
 
@@ -62,3 +62,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-11: **item 2 accepted**: the user's second consecutive run with 1.31.0 completed, and a backend restart afterwards still diarizes. Item 2 ticked; the discovered open-fix item resolved by the 1.31.0 pin. Item 3 pending: the user's deps.json updateScript run failed on a network timeout (`Read timed out` on a HEAD to Maven Central for `kotlinx-coroutines-bom-1.8.0.pom`; nothing written, worktree clean) — to be retried, then `nix build .`, plus `gradle check` / `gradle integrationTest` on the user's machine (acceptance criterion "sandbox and user").
 - 2026-10-11: **item 3 accepted**: the user's retried updateScript run succeeded and regenerated `backend/deps.json` byte-identical to the committed 1.31.0 entry (worktree unchanged); `nix build .` green; on the user's machine `gradle check` and `gradle integrationTest` green at the 1.31.0 pin commit. All test-list items ticked; status → `in-review`.
 - 2026-10-11: GPU for diarization considered at the user's question and not pursued: ONNX Runtime's GPU build on Maven (`onnxruntime_gpu`) is CUDA-only (the user's NVIDIA dGPU would qualify; the AMD iGPU would not, and ORT has no Vulkan path), and diarization takes about 0.4 s of a run on the user's machine (speaker model loaded 03:53:47.138, summary 03:53:47.533), so the gain does not justify a second native runtime. Any future change is its own roadmap item with an ADR.
+- 2026-10-11: merged into `main` (head `1f2e6d81`) after the user approved the diff. ONNX Runtime is force-pinned to 1.31.0 (ADR 0043); sequential execution with one inter-op thread stays as defense-in-depth. Spec and final test list moved here from `roadmap/30-diarization-crash-ort-recursion.md`.
