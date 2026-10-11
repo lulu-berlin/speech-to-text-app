@@ -48,7 +48,7 @@ Item 16 extends the `default` package with:
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. Nix-level items are user-verified (ADR 0010):
 
-- [ ] `nix build .` produces `result/bin/stt-app`
+- [x] `nix build .` produces `result/bin/stt-app`
 - [ ] Starting `stt-app` with no `STT_DATA_DIR` set creates the default data directory and the database in it
 - [ ] `GET /api/health` on the started app returns `{"status":"ok"}`
 - [ ] The started app serves the frontend at `/`
@@ -70,3 +70,4 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-09: consultation answers approved: one shared nixpkgs pin (ADR 0036); any Linux, no NixOS module; macOS out of scope (future draft item); Docker aborted (item 19 removed) because the GPU requirement cannot be delivered through a container. Test list not yet approved.
 - 2026-10-09: test list (8 items) approved by the user; status `spec-approved`.
 - 2026-10-09: Docker reinstated as item 19 after the user corrected the GPU claim (`docker run --gpus all`); a recipe that briefly replaced it was dropped. The GPU matrix lives in item 19.
+- 2026-10-11 (workspace, cycle 1 = item 1): first checkpoint — ADR 0036 wiring settled: `devenv.yaml` rev-pins the flake's locked nixpkgs (`github:NixOS/nixpkgs/494ce7f…`), and a `nix flake check` must guard the sync (lands with test 8). Wrapper renamed `bin/speech-to-text-app` → `bin/stt-app` (commit `edf2674`, no behavior change). User-verified green: `nix build . && test -x result/bin/stt-app`.
