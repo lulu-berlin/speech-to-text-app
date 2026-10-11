@@ -1,5 +1,6 @@
 {
   pkgs,
+  config,
   ...
 }:
 
@@ -54,6 +55,28 @@ in
   # Integration-test fixtures of roadmap item 07 (test-only, TEST_ prefix: STT_* is read only by Config)
   env.TEST_WHISPER_TINY_EN_MODEL = "${models.whisperTinyEn}";
   env.TEST_JFK_WAV = "${testFixtures.jfkWav}";
+
+  # Roadmap item 34 (dev mode): dev data (stt.db, uploads) lives in devenv's state dir, a
+  # fixed, git-ignored location (.gitignore covers .devenv*), so the queue and history
+  # survive `devenv up` restarts; the packaged app sets its own STT_DATA_DIR (flake.nix).
+  env.STT_DATA_DIR = "${config.devenv.state}/stt";
+
+  # https://devenv.sh/processes/
+  # Roadmap item 34 (dev mode): `devenv up` runs the whole app for development — the Vite
+  # dev server with hot module reload and the Ktor backend. No browser is opened; the
+  # frontend process prints the Vite URL. Backend restart-on-change is a later test cycle
+  # (continuous build + restart), not Ktor auto-reload.
+  processes = {
+    frontend = {
+      # `pnpm install` makes a fresh worktree self-sufficient; up to date it takes a second.
+      exec = "pnpm install && pnpm dev";
+      cwd = "frontend";
+    };
+    backend = {
+      exec = "gradle run";
+      cwd = "backend";
+    };
+  };
 
   # https://devenv.sh/tests/
   # `devenv test`: test list of roadmap item 01 (dev environment).
