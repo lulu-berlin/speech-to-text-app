@@ -79,7 +79,7 @@ graph TD
   34 --> 33
   34[34 dev mode ✓]:::done
   21 --> 35[35 README and architecture overview]
-  36 --> 35[35 README and architecture overview]
+  36[36 follow-mode hold-off race ✓]:::done --> 35[35 README and architecture overview]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -122,4 +122,4 @@ graph TD
 | [33 — Gradle bootstrap for developers without Nix](33-gradle-bootstrap-without-nix.md) | spec-approved | 16, 34 |
 | [34 — Dev mode: frontend and backend with one command](../docs/specs/dev-mode.md) | done | — |
 | [35 — README and architecture overview](35-readme-and-architecture-overview.md) | spec-approved | 21 |
-| [36 — Follow mode stops by itself (hold-off race)](36-follow-mode-hold-off-race.md) | spec-approved | 15, 21 |
+| [36 — Follow mode stops by itself (hold-off race)](../docs/specs/follow-mode-hold-off-race.md) | done | 15, 21 |
