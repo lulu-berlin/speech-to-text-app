@@ -47,6 +47,34 @@ async function audioSecond(page: Page): Promise<number> {
   return page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime);
 }
 
+// Waits for the playhead to enter `target` with the user's hands off, returning false if
+// the audio stops advancing first (played out, or this clip's joined flac stalling
+// before its transcript ends). A "Back to playing position" button at any moment is an
+// automatic stop and fails the wait immediately.
+async function playheadReaches(
+  page: Page,
+  region: Locator,
+  back: Locator,
+  target: number,
+): Promise<boolean> {
+  let lastSecond = await audioSecond(page);
+  let lastAdvanceMs = Date.now();
+  for (;;) {
+    await expect(back).toBeHidden();
+    if ((await activeIndex(region)) >= target) {
+      return true;
+    }
+    const at = await audioSecond(page);
+    if (at > lastSecond) {
+      lastSecond = at;
+      lastAdvanceMs = Date.now();
+    } else if (Date.now() - lastAdvanceMs > 8_000) {
+      return false;
+    }
+    await page.waitForTimeout(500);
+  }
+}
+
 // Item 36, ADR 0046: real playback follows the moving playhead through many follow
 // scrolls and "Back to playing position" never appears without a hand scroll — the race
 // this item fixes made it appear on its own while recording item 35's playback GIF. A
@@ -78,31 +106,10 @@ test('follow mode: long playback never shows "Back to playing position" without 
       break; // nothing left below the fold: the transcript is fully followed.
     }
     const startTop = await region.evaluate((element) => element.scrollTop);
-    // The playhead must reach the out-of-view segment on its own; a "Back to playing
-    // position" button at any moment is an automatic stop and fails the round here.
-    let reached = false;
-    let lastSecond = await audioSecond(page);
-    let lastAdvanceMs = Date.now();
-    for (;;) {
-      await expect(back).toBeHidden();
-      if ((await activeIndex(region)) >= target) {
-        reached = true;
-        break;
-      }
-      const at = await audioSecond(page);
-      if (at > lastSecond) {
-        lastSecond = at;
-        lastAdvanceMs = Date.now();
-      } else if (Date.now() - lastAdvanceMs > 8_000) {
-        // The audio stopped advancing: played out, or this clip's joined flac stalls
-        // before its transcript ends (the transcribed turns can outlast the audio).
-        // Either way there is nothing more to follow into.
-        break;
-      }
-      await page.waitForTimeout(500);
-    }
-    if (!reached) {
-      break; // the audio could not reach this segment: nothing more to follow into.
+    // Wait for playback to reach the out-of-view segment on its own; if the audio stops
+    // advancing first, there is nothing more to follow into and the rounds end.
+    if (!(await playheadReaches(page, region, back, target))) {
+      break;
     }
     // The follow scroll brought the formerly out-of-view segment in, moving the region.
     await expect.poll(() => activeInView(region), { timeout: 5_000 }).toBe(true);
