@@ -29,7 +29,7 @@ Fix the four bugs found in the first real end-to-end runs (user QA, 2026-10-10/1
 
 Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
-- [ ] An upload processed through the HTTP API runs to COMPLETED with no queue toggle or other engine signal (fix 1, red today: stays QUEUED)
+- [x] An upload processed through the HTTP API runs to COMPLETED with no queue toggle or other engine signal (fix 1, red today: stays QUEUED)
 - [ ] While the user drags the seek bar, the thumb follows the drag and does not jump back to the playhead; on release the audio seeks to the dragged position and the highlight follows (fix 2)
 - [ ] A completed task's `/api/tasks/{id}/audio` serves the joined FLAC (the joiner's scratch survives without the work directory); 200 with `audio/flac` and Range still works (fix 3)
 - [ ] Closing the client mid-stream ends the SSE response quietly — no unhandled exception logged, no response error (fix 4)
