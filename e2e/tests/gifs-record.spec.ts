@@ -19,8 +19,15 @@ import {
 // spec (playwright.config.ts ignores it). The webm files are gitignored like the
 // screenshots; the user converts them to the small GIFs the README shows.
 const RECORDINGS_DIR = join('screenshots', 'recordings');
-// The playback journey's short viewport (06-playback.spec.ts).
-const PLAYBACK_VIEWPORT = { width: 1280, height: 500 };
+// The playback flow's frame. The transcript region is 60vh tall, follow mode uses
+// scrollIntoView({ block: 'nearest' }) (which scrolls the page too whenever the target
+// is not wholly on screen), and "Back to playing position" appears right under the
+// region. So the player, the region and that button's spot must all fit the viewport,
+// while the region stays shorter than the long clip's transcript. Measured at 1280 px
+// wide: the region starts 222 px below the player's top, the transcript is 490 px tall,
+// the button is 42 px. At 720 px the region is 432 px (58 px to scroll); with 16 px
+// above the player that leaves 8 px under the button.
+const PLAYBACK_VIEWPORT = { width: 1280, height: 720 };
 // The recordings are watched as GIFs: the flows pause between steps so a viewer can
 // follow them (machine speed was too fast and jumpy — user, 2026-10-11).
 const VIEWER_PAUSE = 1_500;
@@ -99,13 +106,11 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
   });
 
   // Flow 2 — transcript playback with follow mode, at a viewer's pace: the player and
-  // the transcript fill the frame, playing advances the time and the highlight, a click
-  // on the last visible segment seeks there and plays on, and as the highlight passes the
-  // region's bottom edge following scrolls it back into view (its own scroll does not
-  // stop following). A slow hand scroll stops following until "Back to playing position"
-  // resumes it. A short viewport, as in the playback journey: the transcript region
-  // (max-height 60vh) must be far shorter than the long clip's transcript, or following
-  // has nothing to scroll.
+  // the transcript region fill the frame, playing advances the time and the highlight, a
+  // click on the last visible segment seeks there and plays on, and as the highlight
+  // passes the region's bottom edge following scrolls the region (not the page — the
+  // player stays in view; its own scroll does not stop following). A slow hand scroll
+  // stops following until "Back to playing position" resumes it.
   const playbackUrl = await transcriptUrl(browser, PLAYBACK_CLIP);
   await recordFlow(browser, 'gif-playback-follow.webm', PLAYBACK_VIEWPORT, async (page) => {
     await page.goto(playbackUrl);
@@ -116,9 +121,18 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
     ).toBe(true);
     const back = page.getByRole('button', { name: 'Back to playing position' });
     const times = page.getByText(/^\d\d:\d\d \/ \d\d:\d\d$/);
-    await page
-      .getByRole('slider', { name: 'Seek' })
-      .evaluate((element) => element.scrollIntoView({ block: 'start' }));
+    // Frame it: the region's bottom 50 px above the viewport's bottom (the button's spot
+    // and a margin), which puts the whole player above it. The page ends only 24 px under
+    // the region, too short to scroll that far, so the body gets bottom padding — it lies
+    // below the frame, and without it Playwright scrolled the page to reach the button.
+    await page.evaluate(() => {
+      document.body.style.paddingBottom = '60px';
+    });
+    await region.evaluate((element) => element.scrollIntoView({ block: 'end' }));
+    await page.evaluate(() => window.scrollBy(0, 50));
+    const seekBar = page.getByRole('slider', { name: 'Seek' });
+    expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+    const framedAt = await page.evaluate(() => window.scrollY);
     await page.waitForTimeout(VIEWER_PAUSE);
 
     await page.getByRole('button', { name: 'Play' }).click();
@@ -164,6 +178,8 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       .toBe(true);
     await page.waitForTimeout(4_000);
     await expect(back).toBeHidden();
+    expect(await page.evaluate(() => window.scrollY)).toBe(framedAt);
+    expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
 
     // A slow hand scroll up, no further than the region has scrolled: past its top the
     // wheel would scroll the page instead and jump the frame to the header.
@@ -175,6 +191,8 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await page.waitForTimeout(100);
     }
     await expect(back).toBeVisible();
+    const backBox = (await back.boundingBox())!;
+    expect(backBox.y + backBox.height).toBeLessThanOrEqual(PLAYBACK_VIEWPORT.height);
     await page.waitForTimeout(VIEWER_PAUSE);
     await back.click();
     await expect
@@ -192,6 +210,7 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       .toBe(true);
     await page.waitForTimeout(VIEWER_PAUSE);
     await expect(back).toBeHidden();
+    expect(await page.evaluate(() => window.scrollY)).toBe(framedAt);
   });
 
   // Flow 3 — speaker rename and merge on item 09's two-speaker fixture, whose pinned
