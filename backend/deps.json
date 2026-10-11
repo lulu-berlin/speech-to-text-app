@@ -1290,9 +1290,6 @@
   "org/sonatype/oss#oss-parent/9": {
    "pom": "sha256-+0AmX5glSCEv+C42LllzKyGH7G8NgBgohcFO8fmCgno="
   },
-  "org/xerial#sqlite-jdbc/3.49.1.0": {
-   "pom": "sha256-Cfv+ow09OG+tA6hKcflhQhCAdeoz2qA05R63oC5L+oA="
-  },
   "org/xerial#sqlite-jdbc/3.50.3.0": {
    "jar": "sha256-o/U6KqFa6UJannk7vpyOUoj+vrS2XvXBpOgNTCBFzwg=",
    "pom": "sha256-Z5fXaAoU/+FbCb4l177Koo6CvF2LXZ3rRlsDj5UBTsg="
