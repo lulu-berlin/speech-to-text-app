@@ -45,7 +45,7 @@ Delete is not a transition and works on any task.
 
 ## Languages
 
-`languages.json` is contract data, not a response: the language codes whisper-cli 1.9.2 accepts, with their names, plus `auto` (auto-detect), which is the default for uploads.
+`languages.json` is contract data, not a response: the language codes whisper-cli 1.8.4 accepts, with their names, plus `auto` (auto-detect), which is the default for uploads.
 
 - The upload form's language select reads it (item 14).
 - Item 12 validates the `language` upload field against it (`400 invalid-language` otherwise).
@@ -61,7 +61,7 @@ const char *whisper_lang_str(int id);
 const char *whisper_lang_str_full(int id);
 int main(void) {
   int n = whisper_lang_max_id();
-  printf("{\n  \"whisperVersion\": \"1.9.2\",\n  \"default\": \"auto\",\n  \"languages\": [\n    { \"code\": \"auto\", \"name\": \"auto-detect\" }");
+  printf("{\n  \"whisperVersion\": \"1.8.4\",\n  \"default\": \"auto\",\n  \"languages\": [\n    { \"code\": \"auto\", \"name\": \"auto-detect\" }");
   for (int i = 0; i <= n; i++) printf(",\n    { \"code\": \"%s\", \"name\": \"%s\" }", whisper_lang_str(i), whisper_lang_str_full(i));
   printf("\n  ]\n}\n");
   return 0;

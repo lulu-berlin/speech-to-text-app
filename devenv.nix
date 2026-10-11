@@ -10,11 +10,11 @@ let
 in
 {
   # https://devenv.sh/packages/
-  packages = [ 
-    pkgs.git 
-    
-    # Transcribe CLI
-    (pkgs.whisper-cpp.override { vulkanSupport = true; }) # GPU accel on AMD + NVIDIA via Vulkan
+  packages = [
+    pkgs.git
+
+    # Transcribe CLI, the same pinned 1.8.4 Vulkan build the package ships (nix/whisper-cpp.nix)
+    (import ./nix/whisper-cpp.nix { inherit pkgs; })
     
     # Audio tooling: whisper-cpp already decodes any format via embedded FFmpeg,
     # standalone ffmpeg is handy for trimming/merging audio before transcription
