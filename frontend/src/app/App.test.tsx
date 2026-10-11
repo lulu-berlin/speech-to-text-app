@@ -28,8 +28,10 @@ function renderAt(path: string) {
 
 // The header's mascot (item 31): the artwork is the header svg; it swaps between the
 // animated mascot and the small static logo depending on the shell's placeholder count.
-function headerMascot(): Element {
-  return required(required(screen.getByRole('banner')).querySelector('svg'));
+function headerMascot(): SVGElement {
+  return required(
+    required(screen.getByRole('banner')).querySelector('svg'),
+  ) as SVGElement;
 }
 
 function headerMascotSize(): string {
@@ -72,7 +74,7 @@ describe('the app root', () => {
 
     const title = screen.getByRole('heading', { name: 'Speech-to-Text' });
     const header = required(title.closest('header'));
-    const steno = required(header.querySelector('svg'));
+    const steno = required(header.querySelector('svg')) as SVGElement;
 
     // The mascot, inside its home link (item 31), sits directly before the product name.
     const home = required(header.querySelector('a'));
@@ -530,7 +532,7 @@ describe('the mascot home link', () => {
     expect(home).toHaveAttribute('href', '/');
 
     // The mascot stays decorative inside it: the link carries the name.
-    const mascot = required(home.querySelector('svg'));
+    const mascot = required(home.querySelector('svg')) as SVGElement;
     expect(mascot.getAttribute('aria-hidden')).toBe('true');
     expect(home).toContainElement(mascot);
 
