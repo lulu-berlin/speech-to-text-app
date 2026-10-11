@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RESTART_CLIPS, loadState, startBackend, stopBackend } from '../lib/backend.mjs';
+import { RESTART_CLIPS, loadState, saveState, startBackend, stopBackend } from '../lib/backend.mjs';
 import { appLive, rowOrder, uploadClips } from './helpers/ui';
 
 test('restarting the backend reconnects the event stream and the state is restored from the snapshot', async ({
@@ -42,7 +42,12 @@ test('restarting the backend reconnects the event stream and the state is restor
     }
   } finally {
     // The global teardown only knows the run's original pid — stop the restarted
-    // backend here, or its JVM would outlive this test file.
+    // backend here, or its JVM would outlive this test file. Then bring the shared
+    // backend back up on the same socket and data dir for the remaining tests: with
+    // `gradle run` the app JVM could outlive the group kill by accident, but the
+    // packaged wrapper's JVM dies with its group, so the handover must be explicit.
     await stopBackend(restarted.pid, port, dataDir);
+    const fresh = await startBackend({ port, dataDir });
+    saveState({ pid: fresh.pid });
   }
 });
