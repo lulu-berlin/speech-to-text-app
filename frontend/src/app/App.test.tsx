@@ -7,6 +7,7 @@ import {
   errorDuplicateAudio,
   snapshot as snapshotFixture,
   taskCompleted,
+  taskRunning,
 } from '../shared/api/fixtures';
 import { asRgb, mediaRulesFor, px, required, stateRulesFor, styleRules } from '../test/dom';
 import { renderThemed } from '../test/render';
@@ -52,8 +53,12 @@ describe('the app root', () => {
     expect(required(region.querySelector('svg')).getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('shows the stenographer animation next to the product name at the header size', () => {
+  it('shows the stenographer animation next to the product name at the header size', async () => {
     renderAt('/queue');
+    // The header shows its animated mascot (at the header size) once no placeholder is
+    // on screen; until the snapshot lands, the shell's loading region is that
+    // placeholder and the header shows the small static logo instead (item 31).
+    await screen.findByText('Live');
 
     const title = screen.getByRole('heading', { name: 'Speech-to-Text' });
     const header = required(title.closest('header'));
@@ -503,9 +508,9 @@ describe('the navigation pills', () => {
 
     // The keyboard focus ring stays on the pill (the walk covers both links too).
     const focus = stateRulesFor(historyLink, ':focus-visible');
-    expect(
-      focus.some((rule) => rule.style.boxShadow.includes(lightTheme.colors.focusRing)),
-    ).toBe(true);
+    expect(focus.some((rule) => rule.style.boxShadow.includes(lightTheme.colors.focusRing))).toBe(
+      true,
+    );
   });
 });
 
@@ -533,6 +538,48 @@ describe('the mascot home link', () => {
     // keyboard path is exercised in the e2e suite, item 7).
     fireEvent.click(home);
     expect(screen.getByRole('heading', { name: 'Queue' })).toBeInTheDocument();
+  });
+});
+
+describe('the one-mascot rule', () => {
+  it('shows the small static logo in the header while a placeholder shows the mascot, and the animated mascot otherwise — never two on screen', async () => {
+    const headerMascot = () => required(required(screen.getByRole('banner')).querySelector('svg'));
+    const size = () => getComputedStyle(headerMascot()).width;
+
+    // While connecting, the shell's loading region shows the placeholder mascot, so the
+    // header shows the small static logo: compact, resting, still the home link.
+    const queue = renderAt('/queue');
+    expect(size()).toBe(px(lightTheme.sizes.stenoCompact));
+    expect(headerMascot().getAttribute('class')).not.toContain('is-typing');
+    expect(headerMascot().closest('a')).toHaveAttribute('aria-label', 'Speech-to-Text home');
+
+    // Once live with tasks there is no placeholder: the animated mascot returns at the
+    // full size, typing while the running task runs.
+    await screen.findByText('Live');
+    expect(size()).toBe(px(lightTheme.sizes.stenoHeader));
+    expect(headerMascot().getAttribute('class')).toContain('is-typing');
+    queue.unmount();
+
+    // History with nothing finished while a task runs: the empty state shows the
+    // placeholder mascot, so the header's static logo returns even though a task runs —
+    // the rule follows the placeholder, not the running task.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          ['snapshot', { tasks: [taskRunning], queue: { paused: false, taskIds: [5] } }],
+        ]),
+      ),
+    );
+    const history = renderAt('/history');
+    await screen.findByText('No transcripts yet');
+    expect(size()).toBe(px(lightTheme.sizes.stenoCompact));
+    expect(headerMascot().getAttribute('class')).not.toContain('is-typing');
+    // The placeholder itself shows the mascot at the empty-state size.
+    const placeholder = required(
+      required(screen.getByText('No transcripts yet').parentElement).querySelector('svg'),
+    );
+    expect(getComputedStyle(placeholder).width).toBe(px(lightTheme.sizes.stenoEmpty));
+    history.unmount();
   });
 });
 

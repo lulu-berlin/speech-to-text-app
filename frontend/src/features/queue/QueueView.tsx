@@ -27,7 +27,7 @@ import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Switch } from '../../shared/ui/Switch';
 import { TextButton } from '../../shared/ui/TextButton';
-import { StenographerAnimation } from '../../shared/brand/StenographerAnimation';
+import { PlaceholderMascot } from '../../shared/brand/PlaceholderMascot';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { toggleMachine } from '../../shared/state/toggleMachine';
@@ -116,7 +116,7 @@ function DropZoneContent({ empty, over }: { empty: boolean; over: boolean }) {
   }
   return (
     <EmptyZoneContent>
-      <StenographerAnimation size="empty" />
+      <PlaceholderMascot />
       {label}
     </EmptyZoneContent>
   );

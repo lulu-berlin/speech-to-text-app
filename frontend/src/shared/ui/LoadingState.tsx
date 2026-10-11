@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { StenographerAnimation } from '../brand/StenographerAnimation';
+import { PlaceholderMascot } from '../brand/PlaceholderMascot';
 
 const LoadingStateBase = styled.div`
   display: flex;
@@ -19,13 +19,14 @@ export interface LoadingStateProps {
   label: string;
 }
 
-// The loading pattern (item 17, applied by item 25): the mascot at the empty-state size
-// above a short muted label, centred. The mascot is decorative; the label carries the
-// meaning.
+// The loading pattern (item 17, applied by item 25): the placeholder mascot at the
+// empty-state size above a short muted label, centred. The mascot is decorative; the
+// label carries the meaning. It registers with the shell, so the header stays on the
+// small static logo while it is on screen (item 31).
 export function LoadingState({ label }: LoadingStateProps) {
   return (
     <LoadingStateBase>
-      <StenographerAnimation size="empty" />
+      <PlaceholderMascot />
       <LoadingLabel>{label}</LoadingLabel>
     </LoadingStateBase>
   );
