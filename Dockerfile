@@ -33,26 +33,34 @@ RUN set -eux; \
     nix build --option sandbox false .#stt-app --out-link /out/app; \
     nix-store -qR "$(readlink -f /out/app)" > /out/closure.txt
 
-# Assemble the runtime rootfs from the closure and the OS scaffolding. bash and curl
-# live inside the closure (the wrapper script's shebang and the PATH prefix reference
-# them; curl was added to the package for the healthcheck — flake.nix), so they are
-# found by glob, not by a hard-coded store hash.
+# Assemble the runtime rootfs from the closure and the OS scaffolding. bash's store
+# path is read from the wrapper script's own shebang (makeWrapper emits an absolute
+# path, so the interpreter is guaranteed to be in the closure); curl - only in the
+# closure because the package PATH prefix references it (flake.nix) - is found by
+# scanning the closure list, NOT the whole store, which also holds the builder
+# image's own packages. `/rootfs` must exist before `cp --parents` (it needs the
+# destination directory).
 RUN set -eux; \
+    mkdir -p /rootfs; \
     appBin="$(readlink -f /out/app)/bin/stt-app"; \
-    shopt -s nullglob; \
-    bashBin=""; for p in /nix/store/*-bash-*/bin/bash; do [ -e "$p" ] && { bashBin="$p"; break; }; done; \
-    curlBin=""; for p in /nix/store/*-curl-*/bin/curl; do [ -e "$p" ] && { curlBin="$p"; break; }; done; \
-    [ -n "$bashBin" ] && [ -n "$curlBin" ]; \
+    IFS= read -r shebang < "$appBin"; \
+    interp=${shebang#\#!}; \
+    interp=${interp# }; \
+    interp=${interp%% *}; \
+    [ -x "$interp" ] || { echo "no interpreter in $appBin: $shebang" >&2; exit 1; }; \
+    curlBin=""; \
+    while read -r p; do case "${p##*/}" in *-curl-*) [ -e "$p/bin/curl" ] && { curlBin="$p/bin/curl"; break; } ;; esac; done < /out/closure.txt; \
+    [ -n "$curlBin" ] || { echo "no curl in the closure" >&2; exit 1; }; \
     while read -r p; do cp -a --parents "$p" /rootfs; done < /out/closure.txt; \
     mkdir -p /rootfs/bin /rootfs/etc /rootfs/usr/local/bin /rootfs/tmp /rootfs/data /rootfs/home/stt; \
-    ln -s "$bashBin" /rootfs/bin/sh; \
+    ln -s "$interp" /rootfs/bin/sh; \
     ln -s "$curlBin" /rootfs/usr/local/bin/curl; \
     printf 'root:x:0:0:root:/root:%s\nstt:x:1000:1000:stt:/home/stt:%s\n' /bin/sh /bin/sh > /rootfs/etc/passwd; \
     printf 'root:x:0:\nstt:x:1000:\n' > /rootfs/etc/group; \
     printf 'passwd: files\nshadow: files\ngroup: files\nhosts: files dns\nnetworks: files\nservices: files\n' > /rootfs/etc/nsswitch.conf; \
     chmod 1777 /rootfs/tmp; \
     chown -R 1000:1000 /rootfs/data /rootfs/home/stt; \
-    printf '#!%s\nexec %s "$@"\n' "$bashBin" "$appBin" > /rootfs/entrypoint.sh; \
+    printf '#!%s\nexec %s "$@"\n' "$interp" "$appBin" > /rootfs/entrypoint.sh; \
     chmod 755 /rootfs/entrypoint.sh
 
 FROM scratch
