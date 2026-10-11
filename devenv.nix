@@ -69,8 +69,9 @@ in
   env.TEST_JFK_WAV = "${testFixtures.jfkWav}";
 
   # E2E browsers (roadmap item 21): the suite resolves its browser from the store
-  # (ADR 0010) instead of downloading one ad hoc; only Chromium is in the farm.
-  env.PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers.override { withFirefox = false; withWebkit = false; withFfmpeg = false; }}";
+  # (ADR 0010) instead of downloading one ad hoc; Chromium is in the farm, plus
+  # ffmpeg for Playwright's recordVideo (roadmap item 35's GIF source recordings).
+  env.PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers.override { withFirefox = false; withWebkit = false; withFfmpeg = true; }}";
 
   # Roadmap item 34 (dev mode): dev data (stt.db, uploads) lives in devenv's state dir, a
   # fixed, git-ignored location (.gitignore covers .devenv*), so the queue and history
