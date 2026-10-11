@@ -85,9 +85,7 @@ class AudioJoinIntegrationSpec :
  * Stores two sine-wave chunk FLACs (0.3 s at 440 Hz, then 0.5 s at 880 Hz) for a new task in [dataDir] and joins
  * them with the real [FfmpegAudioJoiner] (which runs its own ProcessRunner per join, item 37); returns the joined file.
  */
-private suspend fun joinTwoSineChunks(
-    dataDir: Path,
-): Path {
+private suspend fun joinTwoSineChunks(dataDir: Path): Path {
     val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
     val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
     val target = dataDir.resolve("joined.flac")

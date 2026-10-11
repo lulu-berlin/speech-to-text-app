@@ -31,7 +31,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Opening a completed clip's transcript while the queue transcribes a task answers 200 for `/audio` and the player has audio (never 500)
 - [x] Two simultaneous `/audio` joins both succeed (each join is independent; no serialization errors)
 - [x] An engine process and an audio join run concurrently without interference (the engine's pause/cancel keeps working while a join runs)
-- [ ] (e2e, ADR 0046) Against the real backend: while a task transcribes, a completed transcript's player has a playable file (the currently silent failure must become an assertion)
+- [x] (e2e, ADR 0046) Against the real backend: while a task transcribes, a completed transcript's player has a playable file (the currently silent failure must become an assertion)
 - [ ] (must not break) The audio tests (`AudioJoinCompletedSpec`, the playback e2e journey) and the full suites stay green
 
 ## Acceptance criteria
