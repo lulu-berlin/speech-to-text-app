@@ -30,6 +30,7 @@ export default async function globalSetup() {
     { args: ['-t', '2'], file: FIXTURE_CLIPS[3] }, // 0-2s
     { args: ['-ss', '2', '-t', '2'], file: FIXTURE_CLIPS[4] }, // 2-4s
     { args: ['-ss', '4', '-t', '2'], file: FIXTURE_CLIPS[5] }, // 4-6s
+    { args: ['-stream_loop', '11'], file: FIXTURE_CLIPS[6] }, // the sample 12 times (~132 s)
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);
