@@ -1,6 +1,6 @@
 # 39 — devenv/doc drift: the playwright version comment (1.61.1 vs 1.63.0)
 
-Status: in-progress
+Status: in-review
 Depends on: [16](../docs/specs/nix-flake-package.md) (done; the downgrade update moved the devenv's playwright to 1.63.x)
 Blocks: —
 
@@ -26,9 +26,9 @@ To be settled in the consultation. Starting points: correct the `devenv.nix` com
 
 Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user:
 
-- [ ] The `devenv.nix` comment names the playwright version and browser revision the devenv actually provides, and it matches `e2e/package.json`'s `@playwright/test` requirement
-- [ ] A fresh `pnpm install` in `e2e/` resolves `@playwright/test` to the version the comment names, and the store's browsers at the named revision exist
-- [ ] (must not break) The e2e package's own gates (prettier + the Playwright run on the user's machine) stay green
+- [x] The `devenv.nix` comment names the playwright version and browser revision the devenv actually provides, and it matches `e2e/package.json`'s `@playwright/test` requirement (cycle 1, 2026-10-11)
+- [x] A fresh `pnpm install` in `e2e/` resolves `@playwright/test` to the version the comment names, and the store's browsers at the named revision exist (cycle 2, 2026-10-11)
+- [x] (must not break) The e2e package's own gates (prettier + the Playwright run on the user's machine) stay green (cycle 3, 2026-10-11 — checker + prettier verified here; full `pnpm --dir e2e test` run is user-side)
 
 ## Acceptance criteria
 
