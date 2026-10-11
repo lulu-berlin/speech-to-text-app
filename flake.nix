@@ -216,7 +216,7 @@
       fi
       if [ "$flakeRev" != "$devenvRev" ]; then
         echo "devenv-pin-sync: devenv.yaml pins nixpkgs $devenvRev but flake.lock has $flakeRev" >&2
-        echo "run '\''devenv update'\'' (or fix devenv.yaml) and re-enter the shell" >&2
+        echo "run 'devenv update' (or fix devenv.yaml) and re-enter the shell" >&2
         exit 1
       fi
       echo "$flakeRev" > $out
