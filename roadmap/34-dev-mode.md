@@ -1,6 +1,6 @@
 # 34 — Dev mode: frontend and backend with one command
 
-Status: spec-approved
+Status: in-progress
 Depends on: —
 
 ## Goal
