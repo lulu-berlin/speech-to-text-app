@@ -1,6 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { PLAYBACK_CLIP } from '../lib/backend.mjs';
-import { appLive, uploadClips } from './helpers/ui';
+import { uploadAndOpen } from './helpers/ui';
 
 // The index of the highlighted segment among the transcript's segment buttons (-1: none).
 async function activeIndex(region: Locator): Promise<number> {
@@ -41,11 +41,7 @@ test('playback: the highlight follows seeking and pausing, a click seeks and pla
   page,
 }) => {
   test.setTimeout(300_000);
-  await appLive(page);
-  await uploadClips(page, [PLAYBACK_CLIP]);
-  const notice = page.getByText(`${PLAYBACK_CLIP} transcribed`);
-  await expect(notice).toBeVisible({ timeout: 240_000 });
-  await notice.getByRole('link', { name: 'open' }).click();
+  await uploadAndOpen(page, PLAYBACK_CLIP);
 
   // A short viewport: the transcript region (max-height 60vh) is then far shorter than the
   // long clip's transcript, so keeping the highlight in view takes real scrolling.
