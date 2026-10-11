@@ -1,33 +1,40 @@
 package stt.http
 
-import java.io.BufferedReader
+import java.io.InputStream
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Reads SSE frames ("event: …\ndata: …\n\n") from the JDK HTTP client's stream: one frame per call, with a
- * 5-second deadline per line, so a closed or stalled stream fails the test instead of hanging it.
+ * deadline per line (5 seconds unless the caller waits for something slower, like a heartbeat), so a closed or
+ * stalled stream fails the test instead of hanging it.
  */
 internal class SseTestReader(
-    private val reader: BufferedReader,
+    private val stream: InputStream,
 ) : AutoCloseable {
+    private val reader = stream.bufferedReader()
     private val pool = Executors.newSingleThreadExecutor()
 
-    /** Drops this subscriber's connection, as a closed browser tab does. */
+    /**
+     * Drops this subscriber's connection, as a closed browser tab does. Closes the raw stream, not the reader: a
+     * read that timed out still holds the reader's lock inside `readLine`, and closing the reader would wait on it.
+     */
     override fun close() {
-        reader.close()
+        stream.close()
         pool.shutdownNow()
     }
 
-    fun readEvent(): Pair<String, String> {
+    fun readEvent(lineTimeout: Duration = 5.seconds): Pair<String, String> {
         var name: String? = null
         val data = StringBuilder()
         while (true) {
             val line =
                 pool
                     .submit<String?>(Callable<String?> { reader.readLine() })
-                    .get(5, TimeUnit.SECONDS)
+                    .get(lineTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
                     ?: error("the SSE stream closed")
             when {
                 line.isEmpty() -> {
