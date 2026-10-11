@@ -1,9 +1,12 @@
 package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import stt.engine.TaskCommandOutcome
 import stt.queue.TaskStatus
+import java.nio.file.Files
 
 class ProcessingEngineSpec :
     BehaviorSpec({
@@ -27,6 +30,26 @@ class ProcessingEngineSpec :
                         fixture.transcriber.probe.max shouldBe 1
                         tasks.find(first)?.task?.status shouldBe TaskStatus.COMPLETED
                         tasks.find(second)?.task?.status shouldBe TaskStatus.COMPLETED
+                    }
+                }
+            }
+        }
+
+        given("a completed task whose work directory still exists") {
+            `when`("deleting it") {
+                then("the task row, its cached audio and its work directory are gone") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        // enqueueTask seeds `work/<id>/source`, the state a COMPLETED task's prune leaves
+                        // (ADR 0024). The engine is not started, so only the delete path can remove it.
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "doomed.wav", queuePosition = 0, createdAt = 1)
+                        fixture.tasks.setCompleted(task, finishedAt = 1_000L)
+
+                        fixture.engine.deleteTask(task) shouldBe TaskCommandOutcome.Accepted
+
+                        fixture.tasks.find(task) shouldBe null
+                        Files.exists(fixture.workDirectories.workDir(task)).shouldBeFalse()
+                        Files.exists(fixture.workDirectories.cachedAudio(task)).shouldBeFalse()
                     }
                 }
             }
