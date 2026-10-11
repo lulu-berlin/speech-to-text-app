@@ -68,6 +68,11 @@ graph TD
   28[28 post-merge cleanup ✓]:::done
   29[29 backend bug fixes ✓]:::done
   30[30 diarization crash ✓]:::done
+  17 --> 31[31 header and navigation polish]
+  25 --> 31
+  11 --> 32[32 settings: device selection]
+  12 --> 32
+  13 --> 32
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -105,3 +110,5 @@ graph TD
 | [28 — Post-merge cleanup refactors](../docs/specs/cleanup-refactors.md) | done | — |
 | [29 — Post-merge bug fixes: engine wake, seek bar, audio join, SSE disconnect](../docs/specs/post-merge-bug-fixes.md) | done | — |
 | [30 — Diarization crash on the user's machine (ONNX Runtime recursion)](../docs/specs/onnxruntime-pin.md) | done | — |
+| [31 — Header and navigation polish](31-header-and-navigation-polish.md) | draft | 17, 25 |
+| [32 — Settings page: processing device selection](32-settings-page-device-selection.md) | draft | 11, 12, 13 |
