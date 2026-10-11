@@ -1,6 +1,6 @@
 # 32 — Settings page: device, threads and upload defaults
 
-Status: draft
+Status: spec-approved
 Depends on: [11](../docs/specs/processing-engine.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [13](../docs/specs/frontend-foundation.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
@@ -44,7 +44,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
+Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] Settings (device, threads, default language, default speakers mode, default max speakers — 8 on a fresh database) are stored in the database, have defaults on a fresh database, and survive a restart
 - [ ] At startup the backend asks whisper-cli for its devices; `GET /api/settings` returns the stored settings and the available devices (CPU, auto, and each reported GPU) and matches its `docs/api/` example
@@ -69,3 +69,4 @@ Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are ap
 - 2026-10-11: drafted by the root agent from the user's request (a settings page to choose CPU vs which GPU, persisted in the database for future runs).
 - 2026-10-11: consultation answers (STT_DEVICE removed; GPUs from whisper-cli at startup; next task only; scope device + threads + default language + default speakers mode; unavailable GPU → CPU with a notice and the setting switched to CPU) and the proposed test list incl. its e2e test (ADR 0046). Remaining: STT_THREADS, maxSpeakers default, the notice's form; test list approval.
 - 2026-10-11: remaining answers: `STT_THREADS` removed; the max-speakers default is a setting (8 initially); the CPU-fallback notice is a global banner on the Queue. Remaining: test list approval.
+- 2026-10-11: test list (10 items, incl. the e2e test) approved by the user; status `spec-approved`. Starts when item 21 delivers the `e2e/` suite.

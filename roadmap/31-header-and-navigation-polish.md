@@ -1,6 +1,6 @@
 # 31 — Header and navigation polish
 
-Status: draft
+Status: spec-approved
 Depends on: [17](../docs/specs/branding-stenographer-animation.md) (done), [25](../docs/specs/visual-polish.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
@@ -41,7 +41,7 @@ None.
 
 ## Test list (written with the user; Canon TDD step 1)
 
-Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
+Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user.
 
 - [ ] The header stays at the top while the page scrolls (sticky, token background and bottom border) on Queue, History and the transcript
 - [ ] At the top of a page the header shows the full-size mascot; once the page scrolls it shrinks to the compact size with an animated transition (instant under reduced motion), and grows back when scrolled to the top; the compact mascot keeps its typing/resting animation
@@ -64,3 +64,4 @@ Proposed 2026-10-11, to be approved. Behaviors only; discovered scenarios are ap
 - 2026-10-11: drafted by the root agent from the user's request (sticky header, nicer navigation with a hover transition, mascot links to `/`, mascot never in two places at once).
 - 2026-10-11: consultation answers (static logo while a placeholder shows the mascot; shrink on scroll, animated; background-pill navigation; item 21 first) and the proposed test list incl. its e2e test (ADR 0046). Remaining: test list approval.
 - 2026-10-11: reduced motion clarified by the user: respected as everywhere (the shrink animates only under `no-preference`); shrinking is not a reason to reduce the mascot's own motion.
+- 2026-10-11: test list (8 items, incl. the e2e test) approved by the user; status `spec-approved`. Starts when item 21 delivers the `e2e/` suite.
