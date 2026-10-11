@@ -1,6 +1,6 @@
 # 31 — Header and navigation polish
 
-Status: in-progress
+Status: in-review
 Depends on: [17](../docs/specs/branding-stenographer-animation.md) (done), [25](../docs/specs/visual-polish.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
@@ -48,9 +48,9 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Navigation links show a background pill on hover and a filled pill on the active link, from tokens, with a token transition; the keyboard focus ring stays visible
 - [x] The header mascot (or the static logo) is a link to `/` with an accessible name; clicking it or pressing Enter lands on `/queue`
 - [x] While an empty, loading or connecting placeholder shows the mascot, the header shows the small static logo instead; otherwise the header shows the animated mascot — never two animated mascots on screen
-- [ ] The transcript's follow mode keeps the playing segment visible below the sticky header
+- [x] The transcript's follow mode keeps the playing segment visible below the sticky header
 - [x] (e2e, ADR 0046) Against the real backend: scrolling a long transcript keeps the header in view and shrinks it; the nav pill follows the route; the mascot link returns to the queue; on the empty queue the header shows the static logo and the placeholder the animated mascot — with screenshots (light/dark, phone/desktop) of the new shell
-- [ ] (must not break) Existing view tests, the design-value convention check and the reduced-motion scan stay green
+- [x] (must not break) Existing view tests, the design-value convention check and the reduced-motion scan stay green
 
 ## Acceptance criteria
 
