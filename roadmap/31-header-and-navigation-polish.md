@@ -1,6 +1,6 @@
 # 31 — Header and navigation polish
 
-Status: spec-approved
+Status: in-progress
 Depends on: [17](../docs/specs/branding-stenographer-animation.md) (done), [25](../docs/specs/visual-polish.md) (done), [21](21-frontend-backend-end-to-end.md) (the `e2e/` suite, ADR 0046)
 
 ## Goal
