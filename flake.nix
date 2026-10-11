@@ -21,29 +21,7 @@
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
     models = import ./nix/models.nix {inherit pkgs;};
-
-    # whisper-cli pinned to the 1.8.4 tag (item 33 consultation, 2026-10-11): the Gradle
-    # bootstrap downloads the jiang1997 1.8.4 prebuild, so both paths run one version.
-    # Vulkan is the GPU path on any Linux host with a Vulkan driver. nixpkgs' recipe is
-    # for 1.9.2, and two of its parts differ at 1.8.4: the install check also runs
-    # parakeet-cli, which 1.8.4 does not have, and its WHISPER_COMMON_FFMPEG option is
-    # still named WHISPER_FFMPEG there, so the flag is a no-op and whisper-cli is built
-    # without ffmpeg libs (it reads the backend's FLAC chunks through its bundled
-    # miniaudio). The source hash is the NAR hash of the v1.8.4 tarball.
-    whisperCpp = (pkgs.whisper-cpp.override {vulkanSupport = true;}).overrideAttrs {
-      version = "1.8.4";
-      src = pkgs.fetchFromGitHub {
-        owner = "ggml-org";
-        repo = "whisper.cpp";
-        tag = "v1.8.4";
-        hash = "sha256-YCuWKDKlrhbx+t3t2kDpAwuKt4rkipDsOXO6uqIU/W0=";
-      };
-      installCheckPhase = ''
-        runHook preInstallCheck
-        "$out/bin/whisper-cli" --help >/dev/null
-        runHook postInstallCheck
-      '';
-    };
+    whisperCpp = import ./nix/whisper-cpp.nix {inherit pkgs;};
 
     # Each part's source holds only what its build reads: its own directory, docs/api (the
     # frontend imports the contract JSON, the backend's contract tests read it) and, for

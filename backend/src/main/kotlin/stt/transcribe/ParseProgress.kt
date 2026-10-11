@@ -1,6 +1,6 @@
 package stt.transcribe
 
-/** whisper-cli 1.9.2 `-pp` stderr line; the percentage is padded to width 3 (`progress =  27%`). */
+/** whisper-cli `-pp` stderr line (the package pins 1.8.4; the format is the same in 1.9.2), the percentage padded to width 3 (`progress =  27%`). */
 private val PROGRESS = Regex("""^whisper_print_progress_callback: progress = +(\d+)%$""")
 
 /** The chunk fraction (0.0–1.0) reported by a whisper-cli `-pp` stderr [line], or null for any other line. */
