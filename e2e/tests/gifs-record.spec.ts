@@ -239,16 +239,22 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
       const framedAt = await pageScrollY();
 
-      // The playhead on the first segment starting 150 px below the region's visible part
-      // (deep enough for a 150 px hand scroll, leaving room below for following to scroll):
-      // a DOM click seeks there and plays (a Playwright click would scroll it into view
-      // first), and pausing at once leaves it there.
+      // The playhead on the last segment that lies below the region's visible part but
+      // still has at least 60 px of transcript after it: following scrolls into that rest
+      // (the region cannot scroll past its bottom), and the video runs the transcript to its
+      // end, so the last segment is the highlighted one when it closes (user: "never shows
+      // the last segment highlighted"). A DOM click seeks there and plays (a Playwright
+      // click would scroll it into view first), and pausing at once leaves it there.
       const deep = await region.evaluate((element) => {
         const box = element.getBoundingClientRect();
         const segments = [...element.querySelectorAll<HTMLElement>('[role="button"]')];
-        const index = segments.findIndex(
-          (segment) => segment.getBoundingClientRect().top - box.top >= element.clientHeight + 150,
-        );
+        const index = segments.findLastIndex((segment) => {
+          const rect = segment.getBoundingClientRect();
+          return (
+            rect.top - box.top >= element.clientHeight &&
+            rect.bottom - box.top <= element.scrollHeight - 60
+          );
+        });
         segments[index]?.click();
         return index;
       });
@@ -272,7 +278,7 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
         deepEndMs / 1000 - 2,
       );
       const startTop = await regionScrollTop();
-      expect(startTop).toBeGreaterThanOrEqual(150);
+      expect(startTop).toBeGreaterThan(0);
       await expect(back).toBeHidden();
       expect(await pageScrollY()).toBe(framedAt);
 
@@ -286,10 +292,25 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await expect(back).toBeHidden();
       expect(await pageScrollY()).toBe(framedAt);
       expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
-      // The viewer sees following keep the highlight in view; hand scroll and "Back to
-      // playing position" are real, but reading as a glitch in a looped GIF, so the flow
-      // stops here (user, 2026-10-11).
-      await page.waitForTimeout(2_000);
+      // Run the playback to its end, so the video closes on the last highlighted
+      // segment (user: "never shows the last segment highlighted").
+      const lastIndex = await region.evaluate(
+        (element) => element.querySelectorAll('[role="button"]').length - 1,
+      );
+      await expect
+        .poll(
+          () =>
+            region.evaluate((element) =>
+              [...element.querySelectorAll('[role="button"]')].findIndex((segment) =>
+                segment.hasAttribute('data-active'),
+              ),
+            ),
+          { timeout: 60_000 },
+        )
+        .toBe(lastIndex);
+      await expect(back).toBeHidden();
+      expect(await pageScrollY()).toBe(framedAt);
+      await page.waitForTimeout(1_500);
       await expect(back).toBeHidden();
     },
   );
