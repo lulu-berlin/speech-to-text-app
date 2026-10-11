@@ -49,8 +49,6 @@ class FfmpegAudioJoiner(
         Files.write(listFile, inputs.map { "file '${it.fileName}'" })
         try {
             val result =
-                // Item 37: a fresh runner per join — this run must never contend with the engine's
-                // single-flight runner or with another join's (see the class doc).
                 ProcessRunner().run(
                     FFMPEG +
                         listOf(

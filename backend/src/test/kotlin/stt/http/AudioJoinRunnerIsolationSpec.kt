@@ -16,16 +16,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import stt.Integration
-import stt.audio.ExportedChunk
-import stt.audio.PlannedChunk
-import stt.audio.sineFlac
-import stt.db.ChunkRepository
-import stt.db.Database
-import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
-import stt.db.queuedTask
 import stt.process.ProcessRunner
-import stt.queue.TaskStatus
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -42,32 +33,7 @@ class AudioJoinRunnerIsolationSpec :
             `when`("a COMPLETED task's audio is requested") {
                 then("200 audio/flac serves the joined FLAC, never 500") {
                     val dataDir = tempdir("stt-join-engine-busy").toPath()
-                    val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
-                    val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
-
-                    val id =
-                        Database.open(dataDir).use { db ->
-                            val workDirectories = TaskWorkDirectories(dataDir)
-                            val stored =
-                                TaskRepository(db, workDirectories).createFromUpload(
-                                    queuedTask("done.wav", createdAt = 1).copy(
-                                        queuePosition = 0,
-                                        status = TaskStatus.COMPLETED,
-                                        finishedAt = 1_000,
-                                    ),
-                                    "audio bytes".toByteArray().inputStream(),
-                                )
-                            ChunkRepository(db).storePlan(
-                                stored,
-                                listOf(
-                                    ExportedChunk(PlannedChunk(0L, 300L), chunk0),
-                                    ExportedChunk(PlannedChunk(300L, 800L), chunk1),
-                                ),
-                            )
-                            // The finished state (item 11): the work directory is gone.
-                            workDirectories.workDir(stored).toFile().deleteRecursively()
-                            stored
-                        }
+                    val id = seedCompletedTaskWithChunks(dataDir)
 
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }
