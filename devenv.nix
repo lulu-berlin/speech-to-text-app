@@ -16,9 +16,11 @@ in
     # Transcribe CLI, the same pinned 1.8.4 Vulkan build the package ships (nix/whisper-cpp.nix)
     (import ./nix/whisper-cpp.nix { inherit pkgs; })
     
-    # Audio tooling: whisper-cpp already decodes any format via embedded FFmpeg,
-    # standalone ffmpeg is handy for trimming/merging audio before transcription.
-    # ffmpeg_8, like the package (no drift; item 33's Gradle bootstrap syncs 8.1 too).
+    # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks
+    # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see
+    # nix/whisper-cpp.nix); standalone ffmpeg is handy for trimming/merging audio
+    # before transcription. ffmpeg_8, like the package (no drift; item 33's Gradle
+    # bootstrap syncs 8.1 too).
     pkgs.ffmpeg_8
     
     # Diagnostics: `vulkaninfo --summary` verifies the GPU is visible to Vulkan
