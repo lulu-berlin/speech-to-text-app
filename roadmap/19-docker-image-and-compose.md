@@ -62,13 +62,24 @@ None.
   added to the package's PATH prefix in flake.nix — "curl from the flake"; bash was already
   in the closure as the wrapper's interpreter).
 
+- 2026-10-11 (cycle 1, green, user-verified): `docker compose up -d --build` on a fresh clone
+  built the image (first build ~11 min: nixpkgs, gradle deps, whisper-cpp 1.8.4 Vulkan, both
+  models), `docker compose ps` showed `Up (healthy)` and `GET /` answered 200. Two build bugs
+  found and fixed on the way: the closure copy needed `/rootfs` to exist first (`cp --parents`,
+  commit `1d5d0b7`), and since the builder is `FROM nixos/nix`, its own packages share
+  `/nix/store` with the fresh build — bash is now taken from the wrapper's own shebang (a
+  closure reference) and curl from the closure list, never from the image's store. Rebuild
+  mechanics observed: the `Dockerfile`/`.dockerignore` are part of the build context
+  (`COPY . .`), so editing the Dockerfile re-runs the whole `nix build` inside Docker (another
+  ~11 min); excluding them from the context is the refactor candidate.
+
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
 
 ADR 0046 (every app feature gets an e2e test) is exempt and why: this item changes packaging only — no app feature or UI; the app's features are covered by item 21's e2e suite booting the packaged app, and a container image cannot be exercised by the UI e2e suite. The image's verification is the user-run Docker scenarios in this list.
 
-- [ ] From a fresh clone with only Docker installed, the documented command builds the image and starts the app on `http://localhost:8080`
+- [x] From a fresh clone with only Docker installed, the documented command builds the image and starts the app on `http://localhost:8080`
 - [ ] `GET /api/health` answers `{"status":"ok"}` and the compose healthcheck reports the service healthy
 - [ ] Data survives `docker compose down` and `up`: a finished transcription is still in the history
 - [ ] Uploading a short clip in the containerized app completes with a transcript
