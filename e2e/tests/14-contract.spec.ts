@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { HISTORY_CLIPS, appUrl } from '../lib/backend.mjs';
+import { CONTRACT_CLIP, appUrl } from '../lib/backend.mjs';
 import { capturedSse, installHttpCapture, installSseCapture } from './helpers/capture';
 import { mustConform } from './helpers/contract';
 import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
@@ -73,14 +73,14 @@ test('the responses the browser received match the structure of their docs/api e
   // watch it complete, exercise the queue pause, then open the transcript (turns)
   // and read the history list. Nothing is intercepted — the capture only listens.
   await appLive(page);
-  const clip = HISTORY_CLIPS[0];
+  const clip = CONTRACT_CLIP;
   const pause = page.getByRole('switch', { name: 'Pause the queue' });
   // Pause so the upload's 201 answers while the task is still QUEUED (the engine cannot
   // race the response): the queue-paused snapshot is what task.queued.json declares.
   await pause.click();
   await expect(pause).toBeChecked();
   await uploadClips(page, [clip]);
-  await expect(page.getByRole('listitem').filter({ hasText: 'jfk-g.wav' })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: clip })).toBeVisible();
   await pause.click();
   await expect(pause).not.toBeChecked();
   await expect(page.getByText(`${clip} transcribed`)).toBeVisible({ timeout: 240_000 });

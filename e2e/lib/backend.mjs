@@ -22,7 +22,7 @@ const STATE_FILE = join(e2eRoot, '.e2e-state.json');
 const healthUrl = (port) => `http://127.0.0.1:${port}/api/health`;
 
 // The journey's fixture clips, created by global-setup.mjs: from TEST_JFK_WAV the full
-// sample, six distinct trims and the sample looped into two long clips; from item 08's
+// sample, its distinct trims and loops (every clip has its own bytes); from item 08's
 // committed LibriSpeech clips a two-speaker recording; and a .wav that cannot be decoded.
 // Uploaded tasks are deduplicated by content sha256, and every test shares one backend per
 // run — so each test that uploads needs its own bytes, or the second upload of the same
@@ -30,8 +30,9 @@ const healthUrl = (port) => `http://127.0.0.1:${port}/api/health`;
 // feeds the queue journey, the reorder test uses REORDER_CLIPS, the playback test
 // PLAYBACK_CLIP (long enough that its transcript scrolls in a short viewport), the merge
 // test MERGE_CLIP, the cancel/retry test CANCEL_CLIP (long enough to cancel while it
-// transcribes) and BROKEN_CLIP (fails in chunking), and the delete test DELETE_CLIP,
-// which it uploads twice on purpose.
+// transcribes) and BROKEN_CLIP (fails in chunking), the delete test DELETE_CLIP, which it
+// uploads twice on purpose, and the contract check CONTRACT_CLIP (the history test leaves
+// its completed clips behind, so 14 must not re-use them).
 export const FIXTURE_CLIPS = [
   'jfk-a.wav',
   'jfk-b.wav',
@@ -53,6 +54,7 @@ export const FIXTURE_CLIPS = [
   'jfk-l.wav', // 0-4s
   'jfk-m.wav', // 0-5s
   'jfk-n.wav', // the sample looped 8x, ~88s
+  'jfk-o.wav', // 5-7s, the contract check (item 16)
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -61,6 +63,9 @@ export const MERGE_CLIP = FIXTURE_CLIPS[7];
 export const CANCEL_CLIP = FIXTURE_CLIPS[8];
 export const BROKEN_CLIP = FIXTURE_CLIPS[9];
 export const DELETE_CLIP = FIXTURE_CLIPS[10];
+// The contract check's own trim: the history test leaves its completed clips in the
+// shared backend, so re-using HISTORY_CLIPS would answer 409 on the first upload.
+export const CONTRACT_CLIP = FIXTURE_CLIPS[20];
 // The history and restart tests' own trims (unique bytes, so they still upload when the
 // shared run's clips are finished tasks) — four trims partition the sample, two per
 // test, so 12's uploads cannot be 13's already-finished tasks.
