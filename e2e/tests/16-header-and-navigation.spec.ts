@@ -59,9 +59,9 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
     `span:has-text("No tasks yet — drop audio files here, or click to choose them") > ${MASCOT}`,
   );
   await expect(dropZoneMascot).toBeVisible();
-  expect((await dropZoneMascot.boundingBox())?.width).toBe(px(140));
+  expect((await dropZoneMascot.boundingBox())?.width).toBe(px(8.75));
   await expect(headerMascot).toBeVisible();
-  expect(await headerMascotWidth()).toBe(px(64));
+  expect(await headerMascotWidth()).toBe(px(4));
   await expect(page.locator('.is-typing')).toHaveCount(0);
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -109,7 +109,7 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   await expect(running.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(headerMascot).toBeVisible();
-  expect(await headerMascotWidth()).toBe(px(120));
+  expect(await headerMascotWidth()).toBe(px(7.5));
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
       await shot(
@@ -131,7 +131,7 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
     const viewport = width === 'desktop' ? { width: 1280, height: 600 } : PHONE_VIEWPORT;
     await page.setViewportSize(viewport);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await expect.poll(headerMascotWidth).toBe(px(64));
+    await expect.poll(headerMascotWidth).toBe(px(4));
     await expect(headerMascot).toBeInViewport();
     for (const theme of ['light', 'dark'] as const) {
       await shot('shell-transcript-scrolled', width, theme, viewport);
@@ -139,7 +139,7 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   }
   await page.setViewportSize(DESKTOP_VIEWPORT);
   await page.evaluate(() => window.scrollTo(0, 0));
-  await expect.poll(headerMascotWidth).toBe(px(120));
+  await expect.poll(headerMascotWidth).toBe(px(7.5));
 });
 
 // The compact (4rem) and full (7.5rem) header mascot sizes, as the browser reports
