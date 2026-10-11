@@ -22,15 +22,16 @@ const STATE_FILE = join(e2eRoot, '.e2e-state.json');
 const healthUrl = (port) => `http://127.0.0.1:${port}/api/health`;
 
 // The journey's fixture clips, created by global-setup.mjs: from TEST_JFK_WAV the full
-// sample, five distinct trims and the sample looped into two long clips; from item 08's
+// sample, six distinct trims and the sample looped into two long clips; from item 08's
 // committed LibriSpeech clips a two-speaker recording; and a .wav that cannot be decoded.
 // Uploaded tasks are deduplicated by content sha256, and every test shares one backend per
 // run — so each test that uploads needs its own bytes, or the second upload of the same
 // content answers 409 duplicate-audio (the delete test re-uploads by design). QUEUE_CLIPS
 // feeds the queue journey, the reorder test uses REORDER_CLIPS, the playback test
 // PLAYBACK_CLIP (long enough that its transcript scrolls in a short viewport), the merge
-// test MERGE_CLIP, and the cancel/retry test CANCEL_CLIP (long enough to cancel while it
-// transcribes) and BROKEN_CLIP (fails in chunking).
+// test MERGE_CLIP, the cancel/retry test CANCEL_CLIP (long enough to cancel while it
+// transcribes) and BROKEN_CLIP (fails in chunking), and the delete test DELETE_CLIP,
+// which it uploads twice on purpose.
 export const FIXTURE_CLIPS = [
   'jfk-a.wav',
   'jfk-b.wav',
@@ -42,6 +43,7 @@ export const FIXTURE_CLIPS = [
   'librispeech-1089-1188-1089.wav',
   'jfk-cancel.wav',
   'broken.wav',
+  'jfk-delete.wav',
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -49,6 +51,7 @@ export const PLAYBACK_CLIP = FIXTURE_CLIPS[6];
 export const MERGE_CLIP = FIXTURE_CLIPS[7];
 export const CANCEL_CLIP = FIXTURE_CLIPS[8];
 export const BROKEN_CLIP = FIXTURE_CLIPS[9];
+export const DELETE_CLIP = FIXTURE_CLIPS[10];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
