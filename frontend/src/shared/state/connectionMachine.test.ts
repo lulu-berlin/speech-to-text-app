@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import { createActor, waitFor } from 'xstate';
+import { createActor, fromCallback, waitFor } from 'xstate';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { eventStreamResponse } from '../api/handlers';
+import { subscribeToEvents } from '../api/client';
+import type { StreamEvent } from '../api/types';
 import {
   error as errorFixture,
   queue,
@@ -195,4 +197,86 @@ describe('the connection machine', () => {
     expect(live.context.tasks).toEqual(snapshot.tasks);
     actor.stop();
   }, 10000);
+
+  it('treats a stream without any event for the idle timeout as dropped, and stays live while heartbeats arrive', async () => {
+    // ADR 0044: any event, a heartbeat included, proves the stream alive; the idle timeout
+    // without one means the connection is lost though EventSource has not noticed (a silent
+    // partition). The real timeout is 15 s; the stream actor is given 300 ms here, and a
+    // 50 ms reconnect delay.
+    // Mock additions: the first connection sends the snapshot and then only what the test
+    // pushes; the second sends snapshot.json without task 4, as if task 4 had been deleted
+    // while the client was cut off.
+    const snapshotWithoutTask4 = {
+      ...snapshot,
+      tasks: snapshot.tasks.filter((task) => task.id !== 4),
+    };
+    const encoder = new TextEncoder();
+    const frame = (name: string, data: unknown) =>
+      encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+    let first: ReadableStreamDefaultController<Uint8Array> | undefined;
+    let connections = 0;
+    server.use(
+      http.get('/api/events', () => {
+        connections += 1;
+        if (connections > 1) {
+          return eventStreamResponse([['snapshot', snapshotWithoutTask4]]);
+        }
+        return new HttpResponse(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              first = controller;
+              controller.enqueue(frame('snapshot', snapshot));
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } },
+        );
+      }),
+    );
+    const machine = connectionMachine.provide({
+      actors: {
+        eventStream: fromCallback<StreamEvent>(({ sendBack }) =>
+          subscribeToEvents(sendBack, 50, 300),
+        ),
+      },
+    });
+    const actor = createActor(machine);
+    const visited: unknown[] = [];
+    actor.subscribe((state) => {
+      if (visited.at(-1) !== state.value) {
+        visited.push(state.value);
+      }
+    });
+    actor.start();
+    await waitFor(actor, (state) => state.matches('live'));
+
+    const stream = first;
+    if (stream === undefined) {
+      throw new Error('the first connection did not open');
+    }
+
+    // Heartbeats every 100 ms for a second, over three idle timeouts: still live, on the
+    // first connection. Real time on purpose: the behavior is the timeout against a live
+    // stream, and fake timers would also take over the timers the EventSource polyfill and
+    // the MSW stream deliver frames with.
+    for (let beat = 0; beat < 10; beat += 1) {
+      const { promise: tick, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, 100);
+      await tick;
+      stream.enqueue(frame('heartbeat', {}));
+    }
+    expect(visited).toEqual(['connecting', 'live']);
+    expect(connections).toBe(1);
+
+    // The heartbeats stop: after the idle timeout the stream counts as dropped, and the next
+    // connection's snapshot replaces the state (no task-deleted was ever sent).
+    const reconnected = await waitFor(
+      actor,
+      (state) => state.matches('live') && !state.context.tasks.some((task) => task.id === 4),
+      { timeout: 2000 },
+    );
+    expect(visited).toEqual(['connecting', 'live', 'reconnecting', 'live']);
+    expect(connections).toBe(2);
+    expect(reconnected.context.tasks).toEqual(snapshotWithoutTask4.tasks);
+    actor.stop();
+  });
 });
