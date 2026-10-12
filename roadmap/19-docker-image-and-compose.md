@@ -167,6 +167,16 @@ None.
   nvidia.com/gpu=all` — Docker has CDI enabled but no spec defines the name; host-side
   diagnosis pending. The discovered item was confirmed by the user and ticked on the observed
   runs (`ps` showed one `stt-app`; `down` removed the container created under an override).
+  Third run (after `86d40e1`, image 3.34 GB with Mesa): **Vulkan half demonstrated.** In
+  the container, whisper-cli with the entrypoint's export found `RADV REMBRANDT` and used
+  `Vulkan0`; the JVM's environment carries `VK_ADD_DRIVER_FILES` (Mesa 26.2.4's radeon,
+  intel, intel_hasvk ICDs) and `STT_DEVICE=auto`, so the app's own whisper-cli inherits it;
+  a ~50 s clip uploaded through the API reached `COMPLETED` while the host's
+  `gpu_busy_percent` for the AMD device read 86/100/100 %. Test 8 re-checked green with Mesa
+  in the image (image store == builder's union closure). NVIDIA: `docker info` lists CDI
+  dirs `/etc/cdi`, `/var/run/cdi`, neither exists; no `nvidia-ctk`, no generator unit — the
+  toolkit is not active on the host. The user is enabling
+  `hardware.nvidia-container-toolkit` to verify the NVIDIA half; test 9 stays open until then.
 
 ## Test list (written with the user; Canon TDD step 1)
 
