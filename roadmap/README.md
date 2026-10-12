@@ -126,6 +126,6 @@ graph TD
 | [34 — Dev mode: frontend and backend with one command](../docs/specs/dev-mode.md) | done | — |
 | [35 — README and architecture overview](../docs/specs/readme-and-architecture.md) | done | 21 |
 | [36 — Follow mode stops by itself (hold-off race)](../docs/specs/follow-mode-hold-off-race.md) | done | 15, 21 |
-| [37 — Audio request 500: the joiner shares the engine's single-flight runner](37-audio-request-500-single-flight-joiner.md) | spec-approved | 15 |
+| [37 — Audio request 500: the joiner shares the engine's single-flight runner](../docs/specs/audio-join-isolation.md) | done | 15 |
 | [38 — Joined playback stalls at ~90 s of a long clip](38-joined-playback-stalls.md) | spec-approved | 15 |
 | [39 — devenv/doc drift: the playwright version comment](39-devenv-playwright-comment-drift.md) | spec-approved | 16 |
