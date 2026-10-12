@@ -61,7 +61,9 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   await expect(dropZoneMascot).toBeVisible();
   expect((await dropZoneMascot.boundingBox())?.width).toBe(px(8.75));
   await expect(headerMascot).toBeVisible();
-  expect(await headerMascotWidth()).toBe(px(4));
+  // The compact size is reached through an entrance animation, so poll until it settles
+  // (the same idiom the transcript-scrolled check below uses).
+  await expect.poll(headerMascotWidth).toBe(px(4));
   await expect(page.locator('.is-typing')).toHaveCount(0);
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
