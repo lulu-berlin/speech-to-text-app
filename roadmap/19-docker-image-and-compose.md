@@ -119,6 +119,19 @@ None.
   one-time context-shape change from the cycle-1 refactor; Dockerfile-only edits are cached
   now. No refactoring suggested.
 
+- 2026-10-12 (cycle 8, green, user-verified): no code change. The image store equals the
+  **builder's own** `/out/closure.txt` (`docker build --target builder` then `cat`; `diff`
+  silent — the image is the closure it was copied from, by construction). The first reference
+  (a host-side `nix build .#stt-app`) was the wrong probe: the host evaluates a different
+  derivation (`6df9qmh0…` vs the container's `gl4jz8wv…`) even though every dependency store
+  path in the two closures matches, and each side reproduces its own path deterministically —
+  a real eval drift between the host's nix and the container's `2.35.2`, worth one probe
+  (`nix-store -q --deriver` on both paths + `nix derivation show` diff) but not an item-19
+  acceptance failure: the image is reproducible in its own build. The root-level check
+  (`docker run … echo /*` = `/bin /data /entrypoint.sh /etc /home /nix /tmp /usr`, plus the
+  runtime mounts `/dev /proc /sys`) confirms the scaffolding is the known nine files.
+  No refactoring suggested.
+
 ## Test list (written with the user; Canon TDD step 1)
 
 Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user. All items are verified by the user on a machine with Docker:
@@ -132,7 +145,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - [x] A task interrupted by `docker compose stop` resumes after `docker compose start` (item 11's restart recovery)
 - [x] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
 - [x] The container runs as a non-root user and writes only to `/data`
-- [ ] The image contains only the flake closure's files (plus the init)
+- [x] The image contains only the flake closure's files (plus the init)
 - [ ] On a host with an NVIDIA GPU and the container toolkit, `docker compose --profile gpu-nvidia up` uses the GPU (`STT_DEVICE=auto`, `nvidia-smi`-visible); on an Intel/AMD host, the `gpu-vulkan` profile uses `/dev/dri`
 
 ## Acceptance criteria
