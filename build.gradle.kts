@@ -197,13 +197,18 @@ fun linuxLibraryPathWrapper(exe: File): File {
     return wrapperDir
 }
 
+// The cache file for a versions.json asset: <dir>/<sha256-prefix>-<URL file name>.
+fun assetCacheFile(dir: String, entry: Map<*, *>): File {
+    val sha = entry["sha256"] as String
+    val fileName = URI(entry["url"] as String).path.substringAfterLast('/')
+    return File(sttCache, "$dir/${sha.take(12)}-$fileName")
+}
+
+fun modelCacheFile(key: String): File = assetCacheFile("models", models[key] as Map<*, *>)
+
 fun prepareModel(key: String) {
     val entry = models[key] as Map<*, *>
-    val url = entry["url"] as String
-    val sha = entry["sha256"] as String
-    val fileName = URI(url).path.substringAfterLast('/')
-    val target = File(sttCache, "models/${sha.take(12)}-$fileName")
-    downloadVerified(url, sha, target)
+    downloadVerified(entry["url"] as String, entry["sha256"] as String, modelCacheFile(key))
 }
 
 tasks.register("prepareRuntime") {
@@ -247,17 +252,11 @@ fun appEnv(): Map<String, String> = mapOf(
     "JAVA_HOME" to runtimeJavaHome.get(),
     // The model defaults are the paths the cache *will* hold after prepareRuntime
     // (which both tasks depend on), not a value only set during its execution.
-    "STT_WHISPER_MODEL" to (System.getenv("STT_WHISPER_MODEL") ?: modelCachePath("whisper", "ggml-large-v3-turbo-q5_0.bin")),
-    "STT_SPEAKER_MODEL" to (System.getenv("STT_SPEAKER_MODEL") ?: modelCachePath("speaker", "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx")),
+    "STT_WHISPER_MODEL" to (System.getenv("STT_WHISPER_MODEL") ?: modelCacheFile("whisper").absolutePath),
+    "STT_SPEAKER_MODEL" to (System.getenv("STT_SPEAKER_MODEL") ?: modelCacheFile("speaker").absolutePath),
     "STT_DATA_DIR" to (System.getenv("STT_DATA_DIR") ?: defaultDataDir()),
     "STT_STATIC_DIR" to (System.getenv("STT_STATIC_DIR") ?: rootProject.file("frontend/dist").absolutePath),
 )
-
-// The cache paths matched by prepareModel/prepareRuntime: <sha256-prefix>-<file name>.
-fun modelCachePath(key: String, fileName: String): String {
-    val sha = (models[key] as Map<*, *>)["sha256"] as String
-    return File(sttCache, "models/${sha.take(12)}-$fileName").absolutePath
-}
 
 // The distribution directory name the node plugin uses for this OS/arch: the OS name
 // from the node download (linux-x64, darwin-arm64, darwin-x64), which differs from
@@ -304,15 +303,8 @@ val e2eDir = rootProject.file("e2e")
 val pnpmExe = File(nodeInstallDir(), "pnpm/pnpm-v${manifest["pnpm"]}/bin/pnpm")
 val fixtures = manifest["fixtures"] as Map<*, *>
 
-// The cache file for a versions.json asset: <dir>/<sha256-prefix>-<URL file name>.
-fun assetCacheFile(dir: String, entry: Map<*, *>): File {
-    val sha = entry["sha256"] as String
-    val fileName = URI(entry["url"] as String).path.substringAfterLast('/')
-    return File(sttCache, "$dir/${sha.take(12)}-$fileName")
-}
-
 val jfkWavFile = assetCacheFile("fixtures", fixtures["jfkWav"] as Map<*, *>)
-val tinyModelFile = assetCacheFile("models", models["whisperTinyEn"] as Map<*, *>)
+val tinyModelFile = modelCacheFile("whisperTinyEn")
 // Playwright's own browser download, shared across clones like the other tools.
 val playwrightBrowsers = System.getenv("PLAYWRIGHT_BROWSERS_PATH") ?: File(sttCache, "ms-playwright").absolutePath
 
