@@ -1,6 +1,6 @@
 # 45 — Make both GPUs selectable: enumerate physical Vulkan devices
 
-Status: draft
+Status: spec-approved
 Depends on: [11](../docs/specs/processing-engine.md) (done), [32](../docs/specs/settings-page.md) (done; the device setting and the probe)
 Blocks: —
 
@@ -19,16 +19,16 @@ The Settings page lists every Vulkan GPU whisper-cli can actually be directed to
 To be settled in the consultation. Starting point:
 
 - **Enumeration, no extra probe runs**: the existing startup probe already makes whisper-cli print every visible physical device — `ggml_vulkan: N = <name> (<backend>) | uma: … | matrix cores: …` — because `GGML_VK_VISIBLE_DEVICES` unset exposes them all (verified on the user's machine). Parse those lines (the `found GPU device` lines stay as the effective-device check).
-- **Per-task selection**: when a task's device is a specific GPU, its whisper-cli runs with `GGML_VK_VISIBLE_DEVICES=<index>` (and `--device 0`, since the one ggml device is then that GPU); `auto`/`cpu` set nothing / `--no-gpu` as today. The engine/runner gains a per-run environment (today `ProcessRunner` inherits the JVM env; a small per-run env parameter, kept engine-only — the audio joiner's runner is untouched).
+- **Per-task selection**: when a task's device is a specific GPU, that task's whisper-cli command is wrapped as `env GGML_VK_VISIBLE_DEVICES=<index> whisper-cli … --device 0` (the one ggml device is then that GPU); `auto`/`cpu` set nothing / `--no-gpu` as today. The wrapper keeps `ProcessRunner` and the audio joiner's runner untouched (user, 2026-10-12).
 - **Wire form**: `gpu:<index>` still indexes the physical list (the order ggml prints), and the Settings page's labels use the names/enumerate (e.g. "GPU 0 — NVIDIA GeForce RTX 3050"; open question whether `availableDevices` gains names on the wire, which is a `docs/api` contract change).
 - **Fallback unchanged**: a chosen GPU that cannot initialize at run time → CPU with the stored notice (item 32).
 - The concurrency, delete, pause, diarization paths are untouched; the setting applies to the next task as before.
 
-## Open questions (to be answered in the consultation)
+## Open questions (answered 2026-10-12)
 
-- `availableDevices` on the wire: keep `["cpu","auto","gpu:0","gpu:1"]` indices (Settings page shows names by mapping) or enrich to value+label objects (a contract change with new `docs/api/settings*.json` variants)?
-- The physical list's order/stability: ggml's enumeration order (as today) or sorted by name?
-- Per-run env plumbing: an explicit `env` parameter on `ProcessRunner.run` (recommended) vs a per-call wrapper — and whether the probe's starting run also sets nothing (all devices visible) as today.
+- `availableDevices` on the wire? → **Keep the index strings** (`cpu`, `auto`, `gpu:<index>`) — they enable the full range of choices; the Settings page maps the names (user).
+- The physical list's order? → **Not a decision**: the indices are defined by the order the probe prints (ggml's enumeration on that boot), so `gpu:N` always means "the Nth device the probe listed"; the page shows the same list. (The question was noise; removed.)
+- Per-run env plumbing? → **A per-call wrapper**: the whisper command is built as `env GGML_VK_VISIBLE_DEVICES=<index> whisper-cli …` — coreutils' `env` is on PATH in every environment (the devenv, the closure's `--prefix PATH`, item 16), so `ProcessRunner` and the joiner's runner stay untouched (user).
 
 ## Test list (proposed; behaviors only)
 
@@ -36,7 +36,7 @@ To be settled in the consultation. Starting point:
 - [ ] Choosing a specific GPU runs that task's whisper-cli against it: the run's process env carries `GGML_VK_VISIBLE_DEVICES=<index>` and the run's log shows that physical device (user-verified on the user's machine for both GPUs)
 - [ ] `auto`/`cpu` set no device env (auto keeps the backend's selection; cpu passes `--no-gpu`)
 - [ ] A stored `gpu:<index>` past the physical count still falls back to the CPU with the notice (item 32's rule)
-- [ ] The Settings page shows each offered GPU with its name (or the agreed wire form) and saving it applies to the next task (existing settings behaviors unchanged)
+- [ ] The Settings page shows each offered GPU (index strings; the names mapped in the UI) and saving it applies to the next task (existing settings behaviors unchanged)
 - [ ] (must not break) The suites, the contract-shape checks (`settings*.json`) and the e2e journey stay green
 
 ## Acceptance criteria
@@ -47,3 +47,4 @@ To be settled in the consultation. Starting point:
 ## Approval log
 
 - 2026-10-12: filed from the user's two-GPU diagnosis (whisper-cli exposes a single ggml device; `GGML_VK_VISIBLE_DEVICES` selects the physical GPU; the probe and `--device` index were the gap).
+- 2026-10-12: consultation answers: index-string `availableDevices` kept; per-run env via a per-call `env` wrapper (runner untouched); the order question withdrawn (indices are the probe's printed order by definition). Test list approved; status `spec-approved`.
