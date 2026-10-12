@@ -165,4 +165,49 @@ class ProcessingEngineAtomicTransitionsSpec :
                 }
             }
         }
+
+        given("a running task whose cancel races its pause") {
+            `when`("the pause's read passes first and its write lands after the cancel") {
+                then("the task ends CANCELED, the pause is refused, and nothing is left dead PAUSED") {
+                    runTest {
+                        val dataDir = tempdir("stt-engine").toPath()
+                        val lock = CountingMutex()
+                        Database.open(dataDir, lock).use { db ->
+                            val fixture = engineUnderTest(TestDataDir(dataDir), db)
+                            val task =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                            fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
+
+                            // Hold the writer lock; the cancel's conditional write queues first, then the
+                            // pause's. The pause's read gate already passed on RUNNING, and its write waits
+                            // behind the cancel — reads use their own connections.
+                            val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 2L))
+                            val base = lock.lockCalls.value
+                            val cancel = async(Dispatchers.Default) { fixture.engine.cancelTask(task) }
+                            awaitLockCall(lock, base + 1)
+                            val pause = async(Dispatchers.Default) { fixture.engine.pauseTask(task) }
+                            awaitLockCall(lock, base + 2)
+
+                            // Release: the cancel commits CANCELED first, so the pause's write lands on a
+                            // task that is no longer pausable. It must be refused — and freeze nothing: a
+                            // started PAUSED row with no way forward is the queue's blocking condition.
+                            held.release()
+                            cancel.await() shouldBe TaskCommandOutcome.Accepted
+                            pause.await() shouldBe TaskCommandOutcome.Illegal(TaskStatus.CANCELED, TaskStatus.PAUSED)
+                            statusOf(fixture, task) shouldBe TaskStatus.CANCELED
+                            fixture.processControl.pauses shouldBe 0
+                            fixture.processControl.frozen shouldBe false
+                            fixture.tasks.startedPaused() shouldBe null
+
+                            // The queue stays live: the canceled task left it, and a next task still completes.
+                            val second =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
+                            fixture.engine.start()
+                            fixture.completed.receive() shouldBe second
+                            held.outcome.await().isFailure.shouldBeTrue()
+                        }
+                    }
+                }
+            }
+        }
     })
