@@ -1,6 +1,6 @@
 # 38 — Joined playback stalls at ~90 s of a long clip
 
-Status: in-progress
+Status: in-review
 Depends on: [15](../docs/specs/frontend-history-ui.md) (done; the transcript player's `/audio` join)
 Blocks: [35](../docs/specs/readme-and-architecture.md) (its playback GIF)
 
@@ -34,7 +34,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The served `/audio` file's duration matches the task's (within a small tolerance); the player does not report a longer duration than the file carries
 - [x] A chunk whose decoded stream ends early (a short or truncated tail) joins without stalling the rest of the file
 - [x] (e2e, ADR 0046) Against the real backend: the long clip plays past the former stall point — `17-follow-mode.spec.ts`'s audio-stall guard (or its replacement) no longer has to forgive the stall; playback advances past ~90 s of the 14× clip
-- [ ] (must not break) The audio tests and the playback e2e journey stay green
+- [x] (must not break) The audio tests and the playback e2e journey stay green
 
 ## Acceptance criteria
 
@@ -50,3 +50,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-12 (workspace, cycle 3, test-list item 2): green on arrival (regression pin). New `AudioJoinIntegrationSpec` scenario: a Range request for the last 8 KiB of the **real** served file (real join + cache, paused-queue COMPLETED task) answers 206 with `Content-Range bytes <L-8192>-<L-1>/<L>` and bytes exactly equal to the served file's tail; prepending the file's own header (bytes before the first frame, from `packet=pos`) makes that slice decode to non-zero audio — a browser's end-seek lands in playable audio, not a stall. Red first run caught a real assert bug in the test itself (`.single()` on the multi-packet `packet=pos` list → `.first()`). Approved refactor after the cycle: `servedAudioBytes` helper shared by the two route scenarios. 5/5 integration scenarios green; committed `Test:` + `Refactor:`.
 - 2026-10-12 (workspace, cycle 4, test-list item 1, e2e): green after the change. `17-follow-mode.spec.ts` now ends by asserting the 14× clip plays through: `duration > 90` sanity + `expect.poll(() => audio.ended, 90 s).toBe(true)` after the follow rounds (which leave playback near ~130 s). Verified in the sandbox against the real backend (fresh data dir, tiny model, store Chromium): full journey green in 2.9 min, `ended` firing on its own. Committed `Test:`; no refactor suggested (the guard's forgiveness is the next item's behavior change).
 - 2026-10-12 (workspace, cycle 5, test-list item 5, e2e): green after the change. `17-follow-mode.spec.ts`'s stall guard is replaced: `playheadReaches`'s 8 s no-advance now distinguishes — `ended` → the rounds end (played out), anything else → `throw "playback stalled at …s before reaching segment N"` (the item-36 stall is a red failure, never a silent round end); the rounds end with `expect(audioSecond()).toBeGreaterThan(90)` (the hands-off journey crossed the former stall point); the obsolete "the joined flac of this clip stalls" comments updated. Verified in the sandbox against the real backend: green in 2.9 min. Committed `Test:`; no refactor suggested (the new paths read clearly).
+- 2026-10-12 (workspace, cycle 6, test-list item 6, must not break): `gradle check` green (ktlint + 256 unit tests), `gradle integrationTest` green (all Integration, incl. the extended `AudioJoinIntegrationSpec` 5/5 and the untouched `AudioDownloadSpec`/`AudioRangeSpec`); the playback e2e journey green in the sandbox against the real backend — `06-playback.spec.ts` (unchanged, 18.7 s) and `17-follow-mode.spec.ts` (with items 1 and 5's assertions). The full e2e suite's green run is the user's machine, as always. Status → in-review.
