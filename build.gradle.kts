@@ -234,6 +234,58 @@ val jdkMajor = (manifest["jdk"] as String).substringBefore('.')
 val runtimeJavaHome = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(jdkMajor)) }
     .map { it.metadata.installationPath.asFile.absolutePath }
 
+// The node-gradle plugin's install location, set in frontend/build.gradle.kts:
+// node/pnpm live under $GRADLE_USER_HOME/stt-app/node, shared across clones.
+fun nodeInstallDir(): File = File(sttCache, "node")
+
+fun devEnv(): Map<String, String> = mapOf(
+    // The managed tools on PATH (ADR 0047), then node/pnpm from the Gradle-managed
+    // install, so the Vite server and the backend runner use the pinned versions.
+    "PATH" to (runtimeBinDirs.map { it.absolutePath } + nodeInstallDir().let { n ->
+        listOf(
+            File(n, "pnpm/pnpm-v${manifest["pnpm"]}/bin").absolutePath,
+            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}/bin").absolutePath,
+        )
+    } + System.getenv("PATH")).joinToString(":"),
+    "JAVA_HOME" to runtimeJavaHome.get(),
+    // The model defaults are the paths the cache *will* hold after prepareRuntime
+    // (which both tasks depend on), not a value only set during its execution.
+    "STT_WHISPER_MODEL" to (System.getenv("STT_WHISPER_MODEL") ?: modelCachePath("whisper", "ggml-large-v3-turbo-q5_0.bin")),
+    "STT_SPEAKER_MODEL" to (System.getenv("STT_SPEAKER_MODEL") ?: modelCachePath("speaker", "3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx")),
+    "STT_DATA_DIR" to (System.getenv("STT_DATA_DIR") ?: defaultDataDir()),
+    "STT_STATIC_DIR" to (System.getenv("STT_STATIC_DIR") ?: rootProject.file("frontend/dist").absolutePath),
+)
+
+// The cache paths matched by prepareModel/prepareRuntime: <sha256-prefix>-<file name>.
+fun modelCachePath(key: String, fileName: String): String {
+    val sha = (models[key] as Map<*, *>)["sha256"] as String
+    return File(sttCache, "models/${sha.take(12)}-$fileName").absolutePath
+}
+
+// The distribution directory name the node plugin uses for this OS/arch: the OS name
+// from the node download (linux-x64, darwin-arm64, darwin-x64), which differs from
+// the Gradle platform string only in the OS portion (macosx-* vs darwin-*).
+fun nodePlatform(): String = when {
+    platform == "linux-x64" -> "linux-x64"
+    platform == "darwin-arm64" -> "darwin-arm64"
+    else -> "darwin-x64"
+}
+
+tasks.register<Exec>("dev") {
+    group = "run"
+    description = "Dev mode for the Gradle bootstrap (roadmap item 33): the Vite dev server with hot module reload and the backend through item 34's dev-run.sh (rebuild and restart on source change)"
+    dependsOn("prepareRuntime", ":frontend:pnpmInstall")
+    doFirst {
+        // The same environment as `run`, plus the runner's hook: item 34's dev-run.sh
+        // rebuilds with the repo's wrapper (DEV_RUN_GRADLE), not a bare `gradle`.
+        val env = devEnv()
+        env.forEach { (k, v) -> environment(k, requireNotNull(v)) }
+        environment("DEV_RUN_GRADLE", rootProject.file("gradlew").absolutePath)
+        workingDir = rootProject.projectDir
+        setCommandLine(rootProject.file("dev.sh").absolutePath)
+    }
+}
+
 tasks.register<Exec>("run") {
     group = "run"
     description = "Build backend + frontend, fetch the runtime tools and models, and start the app on http://localhost:8080 (roadmap item 33)"

@@ -48,7 +48,9 @@ stop_server() {
 
 rebuild_and_restart() {
   echo "[dev-run] change detected; rebuilding (installDist)"
-  if gradle installDist --console=plain; then
+  # ./gradlew dev sets DEV_RUN_GRADLE to the repo's wrapper; the devenv leaves it
+  # unset, so `gradle` comes from PATH (item 33).
+  if ${DEV_RUN_GRADLE:-gradle} installDist --console=plain; then
     stop_server
     start_server
   else
