@@ -148,10 +148,8 @@ val whisperCliEntry = (downloads["whisper-cli"] as Map<*, *>)[platform] as Map<*
 val ffmpegEntry = (downloads["ffmpeg"] as Map<*, *>)[platform] as Map<*, *>?
 val models = manifest["models"] as Map<*, *>
 
-// prepareRuntime writes these; the run task reads them at execution time.
+// prepareRuntime writes this; the run, dev and e2e tasks read it at execution time.
 val runtimeBinDirs = mutableListOf<File>()
-var runtimeWhisperModel: File? = null
-var runtimeSpeakerModel: File? = null
 
 // Downloads, verifies and unpacks one tool and returns its executable. Archives are
 // .tar.gz (whisper-cli) or .jar (ffmpeg from Maven Central, a zip).
@@ -199,14 +197,13 @@ fun linuxLibraryPathWrapper(exe: File): File {
     return wrapperDir
 }
 
-fun prepareModel(key: String): File {
+fun prepareModel(key: String) {
     val entry = models[key] as Map<*, *>
     val url = entry["url"] as String
     val sha = entry["sha256"] as String
     val fileName = URI(url).path.substringAfterLast('/')
     val target = File(sttCache, "models/${sha.take(12)}-$fileName")
     downloadVerified(url, sha, target)
-    return target
 }
 
 tasks.register("prepareRuntime") {
@@ -221,8 +218,8 @@ tasks.register("prepareRuntime") {
             val binDir = if (label == "ffmpeg" && platform.startsWith("linux")) linuxLibraryPathWrapper(exe) else exe.parentFile
             runtimeBinDirs.add(binDir.absoluteFile)
         }
-        runtimeWhisperModel = prepareModel("whisper")
-        runtimeSpeakerModel = prepareModel("speaker")
+        prepareModel("whisper")
+        prepareModel("speaker")
     }
 }
 
