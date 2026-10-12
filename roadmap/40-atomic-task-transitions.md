@@ -43,6 +43,12 @@ Discovered 2026-10-12 in the e2e runs (approved by the user):
 - [x] (discovered) The queue row's action machine accepts a second command on the same row (pause then resume from one row): the e2e journey exposed that `rowActionMachine` stays in `done` after one successful command and silently swallows the next `ACTIVATE` — the browser never sent the resume request (playwright trace proof) while the backend itself handles pause→resume correctly (curl repro: COMPLETED). Fix with a `QueueView` test (both endpoints called) then the machine change; then the e2e journey can pass.
 - [x] (discovered) The settings e2e journey (`17-settings.spec.ts`) hands the shared backend back after its restart, like `13-restart.spec.ts`: it stopped its restarted backend in `finally` without starting a fresh one, so every later spec (now `40-atomic-transitions`) met a dead port (`ERR_CONNECTION_REFUSED`) in the full suite.
 
+Added 2026-10-12 by the review (approved by the user):
+
+- [ ] (review) A pause that is accepted but whose task still finishes (the pause landed after the task's last frozen process) leaves the next task free: the next task, including its DIARIZING phase, runs to completion — a stale pause never stalls the queue. No e2e of its own: the window is too narrow to hit reliably from a browser; the deterministic engine test covers it.
+- [ ] (review) Pausing a QUEUED task while another task runs leaves the running task untouched: its process is not frozen, its diarization is not held, and it completes; the paused task stays PAUSED and is not started
+- [ ] (review, e2e, ADR 0046) Against the real backend, pausing a queued upload while another transcribes: the running one still completes, the paused one stays paused until resumed, then completes
+
 ## Acceptance criteria
 
 - The queue survives every command race: no stuck task, no blocked worker, one consistent outcome, exercised by the deterministic tests and the e2e journey.
