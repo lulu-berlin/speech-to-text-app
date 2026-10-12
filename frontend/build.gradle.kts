@@ -16,6 +16,12 @@ node {
     download.set(true)
     version.set(manifest["node"] as String)
     pnpmVersion.set(manifest["pnpm"] as String)
+    // Installed under the Gradle user home, beside the other downloaded tools, not in
+    // frontend/.gradle: frontend/ is the pnpm project the devenv's tools scan (`pnpm test`'s
+    // `prettier --check .` failed on node's CHANGELOG.md there), and a second clone reuses it.
+    val nodeHome = File(gradle.gradleUserHomeDir, "stt-app/node")
+    workDir.set(File(nodeHome, "nodejs"))
+    pnpmWorkDir.set(File(nodeHome, "pnpm"))
 }
 
 // npmInstallCommand stays at its default, `install`: it names the install subcommand
