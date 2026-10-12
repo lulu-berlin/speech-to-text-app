@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import stt.db.Database
+import stt.db.TaskPhase
 import stt.db.TestDataDir
 import stt.db.queuedTask
 import stt.queue.TaskStatus
@@ -55,6 +56,53 @@ class ProcessingEngineAtomicTransitionsSpec :
                             fixture.tasks.startedPaused() shouldBe null
 
                             // The queue keeps working: the next task still runs to completion.
+                            val second =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
+                            fixture.engine.start()
+                            fixture.completed.receive() shouldBe second
+                            held.outcome.await().isFailure.shouldBeTrue()
+                        }
+                    }
+                }
+            }
+        }
+
+        given("a paused task whose cancel races its resume") {
+            `when`("the resume's read passes first and its write lands after the cancel") {
+                then("the task ends CANCELED, the resume is refused, and the queue stays live") {
+                    runTest {
+                        val dataDir = tempdir("stt-engine").toPath()
+                        val lock = CountingMutex()
+                        Database.open(dataDir, lock).use { db ->
+                            val fixture = engineUnderTest(TestDataDir(dataDir), db)
+                            val task =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                            fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
+                            fixture.tasks.setStatus(task, TaskStatus.PAUSED)
+                            fixture.tasks.setPhase(task, TaskPhase.TRANSCRIBING)
+
+                            // Hold the writer lock; the cancel's conditional write queues first, then the
+                            // resume's. The resume's read gate already passed on PAUSED, and its write waits
+                            // behind the cancel — reads use their own connections.
+                            val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 2L))
+                            val base = lock.lockCalls.value
+                            val cancel = async(Dispatchers.Default) { fixture.engine.cancelTask(task) }
+                            awaitLockCall(lock, base + 1)
+                            val resume = async(Dispatchers.Default) { fixture.engine.resumeTask(task) }
+                            awaitLockCall(lock, base + 2)
+
+                            // Release: the cancel commits first, so the resume's write lands on a task that is
+                            // no longer PAUSED. It must be refused — a resume that lost must not unfreeze the
+                            // process or the pause gate, which would release a different paused task.
+                            held.release()
+                            cancel.await() shouldBe TaskCommandOutcome.Accepted
+                            resume.await() shouldBe TaskCommandOutcome.Illegal(TaskStatus.CANCELED, TaskStatus.QUEUED)
+                            statusOf(fixture, task) shouldBe TaskStatus.CANCELED
+                            fixture.processControl.resumes shouldBe 0
+                            fixture.processControl.frozen shouldBe false
+                            fixture.tasks.startedPaused() shouldBe null
+
+                            // The queue stays live: the canceled task left it, and a next task still completes.
                             val second =
                                 enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()

@@ -212,29 +212,33 @@ class ProcessingEngine internal constructor(
         }
 
     /**
-     * Resumes a paused task at once: item 04's table has no `PAUSED → RUNNING`, so the task is written as
-     * QUEUED and immediately as RUNNING again, and it continues where it stopped even when another QUEUED
-     * task is ahead of it — its worker is still inside it. Neither write touches the phase: only the
-     * queue-level QUEUED (retry, restart recovery) drops it, so a resume cannot lose a stopped task's phase.
+     * Resumes a paused task at once: item 04's table has no `PAUSED → RUNNING`, so a task with no runner
+     * is written back as QUEUED and the worker picks it up directly, continuing where it stopped even
+     * when another QUEUED task is ahead of it; a task whose worker is still inside it is written RUNNING
+     * again at once. Either way it is one conditional write, so a resume that races a cancel, a failure
+     * or a completion is refused: a resume that loses unfreezes nothing, because the process and the
+     * pause gate belong to the *current* run, not this task. Neither write touches the phase: only the
+     * queue-level QUEUED (retry, restart recovery) drops it, so a resume cannot lose a stopped task's
+     * phase.
      */
     suspend fun resumeTask(id: Long): TaskCommandOutcome =
         command(id, TaskStatus.QUEUED) {
             val runningHere = runningJob(id) != null
-            tasks.setStatus(id, TaskStatus.QUEUED)
-            publish(id)
-            if (runningHere) {
-                // A mid-run pause: the worker is inside this task, so it is RUNNING again at once.
-                tasks.setStatus(id, TaskStatus.RUNNING)
+            if (tasks.resumeIfPaused(id, if (runningHere) TaskStatus.RUNNING else TaskStatus.QUEUED)) {
                 publish(id)
+                if (!runningHere) {
+                    // A pause across a restart: there is no runner. The worker, which is waiting for this
+                    // task because a started PAUSED task blocks the queue, picks it up directly and moves it
+                    // to RUNNING itself, as for any task.
+                    wake()
+                }
+                processControl.resume()
+                pauseGate.resume()
+                TaskCommandOutcome.Accepted
             } else {
-                // A pause across a restart: there is no runner. The worker, which is waiting for this
-                // task because a started PAUSED task blocks the queue, picks it up directly and moves it
-                // to RUNNING itself, as for any task.
-                wake()
+                val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
+                TaskCommandOutcome.Illegal(after, TaskStatus.QUEUED)
             }
-            processControl.resume()
-            pauseGate.resume()
-            TaskCommandOutcome.Accepted
         }
 
     /**

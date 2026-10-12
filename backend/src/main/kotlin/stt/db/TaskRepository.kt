@@ -345,6 +345,21 @@ class TaskRepository(
     }
 
     /**
+     * Resumes a paused task: writes [resumeAs] — QUEUED, for the worker to pick it up, or RUNNING, when
+     * the worker is already inside it — only while the task is still PAUSED. A task cancelled, failed or
+     * completed in the meantime keeps its status: the resume loses the race instead of a late write
+     * resurrecting the row over the newer status. Returns whether the row was written; the phase is
+     * untouched (item 12's contract: only a queue-level QUEUED drops it).
+     */
+    suspend fun resumeIfPaused(
+        id: Long,
+        resumeAs: TaskStatus,
+    ): Boolean =
+        updateTaskIf(id, TasksTable.status eq TaskStatus.PAUSED) {
+            it[TasksTable.status] = resumeAs
+        }
+
+    /**
      * Marks the task PAUSED, but only while its status still allows being paused (item 04's table:
      * QUEUED, RUNNING). A task that finished, failed or was cancelled in the meantime keeps its status —
      * the pause loses the race — instead of being overwritten by a dead PAUSED, which would block the
