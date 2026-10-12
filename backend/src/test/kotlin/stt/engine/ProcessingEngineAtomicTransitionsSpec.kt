@@ -5,16 +5,20 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.test.runTest
 import stt.db.Database
+import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.db.TestDataDir
 import stt.db.queuedTask
 import stt.queue.TaskStatus
+import stt.transcribe.WhisperSegment
 import java.nio.file.Files
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The engine's task commands under races (roadmap item 40): a command never overwrites a newer state.
@@ -218,6 +222,48 @@ class ProcessingEngineAtomicTransitionsSpec :
                                 .isFailure
                                 .shouldBeTrue()
                         }
+                    }
+                }
+            }
+        }
+
+        given("a pause that is accepted while its task's last process is already exiting") {
+            `when`("the task still finishes") {
+                then("the next task, including its DIARIZING phase, runs to completion: the stale pause stalls nothing") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                        // The next task has speakers, so its DIARIZING phase passes the pause gate.
+                        val next =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "next.wav",
+                                queuePosition = 1,
+                                createdAt = 2,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        fixture.transcriber.segmentsByTask =
+                            mapOf(next to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = release
+                        fixture.engine.start()
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe first
+                        fixture.engine.pauseTask(first) shouldBe TaskCommandOutcome.Accepted
+
+                        // The fake process ignores the freeze, as when the pause lands after the task's last
+                        // process has exited: the task still finishes, and completion wins over the pause.
+                        fixture.transcriber.hold = null
+                        release.complete(Unit)
+                        pumpUntil(3.seconds) { statusOf(fixture, next) == TaskStatus.COMPLETED }
+                        statusOf(fixture, first) shouldBe TaskStatus.COMPLETED
+                        fixture.diarizer.passedGate shouldBe true
+                        statusOf(fixture, next) shouldBe TaskStatus.COMPLETED
                     }
                 }
             }

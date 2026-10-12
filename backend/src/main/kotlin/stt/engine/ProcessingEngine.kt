@@ -97,7 +97,7 @@ class ProcessingEngine internal constructor(
     /**
      * The in-JVM pause gate (ADR 0004): the DIARIZING phase checks it, and [pauseTask]/[pauseQueue]
      * close it, so a paused task without an external process still stops at the next checkpoint.
-     * One gate suffices: the worker runs one task at a time.
+     * One gate suffices: the worker runs one task at a time, and every run starts with it open ([runInJob]).
      */
     private val pauseGate = PauseGate()
 
@@ -423,8 +423,14 @@ class ProcessingEngine internal constructor(
      * Runs [task]'s phases in a job of their own and waits for it. The job is what [cancelTask] cancels:
      * cancelling the coroutine inside item 05's `run` is what kills the task's process (ADR 0020). It is
      * named `task-<id>`, so the coroutine debugger and dumps show which task it runs (item 46).
+     *
+     * The run starts with the pause gate open: a pause whose task finished anyway (completion wins over a
+     * pause) must not hold the next task's DIARIZING phase. The gate opens before the run is registered
+     * in [running], so a [pauseTask] that sees this task running closes it after the reset, never before.
+     * A paused queue is honoured before this: [nextTask] starts nothing while the queue is paused.
      */
     private suspend fun runInJob(task: StoredTask) {
+        pauseGate.resume()
         val job =
             scope.launch(CoroutineName("task-${task.id}")) {
                 withTaskLoggingContext(task.id) {
