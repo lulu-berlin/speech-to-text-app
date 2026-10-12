@@ -3,10 +3,9 @@
 # bin/stt-app (bin/speech-to-text-app before item 16): a java wrapper that defaults
 # STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended), defaults
 # both models from nix/models.nix (a user-set value wins), and puts the pinned
-# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047);
-# curl trails the list so the Docker image's healthcheck tool comes from the flake
-# (roadmap item 19). Nix evaluation happens on the user's machine - this file is
-# unverified here.
+# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
+# `docker-root` is the Docker image's root filesystem (roadmap item 19, see Dockerfile).
+# Nix evaluation happens on the user's machine - this file is unverified here.
 {
   description = "Speech-to-Text app (backend + bundled frontend, roadmap item 16)";
 
@@ -139,7 +138,7 @@
       '';
     });
   in {
-    packages.x86_64-linux = rec {
+    packages.x86_64-linux = {
       inherit backend frontend;
 
       # `nix build .` builds both parts and provides bin/stt-app, which
@@ -175,14 +174,12 @@
           # the package's own tools come first, so a caller's PATH (e.g. the devenv's
           # whisper-cli) cannot replace them. ffmpeg_8, not nixpkgs' default ffmpeg (9.0 at
           # the locked rev): item 33's Gradle bootstrap syncs ffmpeg to the 8.1 branch.
-          # curl trails the list (no name collisions): item 19's Docker image needs a
-          # healthcheck tool from the flake, and this puts it in the package's closure.
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
             --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
             --set-default STT_WHISPER_MODEL ${models.whisper} \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
-            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg_8 pkgs.util-linux pkgs.coreutils pkgs.curl]} \
+            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg_8 pkgs.util-linux pkgs.coreutils]} \
             --set CLASSPATH "$CP" \
             --add-flags "stt.MainKt"
           runHook postInstall
@@ -193,31 +190,29 @@
         };
       };
 
-      # Alias so the documented `nix build .#stt-app` (roadmap item 19's Docker
-      # builder stage) names the package it builds explicitly.
-      stt-app = default;
-
-      # Image-only (roadmap item 19): the GPU userspace the Docker image needs beyond the app
-      # (a native host brings its own, e.g. NixOS's /run/opengl-driver, so the app package
-      # does not carry it). Two files, read by the Dockerfile into the generated entrypoint:
-      # - vk-driver-files: Mesa's Vulkan drivers for Intel/AMD GPUs as the VK_ADD_DRIVER_FILES
-      #   value: the radeon (RADV) and intel (ANV, HASVK) ICDs only - no lavapipe, so a CPU
-      #   "GPU" is never picked - and additive, so a CDI-mounted NVIDIA ICD still loads. A
-      #   renamed ICD fails the build.
-      # - ld-library-path: the libraries NVIDIA's userspace driver links (libGLX_nvidia needs
-      #   libX11 and more; a CDI mount brings only the driver and glibc), mirroring nixpkgs'
-      #   nvidia-x11 libPath. The driver's RUNPATH names the host's store paths, so the
-      #   entrypoint exports these as LD_LIBRARY_PATH, only when /dev/nvidiactl exists.
-      docker-gpu-runtime = pkgs.runCommand "stt-app-docker-gpu-runtime" { } ''
-        mkdir -p $out
-        icds=""
-        for icd in radeon_icd intel_icd intel_hasvk_icd; do
-          f=${pkgs.mesa}/share/vulkan/icd.d/$icd.x86_64.json
-          test -e "$f"
-          icds="$icds''${icds:+:}$f"
-        done
-        printf '%s' "$icds" > $out/vk-driver-files
-        printf '%s' ${pkgs.lib.escapeShellArg (pkgs.lib.makeLibraryPath [
+      # Image-only (roadmap item 19): the Docker image's root filesystem besides /nix/store,
+      # with every store path known here. The Dockerfile copies this output's closure 1:1 to
+      # /nix/store and its contents to /.
+      # - entrypoint.sh exports the GPU userspace the host cannot lend the container, then
+      #   execs the app (a native host brings its own, e.g. NixOS's /run/opengl-driver, so the
+      #   app package does not carry it):
+      #   - VK_ADD_DRIVER_FILES: Mesa's Vulkan drivers for Intel/AMD GPUs - the radeon (RADV)
+      #     and intel (ANV, HASVK) ICDs only, no lavapipe, so a CPU "GPU" is never picked;
+      #     additive, so a CDI-mounted NVIDIA ICD still loads. A renamed ICD fails the build.
+      #   - LD_LIBRARY_PATH, only when /dev/nvidiactl exists: the libraries NVIDIA's
+      #     CDI-mounted driver links (libGLX_nvidia needs libX11 and more; the CDI mount brings
+      #     only the driver and glibc), mirroring nixpkgs' nvidia-x11 libPath. The driver's
+      #     RUNPATH names the host's store paths, so they are found only this way.
+      # - bin/sh: bash, for `docker compose exec stt-app sh`.
+      # - usr/local/bin/curl: the compose healthcheck's tool.
+      # - etc/passwd, etc/group, etc/nsswitch.conf: root and the app user stt (uid/gid 1000).
+      docker-root = let
+        vkIcds = map (icd: "${pkgs.mesa}/share/vulkan/icd.d/${icd}.x86_64.json") [
+          "radeon_icd"
+          "intel_icd"
+          "intel_hasvk_icd"
+        ];
+        nvidiaLibPath = pkgs.lib.makeLibraryPath [
           pkgs.libdrm
           pkgs.libxext
           pkgs.libx11
@@ -231,8 +226,25 @@
           pkgs.libGL
           pkgs.openssl
           pkgs.dbus
-        ])} > $out/ld-library-path
-      '';
+        ];
+        entrypoint = pkgs.writeShellScript "stt-app-docker-entrypoint" ''
+          export VK_ADD_DRIVER_FILES=${pkgs.lib.concatStringsSep ":" vkIcds}
+          if [ -e /dev/nvidiactl ]; then
+            export LD_LIBRARY_PATH=${nvidiaLibPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+          fi
+          exec ${pkgs.lib.getExe self.packages.${system}.default} "$@"
+        '';
+      in
+        pkgs.runCommand "stt-app-docker-root" { } ''
+          for icd in ${pkgs.lib.concatStringsSep " " vkIcds}; do test -e "$icd"; done
+          mkdir -p $out/bin $out/usr/local/bin $out/etc
+          ln -s ${entrypoint} $out/entrypoint.sh
+          ln -s ${pkgs.runtimeShell} $out/bin/sh
+          ln -s ${pkgs.lib.getExe pkgs.curl} $out/usr/local/bin/curl
+          printf 'root:x:0:0:root:/root:/bin/sh\nstt:x:1000:1000:stt:/home/stt:/bin/sh\n' > $out/etc/passwd
+          printf 'root:x:0:\nstt:x:1000:\n' > $out/etc/group
+          printf 'passwd: files\nshadow: files\ngroup: files\nhosts: files dns\nnetworks: files\nservices: files\n' > $out/etc/nsswitch.conf
+        '';
     };
 
     # `nix run .` starts bin/stt-app (named by meta.mainProgram), on http://localhost:8080.

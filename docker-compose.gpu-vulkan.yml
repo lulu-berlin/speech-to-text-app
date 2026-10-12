@@ -3,7 +3,7 @@
 #     docker compose -f docker-compose.yml -f docker-compose.gpu-vulkan.yml up -d
 #
 # Passes the host's DRM devices; the image brings Mesa's Vulkan drivers (flake output
-# docker-gpu-runtime). The app runs as uid 1000 and /dev/dri/renderD* belongs to the
+# docker-root). The app runs as uid 1000 and /dev/dri/renderD* belongs to the
 # host's `render` group, whose id differs per host, so it is passed in. The Settings page
 # then lists the GPU, and the device setting's default (automatic) uses it.
 services:

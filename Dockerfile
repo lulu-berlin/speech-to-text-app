@@ -1,9 +1,10 @@
 # Multi-stage Docker image (roadmap item 19). The app is built inside Nix from the
 # flake's own inputs — flake.nix and devenv.nix are the only dependency sources
 # (AGENTS.md), so there is no apt/apk anywhere — and the runtime image is exactly the
-# closure of item 16's stt-app package plus the image-only Mesa Vulkan drivers
-# (flake output docker-vulkan-drivers) on scratch, plus a handful of OS files
-# (users, /tmp, /data) and a generated entrypoint shim.
+# closure of the flake output docker-root on scratch: item 16's stt-app package, the
+# GPU userspace the host cannot lend a container, and the image's root files (the
+# entrypoint, /bin/sh, curl for the healthcheck, the users) — plus /data, /home/stt and
+# /tmp.
 #
 # The builder copies each closure store path 1:1 to its absolute /nix/store location,
 # so every embedded reference (the dynamic linker, RPATHs, the makeWrapper script,
@@ -26,63 +27,41 @@ RUN echo 'experimental-features = nix-command flakes' >> /etc/nix/nix.conf
 WORKDIR /build
 COPY . .
 
-# `stt-app` is an alias of the default package (flake.nix), so the build is explicit;
-# `docker-gpu-runtime` is the image-only GPU userspace (Mesa's Intel/AMD Vulkan drivers,
-# the libraries NVIDIA's CDI-mounted driver links). The out-links give stable handles for
-# readlink -f; the union of both closures feeds the rootfs assembly below.
+# The out-link gives a stable handle for readlink -f; the closure list feeds the rootfs
+# assembly below (and lets a check compare it with the finished image's store).
 RUN set -euxo pipefail; \
     mkdir -p /out; \
-    nix build --option sandbox false .#stt-app --out-link /out/app; \
-    nix build --option sandbox false .#docker-gpu-runtime --out-link /out/gpu-runtime; \
-    nix-store -qR "$(readlink -f /out/app)" "$(readlink -f /out/gpu-runtime)" | sort -u > /out/closure.txt
+    nix build --option sandbox false .#docker-root --out-link /out/root; \
+    nix-store -qR "$(readlink -f /out/root)" > /out/closure.txt
 
-# Assemble the runtime rootfs from the closure and the OS scaffolding. bash's store
-# path is read from the wrapper script's own shebang (makeWrapper emits an absolute
-# path, so the interpreter is guaranteed to be in the closure); curl - only in the
-# closure because the package PATH prefix references it (flake.nix) - is found by
-# scanning the closure list, NOT the whole store, which also holds the builder
-# image's own packages. `/rootfs` must exist before `cp --parents` (it needs the
-# destination directory).
+# The closure goes to its own absolute paths, docker-root's contents become the root.
+# `cp --parents` needs /rootfs to exist; --no-preserve=mode keeps the store's read-only
+# directory modes off the image's /, /bin, /etc and /usr. /data and /home/stt belong to
+# the app user, /tmp is the shared scratch dir.
 RUN set -eux; \
     mkdir -p /rootfs; \
-    appBin="$(readlink -f /out/app)/bin/stt-app"; \
-    IFS= read -r shebang < "$appBin"; \
-    interp=${shebang#\#!}; \
-    interp=${interp# }; \
-    interp=${interp%% *}; \
-    [ -x "$interp" ] || { echo "no interpreter in $appBin: $shebang" >&2; exit 1; }; \
-    curlBin=""; \
-    while read -r p; do case "${p##*/}" in *-curl-*) [ -e "$p/bin/curl" ] && { curlBin="$p/bin/curl"; break; } ;; esac; done < /out/closure.txt; \
-    [ -n "$curlBin" ] || { echo "no curl in the closure" >&2; exit 1; }; \
     while read -r p; do cp -a --parents "$p" /rootfs; done < /out/closure.txt; \
-    mkdir -p /rootfs/bin /rootfs/etc /rootfs/usr/local/bin /rootfs/tmp /rootfs/data /rootfs/home/stt; \
-    ln -s "$interp" /rootfs/bin/sh; \
-    ln -s "$curlBin" /rootfs/usr/local/bin/curl; \
-    printf 'root:x:0:0:root:/root:%s\nstt:x:1000:1000:stt:/home/stt:%s\n' /bin/sh /bin/sh > /rootfs/etc/passwd; \
-    printf 'root:x:0:\nstt:x:1000:\n' > /rootfs/etc/group; \
-    printf 'passwd: files\nshadow: files\ngroup: files\nhosts: files dns\nnetworks: files\nservices: files\n' > /rootfs/etc/nsswitch.conf; \
+    cp -RP --no-preserve=mode,ownership "$(readlink -f /out/root)"/. /rootfs/; \
+    mkdir -p /rootfs/tmp /rootfs/data /rootfs/home/stt; \
     chmod 1777 /rootfs/tmp; \
-    chown -R 1000:1000 /rootfs/data /rootfs/home/stt; \
-    vkDriverFiles="$(cat /out/gpu-runtime/vk-driver-files)"; \
-    nvidiaLibPath="$(cat /out/gpu-runtime/ld-library-path)"; \
-    printf '#!%s\nexport VK_ADD_DRIVER_FILES=%s\nif [ -e /dev/nvidiactl ]; then export LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}; fi\nexec %s "$@"\n' "$interp" "$vkDriverFiles" "$nvidiaLibPath" "$appBin" > /rootfs/entrypoint.sh; \
-    chmod 755 /rootfs/entrypoint.sh
+    chown -R 1000:1000 /rootfs/data /rootfs/home/stt
 
 FROM scratch
 
 COPY --from=builder /rootfs/ /
 
-# /usr/local/bin/curl is a symlink into the closure, for the compose healthcheck;
-# /bin/sh is a symlink to the closure's bash (a login shell for `docker compose exec`).
+# /usr/local/bin/curl (the compose healthcheck) and /bin/sh (a shell for
+# `docker compose exec`) are symlinks into the closure.
 ENV PATH=/usr/local/bin:/bin \
     HOME=/home/stt
 
 EXPOSE 8080
 
-# The stt user from /etc/passwd above; /data (volume) and /home/stt are its own, the
-# store is read-only, so the app can write only to /data (STT_DATA_DIR) and scratch.
+# The stt user from docker-root's /etc/passwd; /data (volume) and /home/stt are its own,
+# the store is read-only, so the app can write only to /data (STT_DATA_DIR) and scratch.
 USER 1000:1000
 
-# docker-init (compose init: true) is PID 1 and execs this generated shim, which
-# execs the wrapper, which execs the JVM — one process chain, signals pass through.
+# docker-init (compose init: true) is PID 1 and execs the entrypoint (docker-root), which
+# exports the GPU environment and execs the wrapper, which execs the JVM — one process
+# chain, signals pass through.
 ENTRYPOINT ["/entrypoint.sh"]

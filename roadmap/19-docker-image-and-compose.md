@@ -20,9 +20,9 @@ Make the app easy to build and run with Docker: a container image of the package
 ## Proposal (approved 2026-10-09)
 
 - **Image** built from item 16's flake closure by a multi-stage Dockerfile:
-  - builder stage on `nixos/nix`: `nix build .#stt-app` (item 16's package: wrapper, JRE, frontend, Vulkan whisper-cli, ffmpeg, `setsid`, both models);
+  - builder stage on `nixos/nix`: `nix build .#docker-root` — the image's root as a flake output, whose closure holds item 16's package (wrapper, JRE, frontend, Vulkan whisper-cli, ffmpeg, `setsid`, both models); `.#stt-app` until the cycle-9 refactor, see Checkpoints;
   - runtime stage: the closure's files (the exact copy mechanism — store path copying with an env shim, or similar — is settled at the first checkpoint), a non-root user, PID 1 = an init (`tini` from the closure or `compose init: true`); `STT_DATA_DIR=/data`; port 8080.
-  - The closure carries the Vulkan whisper-cli, `ffmpeg`, `util-linux`'s `setsid` and the models; the image additionally carries the GPU userspace the host cannot lend it (flake output `docker-gpu-runtime`, cycle 9): Mesa's Vulkan drivers for Intel/AMD, so there the host contributes only the GPU device (kernel driver, `/dev/dri`), and the libraries NVIDIA's driver links (X11 client libs, libglvnd, …), since for NVIDIA the Container Toolkit injects only the host's driver itself.
+  - The closure carries the Vulkan whisper-cli, `ffmpeg`, `util-linux`'s `setsid` and the models; the image additionally carries the GPU userspace the host cannot lend it (in the flake output `docker-root`, cycle 9): Mesa's Vulkan drivers for Intel/AMD, so there the host contributes only the GPU device (kernel driver, `/dev/dri`), and the libraries NVIDIA's driver links (X11 client libs, libglvnd, …), since for NVIDIA the Container Toolkit injects only the host's driver itself.
 - **GPU** (the corrected matrix, recorded as decided):
   - **NVIDIA:** the GPUs plus the NVIDIA Container Toolkit on the host (`--gpus all` semantics; on CDI hosts the device `nvidia.com/gpu=all`); the Vulkan build uses the driver's Vulkan ICD. Compose exposes this via the `docker-compose.gpu-nvidia.yml` override (profiles until cycle 9, see Checkpoints).
   - **Intel / AMD:** `/dev/dri` passed to the container; the `docker-compose.gpu-vulkan.yml` override; the userspace driver (Mesa RADV/ANV) comes with the image.
@@ -223,6 +223,19 @@ None.
   27/50 %), the task `COMPLETED`. Test 8's closure diff green on the rebased image. Test 9
   ticked; switching variants is a plain `up -d` with another override (the same container
   is recreated). Unverified: NVIDIA on non-NixOS hosts (see the fourth run's note).
+
+- 2026-10-12 (refactor after cycle 9, approved by the user, A + B): (A) the image root moved
+  into Nix — flake output `docker-root` holds `entrypoint.sh` (a `writeShellScript` with the
+  Mesa `VK_ADD_DRIVER_FILES`, the `/dev/nvidiactl`-gated `LD_LIBRARY_PATH` and `exec` of the
+  app, every store path interpolated at eval time), `bin/sh` → bash, `usr/local/bin/curl` and
+  `etc/{passwd,group,nsswitch.conf}`; the Dockerfile builds only `.#docker-root`, copies its
+  closure and `cp -RP --no-preserve=mode` its contents (store directory modes stay off `/`),
+  and lost the shebang parsing, the curl scan and the two-file handoff. With curl referenced
+  there, the app wrapper's `PATH` no longer carries it and the `.#stt-app` alias is gone, so
+  item 16's package is back to main's (the flake diff against main is the header line and
+  `docker-root`). (B) the base compose header points at the override files and README.md
+  instead of repeating their commands. No behavior change intended; re-verification on the
+  rebuilt image follows.
 
 ## Test list (written with the user; Canon TDD step 1)
 

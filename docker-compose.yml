@@ -1,18 +1,15 @@
 # docker-compose setup (roadmap item 19): one service, CPU by default — no GPU is passed
 # in, so the Settings page's device (automatic by default) finds none and uses the CPU.
 #
-# The GPU variants are override files layered on top of this one, so every variant is the
-# same service: `down`, `exec stt-app`, `logs` work identically, and no second container
-# competes for 8080 (compose profiles were tried first and could not do that: a service
-# without a profile always starts too):
-#
-#   docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up -d
-#   STT_RENDER_GID=$(getent group render | cut -d: -f3) \
-#     docker compose -f docker-compose.yml -f docker-compose.gpu-vulkan.yml up -d
+# The GPU variants are the override files beside this one (docker-compose.gpu-*.yml; their
+# headers and README.md § Docker give the commands). Every variant is the same service, so
+# `down`, `exec stt-app` and `logs` work identically and no second container competes for
+# 8080 (compose profiles were tried first and could not do that: a service without a
+# profile always starts too).
 #
 # Data lives in the named volume stt-data mounted at /data (STT_DATA_DIR); the container
 # runs as the non-root stt user (uid 1000) and writes only there. The healthcheck uses
-# curl from the image's closure (flake.nix) against the app's own /api/health. init: true
+# curl from the image (flake output docker-root) against the app's own /api/health. init: true
 # makes docker-init (a static tini) PID 1 so orphaned process trees are reaped (ADR 0020).
 
 services:
