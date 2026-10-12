@@ -802,7 +802,7 @@ class ProcessingEngine internal constructor(
     private fun now(): Long = System.currentTimeMillis()
 
     private companion object {
-        /** The MDC key the task's id is logged under (item 46; the console pattern's `%X{taskId:-}` is the same key). */
+        /** The MDC key the task's id is logged under (item 46; `logback.xml`'s console pattern reads the same key). */
         const val TASK_ID_MDC_KEY = "taskId"
 
         val logger: Logger = LoggerFactory.getLogger(ProcessingEngine::class.java)
