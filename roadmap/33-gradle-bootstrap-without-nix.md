@@ -67,6 +67,12 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] (discovered) The README gives the launcher JVM as "Java 17 or newer (Gradle 9.8 runs on Java 17–27; tested with 25)" instead of 17–25: Gradle 9.8.0's compatibility matrix lists running Gradle on Java 17 through 27 (confirmed 2026-10-12)
 - [x] (discovered) `./gradlew e2eSystemDeps` takes care of Chromium's Linux system libraries without Gradle ever asking for a password: run as root (containers, CI) it installs them (`playwright install-deps chromium`); run as another user it installs nothing, reports "all installed" when nothing is missing, and otherwise fails with the exact `sudo apt-get …` line naming the missing packages; on macOS it does nothing. The README's `./gradlew e2e` step uses it instead of the versioned node/pnpm paths (confirmed 2026-10-12: user chose this over keeping the manual command or listing Playwright's packages in the README)
 
+### Added 2026-10-12 by the review (approved by the user):
+
+- [ ] (review) The agents' standard `cd backend && gradle check` also fails on a formatting violation in the root build scripts (`build.gradle.kts`, `settings.gradle.kts`, `frontend/build.gradle.kts`), and `gradle ktlintFormat` fixes them; the Nix build's `gradle check`, whose source holds only `backend/`, still passes without them
+- [ ] (review) On a platform the Gradle path does not support (e.g. Linux arm64), tasks that need no downloaded tool (`checkVersions`, `-p backend check`) still run, and `run`, `dev`, `e2e` and `prepareRuntime` fail with a message naming the detected platform and the supported ones
+- [ ] (review) Building the backend through `./gradlew` on a JVM newer than 21 rejects code that uses a JDK API newer than 21, so it cannot compile and then fail on the JDK 21 runtime; the devenv and Nix builds are unchanged
+
 ## Acceptance criteria
 
 - User-run on a Linux machine without Nix (Java installed): from a fresh clone, `./gradlew run` serves the UI on `http://localhost:8080` and a short clip completes with a transcript; item 21's e2e suite passes against it.
