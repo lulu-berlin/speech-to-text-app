@@ -238,7 +238,7 @@ val runtimeJavaHome = javaToolchains.launcherFor { languageVersion.set(JavaLangu
 // node/pnpm live under $GRADLE_USER_HOME/stt-app/node, shared across clones.
 fun nodeInstallDir(): File = File(sttCache, "node")
 
-fun devEnv(): Map<String, String> = mapOf(
+fun appEnv(): Map<String, String> = mapOf(
     // The managed tools on PATH (ADR 0047), then node/pnpm from the Gradle-managed
     // install, so the Vite server and the backend runner use the pinned versions.
     "PATH" to (runtimeBinDirs.map { it.absolutePath } + nodeInstallDir().let { n ->
@@ -276,10 +276,9 @@ tasks.register<Exec>("dev") {
     description = "Dev mode for the Gradle bootstrap (roadmap item 33): the Vite dev server with hot module reload and the backend through item 34's dev-run.sh (rebuild and restart on source change)"
     dependsOn("prepareRuntime", ":frontend:pnpmInstall")
     doFirst {
-        // The same environment as `run`, plus the runner's hook: item 34's dev-run.sh
-        // rebuilds with the repo's wrapper (DEV_RUN_GRADLE), not a bare `gradle`.
-        val env = devEnv()
-        env.forEach { (k, v) -> environment(k, requireNotNull(v)) }
+        // appEnv() plus the runner's hook: item 34's dev-run.sh rebuilds with the
+        // repo's wrapper (DEV_RUN_GRADLE), not a bare `gradle`.
+        applyAppEnv(this as Exec)
         environment("DEV_RUN_GRADLE", rootProject.file("gradlew").absolutePath)
         workingDir = rootProject.projectDir
         setCommandLine(rootProject.file("dev.sh").absolutePath)
@@ -291,17 +290,12 @@ tasks.register<Exec>("run") {
     description = "Build backend + frontend, fetch the runtime tools and models, and start the app on http://localhost:8080 (roadmap item 33)"
     dependsOn("prepareRuntime", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
-        // The managed tools come first on PATH (ADR 0047); a user-set STT_* wins,
-        // otherwise the default comes from versions.json/the manifest (like the
-        // packaged wrapper's --set-default).
-        environment("PATH", (runtimeBinDirs.map { it.absolutePath } + (System.getenv("PATH") ?: "")).joinToString(":"))
-        environment("STT_WHISPER_MODEL", System.getenv("STT_WHISPER_MODEL") ?: runtimeWhisperModel!!.absolutePath)
-        environment("STT_SPEAKER_MODEL", System.getenv("STT_SPEAKER_MODEL") ?: runtimeSpeakerModel!!.absolutePath)
-        environment("STT_STATIC_DIR", System.getenv("STT_STATIC_DIR") ?: rootProject.file("frontend/dist").absolutePath)
-        environment("STT_DATA_DIR", System.getenv("STT_DATA_DIR") ?: defaultDataDir())
-        // The app runs on the pinned JDK 21. Exec.environment does not resolve providers
-        // (it stores their toString), so resolve here — this may trigger the foojay download.
-        environment("JAVA_HOME", runtimeJavaHome.get())
+        applyAppEnv(this as Exec)
         setCommandLine(backendMain.absolutePath)
     }
 }
+
+// The backend's environment, shared by `run` and `dev`: the managed tools come first
+// on PATH (ADR 0047), and a user-set STT_* wins, otherwise the default comes from
+// versions.json/the manifest (like the packaged wrapper's --set-default).
+fun applyAppEnv(task: Exec) = appEnv().forEach { (k, v) -> task.environment(k, requireNotNull(v)) }
