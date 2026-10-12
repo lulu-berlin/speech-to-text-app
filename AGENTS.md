@@ -83,6 +83,11 @@ Frontend (pnpm — ADR 0012):
 - `pnpm build` — `tsc --noEmit` + `vite build` (output: `frontend/dist/`).
 - `pnpm dev` — Vite dev server; proxies `/api` to `http://localhost:8080`.
 
+Documentation (Node, run from the repository root; run them after changing `README.md` or `docs/architecture.md`, or code the overview names):
+
+- `node docs/check-links.mjs README.md docs/architecture.md` — every relative link, `#anchor` and image resolves.
+- `node docs/check-architecture-names.mjs && node docs/check-architecture-diagram.mjs` — every code name in the architecture overview exists in the code, and its diagram's boxes and arrows are real components and calls.
+
 ## Git
 
 - Default branch `main`; feature branches `roadmap/<NN-slug>`, checked out as worktrees under `workspaces/`.
