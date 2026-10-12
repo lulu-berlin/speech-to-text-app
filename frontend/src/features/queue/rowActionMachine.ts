@@ -5,7 +5,7 @@
 // confirmActionMachine (item 28). TaskRow reads done (forwarding the returned task to the
 // live state) and failed (context.error is the inline error of item 17). ACTIVATE is
 // handled on the `ready` parent, so a failed action can start the next one, clearing the
-// error.
+// error, and on `done`, so a row takes a second command after a successful one (item 40).
 import { assign, fromPromise, setup } from 'xstate';
 import { runTaskCommand } from '../../shared/api/client';
 import type { Task } from '../../shared/api/types';
@@ -114,6 +114,21 @@ export const rowActionMachine = setup({
         },
       },
     },
-    done: {},
+    // The returned task is forwarded by TaskRow; the row's next command starts from here.
+    done: {
+      on: {
+        ACTIVATE: [
+          {
+            guard: ({ event }) => event.confirm,
+            target: 'confirming',
+            actions: 'setAction',
+          },
+          {
+            target: 'running',
+            actions: 'setAction',
+          },
+        ],
+      },
+    },
   },
 });

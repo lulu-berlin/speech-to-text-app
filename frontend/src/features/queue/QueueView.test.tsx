@@ -661,6 +661,37 @@ describe('task controls', () => {
     expect(resumes).toEqual(['7']);
   });
 
+  it('runs a second command on the same row: pause, then resume, calls both endpoints', async () => {
+    // Item 40 (discovered): after one successful command the row must still accept the
+    // next one. The stream sends nothing after the snapshot, so the row's state comes
+    // from the commands' responses.
+    const calls: string[] = [];
+    server.use(
+      http.post('/api/tasks/:id/pause', ({ params }) => {
+        calls.push(`pause ${String(params.id)}`);
+        return HttpResponse.json({ ...taskRunning, status: 'PAUSED' });
+      }),
+      http.post('/api/tasks/:id/resume', ({ params }) => {
+        calls.push(`resume ${String(params.id)}`);
+        return HttpResponse.json(taskRunning);
+      }),
+    );
+
+    renderQueue();
+
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' }));
+    await waitFor(() => expect(within(lecture).getByText('PAUSED')).toBeInTheDocument());
+
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' }));
+
+    // The resume response puts the task back to RUNNING; pause is offered again.
+    await waitFor(() => expect(within(lecture).getByText('RUNNING')).toBeInTheDocument());
+    expect(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' })).toBeInTheDocument();
+    expect(calls).toEqual(['pause 5', 'resume 5']);
+  });
+
   it('confirms cancel only when work would be lost, then calls the cancel endpoint', async () => {
     const events = controllableEventStream();
     const canceled: string[] = [];
