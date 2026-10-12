@@ -54,6 +54,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [ ] The architecture overview's diagram matches the running system: each box is a real component, each arrow a real call or event
 - [ ] The GIF recording spec runs against the real backend and produces the GIFs of the agreed flows; the README shows them and the screenshots
 - [ ] The user reads the architecture overview and approves it as easy to understand
+- [ ] (discovered, confirmed 2026-10-12) A recording flow that fails still closes its recording, so no stray unnamed video is left in `e2e/screenshots/recordings/`
 
 ## Acceptance criteria
 
