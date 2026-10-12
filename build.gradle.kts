@@ -86,10 +86,18 @@ fun sha256(file: File): String {
     return md.digest().joinToString("") { "%02x".format(it) }
 }
 
-// Downloads url into target after verifying its sha256 against the manifest entry.
-// A verified file is never downloaded again (item 33: second clones reuse the cache).
+// Ensures target holds the bytes versions.json pins for url. A cached file is checked
+// on every run (about 0.5 s of hashing for all tools and models): if it matches it is
+// used without any network access (item 33: a second run downloads nothing), if not
+// (a damaged or tampered cache) it is downloaded again.
 fun downloadVerified(url: String, expectedSha256: String, target: File) {
-    if (target.isFile) return
+    if (target.isFile) {
+        val cached = sha256(target)
+        if (cached == expectedSha256) return
+        logger.warn("Cached ${target.name} does not match versions.json (sha256 $cached, expected $expectedSha256); downloading it again")
+        target.delete()
+    }
+    logger.lifecycle("Downloading $url")
     target.parentFile.mkdirs()
     val tmp = File.createTempFile("stt-download", ".part", target.parentFile)
     try {
@@ -152,7 +160,7 @@ fun prepareTool(label: String, entry: Map<*, *>, exeName: String): File {
     val sha = entry["sha256"] as String
     val archiveName = URI(url).path.substringAfterLast('/')
     val archive = File(sttCache, "dl/$label/$platform/${sha.take(12)}-$archiveName")
-    if (!archive.isFile) downloadVerified(url, sha, archive)
+    downloadVerified(url, sha, archive)
     val extractDir = File(sttCache, "tools/$label/$platform/$sha")
     // Written after a complete unpack; the number changes with the unpack method, so a
     // directory from an older method or an interrupted run is unpacked again.
@@ -197,7 +205,7 @@ fun prepareModel(key: String): File {
     val sha = entry["sha256"] as String
     val fileName = URI(url).path.substringAfterLast('/')
     val target = File(sttCache, "models/${sha.take(12)}-$fileName")
-    if (!target.isFile) downloadVerified(url, sha, target)
+    downloadVerified(url, sha, target)
     return target
 }
 
