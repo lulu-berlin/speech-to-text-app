@@ -1,6 +1,6 @@
 # 40 — Task transitions are not atomic (pause/resume race a finishing task)
 
-Status: in-progress
+Status: in-review
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 Blocks: —
 
@@ -35,12 +35,13 @@ The mechanism is conditional updates on the command writes (pause, resume) plus 
 - [x] A resume racing a cancel ends in exactly one of the two states, consistently, and the queue stays live
 - [x] Delete racing a completion: the row still goes and the file is freed (the current cancel-guard behavior pinned)
 - [x] Pausing a task whose row is no longer in the paused-able state is rejected, never a dead `PAUSED`
-- [ ] (e2e, ADR 0046) Against the real backend, rapid pause/resume/cancel while a task nears completion never leaves the queue blocked or a task stuck
+- [x] (e2e, ADR 0046) Against the real backend, rapid pause/resume/cancel while a task nears completion never leaves the queue blocked or a task stuck
 - [x] (must not break) The engine command suites (`ProcessingEngineCancelSpec`, `ProcessingEngineTaskPauseSpec`, …) stay green
 
-Discovered 2026-10-12 in the first e2e run (approved by the user):
+Discovered 2026-10-12 in the e2e runs (approved by the user):
 
 - [x] (discovered) The queue row's action machine accepts a second command on the same row (pause then resume from one row): the e2e journey exposed that `rowActionMachine` stays in `done` after one successful command and silently swallows the next `ACTIVATE` — the browser never sent the resume request (playwright trace proof) while the backend itself handles pause→resume correctly (curl repro: COMPLETED). Fix with a `QueueView` test (both endpoints called) then the machine change; then the e2e journey can pass.
+- [x] (discovered) The settings e2e journey (`17-settings.spec.ts`) hands the shared backend back after its restart, like `13-restart.spec.ts`: it stopped its restarted backend in `finally` without starting a fresh one, so every later spec (now `40-atomic-transitions`) met a dead port (`ERR_CONNECTION_REFUSED`) in the full suite.
 
 ## Acceptance criteria
 
@@ -52,3 +53,4 @@ Discovered 2026-10-12 in the first e2e run (approved by the user):
 - 2026-10-12: filed from the third-party review's finding 1 after code triage (unconditional `setStatus` behind a non-atomic `command()` gate).
 - 2026-10-12: the user confirmed the test list; requested the race-scenario clarification (recorded above) before deciding the winners. Pending: the winner decision.
 - 2026-10-12: the user confirmed the winner set: completion over pause (losing pause → 409 illegal-transition), cancel over resume, delete over everything. Test list approved; status `spec-approved`.
+- 2026-10-12: the user approved the refactor moving the row-action `done` state under `ready` (one ACTIVATE definition), and fixing the settings journey's backend handover inside this item (discovered in the full e2e suite).
