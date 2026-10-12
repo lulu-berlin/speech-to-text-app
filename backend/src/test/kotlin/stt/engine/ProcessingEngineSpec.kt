@@ -246,6 +246,25 @@ class ProcessingEngineSpec :
                 }
             }
         }
+
+        given("two queued tasks, named in coroutine dumps") {
+            `when`("the worker processes them") {
+                then("each task's work runs in a coroutine named task-<its id>") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        fixture.engine.start()
+                        fixture.completed.receive() shouldBe first
+                        fixture.completed.receive() shouldBe second
+
+                        // Observed from inside the task's transcription call (item 46): the name the coroutine
+                        // debugger and dumps show for the task's job.
+                        fixture.transcriber.coroutineNames shouldBe listOf("task-$first", "task-$second")
+                    }
+                }
+            }
+        }
     })
 
 /** At least one event was captured, and every one carries [task]'s id in its MDC map (item 46). */

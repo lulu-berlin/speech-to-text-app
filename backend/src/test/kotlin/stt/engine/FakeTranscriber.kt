@@ -2,11 +2,13 @@ package stt.engine
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -45,6 +47,9 @@ internal class FakeTranscriber : Transcriber {
     /** True once a call reported progress from the reader coroutine (item 46's contextual-logging seam). */
     var progressReaderLogged = false
 
+    /** The name of the coroutine every call ran in, in call order (item 46: the task's job is named `task-<id>`). */
+    val coroutineNames = mutableListOf<String?>()
+
     /**
      * When set, a cancelled call does not die at once: it reports itself on [dyingStarted] and waits for
      * this before it is recorded in [cancelled], like item 05's runner waiting out its SIGTERM grace period.
@@ -75,6 +80,7 @@ internal class FakeTranscriber : Transcriber {
         onGpuUnavailable: suspend () -> Unit,
     ): List<WhisperSegment> =
         probe.around {
+            coroutineNames.add(currentCoroutineContext()[CoroutineName]?.name)
             logger.info("transcribing {}", audio)
             // A line logged from inside Dispatchers.IO — the chunk/file work thread (item 46's dispatcher test) —
             // the MDC must travel with the coroutine across the switch.

@@ -1,6 +1,7 @@
 package stt.engine
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -389,11 +390,12 @@ class ProcessingEngine internal constructor(
 
     /**
      * Runs [task]'s phases in a job of their own and waits for it. The job is what [cancelTask] cancels:
-     * cancelling the coroutine inside item 05's `run` is what kills the task's process (ADR 0020).
+     * cancelling the coroutine inside item 05's `run` is what kills the task's process (ADR 0020). It is
+     * named `task-<id>`, so the coroutine debugger and dumps show which task it runs (item 46).
      */
     private suspend fun runInJob(task: StoredTask) {
         val job =
-            scope.launch {
+            scope.launch(CoroutineName("task-${task.id}")) {
                 withTaskLoggingContext(task.id) {
                     runTask(task)
                 }
