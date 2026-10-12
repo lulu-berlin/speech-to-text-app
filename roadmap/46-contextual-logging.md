@@ -1,6 +1,6 @@
 # 46 — Contextual logging: the task's id in every log line (MDC) and named coroutines
 
-Status: in-progress
+Status: in-review
 Depends on: [11](../docs/specs/processing-engine.md) (done; the engine whose task job this tags)
 Blocks: —
 
@@ -36,12 +36,13 @@ one worker, one task job, progress callbacks on reader coroutines, JDBC and file
   thread, then `MDCContext()`) leaks — `MDCContext` saves the thread's map, seed included, and
   restores it on every suspension, so the launching thread kept the id for the coroutines that ran
   on it next (found in cycle 5, 2026-10-12).
-- **Named worker**: the engine worker gets a fixed name (`engine-worker`), distinct from per-task
-  names. Exact placement (the worker scope vs. the `launch { engine.start() }` site) is an
-  implementation detail for the cycle; task-agnostic logs stay untagged either way.
-- **Console visibility**: `logback.xml`'s pattern gains `%X{taskId:-}` (the id printed when
-  present, nothing when absent). Cosmetic only: tests capture events off an appender and read the
-  event's MDC map, so captured-log assertions are unaffected.
+- **Named worker**: the engine worker is named `engine-worker`, distinct from per-task names;
+  `start()` launches it with that `CoroutineName` (cycle 8). Task-agnostic logs stay untagged.
+- **Console visibility**: `logback.xml`'s pattern prints ` [task <id>]` after the logger name
+  when the key is present and nothing when it is absent:
+  `%replace( [task %X{taskId}]){' \[task \]', ''}`. The user chose this over a plain `%X{taskId:-}`
+  on 2026-10-12. Cosmetic only: tests capture events off an appender and read the event's MDC
+  map, so captured-log assertions are unaffected.
 - **Out of scope**: route/request-scoped tagging (HTTP commands run in the caller's coroutine, not
   the task job — their messages already name the task; a per-client SSE id is a later concern),
   tagging whisper-cli/ffmpeg subprocess output (captured, not logged live), the frontend.
@@ -69,7 +70,7 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Task-agnostic logs (startup device probe, worker idle) carry no `taskId` key at all (absent, not blank)
 - [x] The coroutine running a task is named `task-<id>` (observed from inside a fake transcriber through the existing engine-test seam)
 - [x] (discovered) The worker coroutine is named `engine-worker`, distinct from the task names
-- [ ] Must not break: `gradle check` (ktlint + suites) and `gradle integrationTest` stay green; captured-log tests are unaffected by the console pattern change
+- [x] Must not break: `gradle check` (ktlint + suites) and `gradle integrationTest` stay green; captured-log tests are unaffected by the console pattern change
 - [ ] (user-verified) `nix build .` succeeds; `backend/deps.json` unchanged — the artifact already resolves at 1.11.0 (ADR 0042 precedent; regeneration only if the graph actually changed)
 
 ## Acceptance criteria
@@ -91,3 +92,4 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-12 (workspace): cycle 5 refactor checkpoint: none (user). Cycle 6 (list item 7, chosen before item 6): red `expected:<["task-1", "task-2"]> but was:<[<null>, <null>]>` (the fake transcriber records `CoroutineName` per call); green: `runInJob` launches the job with `CoroutineName("task-<id>")`; `gradle check` green (262 tests).
 - 2026-10-12 (workspace): cycle 6 refactor checkpoint: none (user). Discovered and confirmed by the user: the proposal's `engine-worker` name had no test-list item; appended. Cycle 7 (list item 6) green on arrival (regression pin since cycle 5 dropped the thread seed): the startup sweep's warning (a leftover directory with a read-only subdirectory) and the device probe's failure warning (a `ProcessRunner` whose spawn throws, raised from the engine's scope while the task's job is suspended) carry no `taskId` key, while the task's own lines carry its id; `gradle check` green (263 tests).
 - 2026-10-12 (workspace): cycle 7 refactor checkpoint: none (user). Cycle 8 (the discovered `engine-worker` item): red `expected:<["engine-worker", "task-1"]> but was:<["task-1"]>` (names of the engine scope's live child coroutines while the task is held); green: `start()` launches the worker with `CoroutineName("engine-worker")`; after the task completes only `engine-worker` remains; `gradle check` green (264 tests).
+- 2026-10-12 (workspace): cycle 8 refactor checkpoint: none (user). Item 8: console pattern ` [task <id>]` only when set (user's choice, `%replace`; checked against logback 1.6.5: untagged, `[task 7]` and blank-id lines render as intended); ADR 0048 written. `gradle check` (264 tests) and `gradle integrationTest` (63 Integration tests) green. Real run (`gradle run`, tiny.en model, jfk.wav, `Dispatchers.Default`): `SpeakerDiarizer` and `SpeakerSummary` lines print `[task 1]`, startup lines none. Item 9 (`nix build .`, `deps.json` unchanged) is left for the user. Status set to in-review.
