@@ -102,7 +102,7 @@ tasks.named<Test>("test") {
     systemProperty("kotest.tags", "!Integration")
 }
 
-val integrationTest by tasks.registering(Test::class) {
+tasks.register<Test>("integrationTest") {
     group = "verification"
     description = "Run Integration-tagged tests (real processes), ADR 0021"
     useJUnitPlatform {
