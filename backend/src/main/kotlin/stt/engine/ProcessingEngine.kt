@@ -417,11 +417,11 @@ class ProcessingEngine internal constructor(
         id: Long,
         block: suspend () -> T,
     ): T {
-        MDC.put("taskId", id.toString())
+        MDC.put(TASK_ID_MDC_KEY, id.toString())
         try {
             return withContext(MDCContext()) { block() }
         } finally {
-            MDC.remove("taskId")
+            MDC.remove(TASK_ID_MDC_KEY)
         }
     }
 
@@ -807,6 +807,9 @@ class ProcessingEngine internal constructor(
     private fun now(): Long = System.currentTimeMillis()
 
     private companion object {
+        /** The MDC key the task's id is logged under (item 46; the console pattern's `%X{taskId:-}` is the same key). */
+        const val TASK_ID_MDC_KEY = "taskId"
+
         val logger: Logger = LoggerFactory.getLogger(ProcessingEngine::class.java)
     }
 }
