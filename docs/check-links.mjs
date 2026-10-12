@@ -6,18 +6,7 @@
 //   node docs/check-links.mjs README.md docs/architecture.md
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-
-// The lines of a Markdown text outside fenced code blocks, with their 1-based numbers.
-function* proseLines(markdown) {
-  let inFence = false;
-  for (const [index, line] of markdown.split('\n').entries()) {
-    if (line.trimStart().startsWith('```')) {
-      inFence = !inFence;
-    } else if (!inFence) {
-      yield { number: index + 1, line };
-    }
-  }
-}
+import { proseLines } from './markdown-lines.mjs';
 
 // GitHub's heading anchor: lower case, punctuation other than hyphens and spaces dropped,
 // spaces become hyphens; repeated headings get -1, -2, … suffixes.

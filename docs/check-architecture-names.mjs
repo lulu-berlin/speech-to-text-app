@@ -8,6 +8,7 @@
 //   node docs/check-architecture-names.mjs [docs/architecture.md]
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { proseLines } from './markdown-lines.mjs';
 
 const STT = 'backend/src/main/kotlin/stt';
 const MIGRATIONS = 'backend/src/main/resources/db/migration';
@@ -198,18 +199,10 @@ const rules = [
 
 function codeSpans(markdown) {
   const spans = new Map();
-  let inFence = false;
-  for (const [index, line] of markdown.split('\n').entries()) {
-    if (line.trimStart().startsWith('```')) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) {
-      continue;
-    }
+  for (const { number, line } of proseLines(markdown)) {
     for (const match of line.matchAll(/`([^`]+)`/g)) {
       if (!spans.has(match[1])) {
-        spans.set(match[1], index + 1);
+        spans.set(match[1], number);
       }
     }
   }
