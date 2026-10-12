@@ -7,18 +7,25 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+// The lines of a Markdown text outside fenced code blocks, with their 1-based numbers.
+function* proseLines(markdown) {
+  let inFence = false;
+  for (const [index, line] of markdown.split('\n').entries()) {
+    if (line.trimStart().startsWith('```')) {
+      inFence = !inFence;
+    } else if (!inFence) {
+      yield { number: index + 1, line };
+    }
+  }
+}
+
 // GitHub's heading anchor: lower case, punctuation other than hyphens and spaces dropped,
 // spaces become hyphens; repeated headings get -1, -2, … suffixes.
 function anchorsOf(markdown) {
   const anchors = new Set();
   const seen = new Map();
-  let inFence = false;
-  for (const line of markdown.split('\n')) {
-    if (line.trimStart().startsWith('```')) {
-      inFence = !inFence;
-      continue;
-    }
-    const heading = inFence ? null : /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+  for (const { line } of proseLines(markdown)) {
+    const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
     if (heading === null) {
       continue;
     }
@@ -37,21 +44,13 @@ function anchorsOf(markdown) {
 // the src of HTML images.
 function targetsOf(markdown) {
   const targets = [];
-  let inFence = false;
-  for (const [index, line] of markdown.split('\n').entries()) {
-    if (line.trimStart().startsWith('```')) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) {
-      continue;
-    }
+  for (const { number, line } of proseLines(markdown)) {
     const text = line.replace(/`[^`]*`/g, '');
     for (const match of text.matchAll(/!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
-      targets.push({ line: index + 1, target: match[1] });
+      targets.push({ line: number, target: match[1] });
     }
     for (const match of text.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g)) {
-      targets.push({ line: index + 1, target: match[1] });
+      targets.push({ line: number, target: match[1] });
     }
   }
   return targets;
