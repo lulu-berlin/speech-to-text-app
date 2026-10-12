@@ -5,8 +5,13 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldNotBeEmpty
+import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import stt.db.SpeakersMode
 import stt.engine.TaskCommandOutcome
 import stt.queue.TaskStatus
@@ -14,6 +19,7 @@ import stt.transcribe.TranscriptionException
 import stt.transcribe.WhisperSegment
 import stt.withCapturedLogs
 import java.nio.file.Files
+import java.nio.file.Path
 
 class ProcessingEngineSpec :
     BehaviorSpec({
@@ -195,6 +201,51 @@ class ProcessingEngineSpec :
                 }
             }
         }
+
+        given("two tasks processed one after the other") {
+            `when`("a coroutine outside the task jobs logs while the first task is suspended and after both completed") {
+                then("its lines carry no taskId key, and each task's lines carry only that task's id") {
+                    withEngineDatabase { dataDir, db ->
+                        withCapturedLogs(OUTSIDE_THE_TASK_JOBS, Level.INFO) { outsideEvents ->
+                            withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { transcriberEvents ->
+                                val fixture = engineUnderTest(dataDir, db)
+                                val first =
+                                    enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                                val second =
+                                    enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                                val hold = CompletableDeferred<Unit>()
+                                fixture.transcriber.hold = hold
+                                fixture.engine.start()
+
+                                // The first task's job is suspended inside its transcription; a coroutine of the
+                                // engine's scope that is not a task job logs meanwhile (item 46: no leakage).
+                                taskIdOf(
+                                    fixture.transcriber.entered
+                                        .receive()
+                                        .parent,
+                                ) shouldBe first
+                                logOutsideTheTaskJobs("while the first task is suspended")
+                                hold.complete(Unit)
+                                fixture.completed.receive() shouldBe first
+                                fixture.completed.receive() shouldBe second
+                                logOutsideTheTaskJobs("after both tasks completed")
+
+                                outsideEvents.map { it.formattedMessage } shouldBe
+                                    listOf("while the first task is suspended", "after both tasks completed")
+                                outsideEvents.forEach { event -> event.getMDCPropertyMap() shouldNotContainKey "taskId" }
+                                // Every fake-transcriber line names the audio it works on, <dataDir>/work/<id>/…:
+                                // its tag is that task's id, never the other's.
+                                val taskOfLine = { event: ILoggingEvent -> taskIdOf((event.argumentArray[0] as Path).parent) }
+                                transcriberEvents.map(taskOfLine).toSet() shouldBe setOf(first, second)
+                                transcriberEvents.forEach { event ->
+                                    event.getMDCPropertyMap()["taskId"] shouldBe taskOfLine(event).toString()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     })
 
 /** At least one event was captured, and every one carries [task]'s id in its MDC map (item 46). */
@@ -204,4 +255,14 @@ private fun assertTaskIdOnEveryEvent(
 ) {
     events.shouldNotBeEmpty()
     events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+}
+
+/** The logger of [logOutsideTheTaskJobs]: a task-agnostic coroutine's lines (item 46's no-leakage test). */
+private const val OUTSIDE_THE_TASK_JOBS = "stt.engine.OutsideTheTaskJobs"
+
+private val outsideTheTaskJobs: Logger = LoggerFactory.getLogger(OUTSIDE_THE_TASK_JOBS)
+
+/** Logs [message] from a coroutine of the engine's scope that is not a task job, and waits until it has. */
+private suspend fun TestScope.logOutsideTheTaskJobs(message: String) {
+    backgroundScope.launch { outsideTheTaskJobs.info(message) }.join()
 }

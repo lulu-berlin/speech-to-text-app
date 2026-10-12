@@ -407,23 +407,16 @@ class ProcessingEngine internal constructor(
     }
 
     /**
-     * Runs [block] with the task's id in the logging context (item 46): the thread MDC is seeded first, then
-     * `MDCContext` captures the map — the library re-applies it around every resumption, across dispatcher
-     * switches, and every child coroutine inherits it, so the chunk loop, IO blocks, progress readers and the
-     * failure path all log with the id. The previous thread map is restored on exit and the seed removed, so
-     * no task's id leaks onto the worker.
+     * Runs [block] with the task's id in the logging context (item 46): `MDCContext` carries the caller's map
+     * plus the id, and the library applies it around every resumption, across dispatcher switches, and every
+     * child coroutine inherits it, so the chunk loop, IO blocks, progress readers and the failure path all log
+     * with the id. The thread's own map is never written: on every suspension the library restores the map
+     * the thread had, so the id does not leak onto the thread for the coroutines that run on it next.
      */
     private suspend fun <T> withTaskLoggingContext(
         id: Long,
         block: suspend () -> T,
-    ): T {
-        MDC.put(TASK_ID_MDC_KEY, id.toString())
-        try {
-            return withContext(MDCContext()) { block() }
-        } finally {
-            MDC.remove(TASK_ID_MDC_KEY)
-        }
-    }
+    ): T = withContext(MDCContext(MDC.getCopyOfContextMap().orEmpty() + (TASK_ID_MDC_KEY to id.toString()))) { block() }
 
     /** Publishes the queue as it is now; call only after a change that affects it has been persisted. */
     private suspend fun queueUpdated() {
