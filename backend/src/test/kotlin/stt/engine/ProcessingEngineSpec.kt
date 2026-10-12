@@ -1,10 +1,10 @@
 package stt.engine
 
+import ch.qos.logback.classic.Level
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
-import ch.qos.logback.classic.Level
 import kotlinx.coroutines.CompletableDeferred
 import stt.db.SpeakersMode
 import stt.engine.TaskCommandOutcome
@@ -123,8 +123,14 @@ class ProcessingEngineSpec :
                             withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { transcriberEvents ->
                                 val fixture = engineUnderTest(dataDir, db)
                                 val task =
-                                    enqueueTask(fixture.tasks, fixture.workDirectories, "switching.wav", queuePosition = 0, createdAt = 1,
-                                        speakersMode = SpeakersMode.AUTO)
+                                    enqueueTask(
+                                        fixture.tasks,
+                                        fixture.workDirectories,
+                                        "switching.wav",
+                                        queuePosition = 0,
+                                        createdAt = 1,
+                                        speakersMode = SpeakersMode.AUTO,
+                                    )
                                 fixture.transcriber.segmentsByTask =
                                     mapOf(task to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = "hello")))
                                 fixture.engine.start()
@@ -176,7 +182,10 @@ class ProcessingEngineSpec :
                             fixture.engine.start()
 
                             fixture.failed.receive() shouldBe task
-                            fixture.tasks.find(task)?.task?.status shouldBe TaskStatus.FAILED
+                            fixture.tasks
+                                .find(task)
+                                ?.task
+                                ?.status shouldBe TaskStatus.FAILED
 
                             // The engine does not log the failure itself (the error is stored and published);
                             // every line the run did emit — the fake's, before the throw — is inside the

@@ -102,11 +102,12 @@ internal class FakeTranscriber : Transcriber {
             // reader), item 46's deep-leak test: log and report from that coroutine, which the task
             // job does not own directly — the MDC must be inherited by the child.
             coroutineScope {
-                val reader = async(Dispatchers.IO) {
-                    logger.info("progress reader for {}", audio)
-                    progressReaderLogged = true
-                    progressScript.forEach(onProgress)
-                }
+                val reader =
+                    async(Dispatchers.IO) {
+                        logger.info("progress reader for {}", audio)
+                        progressReaderLogged = true
+                        progressScript.forEach(onProgress)
+                    }
                 reader.await()
             }
             if (gpuUnavailable && settings.device is Device.Gpu) onGpuUnavailable()
