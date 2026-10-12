@@ -206,8 +206,7 @@ class ProcessingEngine internal constructor(
                 pauseGate.pause()
                 TaskCommandOutcome.Accepted
             } else {
-                val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
-                TaskCommandOutcome.Illegal(after, TaskStatus.PAUSED)
+                lostTransition(id, TaskStatus.PAUSED)
             }
         }
 
@@ -236,8 +235,7 @@ class ProcessingEngine internal constructor(
                 pauseGate.resume()
                 TaskCommandOutcome.Accepted
             } else {
-                val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
-                TaskCommandOutcome.Illegal(after, TaskStatus.QUEUED)
+                lostTransition(id, TaskStatus.QUEUED)
             }
         }
 
@@ -326,8 +324,7 @@ class ProcessingEngine internal constructor(
                 wake()
                 TaskCommandOutcome.Accepted
             } else {
-                val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
-                TaskCommandOutcome.Illegal(after, TaskStatus.QUEUED)
+                lostTransition(id, TaskStatus.QUEUED)
             }
         }
 
@@ -369,6 +366,23 @@ class ProcessingEngine internal constructor(
         if (!status.canTransitionTo(to)) return TaskCommandOutcome.Illegal(status, to)
         return body()
     }
+
+    /**
+     * The outcome of a command whose conditional write was refused: the transition lost to a newer state,
+     * so it reports [TaskCommandOutcome.Illegal] with the status the task is actually in — or Unknown
+     * when the row is gone meanwhile. Shared by the commands whose write re-checks the status (pause,
+     * resume, retry); [cancelTask] decides Accepted vs Illegal for itself because its write is the
+     * terminal state it reports.
+     */
+    private suspend fun lostTransition(
+        id: Long,
+        to: TaskStatus,
+    ): TaskCommandOutcome =
+        tasks.find(id)
+            ?.task
+            ?.status
+            ?.let { TaskCommandOutcome.Illegal(it, to) }
+            ?: TaskCommandOutcome.Unknown
 
     /**
      * The task to run next. Nothing while the queue is paused; and while a started task is paused, nothing
