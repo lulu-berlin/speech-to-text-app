@@ -26,7 +26,7 @@ Make the app easy to build and run with Docker: a container image of the package
 - **GPU** (the corrected matrix, recorded as decided):
   - **NVIDIA:** the GPUs plus the NVIDIA Container Toolkit on the host (`--gpus all` semantics; on CDI hosts the device `nvidia.com/gpu=all`); the Vulkan build uses the driver's Vulkan ICD. Compose exposes this via the `docker-compose.gpu-nvidia.yml` override (profiles until cycle 9, see Checkpoints).
   - **Intel / AMD:** `/dev/dri` passed to the container; the `docker-compose.gpu-vulkan.yml` override; the userspace driver (Mesa RADV/ANV) comes with the image.
-  - **CPU:** the default (`docker-compose.yml` alone); `STT_DEVICE=cpu`.
+  - **CPU:** the default (`docker-compose.yml` alone): no GPU is passed in, so the device setting (item 32's Settings page, seeded automatic) finds none and runs on the CPU. (Until the rebase onto item 32 the compose files set `STT_DEVICE`, which item 32 removed.)
   - **macOS:** Docker Desktop runs the Linux image CPU-only (no GPU passthrough into Linux containers); documented.
   - **TPU:** out of scope — whisper.cpp has no TPU backend.
 - **`docker-compose.yml`** at the repository root: one service `stt-app`; a named volume at `/data`; `8080:8080`; a healthcheck `curl -fs http://localhost:8080/api/health`; a restart policy; the two GPU override files beside it; `init: true` if no `tini`.
@@ -205,6 +205,13 @@ None.
   seeded `auto`) and 35 (README) were found merged on main; the user approved rebasing onto
   main, dropping the dead `STT_DEVICE` from the compose files and moving the Docker section
   into README.md, with one re-verification run on the rebased image.
+  Rebase done (18 commits replayed, no conflicts — main had changed none of the branch's
+  files). Then: `STT_DEVICE` dropped from all three compose files (the overrides now only add
+  devices; the base file's CPU default comes from passing no GPU); the Docker section moved
+  from this spec into README.md (`### Docker` replaces item 35's placeholder, the "Ways to
+  run it" row says available, "Where your data lives" gains the `stt-data` volume and its
+  backup/restore commands); `node docs/check-links.mjs README.md docs/architecture.md`
+  passes. Re-verification on the rebased image is the next run.
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -220,7 +227,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - [x] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
 - [x] The container runs as a non-root user and writes only to `/data`
 - [x] The image contains only the flake closure's files (plus the init)
-- [ ] On a host with an NVIDIA GPU and the container toolkit (CDI), `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up` uses the GPU (`STT_DEVICE=auto`, `nvidia-smi`-visible); on an Intel/AMD host, the `docker-compose.gpu-vulkan.yml` override uses `/dev/dri`
+- [ ] On a host with an NVIDIA GPU and the container toolkit (CDI), `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up` runs the app's whisper-cli on the GPU (`nvidia-smi`-visible); on an Intel/AMD host, the `docker-compose.gpu-vulkan.yml` override does the same through `/dev/dri`
 - [x] (discovered) A GPU variant runs as the only app container (no CPU service beside it, one `stt-app` for `exec`/`logs`), and a plain `docker compose down` removes it
 
 ## Acceptance criteria
@@ -229,65 +236,11 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - On the available hardware, at least one GPU variant is demonstrated (NVIDIA or Vulkan), with the others documented as unverified.
 - All test-list items ticked and verified; user approved the diff.
 
-## Documentation deliverable — the root README's Docker section
+## Documentation
 
-The root README.md is written by item 35 (parallel workspace). This item's documentation
-goes into it when 35 lands; until then it lives here. Ready-to-paste text:
-
----
-
-## Run with Docker
-
-Requires Docker with Compose v2 on x86_64 Linux. The image is built locally — a host
-with only Docker is enough, the build runs inside a `nixos/nix` container, and nothing is
-pushed to a registry. macOS and Windows run this Linux image through Docker Engine
-(Desktop/VM) CPU-only: Docker does not pass GPUs into Linux containers there.
-
-- **Build and start:** `docker compose up -d --build`. The first build downloads the
-  locked nixpkgs and both models (~600 MB) and runs the backend's unit tests inside the
-  Nix build, so it takes a while. The app then serves http://localhost:8080.
-- **Status and logs:** `docker compose ps` (a curl healthcheck against `GET /api/health`
-  reports the service healthy), `docker compose logs -f stt-app`.
-- **Stop/start/down:** `docker compose stop` / `docker compose start` (a transcription
-  task interrupted by `stop` resumes after `start` — the runner's restart recovery),
-  `docker compose down` (removes the container, keeps your data).
-
-**Data.** Everything — the `stt.db` database and the `work/` uploads — lives in
-`STT_DATA_DIR=/data`, the named volume `stt-data`; the container runs as a non-root user
-and `/data` is its only writable path. `docker compose down` keeps the volume,
-`docker compose down -v` deletes it. Back up (stop the app for a consistent snapshot):
-
-```sh
-docker compose stop
-docker run --rm -v stt-data:/data:ro -v "$PWD":/backup alpine:3 tar czf /backup/stt-data.tar.gz -C /data .
-docker compose start
-```
-
-Restore (files land owned by the container's uid 1000):
-
-```sh
-docker compose stop
-docker run --rm --user 1000:1000 -v stt-data:/data -v "$PWD":/backup alpine:3 tar xzf /backup/stt-data.tar.gz -C /data
-docker compose start
-```
-
-**GPU matrix.** Whisper runs on the GPU through Vulkan (the image ships the packaged
-Vulkan whisper build, Mesa's Intel/AMD Vulkan drivers and the libraries NVIDIA's driver
-links, so any Linux host with the kernel GPU driver works for Intel/AMD; NVIDIA's driver
-itself comes from the host's NVIDIA Container Toolkit). A GPU variant is an override file
-layered on `docker-compose.yml`: it is the same `stt-app` service, so `docker compose
-down`, `exec stt-app` and `logs` work the same for every variant.
-
-| Host | Command |
-| --- | --- |
-| CPU (any) | `docker compose up -d` — `STT_DEVICE=cpu` |
-| NVIDIA (NVIDIA Container Toolkit with CDI: NixOS `hardware.nvidia-container-toolkit.enable`, elsewhere `nvidia-ctk cdi generate`; Docker with CDI enabled) | `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up -d` — CDI device `nvidia.com/gpu=all`; Vulkan through the driver's ICD, `STT_DEVICE=auto` |
-| Intel / AMD (Vulkan driver) | `STT_RENDER_GID=$(getent group render \| cut -d: -f3) docker compose -f docker-compose.yml -f docker-compose.gpu-vulkan.yml up -d` — `/dev/dri` passed, the container user joins the host's `render` group; `STT_DEVICE=auto` |
-| macOS / Windows | `docker compose up -d` — CPU-only (no GPU passthrough into Linux containers) |
-
-TPU is out of scope (whisper.cpp has no TPU backend).
-
----
+The Docker section lives in the root README.md (`### Docker`, plus the Docker row and the
+volume backup under "Where your data lives"), written there after item 35 landed; it was
+drafted in this spec until then.
 
 ## Approval log
 

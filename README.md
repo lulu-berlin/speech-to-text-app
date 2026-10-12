@@ -36,10 +36,10 @@ How it works inside — the components, the life of a task, the data model, the 
 | --- | --- | --- |
 | [Packaged app with Nix](#packaged-app-with-nix) | Using the app | available |
 | [Development environment (devenv)](#development-environment-devenv) | Working on the app | available |
-| [Docker](#docker) | Using the app without Nix | planned ([roadmap item 19](roadmap/19-docker-image-and-compose.md)) |
+| [Docker](#docker) | Using the app without Nix | available |
 | [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | planned ([roadmap item 33](roadmap/33-gradle-bootstrap-without-nix.md)) |
 
-All ways need **Linux on x86-64**. A GPU is optional: whisper.cpp runs on any GPU with a **Vulkan** driver and falls back to the CPU otherwise. The first build of the package or the development shell downloads about 600 MB of models.
+All ways need **Linux on x86-64**. A GPU is optional: whisper.cpp runs on any GPU with a **Vulkan** driver and falls back to the CPU otherwise. The first build of the package, the development shell or the Docker image downloads about 600 MB of models.
 
 ### Packaged app with Nix
 
@@ -83,7 +83,31 @@ Then open <http://localhost:8080>. Tests and the other commands are in [AGENTS.m
 
 ### Docker
 
-Not available yet. [Roadmap item 19](roadmap/19-docker-image-and-compose.md) adds a Docker image and a `docker-compose.yml`, with GPU passthrough, and documents it here.
+Prerequisites: Docker with Compose v2. Nothing else: the image is built on your machine from this repository's Nix flake, inside a `nixos/nix` build container, so the host needs no Nix; nothing is pulled from or pushed to an app registry. On macOS and Windows, Docker Desktop runs the Linux image on the CPU only.
+
+```sh
+git clone https://github.com/lulu-berlin/speech-to-text-app.git
+cd speech-to-text-app
+docker compose up -d --build
+```
+
+Then open <http://localhost:8080>. The first build takes a while (about 11 minutes on the machine it was tested on: it downloads the pinned nixpkgs and the models and runs the backend's tests); later builds reuse Docker's cache until the flake or the sources change. The image is about 3.3 GB.
+
+- `docker compose ps` — the status; a healthcheck calls `GET /api/health`.
+- `docker compose logs -f stt-app` — the app's log.
+- `docker compose stop` / `docker compose start` — a task interrupted by `stop` continues after `start`.
+- `docker compose down` — removes the container; the data stays in the `stt-data` volume ([Where your data lives](#where-your-data-lives)). `docker compose down -v` deletes it.
+
+The container runs as an unprivileged user (uid 1000) and writes only to its data volume and scratch space.
+
+**GPU.** `docker-compose.yml` alone runs on the CPU. An override file adds a GPU; the Settings page then lists the GPUs the container sees, and the default device (automatic) uses the first one.
+
+| GPU | The host needs | Start with |
+| --- | --- | --- |
+| NVIDIA | the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html) with a CDI spec — on NixOS `hardware.nvidia-container-toolkit.enable = true;`, elsewhere `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml` | `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up -d` |
+| Intel / AMD | only the kernel's GPU driver: the image brings Mesa's Vulkan drivers | `STT_RENDER_GID=$(getent group render \| cut -d: -f3) docker compose -f docker-compose.yml -f docker-compose.gpu-vulkan.yml up -d` |
+
+`STT_RENDER_GID` lets the container's user open the render device. Both variants were tested on NixOS (an AMD Radeon iGPU and an NVIDIA RTX 3050); NVIDIA on other distributions is untested. Details: [roadmap item 19](roadmap/19-docker-image-and-compose.md).
 
 ### Gradle without Nix
 
@@ -114,6 +138,7 @@ Everything the app keeps — the queue, the transcripts, the speaker names and t
 | Nix package | `$STT_DATA_DIR` if set, else `${XDG_DATA_HOME:-~/.local/share}/stt-app` |
 | `devenv up` and the devenv shell | `.devenv/state/stt` inside the repository (git-ignored, survives restarts) |
 | `gradle run` | `$STT_DATA_DIR`, which you choose |
+| Docker | the named volume `stt-data`, mounted at `/data` in the container |
 
 Inside it:
 
@@ -122,6 +147,15 @@ Inside it:
 - `tmp/` — upload spools and the playback cache; cleared on every start.
 
 **Backup**: stop the app, then copy the whole directory (`tmp/` may be left out). Restore by copying it back while the app is stopped. Copying only `stt.db` is not enough: the write-ahead log and the originals in `work/` are part of the state ([ADR 0017](docs/decisions/0017-database-location-and-connection-contract.md), [ADR 0024](docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md)). If the app stops while a task runs, that task continues from its last finished chunk on the next start.
+
+With Docker, back up the volume while the app is stopped, and restore it the same way (the restored files belong to the container's user, uid 1000):
+
+```sh
+docker compose stop
+docker run --rm -v stt-data:/data:ro -v "$PWD":/backup alpine:3 tar czf /backup/stt-data.tar.gz -C /data .
+# restore: docker run --rm --user 1000:1000 -v stt-data:/data -v "$PWD":/backup alpine:3 tar xzf /backup/stt-data.tar.gz -C /data
+docker compose start
+```
 
 ## Documentation
 

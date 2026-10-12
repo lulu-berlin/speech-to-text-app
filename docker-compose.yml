@@ -1,4 +1,5 @@
-# docker-compose setup (roadmap item 19): one service, CPU by default.
+# docker-compose setup (roadmap item 19): one service, CPU by default — no GPU is passed
+# in, so the Settings page's device (automatic by default) finds none and uses the CPU.
 #
 # The GPU variants are override files layered on top of this one, so every variant is the
 # same service: `down`, `exec stt-app`, `logs` work identically, and no second container
@@ -24,8 +25,6 @@ services:
       - "8080:8080"
     environment:
       STT_DATA_DIR: /data
-      # CPU by default (whisper-cli gets --no-gpu); the GPU overrides set auto.
-      STT_DEVICE: cpu
     volumes:
       - stt-data:/data
     healthcheck:

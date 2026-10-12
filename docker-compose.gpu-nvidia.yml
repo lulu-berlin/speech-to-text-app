@@ -5,11 +5,10 @@
 # NixOS `hardware.nvidia-container-toolkit.enable = true;` generates it; elsewhere
 # `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`. Docker must have CDI enabled
 # (`"features": {"cdi": true}` in daemon.json where it is not the default). The toolkit
-# mounts the driver, including its Vulkan ICD, so the closure's Vulkan whisper-cli runs
-# on the GPU with STT_DEVICE=auto.
+# mounts the driver (including its Vulkan ICD); the image brings the libraries it links
+# (flake output docker-gpu-runtime). The Settings page then lists the GPU, and the device
+# setting's default (automatic) uses it.
 services:
   stt-app:
-    environment:
-      STT_DEVICE: auto
     devices:
       - nvidia.com/gpu=all
