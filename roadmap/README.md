@@ -83,6 +83,10 @@ graph TD
   37 --> 35[35 README and architecture overview]
   38 --> 35[35 README and architecture overview]
   39[39 devenv/doc drift: playwright comment ✓]:::done
+  11 --> 40[40 atomic task transitions]
+  12 --> 41[41 upload hardening]
+  11 --> 42[42 worker stability]
+  11 --> 43[43 diarization memory]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -129,3 +133,7 @@ graph TD
 | [37 — Audio request 500: the joiner shares the engine's single-flight runner](../docs/specs/audio-join-isolation.md) | done | 15 |
 | [38 — Joined playback stalls at ~90 s of a long clip](38-joined-playback-stalls.md) | spec-approved | 15 |
 | [39 — devenv/doc drift: the playwright version comment](../docs/specs/playwright-version-sync.md) | done | 16 |
+| [40 — Task transitions are not atomic (pause/resume race a finishing task)](40-atomic-task-transitions.md) | draft | 11 |
+| [41 — Upload hardening: duplicate race, size limit, spool cleanup](41-upload-hardening.md) | draft | 12 |
+| [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | draft | 11 |
+| [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
