@@ -1,0 +1,14 @@
+# Intel/AMD Vulkan override (roadmap item 19), layered on docker-compose.yml:
+#   STT_RENDER_GID=$(getent group render | cut -d: -f3) \
+#     docker compose -f docker-compose.yml -f docker-compose.gpu-vulkan.yml up -d
+#
+# Passes the host's DRM devices. The app runs as uid 1000 and /dev/dri/renderD* belongs
+# to the host's `render` group, whose id differs per host, so it is passed in.
+services:
+  stt-app:
+    environment:
+      STT_DEVICE: auto
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${STT_RENDER_GID:?set STT_RENDER_GID to the host render group id (getent group render)}"

@@ -1,71 +1,39 @@
-# docker-compose setup (roadmap item 19). One service, three profiles:
+# docker-compose setup (roadmap item 19): one service, CPU by default.
 #
-#   default (CPU)     — any host; STT_DEVICE=cpu (the image's whisper-cli is the
-#                       closure's Vulkan build; the CPU profile disables it).
-#   gpu-nvidia        — host NVIDIA GPUs via the NVIDIA Container Toolkit: compose's
-#                       deploy.resources.reservations.devices with driver nvidia is
-#                       the `--gpus all` story; whisper runs on the GPU through the
-#                       driver's Vulkan ICD (STT_DEVICE=auto).
-#   gpu-vulkan        — /dev/dri passed to the container for Intel/AMD Vulkan
-#                       (STT_DEVICE=auto).
+# The GPU variants are override files layered on top of this one, so every variant is the
+# same service: `down`, `exec stt-app`, `logs` work identically, and no second container
+# competes for 8080 (compose profiles were tried first and could not do that: a service
+# without a profile always starts too):
 #
-# Data lives in the named volume stt-data mounted at /data (STT_DATA_DIR); the
-# container runs as the non-root stt user (uid 1000) and writes only there. The
-# healthcheck uses curl from the image's closure (flake.nix) against the app's own
-# /api/health. init: true makes docker-init (a static tini) PID 1 so orphaned
-# process trees are reaped (ADR 0020).
+#   docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up -d
+#   STT_RENDER_GID=$(getent group render | cut -d: -f3) \
+#     docker compose -f docker-compose.yml -f docker-compose.gpu-vulkan.yml up -d
 #
-# The GPU profiles replace the default CPU service (compose always starts profile-less
-# services too, and the three share the 8080 mapping), so switch with
-# `docker compose down` in between — see the README's GPU matrix.
-
-x-app: &app
-  image: stt-app:local
-  build: .
-  init: true
-  restart: unless-stopped
-  ports:
-    - "8080:8080"
-  environment:
-    STT_DATA_DIR: /data
-  volumes:
-    - stt-data:/data
-  healthcheck:
-    test: ["CMD", "curl", "-fs", "http://localhost:8080/api/health"]
-    interval: 30s
-    timeout: 5s
-    retries: 3
-    start_period: 30s
+# Data lives in the named volume stt-data mounted at /data (STT_DATA_DIR); the container
+# runs as the non-root stt user (uid 1000) and writes only there. The healthcheck uses
+# curl from the image's closure (flake.nix) against the app's own /api/health. init: true
+# makes docker-init (a static tini) PID 1 so orphaned process trees are reaped (ADR 0020).
 
 services:
   stt-app:
-    <<: *app
+    image: stt-app:local
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
     environment:
       STT_DATA_DIR: /data
+      # CPU by default (whisper-cli gets --no-gpu); the GPU overrides set auto.
       STT_DEVICE: cpu
-
-  stt-app-gpu-nvidia:
-    <<: *app
-    profiles: ["gpu-nvidia"]
-    environment:
-      STT_DATA_DIR: /data
-      STT_DEVICE: auto
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: ["gpu"]
-
-  stt-app-gpu-vulkan:
-    <<: *app
-    profiles: ["gpu-vulkan"]
-    environment:
-      STT_DATA_DIR: /data
-      STT_DEVICE: auto
-    devices:
-      - "/dev/dri:/dev/dri"
+    volumes:
+      - stt-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   stt-data:

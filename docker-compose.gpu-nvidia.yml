@@ -1,0 +1,15 @@
+# NVIDIA override (roadmap item 19), layered on docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up -d
+#
+# The host needs the NVIDIA Container Toolkit with a CDI spec for `nvidia.com/gpu`: on
+# NixOS `hardware.nvidia-container-toolkit.enable = true;` generates it; elsewhere
+# `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`. Docker must have CDI enabled
+# (`"features": {"cdi": true}` in daemon.json where it is not the default). The toolkit
+# mounts the driver, including its Vulkan ICD, so the closure's Vulkan whisper-cli runs
+# on the GPU with STT_DEVICE=auto.
+services:
+  stt-app:
+    environment:
+      STT_DEVICE: auto
+    devices:
+      - nvidia.com/gpu=all
