@@ -4,7 +4,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -39,6 +41,9 @@ internal class FakeTranscriber : Transcriber {
 
     /** The chunk fractions every call reports through `onProgress`, in order, before it returns. */
     var progressScript: List<Double> = emptyList()
+
+    /** True once a call reported progress from the reader coroutine (item 46's contextual-logging seam). */
+    var progressReaderLogged = false
 
     /**
      * When set, a cancelled call does not die at once: it reports itself on [dyingStarted] and waits for
@@ -93,7 +98,17 @@ internal class FakeTranscriber : Transcriber {
                 failNext = null
                 throw failure
             }
-            progressScript.forEach(onProgress)
+            // The whisper progress arrives on a reader coroutine (ProcessRunner's async(Dispatchers.IO)
+            // reader), item 46's deep-leak test: log and report from that coroutine, which the task
+            // job does not own directly — the MDC must be inherited by the child.
+            coroutineScope {
+                val reader = async(Dispatchers.IO) {
+                    logger.info("progress reader for {}", audio)
+                    progressReaderLogged = true
+                    progressScript.forEach(onProgress)
+                }
+                reader.await()
+            }
             if (gpuUnavailable && settings.device is Device.Gpu) onGpuUnavailable()
             segmentsByTask[taskIdOf(audio.parent)].orEmpty()
         }

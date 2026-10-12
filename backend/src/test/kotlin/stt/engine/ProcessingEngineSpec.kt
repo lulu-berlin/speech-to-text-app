@@ -142,4 +142,25 @@ class ProcessingEngineSpec :
                 }
             }
         }
+
+        given("a task whose progress is reported from a reader coroutine") {
+            `when`("the reader logs while the task runs") {
+                then("the reader's event carries the task's id: the child coroutine inherited the context") {
+                    withEngineDatabase { dataDir, db ->
+                        withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { events ->
+                            val fixture = engineUnderTest(dataDir, db)
+                            val task =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "reader.wav", queuePosition = 0, createdAt = 1)
+                            fixture.transcriber.progressScript = listOf(0.5, 1.0)
+                            fixture.engine.start()
+                            fixture.completed.receive() shouldBe task
+
+                            fixture.transcriber.progressReaderLogged shouldBe true
+                            events.shouldNotBeEmpty()
+                            events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                        }
+                    }
+                }
+            }
+        }
     })
