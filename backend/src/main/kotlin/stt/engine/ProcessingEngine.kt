@@ -118,12 +118,12 @@ class ProcessingEngine internal constructor(
     private var running: Running? = null
 
     /**
-     * Starts the single worker coroutine; it runs until [scope] is cancelled. Before it picks anything up,
-     * tasks whose crash left them RUNNING are queued again (ADR 0004), so the worker resumes them from
-     * their stored plans instead of leaving them stuck.
+     * Starts the single worker coroutine, named `engine-worker` (item 46); it runs until [scope] is cancelled.
+     * Before it picks anything up, tasks whose crash left them RUNNING are queued again (ADR 0004), so the
+     * worker resumes them from their stored plans instead of leaving them stuck.
      */
     fun start() {
-        scope.launch {
+        scope.launch(CoroutineName("engine-worker")) {
             tasks.recoverRunning()
             cleanupWorkDirectories()
             workerLoop()

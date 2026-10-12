@@ -8,6 +8,9 @@ import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import org.slf4j.Logger
@@ -333,6 +336,33 @@ class ProcessingEngineSpec :
                 }
             }
         }
+
+        given("a started engine with one queued task") {
+            `when`("the task is held mid-transcription, then completes") {
+                then("the worker runs as engine-worker beside task-<id>, and stays after the task's job is gone") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val hold = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = hold
+                        fixture.engine.start()
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe task
+
+                        // The names a coroutine dump shows for the engine's scope (item 46).
+                        namedEngineCoroutines().toSet() shouldBe setOf("engine-worker", "task-$task")
+
+                        hold.complete(Unit)
+                        fixture.completed.receive() shouldBe task
+                        pumpUntil(5.seconds) { namedEngineCoroutines() == listOf("engine-worker") }
+                        namedEngineCoroutines() shouldBe listOf("engine-worker")
+                    }
+                }
+            }
+        }
     })
 
 /** At least one event was captured, and every one carries [task]'s id in its MDC map (item 46). */
@@ -353,3 +383,9 @@ private val outsideTheTaskJobs: Logger = LoggerFactory.getLogger(OUTSIDE_THE_TAS
 private suspend fun TestScope.logOutsideTheTaskJobs(message: String) {
     backgroundScope.launch { outsideTheTaskJobs.info(message) }.join()
 }
+
+/** The names of the live coroutines of the engine's scope that have one (each launched job is its own scope). */
+private fun TestScope.namedEngineCoroutines(): List<String> =
+    backgroundScope.coroutineContext.job.children
+        .mapNotNull { (it as CoroutineScope).coroutineContext[CoroutineName]?.name }
+        .toList()
