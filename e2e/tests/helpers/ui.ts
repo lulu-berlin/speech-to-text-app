@@ -114,6 +114,17 @@ export async function taskIdOf(page: Page, filename: string): Promise<string> {
   return href?.split('/').pop() ?? '';
 }
 
+// The task id of `filename` on the shared backend, from the task list API: an upload that
+// is still in the queue has no History card yet, so taskIdOf cannot read it from the DOM.
+export async function apiTaskIdOf(page: Page, filename: string): Promise<number> {
+  const list = await (await page.request.get(appUrl('/api/tasks'))).json();
+  const task = list.tasks.find(
+    (candidate: { filename: string }) => candidate.filename === filename,
+  );
+  expect(task, `task ${filename} to exist`).toBeTruthy();
+  return task.id;
+}
+
 // Switches view through the header navigation (finish notices carry their own links).
 export async function goTo(page: Page, view: 'Queue' | 'History') {
   await page.getByRole('navigation').getByRole('link', { name: view }).click();

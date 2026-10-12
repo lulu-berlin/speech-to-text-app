@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { COMPLETED_PLAYER_CLIP, TRANSCRIBING_BACKGROUND_CLIP, appUrl } from '../lib/backend.mjs';
-import { appLive, goTo, openTranscript, rowOf, uploadClips } from './helpers/ui';
+import { apiTaskIdOf, appLive, goTo, openTranscript, rowOf, uploadClips } from './helpers/ui';
 
 // Item 37 (ADR 0046): a completed transcript's player used to fetch /audio 500 whenever
 // the engine held its single-flight runner with another task — the joiner shared that
@@ -61,13 +61,3 @@ test('a completed player has playable audio while another task transcribes', asy
     .click();
   await expect(transcribing).toHaveCount(0);
 });
-
-/** The task id of [filename] on the shared backend, from the task list. */
-async function apiTaskIdOf(page: Page, filename: string): Promise<number> {
-  const list = await (await page.request.get(appUrl('/api/tasks'))).json();
-  const task = list.tasks.find(
-    (candidate: { filename: string }) => candidate.filename === filename,
-  );
-  expect(task, `task ${filename} to exist`).toBeTruthy();
-  return task.id;
-}
