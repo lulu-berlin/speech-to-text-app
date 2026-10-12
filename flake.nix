@@ -39,8 +39,9 @@
     # versions the flake builds with, rendered into the committed versions.json by the
     # update-versions app below. Node/pnpm/gradle/jdk/ffmpeg come from this nixpkgs
     # rev (ADR 0036), whisper-cpp and the prebuilt tool downloads from
-    # nix/versions.nix, the models from nix/models.nix (whose derivations are built
-    # from the same table). The versions-sync check fails when versions.json drifts.
+    # nix/versions.nix, the models from nix/models.nix and the e2e test fixtures from
+    # nix/test-fixtures.nix (whose derivations are built from the same tables). The
+    # versions-sync check fails when versions.json drifts.
     versions = let
       data = import ./nix/versions.nix;
     in {
@@ -53,6 +54,7 @@
       whisperCpp = data.whisperCppTag;
       models = models.meta;
       downloads = data.downloads;
+      fixtures = (import ./nix/test-fixtures.nix {inherit pkgs;}).meta;
     };
     versionsJson = pkgs.writeText "versions.json" (builtins.toJSON versions);
 

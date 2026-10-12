@@ -30,6 +30,12 @@
     }
   },
   "ffmpeg": "8.1",
+  "fixtures": {
+    "jfkWav": {
+      "sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+      "url": "https://raw.githubusercontent.com/ggml-org/whisper.cpp/v1.9.2/samples/jfk.wav"
+    }
+  },
   "gradle": "9.8.0",
   "jdk": "21.0.12.1+1",
   "models": {

@@ -37,7 +37,11 @@ if (!required) fail('e2e/package.json has no @playwright/test devDependency');
 
 // 3. What the store actually provides.
 const store = process.env.PLAYWRIGHT_BROWSERS_PATH;
-if (!store) fail('PLAYWRIGHT_BROWSERS_PATH is not set (devenv.nix sets it; re-enter the shell)');
+if (!store) {
+  fail(
+    'PLAYWRIGHT_BROWSERS_PATH is not set (devenv.nix sets it; re-enter the shell — without Nix, ./gradlew e2e sets it)',
+  );
+}
 let storeRevision;
 try {
   const chromium = readdirSync(store).find((entry) => /^chromium-\d+$/.test(entry));

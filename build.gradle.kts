@@ -299,3 +299,78 @@ tasks.register<Exec>("run") {
 // on PATH (ADR 0047), and a user-set STT_* wins, otherwise the default comes from
 // versions.json/the manifest (like the packaged wrapper's --set-default).
 fun applyAppEnv(task: Exec) = appEnv().forEach { (k, v) -> task.environment(k, requireNotNull(v)) }
+
+// ---- e2e: the item-21 Playwright suite without Nix (roadmap item 33, discovered) ----
+// Gradle provides what the devenv otherwise sets: the pinned fixtures, the managed
+// tools on PATH, the browsers and the backend command. A user-set variable wins.
+val e2eDir = rootProject.file("e2e")
+val pnpmExe = File(nodeInstallDir(), "pnpm/pnpm-v${manifest["pnpm"]}/bin/pnpm")
+val fixtures = manifest["fixtures"] as Map<*, *>
+
+// The cache file for a versions.json asset: <dir>/<sha256-prefix>-<URL file name>.
+fun assetCacheFile(dir: String, entry: Map<*, *>): File {
+    val sha = entry["sha256"] as String
+    val fileName = URI(entry["url"] as String).path.substringAfterLast('/')
+    return File(sttCache, "$dir/${sha.take(12)}-$fileName")
+}
+
+val jfkWavFile = assetCacheFile("fixtures", fixtures["jfkWav"] as Map<*, *>)
+val tinyModelFile = assetCacheFile("models", models["whisperTinyEn"] as Map<*, *>)
+// Playwright's own browser download, shared across clones like the other tools.
+val playwrightBrowsers = System.getenv("PLAYWRIGHT_BROWSERS_PATH") ?: File(sttCache, "ms-playwright").absolutePath
+
+// The suite's environment: the app's (managed tools and node/pnpm on PATH, JDK 21, the
+// speaker model) plus the fixtures, the browsers and the backend command.
+fun applyE2eEnv(task: Exec) {
+    applyAppEnv(task)
+    task.environment("PLAYWRIGHT_BROWSERS_PATH", playwrightBrowsers)
+    task.environment("TEST_JFK_WAV", System.getenv("TEST_JFK_WAV") ?: jfkWavFile.absolutePath)
+    task.environment("TEST_WHISPER_TINY_EN_MODEL", System.getenv("TEST_WHISPER_TINY_EN_MODEL") ?: tinyModelFile.absolutePath)
+    // The installed backend `run` starts, relative to the repository root (the harness's
+    // working directory), so a checkout path with spaces cannot break the command line.
+    task.environment("E2E_BACKEND_CMD", System.getenv("E2E_BACKEND_CMD") ?: backendMain.relativeTo(rootProject.projectDir).path)
+    task.workingDir = e2eDir
+}
+
+tasks.register("prepareE2eFixtures") {
+    group = "verification"
+    description = "Download and sha256-verify the e2e fixtures from versions.json (jfk.wav, the tiny whisper model) into the Gradle user home"
+    doLast {
+        for ((entry, target) in listOf(fixtures["jfkWav"] to jfkWavFile, models["whisperTinyEn"] to tinyModelFile)) {
+            entry as Map<*, *>
+            downloadVerified(entry["url"] as String, entry["sha256"] as String, target)
+        }
+    }
+}
+
+tasks.register<Exec>("e2eInstall") {
+    group = "verification"
+    description = "Install the e2e package's dependencies (frozen lockfile) with the managed pnpm"
+    dependsOn("prepareRuntime", ":frontend:pnpmSetup")
+    doFirst {
+        applyE2eEnv(this as Exec)
+        setCommandLine(pnpmExe.absolutePath, "install", "--frozen-lockfile")
+    }
+}
+
+tasks.register<Exec>("e2eBrowsers") {
+    group = "verification"
+    description = "Download the Chromium the e2e package's Playwright expects into the Gradle user home"
+    dependsOn("e2eInstall")
+    // A user-set PLAYWRIGHT_BROWSERS_PATH (the devenv's read-only Nix browser farm) is used as is.
+    onlyIf { System.getenv("PLAYWRIGHT_BROWSERS_PATH") == null }
+    doFirst {
+        applyE2eEnv(this as Exec)
+        setCommandLine(pnpmExe.absolutePath, "exec", "playwright", "install", "chromium")
+    }
+}
+
+tasks.register<Exec>("e2e") {
+    group = "verification"
+    description = "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: 'playwright install-deps chromium')"
+    dependsOn("prepareRuntime", "prepareE2eFixtures", "e2eBrowsers", backendInstallDist, ":frontend:frontendBuild")
+    doFirst {
+        applyE2eEnv(this as Exec)
+        setCommandLine(pnpmExe.absolutePath, "test")
+    }
+}

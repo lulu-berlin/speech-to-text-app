@@ -139,19 +139,17 @@ export function appUrl(path = '/') {
   return `http://127.0.0.1:${loadState().port}${path}`;
 }
 
+// Without Nix, `./gradlew e2e` sets all of these (roadmap item 33).
 export function checkPreconditions() {
+  const setBy = 'run inside the devenv shell (devenv.nix sets it) or use ./gradlew e2e';
   if (!process.env.TEST_WHISPER_TINY_EN_MODEL) {
-    throw new Error(
-      'TEST_WHISPER_TINY_EN_MODEL is unset — run inside the devenv shell (devenv.nix sets it)',
-    );
+    throw new Error(`TEST_WHISPER_TINY_EN_MODEL is unset — ${setBy}`);
   }
   if (!process.env.STT_SPEAKER_MODEL) {
-    throw new Error(
-      'STT_SPEAKER_MODEL is unset — run inside the devenv shell (devenv.nix sets it)',
-    );
+    throw new Error(`STT_SPEAKER_MODEL is unset — ${setBy}`);
   }
   if (!process.env.TEST_JFK_WAV) {
-    throw new Error('TEST_JFK_WAV is unset — run inside the devenv shell (devenv.nix sets it)');
+    throw new Error(`TEST_JFK_WAV is unset — ${setBy}`);
   }
   if (!process.env.E2E_BACKEND_CMD && !existsSync(join(frontendDist, 'index.html'))) {
     throw new Error(
