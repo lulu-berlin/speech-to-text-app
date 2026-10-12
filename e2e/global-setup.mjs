@@ -51,7 +51,7 @@ export default async function globalSetup() {
     { args: ['-stream_loop', '13'], file: FIXTURE_CLIPS[22] }, // ~154s, item 36's follow-mode e2e
     { args: ['-ss', '3', '-t', '2'], file: FIXTURE_CLIPS[23] }, // 3-5s, item 37's completed player clip
     { args: ['-stream_loop', '5'], file: FIXTURE_CLIPS[24] }, // ~55s, item 37's background transcription
-    { args: ['-stream_loop', '6'], file: FIXTURE_CLIPS[25] }, // ~66s, item 40's atomic-transitions race clip
+    { args: ['-stream_loop', '9'], file: FIXTURE_CLIPS[25] }, // ~110s, item 40's atomic-transitions race clip
     { args: ['-ss', '6', '-t', '3'], file: FIXTURE_CLIPS[26] }, // 6-9s, item 40's queue-is-live follow-up
   ];
   for (const { args, file } of recipes) {

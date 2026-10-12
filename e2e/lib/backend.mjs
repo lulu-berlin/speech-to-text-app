@@ -59,7 +59,7 @@ export const FIXTURE_CLIPS = [
   'jfk-follow.wav', // the sample looped 14x, ~154s (item 36)
   'jfk-q.wav', // 3-5s, item 37's completed player clip
   'jfk-r.wav', // the sample looped 5x, ~55s, item 37's background transcription
-  'jfk-s.wav', // the sample looped 6x, ~66s, item 40's atomic-transitions race clip
+  'jfk-s.wav', // the sample looped 9x, ~110s, item 40's atomic-transitions race clip
   'jfk-u.wav', // 6-9s, item 40's queue-is-live follow-up
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
@@ -105,7 +105,7 @@ export const TRANSCRIBING_BACKGROUND_CLIP = FIXTURE_CLIPS[24]; // the sample loo
 // pause/resume/cancel race, and a short trim whose completion proves the queue kept
 // working. Unique bytes: jfk-r (5x), jfk-k (7x), jfk-n (8x), jfk-long (12x) and
 // jfk-follow (14x) are other tests' loops, and 6-9s is no existing trim.
-export const ATOMIC_RACE_CLIP = FIXTURE_CLIPS[25]; // the sample looped 6x, ~66s
+export const ATOMIC_RACE_CLIP = FIXTURE_CLIPS[25]; // the sample looped 9x, ~110s
 export const ATOMIC_NEXT_CLIP = FIXTURE_CLIPS[26]; // 6-9s
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
