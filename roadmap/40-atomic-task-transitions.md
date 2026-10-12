@@ -31,7 +31,7 @@ The mechanism is conditional updates on the command writes (pause, resume) plus 
 
 ## Test list (proposed; behaviors only)
 
-- [x-pending] A pause racing a completion leaves the task COMPLETED and the queue keeps working (deterministic concurrency test)
+- [ ] A pause racing a completion leaves the task COMPLETED and the queue keeps working (deterministic concurrency test)
 - [ ] A resume racing a cancel ends in exactly one of the two states, consistently, and the queue stays live
 - [ ] Delete racing a completion: the row still goes and the file is freed (the current cancel-guard behavior pinned)
 - [ ] Pausing a task whose row is no longer in the paused-able state is rejected, never a dead `PAUSED`
