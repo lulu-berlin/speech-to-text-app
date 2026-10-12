@@ -143,21 +143,11 @@ class AudioJoinIntegrationSpec :
                             800L,
                         )
 
-                    testApplication {
-                        application {
-                            // No joiner override: unlike the unit specs' RecordingJoiner, the app's own
-                            // FfmpegAudioJoiner and JoinedAudioCache build and serve the file for real.
-                            sttApp(stt.config.testConfig(dataDir))
-                        }
-
-                        val served = client.get("/api/tasks/$id/audio")
-                        served.status shouldBe HttpStatusCode.OK
-                        val file = dataDir.resolve("served.flac")
-                        Files.write(file, served.bodyAsBytes())
-                        // The player's timeline comes from the task's durationMs, playback from the file's
-                        // header; they must agree — 800 ms × 16 kHz = 12 800 samples, no longer, by hand.
-                        ffprobe(runner, file, "stream=duration_ts").single().toLong() shouldBe 12_800L
-                    }
+                    val file = dataDir.resolve("served.flac")
+                    Files.write(file, servedAudioBytes(dataDir, id))
+                    // The player's timeline comes from the task's durationMs, playback from the file's
+                    // header; they must agree — 800 ms × 16 kHz = 12 800 samples, no longer, by hand.
+                    ffprobe(runner, file, "stream=duration_ts").single().toLong() shouldBe 12_800L
                 }
             }
         }
@@ -177,18 +167,16 @@ class AudioJoinIntegrationSpec :
                             800L,
                         )
 
+                    val file = dataDir.resolve("served.flac")
+                    Files.write(file, servedAudioBytes(dataDir, id))
+                    val size = Files.size(file)
+                    // The tail window a browser's end-seek reads: the last 8 KiB of the served file.
+                    val tailStart = size.coerceAtLeast(8_192L) - 8_192L
+
                     testApplication {
                         application {
                             sttApp(stt.config.testConfig(dataDir))
                         }
-
-                        val whole = client.get("/api/tasks/$id/audio")
-                        whole.status shouldBe HttpStatusCode.OK
-                        val file = dataDir.resolve("served.flac")
-                        Files.write(file, whole.bodyAsBytes())
-                        val size = Files.size(file)
-                        // The tail window a browser's end-seek reads: the last 8 KiB of the served file.
-                        val tailStart = size.coerceAtLeast(8_192L) - 8_192L
 
                         val tailRequest =
                             client.get("/api/tasks/$id/audio") {
@@ -283,6 +271,27 @@ private suspend fun seedCompletedTask(
         tasks.setDurationMs(id, durationMs)
         id
     }
+
+/**
+ * GETs the task's whole `/audio` through the app serving [dataDir] and returns the served bytes. The app's own
+ * [FfmpegAudioJoiner] and [JoinedAudioCache] build and serve the file for real — no joiner override, unlike the
+ * unit specs' `RecordingJoiner`.
+ */
+private suspend fun servedAudioBytes(
+    dataDir: Path,
+    id: Long,
+): ByteArray {
+    var bytes: ByteArray? = null
+    testApplication {
+        application {
+            sttApp(stt.config.testConfig(dataDir))
+        }
+        val served = client.get("/api/tasks/$id/audio")
+        served.status shouldBe HttpStatusCode.OK
+        bytes = served.bodyAsBytes()
+    }
+    return bytes ?: throw IllegalStateException("no /audio bytes were served for task $id")
+}
 
 /**
  * Decodes [file] to raw s16le and returns its sample count — what a player really gets out of the file,
