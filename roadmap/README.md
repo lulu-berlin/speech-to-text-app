@@ -134,7 +134,7 @@ graph TD
 | [35 — README and architecture overview](../docs/specs/readme-and-architecture.md) | done | 21 |
 | [36 — Follow mode stops by itself (hold-off race)](../docs/specs/follow-mode-hold-off-race.md) | done | 15, 21 |
 | [37 — Audio request 500: the joiner shares the engine's single-flight runner](../docs/specs/audio-join-isolation.md) | done | 15 |
-| [38 — Joined playback stalls at ~90 s of a long clip](38-joined-playback-stalls.md) | spec-approved | 15 |
+| [38 — Joined playback stalls at ~90 s of a long clip](../docs/specs/joined-playback-stalls.md) | done | 15 |
 | [39 — devenv/doc drift: the playwright version comment](../docs/specs/playwright-version-sync.md) | done | 16 |
 | [40 — Task transitions are not atomic (pause/resume race a finishing task)](40-atomic-task-transitions.md) | draft | 11 |
 | [41 — Upload hardening: duplicate race, size limit, spool cleanup](41-upload-hardening.md) | draft | 12 |
