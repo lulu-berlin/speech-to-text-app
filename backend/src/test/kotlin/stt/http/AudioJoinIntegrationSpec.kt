@@ -4,9 +4,12 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsBytes
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import stt.Integration
@@ -154,6 +157,55 @@ class AudioJoinIntegrationSpec :
                         // The player's timeline comes from the task's durationMs, playback from the file's
                         // header; they must agree — 800 ms × 16 kHz = 12 800 samples, no longer, by hand.
                         ffprobe(runner, file, "stream=duration_ts").single().toLong() shouldBe 12_800L
+                    }
+                }
+            }
+        }
+
+        given("a completed task whose joined FLAC a player would seek near its end (queue paused)") {
+            `when`("a Range request for the file's tail hits the route") {
+                then("the exact tail bytes are served, and they are the last audio frames, not a stall") {
+                    val runner = ProcessRunner()
+                    val dataDir = tempdir("stt-range-tail").toPath()
+                    val id =
+                        seedCompletedTask(
+                            dataDir,
+                            listOf(
+                                PlannedChunk(0L, 300L) to sineFlac(dataDir, "chunk-0", "440", "0.3"),
+                                PlannedChunk(300L, 800L) to sineFlac(dataDir, "chunk-1", "880", "0.5"),
+                            ),
+                            800L,
+                        )
+
+                    testApplication {
+                        application {
+                            sttApp(stt.config.testConfig(dataDir))
+                        }
+
+                        val whole = client.get("/api/tasks/$id/audio")
+                        whole.status shouldBe HttpStatusCode.OK
+                        val file = dataDir.resolve("served.flac")
+                        Files.write(file, whole.bodyAsBytes())
+                        val size = Files.size(file)
+                        // The tail window a browser's end-seek reads: the last 8 KiB of the served file.
+                        val tailStart = size.coerceAtLeast(8_192L) - 8_192L
+
+                        val tailRequest =
+                            client.get("/api/tasks/$id/audio") {
+                                header(HttpHeaders.Range, "bytes=$tailStart-")
+                            }
+                        tailRequest.status shouldBe HttpStatusCode.PartialContent
+                        tailRequest.headers[HttpHeaders.ContentRange] shouldBe "bytes $tailStart-${size - 1}/$size"
+                        val tail = Files.readAllBytes(file).copyOfRange(tailStart.toInt(), size.toInt())
+                        tailRequest.bodyAsBytes() shouldBe tail
+
+                        // The slice is playable audio, not a stall: prepend the file's own header (everything
+                        // before the first frame) and the tail decodes to non-zero samples — a browser's seek
+                        // to the end lands in real audio.
+                        val headerSize = ffprobe(runner, file, "packet=pos").first().toLong()
+                        val probe = dataDir.resolve("tail-probe.flac")
+                        Files.write(probe, Files.readAllBytes(file).copyOf(headerSize.toInt()).plus(tail))
+                        decodeSamples(runner, dataDir.resolve("tail-probe.raw"), probe) shouldBeGreaterThan 0L
                     }
                 }
             }
