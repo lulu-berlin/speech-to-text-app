@@ -132,4 +132,14 @@ test('follow mode: long playback never shows "Back to playing position" without 
   await expect.poll(() => activeInView(region)).toBe(true);
   await page.waitForTimeout(500);
   await expect(back).toBeHidden();
+
+  // The clip plays through to its end (item 38): the rounds above left playback near
+  // ~130 s of the 154 s clip, and it must keep going and fire `ended` on its own — the
+  // joined-FLAC stall this item was filed for (playhead frozen at ~90 s, `ended` never
+  // firing) would fail right here. The clip is long, so a short file cannot fake it.
+  const duration = await page.locator('audio').evaluate((audio) => audio.duration);
+  expect(duration).toBeGreaterThan(90);
+  await expect
+    .poll(() => page.locator('audio').evaluate((audio) => audio.ended), { timeout: 90_000 })
+    .toBe(true);
 });
