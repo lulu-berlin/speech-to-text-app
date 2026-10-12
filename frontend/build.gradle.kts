@@ -16,9 +16,11 @@ node {
     download.set(true)
     version.set(manifest["node"] as String)
     pnpmVersion.set(manifest["pnpm"] as String)
-    npmInstallCommand.set("pnpm")
 }
 
+// npmInstallCommand stays at its default, `install`: it names the install subcommand
+// that pnpmInstall runs, not the package manager (setting it to "pnpm" ran
+// `pnpm pnpm --frozen-lockfile`).
 tasks.named<PnpmInstallTask>("pnpmInstall") {
     args.add("--frozen-lockfile")
 }
