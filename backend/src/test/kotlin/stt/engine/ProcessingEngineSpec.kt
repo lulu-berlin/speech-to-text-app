@@ -14,12 +14,17 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import stt.db.SpeakersMode
 import stt.engine.TaskCommandOutcome
+import stt.process.ProcessRunner
 import stt.queue.TaskStatus
+import stt.transcribe.DeviceProbe
 import stt.transcribe.TranscriptionException
 import stt.transcribe.WhisperSegment
 import stt.withCapturedLogs
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
+import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineSpec :
     BehaviorSpec({
@@ -261,6 +266,69 @@ class ProcessingEngineSpec :
                         // Observed from inside the task's transcription call (item 46): the name the coroutine
                         // debugger and dumps show for the task's job.
                         fixture.transcriber.coroutineNames shouldBe listOf("task-$first", "task-$second")
+                    }
+                }
+            }
+        }
+
+        given("a leftover work directory the startup sweep cannot remove, and one queued task") {
+            `when`("the engine starts, and the device probe fails while the task is suspended") {
+                then("the sweep's and the probe's warnings carry no taskId key; the task's own lines carry its id") {
+                    withEngineDatabase { dataDir, db ->
+                        withCapturedLogs("stt.engine.ProcessingEngine") { engineWarnings ->
+                            withCapturedLogs("stt.transcribe.DeviceProbe") { probeWarnings ->
+                                withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { transcriberEvents ->
+                                    val fixture = engineUnderTest(dataDir, db)
+                                    // No task 999 exists, so the sweep deletes its directory; a read-only
+                                    // subdirectory makes that fail, and the sweep warns and skips it.
+                                    val locked = fixture.workDirectories.workDir(999).resolve("locked")
+                                    Files.createDirectories(locked)
+                                    Files.writeString(locked.resolve("kept"), "x")
+                                    Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("r-x------"))
+                                    try {
+                                        val task =
+                                            enqueueTask(
+                                                fixture.tasks,
+                                                fixture.workDirectories,
+                                                "task.wav",
+                                                queuePosition = 0,
+                                                createdAt = 1,
+                                            )
+                                        val hold = CompletableDeferred<Unit>()
+                                        fixture.transcriber.hold = hold
+                                        fixture.engine.start()
+                                        taskIdOf(
+                                            fixture.transcriber.entered
+                                                .receive()
+                                                .parent,
+                                        ) shouldBe task
+
+                                        // The task's job is suspended; the probe (no whisper-cli: the spawn throws,
+                                        // no process starts) runs in a coroutine of the engine's scope.
+                                        val probe =
+                                            DeviceProbe(
+                                                ProcessRunner(2.seconds) { throw IOException("no whisper-cli") },
+                                                Path.of("/m.bin"),
+                                                "/whisper-cli",
+                                            )
+                                        backgroundScope.launch { probe.gpus() }.join()
+                                        hold.complete(Unit)
+                                        fixture.completed.receive() shouldBe task
+
+                                        engineWarnings.map { it.formattedMessage.substringBefore(";") } shouldBe
+                                            listOf("Could not clean up the work directory ${fixture.workDirectories.workDir(999)}")
+                                        probeWarnings.map { it.formattedMessage.substringBefore(";") } shouldBe
+                                            listOf("Device probe failed")
+                                        (engineWarnings + probeWarnings).forEach { event ->
+                                            event.getMDCPropertyMap() shouldNotContainKey "taskId"
+                                        }
+                                        assertTaskIdOnEveryEvent(transcriberEvents, task)
+                                    } finally {
+                                        Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"))
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
