@@ -14,6 +14,7 @@ plugins {
 
 import groovy.json.JsonSlurper
 import org.gradle.jvm.toolchain.JavaLanguageVersion
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.net.URI
@@ -354,9 +355,56 @@ tasks.register<Exec>("e2eBrowsers") {
     }
 }
 
+// Chromium's Linux system libraries come from apt and need root, and a Gradle daemon has
+// no terminal for a sudo prompt. So as root (containers, CI) this installs them; as anyone
+// else it only checks (Playwright's --dry-run simulates the apt install, no root needed)
+// and fails with the sudo line for the missing packages. macOS needs none.
+val runningAsRoot by lazy { providers.exec { commandLine("id", "-u") }.standardOutput.asText.get().trim() == "0" }
+
+tasks.register<Exec>("e2eSystemDeps") {
+    group = "verification"
+    description = "Linux: install Chromium's system libraries for the e2e suite when run as root; otherwise check them and print the sudo apt-get line for the missing ones"
+    dependsOn("e2eInstall")
+    onlyIf { platform.startsWith("linux") }
+    val dryRunOutput = ByteArrayOutputStream()
+    doFirst {
+        applyE2eEnv(this as Exec)
+        if (runningAsRoot) {
+            // Gradle gives the process no terminal, so apt's debconf must not ask anything.
+            environment("DEBIAN_FRONTEND", System.getenv("DEBIAN_FRONTEND") ?: "noninteractive")
+            setCommandLine(pnpmExe.absolutePath, "exec", "playwright", "install-deps", "chromium")
+        } else {
+            setCommandLine(pnpmExe.absolutePath, "exec", "playwright", "install-deps", "--dry-run", "chromium")
+            standardOutput = dryRunOutput
+            isIgnoreExitValue = true
+        }
+    }
+    doLast {
+        if (runningAsRoot) return@doLast
+        val report = dryRunOutput.toString()
+        // Playwright prints "Missing system dependencies (N):" and one indented package per line.
+        val missing = report.lines()
+            .dropWhile { !it.startsWith("Missing system dependencies") }
+            .drop(1)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        when {
+            missing.isNotEmpty() -> throw GradleException(
+                "Chromium's system libraries are missing (${missing.size} packages). Install them, then run ./gradlew e2e:\n\n" +
+                    "    sudo apt-get update && sudo apt-get install -y --no-install-recommends ${missing.joinToString(" ")}\n",
+            )
+            executionResult.get().exitValue == 0 -> println(report.trim())
+            else -> {
+                println(report.trim())
+                throw GradleException("playwright install-deps --dry-run failed with exit code ${executionResult.get().exitValue}; its output is above.")
+            }
+        }
+    }
+}
+
 tasks.register<Exec>("e2e") {
     group = "verification"
-    description = "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: 'playwright install-deps chromium')"
+    description = "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: ./gradlew e2eSystemDeps)"
     dependsOn("prepareRuntime", "prepareE2eFixtures", "e2eBrowsers", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
         applyE2eEnv(this as Exec)

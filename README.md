@@ -143,12 +143,10 @@ cd speech-to-text-app
 Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads about 850 MB (more when Gradle also has to download JDK 21) and builds the frontend and the backend. Later runs reuse the downloads and still check every file's SHA-256.
 
 - `./gradlew dev` — dev mode, like `devenv up`: the Vite dev server on <http://localhost:5173> with hot reload, and the backend rebuilt and restarted when its sources change. Vite is ready first; the API answers once the backend has built and logs `Responding at`. Ctrl-C stops both.
-- `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. Once per machine, Chromium's system libraries need installing (Debian and Ubuntu only; asks for `sudo`). The version numbers in the paths are `node` and `pnpm` in `versions.json`:
+- `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. On Linux, Chromium also needs system libraries from apt (Debian and Ubuntu only). `./gradlew e2eSystemDeps` installs them when run as root, for example in a container; run as yourself, it only checks them and, if some are missing, fails with the `sudo apt-get install …` line to run (Gradle never asks for your password):
 
   ```sh
-  ./gradlew e2eBrowsers
-  PATH="$HOME/.gradle/stt-app/node/nodejs/node-v24.21.0-linux-x64/bin:$PATH" \
-    ~/.gradle/stt-app/node/pnpm/pnpm-v11.27.0/bin/pnpm --dir e2e exec playwright install-deps chromium
+  ./gradlew e2eSystemDeps
   ./gradlew e2e
   ```
 
