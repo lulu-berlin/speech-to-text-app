@@ -60,8 +60,8 @@ one worker, one task job, progress callbacks on reader coroutines, JDBC and file
 
 Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user:
 
-- [ ] A log line emitted while a task is being processed carries the task's id in the log event's MDC map (captured with the existing `withCapturedLogs` harness; asserted on the event's MDC property map, not the message text)
-- [ ] The id survives suspension and dispatcher switches: a log from inside the embedding loop (`Dispatchers.Default`) and from a chunk's `withContext(Dispatchers.IO)` block carries it
+- [x] A log line emitted while a task is being processed carries the task's id in the log event's MDC map (captured with the existing `withCapturedLogs` harness; asserted on the event's MDC property map, not the message text)
+- [x] The id survives suspension and dispatcher switches: a log from inside the embedding loop (`Dispatchers.Default`) and from a chunk's `withContext(Dispatchers.IO)` block carries it
 - [ ] A log emitted from the whisper progress reader (the `async(Dispatchers.IO)` reader coroutine's callback) carries it
 - [ ] The task's own failure path (a failing chunk → task FAILED) logs with the id
 - [ ] No leakage: after task A completes, a log emitted while task B runs — or while the worker is idle — carries B's id or none, never A's
@@ -84,3 +84,4 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
   ids). `backend/deps.json` already resolves `kotlinx-coroutines-slf4j/1.11.0` (transitive via
   Ktor), so no lockfile change is expected (verified 2026-10-12).
 - 2026-10-12: consultation answers: key `taskId`; the command boundary accepted; ADR 0048 to be written. Test list (9 items) approved; status stays `in-progress` in the worktree.
+- 2026-10-12 (workspace): cycle 1 green (the core MDC map; drove the dependency + `withTaskLoggingContext`); refactor approved (the `TASK_ID_MDC_KEY` constant). Cycle 2 green on arrival (regression pin — the cycle-1 implementation already covers the dispatchers; the fake seams log from inside `Dispatchers.IO`/`Dispatchers.Default`); no refactor suggested.
