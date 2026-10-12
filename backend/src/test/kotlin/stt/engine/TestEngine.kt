@@ -1,17 +1,25 @@
 package stt.engine
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import io.kotest.matchers.booleans.shouldBeTrue
 import stt.audio.ExportedChunk
 import stt.audio.PlannedChunk
 import stt.config.testConfig
@@ -21,14 +29,19 @@ import stt.db.QueueStateRepository
 import stt.db.SegmentRepository
 import stt.db.SettingsRepository
 import stt.db.SpeakersMode
+import stt.db.Task
 import stt.db.TaskPhase
 import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.db.TestDataDir
+import stt.db.insertTaskRow
 import stt.db.queuedTask
 import stt.queue.TaskStatus
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -236,3 +249,67 @@ internal suspend fun exportedPlan(
         ExportedChunk(PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L), file)
     }
 }
+
+// Deterministic race machinery (roadmap item 40): the atomic-transition specs interleave two commands by
+// holding the writer lock, queuing the losing write first and the winner's write second, and releasing —
+// the lock grants waiters in FIFO order, so the commit order is the launch order and the test is exact,
+// not probabilistic.
+
+/** A [Mutex] that counts its lock() calls, so a test can see a caller start waiting for it. */
+internal class CountingMutex(
+    private val delegate: Mutex = Mutex(),
+) : Mutex by delegate {
+    val lockCalls = MutableStateFlow(0)
+
+    override suspend fun lock(owner: Any?) {
+        lockCalls.update { it + 1 }
+        delegate.lock(owner)
+    }
+}
+
+/** A write transaction held open on the writer connection; once released it fails, so it rolls back. */
+internal class HeldWrite(
+    private val releaseLatch: CountDownLatch,
+    val outcome: Deferred<Result<Unit>>,
+) {
+    fun release() = releaseLatch.countDown()
+}
+
+/**
+ * Starts a write transaction that inserts [task] and stays open until released; returns once it is open.
+ * The held transaction owns the writer lock, so every write launched after it waits behind it (reads do
+ * not: they use their own read-only connections).
+ */
+internal suspend fun CoroutineScope.holdWriteTransaction(
+    db: Database,
+    task: Task,
+): HeldWrite {
+    val held = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val outcome =
+        async {
+            runCatching {
+                db.writeTransaction {
+                    insertTaskRow(task)
+                    held.countDown()
+                    release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    throw IOException("held transaction failed")
+                }
+            }
+        }
+    withContext(Dispatchers.IO) { held.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
+    return HeldWrite(release, outcome)
+}
+
+/**
+ * Waits until the writer lock has been called [call] times: the operation launched before this wait is
+ * now waiting on the lock, so it cannot commit before another operation launched after this wait.
+ */
+internal suspend fun awaitLockCall(lock: CountingMutex, call: Int) {
+    withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { lock.lockCalls.first { it == call } } }
+}
+
+// The waits above bound the real-time probes: a probe waits for something that must happen, and the held
+// transaction's safety bound outlasts every probe, so a stalled release cannot let a probe pass behind it.
+private const val PROBE_TIMEOUT_MS = 10_000L
+private const val STALL_SAFETY_TIMEOUT_MS = 30_000L

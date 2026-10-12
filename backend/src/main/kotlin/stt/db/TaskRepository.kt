@@ -345,6 +345,18 @@ class TaskRepository(
     }
 
     /**
+     * Marks the task PAUSED, but only while its status still allows being paused (item 04's table:
+     * QUEUED, RUNNING). A task that finished, failed or was cancelled in the meantime keeps its status —
+     * the pause loses the race — instead of being overwritten by a dead PAUSED, which would block the
+     * queue (a started PAUSED task is the queue's only blocker, roadmap item 19). Returns whether the
+     * row was written; the phase the task stopped in stays (item 12's contract).
+     */
+    suspend fun pauseIfPossible(id: Long): Boolean =
+        updateTaskIf(id, TasksTable.status inList pausableFrom) {
+            it[TasksTable.status] = TaskStatus.PAUSED
+        }
+
+    /**
      * Marks the task CANCELED and records when it finished, but only while its status still allows being
      * cancelled (item 04's table: QUEUED, RUNNING, PAUSED). A task that finished in the meantime keeps its
      * status, which is what makes a cancel racing a completion harmless. Returns whether the row was
@@ -529,3 +541,6 @@ private val ListOrder: Comparator<TaskDetails> =
 
 /** The statuses a task can be cancelled from (item 04's table: QUEUED, RUNNING, PAUSED). */
 private val cancellableFrom = TaskStatus.entries.filter { it.canTransitionTo(TaskStatus.CANCELED) }
+
+/** The statuses a task can be paused from (item 04's table: QUEUED, RUNNING). */
+private val pausableFrom = TaskStatus.entries.filter { it.canTransitionTo(TaskStatus.PAUSED) }
