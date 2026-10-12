@@ -33,7 +33,7 @@ The mechanism is conditional updates on the command writes (pause, resume) plus 
 
 - [x] A pause racing a completion leaves the task COMPLETED and the queue keeps working (deterministic concurrency test)
 - [x] A resume racing a cancel ends in exactly one of the two states, consistently, and the queue stays live
-- [ ] Delete racing a completion: the row still goes and the file is freed (the current cancel-guard behavior pinned)
+- [x] Delete racing a completion: the row still goes and the file is freed (the current cancel-guard behavior pinned)
 - [ ] Pausing a task whose row is no longer in the paused-able state is rejected, never a dead `PAUSED`
 - [ ] (e2e, ADR 0046) Against the real backend, rapid pause/resume/cancel while a task nears completion never leaves the queue blocked or a task stuck
 - [ ] (must not break) The engine command suites (`ProcessingEngineCancelSpec`, `ProcessingEngineTaskPauseSpec`, …) stay green
