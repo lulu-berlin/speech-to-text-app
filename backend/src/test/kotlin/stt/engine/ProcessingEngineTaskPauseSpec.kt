@@ -221,6 +221,40 @@ class ProcessingEngineTaskPauseSpec :
                 }
             }
         }
+
+        given("a two-chunk task paused while its first chunk's process is already exiting") {
+            `when`("the freeze misses that process") {
+                then("no further process starts: it stops before its next chunk, PAUSED, until resumed, then completes") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        fixture.chunker.chunkCount = 2
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = release
+                        fixture.engine.start()
+                        fixture.transcriber.entered
+                            .receive()
+                            .fileName
+                            .toString() shouldBe "chunk-0.flac"
+                        fixture.engine.pauseTask(task) shouldBe TaskCommandOutcome.Accepted
+
+                        // The fake process ignores the freeze, as when the pause lands while chunk 0's process
+                        // exits: the pause now falls between two processes.
+                        fixture.transcriber.hold = null
+                        release.complete(Unit)
+                        pumpUntil(300.milliseconds) { fixture.transcriber.audioFiles.size > 1 }
+                        fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-0.flac")
+                        statusOf(fixture, task) shouldBe TaskStatus.PAUSED
+
+                        // Resumed, it continues with the next chunk and completes.
+                        fixture.engine.resumeTask(task) shouldBe TaskCommandOutcome.Accepted
+                        fixture.completed.receive() shouldBe task
+                        fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-0.flac", "chunk-1.flac")
+                    }
+                }
+            }
+        }
     })
 
 /** An id no task has: ids are autoincrement and start at 1. */

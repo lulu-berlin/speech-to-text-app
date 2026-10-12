@@ -95,9 +95,10 @@ class ProcessingEngine internal constructor(
     private val wakeups = Channel<Unit>(Channel.CONFLATED)
 
     /**
-     * The in-JVM pause gate (ADR 0004): the DIARIZING phase checks it, and [pauseTask]/[pauseQueue]
-     * close it, so a paused task without an external process still stops at the next checkpoint.
-     * One gate suffices: the worker runs one task at a time, and every run starts with it open ([runInJob]).
+     * The in-JVM pause gate (ADR 0004): the DIARIZING phase and the chunk loop (before each whisper-cli run)
+     * check it, and [pauseTask]/[pauseQueue] close it, so a paused task stops at the next checkpoint even
+     * when no external process is in flight to freeze. One gate suffices: the worker runs one task at a
+     * time, and every run starts with it open ([runInJob]).
      */
     private val pauseGate = PauseGate()
 
@@ -388,13 +389,13 @@ class ProcessingEngine internal constructor(
             ?.let { TaskCommandOutcome.Illegal(it, to) }
             ?: TaskCommandOutcome.Unknown
 
-    /** Freezes the current run: its process (SIGSTOP; a no-op when none is in flight) and its DIARIZING gate. */
+    /** Freezes the current run: its process (SIGSTOP; a no-op when none is in flight) and its pause gate. */
     private fun freezeCurrentRun() {
         processControl.pause()
         pauseGate.pause()
     }
 
-    /** Continues the current run: its frozen process and its DIARIZING gate. */
+    /** Continues the current run: its frozen process and its pause gate. */
     private fun continueCurrentRun() {
         processControl.resume()
         pauseGate.resume()
@@ -539,7 +540,9 @@ class ProcessingEngine internal constructor(
     /**
      * TRANSCRIBING (ADR 0004): each chunk in `idx` order that is not DONE yet, with the previous chunk's
      * stored text as the prompt. The chunk's FLAC is written from the database for whisper-cli and removed
-     * again once the chunk is stored (item 07).
+     * again once the chunk is stored (item 07). Each chunk first passes the pause gate: a pause that missed
+     * the previous chunk's exiting process (a freeze only reaches a process in flight) still stops the task
+     * before its next whisper-cli run, until it is resumed.
      */
     private suspend fun transcribeChunks(
         id: Long,
@@ -559,6 +562,7 @@ class ProcessingEngine internal constructor(
             launch {
                 for (chunk in stored) {
                     if (chunk.status == ChunkStatus.DONE) continue
+                    pauseGate.checkpoint()
                     val audio = workDir.resolve("chunk-${chunk.idx}.flac")
                     writeChunkFlac(id, chunk.idx, audio)
                     transcription.transcribe(
