@@ -166,6 +166,61 @@ class ProcessingEngineTaskPauseSpec :
                 }
             }
         }
+
+        given("a running task paused in place and a queued task paused behind it") {
+            `when`("the queued task is resumed") {
+                then("the paused running task stays frozen, gated and PAUSED until it is resumed itself") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        // The running task has speakers, so its DIARIZING phase checks the pause gate.
+                        val running =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "running.wav",
+                                queuePosition = 0,
+                                createdAt = 1,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        val queued = enqueueTask(fixture.tasks, fixture.workDirectories, "queued.wav", queuePosition = 1, createdAt = 2)
+                        fixture.transcriber.segmentsByTask =
+                            mapOf(running to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = release
+                        fixture.engine.start()
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe running
+                        fixture.engine.pauseTask(running) shouldBe TaskCommandOutcome.Accepted
+                        fixture.engine.pauseTask(queued) shouldBe TaskCommandOutcome.Accepted
+
+                        fixture.engine.resumeTask(queued) shouldBe TaskCommandOutcome.Accepted
+                        statusOf(fixture, queued) shouldBe TaskStatus.QUEUED
+                        // The resumed task is not the running one: the running task's process stays frozen.
+                        fixture.processControl.frozen shouldBe true
+                        fixture.processControl.resumes shouldBe 0
+                        statusOf(fixture, running) shouldBe TaskStatus.PAUSED
+
+                        // Its gate stays closed too: once its process ends (the fake ignores the freeze),
+                        // its DIARIZING phase is held at the gate.
+                        fixture.transcriber.hold = null
+                        release.complete(Unit)
+                        pumpUntil(200.milliseconds) { fixture.diarizer.passedGate }
+                        fixture.diarizer.passedGate shouldBe false
+                        statusOf(fixture, running) shouldBe TaskStatus.PAUSED
+
+                        // Resuming the running task itself releases it; then the resumed queued task runs.
+                        fixture.engine.resumeTask(running) shouldBe TaskCommandOutcome.Accepted
+                        fixture.completed.receive() shouldBe running
+                        fixture.diarizer.passedGate shouldBe true
+                        fixture.completed.receive() shouldBe queued
+                    }
+                }
+            }
+        }
     })
 
 /** An id no task has: ids are autoincrement and start at 1. */
