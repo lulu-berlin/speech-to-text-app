@@ -46,7 +46,7 @@ Discovered 2026-10-12 in the e2e runs (approved by the user):
 Added 2026-10-12 by the review (approved by the user):
 
 - [ ] (review) A pause that is accepted but whose task still finishes (the pause landed after the task's last frozen process) leaves the next task free: the next task, including its DIARIZING phase, runs to completion — a stale pause never stalls the queue. No e2e of its own: the window is too narrow to hit reliably from a browser; the deterministic engine test covers it.
-- [ ] (review) Pausing a QUEUED task while another task runs leaves the running task untouched: its process is not frozen, its diarization is not held, and it completes; the paused task stays PAUSED and is not started
+- [x] (review) Pausing a QUEUED task while another task runs leaves the running task untouched: its process is not frozen, its diarization is not held, and it completes; the paused task stays PAUSED and is not started
 - [ ] (review, e2e, ADR 0046) Against the real backend, pausing a queued upload while another transcribes: the running one still completes, the paused one stays paused until resumed, then completes
 - [ ] (discovered) A task paused between two of its processes (e.g. between two chunks, after the freeze missed the exiting process) starts no further process: it stops before its next chunk and stays PAUSED until resumed, then completes. (Found while checking the review's finding 1: `ProcessRunner.pause()` is a no-op with no run in flight and each run's end clears the freeze, and the chunk loop never checks for a pause — a probe saw chunk 1 start, and the task complete, while it was PAUSED.)
 
@@ -62,3 +62,4 @@ Added 2026-10-12 by the review (approved by the user):
 - 2026-10-12: the user confirmed the winner set: completion over pause (losing pause → 409 illegal-transition), cancel over resume, delete over everything. Test list approved; status `spec-approved`.
 - 2026-10-12: the user approved the refactor moving the row-action `done` state under `ready` (one ACTIVATE definition), and fixing the settings journey's backend handover inside this item (discovered in the full e2e suite).
 - 2026-10-12: review: changes requested — a won pause can leave the pause gate closed and stall the next task; pausing a QUEUED task freezes the running one. Both approved into this item by the user (test-list items below).
+- 2026-10-12: the user added the discovered pause-between-processes item to this item and chose review item 2 as the next cycle; fix design chosen by the user: `pauseTask` freezes the process and closes the gate only when the paused task is the one the worker runs (`runningJob(id) != null`, as `resumeTask` does). Green (`gradle check`: 269 tests, 0 failures).
