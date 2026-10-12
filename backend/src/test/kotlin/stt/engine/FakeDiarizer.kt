@@ -1,13 +1,20 @@
 package stt.engine
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.withContext
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import stt.db.DiarizationStage
 import stt.db.StoredTask
 import stt.pause.PauseGate
 
 /** Records the tasks whose DIARIZING phase it ran, without loading any model. */
 internal class FakeDiarizer : Diarizer {
+    /** Logs one line per diarization from Dispatchers.Default (item 46's contextual-logging seam). */
+    private val logger: Logger = LoggerFactory.getLogger(FakeDiarizer::class.java)
+
     /** The ids of the tasks it diarized, in order. */
     val diarized = mutableListOf<Long>()
 
@@ -35,6 +42,9 @@ internal class FakeDiarizer : Diarizer {
         onStage: (DiarizationStage) -> Unit,
         onProgress: (Double) -> Unit,
     ) {
+        // A line logged from inside Dispatchers.Default — the embedding loop's thread in a real run
+        // (item 46's dispatcher test): the MDC must travel with the coroutine across the switch.
+        withContext(Dispatchers.Default) { logger.info("embedding task {}", task.id) }
         diarized.add(task.id)
         this.threads.add(threads)
         pcms.add(pcm)

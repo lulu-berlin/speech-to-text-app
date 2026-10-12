@@ -2,6 +2,7 @@ package stt.engine
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
@@ -70,6 +71,9 @@ internal class FakeTranscriber : Transcriber {
     ): List<WhisperSegment> =
         probe.around {
             logger.info("transcribing {}", audio)
+            // A line logged from inside Dispatchers.IO — the chunk/file work thread (item 46's dispatcher test) —
+            // the MDC must travel with the coroutine across the switch.
+            withContext(Dispatchers.IO) { logger.info("chunk io for {}", audio) }
             audioFiles.add(audio)
             this.settings.add(settings)
             entered.send(audio)

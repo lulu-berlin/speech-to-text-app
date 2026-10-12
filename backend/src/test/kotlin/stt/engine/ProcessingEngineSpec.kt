@@ -6,8 +6,10 @@ import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import ch.qos.logback.classic.Level
 import kotlinx.coroutines.CompletableDeferred
+import stt.db.SpeakersMode
 import stt.engine.TaskCommandOutcome
 import stt.queue.TaskStatus
+import stt.transcribe.WhisperSegment
 import stt.withCapturedLogs
 import java.nio.file.Files
 
@@ -107,6 +109,34 @@ class ProcessingEngineSpec :
                             // of the log record, not text in the message (item 46).
                             events.shouldNotBeEmpty()
                             events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                        }
+                    }
+                }
+            }
+        }
+
+        given("a task whose work runs across the dispatchers") {
+            `when`("the chunk's IO block and the embedding loop log") {
+                then("both lines carry the task's id: the MDC travelled with the coroutine across the switches") {
+                    withEngineDatabase { dataDir, db ->
+                        withCapturedLogs("stt.engine.FakeDiarizer", Level.INFO) { diarizerEvents ->
+                            withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { transcriberEvents ->
+                                val fixture = engineUnderTest(dataDir, db)
+                                val task =
+                                    enqueueTask(fixture.tasks, fixture.workDirectories, "switching.wav", queuePosition = 0, createdAt = 1,
+                                        speakersMode = SpeakersMode.AUTO)
+                                fixture.transcriber.segmentsByTask =
+                                    mapOf(task to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = "hello")))
+                                fixture.engine.start()
+                                fixture.completed.receive() shouldBe task
+
+                                // The transcriber logs from inside Dispatchers.IO, the diarizer from inside
+                                // Dispatchers.Default (item 46): both ran and both events carry the id.
+                                transcriberEvents.shouldNotBeEmpty()
+                                diarizerEvents.shouldNotBeEmpty()
+                                (transcriberEvents + diarizerEvents)
+                                    .forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                            }
                         }
                     }
                 }
