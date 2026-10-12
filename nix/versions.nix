@@ -5,6 +5,9 @@
 # `./gradlew checkVersions` fail on drift; regenerate with `nix run .#update-versions`.
 let
   wcTag = "1.8.4";
+  # FFmpeg as published by bytedeco on Maven Central: <ffmpeg version>-<javacpp version>.
+  ffmpegJar = "8.1.2-1.5.14";
+  ffmpegUrl = classifier: "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/${ffmpegJar}/ffmpeg-${ffmpegJar}-${classifier}-gpl.jar";
 in {
   # The whisper.cpp release tag the Nix build (nix/whisper-cpp.nix) and the Gradle
   # bootstrap's prebuilt whisper-cli both run (user decision 2026-10-11: upstream
@@ -12,15 +15,16 @@ in {
   # jiang1997/whisper.cpp-release prebuild pinned to the same tag).
   whisperCppTag = wcTag;
 
-  # Prebuilt tools for machines without Nix (user decision 2026-10-11): whisper-cli
-  # (jiang1997 prebuild, same tag as the Nix build; Vulkan on Linux, CoreML on
-  # macOS), ffmpeg static builds on the 8.1 branch. Every entry is pinned by URL and
-  # sha256; all hashes were verified against the sources' published checksums
-  # (whisper-cli: computed over the GitHub release assets; ffmpeg linux-x64: the
-  # BtbN checksums.sha256 of its autobuild release; ffmpeg darwin-arm64:
-  # ffmpeg.martin-riedl.de's ffmpeg.zip.sha256). macOS Intel ships no published
-  # static 8.1 ffmpeg (evermeet prunes old releases; martin-riedl builds arm64
-  # only), so darwin-x64 has no entry - the README documents that gap.
+  # Prebuilt tools for machines without Nix (user decisions 2026-10-11/12), each pinned
+  # by URL and sha256:
+  # - whisper-cli: the jiang1997 prebuild of the Nix build's tag (Vulkan on Linux,
+  #   CoreML on macOS); hashes computed over the GitHub release assets.
+  # - ffmpeg: bytedeco's builds on Maven Central (user decision 2026-10-12), which
+  #   never deletes or changes a published artifact - the BtbN daily build first pinned
+  #   here was deleted after 14 days. 8.1.2 is the flake's ffmpeg_8. Each jar holds a
+  #   self-contained `ffmpeg` executable with its libav* libraries beside it (RUNPATH
+  #   $ORIGIN on Linux, @rpath = @loader_path on macOS). Central publishes SHA-1 only:
+  #   the sha256 below was computed over bytes that match Central's SHA-1.
   downloads = {
     # The whisper-cli URLs are constructed from whisperCppTag (one copy of the tag).
     "whisper-cli" = {
@@ -38,17 +42,17 @@ in {
       };
     };
     ffmpeg = {
-      # BtbN keeps the last build of each month for two years and only the last 14
-      # daily builds (BtbN/FFmpeg-Builds README): pin a month-end release. The first
-      # pin, the daily autobuild-2026-09-27, was deleted after 14 days (item 33).
-      # This one stays until about 2028-09; re-pin to a newer month-end before then.
       "linux-x64" = {
-        url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1.tar.xz";
-        sha256 = "97ce978979194b5cf7e06a5e68020dbdaa7a4f3294c5452b6a1bc347100dbb79";
+        url = ffmpegUrl "linux-x86_64";
+        sha256 = "3c56835c2675ed4fae638268588896a00e1dd109ccdea5aacc3056d6330a669e";
       };
       "darwin-arm64" = {
-        url = "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip";
-        sha256 = "ef1aa60006c7b77ce170c1608c08d8e4ba1c30c5746f2ac986ded932d0ac2c3c";
+        url = ffmpegUrl "macosx-arm64";
+        sha256 = "03abefca5abf608f040da235a83f22ad32518ed4780c8dac724f940015d653bd";
+      };
+      "darwin-x64" = {
+        url = ffmpegUrl "macosx-x86_64";
+        sha256 = "917327cd6178e7ecddd4fb9dd5981cb4c5f04631a06dc0bd81cfe0377b1f3705";
       };
     };
   };

@@ -14,6 +14,6 @@ ADR 0014 decided "no Gradle wrapper": agents build with the devenv's Gradle and 
 
 ## Consequences
 - A Gradle bump is one coordinated change: the nixpkgs pin (flake and devenv, ADR 0036), the regenerated `versions.json` (`nix run .#update-versions`), the wrapper (`gradle wrapper --gradle-version … --gradle-distribution-sha256-sum …`) and `backend/deps.json` (the `mitmCache` update script). The checks name the missing step.
-- Gradle 9 removed APIs that 8.x only deprecated: build logic uses `providers.exec` instead of `Project.exec`, and custom `Test` tasks set `testClassesDirs` and `classpath` explicitly (without them `integrationTest` became NO-SOURCE and silently ran nothing).
+- Gradle 9 removed conventions that 8.x only deprecated: custom `Test` tasks set `testClassesDirs` and `classpath` explicitly (without them `integrationTest` became NO-SOURCE and silently ran nothing).
 - Gradle 9's HTML test report writes one directory per test name, so test names with non-ASCII characters need UTF-8 file names in the JVM: the devenv and the flake's backend build set `LC_CTYPE=C.UTF-8`; humans who run the backend tests through Gradle need a UTF-8 locale (the README says so). `./gradlew run` does not run tests and needs none.
 - Humans can launch `gradlew` on any JVM from 17 to 25.

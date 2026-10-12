@@ -146,8 +146,8 @@ var runtimeWhisperModel: File? = null
 var runtimeSpeakerModel: File? = null
 
 // Downloads, verifies and unpacks one tool; the dir holding the executable is
-// prepended to PATH for the backend (ADR 0047). .zip and .tar.gz/.tar.xz are
-// supported (whisper-cli archives, the BtbN .tar.xz and the macOS .zip ffmpeg).
+// prepended to PATH for the backend (ADR 0047). Archives are .tar.gz (whisper-cli)
+// or .jar (ffmpeg from Maven Central, a zip); both unpack in the JVM.
 fun prepareTool(label: String, entry: Map<*, *>, exeName: String): File {
     val url = entry["url"] as String
     val sha = entry["sha256"] as String
@@ -157,12 +157,7 @@ fun prepareTool(label: String, entry: Map<*, *>, exeName: String): File {
     val extractDir = File(sttCache, "tools/$label/$platform/$sha")
     if (!extractDir.isDirectory || extractDir.listFiles().isNullOrEmpty()) {
         extractDir.mkdirs()
-        if (archiveName.endsWith(".tar.xz")) {
-            // Gradle's tarTree does not decompress XZ (silently extracts nothing), so the
-            // system tar unpacks it. providers.exec: Project.exec was removed in Gradle 9.
-            providers.exec { commandLine("tar", "-xJf", archive.absolutePath, "-C", extractDir.absolutePath) }
-                .result.get().assertNormalExitValue()
-        } else if (archiveName.endsWith(".zip")) {
+        if (archiveName.endsWith(".jar") || archiveName.endsWith(".zip")) {
             project.copy { into(extractDir); from(project.zipTree(archive)) }
         } else {
             project.copy { into(extractDir); from(project.tarTree(archive)) }
@@ -187,15 +182,11 @@ tasks.register("prepareRuntime") {
     group = "build"
     description = "Download, sha256-verify and unpack the runtime tools and models from versions.json into the Gradle user home"
     doLast {
-        if (whisperCliEntry != null) {
-            prepareTool("whisper-cli", whisperCliEntry, "whisper-cli")
-        } else {
-            throw GradleException("versions.json has no whisper-cli download for $platform (supported: linux-x64, darwin-x64, darwin-arm64)")
-        }
-        if (ffmpegEntry != null) {
-            prepareTool("ffmpeg", ffmpegEntry, "ffmpeg")
-        } else {
-            logger.warn("versions.json has no ffmpeg download for $platform - the backend will resolve ffmpeg from PATH (macOS best-effort, see README)")
+        for ((label, entry) in listOf("whisper-cli" to whisperCliEntry, "ffmpeg" to ffmpegEntry)) {
+            if (entry == null) {
+                throw GradleException("versions.json has no $label download for $platform (supported: linux-x64, darwin-x64, darwin-arm64)")
+            }
+            prepareTool(label, entry, label)
         }
         runtimeWhisperModel = prepareModel("whisper")
         runtimeSpeakerModel = prepareModel("speaker")
