@@ -46,7 +46,7 @@ All ways need **Linux on x86-64**. A GPU is optional: whisper.cpp runs on any GP
 Prerequisites: [Nix](https://nixos.org/download/) with flakes enabled (`experimental-features = nix-command flakes` in `nix.conf`). Everything else — Java, whisper.cpp, ffmpeg, the models and the built frontend — comes with the package.
 
 ```sh
-git clone <repository-url> speech-to-text-app
+git clone https://github.com/lulu-berlin/speech-to-text-app.git
 cd speech-to-text-app
 nix run .
 ```
@@ -58,7 +58,7 @@ Then open <http://localhost:8080>. `nix build .` builds the same app into `./res
 Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell). The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
 
 ```sh
-git clone <repository-url> speech-to-text-app
+git clone https://github.com/lulu-berlin/speech-to-text-app.git
 cd speech-to-text-app
 direnv allow        # or: devenv shell
 ```
