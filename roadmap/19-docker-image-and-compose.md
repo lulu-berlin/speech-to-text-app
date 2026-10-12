@@ -1,6 +1,6 @@
 # 19 — Docker image and docker-compose setup
 
-Status: in-progress
+Status: in-review
 Depends on: [16](../docs/specs/nix-flake-package.md)
 
 ## Goal
@@ -236,6 +236,15 @@ None.
   `docker-root`). (B) the base compose header points at the override files and README.md
   instead of repeating their commands. No behavior change intended; re-verification on the
   rebuilt image follows.
+  Verified by the user on the rebuilt image `bdb051c`: the root is `/bin /data
+  /entrypoint.sh /etc /home /nix /tmp /usr` (plus the runtime mounts), `/bin/sh` and
+  `/usr/local/bin/curl` resolve, `/etc/passwd` holds root and stt; CPU — healthy, settings
+  `[cpu, auto]`, an upload `COMPLETED`, exec `Uid: 1000`, `/data` writable and none of `/`,
+  `/bin`, `/etc`, `/usr`, `/nix/store` (the `--no-preserve=mode` copy; `/tmp` and
+  `/home/stt` were not in that run because of a typo, they are created exactly as before);
+  Vulkan — `gpu:0` listed, the iGPU at 98–100 %, `COMPLETED`; NVIDIA — `gpu:0` listed,
+  `pmon` shows the app's `whisper-cli` on GPU 0 (C+G, ~814–833 MB), `COMPLETED`; test 8's
+  closure diff green. All test-list items done; status `in-review`.
 
 ## Test list (written with the user; Canon TDD step 1)
 
