@@ -61,6 +61,8 @@ export const FIXTURE_CLIPS = [
   'jfk-r.wav', // the sample looped 5x, ~55s, item 37's background transcription
   'jfk-s.wav', // the sample looped 9x, ~110s, item 40's atomic-transitions race clip
   'jfk-u.wav', // 6-9s, item 40's queue-is-live follow-up
+  'jfk-v.wav', // the sample looped 11x, ~121s, item 40's pause-queued running clip
+  'jfk-w.wav', // 2-6s, item 40's pause-queued clip
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -107,6 +109,11 @@ export const TRANSCRIBING_BACKGROUND_CLIP = FIXTURE_CLIPS[24]; // the sample loo
 // jfk-follow (14x) are other tests' loops, and 6-9s is no existing trim.
 export const ATOMIC_RACE_CLIP = FIXTURE_CLIPS[25]; // the sample looped 9x, ~110s
 export const ATOMIC_NEXT_CLIP = FIXTURE_CLIPS[26]; // 6-9s
+// Item 40's pause-a-queued-upload journey (the review): a long clip that keeps the engine
+// transcribing, and a short trim queued behind it that the test pauses. Unique bytes: no
+// other test loops the sample 11x, and 2-6s is no existing trim.
+export const PAUSE_QUEUED_RUNNING_CLIP = FIXTURE_CLIPS[27]; // the sample looped 11x, ~121s
+export const PAUSE_QUEUED_CLIP = FIXTURE_CLIPS[28]; // 2-6s
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];

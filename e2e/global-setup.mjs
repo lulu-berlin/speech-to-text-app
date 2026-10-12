@@ -53,6 +53,8 @@ export default async function globalSetup() {
     { args: ['-stream_loop', '5'], file: FIXTURE_CLIPS[24] }, // ~55s, item 37's background transcription
     { args: ['-stream_loop', '9'], file: FIXTURE_CLIPS[25] }, // ~110s, item 40's atomic-transitions race clip
     { args: ['-ss', '6', '-t', '3'], file: FIXTURE_CLIPS[26] }, // 6-9s, item 40's queue-is-live follow-up
+    { args: ['-stream_loop', '10'], file: FIXTURE_CLIPS[27] }, // ~121s, item 40's pause-queued running clip
+    { args: ['-ss', '2', '-t', '4'], file: FIXTURE_CLIPS[28] }, // 2-6s, item 40's pause-queued clip
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);
