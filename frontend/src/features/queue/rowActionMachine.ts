@@ -4,8 +4,9 @@
 // row's action vocabulary but its dialog/delete lifecycle is delegated to
 // confirmActionMachine (item 28). TaskRow reads done (forwarding the returned task to the
 // live state) and failed (context.error is the inline error of item 17). ACTIVATE is
-// handled on the `ready` parent, so a failed action can start the next one, clearing the
-// error, and on `done`, so a row takes a second command after a successful one (item 40).
+// handled on the `ready` parent of idle, failed and done, so a failed action can start the
+// next one, clearing the error, and a row takes a second command after a successful one
+// (item 40).
 import { assign, fromPromise, setup } from 'xstate';
 import { runTaskCommand } from '../../shared/api/client';
 import type { Task } from '../../shared/api/types';
@@ -66,7 +67,7 @@ export const rowActionMachine = setup({
   }),
   initial: 'ready',
   states: {
-    // Idle or failed: the same ACTIVATE applies, asking only when the row says so.
+    // Idle, failed or done: the same ACTIVATE applies, asking only when the row says so.
     ready: {
       initial: 'idle',
       on: {
@@ -85,6 +86,8 @@ export const rowActionMachine = setup({
       states: {
         idle: {},
         failed: {},
+        // The returned task is forwarded by TaskRow.
+        done: {},
       },
     },
     confirming: {
@@ -105,29 +108,13 @@ export const rowActionMachine = setup({
           status: context.status as Task['status'],
         }),
         onDone: {
-          target: 'done',
+          target: 'ready.done',
           actions: assign({ task: ({ event }) => event.output }),
         },
         onError: {
           target: 'ready.failed',
           actions: assign({ error: ({ event }) => event.error }),
         },
-      },
-    },
-    // The returned task is forwarded by TaskRow; the row's next command starts from here.
-    done: {
-      on: {
-        ACTIVATE: [
-          {
-            guard: ({ event }) => event.confirm,
-            target: 'confirming',
-            actions: 'setAction',
-          },
-          {
-            target: 'running',
-            actions: 'setAction',
-          },
-        ],
       },
     },
   },

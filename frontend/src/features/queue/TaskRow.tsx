@@ -130,7 +130,7 @@ export function TaskRow({
   // A finished command applies its returned task to the live state (idempotent with the
   // server's own events); a finished delete removes the task.
   useEffect(() => {
-    if (action.matches('done') && action.context.task !== null) {
+    if (action.matches({ ready: 'done' }) && action.context.task !== null) {
       connection.send({ type: 'task-updated', task: action.context.task });
     }
   }, [action, connection]);
