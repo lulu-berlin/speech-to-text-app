@@ -163,4 +163,29 @@ class ProcessingEngineSpec :
                 }
             }
         }
+
+        given("a task that fails while being processed") {
+            `when`("its chunks throw") {
+                then("the failure path's logged lines carry the task's id, and the task lands FAILED") {
+                    withEngineDatabase { dataDir, db ->
+                        withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { events ->
+                            val fixture = engineUnderTest(dataDir, db)
+                            val task =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "failing.wav", queuePosition = 0, createdAt = 1)
+                            fixture.transcriber.failNext = stt.transcribe.TranscriptionException("boom")
+                            fixture.engine.start()
+
+                            fixture.failed.receive() shouldBe task
+                            fixture.tasks.find(task)?.task?.status shouldBe TaskStatus.FAILED
+
+                            // The engine does not log the failure itself (the error is stored and published);
+                            // every line the run did emit — the fake's, before the throw — is inside the
+                            // task's tag, and the FAILED terminal was reached within the span (item 46).
+                            events.shouldNotBeEmpty()
+                            events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                        }
+                    }
+                }
+            }
+        }
     })
