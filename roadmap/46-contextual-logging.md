@@ -45,21 +45,30 @@ one worker, one task job, progress callbacks on reader coroutines, JDBC and file
   the task job — their messages already name the task; a per-client SSE id is a later concern),
   tagging whisper-cli/ffmpeg subprocess output (captured, not logged live), the frontend.
 
-## Open questions (for the consultation)
+## Open questions (answered 2026-10-12)
 
-- MDC key name → propose `taskId` (matches the project's words: "the task's id").
-- Failure-path reach: the task's own failure handling (`runTask`'s catch → `failIfRunning`) runs
-  inside the tagged job and will carry the id; the HTTP `DELETE`/`cancel` path runs in the caller's
-  coroutine and will not. Accept that boundary, or tag command handlers too? (Proposal: accept —
-  commands are one per request, their messages name the task.)
-- New ADR? → propose ADR 0048 recording the approach: task-id in the logging context via
-  `kotlinx-coroutines-slf4j` + `CoroutineName("task-<id>")` per task job, key `taskId`; e2e-exempt
-  per ADR 0046 (observability change; nothing the browser sees changes — state the exempt reason in
-  the item). Next free ADR number verified against `docs/decisions/` (0047 exists).
+- MDC key name → **`taskId`** (user).
+- Failure-path reach → **accept the boundary**: only the task job is tagged; HTTP commands
+  (pause/resume/cancel/delete) run in the caller's coroutine and stay untagged — their messages
+  name the task (user).
+- New ADR? → **Yes, ADR 0048** (user): the approach — task-id in the logging context via
+  `kotlinx-coroutines-slf4j` + `CoroutineName("task-<id>")` per task job, key `taskId`, the named
+  worker, and the command boundary. ADR 0046 exemption: observability-only — nothing the browser
+  sees changes (state the reason in the ADR).
 
 ## Test list (written with the user; Canon TDD step 1)
 
-To be written in the consultation.
+Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user:
+
+- [ ] A log line emitted while a task is being processed carries the task's id in the log event's MDC map (captured with the existing `withCapturedLogs` harness; asserted on the event's MDC property map, not the message text)
+- [ ] The id survives suspension and dispatcher switches: a log from inside the embedding loop (`Dispatchers.Default`) and from a chunk's `withContext(Dispatchers.IO)` block carries it
+- [ ] A log emitted from the whisper progress reader (the `async(Dispatchers.IO)` reader coroutine's callback) carries it
+- [ ] The task's own failure path (a failing chunk → task FAILED) logs with the id
+- [ ] No leakage: after task A completes, a log emitted while task B runs — or while the worker is idle — carries B's id or none, never A's
+- [ ] Task-agnostic logs (startup device probe, worker idle) carry no `taskId` key at all (absent, not blank)
+- [ ] The coroutine running a task is named `task-<id>` (observed from inside a fake transcriber through the existing engine-test seam)
+- [ ] Must not break: `gradle check` (ktlint + suites) and `gradle integrationTest` stay green; captured-log tests are unaffected by the console pattern change
+- [ ] (user-verified) `nix build .` succeeds; `backend/deps.json` unchanged — the artifact already resolves at 1.11.0 (ADR 0042 precedent; regeneration only if the graph actually changed)
 
 ## Acceptance criteria
 
@@ -74,3 +83,4 @@ To be written in the consultation.
   next" answer (correlate one task's logs across suspension; name coroutines so dumps show task
   ids). `backend/deps.json` already resolves `kotlinx-coroutines-slf4j/1.11.0` (transitive via
   Ktor), so no lockfile change is expected (verified 2026-10-12).
+- 2026-10-12: consultation answers: key `taskId`; the command boundary accepted; ADR 0048 to be written. Test list (9 items) approved; status stays `in-progress` in the worktree.
