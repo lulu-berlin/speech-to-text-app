@@ -19,13 +19,19 @@ A task command never overwrites a newer state: when a completion, a cancel and a
 
 To be settled in the consultation. Starting point: every transition is a conditional UPDATE inside the database transaction — `pauseIfRunning` (and `pauseIfQueued`), `resumeIfPaused`, with zero-rows → the transition lost the race → report it consistently. Where two operations "both" apply (delete-vs-complete), decide the winner once and keep it. Add deterministic concurrency tests (the reviewer's own recommendation) for pause-vs-complete, resume-vs-cancel and delete-vs-complete before touching anything else in the queue.
 
-## Open questions (to be answered in the consultation)
+## Open questions (clarification requested by the user, 2026-10-12)
 
-- Who wins each race: completion over pause; cancel over resume; delete over everything (the delete path already cancels first — the outcome to pin)?
+The user asked for the concrete interleavings before deciding the winners. The clarified scenarios (recorded):
+
+- **A — Pause vs completion** (RUNNING, worker finishing): today a late pause overwrites `COMPLETED` into `PAUSED`, and `startedPaused()` blocks the whole queue. Fix: pause writes only `if status IN (QUEUED, RUNNING)`; zero rows → 409. Winner: completion (a done task cannot be un-done); open sub-choice: the losing pause answers 409 (recommended) vs 200-ignored.
+- **B — Resume vs cancel** (PAUSED): with resume also conditional (`if status = PAUSED`), both interleavings end `CANCELED` (cancel first → resume 409; resume first → cancel's conditional still allows it). Winner: cancel, by construction.
+- **C — Delete vs completion**: today delete cancels first then removes the row regardless; a completion after the deletion hits no row and publishes nothing. Winner: delete — already true; the item pins it with a test.
+
+The mechanism is conditional updates on the command writes (pause, resume) plus `cancelIfPossible` as-is; `setCompleted` stays the durable terminal write. Today `cancelTask`/`deleteTask` are the safe ones; `pauseTask`/`resumeTask` are the two unconditional writers this item fixes.
 
 ## Test list (proposed; behaviors only)
 
-- [ ] A pause racing a completion leaves the task COMPLETED and the queue keeps working (deterministic concurrency test)
+- [x-pending] A pause racing a completion leaves the task COMPLETED and the queue keeps working (deterministic concurrency test)
 - [ ] A resume racing a cancel ends in exactly one of the two states, consistently, and the queue stays live
 - [ ] Delete racing a completion: the row still goes and the file is freed (the current cancel-guard behavior pinned)
 - [ ] Pausing a task whose row is no longer in the paused-able state is rejected, never a dead `PAUSED`
@@ -40,3 +46,4 @@ To be settled in the consultation. Starting point: every transition is a conditi
 ## Approval log
 
 - 2026-10-12: filed from the third-party review's finding 1 after code triage (unconditional `setStatus` behind a non-atomic `command()` gate).
+- 2026-10-12: the user confirmed the test list; requested the race-scenario clarification (recorded above) before deciding the winners. Pending: the winner decision.
