@@ -92,6 +92,7 @@ graph TD
   11 --> 45[45 selectable GPUs]
   32 --> 45
   12 --> 44
+  11 --> 46[46 contextual logging ✓]:::done
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -144,3 +145,4 @@ graph TD
 | [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
 | [44 — Store the full audio in the database; drop the file cache](44-audio-in-database.md) | spec-approved | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](45-selectable-gpus.md) | spec-approved | 11, 32 |
+| [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |

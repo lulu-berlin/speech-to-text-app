@@ -1,8 +1,7 @@
 # 46 — Contextual logging: the task's id in every log line (MDC) and named coroutines
 
-Status: in-review
-Depends on: [11](../docs/specs/processing-engine.md) (done; the engine whose task job this tags)
-Blocks: —
+Status: done (roadmap item 46, merged 2026-10-12)
+Depends on: [11 — Processing engine](processing-engine.md)
 
 ## Goal
 
@@ -94,3 +93,4 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-12 (workspace): cycle 7 refactor checkpoint: none (user). Cycle 8 (the discovered `engine-worker` item): red `expected:<["engine-worker", "task-1"]> but was:<["task-1"]>` (names of the engine scope's live child coroutines while the task is held); green: `start()` launches the worker with `CoroutineName("engine-worker")`; after the task completes only `engine-worker` remains; `gradle check` green (264 tests).
 - 2026-10-12 (workspace): cycle 8 refactor checkpoint: none (user). Item 8: console pattern ` [task <id>]` only when set (user's choice, `%replace`; checked against logback 1.6.5: untagged, `[task 7]` and blank-id lines render as intended); ADR 0048 written. `gradle check` (264 tests) and `gradle integrationTest` (63 Integration tests) green. Real run (`gradle run`, tiny.en model, jfk.wav, `Dispatchers.Default`): `SpeakerDiarizer` and `SpeakerSummary` lines print `[task 1]`, startup lines none. Item 9 (`nix build .`, `deps.json` unchanged) is left for the user. Status set to in-review.
 - 2026-10-12: the user verified `nix build .`, read the diff and approved it.
+- 2026-10-12: merged into `main` (head `4e41f30a`) after the user approved the diff and `nix build .` passed. Spec and final test list moved here from `roadmap/46-contextual-logging.md`; decision recorded in [ADR 0048](../decisions/0048-task-id-in-logging-context-and-named-coroutines.md).
