@@ -142,7 +142,7 @@ cd speech-to-text-app
 
 Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads about 850 MB (more when Gradle also has to download JDK 21) and builds the frontend and the backend. Later runs reuse the downloads and still check every file's SHA-256.
 
-- `./gradlew dev` — dev mode, like `devenv up`: the Vite dev server on <http://localhost:5173> with hot reload, and the backend rebuilt and restarted when its sources change. Ctrl-C stops both.
+- `./gradlew dev` — dev mode, like `devenv up`: the Vite dev server on <http://localhost:5173> with hot reload, and the backend rebuilt and restarted when its sources change. Vite is ready first; the API answers once the backend has built and logs `Responding at`. Ctrl-C stops both.
 - `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. Once per machine, Chromium's system libraries need installing (Debian and Ubuntu only; asks for `sudo`). The version numbers in the paths are `node` and `pnpm` in `versions.json`:
 
   ```sh
