@@ -1,6 +1,7 @@
 package stt.engine
 
 import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.spi.ILoggingEvent
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -107,8 +108,7 @@ class ProcessingEngineSpec :
 
                             // The line the fake transcriber logs while the task runs: the id is a property
                             // of the log record, not text in the message (item 46).
-                            events.shouldNotBeEmpty()
-                            events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                            assertTaskIdOnEveryEvent(events, task)
                         }
                     }
                 }
@@ -140,8 +140,7 @@ class ProcessingEngineSpec :
                                 // Dispatchers.Default (item 46): both ran and both events carry the id.
                                 transcriberEvents.shouldNotBeEmpty()
                                 diarizerEvents.shouldNotBeEmpty()
-                                (transcriberEvents + diarizerEvents)
-                                    .forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                                assertTaskIdOnEveryEvent(transcriberEvents + diarizerEvents, task)
                             }
                         }
                     }
@@ -162,8 +161,7 @@ class ProcessingEngineSpec :
                             fixture.completed.receive() shouldBe task
 
                             fixture.transcriber.progressReaderLogged shouldBe true
-                            events.shouldNotBeEmpty()
-                            events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                            assertTaskIdOnEveryEvent(events, task)
                         }
                     }
                 }
@@ -190,11 +188,19 @@ class ProcessingEngineSpec :
                             // The engine does not log the failure itself (the error is stored and published);
                             // every line the run did emit — the fake's, before the throw — is inside the
                             // task's tag, and the FAILED terminal was reached within the span (item 46).
-                            events.shouldNotBeEmpty()
-                            events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                            assertTaskIdOnEveryEvent(events, task)
                         }
                     }
                 }
             }
         }
     })
+
+/** At least one event was captured, and every one carries [task]'s id in its MDC map (item 46). */
+private fun assertTaskIdOnEveryEvent(
+    events: List<ILoggingEvent>,
+    task: Long,
+) {
+    events.shouldNotBeEmpty()
+    events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+}
