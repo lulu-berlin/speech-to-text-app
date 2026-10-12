@@ -82,7 +82,7 @@ graph TD
   36[36 follow-mode hold-off race ✓]:::done --> 35[35 README and architecture overview ✓]:::done
   37 --> 35[35 README and architecture overview]
   38 --> 35[35 README and architecture overview]
-  39[39 devenv/doc drift: playwright comment]
+  39[39 devenv/doc drift: playwright comment ✓]:::done
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -128,4 +128,4 @@ graph TD
 | [36 — Follow mode stops by itself (hold-off race)](../docs/specs/follow-mode-hold-off-race.md) | done | 15, 21 |
 | [37 — Audio request 500: the joiner shares the engine's single-flight runner](../docs/specs/audio-join-isolation.md) | done | 15 |
 | [38 — Joined playback stalls at ~90 s of a long clip](38-joined-playback-stalls.md) | spec-approved | 15 |
-| [39 — devenv/doc drift: the playwright version comment](39-devenv-playwright-comment-drift.md) | spec-approved | 16 |
+| [39 — devenv/doc drift: the playwright version comment](../docs/specs/playwright-version-sync.md) | done | 16 |

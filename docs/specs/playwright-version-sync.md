@@ -1,7 +1,7 @@
-# 39 — devenv/doc drift: the playwright version comment (1.61.1 vs 1.63.0)
+# devenv/doc drift: the playwright version comment (1.61.1 vs 1.63.0)
 
-Status: in-review
-Depends on: [16](../docs/specs/nix-flake-package.md) (done; the downgrade update moved the devenv's playwright to 1.63.x)
+Status: done (roadmap item 39, merged 2026-10-12)
+Depends on: [16 — Nix flake package](nix-flake-package.md) (done; the devenv update moved the devenv's playwright to 1.63.x)
 Blocks: —
 
 ## Goal
@@ -37,4 +37,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 
 ## Approval log
 
-- 2026-10-11: filed from the item 36 workspace's findings; consultation: own minimal item. Test list approved; status `spec-approved`.
+- 2026-10-11: filed from the item 36 workspace's findings; consultation: own minimal item. Test list approved; status `spec-approved`.- 2026-10-12: merged into `main` (head `bb981142`) after the user approved the diff. The `devenv.nix` e2e comment now names the real playwright 1.63.0 / browsers 1243 (and the ADR 0036 source); `e2e/check-playwright.mjs` runs at the head of `pnpm --dir e2e test`, failing loudly with the fix line when the comment, `e2e/package.json`, the installed package or the realized browser store drift. Spec and final test list moved here from `roadmap/39-devenv-playwright-comment-drift.md`.
