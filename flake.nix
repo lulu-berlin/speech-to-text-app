@@ -206,9 +206,6 @@
       # - bin/sh: bash, for `docker compose exec stt-app sh`.
       # - usr/local/bin/curl: the compose healthcheck's tool.
       # - etc/passwd, etc/group, etc/nsswitch.conf: root and the app user stt (uid/gid 1000).
-      # - docker-init (tini): PID 1 in the container (compose `init: true` runs the image's
-      #   /usr/local/bin/docker-init with the entrypoint as its argument), so orphaned process
-      #   trees are reaped for real (ADR 0020) — a JVM as PID 1 never reaps adopted orphans.
       docker-root = let
         vkIcds = map (icd: "${pkgs.mesa}/share/vulkan/icd.d/${icd}.x86_64.json") [
           "radeon_icd"
@@ -242,8 +239,6 @@
           for icd in ${pkgs.lib.concatStringsSep " " vkIcds}; do test -e "$icd"; done
           mkdir -p $out/bin $out/usr/local/bin $out/etc
           ln -s ${entrypoint} $out/entrypoint.sh
-          ln -s ${pkgs.lib.getExe pkgs.tini} $out/usr/local/bin/docker-init
-          ln -s ${pkgs.lib.getExe pkgs.tini} $out/docker-init
           ln -s ${pkgs.runtimeShell} $out/bin/sh
           ln -s ${pkgs.lib.getExe pkgs.curl} $out/usr/local/bin/curl
           printf 'root:x:0:0:root:/root:/bin/sh\nstt:x:1000:1000:stt:/home/stt:/bin/sh\n' > $out/etc/passwd
