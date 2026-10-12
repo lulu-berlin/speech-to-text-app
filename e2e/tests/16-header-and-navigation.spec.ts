@@ -75,17 +75,22 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   }
 
   // The nav pill follows the route: the active link is the filled pill, the others are
-  // bare until hovered.
+  // bare until hovered. With History and Settings both inactive there are two of them
+  // (item 32 added the Settings pill), so every inactive link is checked.
   const activePill = page.locator('nav a.active');
   await expect(activePill).toHaveText('Queue');
   expect(
     await activePill.evaluate((element) => getComputedStyle(element).backgroundColor),
   ).not.toBe('rgba(0, 0, 0, 0)');
-  expect(
-    await page
-      .locator('nav a:not(.active)')
-      .evaluate((element) => getComputedStyle(element).backgroundColor),
-  ).toBe('rgba(0, 0, 0, 0)');
+  const inactivePillColors = await page
+    .locator('nav a:not(.active)')
+    .evaluateAll((elements) =>
+      elements.map((element) => getComputedStyle(element).backgroundColor),
+    );
+  expect(inactivePillColors).not.toHaveLength(0);
+  for (const color of inactivePillColors) {
+    expect(color).toBe('rgba(0, 0, 0, 0)');
+  }
   await goTo(page, 'History');
   await expect(activePill).toHaveText('History');
   await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
