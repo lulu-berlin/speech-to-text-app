@@ -40,17 +40,18 @@ async function nextOutOfViewSegment(region: Locator): Promise<number> {
   });
 }
 
-// The audio element's currentTime in seconds. The playhead's progress signal: when it
-// stops advancing the rounds must stop — the joined flac of this clip stalls before its
-// transcript ends, so a segment the audio never reaches is not a failure of following.
+// The audio element's currentTime in seconds. The playhead's progress signal: playback
+// must keep advancing (item 38) — a freeze before the segment is reached is the joined-
+// FLAC stall, a failure, not a forgivable round end.
 async function audioSecond(page: Page): Promise<number> {
   return page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime);
 }
 
-// Waits for the playhead to enter `target` with the user's hands off, returning false if
-// the audio stops advancing first (played out, or this clip's joined flac stalling
-// before its transcript ends). A "Back to playing position" button at any moment is an
-// automatic stop and fails the wait immediately.
+// Waits for the playhead to enter `target` with the user's hands off, returning false
+// only if the audio plays out (ended) before the segment is reached — the joined flac
+// of this clip plays through to the end, so a stop that is not the end is the item-38
+// stall and fails immediately. A "Back to playing position" button at any moment is an
+// automatic stop and fails the wait too.
 async function playheadReaches(
   page: Page,
   region: Locator,
@@ -69,7 +70,12 @@ async function playheadReaches(
       lastSecond = at;
       lastAdvanceMs = Date.now();
     } else if (Date.now() - lastAdvanceMs > 8_000) {
-      return false;
+      if (await page.locator('audio').evaluate((audio) => audio.ended)) {
+        return false; // played out before this segment: nothing more to follow into.
+      }
+      throw new Error(
+        `playback stalled at ${lastSecond.toFixed(1)}s before reaching segment ${target}`,
+      );
     }
     await page.waitForTimeout(500);
   }
@@ -106,8 +112,9 @@ test('follow mode: long playback never shows "Back to playing position" without 
       break; // nothing left below the fold: the transcript is fully followed.
     }
     const startTop = await region.evaluate((element) => element.scrollTop);
-    // Wait for playback to reach the out-of-view segment on its own; if the audio stops
-    // advancing first, there is nothing more to follow into and the rounds end.
+    // Wait for playback to reach the out-of-view segment on its own; a freeze before the
+    // segment fails as the joined-FLAC stall (item 38), so the rounds only end when the
+    // audio plays out or the transcript runs out of segments.
     if (!(await playheadReaches(page, region, back, target))) {
       break;
     }
@@ -121,6 +128,9 @@ test('follow mode: long playback never shows "Back to playing position" without 
     scrolled,
     'hands-off playback must scroll through at least 3 out-of-view segments',
   ).toBeGreaterThanOrEqual(3);
+  // The hands-off rounds crossed the former stall point: the joined flac must play past
+  // ~90 s of the 154 s clip (item 38), or this fails instead of forgiving a stall.
+  expect(await audioSecond(page)).toBeGreaterThan(90);
 
   // A hand scroll (wheel) still stops following: the button appears.
   await region.hover();
