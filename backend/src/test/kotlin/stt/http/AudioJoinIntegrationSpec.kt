@@ -5,6 +5,10 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsBytes
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.testing.testApplication
 import stt.Integration
 import stt.audio.ExportedChunk
 import stt.audio.FfmpegAudioJoiner
@@ -18,6 +22,7 @@ import stt.db.TaskRepository
 import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.process.ProcessRunner
+import stt.queue.TaskStatus
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -114,6 +119,59 @@ class AudioJoinIntegrationSpec :
                     // declared beyond the frames, which is what a "waits for audio that never comes" stall
                     // needs. (The pre-ADR-0045 `-c copy` join kept the first chunk's declared length instead.)
                     ffprobe(runner, target, "stream=duration_ts").single().toLong() shouldBe decoded
+                }
+            }
+        }
+
+        given("a completed task with stored chunk audio and its decoded duration (queue paused)") {
+            `when`("its /audio route serves the joined file through the real joiner and cache") {
+                then("the served file declares exactly the task's stored duration") {
+                    val runner = ProcessRunner()
+                    val dataDir = tempdir("stt-route-duration").toPath()
+                    val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
+                    val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
+                    val id =
+                        Database.open(dataDir).use { db ->
+                            QueueStateRepository(db).setPaused(true)
+                            val workDirectories = TaskWorkDirectories(dataDir)
+                            val tasks = TaskRepository(db, workDirectories)
+                            val created =
+                                tasks.createFromUpload(
+                                    queuedTask("duration.wav", createdAt = 1).copy(
+                                        queuePosition = 0,
+                                        status = TaskStatus.COMPLETED,
+                                        finishedAt = 1_000,
+                                    ),
+                                    "audio".toByteArray().inputStream(),
+                                )
+                            ChunkRepository(db).storePlan(
+                                created,
+                                listOf(
+                                    ExportedChunk(PlannedChunk(0L, 300L), chunk0),
+                                    ExportedChunk(PlannedChunk(300L, 800L), chunk1),
+                                ),
+                            )
+                            // The decoded duration the engine stores once the source is chunked (item 11):
+                            // 0.3 s + 0.5 s = 800 ms, by hand.
+                            tasks.setDurationMs(created, 800L)
+                            created
+                        }
+
+                    testApplication {
+                        application {
+                            // No joiner override: unlike the unit specs' RecordingJoiner, the app's own
+                            // FfmpegAudioJoiner and JoinedAudioCache build and serve the file for real.
+                            sttApp(stt.config.testConfig(dataDir))
+                        }
+
+                        val served = client.get("/api/tasks/$id/audio")
+                        served.status shouldBe HttpStatusCode.OK
+                        val file = dataDir.resolve("served.flac")
+                        Files.write(file, served.bodyAsBytes())
+                        // The player's timeline comes from the task's durationMs, playback from the file's
+                        // header; they must agree — 800 ms × 16 kHz = 12 800 samples, no longer, by hand.
+                        ffprobe(runner, file, "stream=duration_ts").single().toLong() shouldBe 12_800L
+                    }
                 }
             }
         }
