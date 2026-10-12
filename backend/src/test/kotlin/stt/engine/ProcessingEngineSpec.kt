@@ -2,10 +2,13 @@ package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.booleans.shouldBeFalse
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
+import ch.qos.logback.classic.Level
 import kotlinx.coroutines.CompletableDeferred
 import stt.engine.TaskCommandOutcome
 import stt.queue.TaskStatus
+import stt.withCapturedLogs
 import java.nio.file.Files
 
 class ProcessingEngineSpec :
@@ -84,6 +87,27 @@ class ProcessingEngineSpec :
                         fixture.completed.receive() shouldBe third
                         fixture.completed.receive() shouldBe second
                         fixture.chunker.workDirs.map(::taskIdOf) shouldBe listOf(first, third, second)
+                    }
+                }
+            }
+        }
+
+        given("a task being processed by the worker") {
+            `when`("a log line is emitted from inside its job") {
+                then("the log event's MDC map carries the task's id, in every line the job emits") {
+                    withEngineDatabase { dataDir, db ->
+                        withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { events ->
+                            val fixture = engineUnderTest(dataDir, db)
+                            val task =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "tagged.wav", queuePosition = 0, createdAt = 1)
+                            fixture.engine.start()
+                            fixture.completed.receive() shouldBe task
+
+                            // The line the fake transcriber logs while the task runs: the id is a property
+                            // of the log record, not text in the message (item 46).
+                            events.shouldNotBeEmpty()
+                            events.forEach { event -> event.getMDCPropertyMap()["taskId"] shouldBe task.toString() }
+                        }
                     }
                 }
             }

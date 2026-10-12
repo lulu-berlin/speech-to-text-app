@@ -34,6 +34,7 @@ dependencies {
     implementation(libs.jna)
     implementation(libs.logback.classic)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.slf4j)
     implementation(libs.exposed.core)
     implementation(libs.exposed.jdbc)
     implementation(libs.flyway.core)

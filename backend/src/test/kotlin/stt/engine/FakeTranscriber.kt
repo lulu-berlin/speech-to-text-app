@@ -5,6 +5,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import stt.config.Device
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSegment
@@ -54,6 +56,10 @@ internal class FakeTranscriber : Transcriber {
 
     val probe = ConcurrencyProbe()
 
+    /** Logs one INFO line per transcription (item 46's contextual-logging seam); a test captures this
+     *  logger's events and asserts the MDC carries the task's id. */
+    private val logger: Logger = LoggerFactory.getLogger(FakeTranscriber::class.java)
+
     override suspend fun transcribe(
         settings: WhisperSettings,
         audio: Path,
@@ -63,6 +69,7 @@ internal class FakeTranscriber : Transcriber {
         onGpuUnavailable: suspend () -> Unit,
     ): List<WhisperSegment> =
         probe.around {
+            logger.info("transcribing {}", audio)
             audioFiles.add(audio)
             this.settings.add(settings)
             entered.send(audio)

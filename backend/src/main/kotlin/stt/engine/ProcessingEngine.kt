@@ -14,11 +14,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import stt.audio.Chunker
 import stt.audio.PcmDecoder
 import stt.config.Config
@@ -390,12 +392,36 @@ class ProcessingEngine internal constructor(
      * cancelling the coroutine inside item 05's `run` is what kills the task's process (ADR 0020).
      */
     private suspend fun runInJob(task: StoredTask) {
-        val job = scope.launch { runTask(task) }
+        val job =
+            scope.launch {
+                withTaskLoggingContext(task.id) {
+                    runTask(task)
+                }
+            }
         runningLock.withLock { running = Running(task.id, job) }
         try {
             job.join()
         } finally {
             runningLock.withLock { running = null }
+        }
+    }
+
+    /**
+     * Runs [block] with the task's id in the logging context (item 46): the thread MDC is seeded first, then
+     * `MDCContext` captures the map — the library re-applies it around every resumption, across dispatcher
+     * switches, and every child coroutine inherits it, so the chunk loop, IO blocks, progress readers and the
+     * failure path all log with the id. The previous thread map is restored on exit and the seed removed, so
+     * no task's id leaks onto the worker.
+     */
+    private suspend fun <T> withTaskLoggingContext(
+        id: Long,
+        block: suspend () -> T,
+    ): T {
+        MDC.put("taskId", id.toString())
+        try {
+            return withContext(MDCContext()) { block() }
+        } finally {
+            MDC.remove("taskId")
         }
     }
 
