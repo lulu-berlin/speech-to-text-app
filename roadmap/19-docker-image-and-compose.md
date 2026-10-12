@@ -193,6 +193,18 @@ None.
   after it). Unverifiable here: on non-NixOS hosts the toolkit's ICD may name
   `libGLX_nvidia.so.0` without a path, which the image's Nix loader would not search in
   `/usr/lib/x86_64-linux-gnu` — NVIDIA on non-NixOS stays documented as unverified.
+  Fifth run (image `449dba8`): **NVIDIA half demonstrated.** In the container the loader
+  now loads `libGLX_nvidia` (`ggml_vulkan: 0 = NVIDIA GeForce RTX 3050 Laptop GPU`, `using
+  Vulkan0 backend`); the JVM carries the gated `LD_LIBRARY_PATH`; a ~20 s clip uploaded
+  through the API ran as the app's own `whisper-cli` on GPU 0 — `nvidia-smi pmon` listed it
+  (type C+G, ~815–894 MB framebuffer, SM bursts 61/39/6/8 %) until the task ended (1-second
+  `utilization.gpu` samples had read 0 % on an earlier run — the decode phase is light; `pmon`
+  per-process SM is the evidence). Regression on the same image: the Vulkan override still
+  uses RADV with `LD_LIBRARY_PATH` unset (the gate holds); test 8's closure diff is still
+  green. Then items 32 (settings page: `STT_DEVICE`/`STT_THREADS` removed, device stored,
+  seeded `auto`) and 35 (README) were found merged on main; the user approved rebasing onto
+  main, dropping the dead `STT_DEVICE` from the compose files and moving the Docker section
+  into README.md, with one re-verification run on the rebased image.
 
 ## Test list (written with the user; Canon TDD step 1)
 
