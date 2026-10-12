@@ -147,8 +147,10 @@ fun prepareTool(label: String, entry: Map<*, *>, exeName: String): File {
     if (!extractDir.isDirectory || extractDir.listFiles().isNullOrEmpty()) {
         extractDir.mkdirs()
         if (archiveName.endsWith(".tar.xz")) {
-            // Gradle's tarTree does not decompress XZ (silently extracts nothing).
-            project.exec { commandLine("tar", "-xJf", archive.absolutePath, "-C", extractDir.absolutePath) }
+            // Gradle's tarTree does not decompress XZ (silently extracts nothing), so the
+            // system tar unpacks it. providers.exec: Project.exec was removed in Gradle 9.
+            providers.exec { commandLine("tar", "-xJf", archive.absolutePath, "-C", extractDir.absolutePath) }
+                .result.get().assertNormalExitValue()
         } else if (archiveName.endsWith(".zip")) {
             project.copy { into(extractDir); from(project.zipTree(archive)) }
         } else {

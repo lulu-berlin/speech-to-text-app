@@ -51,16 +51,34 @@ in
     # must agree on the browser revisions. Bump both together. Dev only — the flake's
     # build is untouched (ADR 0010).
     pkgs.playwright-driver
+
+    # Kotlin CLI + language server, as languages.kotlin provided them before item 33
+    # replaced it (it hard-codes nixpkgs' default gradle, 8.14.4).
+    pkgs.kotlin
+    pkgs.kotlin-language-server
   ];
 
   # https://devenv.sh/languages/
-  # Kotlin brings JDK 21 + Gradle. The ONNX Runtime native lib bundled in the
-  # Maven artifact loads under this JDK without LD_LIBRARY_PATH (verified 2026-10-05).
-  languages.kotlin.enable = true;
+  # JDK 21 (pkgs.jdk, the flake's runtime JDK) as JAVA_HOME, and Gradle 9.8 on it — the
+  # flake's gradle_9 and the committed wrapper's version (item 33, ADR 0048; Gradle 8.14
+  # cannot run on Java 25). The ONNX Runtime native lib bundled in the Maven artifact
+  # loads under this JDK without LD_LIBRARY_PATH (verified 2026-10-05).
+  languages.java = {
+    enable = true;
+    gradle.enable = true;
+    gradle.package = pkgs.gradle_9.override { java = config.languages.java.jdk.package; };
+    lsp.enable = false;
+  };
   languages.typescript.enable = true;
   # Node + npm for the Vite/React frontend
   languages.javascript.enable = true;
   languages.javascript.npm.enable = true;
+
+  # UTF-8 file names for the JVM (item 33): Gradle 9's HTML test report writes one
+  # directory per test name, and names like "0°, 20°" or "O(n³)" fail to encode when the
+  # locale is POSIX (an unset LANG, as in agent shells). LC_CTYPE only sets the charset;
+  # the user's LANG (messages, sorting) is left alone.
+  env.LC_CTYPE = "C.UTF-8";
 
   # Models for the app and integration tests (pinned in nix/models.nix)
   env.STT_WHISPER_MODEL = "${models.whisper}";

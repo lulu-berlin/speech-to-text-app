@@ -68,7 +68,7 @@ Root (devenv):
 
 - `devenv up` — start the whole app for development: the frontend (`pnpm dev`, Vite dev server with HMR on port 5173, proxying `/api` to the backend) and the backend (Ktor on 8080; rebuilt and restarted when backend sources change; `STT_DATA_DIR` comes from the devenv shell). No browser opens; the Vite URL and both processes' logs are printed. Stop with Ctrl-C, then `q` to confirm — or `devenv down`. Dev data (`stt.db`, uploads) lives in `.devenv/state/stt`, a fixed, git-ignored location that survives restarts. Changes to `devenv.nix` need `direnv reload` to take effect.
 
-Backend (Gradle 8.14 via devenv, no wrapper — ADR 0014):
+Backend (Gradle 9.8 via devenv — ADR 0048; agents use the devenv `gradle`, not the root `./gradlew`, which exists for human developers without Nix — ADR 0014 as scoped by 0048):
 
 - `gradle check` — formatting gate (`ktlintCheck`) + all unit tests. The standard verification command.
 - `gradle test` — unit tests only.

@@ -28,6 +28,13 @@
     models = import ./nix/models.nix {inherit pkgs;};
     whisperCpp = import ./nix/whisper-cpp.nix {inherit pkgs;};
 
+    # Gradle 9.8 (nixpkgs' gradle_9) on the runtime JDK 21 (pkgs.jdk = pkgs.jre's JDK):
+    # the same Gradle as the devenv and the committed wrapper (item 33, ADR 0048). 9.x
+    # is the first line that runs on Java 25 (8.14's embedded Kotlin cannot parse it);
+    # JDK 21 instead of gradle_9's default JDK 25 keeps the build and test JVM equal to
+    # the app's runtime and to item 16's verified environment.
+    gradle = pkgs.gradle_9.override {java = pkgs.jdk;};
+
     # Version manifest for the human Gradle bootstrap (roadmap item 33): the same
     # versions the flake builds with, rendered into the committed versions.json by the
     # update-versions app below. Node/pnpm/gradle/jdk/ffmpeg come from this nixpkgs
@@ -40,7 +47,7 @@
       nixpkgsRev = nixpkgs.rev;
       node = pkgs.nodejs.version;
       pnpm = pkgs.pnpm_11.version;
-      gradle = pkgs.gradle.version;
+      gradle = gradle.version;
       jdk = pkgs.jre.version;
       ffmpeg = pkgs.lib.versions.majorMinor pkgs.ffmpeg_8.version;
       whisperCpp = data.whisperCppTag;
@@ -76,7 +83,7 @@
       postUnpack = "chmod -R u+w .";
 
       nativeBuildInputs = [
-        pkgs.gradle
+        gradle
         pkgs.makeWrapper
         pkgs.jre
       ];
@@ -88,7 +95,7 @@
       # resolved as an attribute path inside nixpkgs and fails. The default bwrapFlags
       # bind-mounts $PWD read-only (fine for nixpkgs, broken for us): make it writable
       # so the unpack phase can prepare the source and write deps.json.
-      mitmCache = pkgs.gradle.fetchDeps {
+      mitmCache = gradle.fetchDeps {
         pkg = finalAttrs.finalPackage;
         data = ./backend/deps.json;
         bwrapFlags = ''--bind "$PWD" "$PWD"'';
@@ -98,6 +105,11 @@
       # settings, -Xmx512m -XX:MaxMetaspaceSize=384m (ADR 0025: the former
       # 384m/256m cap ran out of metaspace in :compileKotlin).
       gradleFlags = ["-Pkotlin.compiler.execution.strategy=in-process"];
+
+      # UTF-8 file names for the JVM: Gradle 9's HTML test report writes one directory
+      # per test name ("0°", "O(n³)"), which fails under the build sandbox's POSIX locale.
+      # glibc has C.UTF-8 built in. Same setting as the devenv (item 33).
+      LC_CTYPE = "C.UTF-8";
 
       # The Nix check runs `gradle check` (ktlintCheck + tests, ADR 0015): nixpkgs'
       # gradle setup hook defaults gradleCheckTask to `test` (verified in the pinned

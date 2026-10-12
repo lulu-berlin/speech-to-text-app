@@ -26,7 +26,7 @@
     }
   },
   "ffmpeg": "8.1",
-  "gradle": "8.14.4",
+  "gradle": "9.8.0",
   "jdk": "21.0.12.1+1",
   "models": {
     "speaker": {
