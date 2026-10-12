@@ -71,7 +71,7 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The coroutine running a task is named `task-<id>` (observed from inside a fake transcriber through the existing engine-test seam)
 - [x] (discovered) The worker coroutine is named `engine-worker`, distinct from the task names
 - [x] Must not break: `gradle check` (ktlint + suites) and `gradle integrationTest` stay green; captured-log tests are unaffected by the console pattern change
-- [ ] (user-verified) `nix build .` succeeds; `backend/deps.json` unchanged — the artifact already resolves at 1.11.0 (ADR 0042 precedent; regeneration only if the graph actually changed)
+- [x] (user-verified) `nix build .` succeeds; `backend/deps.json` unchanged — the artifact already resolves at 1.11.0 (ADR 0042 precedent; regeneration only if the graph actually changed)
 
 ## Acceptance criteria
 
@@ -93,3 +93,4 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-12 (workspace): cycle 6 refactor checkpoint: none (user). Discovered and confirmed by the user: the proposal's `engine-worker` name had no test-list item; appended. Cycle 7 (list item 6) green on arrival (regression pin since cycle 5 dropped the thread seed): the startup sweep's warning (a leftover directory with a read-only subdirectory) and the device probe's failure warning (a `ProcessRunner` whose spawn throws, raised from the engine's scope while the task's job is suspended) carry no `taskId` key, while the task's own lines carry its id; `gradle check` green (263 tests).
 - 2026-10-12 (workspace): cycle 7 refactor checkpoint: none (user). Cycle 8 (the discovered `engine-worker` item): red `expected:<["engine-worker", "task-1"]> but was:<["task-1"]>` (names of the engine scope's live child coroutines while the task is held); green: `start()` launches the worker with `CoroutineName("engine-worker")`; after the task completes only `engine-worker` remains; `gradle check` green (264 tests).
 - 2026-10-12 (workspace): cycle 8 refactor checkpoint: none (user). Item 8: console pattern ` [task <id>]` only when set (user's choice, `%replace`; checked against logback 1.6.5: untagged, `[task 7]` and blank-id lines render as intended); ADR 0048 written. `gradle check` (264 tests) and `gradle integrationTest` (63 Integration tests) green. Real run (`gradle run`, tiny.en model, jfk.wav, `Dispatchers.Default`): `SpeakerDiarizer` and `SpeakerSummary` lines print `[task 1]`, startup lines none. Item 9 (`nix build .`, `deps.json` unchanged) is left for the user. Status set to in-review.
+- 2026-10-12: the user verified `nix build .`, read the diff and approved it.
