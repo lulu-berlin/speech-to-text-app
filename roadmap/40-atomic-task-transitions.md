@@ -49,7 +49,7 @@ Added 2026-10-12 by the review (approved by the user):
 - [x] (review) Pausing a QUEUED task while another task runs leaves the running task untouched: its process is not frozen, its diarization is not held, and it completes; the paused task stays PAUSED and is not started
 - [ ] (review, e2e, ADR 0046) Against the real backend, pausing a queued upload while another transcribes: the running one still completes, the paused one stays paused until resumed, then completes
 - [ ] (discovered) A task paused between two of its processes (e.g. between two chunks, after the freeze missed the exiting process) starts no further process: it stops before its next chunk and stays PAUSED until resumed, then completes. (Found while checking the review's finding 1: `ProcessRunner.pause()` is a no-op with no run in flight and each run's end clears the freeze, and the chunk loop never checks for a pause — a probe saw chunk 1 start, and the task complete, while it was PAUSED.)
-- [ ] (discovered) Resuming a PAUSED task that never started, while another task is paused in place, leaves that other task frozen, gated and PAUSED. (Found at the review-item-2 checkpoint: `resumeTask` calls `processControl.resume()` and `pauseGate.resume()` whichever task it resumes.)
+- [x] (discovered) Resuming a PAUSED task that never started, while another task is paused in place, leaves that other task frozen, gated and PAUSED. (Found at the review-item-2 checkpoint: `resumeTask` calls `processControl.resume()` and `pauseGate.resume()` whichever task it resumes.)
 
 ## Acceptance criteria
 
@@ -66,3 +66,5 @@ Added 2026-10-12 by the review (approved by the user):
 - 2026-10-12: the user added the discovered pause-between-processes item to this item and chose review item 2 as the next cycle; fix design chosen by the user: `pauseTask` freezes the process and closes the gate only when the paused task is the one the worker runs (`runningJob(id) != null`, as `resumeTask` does). Green (`gradle check`: 269 tests, 0 failures).
 - 2026-10-12: checkpoint after review item 2: no refactoring suggested (the `runningHere` guard is one line, used differently by pause and resume). The user added the discovered resume-mirror item; a second candidate (a pause racing the worker's pick of the same QUEUED task) was not added. Next cycle: review item 1.
 - 2026-10-12: review item 1: fix design chosen by the user — every run starts with the pause gate open (`runInJob` reopens it before the run is registered in `running`). Green (`gradle check`: 270 tests, 0 failures).
+- 2026-10-12: checkpoint after review item 1: the user declined the suggested test-helper extraction (no refactor). Next cycle: the discovered resume mirror.
+- 2026-10-12: discovered resume mirror: fix design chosen by the user — `resumeTask` continues the process and opens the gate only when the worker is inside the resumed task (`runningHere`), mirroring the pause guard. Green (`gradle check`: 271 tests, 0 failures).
