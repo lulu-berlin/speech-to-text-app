@@ -28,13 +28,14 @@ one worker, one task job, progress callbacks on reader coroutines, JDBC and file
   equals the resolved version changes nothing). The user still re-verifies `nix build .`
   (ADR 0010/0014).
 - **Per-task tagging in `runInJob`** (`ProcessingEngine`): the task's job launches with
-  `CoroutineName("task-<id>")`, and the job body seeds the id into the MDC and runs the task inside
-  `withContext(MDCContext())`. Mechanics (the canonical kotlinx pattern, docs "Debugging coroutines"
-  → logging): the id is put into the MDC on the coroutine's thread first; `MDCContext`'s
-  constructor captures that map at creation; the library re-applies it around every resumption,
-  across dispatcher switches, and child coroutines inherit it. Result: logs from the chunk loop, the
-  IO file/JDBC blocks, the embedding loop, and the whisper progress reader all carry the id — while
-  whichever previous task's id was on the thread is restored afterwards, so nothing leaks.
+  `CoroutineName("task-<id>")`, and the job body runs the task inside
+  `withContext(MDCContext(<caller's map> + taskId))`. Mechanics: the library applies that map
+  around every resumption, across dispatcher switches, and child coroutines inherit it. Result:
+  logs from the chunk loop, the IO file/JDBC blocks, the embedding loop, and the whisper progress
+  reader all carry the id. The thread's own MDC is never written: the docs' idiom (`MDC.put` on the
+  thread, then `MDCContext()`) leaks — `MDCContext` saves the thread's map, seed included, and
+  restores it on every suspension, so the launching thread kept the id for the coroutines that ran
+  on it next (found in cycle 5, 2026-10-12).
 - **Named worker**: the engine worker gets a fixed name (`engine-worker`), distinct from per-task
   names. Exact placement (the worker scope vs. the `launch { engine.start() }` site) is an
   implementation detail for the cycle; task-agnostic logs stay untagged either way.
@@ -64,7 +65,7 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
 - [x] The id survives suspension and dispatcher switches: a log from inside the embedding loop (`Dispatchers.Default`) and from a chunk's `withContext(Dispatchers.IO)` block carries it
 - [x] A log emitted from the whisper progress reader (the `async(Dispatchers.IO)` reader coroutine's callback) carries it
 - [x] The task's own failure path (a failing chunk → task FAILED) logs with the id
-- [ ] No leakage: after task A completes, a log emitted while task B runs — or while the worker is idle — carries B's id or none, never A's
+- [x] No leakage: while a task's job is suspended, and after tasks A and B have completed, a log from a coroutine outside the task jobs (on the engine's scope) carries no `taskId` key; each task's own lines carry only that task's id, never the other's (sharpened 2026-10-12 in cycle 5: the single-thread test dispatcher hides the post-completion leak, the suspended-task leak shows it deterministically)
 - [ ] Task-agnostic logs (startup device probe, worker idle) carry no `taskId` key at all (absent, not blank)
 - [ ] The coroutine running a task is named `task-<id>` (observed from inside a fake transcriber through the existing engine-test seam)
 - [ ] Must not break: `gradle check` (ktlint + suites) and `gradle integrationTest` stay green; captured-log tests are unaffected by the console pattern change
@@ -85,3 +86,4 @@ Approved 2026-10-12 with the spec. Behaviors only; discovered scenarios are appe
   Ktor), so no lockfile change is expected (verified 2026-10-12).
 - 2026-10-12: consultation answers: key `taskId`; the command boundary accepted; ADR 0048 to be written. Test list (9 items) approved; status stays `in-progress` in the worktree.
 - 2026-10-12 (workspace): cycle 1 green (the core MDC map; drove the dependency + `withTaskLoggingContext`); refactor approved (the `TASK_ID_MDC_KEY` constant). Cycle 2 green on arrival (regression pin — the cycle-1 implementation already covers the dispatchers; the fake seams log from inside `Dispatchers.IO`/`Dispatchers.Default`); no refactor suggested. Cycle 3 green on arrival (regression pin: child coroutines inherit the context — the fake's progress comes from a `coroutineScope`+`async(Dispatchers.IO)` reader with the log + a `progressReaderLogged` flag); no refactor suggested. Cycle 4 green on arrival (pin: the tag spans the failure stretch — the fake fails via `failNext`, the task lands FAILED, the emitted lines still carry the id); no refactor suggested.
+- 2026-10-12 (workspace): cycle 4 refactor checkpoint — approved and done as separate commits: `ktlintFormat` of the item's test seams (`ktlintCheck` had been failing on them), the `assertTaskIdOnEveryEvent` helper, the `TranscriptionException` import. Cycle 5: before writing it, found that the seed-then-`MDCContext()` idiom leaks (the library saves the thread's map, seed included, and restores it on every suspension); user chose to sharpen item 5 into a red test. Red: `Map should not contain key taskId` on the outside coroutine's line while the first task was suspended. Green: `withTaskLoggingContext` builds `MDCContext(<caller's map> + taskId)` and no longer writes the thread's MDC; `gradle check` green (261 tests).
