@@ -164,8 +164,7 @@ class ProcessingEngine internal constructor(
      */
     suspend fun pauseQueue() {
         queueState.setPaused(true)
-        processControl.pause()
-        pauseGate.pause()
+        freezeCurrentRun()
         queueUpdated()
     }
 
@@ -174,8 +173,7 @@ class ProcessingEngine internal constructor(
      */
     suspend fun resumeQueue() {
         queueState.setPaused(false)
-        processControl.resume()
-        pauseGate.resume()
+        continueCurrentRun()
         queueUpdated()
         wake()
     }
@@ -206,8 +204,7 @@ class ProcessingEngine internal constructor(
             if (tasks.pauseIfPossible(id)) {
                 publish(id)
                 if (runningHere) {
-                    processControl.pause()
-                    pauseGate.pause()
+                    freezeCurrentRun()
                 }
                 TaskCommandOutcome.Accepted
             } else {
@@ -232,8 +229,7 @@ class ProcessingEngine internal constructor(
             if (tasks.resumeIfPaused(id, if (runningHere) TaskStatus.RUNNING else TaskStatus.QUEUED)) {
                 publish(id)
                 if (runningHere) {
-                    processControl.resume()
-                    pauseGate.resume()
+                    continueCurrentRun()
                 } else {
                     // No runner: the task was paused while queued, or across a restart. The worker picks it
                     // up when it looks again (a started PAUSED task it waits on, directly) and moves it to
@@ -391,6 +387,18 @@ class ProcessingEngine internal constructor(
             ?.status
             ?.let { TaskCommandOutcome.Illegal(it, to) }
             ?: TaskCommandOutcome.Unknown
+
+    /** Freezes the current run: its process (SIGSTOP; a no-op when none is in flight) and its DIARIZING gate. */
+    private fun freezeCurrentRun() {
+        processControl.pause()
+        pauseGate.pause()
+    }
+
+    /** Continues the current run: its frozen process and its DIARIZING gate. */
+    private fun continueCurrentRun() {
+        processControl.resume()
+        pauseGate.resume()
+    }
 
     /**
      * The task to run next. Nothing while the queue is paused; and while a started task is paused, nothing
