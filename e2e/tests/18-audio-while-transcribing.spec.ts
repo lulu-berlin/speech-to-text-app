@@ -1,9 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  COMPLETED_PLAYER_CLIP,
-  TRANSCRIBING_BACKGROUND_CLIP,
-  appUrl,
-} from '../lib/backend.mjs';
+import { COMPLETED_PLAYER_CLIP, TRANSCRIBING_BACKGROUND_CLIP, appUrl } from '../lib/backend.mjs';
 import { appLive, goTo, openTranscript, rowOf, uploadClips } from './helpers/ui';
 
 // Item 37 (ADR 0046): a completed transcript's player used to fetch /audio 500 whenever
@@ -11,9 +7,7 @@ import { appLive, goTo, openTranscript, rowOf, uploadClips } from './helpers/ui'
 // runner — and the player then had no audio, silently (no assertion failed). This journey
 // makes the silence the assertion: while a task transcribes, the completed clip's player
 // must load actual playable audio.
-test('a completed player has playable audio while another task transcribes', async ({
-  page,
-}) => {
+test('a completed player has playable audio while another task transcribes', async ({ page }) => {
   test.setTimeout(360_000);
   await appLive(page);
 
@@ -57,7 +51,9 @@ test('a completed player has playable audio while another task transcribes', asy
 /** The task id of [filename] on the shared backend, from the task list. */
 async function apiTaskIdOf(page: Page, filename: string): Promise<number> {
   const list = await (await page.request.get(appUrl('/api/tasks'))).json();
-  const task = list.tasks.find((candidate: { filename: string }) => candidate.filename === filename);
+  const task = list.tasks.find(
+    (candidate: { filename: string }) => candidate.filename === filename,
+  );
   expect(task, `task ${filename} to exist`).toBeTruthy();
   return task.id;
 }
