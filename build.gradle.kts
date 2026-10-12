@@ -336,7 +336,7 @@ tasks.register("prepareE2eFixtures") {
 tasks.register<Exec>("e2eInstall") {
     group = "verification"
     description = "Install the e2e package's dependencies (frozen lockfile) with the managed pnpm"
-    dependsOn("prepareRuntime", ":frontend:pnpmSetup")
+    dependsOn(":frontend:pnpmSetup")
     doFirst {
         applyE2eEnv(this as Exec)
         setCommandLine(pnpmExe.absolutePath, "install", "--frozen-lockfile")
