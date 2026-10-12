@@ -191,19 +191,24 @@ class ProcessingEngine internal constructor(
     }
 
     /**
-     * Pauses a task: its process is frozen and its status becomes PAUSED; the phase it is in stays, so
-     * a paused task can still say where it stopped. A QUEUED task only changes status (no process is in
-     * flight); only a QUEUED or RUNNING task can be paused (item 04's table). The write is conditional:
-     * a pause that races a task's finish is refused instead of writing PAUSED over the newer status, and
-     * the losing pause freezes nothing — the process and the pause gate are only touched when the pause
-     * won (frozen processes and a paused gate would stall the *next* task).
+     * Pauses a task: its status becomes PAUSED and, when it is the task the worker is running, its process
+     * is frozen and the pause gate closed; the phase it is in stays, so a paused task can still say where
+     * it stopped. A task the worker is not running (QUEUED, never started) only changes status: the
+     * process in flight and the pause gate belong to the *current* run, which is another task's. Only a
+     * QUEUED or RUNNING task can be paused (item 04's table). The write is conditional: a pause that races
+     * a task's finish is refused instead of writing PAUSED over the newer status, and the losing pause
+     * freezes nothing — the process and the pause gate are only touched when the pause won (frozen
+     * processes and a paused gate would stall the *next* task).
      */
     suspend fun pauseTask(id: Long): TaskCommandOutcome =
         command(id, TaskStatus.PAUSED) {
+            val runningHere = runningJob(id) != null
             if (tasks.pauseIfPossible(id)) {
                 publish(id)
-                processControl.pause()
-                pauseGate.pause()
+                if (runningHere) {
+                    processControl.pause()
+                    pauseGate.pause()
+                }
                 TaskCommandOutcome.Accepted
             } else {
                 lostTransition(id, TaskStatus.PAUSED)

@@ -3,8 +3,12 @@ package stt.engine
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.queue.TaskStatus
+import stt.transcribe.WhisperSegment
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineTaskPauseSpec :
     BehaviorSpec({
@@ -109,6 +113,55 @@ class ProcessingEngineTaskPauseSpec :
                         fixture.completed.receive() shouldBe task
                         fixture.processControl.pauses shouldBe 1
                         fixture.processControl.resumes shouldBe 1
+                    }
+                }
+            }
+        }
+
+        given("a queued task paused while another task runs") {
+            `when`("the queued task is paused") {
+                then("the running task is untouched and completes, and the paused task stays PAUSED, never started") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        // The running task has speakers, so its DIARIZING phase passes the pause gate.
+                        val running =
+                            enqueueTask(
+                                fixture.tasks,
+                                fixture.workDirectories,
+                                "running.wav",
+                                queuePosition = 0,
+                                createdAt = 1,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        val queued = enqueueTask(fixture.tasks, fixture.workDirectories, "queued.wav", queuePosition = 1, createdAt = 2)
+                        fixture.transcriber.segmentsByTask =
+                            mapOf(running to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = release
+                        fixture.engine.start()
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe running
+
+                        fixture.engine.pauseTask(queued) shouldBe TaskCommandOutcome.Accepted
+                        statusOf(fixture, queued) shouldBe TaskStatus.PAUSED
+                        // The running task's process is not the paused task's: it is not frozen.
+                        fixture.processControl.frozen shouldBe false
+                        fixture.processControl.pauses shouldBe 0
+
+                        fixture.transcriber.hold = null
+                        release.complete(Unit)
+                        pumpUntil(2.seconds) { statusOf(fixture, running) == TaskStatus.COMPLETED }
+                        fixture.diarizer.passedGate shouldBe true
+                        statusOf(fixture, running) shouldBe TaskStatus.COMPLETED
+
+                        // The paused task is not started after the running one finishes.
+                        pumpUntil(200.milliseconds) { fixture.chunker.workDirs.size > 1 }
+                        fixture.chunker.workDirs.map(::taskIdOf) shouldBe listOf(running)
+                        statusOf(fixture, queued) shouldBe TaskStatus.PAUSED
                     }
                 }
             }
