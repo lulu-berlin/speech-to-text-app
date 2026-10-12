@@ -37,9 +37,9 @@ How it works inside — the components, the life of a task, the data model, the 
 | [Packaged app with Nix](#packaged-app-with-nix) | Using the app | available |
 | [Development environment (devenv)](#development-environment-devenv) | Working on the app | available |
 | [Docker](#docker) | Using the app without Nix | available |
-| [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | planned ([roadmap item 33](roadmap/33-gradle-bootstrap-without-nix.md)) |
+| [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | available |
 
-All ways need **Linux on x86-64**. A GPU is optional: whisper.cpp runs on any GPU with a **Vulkan** driver and falls back to the CPU otherwise. The first build of the package, the development shell or the Docker image downloads about 600 MB of models.
+All ways need **Linux on x86-64**; the Gradle path also has macOS builds, untested. A GPU is optional: whisper.cpp runs on any GPU with a **Vulkan** driver and falls back to the CPU otherwise. The first build of the package, the development shell or the Docker image downloads about 600 MB of models.
 
 ### Packaged app with Nix
 
@@ -111,15 +111,63 @@ The container runs as an unprivileged user (uid 1000) and writes only to its dat
 
 ### Gradle without Nix
 
-Not available yet. [Roadmap item 33](roadmap/33-gradle-bootstrap-without-nix.md) adds a Gradle bootstrap that fetches the tools itself, for developers who do not use Nix, and documents it here.
+For working on the app without Nix: the repository's `./gradlew` downloads everything else itself — Gradle 9.8, JDK 21, Node.js, pnpm, whisper-cli 1.8.4, ffmpeg 8.1 and the models — at the versions the Nix flake pins (the committed [`versions.json`](versions.json), which the flake checks), and verifies every file's SHA-256. Linux x86-64 is tested; the macOS builds (Intel and Apple Silicon) are best-effort and untested. This path is for people; AI agents working on the repository keep to Nix and devenv ([AGENTS.md](AGENTS.md)).
+
+Prerequisites:
+
+- **Java 17 or newer** to start Gradle (Gradle 9.8 runs on Java 17–27; tested with 25). The app itself is built and run with JDK 21, which Gradle downloads when your Java is another version.
+- **Linux**: glibc 2.38 or newer (Ubuntu 24.04+, Debian 13+, Fedora 39+) and the system libraries the prebuilt tools are linked against — only this path needs them; Nix, devenv and Docker bring their own:
+  - whisper-cli: `libstdc++6`, `libgomp1` and the Vulkan loader `libvulkan1` (needed even without a GPU);
+  - ffmpeg: `libasound2` (`libasound2t64` on Ubuntu 24.04+ and Debian 13), `libpulse0`, `libxcb1`, `libxcb-shm0` and `libudev1`.
+
+  On Ubuntu 24.04, with Java and git:
+
+  ```sh
+  sudo apt-get install -y openjdk-25-jdk-headless git \
+    libgomp1 libvulkan1 libasound2t64 libpulse0 libxcb1 libxcb-shm0 libudev1 libstdc++6
+  ```
+
+- **macOS**: `setsid` (the app starts whisper-cli and ffmpeg through it), from Homebrew's `util-linux`, which does not put it on `PATH` by itself:
+
+  ```sh
+  brew install util-linux
+  export PATH="$(brew --prefix util-linux)/bin:$PATH"
+  ```
+
+```sh
+git clone https://github.com/lulu-berlin/speech-to-text-app.git
+cd speech-to-text-app
+./gradlew run
+```
+
+Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads about 850 MB (more when Gradle also has to download JDK 21) and builds the frontend and the backend. Later runs reuse the downloads and still check every file's SHA-256.
+
+- `./gradlew dev` — dev mode, like `devenv up`: the Vite dev server on <http://localhost:5173> with hot reload, and the backend rebuilt and restarted when its sources change. Ctrl-C stops both.
+- `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. Once per machine, Chromium's system libraries need installing (Debian and Ubuntu only; asks for `sudo`). The version numbers in the paths are `node` and `pnpm` in `versions.json`:
+
+  ```sh
+  ./gradlew e2eBrowsers
+  PATH="$HOME/.gradle/stt-app/node/nodejs/node-v24.21.0-linux-x64/bin:$PATH" \
+    ~/.gradle/stt-app/node/pnpm/pnpm-v11.27.0/bin/pnpm --dir e2e exec playwright install-deps chromium
+  ./gradlew e2e
+  ```
+
+- `./gradlew checkVersions` — checks that `versions.json` still matches the Gradle wrapper and the flake's locked nixpkgs.
+- `./gradlew -p backend check` — the backend's tests. They need a UTF-8 locale, for example `export LANG=C.UTF-8` first; `./gradlew run` does not. A running Gradle daemon keeps the locale it started with, so after changing it run `./gradlew --stop` once.
+
+Where things live:
+
+- The downloads: `~/.gradle/stt-app/` (`dl/`, `tools/`, `models/`, `fixtures/`, `node/`, `ms-playwright/`), shared by every clone; `GRADLE_USER_HOME` moves it with the rest of Gradle's files. Deleting it is safe: the next run downloads again.
+- The data: `${XDG_DATA_HOME:-~/.local/share}/stt-app`, the same directory as the Nix package's ([Where your data lives](#where-your-data-lives)).
+- Every [`STT_*` variable](#configuration) you set yourself wins over Gradle's default, for example `STT_DATA_DIR` or `STT_PORT`.
 
 ## Configuration
 
-The backend is configured with environment variables. The Nix package and the development shell set all of them; you only set them yourself to change something.
+The backend is configured with environment variables. The Nix package, the development shell and `./gradlew run`/`dev` set all of them; you only set them yourself to change something.
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
-| `STT_DATA_DIR` | yes (the Nix package has a default) | Where the database and the stored audio live — see [Where your data lives](#where-your-data-lives). |
+| `STT_DATA_DIR` | yes (the Nix package and `./gradlew` have a default) | Where the database and the stored audio live — see [Where your data lives](#where-your-data-lives). |
 | `STT_WHISPER_MODEL` | yes | The whisper.cpp model file. The pinned default is `large-v3-turbo-q5_0` ([ADR 0008](docs/decisions/0008-default-whisper-model.md)). |
 | `STT_SPEAKER_MODEL` | yes | The CAM++ speaker-embedding model (ONNX) used for diarization ([ADR 0003](docs/decisions/0003-kotlin-diarization-campplus-onnx.md)). |
 | `STT_PORT` | no | The HTTP port, default `8080`. |
@@ -138,6 +186,7 @@ Everything the app keeps — the queue, the transcripts, the speaker names and t
 | Nix package | `$STT_DATA_DIR` if set, else `${XDG_DATA_HOME:-~/.local/share}/stt-app` |
 | `devenv up` and the devenv shell | `.devenv/state/stt` inside the repository (git-ignored, survives restarts) |
 | `gradle run` | `$STT_DATA_DIR`, which you choose |
+| `./gradlew run` and `./gradlew dev` | `$STT_DATA_DIR` if set, else `${XDG_DATA_HOME:-~/.local/share}/stt-app` |
 | Docker | the named volume `stt-data`, mounted at `/data` in the container |
 
 Inside it:
