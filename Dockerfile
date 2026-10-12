@@ -27,14 +27,14 @@ WORKDIR /build
 COPY . .
 
 # `stt-app` is an alias of the default package (flake.nix), so the build is explicit;
-# `docker-vulkan-drivers` is the image-only Mesa Vulkan driver list (Intel/AMD GPUs; the
-# image has no host userspace driver). The out-links give stable handles for readlink -f;
-# the union of both closures feeds the rootfs assembly below.
+# `docker-gpu-runtime` is the image-only GPU userspace (Mesa's Intel/AMD Vulkan drivers,
+# the libraries NVIDIA's CDI-mounted driver links). The out-links give stable handles for
+# readlink -f; the union of both closures feeds the rootfs assembly below.
 RUN set -euxo pipefail; \
     mkdir -p /out; \
     nix build --option sandbox false .#stt-app --out-link /out/app; \
-    nix build --option sandbox false .#docker-vulkan-drivers --out-link /out/vulkan-drivers; \
-    nix-store -qR "$(readlink -f /out/app)" "$(readlink -f /out/vulkan-drivers)" | sort -u > /out/closure.txt
+    nix build --option sandbox false .#docker-gpu-runtime --out-link /out/gpu-runtime; \
+    nix-store -qR "$(readlink -f /out/app)" "$(readlink -f /out/gpu-runtime)" | sort -u > /out/closure.txt
 
 # Assemble the runtime rootfs from the closure and the OS scaffolding. bash's store
 # path is read from the wrapper script's own shebang (makeWrapper emits an absolute
@@ -63,8 +63,9 @@ RUN set -eux; \
     printf 'passwd: files\nshadow: files\ngroup: files\nhosts: files dns\nnetworks: files\nservices: files\n' > /rootfs/etc/nsswitch.conf; \
     chmod 1777 /rootfs/tmp; \
     chown -R 1000:1000 /rootfs/data /rootfs/home/stt; \
-    vkDriverFiles="$(cat /out/vulkan-drivers)"; \
-    printf '#!%s\nexport VK_ADD_DRIVER_FILES=%s\nexec %s "$@"\n' "$interp" "$vkDriverFiles" "$appBin" > /rootfs/entrypoint.sh; \
+    vkDriverFiles="$(cat /out/gpu-runtime/vk-driver-files)"; \
+    nvidiaLibPath="$(cat /out/gpu-runtime/ld-library-path)"; \
+    printf '#!%s\nexport VK_ADD_DRIVER_FILES=%s\nif [ -e /dev/nvidiactl ]; then export LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}; fi\nexec %s "$@"\n' "$interp" "$vkDriverFiles" "$nvidiaLibPath" "$appBin" > /rootfs/entrypoint.sh; \
     chmod 755 /rootfs/entrypoint.sh
 
 FROM scratch

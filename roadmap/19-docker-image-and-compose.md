@@ -22,7 +22,7 @@ Make the app easy to build and run with Docker: a container image of the package
 - **Image** built from item 16's flake closure by a multi-stage Dockerfile:
   - builder stage on `nixos/nix`: `nix build .#stt-app` (item 16's package: wrapper, JRE, frontend, Vulkan whisper-cli, ffmpeg, `setsid`, both models);
   - runtime stage: the closure's files (the exact copy mechanism — store path copying with an env shim, or similar — is settled at the first checkpoint), a non-root user, PID 1 = an init (`tini` from the closure or `compose init: true`); `STT_DATA_DIR=/data`; port 8080.
-  - The closure carries the Vulkan whisper-cli, `ffmpeg`, `util-linux`'s `setsid` and the models; the image additionally carries Mesa's Vulkan drivers for Intel/AMD (flake output `docker-vulkan-drivers`, cycle 9), so for Intel/AMD the host contributes only the GPU device (kernel driver, `/dev/dri`); for NVIDIA the Container Toolkit injects the host's userspace driver.
+  - The closure carries the Vulkan whisper-cli, `ffmpeg`, `util-linux`'s `setsid` and the models; the image additionally carries the GPU userspace the host cannot lend it (flake output `docker-gpu-runtime`, cycle 9): Mesa's Vulkan drivers for Intel/AMD, so there the host contributes only the GPU device (kernel driver, `/dev/dri`), and the libraries NVIDIA's driver links (X11 client libs, libglvnd, …), since for NVIDIA the Container Toolkit injects only the host's driver itself.
 - **GPU** (the corrected matrix, recorded as decided):
   - **NVIDIA:** the GPUs plus the NVIDIA Container Toolkit on the host (`--gpus all` semantics; on CDI hosts the device `nvidia.com/gpu=all`); the Vulkan build uses the driver's Vulkan ICD. Compose exposes this via the `docker-compose.gpu-nvidia.yml` override (profiles until cycle 9, see Checkpoints).
   - **Intel / AMD:** `/dev/dri` passed to the container; the `docker-compose.gpu-vulkan.yml` override; the userspace driver (Mesa RADV/ANV) comes with the image.
@@ -177,6 +177,22 @@ None.
   dirs `/etc/cdi`, `/var/run/cdi`, neither exists; no `nvidia-ctk`, no generator unit — the
   toolkit is not active on the host. The user is enabling
   `hardware.nvidia-container-toolkit` to verify the NVIDIA half; test 9 stays open until then.
+  Fourth run (toolkit enabled; `/var/run/cdi/nvidia-container-toolkit.json` lists
+  `nvidia.com/gpu=0` and `=all`): the NVIDIA override starts (healthy), `/dev/nvidia*` are
+  mounted, but whisper-cli stayed on CPU. `VK_LOADER_DEBUG` named the cause: the NVIDIA ICD
+  (via the host's `/run/opengl-driver`, which the NixOS CDI spec mounts) resolves to the
+  mounted `nvidia-x11-595.71.05` store path, and loading `libGLX_nvidia.so.0` fails with
+  `libX11.so.6: cannot open shared object file` — the spec mounts the driver and the host
+  glibc lib dirs, not the X11/libglvnd libraries on the driver's RUNPATH (the host's other
+  `/run/opengl-driver` entries dangle the same way; the loader skips them). NVIDIA's
+  container guidance expects the image to provide those libraries. Fix (`docker-gpu-runtime`
+  replaces `docker-vulkan-drivers`): the image also carries nixpkgs' nvidia-x11 libPath set
+  (`libdrm libxext libx11 libxv libxrandr libxcb zlib gcc-lib wayland libgbm libGL openssl
+  dbus`), and the entrypoint exports it as `LD_LIBRARY_PATH` only when `/dev/nvidiactl`
+  exists (the CPU and Vulkan variants are unaffected; a caller's `LD_LIBRARY_PATH` is kept
+  after it). Unverifiable here: on non-NixOS hosts the toolkit's ICD may name
+  `libGLX_nvidia.so.0` without a path, which the image's Nix loader would not search in
+  `/usr/lib/x86_64-linux-gnu` — NVIDIA on non-NixOS stays documented as unverified.
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -244,11 +260,11 @@ docker compose start
 ```
 
 **GPU matrix.** Whisper runs on the GPU through Vulkan (the image ships the packaged
-Vulkan whisper build and Mesa's Intel/AMD Vulkan drivers, so any Linux host with the
-kernel GPU driver works; NVIDIA's userspace driver comes from the host's NVIDIA Container
-Toolkit). A GPU variant is an override file layered on `docker-compose.yml`: it is the
-same `stt-app` service, so `docker compose down`, `exec stt-app` and `logs` work the same
-for every variant.
+Vulkan whisper build, Mesa's Intel/AMD Vulkan drivers and the libraries NVIDIA's driver
+links, so any Linux host with the kernel GPU driver works for Intel/AMD; NVIDIA's driver
+itself comes from the host's NVIDIA Container Toolkit). A GPU variant is an override file
+layered on `docker-compose.yml`: it is the same `stt-app` service, so `docker compose
+down`, `exec stt-app` and `logs` work the same for every variant.
 
 | Host | Command |
 | --- | --- |

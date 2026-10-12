@@ -197,20 +197,41 @@
       # builder stage) names the package it builds explicitly.
       stt-app = default;
 
-      # Image-only (roadmap item 19): Mesa's Vulkan drivers for Intel/AMD GPUs in the Docker
-      # image, which has no host userspace driver (a native host brings its own, e.g. NixOS's
-      # /run/opengl-driver, so the app package does not carry them). The output is the
-      # VK_ADD_DRIVER_FILES value the image's entrypoint exports: the radeon (RADV) and
-      # intel (ANV, HASVK) ICDs only - no lavapipe, so a CPU "GPU" is never picked, and
-      # additive, so a CDI-mounted NVIDIA ICD still loads. A renamed ICD fails the build.
-      docker-vulkan-drivers = pkgs.runCommand "stt-app-docker-vulkan-drivers" { } ''
+      # Image-only (roadmap item 19): the GPU userspace the Docker image needs beyond the app
+      # (a native host brings its own, e.g. NixOS's /run/opengl-driver, so the app package
+      # does not carry it). Two files, read by the Dockerfile into the generated entrypoint:
+      # - vk-driver-files: Mesa's Vulkan drivers for Intel/AMD GPUs as the VK_ADD_DRIVER_FILES
+      #   value: the radeon (RADV) and intel (ANV, HASVK) ICDs only - no lavapipe, so a CPU
+      #   "GPU" is never picked - and additive, so a CDI-mounted NVIDIA ICD still loads. A
+      #   renamed ICD fails the build.
+      # - ld-library-path: the libraries NVIDIA's userspace driver links (libGLX_nvidia needs
+      #   libX11 and more; a CDI mount brings only the driver and glibc), mirroring nixpkgs'
+      #   nvidia-x11 libPath. The driver's RUNPATH names the host's store paths, so the
+      #   entrypoint exports these as LD_LIBRARY_PATH, only when /dev/nvidiactl exists.
+      docker-gpu-runtime = pkgs.runCommand "stt-app-docker-gpu-runtime" { } ''
+        mkdir -p $out
         icds=""
         for icd in radeon_icd intel_icd intel_hasvk_icd; do
           f=${pkgs.mesa}/share/vulkan/icd.d/$icd.x86_64.json
           test -e "$f"
           icds="$icds''${icds:+:}$f"
         done
-        printf '%s' "$icds" > $out
+        printf '%s' "$icds" > $out/vk-driver-files
+        printf '%s' ${pkgs.lib.escapeShellArg (pkgs.lib.makeLibraryPath [
+          pkgs.libdrm
+          pkgs.libxext
+          pkgs.libx11
+          pkgs.libxv
+          pkgs.libxrandr
+          pkgs.libxcb
+          pkgs.zlib
+          pkgs.stdenv.cc.cc
+          pkgs.wayland
+          pkgs.libgbm
+          pkgs.libGL
+          pkgs.openssl
+          pkgs.dbus
+        ])} > $out/ld-library-path
       '';
     };
 
