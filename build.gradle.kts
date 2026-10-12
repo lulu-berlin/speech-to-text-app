@@ -6,12 +6,6 @@
 // into the Gradle user home, prepends the managed tools' directories to PATH
 // (ADR 0047: no STT_WHISPER_CLI/STT_FFMPEG) and starts the backend with the STT_*
 // environment resolved from versions.json.
-plugins {
-    // java-base only: gives the root build the javaToolchains service (the JDK-21
-    // runtime resolution) without java compilation tasks.
-    id("java-base")
-}
-
 import groovy.json.JsonSlurper
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import java.io.ByteArrayOutputStream
@@ -21,6 +15,12 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.Properties
+
+plugins {
+    // java-base only: gives the root build the javaToolchains service (the JDK-21
+    // runtime resolution) without java compilation tasks.
+    id("java-base")
+}
 
 val manifest = JsonSlurper().parse(rootProject.file("versions.json")) as Map<*, *>
 
@@ -32,13 +32,15 @@ tasks.register("checkVersions") {
         val wrapperProperties = Properties()
         rootProject.file("gradle/wrapper/gradle-wrapper.properties").inputStream().use(wrapperProperties::load)
         val distributionUrl = wrapperProperties.getProperty("distributionUrl")
-        val wrapperVersion = Regex("gradle-([^/]+)-bin\\.zip").find(distributionUrl)?.groupValues?.get(1)
-            ?: throw GradleException("Cannot parse the Gradle version from distributionUrl: $distributionUrl")
+        val wrapperVersion =
+            Regex("gradle-([^/]+)-bin\\.zip").find(distributionUrl)?.groupValues?.get(1)
+                ?: throw GradleException("Cannot parse the Gradle version from distributionUrl: $distributionUrl")
         val manifestGradle = manifest["gradle"] as String
         if (wrapperVersion != manifestGradle) {
             throw GradleException(
-                "versions.json pins Gradle $manifestGradle but the wrapper (gradle/wrapper/gradle-wrapper.properties) is $wrapperVersion. " +
-                    "Run 'gradle wrapper --gradle-version $manifestGradle' at the repository root and commit the result."
+                "versions.json pins Gradle $manifestGradle but the wrapper " +
+                    "(gradle/wrapper/gradle-wrapper.properties) is $wrapperVersion. " +
+                    "Run 'gradle wrapper --gradle-version $manifestGradle' at the repository root and commit the result.",
             )
         }
 
@@ -50,7 +52,7 @@ tasks.register("checkVersions") {
         if (lockRev != manifestRev) {
             throw GradleException(
                 "versions.json was generated from nixpkgs ${manifestRev.take(12)} but flake.lock pins ${lockRev.take(12)}. " +
-                    "On a machine with Nix, run 'nix run .#update-versions' at the repository root and commit the result."
+                    "On a machine with Nix, run 'nix run .#update-versions' at the repository root and commit the result.",
             )
         }
 
@@ -61,18 +63,20 @@ tasks.register("checkVersions") {
 // ---- platform: Linux x64 supported, macOS best-effort (no testing) ----
 val osName = System.getProperty("os.name").lowercase(Locale.ROOT)
 val osArch = System.getProperty("os.arch").lowercase(Locale.ROOT)
-val platform = when {
-    osName.contains("mac") && osArch == "aarch64" -> "darwin-arm64"
-    osName.contains("mac") -> "darwin-x64"
-    osName.contains("linux") && (osArch == "amd64" || osArch == "x86_64") -> "linux-x64"
-    else -> throw GradleException("Unsupported platform for ./gradlew run: $osName/$osArch (Linux x64 supported; macOS best-effort)")
-}
+val platform =
+    when {
+        osName.contains("mac") && osArch == "aarch64" -> "darwin-arm64"
+        osName.contains("mac") -> "darwin-x64"
+        osName.contains("linux") && (osArch == "amd64" || osArch == "x86_64") -> "linux-x64"
+        else -> throw GradleException("Unsupported platform for ./gradlew run: $osName/$osArch (Linux x64 supported; macOS best-effort)")
+    }
 
 // Downloads are cached under the Gradle user home, so a second clone reuses them.
-val sttCache = File(
-    System.getenv("GRADLE_USER_HOME") ?: File(System.getProperty("user.home"), ".gradle").absolutePath,
-    "stt-app",
-)
+val sttCache =
+    File(
+        System.getenv("GRADLE_USER_HOME") ?: File(System.getProperty("user.home"), ".gradle").absolutePath,
+        "stt-app",
+    )
 
 fun sha256(file: File): String {
     val md = MessageDigest.getInstance("SHA-256")
@@ -91,7 +95,11 @@ fun sha256(file: File): String {
 // on every run (about 0.5 s of hashing for all tools and models): if it matches it is
 // used without any network access (item 33: a second run downloads nothing), if not
 // (a damaged or tampered cache) it is downloaded again.
-fun downloadVerified(url: String, expectedSha256: String, target: File) {
+fun downloadVerified(
+    url: String,
+    expectedSha256: String,
+    target: File,
+) {
     if (target.isFile) {
         val cached = sha256(target)
         if (cached == expectedSha256) return
@@ -126,9 +134,13 @@ fun downloadVerified(url: String, expectedSha256: String, target: File) {
     }
 }
 
-fun findExecutable(root: File, name: String): File {
-    val exe = root.walkTopDown().filter { it.isFile && it.name == name }.minByOrNull { it.path.length }
-        ?: throw GradleException("$name not found under $root")
+fun findExecutable(
+    root: File,
+    name: String,
+): File {
+    val exe =
+        root.walkTopDown().filter { it.isFile && it.name == name }.minByOrNull { it.path.length }
+            ?: throw GradleException("$name not found under $root")
     try {
         exe.setExecutable(true, false)
     } catch (_: Exception) {
@@ -154,7 +166,11 @@ val runtimeBinDirs = mutableListOf<File>()
 
 // Downloads, verifies and unpacks one tool and returns its executable. Archives are
 // .tar.gz (whisper-cli) or .jar (ffmpeg from Maven Central, a zip).
-fun prepareTool(label: String, entry: Map<*, *>, exeName: String): File {
+fun prepareTool(
+    label: String,
+    entry: Map<*, *>,
+    exeName: String,
+): File {
     val url = entry["url"] as String
     val sha = entry["sha256"] as String
     val archiveName = URI(url).path.substringAfterLast('/')
@@ -168,12 +184,18 @@ fun prepareTool(label: String, entry: Map<*, *>, exeName: String): File {
         extractDir.deleteRecursively()
         extractDir.mkdirs()
         if (archiveName.endsWith(".jar") || archiveName.endsWith(".zip")) {
-            project.copy { into(extractDir); from(project.zipTree(archive)) }
+            project.copy {
+                into(extractDir)
+                from(project.zipTree(archive))
+            }
         } else {
             // The system tar keeps the archive's symlinks (libwhisper.so.1 -> libwhisper.so.1.8.4);
             // Gradle's tarTree copy turns them into empty files, which the loader rejects.
-            providers.exec { commandLine("tar", "-xzf", archive.absolutePath, "-C", extractDir.absolutePath) }
-                .result.get().assertNormalExitValue()
+            providers
+                .exec { commandLine("tar", "-xzf", archive.absolutePath, "-C", extractDir.absolutePath) }
+                .result
+                .get()
+                .assertNormalExitValue()
         }
         unpacked.writeText("")
     }
@@ -199,7 +221,10 @@ fun linuxLibraryPathWrapper(exe: File): File {
 }
 
 // The cache file for a versions.json asset: <dir>/<sha256-prefix>-<URL file name>.
-fun assetCacheFile(dir: String, entry: Map<*, *>): File {
+fun assetCacheFile(
+    dir: String,
+    entry: Map<*, *>,
+): File {
     val sha = entry["sha256"] as String
     val fileName = URI(entry["url"] as String).path.substringAfterLast('/')
     return File(sttCache, "$dir/${sha.take(12)}-$fileName")
@@ -234,43 +259,52 @@ val backendMain = rootProject.file("backend/build/install/stt-backend/bin/stt-ba
 val jdkMajor = (manifest["jdk"] as String).substringBefore('.')
 // Resolved lazily at execution: the current JVM when it is the pinned JDK, else
 // foojay downloads it (the resolver is root-only, from settings.gradle.kts).
-val runtimeJavaHome = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(jdkMajor)) }
-    .map { it.metadata.installationPath.asFile.absolutePath }
+val runtimeJavaHome =
+    javaToolchains
+        .launcherFor { languageVersion.set(JavaLanguageVersion.of(jdkMajor)) }
+        .map { it.metadata.installationPath.asFile.absolutePath }
 
 // The node-gradle plugin's install location, set in frontend/build.gradle.kts:
 // node/pnpm live under $GRADLE_USER_HOME/stt-app/node, shared across clones.
 fun nodeInstallDir(): File = File(sttCache, "node")
 
-fun appEnv(): Map<String, String> = mapOf(
-    // The managed tools on PATH (ADR 0047), then node/pnpm from the Gradle-managed
-    // install, so the Vite server and the backend runner use the pinned versions.
-    "PATH" to (runtimeBinDirs.map { it.absolutePath } + nodeInstallDir().let { n ->
-        listOf(
-            File(n, "pnpm/pnpm-v${manifest["pnpm"]}/bin").absolutePath,
-            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}/bin").absolutePath,
-        )
-    } + System.getenv("PATH")).joinToString(":"),
-    "JAVA_HOME" to runtimeJavaHome.get(),
-    // The model defaults are the paths the cache *will* hold after prepareRuntime
-    // (which both tasks depend on), not a value only set during its execution.
-    "STT_WHISPER_MODEL" to (System.getenv("STT_WHISPER_MODEL") ?: modelCacheFile("whisper").absolutePath),
-    "STT_SPEAKER_MODEL" to (System.getenv("STT_SPEAKER_MODEL") ?: modelCacheFile("speaker").absolutePath),
-    "STT_DATA_DIR" to (System.getenv("STT_DATA_DIR") ?: defaultDataDir()),
-    "STT_STATIC_DIR" to (System.getenv("STT_STATIC_DIR") ?: rootProject.file("frontend/dist").absolutePath),
-)
+fun appEnv(): Map<String, String> =
+    mapOf(
+        // The managed tools on PATH (ADR 0047), then node/pnpm from the Gradle-managed
+        // install, so the Vite server and the backend runner use the pinned versions.
+        "PATH" to
+            (
+                runtimeBinDirs.map { it.absolutePath } +
+                    nodeInstallDir().let { n ->
+                        listOf(
+                            File(n, "pnpm/pnpm-v${manifest["pnpm"]}/bin").absolutePath,
+                            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}/bin").absolutePath,
+                        )
+                    } + System.getenv("PATH")
+            ).joinToString(":"),
+        "JAVA_HOME" to runtimeJavaHome.get(),
+        // The model defaults are the paths the cache *will* hold after prepareRuntime
+        // (which both tasks depend on), not a value only set during its execution.
+        "STT_WHISPER_MODEL" to (System.getenv("STT_WHISPER_MODEL") ?: modelCacheFile("whisper").absolutePath),
+        "STT_SPEAKER_MODEL" to (System.getenv("STT_SPEAKER_MODEL") ?: modelCacheFile("speaker").absolutePath),
+        "STT_DATA_DIR" to (System.getenv("STT_DATA_DIR") ?: defaultDataDir()),
+        "STT_STATIC_DIR" to (System.getenv("STT_STATIC_DIR") ?: rootProject.file("frontend/dist").absolutePath),
+    )
 
 // The distribution directory name the node plugin uses for this OS/arch: the OS name
 // from the node download (linux-x64, darwin-arm64, darwin-x64), which differs from
 // the Gradle platform string only in the OS portion (macosx-* vs darwin-*).
-fun nodePlatform(): String = when {
-    platform == "linux-x64" -> "linux-x64"
-    platform == "darwin-arm64" -> "darwin-arm64"
-    else -> "darwin-x64"
-}
+fun nodePlatform(): String =
+    when {
+        platform == "linux-x64" -> "linux-x64"
+        platform == "darwin-arm64" -> "darwin-arm64"
+        else -> "darwin-x64"
+    }
 
 tasks.register<Exec>("dev") {
     group = "run"
-    description = "Dev mode for the Gradle bootstrap (roadmap item 33): the Vite dev server with hot module reload and the backend through item 34's dev-run.sh (rebuild and restart on source change)"
+    description =
+        "Dev mode for the Gradle bootstrap (roadmap item 33): the Vite dev server with hot module reload and the backend through item 34's dev-run.sh (rebuild and restart on source change)"
     dependsOn("prepareRuntime", ":frontend:pnpmInstall")
     doFirst {
         // appEnv() plus the runner's hook: item 34's dev-run.sh rebuilds with the
@@ -284,7 +318,8 @@ tasks.register<Exec>("dev") {
 
 tasks.register<Exec>("run") {
     group = "run"
-    description = "Build backend + frontend, fetch the runtime tools and models, and start the app on http://localhost:8080 (roadmap item 33)"
+    description =
+        "Build backend + frontend, fetch the runtime tools and models, and start the app on http://localhost:8080 (roadmap item 33)"
     dependsOn("prepareRuntime", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
         applyAppEnv(this as Exec)
@@ -324,7 +359,8 @@ fun applyE2eEnv(task: Exec) {
 
 tasks.register("prepareE2eFixtures") {
     group = "verification"
-    description = "Download and sha256-verify the e2e fixtures from versions.json (jfk.wav, the tiny whisper model) into the Gradle user home"
+    description =
+        "Download and sha256-verify the e2e fixtures from versions.json (jfk.wav, the tiny whisper model) into the Gradle user home"
     doLast {
         for ((entry, target) in listOf(fixtures["jfkWav"] to jfkWavFile, models["whisperTinyEn"] to tinyModelFile)) {
             entry as Map<*, *>
@@ -359,11 +395,18 @@ tasks.register<Exec>("e2eBrowsers") {
 // no terminal for a sudo prompt. So as root (containers, CI) this installs them; as anyone
 // else it only checks (Playwright's --dry-run simulates the apt install, no root needed)
 // and fails with the sudo line for the missing packages. macOS needs none.
-val runningAsRoot by lazy { providers.exec { commandLine("id", "-u") }.standardOutput.asText.get().trim() == "0" }
+val runningAsRoot by lazy {
+    providers
+        .exec { commandLine("id", "-u") }
+        .standardOutput.asText
+        .get()
+        .trim() == "0"
+}
 
 tasks.register<Exec>("e2eSystemDeps") {
     group = "verification"
-    description = "Linux: install Chromium's system libraries for the e2e suite when run as root; otherwise check them and print the sudo apt-get line for the missing ones"
+    description =
+        "Linux: install Chromium's system libraries for the e2e suite when run as root; otherwise check them and print the sudo apt-get line for the missing ones"
     dependsOn("e2eInstall")
     onlyIf { platform.startsWith("linux") }
     val dryRunOutput = ByteArrayOutputStream()
@@ -383,20 +426,30 @@ tasks.register<Exec>("e2eSystemDeps") {
         if (runningAsRoot) return@doLast
         val report = dryRunOutput.toString()
         // Playwright prints "Missing system dependencies (N):" and one indented package per line.
-        val missing = report.lines()
-            .dropWhile { !it.startsWith("Missing system dependencies") }
-            .drop(1)
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
+        val missing =
+            report
+                .lines()
+                .dropWhile { !it.startsWith("Missing system dependencies") }
+                .drop(1)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
         when {
-            missing.isNotEmpty() -> throw GradleException(
-                "Chromium's system libraries are missing (${missing.size} packages). Install them, then run ./gradlew e2e:\n\n" +
-                    "    sudo apt-get update && sudo apt-get install -y --no-install-recommends ${missing.joinToString(" ")}\n",
-            )
-            executionResult.get().exitValue == 0 -> println(report.trim())
+            missing.isNotEmpty() -> {
+                throw GradleException(
+                    "Chromium's system libraries are missing (${missing.size} packages). Install them, then run ./gradlew e2e:\n\n" +
+                        "    sudo apt-get update && sudo apt-get install -y --no-install-recommends ${missing.joinToString(" ")}\n",
+                )
+            }
+
+            executionResult.get().exitValue == 0 -> {
+                println(report.trim())
+            }
+
             else -> {
                 println(report.trim())
-                throw GradleException("playwright install-deps --dry-run failed with exit code ${executionResult.get().exitValue}; its output is above.")
+                throw GradleException(
+                    "playwright install-deps --dry-run failed with exit code ${executionResult.get().exitValue}; its output is above.",
+                )
             }
         }
     }
@@ -404,7 +457,8 @@ tasks.register<Exec>("e2eSystemDeps") {
 
 tasks.register<Exec>("e2e") {
     group = "verification"
-    description = "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: ./gradlew e2eSystemDeps)"
+    description =
+        "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: ./gradlew e2eSystemDeps)"
     dependsOn("prepareRuntime", "prepareE2eFixtures", "e2eBrowsers", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
         applyE2eEnv(this as Exec)
