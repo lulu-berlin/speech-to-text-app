@@ -128,34 +128,17 @@ class AudioJoinIntegrationSpec :
                 then("the served file declares exactly the task's stored duration") {
                     val runner = ProcessRunner()
                     val dataDir = tempdir("stt-route-duration").toPath()
-                    val chunk0 = sineFlac(dataDir, "chunk-0", "440", "0.3")
-                    val chunk1 = sineFlac(dataDir, "chunk-1", "880", "0.5")
+                    // The decoded duration the engine stores once the source is chunked (item 11):
+                    // 0.3 s + 0.5 s = 800 ms, by hand.
                     val id =
-                        Database.open(dataDir).use { db ->
-                            QueueStateRepository(db).setPaused(true)
-                            val workDirectories = TaskWorkDirectories(dataDir)
-                            val tasks = TaskRepository(db, workDirectories)
-                            val created =
-                                tasks.createFromUpload(
-                                    queuedTask("duration.wav", createdAt = 1).copy(
-                                        queuePosition = 0,
-                                        status = TaskStatus.COMPLETED,
-                                        finishedAt = 1_000,
-                                    ),
-                                    "audio".toByteArray().inputStream(),
-                                )
-                            ChunkRepository(db).storePlan(
-                                created,
-                                listOf(
-                                    ExportedChunk(PlannedChunk(0L, 300L), chunk0),
-                                    ExportedChunk(PlannedChunk(300L, 800L), chunk1),
-                                ),
-                            )
-                            // The decoded duration the engine stores once the source is chunked (item 11):
-                            // 0.3 s + 0.5 s = 800 ms, by hand.
-                            tasks.setDurationMs(created, 800L)
-                            created
-                        }
+                        seedCompletedTask(
+                            dataDir,
+                            listOf(
+                                PlannedChunk(0L, 300L) to sineFlac(dataDir, "chunk-0", "440", "0.3"),
+                                PlannedChunk(300L, 800L) to sineFlac(dataDir, "chunk-1", "880", "0.5"),
+                            ),
+                            800L,
+                        )
 
                     testApplication {
                         application {
@@ -217,6 +200,37 @@ private suspend fun joinStoredChunks(
         FfmpegAudioJoiner(ChunkRepository(db), workDirectories).join(id, target)
     }
 }
+
+/**
+ * Seeds a COMPLETED task (queue paused, so the app's engine leaves it alone) whose stored [chunks] are
+ * `plan -> file` pairs and whose stored decoded duration is [durationMs]: the shape of a finished task an
+ * `/audio` request serves (item 12). Returns the task's id.
+ */
+private suspend fun seedCompletedTask(
+    dataDir: Path,
+    chunks: List<Pair<PlannedChunk, Path>>,
+    durationMs: Long,
+): Long =
+    Database.open(dataDir).use { db ->
+        QueueStateRepository(db).setPaused(true)
+        val workDirectories = TaskWorkDirectories(dataDir)
+        val tasks = TaskRepository(db, workDirectories)
+        val id =
+            tasks.createFromUpload(
+                queuedTask("duration.wav", createdAt = 1).copy(
+                    queuePosition = 0,
+                    status = TaskStatus.COMPLETED,
+                    finishedAt = 1_000,
+                ),
+                "audio".toByteArray().inputStream(),
+            )
+        ChunkRepository(db).storePlan(
+            id,
+            chunks.map { (planned, file) -> ExportedChunk(planned, file) },
+        )
+        tasks.setDurationMs(id, durationMs)
+        id
+    }
 
 /**
  * Decodes [file] to raw s16le and returns its sample count — what a player really gets out of the file,
