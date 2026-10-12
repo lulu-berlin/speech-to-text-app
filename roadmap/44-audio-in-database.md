@@ -1,6 +1,6 @@
 # 44 — Store the full audio in the database; drop the file cache
 
-Status: draft
+Status: spec-approved
 Depends on: [11](../docs/specs/processing-engine.md) (done), [12](../docs/specs/http-api-and-sse.md) (done), [38](38-joined-playback-stalls.md) (the stall fix — the migration concatenates chunk FLACs and playback serves the canonical file)
 Blocks: —
 
@@ -25,12 +25,12 @@ To be settled in the consultation. Starting point (what the user described):
 - What remains on disk: only ephemeral whisper-cli input files (whisper needs a path), created per chunk and deleted — under `tmp/` or the OS temp dir (open question).
 - Migration: existing tasks' chunk FLACs are concatenated into the canonical blob once (this is exactly the failure item 38 works on — this item depends on 38's correctness), and the legacy columns/tables are dropped or kept read-only (open question).
 
-## Open questions (to be answered in the consultation)
+## Open questions (answered 2026-10-12)
 
-- The canonical format and frequency storage: one FLAC (compact, seekable) vs raw float PCM (no encode cost, large) vs another choice — and how windows are extracted (decode the whole blob vs frame-seek into it).
-- Playback: serve the canonical FLAC directly (likely also fixes item 38's stall class at its root), or keep a derived serve format?
-- Ephemeral whisper input files: `tmp/` (still a directory, never a cache) or the OS temp dir?
-- Migration of existing tasks: rebuild the canonical blob from the stored chunk FLACs, or keep the legacy chunk path readable for old tasks while new ones use the new scheme?
+- The canonical format? → **One FLAC, 16 kHz mono** (user). No blocking issue found: FLAC is compact (~30–60 MB/hour of speech), lossless, frame-seekable (extraction decodes from the frame before `fromMs` and trims — sub-second margin at 16 kHz), and fast to encode/decode both ways. Two notes recorded: SQLite's default max BLOB is ~1 GB (a 2 h FLAC is ~60–120 MB; item 41's upload size limit bounds recordings anyway), and the blob belongs inside the database the app already backs up.
+- Playback? → **Serve the canonical FLAC directly** (user) — modern browsers play FLAC in `<audio>`, the existing `/audio` Range handling applies unchanged, and ADR 0045's re-encode becomes unnecessary (a single clean encode is seekable; the concat defect it fixed cannot occur).
+- Ephemeral whisper inputs? → **The OS temp dir** (`java.io.tmpdir`; `/tmp` in the container — writable) with **guaranteed deletion even when the run fails** (user): the per-window temp file is created, used and deleted on every path, success and failure alike.
+- Migration? → **Rebuild the canonical blob from the stored chunk FLACs** (user). The schema version is already stored (`flyway_schema_history`, today `version 7`; ADR 0019: new versioned migrations only), so the migration is an ordinary `V8`; forward-only evolution stays the rule (old DB + new app migrates up; the reverse direction is out of scope unless separately decided).
 
 ## Test list (proposed; behaviors only)
 
@@ -53,3 +53,4 @@ To be settled in the consultation. Starting point (what the user described):
 ## Approval log
 
 - 2026-10-12: drafted from the user's request (full audio in SQLite, chunk pointers, transient per-chunk temp inputs).
+- 2026-10-12: consultation answers: canonical FLAC (16 kHz mono) with the blob-ceiling and frame-seek notes; playback serves the stored FLAC directly; whisper inputs in the OS temp dir with cleanup on failure; migration via a versioned Flyway migration (schema versions already stored). Test list approved; status `spec-approved`.
