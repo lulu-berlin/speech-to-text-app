@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SETTINGS_CLIP, loadState, startBackend, stopBackend } from '../lib/backend.mjs';
+import { SETTINGS_CLIP, loadState, saveState, startBackend, stopBackend } from '../lib/backend.mjs';
 import { appLive, goTo, uploadClips } from './helpers/ui';
 
 // The settings journey (item 32, ADR 0046): change the device, the thread count and the
@@ -93,6 +93,11 @@ test('the settings the user saves survive a restart and the queue runs with them
       )
       .toBe('cpu');
   } finally {
+    // Stop the restarted backend (the global teardown only knows the original pid), then
+    // hand a fresh shared backend on the same socket and data dir to the later specs,
+    // as 13-restart does.
     await stopBackend(restarted.pid, port, dataDir);
+    const fresh = await startBackend({ port, dataDir });
+    saveState({ pid: fresh.pid });
   }
 });
