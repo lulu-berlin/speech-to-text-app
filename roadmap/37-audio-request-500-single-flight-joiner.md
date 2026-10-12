@@ -2,7 +2,7 @@
 
 Status: spec-approved
 Depends on: [15](../docs/specs/frontend-history-ui.md) (done; the transcript player's `/audio` join)
-Blocks: [35](35-readme-and-architecture-overview.md) (its playback GIF opens transcripts while the queue may run)
+Blocks: [35](../docs/specs/readme-and-architecture.md) (its playback GIF opens transcripts while the queue may run)
 
 ## Goal
 
