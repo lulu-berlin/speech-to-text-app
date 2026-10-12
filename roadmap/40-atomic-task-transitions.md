@@ -1,6 +1,6 @@
 # 40 — Task transitions are not atomic (pause/resume race a finishing task)
 
-Status: spec-approved
+Status: in-progress
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 Blocks: —
 
