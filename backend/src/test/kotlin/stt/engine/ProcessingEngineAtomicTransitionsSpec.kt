@@ -2,16 +2,19 @@ package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
+import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.test.runTest
 import stt.db.Database
 import stt.db.TaskPhase
 import stt.db.TestDataDir
 import stt.db.queuedTask
 import stt.queue.TaskStatus
+import java.nio.file.Files
 
 /**
  * The engine's task commands under races (roadmap item 40): a command never overwrites a newer state.
@@ -107,6 +110,55 @@ class ProcessingEngineAtomicTransitionsSpec :
                                 enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe second
+                            held.outcome.await().isFailure.shouldBeTrue()
+                        }
+                    }
+                }
+            }
+        }
+
+        given("a running task whose completion races its deletion") {
+            `when`("the completion commits while the delete is on its cancel-first path") {
+                then("the row still goes and the file is freed") {
+                    runTest {
+                        val dataDir = tempdir("stt-engine").toPath()
+                        val lock = CountingMutex()
+                        Database.open(dataDir, lock).use { db ->
+                            val fixture = engineUnderTest(TestDataDir(dataDir), db)
+                            // The "file": the task's work directory and the original inside it.
+                            val task =
+                                enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                            val workDir = fixture.workDirectories.workDir(task)
+                            Files.exists(workDir).shouldBeTrue()
+                            fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
+
+                            // Hold the writer lock; the completion (the worker's terminal write) queues
+                            // first, then the delete's writes — its read saw RUNNING, so it cancels first
+                            // (the item 12 contract), and deletes the row only after the cancel is done:
+                            // the row's delete is sequenced behind the cancel's write, so queueing the
+                            // completion and the cancel's write is enough to fix the whole order.
+                            val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 2L))
+                            val base = lock.lockCalls.value
+                            val completion = async(Dispatchers.Default) { fixture.tasks.setCompleted(task, 9_000L) }
+                            awaitLockCall(lock, base + 1)
+                            val removal = async(Dispatchers.Default) { fixture.engine.deleteTask(task) }
+                            awaitLockCall(lock, base + 2) // the cancel's conditional write
+
+                            // Release: the completion commits COMPLETED first, so the cancel loses — a
+                            // finished task cannot be cancelled — and the row still goes: delete wins.
+                            held.release()
+                            completion.await()
+                            removal.await() shouldBe TaskCommandOutcome.Accepted
+                            fixture.tasks.find(task) shouldBe null
+                            Files.exists(workDir).shouldBeFalse()
+
+                            // The deletion is the task's last word: it is published once, and nothing
+                            // referring to the id — not even the completion — re-appears after it.
+                            fixture.events.receive() shouldBe Event.TaskDeleted(task)
+                            drain(fixture.events)
+                                .filterIsInstance<Event.TaskUpdated>()
+                                .none { it.task.id == task }
+                                .shouldBeTrue()
                             held.outcome.await().isFailure.shouldBeTrue()
                         }
                     }
