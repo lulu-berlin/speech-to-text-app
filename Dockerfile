@@ -1,7 +1,8 @@
 # Multi-stage Docker image (roadmap item 19). The app is built inside Nix from the
 # flake's own inputs — flake.nix and devenv.nix are the only dependency sources
 # (AGENTS.md), so there is no apt/apk anywhere — and the runtime image is exactly the
-# closure of item 16's stt-app package on scratch, plus a handful of OS files
+# closure of item 16's stt-app package plus the image-only Mesa Vulkan drivers
+# (flake output docker-vulkan-drivers) on scratch, plus a handful of OS files
 # (users, /tmp, /data) and a generated entrypoint shim.
 #
 # The builder copies each closure store path 1:1 to its absolute /nix/store location,
@@ -26,12 +27,14 @@ WORKDIR /build
 COPY . .
 
 # `stt-app` is an alias of the default package (flake.nix), so the build is explicit;
-# the out-link gives a stable handle for readlink -f. The closure list feeds the
-# rootfs assembly below.
-RUN set -eux; \
+# `docker-vulkan-drivers` is the image-only Mesa Vulkan driver list (Intel/AMD GPUs; the
+# image has no host userspace driver). The out-links give stable handles for readlink -f;
+# the union of both closures feeds the rootfs assembly below.
+RUN set -euxo pipefail; \
     mkdir -p /out; \
     nix build --option sandbox false .#stt-app --out-link /out/app; \
-    nix-store -qR "$(readlink -f /out/app)" > /out/closure.txt
+    nix build --option sandbox false .#docker-vulkan-drivers --out-link /out/vulkan-drivers; \
+    nix-store -qR "$(readlink -f /out/app)" "$(readlink -f /out/vulkan-drivers)" | sort -u > /out/closure.txt
 
 # Assemble the runtime rootfs from the closure and the OS scaffolding. bash's store
 # path is read from the wrapper script's own shebang (makeWrapper emits an absolute
@@ -60,7 +63,8 @@ RUN set -eux; \
     printf 'passwd: files\nshadow: files\ngroup: files\nhosts: files dns\nnetworks: files\nservices: files\n' > /rootfs/etc/nsswitch.conf; \
     chmod 1777 /rootfs/tmp; \
     chown -R 1000:1000 /rootfs/data /rootfs/home/stt; \
-    printf '#!%s\nexec %s "$@"\n' "$interp" "$appBin" > /rootfs/entrypoint.sh; \
+    vkDriverFiles="$(cat /out/vulkan-drivers)"; \
+    printf '#!%s\nexport VK_ADD_DRIVER_FILES=%s\nexec %s "$@"\n' "$interp" "$vkDriverFiles" "$appBin" > /rootfs/entrypoint.sh; \
     chmod 755 /rootfs/entrypoint.sh
 
 FROM scratch

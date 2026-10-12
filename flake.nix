@@ -196,6 +196,22 @@
       # Alias so the documented `nix build .#stt-app` (roadmap item 19's Docker
       # builder stage) names the package it builds explicitly.
       stt-app = default;
+
+      # Image-only (roadmap item 19): Mesa's Vulkan drivers for Intel/AMD GPUs in the Docker
+      # image, which has no host userspace driver (a native host brings its own, e.g. NixOS's
+      # /run/opengl-driver, so the app package does not carry them). The output is the
+      # VK_ADD_DRIVER_FILES value the image's entrypoint exports: the radeon (RADV) and
+      # intel (ANV, HASVK) ICDs only - no lavapipe, so a CPU "GPU" is never picked, and
+      # additive, so a CDI-mounted NVIDIA ICD still loads. A renamed ICD fails the build.
+      docker-vulkan-drivers = pkgs.runCommand "stt-app-docker-vulkan-drivers" { } ''
+        icds=""
+        for icd in radeon_icd intel_icd intel_hasvk_icd; do
+          f=${pkgs.mesa}/share/vulkan/icd.d/$icd.x86_64.json
+          test -e "$f"
+          icds="$icds''${icds:+:}$f"
+        done
+        printf '%s' "$icds" > $out
+      '';
     };
 
     # `nix run .` starts bin/stt-app (named by meta.mainProgram), on http://localhost:8080.

@@ -22,10 +22,10 @@ Make the app easy to build and run with Docker: a container image of the package
 - **Image** built from item 16's flake closure by a multi-stage Dockerfile:
   - builder stage on `nixos/nix`: `nix build .#stt-app` (item 16's package: wrapper, JRE, frontend, Vulkan whisper-cli, ffmpeg, `setsid`, both models);
   - runtime stage: the closure's files (the exact copy mechanism — store path copying with an env shim, or similar — is settled at the first checkpoint), a non-root user, PID 1 = an init (`tini` from the closure or `compose init: true`); `STT_DATA_DIR=/data`; port 8080.
-  - The closure carries the Vulkan whisper-cli, `ffmpeg`, `util-linux`'s `setsid` and the models, so the image needs the host only for the GPU device and driver libs.
+  - The closure carries the Vulkan whisper-cli, `ffmpeg`, `util-linux`'s `setsid` and the models; the image additionally carries Mesa's Vulkan drivers for Intel/AMD (flake output `docker-vulkan-drivers`, cycle 9), so for Intel/AMD the host contributes only the GPU device (kernel driver, `/dev/dri`); for NVIDIA the Container Toolkit injects the host's userspace driver.
 - **GPU** (the corrected matrix, recorded as decided):
   - **NVIDIA:** the GPUs plus the NVIDIA Container Toolkit on the host (`--gpus all` semantics; on CDI hosts the device `nvidia.com/gpu=all`); the Vulkan build uses the driver's Vulkan ICD. Compose exposes this via the `docker-compose.gpu-nvidia.yml` override (profiles until cycle 9, see Checkpoints).
-  - **Intel / AMD:** `/dev/dri` passed to the container; the `docker-compose.gpu-vulkan.yml` override.
+  - **Intel / AMD:** `/dev/dri` passed to the container; the `docker-compose.gpu-vulkan.yml` override; the userspace driver (Mesa RADV/ANV) comes with the image.
   - **CPU:** the default (`docker-compose.yml` alone); `STT_DEVICE=cpu`.
   - **macOS:** Docker Desktop runs the Linux image CPU-only (no GPU passthrough into Linux containers); documented.
   - **TPU:** out of scope — whisper.cpp has no TPU backend.
@@ -147,6 +147,26 @@ None.
   override: uid 1000 cannot open `/dev/dri/renderD*` (owned by the host's `render` group,
   id varies per host), so it gets `group_add: ${STT_RENDER_GID}`. Test 9's text changes
   accordingly.
+  Second run (Vulkan override): one `stt-app` container, `/dev/dri/{card0,card1,renderD128,
+  renderD129}` mounted, the app in group 303 (`render`) — but whisper-cli loaded only the
+  CPU backend (`no GPU found`). A/B: the image has `libggml-vulkan.so` and **no ICD** at
+  all; the same whisper-cpp store path natively on the host (NixOS drivers via
+  `/run/opengl-driver`) found RADV (Ryzen 6900HS iGPU) and the RTX 3050 and ran on
+  `Vulkan0`. So the build is fine and the image lacks a userspace Vulkan driver (`/dev/dri`
+  is only the kernel node). Side finding for item 32: natively, `STT_DEVICE=auto` picks
+  device 0 (the iGPU) over the dGPU. **User decision:** bundle stock nixpkgs Mesa in the
+  image (binary-cached; ~265 MB for Mesa itself plus deps): flake output
+  `docker-vulkan-drivers` = the radeon/intel/intel_hasvk ICD paths (no lavapipe), exported
+  by the generated entrypoint as `VK_ADD_DRIVER_FILES` (additive, so a CDI-mounted NVIDIA
+  ICD still loads); the native package stays without it. Bind-mounting host drivers was
+  considered and rejected: on NixOS the drivers are symlinks into the host's `/nix/store`
+  (mounting it would shadow the image's store), on other distros the `.so`s link against
+  the host's `/usr/lib` and glibc (two glibcs in one process); bundling leaves the kernel's
+  DRM API as the only host interface, so non-Nix hosts work the same way (unverified
+  there — the demonstration host is NixOS). NVIDIA: `unresolvable CDI devices
+  nvidia.com/gpu=all` — Docker has CDI enabled but no spec defines the name; host-side
+  diagnosis pending. The discovered item was confirmed by the user and ticked on the observed
+  runs (`ps` showed one `stt-app`; `down` removed the container created under an override).
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -163,7 +183,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - [x] The container runs as a non-root user and writes only to `/data`
 - [x] The image contains only the flake closure's files (plus the init)
 - [ ] On a host with an NVIDIA GPU and the container toolkit (CDI), `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up` uses the GPU (`STT_DEVICE=auto`, `nvidia-smi`-visible); on an Intel/AMD host, the `docker-compose.gpu-vulkan.yml` override uses `/dev/dri`
-- [ ] (discovered) A GPU variant runs as the only app container (no CPU service beside it, one `stt-app` for `exec`/`logs`), and a plain `docker compose down` removes it
+- [x] (discovered) A GPU variant runs as the only app container (no CPU service beside it, one `stt-app` for `exec`/`logs`), and a plain `docker compose down` removes it
 
 ## Acceptance criteria
 
@@ -214,9 +234,11 @@ docker compose start
 ```
 
 **GPU matrix.** Whisper runs on the GPU through Vulkan (the image ships the packaged
-Vulkan whisper build); the host contributes the GPU device and its driver. A GPU variant
-is an override file layered on `docker-compose.yml`: it is the same `stt-app` service, so
-`docker compose down`, `exec stt-app` and `logs` work the same for every variant.
+Vulkan whisper build and Mesa's Intel/AMD Vulkan drivers, so any Linux host with the
+kernel GPU driver works; NVIDIA's userspace driver comes from the host's NVIDIA Container
+Toolkit). A GPU variant is an override file layered on `docker-compose.yml`: it is the
+same `stt-app` service, so `docker compose down`, `exec stt-app` and `logs` work the same
+for every variant.
 
 | Host | Command |
 | --- | --- |
