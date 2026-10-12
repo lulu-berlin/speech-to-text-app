@@ -1,7 +1,7 @@
 # 35 — README and architecture overview
 
 Status: in-review
-Depends on: [21](../docs/specs/frontend-backend-end-to-end.md) (its screenshot set and `e2e/` suite)
+Depends on: [21](frontend-backend-end-to-end.md) (its screenshot set and `e2e/` suite)
 
 ## Goal
 
@@ -13,7 +13,7 @@ A newcomer understands what the app does, what it needs, and how to build and ru
   - a README that explains what the app does, how to build it, how to run it, and what dependencies are needed;
   - an architecture overview document that is easy to read and understand.
 - The repository has no `README.md` today; item 19 already plans a README section for Docker.
-- [ADR 0046](../docs/decisions/0046-every-feature-has-an-e2e-test.md): documentation only: exempt from a Playwright test.
+- [ADR 0046](../decisions/0046-every-feature-has-an-e2e-test.md): documentation only: exempt from a Playwright test.
 
 ## Proposal
 
@@ -84,3 +84,4 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-12 (workspace, cycle 4 = item 5): the test is `docs/check-architecture-diagram.mjs`: it parses the Mermaid diagram's boxes (nodes and subgraphs) and labelled arrows and holds, for each, the code evidence that makes it real — for a box its component's code, for an arrow the caller's reference to the callee down to where the running app wires the real implementation in (`EngineModule.kt` builds `AudioChunker`, `ChunkTranscriber`, `SpeakerDiarizer` and launches `engine.start()`; `SttApp.kt` provides `FfmpegAudioJoiner`; the engine emits on `_events`, `EventStream` subscribes to the engine and `EventsRoutes` streams it). A box or arrow without evidence fails, evidence for one no longer in the diagram fails, evidence that no longer matches the code fails. No red: the diagram was drawn from the same code facts. Its power shown instead with throwaway copies of the overview: an invented arrow (browser → database), a deleted arrow (engine → whisper-cli) and a renamed box each fail (the first rename attempt did not apply — this `sed` has no `\b` — and was redone). Green: 11 boxes, 12 arrows.
 - 2026-10-12 (workspace): `AGENTS.md § Commands` lists the documentation checks (user-approved).
 - 2026-10-12 (user): items 2 and 7 approved; the user asked to merge the current state without running item 1 now and without the discovered recording-cleanup item — both stay open on the list as deferred (candidates for follow-up items). Standard checks: `e2e` prettier gate green; the three documentation checks green; frontend and backend unchanged by this item. Status `in-review`.
+- 2026-10-12: merged into `main` (head `08d86305`) after the user approved the diff; two test-list items stay open as follow-up candidates by the user's decision: item 1 (follow the README from a fresh clone) was intentionally not run, and the discovered recording-cleanup item was not done. The README shows the three approved GIFs (upload/queue, playback-follow, speaker rename/merge; recorded by `pnpm record:gifs` against the real backend, ffmpeg added to the browser farm) and item 21's screenshots; the architecture overview is verified by three documented checks (`check-links`, `check-architecture-names`, `check-architecture-diagram`); the README's Docker and Gradle sections honestly say "planned" (items 19 and 33). Spec and final test list moved here from `roadmap/35-readme-and-architecture-overview.md`.
