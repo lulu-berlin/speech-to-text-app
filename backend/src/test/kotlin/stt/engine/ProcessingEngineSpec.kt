@@ -10,6 +10,7 @@ import kotlinx.coroutines.CompletableDeferred
 import stt.db.SpeakersMode
 import stt.engine.TaskCommandOutcome
 import stt.queue.TaskStatus
+import stt.transcribe.TranscriptionException
 import stt.transcribe.WhisperSegment
 import stt.withCapturedLogs
 import java.nio.file.Files
@@ -176,7 +177,7 @@ class ProcessingEngineSpec :
                             val fixture = engineUnderTest(dataDir, db)
                             val task =
                                 enqueueTask(fixture.tasks, fixture.workDirectories, "failing.wav", queuePosition = 0, createdAt = 1)
-                            fixture.transcriber.failNext = stt.transcribe.TranscriptionException("boom")
+                            fixture.transcriber.failNext = TranscriptionException("boom")
                             fixture.engine.start()
 
                             fixture.failed.receive() shouldBe task
