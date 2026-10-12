@@ -17,7 +17,7 @@ in {
   # macOS), ffmpeg static builds on the 8.1 branch. Every entry is pinned by URL and
   # sha256; all hashes were verified against the sources' published checksums
   # (whisper-cli: computed over the GitHub release assets; ffmpeg linux-x64: the
-  # BtbN checksums.sha256 of the immutable autobuild release; ffmpeg darwin-arm64:
+  # BtbN checksums.sha256 of its autobuild release; ffmpeg darwin-arm64:
   # ffmpeg.martin-riedl.de's ffmpeg.zip.sha256). macOS Intel ships no published
   # static 8.1 ffmpeg (evermeet prunes old releases; martin-riedl builds arm64
   # only), so darwin-x64 has no entry - the README documents that gap.
@@ -38,9 +38,13 @@ in {
       };
     };
     ffmpeg = {
+      # BtbN keeps the last build of each month for two years and only the last 14
+      # daily builds (BtbN/FFmpeg-Builds README): pin a month-end release. The first
+      # pin, the daily autobuild-2026-09-27, was deleted after 14 days (item 33).
+      # This one stays until about 2028-09; re-pin to a newer month-end before then.
       "linux-x64" = {
-        url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-27-13-04/ffmpeg-n8.1.3-2-g45e8e0a3ff-linux64-gpl-8.1.tar.xz";
-        sha256 = "36d914fd29629f170a39879dccacb8e9d6ba6ee5fdbb922a43f88fc03bdccfb3";
+        url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1.tar.xz";
+        sha256 = "97ce978979194b5cf7e06a5e68020dbdaa7a4f3294c5452b6a1bc347100dbb79";
       };
       "darwin-arm64" = {
         url = "https://ffmpeg.martin-riedl.de/download/macos/arm64/1783011502_8.1.2/ffmpeg.zip";

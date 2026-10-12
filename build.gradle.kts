@@ -15,6 +15,7 @@ plugins {
 import groovy.json.JsonSlurper
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import java.io.File
+import java.io.FileNotFoundException
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
@@ -92,7 +93,17 @@ fun downloadVerified(url: String, expectedSha256: String, target: File) {
     target.parentFile.mkdirs()
     val tmp = File.createTempFile("stt-download", ".part", target.parentFile)
     try {
-        URI(url).toURL().openStream().use { input -> tmp.outputStream().use { output -> input.copyTo(output) } }
+        try {
+            URI(url).toURL().openStream().use { input -> tmp.outputStream().use { output -> input.copyTo(output) } }
+        } catch (e: FileNotFoundException) {
+            // HttpURLConnection reports 404/410 this way: the pinned asset was removed upstream.
+            throw GradleException(
+                "Download no longer exists upstream (HTTP 404): $url. Nothing is missing on this machine: " +
+                    "the pin in versions.json must move to an available release (nix/versions.nix, then " +
+                    "'nix run .#update-versions').",
+                e,
+            )
+        }
         val actual = sha256(tmp)
         if (actual != expectedSha256) {
             throw GradleException("SHA-256 mismatch for $url: manifest says $expectedSha256, downloaded $actual")
