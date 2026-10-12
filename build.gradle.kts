@@ -214,7 +214,9 @@ tasks.register<Exec>("run") {
         environment("STT_SPEAKER_MODEL", System.getenv("STT_SPEAKER_MODEL") ?: runtimeSpeakerModel!!.absolutePath)
         environment("STT_STATIC_DIR", System.getenv("STT_STATIC_DIR") ?: rootProject.file("frontend/dist").absolutePath)
         environment("STT_DATA_DIR", System.getenv("STT_DATA_DIR") ?: defaultDataDir())
+        // The app runs on the pinned JDK 21. Exec.environment does not resolve providers
+        // (it stores their toString), so resolve here — this may trigger the foojay download.
+        environment("JAVA_HOME", runtimeJavaHome.get())
         setCommandLine(backendMain.absolutePath)
     }
-    environment("JAVA_HOME", runtimeJavaHome)
 }
