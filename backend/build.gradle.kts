@@ -70,19 +70,31 @@ application {
 // Formatting gate (ADR 0015): `gradle check` runs ktlintCheck before the tests.
 val ktlintMain = "com.pinterest.ktlint.Main"
 
+// The backend's own Kotlin files (ktlint's default patterns, which any explicit pattern
+// replaces) plus the root build scripts of the Gradle bootstrap (roadmap item 33): agents
+// never run the root build, so this gate is the one their `gradle check` reaches. The Nix
+// build's source holds only backend/, so there the root scripts do not exist and only the
+// defaults apply.
+val ktlintPatterns =
+    listOf("**/*.kt", "**/*.kts") +
+        listOf("build.gradle.kts", "settings.gradle.kts", "frontend/build.gradle.kts")
+            .filter { rootDir.parentFile.resolve(it).isFile }
+            .map { "../$it" }
+
 tasks.register<JavaExec>("ktlintCheck") {
     group = "verification"
-    description = "Check Kotlin formatting with ktlint"
+    description = "Check Kotlin formatting with ktlint (the backend and the root build scripts)"
     classpath(ktlintConfiguration)
     mainClass.set(ktlintMain)
+    args(ktlintPatterns)
 }
 
 tasks.register<JavaExec>("ktlintFormat") {
     group = "verification"
-    description = "Auto-format Kotlin sources with ktlint"
+    description = "Auto-format Kotlin sources with ktlint (the backend and the root build scripts)"
     classpath(ktlintConfiguration)
     mainClass.set(ktlintMain)
-    args("--format")
+    args(listOf("--format") + ktlintPatterns)
 }
 
 tasks.named("check") {
