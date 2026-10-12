@@ -61,15 +61,34 @@ tasks.register("checkVersions") {
 }
 
 // ---- platform: Linux x64 supported, macOS best-effort (no testing) ----
+// Null on any other OS/architecture. Tasks that need no downloaded tool (checkVersions)
+// still run there; a build that would download or start one fails before any task runs.
 val osName = System.getProperty("os.name").lowercase(Locale.ROOT)
 val osArch = System.getProperty("os.arch").lowercase(Locale.ROOT)
-val platform =
+val supportedPlatforms = listOf("linux-x64", "darwin-x64", "darwin-arm64")
+val platform: String? =
     when {
         osName.contains("mac") && osArch == "aarch64" -> "darwin-arm64"
         osName.contains("mac") -> "darwin-x64"
         osName.contains("linux") && (osArch == "amd64" || osArch == "x86_64") -> "linux-x64"
-        else -> throw GradleException("Unsupported platform for ./gradlew run: $osName/$osArch (Linux x64 supported; macOS best-effort)")
+        else -> null
     }
+
+fun requirePlatform(): String =
+    platform ?: throw GradleException(
+        "The Gradle bootstrap does not support this platform: $osName/$osArch. " +
+            "Supported: ${supportedPlatforms.joinToString()} (Linux x64 tested, macOS best-effort).",
+    )
+
+// Every task that downloads or runs a managed tool: prepareRuntime (whisper-cli, ffmpeg,
+// models; run, dev and e2e depend on it) and e2eInstall (node/pnpm; e2eBrowsers,
+// e2eSystemDeps and e2e depend on it). Checked once the task graph is known, so the
+// build fails before its first task, not halfway through the frontend's node setup.
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.project == rootProject && it.name in setOf("prepareRuntime", "e2eInstall") }) {
+        requirePlatform()
+    }
+}
 
 // Downloads are cached under the Gradle user home, so a second clone reuses them.
 val sttCache =
@@ -246,7 +265,7 @@ tasks.register("prepareRuntime") {
                 throw GradleException("versions.json has no $label download for $platform (supported: linux-x64, darwin-x64, darwin-arm64)")
             }
             val exe = prepareTool(label, entry, label)
-            val binDir = if (label == "ffmpeg" && platform.startsWith("linux")) linuxLibraryPathWrapper(exe) else exe.parentFile
+            val binDir = if (label == "ffmpeg" && requirePlatform().startsWith("linux")) linuxLibraryPathWrapper(exe) else exe.parentFile
             runtimeBinDirs.add(binDir.absoluteFile)
         }
         prepareModel("whisper")
@@ -408,7 +427,7 @@ tasks.register<Exec>("e2eSystemDeps") {
     description =
         "Linux: install Chromium's system libraries for the e2e suite when run as root; otherwise check them and print the sudo apt-get line for the missing ones"
     dependsOn("e2eInstall")
-    onlyIf { platform.startsWith("linux") }
+    onlyIf { platform?.startsWith("linux") == true }
     val dryRunOutput = ByteArrayOutputStream()
     doFirst {
         applyE2eEnv(this as Exec)
