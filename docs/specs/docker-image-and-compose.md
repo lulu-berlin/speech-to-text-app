@@ -1,7 +1,7 @@
-# 19 — Docker image and docker-compose setup
+# Docker image and docker-compose setup
 
-Status: in-review
-Depends on: [16](../docs/specs/nix-flake-package.md)
+Status: done (roadmap item 19, merged 2026-10-12)
+Depends on: [16 — Nix flake package](nix-flake-package.md)
 
 ## Goal
 
@@ -9,11 +9,11 @@ Make the app easy to build and run with Docker: a container image of the package
 
 ## Already decided
 
-- [ADR 0001 — Stack and monorepo](../docs/decisions/0001-stack-and-monorepo.md): the Nix flake is the deliverable; the image packages it rather than replacing it.
+- [ADR 0001 — Stack and monorepo](../decisions/0001-stack-and-monorepo.md): the Nix flake is the deliverable; the image packages it rather than replacing it.
 - `AGENTS.md`: dependencies come only from `devenv.nix` and `flake.nix`, so the image's contents come from the flake; no `apt`/`apk` installs in a Dockerfile.
-- [ADR 0017 — Database location and connection contract](../docs/decisions/0017-database-location-and-connection-contract.md): `STT_DATA_DIR` is required and has no default, so the compose file sets it to a path on a volume.
-- [ADR 0020 — Process runner](../docs/decisions/0020-process-runner-jna-signals-process-groups.md): orphaned processes must be reaped; with the JVM as PID 1 and no init, cancelled process trees leave zombies (the runner then logs a WARN instead of waiting), so the container runs an init as PID 1.
-- [ADR 0024 — Audio storage](../docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): the whole data directory (`stt.db` and `work/`) holds the only copy of the audio, so it lives on one persistent volume.
+- [ADR 0017 — Database location and connection contract](../decisions/0017-database-location-and-connection-contract.md): `STT_DATA_DIR` is required and has no default, so the compose file sets it to a path on a volume.
+- [ADR 0020 — Process runner](../decisions/0020-process-runner-jna-signals-process-groups.md): orphaned processes must be reaped; with the JVM as PID 1 and no init, cancelled process trees leave zombies (the runner then logs a WARN instead of waiting), so the container runs an init as PID 1.
+- [ADR 0024 — Audio storage](../decisions/0024-audio-storage-original-until-chunking-flac-chunks.md): the whole data directory (`stt.db` and `work/`) holds the only copy of the audio, so it lives on one persistent volume.
 - **The GPU story (2026-10-09, corrected by the user)**: Docker exposes host GPUs to the container — `docker run --gpus all`, by device index, or by UUID — with the NVIDIA Container Toolkit ([Docker's GPU docs](https://docs.docker.com/engine/containers/gpu/)). The image's whisper-cli is the closure's Vulkan build, which runs on NVIDIA through the driver's Vulkan ICD and on Intel/AMD through Vulkan. This reinstates item 19 after a brief abort whose "GPU is impossible in a container" claim the user disproved; a plain-tools recipe that briefly replaced the item was dropped.
 - User decisions: a **multi-stage Dockerfile** whose builder stage runs Nix (portable: only Docker needed on the host); **models baked in at build time**; **build locally only**; **`curl` for the healthcheck**.
 
@@ -281,3 +281,4 @@ drafted in this spec until then.
 - 2026-10-09: test list (9 items) approved by the user; status `spec-approved`.
 
 - 2026-10-12 (review, corrected): the reviewer misread compose's `init: true` as needing a binary in the image and proposed adding tini; the verification showed the design was already correct — `HostConfig.Init: true` and PID 1 = `/sbin/docker-init -- /entrypoint.sh` (the engine's bundled tini), JVM as its child. No image change made; the transient tini addition was reverted. Stray `e2e/gif-*.gif` recordings from the GIF runs were deleted.
+- 2026-10-12: merged into `main` (head `bb321829`) after the user approved the diff. The Dockerfile is a multi-stage no-apt build (Nix inside `nixos/nix`, closure copied 1:1 to store paths, runtime `FROM scratch` + the `docker-root` flake output: entrypoint with the GPU userspace, bash, curl, passwd/group); the compose files give CPU by default with NVIDIA (CDI) and Intel/AMD (render group) overrides; non-root user, data volume, healthcheck, the README § Docker section. The review's PID-1 concern was resolved as a misreading: compose `init: true` is engine-side (`HostConfig.Init: true`, PID 1 = the engine's `docker-init`, verified). Spec and final test list moved here from `roadmap/19-docker-image-and-compose.md`.
