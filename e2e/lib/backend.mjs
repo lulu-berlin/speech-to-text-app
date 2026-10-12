@@ -97,7 +97,7 @@ export const FOLLOW_CLIP = FIXTURE_CLIPS[22];
 // player is checked. Unique bytes: FOLLOW_CLIP is item 36's loop, and the other trims
 // are other tests' clips, so these cannot answer 409.
 export const COMPLETED_PLAYER_CLIP = FIXTURE_CLIPS[23]; // 3-5s
-export const TRANSCRIBING_BACKGROUND_CLIP = FIXTURE_CLIPS[24]; // the sample looped 5x, ~55s
+export const TRANSCRIBING_BACKGROUND_CLIP = FIXTURE_CLIPS[24]; // the sample looped 2x, ~33s
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];

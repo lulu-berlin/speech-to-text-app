@@ -20,6 +20,10 @@ Opening a completed transcript's player answers `200` with a playable file even 
 
 To be settled in the consultation (the direction above is a starting point). Either way, the fix is backend-only and confined to the audio-serving path.
 
+## Shared path with item 38 (note for its workspace)
+
+Item 38 investigates a playback stall on the same audio-serving path: `/api/tasks/{id}/audio` → `JoinedAudioCache` → `AudioJoiner`/`ProcessRunner`. This item only changed *who owns the joiner's process execution*: `FfmpegAudioJoiner` now creates a fresh `ProcessRunner` per join and its DI wiring in `SttApp.kt` no longer resolves the engine's runner. The route, the cache, the ffmpeg command and the engine's runner are untouched. 38's workspace should not find a runner-contention cause here; if its stall turns out to sit in the route/cache layer, that is separate and was not changed by this item.
+
 ## Open questions (answered 2026-10-11)
 
 - One item or two for the two audio-path findings? → **Two** (user): this item is the 500/concurrency; item 38 is the stall. If a shared root cause emerges, that item shrinks to verifying the shared fix.
