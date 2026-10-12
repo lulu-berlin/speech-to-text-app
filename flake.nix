@@ -29,7 +29,7 @@
     whisperCpp = import ./nix/whisper-cpp.nix {inherit pkgs;};
 
     # Gradle 9.8 (nixpkgs' gradle_9) on the runtime JDK 21 (pkgs.jdk = pkgs.jre's JDK):
-    # the same Gradle as the devenv and the committed wrapper (item 33, ADR 0048). 9.x
+    # the same Gradle as the devenv and the committed wrapper (item 33, ADR 0049). 9.x
     # is the first line that runs on Java 25 (8.14's embedded Kotlin cannot parse it);
     # JDK 21 instead of gradle_9's default JDK 25 keeps the build and test JVM equal to
     # the app's runtime and to item 16's verified environment.

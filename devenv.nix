@@ -60,7 +60,7 @@ in
 
   # https://devenv.sh/languages/
   # JDK 21 (pkgs.jdk, the flake's runtime JDK) as JAVA_HOME, and Gradle 9.8 on it — the
-  # flake's gradle_9 and the committed wrapper's version (item 33, ADR 0048; Gradle 8.14
+  # flake's gradle_9 and the committed wrapper's version (item 33, ADR 0049; Gradle 8.14
   # cannot run on Java 25). The ONNX Runtime native lib bundled in the Maven artifact
   # loads under this JDK without LD_LIBRARY_PATH (verified 2026-10-05).
   languages.java = {

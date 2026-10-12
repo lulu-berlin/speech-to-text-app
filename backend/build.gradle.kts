@@ -110,7 +110,7 @@ tasks.register<Test>("integrationTest") {
     }
     systemProperty("kotest.tags", "Integration")
     // Gradle 9 dropped the convention that pointed custom Test tasks at the `test`
-    // source set: without these two lines the task is NO-SOURCE and runs nothing (ADR 0048).
+    // source set: without these two lines the task is NO-SOURCE and runs nothing (ADR 0049).
     testClassesDirs =
         sourceSets.test
             .get()
