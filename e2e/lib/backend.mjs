@@ -296,7 +296,10 @@ export async function startBackend({ port, dataDir }) {
   checkPreconditions();
   const backendCmd = process.env.E2E_BACKEND_CMD;
   if (backendCmd) {
-    const child = spawn(backendCmd, [], {
+    // A command line is allowed (e.g. './gradlew run'); a bare path (item 16's
+    // ./result/bin/stt-app) still works — the split is a no-op without spaces.
+    const [cmd, ...args] = backendCmd.split(/\s+/).filter(Boolean);
+    const child = spawn(cmd, args, {
       cwd: repoRoot,
       detached: true, // own session + process group: a group kill reaches the wrapper and the app JVM
       env: {
