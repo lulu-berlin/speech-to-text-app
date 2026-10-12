@@ -211,7 +211,18 @@ None.
   from this spec into README.md (`### Docker` replaces item 35's placeholder, the "Ways to
   run it" row says available, "Where your data lives" gains the `stt-data` volume and its
   backup/restore commands); `node docs/check-links.mjs README.md docs/architecture.md`
-  passes. Re-verification on the rebased image is the next run.
+  passes.
+
+- 2026-10-12 (cycle 9, green, user-verified on the rebased image `b1b0bc4`, NixOS host with
+  an AMD iGPU and an NVIDIA RTX 3050): CPU (base file) — healthy, `GET /api/settings` →
+  device `auto`, `availableDevices` `[cpu, auto]`, an 11 s clip `COMPLETED` in ~24 s; the
+  existing volume took item 32's migration. Vulkan override — `availableDevices` gains
+  `gpu:0` (item 32's startup probe sees the GPU through the entrypoint's environment), the
+  host's AMD `gpu_busy_percent` hit 100 %, the task `COMPLETED`. NVIDIA override — `gpu:0`
+  listed, `nvidia-smi pmon` showed the app's `whisper-cli` on GPU 0 (C+G, ~814–894 MB, SM
+  27/50 %), the task `COMPLETED`. Test 8's closure diff green on the rebased image. Test 9
+  ticked; switching variants is a plain `up -d` with another override (the same container
+  is recreated). Unverified: NVIDIA on non-NixOS hosts (see the fourth run's note).
 
 ## Test list (written with the user; Canon TDD step 1)
 
@@ -227,7 +238,7 @@ ADR 0046 (every app feature gets an e2e test) is exempt and why: this item chang
 - [x] Cancelling running tasks leaves no zombie processes in the container (PID 1 init)
 - [x] The container runs as a non-root user and writes only to `/data`
 - [x] The image contains only the flake closure's files (plus the init)
-- [ ] On a host with an NVIDIA GPU and the container toolkit (CDI), `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up` runs the app's whisper-cli on the GPU (`nvidia-smi`-visible); on an Intel/AMD host, the `docker-compose.gpu-vulkan.yml` override does the same through `/dev/dri`
+- [x] On a host with an NVIDIA GPU and the container toolkit (CDI), `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up` runs the app's whisper-cli on the GPU (`nvidia-smi`-visible); on an Intel/AMD host, the `docker-compose.gpu-vulkan.yml` override does the same through `/dev/dri`
 - [x] (discovered) A GPU variant runs as the only app container (no CPU service beside it, one `stt-app` for `exec`/`logs`), and a plain `docker compose down` removes it
 
 ## Acceptance criteria
