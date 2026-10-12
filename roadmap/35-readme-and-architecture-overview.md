@@ -1,6 +1,6 @@
 # 35 — README and architecture overview
 
-Status: in-progress
+Status: in-review
 Depends on: [21](../docs/specs/frontend-backend-end-to-end.md) (its screenshot set and `e2e/` suite)
 
 ## Goal
@@ -47,14 +47,14 @@ None.
 
 Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appended as `(discovered)` and confirmed with the user:
 
-- [ ] Following the README from a fresh clone in the devenv shell, every command works and the app runs on the user's machine (user-run)
-- [ ] The README states what the app does, the prerequisites of each way to run it, the configuration variables, where the data lives and how to back it up
+- [ ] Following the README from a fresh clone in the devenv shell, every command works and the app runs on the user's machine (user-run) — **deferred by the user (2026-10-12): not run before the merge**
+- [x] The README states what the app does, the prerequisites of each way to run it, the configuration variables, where the data lives and how to back it up (user-approved 2026-10-12)
 - [x] Every relative link and image in `README.md` and `docs/architecture.md` resolves (cycle 2, 2026-10-12: `node docs/check-links.mjs README.md docs/architecture.md`)
 - [x] Every file path, component, table, endpoint and event name the architecture overview mentions exists in the code (cycle 3, 2026-10-12: `node docs/check-architecture-names.mjs`)
 - [x] The architecture overview's diagram matches the running system: each box is a real component, each arrow a real call or event (cycle 4, 2026-10-12: `node docs/check-architecture-diagram.mjs`)
 - [x] The GIF recording spec runs against the real backend and produces the GIFs of the agreed flows; the README shows them and the screenshots (2026-10-12: GIFs approved, `docs/images/`; the README shows them and item 21's desktop screenshots, light and dark)
-- [ ] The user reads the architecture overview and approves it as easy to understand
-- [ ] (discovered, confirmed 2026-10-12) A recording flow that fails still closes its recording, so no stray unnamed video is left in `e2e/screenshots/recordings/`
+- [x] The user reads the architecture overview and approves it as easy to understand (user-approved 2026-10-12: "a good start"; the user may improve it later)
+- [ ] (discovered, confirmed 2026-10-12) A recording flow that fails still closes its recording, so no stray unnamed video is left in `e2e/screenshots/recordings/` — **deferred by the user (2026-10-12): not done before the merge**
 
 ## Acceptance criteria
 
@@ -82,3 +82,5 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-12 (workspace, cycle 3 = item 4): the test is `docs/check-architecture-names.mjs`: every inline-code name in the overview is classified by rules — endpoint (against the routes' literal paths and the query parameters they read), API prefix, frontend route (`App.tsx` `path=`), command, `STT_*` variable (`Config.kt`), constant (Kotlin code, comments excluded), member and function (`fun …(`), event (`EventsRoutes.kt` literals), table (as it stands after the last migration), package (`backend/src/main/kotlin/stt/<name>`), file extension, error code, repo path, data-directory path (`Database.kt`/`TaskWorkDirectories.kt`/`UploadSpool.kt` literals) — and must hold under at least one rule that applies; a name no rule knows fails. Red: `…/resume`, `…/cancel`, `…/retry` (abbreviated endpoints no rule can check). Sanity: a throwaway file with 15 wrong names (incl. `audio_parts`, dropped by V2) fails on exactly those and passes the 12 right ones. Green: the three endpoints spelled out in full — all 167 code names exist. Names in plain prose ("the connection machine") are not checked; the diagram is item 5.
 - 2026-10-12 (workspace, after cycle 3): refactor approved by the user — the outside-code-fences walk is one shared module (`docs/markdown-lines.mjs`), imported by both checks; behavior unchanged.
 - 2026-10-12 (workspace, cycle 4 = item 5): the test is `docs/check-architecture-diagram.mjs`: it parses the Mermaid diagram's boxes (nodes and subgraphs) and labelled arrows and holds, for each, the code evidence that makes it real — for a box its component's code, for an arrow the caller's reference to the callee down to where the running app wires the real implementation in (`EngineModule.kt` builds `AudioChunker`, `ChunkTranscriber`, `SpeakerDiarizer` and launches `engine.start()`; `SttApp.kt` provides `FfmpegAudioJoiner`; the engine emits on `_events`, `EventStream` subscribes to the engine and `EventsRoutes` streams it). A box or arrow without evidence fails, evidence for one no longer in the diagram fails, evidence that no longer matches the code fails. No red: the diagram was drawn from the same code facts. Its power shown instead with throwaway copies of the overview: an invented arrow (browser → database), a deleted arrow (engine → whisper-cli) and a renamed box each fail (the first rename attempt did not apply — this `sed` has no `\b` — and was redone). Green: 11 boxes, 12 arrows.
+- 2026-10-12 (workspace): `AGENTS.md § Commands` lists the documentation checks (user-approved).
+- 2026-10-12 (user): items 2 and 7 approved; the user asked to merge the current state without running item 1 now and without the discovered recording-cleanup item — both stay open on the list as deferred (candidates for follow-up items). Standard checks: `e2e` prettier gate green; the three documentation checks green; frontend and backend unchanged by this item. Status `in-review`.
