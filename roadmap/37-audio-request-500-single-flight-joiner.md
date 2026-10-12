@@ -1,6 +1,6 @@
 # 37 — Audio request 500: the joiner shares the engine's single-flight runner
 
-Status: in-progress
+Status: in-review
 Depends on: [15](../docs/specs/frontend-history-ui.md) (done; the transcript player's `/audio` join)
 Blocks: [35](../docs/specs/readme-and-architecture.md) (its playback GIF opens transcripts while the queue may run)
 
@@ -36,7 +36,7 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - [x] Two simultaneous `/audio` joins both succeed (each join is independent; no serialization errors)
 - [x] An engine process and an audio join run concurrently without interference (the engine's pause/cancel keeps working while a join runs)
 - [x] (e2e, ADR 0046) Against the real backend: while a task transcribes, a completed transcript's player has a playable file (the currently silent failure must become an assertion)
-- [ ] (must not break) The audio tests (`AudioJoinCompletedSpec`, the playback e2e journey) and the full suites stay green
+- [x] (must not break) The audio tests (`AudioJoinCompletedSpec`, the playback e2e journey) and the full suites stay green
 
 ## Acceptance criteria
 
