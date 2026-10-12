@@ -18,7 +18,14 @@ import {
 // dark mode webm under e2e/screenshots/recordings/. Run standalone (`pnpm record:gifs`)
 // against the real backend from global-setup.mjs; the rest of the suite never runs this
 // spec (playwright.config.ts ignores it). The webm files are gitignored like the
-// screenshots; the user converts them to the small GIFs the README shows.
+// screenshots; the user converts them to the GIFs the README shows, under 1 MB each
+// (decided with the user), in docs/images/ (run from e2e/, <name> without the gif- prefix):
+//   ffmpeg -i screenshots/recordings/gif-<name>.webm -vf "fps=6,scale=640:-1:flags=lanczos,
+//     mpdecimate,tpad=stop_mode=clone:stop_duration=2,split[a][b];
+//     [a]palettegen=max_colors=40:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle"
+//     ../docs/images/<name>.gif
+// (the filter as one string; mpdecimate drops frames that barely change, tpad holds the
+// last frame for 2 s).
 const RECORDINGS_DIR = join('screenshots', 'recordings');
 // The playback flow's frame. The transcript region is 60vh tall, follow mode uses
 // scrollIntoView({ block: 'nearest' }) (which scrolls the page too whenever the target
