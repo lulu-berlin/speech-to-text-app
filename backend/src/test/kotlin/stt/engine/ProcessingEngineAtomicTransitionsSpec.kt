@@ -63,7 +63,10 @@ class ProcessingEngineAtomicTransitionsSpec :
                                 enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe second
-                            held.outcome.await().isFailure.shouldBeTrue()
+                            held.outcome
+                                .await()
+                                .isFailure
+                                .shouldBeTrue()
                         }
                     }
                 }
@@ -110,7 +113,10 @@ class ProcessingEngineAtomicTransitionsSpec :
                                 enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe second
-                            held.outcome.await().isFailure.shouldBeTrue()
+                            held.outcome
+                                .await()
+                                .isFailure
+                                .shouldBeTrue()
                         }
                     }
                 }
@@ -159,7 +165,10 @@ class ProcessingEngineAtomicTransitionsSpec :
                                 .filterIsInstance<Event.TaskUpdated>()
                                 .none { it.task.id == task }
                                 .shouldBeTrue()
-                            held.outcome.await().isFailure.shouldBeTrue()
+                            held.outcome
+                                .await()
+                                .isFailure
+                                .shouldBeTrue()
                         }
                     }
                 }
@@ -204,7 +213,10 @@ class ProcessingEngineAtomicTransitionsSpec :
                                 enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe second
-                            held.outcome.await().isFailure.shouldBeTrue()
+                            held.outcome
+                                .await()
+                                .isFailure
+                                .shouldBeTrue()
                         }
                     }
                 }

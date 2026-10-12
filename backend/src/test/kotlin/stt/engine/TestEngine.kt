@@ -1,5 +1,6 @@
 package stt.engine
 
+import io.kotest.matchers.booleans.shouldBeTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -19,7 +20,6 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import io.kotest.matchers.booleans.shouldBeTrue
 import stt.audio.ExportedChunk
 import stt.audio.PlannedChunk
 import stt.config.testConfig
@@ -305,7 +305,10 @@ internal suspend fun CoroutineScope.holdWriteTransaction(
  * Waits until the writer lock has been called [call] times: the operation launched before this wait is
  * now waiting on the lock, so it cannot commit before another operation launched after this wait.
  */
-internal suspend fun awaitLockCall(lock: CountingMutex, call: Int) {
+internal suspend fun awaitLockCall(
+    lock: CountingMutex,
+    call: Int,
+) {
     withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { lock.lockCalls.first { it == call } } }
 }
 

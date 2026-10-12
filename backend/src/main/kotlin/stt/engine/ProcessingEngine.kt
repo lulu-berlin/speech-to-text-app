@@ -378,7 +378,8 @@ class ProcessingEngine internal constructor(
         id: Long,
         to: TaskStatus,
     ): TaskCommandOutcome =
-        tasks.find(id)
+        tasks
+            .find(id)
             ?.task
             ?.status
             ?.let { TaskCommandOutcome.Illegal(it, to) }
