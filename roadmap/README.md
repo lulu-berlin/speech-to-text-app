@@ -89,6 +89,8 @@ graph TD
   11 --> 43[43 diarization memory]
   38 --> 44[44 audio in database]
   11 --> 44
+  11 --> 45[45 selectable GPUs]
+  32 --> 45
   12 --> 44
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
@@ -141,3 +143,4 @@ graph TD
 | [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | draft | 11 |
 | [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
 | [44 — Store the full audio in the database; drop the file cache](44-audio-in-database.md) | draft | 11, 12, 38 |
+| [45 — Make both GPUs selectable: enumerate physical Vulkan devices](45-selectable-gpus.md) | draft | 11, 32 |
