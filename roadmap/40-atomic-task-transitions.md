@@ -36,7 +36,11 @@ The mechanism is conditional updates on the command writes (pause, resume) plus 
 - [x] Delete racing a completion: the row still goes and the file is freed (the current cancel-guard behavior pinned)
 - [x] Pausing a task whose row is no longer in the paused-able state is rejected, never a dead `PAUSED`
 - [ ] (e2e, ADR 0046) Against the real backend, rapid pause/resume/cancel while a task nears completion never leaves the queue blocked or a task stuck
-- [x] (must not break) The engine command suites (`ProcessingEngineCancelSpec`, `ProcessingEngineTaskPauseSpec`, …) stay green
+- [ ] (must not break) The engine command suites (`ProcessingEngineCancelSpec`, `ProcessingEngineTaskPauseSpec`, …) stay green
+
+Discovered 2026-10-12 in the first e2e run (approved by the user):
+
+- [ ] (discovered) The queue row's action machine accepts a second command on the same row (pause then resume from one row): the e2e journey exposed that `rowActionMachine` stays in `done` after one successful command and silently swallows the next `ACTIVATE` — the browser never sent the resume request (playwright trace proof) while the backend itself handles pause→resume correctly (curl repro: COMPLETED). Fix with a `QueueView` test (both endpoints called) then the machine change; then the e2e journey can pass.
 
 ## Acceptance criteria
 
