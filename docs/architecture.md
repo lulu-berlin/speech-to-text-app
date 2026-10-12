@@ -177,7 +177,7 @@ The browser and the backend talk over a small JSON API under `/api`. Commands ar
 | --- | --- |
 | `POST /api/tasks` | upload a file (multipart) |
 | `GET /api/tasks`, `GET /api/tasks/{id}` | list tasks, read one |
-| `POST /api/tasks/{id}/pause`, `…/resume`, `…/cancel`, `…/retry` | task commands |
+| `POST /api/tasks/{id}/pause`, `POST /api/tasks/{id}/resume`, `POST /api/tasks/{id}/cancel`, `POST /api/tasks/{id}/retry` | task commands |
 | `DELETE /api/tasks/{id}` | delete a task |
 | `GET /api/queue`, `POST /api/queue/pause`, `POST /api/queue/resume`, `PUT /api/queue/order` | read, pause, resume and reorder the queue |
 | `GET /api/tasks/{id}/turns` | the transcript by speaker turns |
