@@ -1,6 +1,6 @@
 # 40 — Task transitions are not atomic (pause/resume race a finishing task)
 
-Status: in-review
+Status: in-progress
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 Blocks: —
 
@@ -54,3 +54,4 @@ Discovered 2026-10-12 in the e2e runs (approved by the user):
 - 2026-10-12: the user confirmed the test list; requested the race-scenario clarification (recorded above) before deciding the winners. Pending: the winner decision.
 - 2026-10-12: the user confirmed the winner set: completion over pause (losing pause → 409 illegal-transition), cancel over resume, delete over everything. Test list approved; status `spec-approved`.
 - 2026-10-12: the user approved the refactor moving the row-action `done` state under `ready` (one ACTIVATE definition), and fixing the settings journey's backend handover inside this item (discovered in the full e2e suite).
+- 2026-10-12: review: changes requested — a won pause can leave the pause gate closed and stall the next task; pausing a QUEUED task freezes the running one. Both approved into this item by the user (test-list items below).
