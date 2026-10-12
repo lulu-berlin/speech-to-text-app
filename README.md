@@ -134,7 +134,7 @@ Inside it:
 
 ## Licenses and attributions
 
-The repository does not declare a license yet. Third-party material:
+The app is licensed under the [BSD 3-Clause License](LICENSE). Third-party material:
 
 - **Test fixtures** — clips from the LibriSpeech ASR corpus (CC BY 4.0); see [docs/attributions.md](docs/attributions.md).
 - **Models** — the whisper.cpp model ([ADR 0008](docs/decisions/0008-default-whisper-model.md)) and the CAM++ speaker model ([ADR 0003](docs/decisions/0003-kotlin-diarization-campplus-onnx.md)) are downloaded from their publishers at build time, not stored in the repository; their sources are pinned in [`nix/models.nix`](nix/models.nix).
