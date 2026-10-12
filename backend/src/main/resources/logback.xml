@@ -1,7 +1,8 @@
 <configuration>
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
-      <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+      <!-- " [task <id>]" while a task's job logs (item 46, MDC key taskId); nothing when the key is absent. -->
+      <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36}%replace( [task %X{taskId}]){' \[task \]', ''} - %msg%n</pattern>
     </encoder>
   </appender>
 

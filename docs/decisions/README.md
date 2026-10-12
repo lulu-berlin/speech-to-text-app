@@ -58,4 +58,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0045 | [The joined playback FLAC is re-encoded (losslessly)](0045-joined-playback-flac-reencoded.md) | accepted, amends 0024's playback join | 2026-10-11 |
 | 0046 | [Every app feature has an end-to-end test](0046-every-feature-has-an-e2e-test.md) | accepted | 2026-10-11 |
 | 0047 | [External tools are resolved from PATH; no tool-path variables](0047-external-tools-resolved-from-path.md) | accepted, withdraws item 16's `STT_WHISPER_CLI`/`STT_FFMPEG` | 2026-10-11 |
+| 0048 | [The task's id in the logging context (MDC) and named engine coroutines](0048-task-id-in-logging-context-and-named-coroutines.md) | accepted | 2026-10-12 |
 
