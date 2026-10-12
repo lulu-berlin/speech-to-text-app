@@ -48,6 +48,7 @@ Added 2026-10-12 by the review (approved by the user):
 - [ ] (review) A pause that is accepted but whose task still finishes (the pause landed after the task's last frozen process) leaves the next task free: the next task, including its DIARIZING phase, runs to completion — a stale pause never stalls the queue. No e2e of its own: the window is too narrow to hit reliably from a browser; the deterministic engine test covers it.
 - [ ] (review) Pausing a QUEUED task while another task runs leaves the running task untouched: its process is not frozen, its diarization is not held, and it completes; the paused task stays PAUSED and is not started
 - [ ] (review, e2e, ADR 0046) Against the real backend, pausing a queued upload while another transcribes: the running one still completes, the paused one stays paused until resumed, then completes
+- [ ] (discovered) A task paused between two of its processes (e.g. between two chunks, after the freeze missed the exiting process) starts no further process: it stops before its next chunk and stays PAUSED until resumed, then completes. (Found while checking the review's finding 1: `ProcessRunner.pause()` is a no-op with no run in flight and each run's end clears the freeze, and the chunk loop never checks for a pause — a probe saw chunk 1 start, and the task complete, while it was PAUSED.)
 
 ## Acceptance criteria
 
