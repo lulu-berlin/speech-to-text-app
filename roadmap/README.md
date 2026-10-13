@@ -87,6 +87,15 @@ graph TD
   12 --> 41[41 upload hardening]
   11 --> 42[42 worker stability]
   11 --> 47[47 atomic-transitions spec flaky]
+  51[51 CI verification]
+  51 --> 48[48 macOS support]
+  05 --> 48
+  16 --> 48
+  45 --> 48
+  33 --> 49[49 Windows support]
+  48 --> 49
+  51 --> 49
+  16 --> 50[50 Electron desktop app]
   11 --> 43[43 diarization memory]
   38 --> 44[44 audio in database]
   11 --> 44
@@ -148,3 +157,7 @@ graph TD
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](45-selectable-gpus.md) | spec-approved | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
 | [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](47-atomic-transitions-spec-flaky.md) | draft | 11 |
+| [48 — macOS support](48-macos-support.md) | spec-approved | 05, 16, 45, 51 |
+| [49 — Windows support](49-windows-support.md) | spec-approved | 33, 48, 51 |
+| [50 — Electron desktop app](50-electron-app.md) | spec-approved | 16 |
+| [51 — CI verification: first GitHub Actions workflow](51-ci-verification.md) | draft | — |
