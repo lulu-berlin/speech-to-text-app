@@ -10,11 +10,15 @@
 # backend/dev-run.sh runs only the backend restart loop.
 set -u
 
-ivp() { kill -0 "$1" 2>/dev/null || return 1; [ -n "${2:-}" ] || kill -TERM -"$1" 2>/dev/null; return 0; }
+is_running() {
+  kill -0 "$1" 2>/dev/null
+}
 
-# Item 34's runner (backend/dev-run.sh). PID 1 hosting (PID 0, user namespaces) is killed
-# by its own stop trap instead of a group signal. DEV_RUN_GRADLE: the dev task points at
-# the repo's ./gradlew; other callers (devenv) get gradle from PATH.
+# Item 34's runner (backend/dev-run.sh). DEV_RUN_GRADLE: the dev task points at the
+# repo's ./gradlew; other callers (devenv) get gradle from PATH. The runner is stopped
+# with a direct TERM, not a kill of its process group: every caller runs this script as
+# a session leader, so its TERM trap reaches the halves and the group kill would have no
+# member to signal it.
 (
   cd backend || exit 1
   trap '[ -n "${DEV_RUN_PID:-}" ] && kill -TERM "$DEV_RUN_PID"' TERM INT
@@ -34,7 +38,8 @@ trap '[ -n "${fpid:-}" ] && { kill -TERM "$fpid" 2>/dev/null; wait "$fpid" 2>/de
 ) &
 fpid=$!
 
-while ivp "$fpid" "$bpid" && ivp "$bpid" "$fpid"; do sleep 1; done
+# Wait until either half exits, then stop the surviving one and reap both.
+while is_running "$fpid" && is_running "$bpid"; do sleep 1; done
 [ -n "${fpid:-}" ] && kill -TERM "$fpid" 2>/dev/null
 [ -n "${bpid:-}" ] && kill -TERM "$bpid" 2>/dev/null
 wait "$fpid" 2>/dev/null
