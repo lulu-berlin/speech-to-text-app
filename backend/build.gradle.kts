@@ -18,7 +18,18 @@ java {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        // JDK 21 review guard: an app must not use an API newer than 21, because
+        // `./gradlew run` executes it on JDK 21. jvmTarget alone only sets the classfile
+        // version; a compiler running on a newer JDK (a human's launcher JVM) would
+        // still accept newer APIs. -Xjdk-release makes the compiler reject them, and is a
+        // no-op where Gradle already runs on JDK 21 (devenv, Nix).
+        freeCompilerArgs.add("-Xjdk-release=21")
     }
+}
+// Java sources (none today) get the same guarantee: -source/-target above do not limit
+// the API surface, --release does.
+tasks.compileJava.configure {
+    options.release.set(21)
 }
 
 repositories {
