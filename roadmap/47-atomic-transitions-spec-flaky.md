@@ -1,6 +1,6 @@
 # 47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)
 
-Status: draft
+Status: spec-approved
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 Blocks: —
 
@@ -28,21 +28,19 @@ before its completion's" test deterministic, so the item-21/40 command-race cove
   that wins its write and then loses to the completion must not hold the next run's gate). It pins a
   real invariant, but its event-count assertion is a second, schedule-dependent claim.
 
-## Proposal
+## Decided (consultation, 2026-10-13)
 
-To be settled in the consultation. Starting point: keep the invariant assertions (both tasks end
-COMPLETED, no dead started PAUSED row, `diarizer.passedGate` true) and drop or make robust the
-two-event receive — e.g. `pumpUntil` the statuses instead of counting events, or assert the event
-set contains both ids via a bounded drain after the worker finishes. Reproduce the failure first
-(loop the spec until it trips), then fix, then run the spec in a loop (e.g. 50x) plus the full
-suite.
+- **Keep the invariant assertions**: both tasks end COMPLETED, no dead started-PAUSED row, `diarizer.passedGate` true.
+- **Replace the two-event receive** — an exact-count scheduling claim (A's COMPLETED can be published twice, the manual `setCompleted` does not publish) — with: wait on repository state until both tasks are COMPLETED, then drain the event channel with a bounded timeout and assert both task ids appear at least once. Duplicates and extra events tolerated; ordering not asserted.
+- **Reproduce first** (loop the spec until it trips), then fix, then run the spec 50× isolated plus the full suite.
 
 ## Test list (proposed; behaviors only)
 
 - [ ] The spec passes 50 consecutive isolated runs (the flake's observed frequency is ≤ 1/10, so 50
       clean runs bound the residual probability)
 - [ ] The invariant still holds when the test is re-run: A ends COMPLETED, no dead started PAUSED
-      row, B diarizes and completes (the assertions that made the test a pin are unchanged)
+      row, B diarizes and completes, and the drained events contain both ids (the state/gate
+      assertions that made the test a pin are unchanged; the exact event count is not asserted)
 - [ ] (must not break) `gradle check` and `gradle integrationTest` stay green
 
 ## Acceptance criteria
@@ -54,3 +52,6 @@ suite.
 
 - 2026-10-13: filed by the main-tree agent after the item-33 rebase gate hit it on plain `main` and
   stress runs reproduced the flake (1/10, then 25 clean). Kept out of item 33's merge per the user.
+- 2026-10-13: consultation — keep the state/gate invariants; replace the exact-count two-event
+  receive with a bounded drain asserting both ids appear (duplicates tolerated); reproduce first,
+  then 50× isolated runs plus the full suite. Test list approved; status `spec-approved`.

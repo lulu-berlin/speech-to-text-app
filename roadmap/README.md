@@ -151,12 +151,12 @@ graph TD
 | [39 — devenv/doc drift: the playwright version comment](../docs/specs/playwright-version-sync.md) | done | 16 |
 | [40 — Task transitions are not atomic (pause/resume race a finishing task)](../docs/specs/atomic-task-transitions.md) | done | 11 |
 | [41 — Upload hardening: duplicate race, size limit, spool cleanup](41-upload-hardening.md) | draft | 12 |
-| [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | draft | 11 |
+| [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | spec-approved | 11 |
 | [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
 | [44 — Store the full audio in the database; drop the file cache](44-audio-in-database.md) | spec-approved | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](45-selectable-gpus.md) | spec-approved | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
-| [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](47-atomic-transitions-spec-flaky.md) | draft | 11 |
+| [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](47-atomic-transitions-spec-flaky.md) | spec-approved | 11 |
 | [48 — macOS support](48-macos-support.md) | spec-approved | 05, 16, 45, 51 |
 | [49 — Windows support](49-windows-support.md) | spec-approved | 33, 48, 51 |
 | [50 — Electron desktop app](50-electron-app.md) | spec-approved | 16 |
