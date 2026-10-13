@@ -1,6 +1,6 @@
 # 40 — Task transitions are not atomic (pause/resume race a finishing task)
 
-Status: in-progress
+Status: in-review
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 Blocks: —
 
@@ -72,3 +72,4 @@ Added 2026-10-12 by the review (approved by the user):
 - 2026-10-12: discovered chunk loop: fix design chosen by the user — the chunk loop passes the pause gate before each chunk's whisper-cli run (chunk 0 included, so the chunking → first-chunk boundary is covered too). Green (`gradle check`: 272 tests, 0 failures).
 - 2026-10-12: checkpoint after the chunk loop: no refactoring suggested (one-line fix). The user did not add the candidate "a pause between PCM decodes starts no further decode" (the decodes are short; the diarizer's window gate stops the task). Next cycle: the review's e2e item.
 - 2026-10-12: review e2e (`e2e/tests/40-pause-queued.spec.ts`, fixtures `jfk-v.wav` ~121s and `jfk-w.wav` 2-6s): passed on arrival (review item 2's engine fix was already in), recorded as a regression pin. Proven to detect the bug: with `pauseTask`'s `runningHere` guard temporarily removed (not committed), the journey failed waiting for "jfk-v.wav transcribed" (240 s) — the running task stayed frozen.
+- 2026-10-13: final verification, branch clean: `gradle check` 272/0; `gradle integrationTest` first run failed once in `AudioJoinIntegrationSpec` (the startup sweep deleting a COMPLETED task's work directory races the `/audio` joiner writing `join-N.flac` — pre-existing, load-dependent, unrelated to item 40; 5 later runs, main and branch, all green); frontend vitest 173/0, prettier clean, `tsc --noEmit` clean; e2e 40-atomic-transitions + 40-pause-queued 2/2 green. Status `in-review`.
