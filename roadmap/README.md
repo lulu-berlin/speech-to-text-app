@@ -86,6 +86,7 @@ graph TD
   11 --> 40[40 atomic task transitions ✓]:::done
   12 --> 41[41 upload hardening]
   11 --> 42[42 worker stability]
+  11 --> 47[47 atomic-transitions spec flaky]
   11 --> 43[43 diarization memory]
   38 --> 44[44 audio in database]
   11 --> 44
@@ -146,3 +147,4 @@ graph TD
 | [44 — Store the full audio in the database; drop the file cache](44-audio-in-database.md) | spec-approved | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](45-selectable-gpus.md) | spec-approved | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
+| [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](47-atomic-transitions-spec-flaky.md) | draft | 11 |
