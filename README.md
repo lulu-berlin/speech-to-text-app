@@ -107,7 +107,7 @@ The container runs as an unprivileged user (uid 1000) and writes only to its dat
 | NVIDIA | the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html) with a CDI spec — on NixOS `hardware.nvidia-container-toolkit.enable = true;`, elsewhere `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml` | `docker compose -f docker-compose.yml -f docker-compose.gpu-nvidia.yml up -d` |
 | Intel / AMD | only the kernel's GPU driver: the image brings Mesa's Vulkan drivers | `STT_RENDER_GID=$(getent group render \| cut -d: -f3) docker compose -f docker-compose.yml -f docker-compose.gpu-vulkan.yml up -d` |
 
-`STT_RENDER_GID` lets the container's user open the render device. Both variants were tested on NixOS (an AMD Radeon iGPU and an NVIDIA RTX 3050); NVIDIA on other distributions is untested. Details: [roadmap item 19](roadmap/19-docker-image-and-compose.md).
+`STT_RENDER_GID` lets the container's user open the render device. Both variants were tested on NixOS (an AMD Radeon iGPU and an NVIDIA RTX 3050); NVIDIA on other distributions is untested. Details: [roadmap item 19](docs/specs/docker-image-and-compose.md).
 
 ### Gradle without Nix
 
