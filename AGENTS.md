@@ -25,7 +25,7 @@ AGENTS.md  devenv.nix  flake.nix  .editorconfig  .prettierrc
 backend/   Gradle (Kotlin DSL) Ktor app; backend/deps.json = Nix lockfile for Gradle deps
 frontend/  Vite + React + TS + styled-components (pnpm)
 nix/       shared Nix expressions (models; more in item 16)
-docs/decisions/  docs/specs/  docs/conventions/  docs/api/ (API contract examples, ADR 0029)  docs/oracle/transcribe.py (reference oracle)
+docs/decisions/  docs/specs/  docs/conventions/  docs/api/ (API contract examples, ADR 0029)  docs/oracle/transcribe.py (reference oracle)  docs/known-issues.md (living backlog of open findings; an issue leaves it the moment a roadmap item plans it)
 roadmap/   pending work, one file per item
 workspaces/  git worktrees (ignored)
 ```
@@ -52,6 +52,10 @@ Commits: one commit per green cycle (test + code, subject `Test: <scenario>`), o
 6. Independent items (no dependency between them) may progress in parallel workspaces, each in its own omp instance with its own per-cycle checkpoints. The instance's tools come from the root `devenv.nix`; checks of a devenv change made on a workspace branch are run by the user inside the worktree. Branch-only `TEST_*` fixtures are passed explicitly by their `/nix/store` paths ([workspaces/README.md § Environment for workspace agents](workspaces/README.md#environment-for-workspace-agents)).
 7. When the test list is done, the workspace agent sets `Status: in-review` in the worktree's roadmap file and stops. The main-tree agent presents the full diff (`git diff main...roadmap/<NN-slug>`) and test output to the user. Changes requested → a new startup prompt for the workspace (step 4).
 8. On approval: rebase the branch onto `main` in the worktree, run `git merge --ff-only roadmap/<NN-slug>` in the main tree, move the spec and final test list into `docs/specs/<area>.md`, delete the roadmap file, update `roadmap/README.md`, and remove the worktree and branch.
+
+## Known issues backlog
+
+Keep [docs/known-issues.md](docs/known-issues.md) current: add every real finding (from a review, a test failure, or a user report) as it appears, with severity and `file:line` evidence; **remove** an issue the moment a roadmap item is created that handles it — it is then planned work tracked by that item. The file's Maintenance rules are the authority; the backlog is never a roadmap item itself.
 
 ## Testing
 

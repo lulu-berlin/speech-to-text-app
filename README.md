@@ -210,6 +210,7 @@ docker compose start
 - [Specifications](docs/specs/) — one per finished roadmap item, with its test list.
 - [Decisions](docs/decisions/README.md) — the architecture decision records.
 - [API examples](docs/api/README.md) — an example of every response and live event of the HTTP API.
+- [Known issues](docs/known-issues.md) — the living backlog of open findings; an issue leaves it the moment a roadmap item plans it.
 - [Roadmap](roadmap/README.md) — pending work.
 - [AGENTS.md](AGENTS.md) — how this repository is developed: the rules, the workflow and the commands.
 
