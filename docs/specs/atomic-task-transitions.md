@@ -1,8 +1,7 @@
 # 40 — Task transitions are not atomic (pause/resume race a finishing task)
 
-Status: in-review
-Depends on: [11](../docs/specs/processing-engine.md) (done)
-Blocks: —
+Status: done (roadmap item 40, merged 2026-10-13)
+Depends on: [11 — Processing engine](processing-engine.md)
 
 ## Goal
 
@@ -13,7 +12,7 @@ A task command never overwrites a newer state: when a completion, a cancel and a
 - Reported 2026-10-12 by a third-party source review of `main`, triaged by the root agent against the code (the finding holds).
 - Evidence (`ProcessingEngine.command()` + `TaskRepository`): `command()` reads the status, checks the transition table (`canTransitionTo`), then runs the body — and `pauseTask`/`resumeTask` call the **unconditional** `TaskRepository.setStatus` after that check. Between the read and the write (two transactions, the worker coroutine interleaves at I/O suspension points) a finish can land: the pause then writes `PAUSED` over `COMPLETED`. The queue then blocks: `nextTask()` waits while any `startedPaused()` task exists, and `PAUSED` has no way forward on its own — a completed task is un-recoverable until a user action. Resume and cancel have the same class of interleaving.
 - The repo already has the right primitive: `setRunningIfQueued`, `failIfRunning` and `updateTaskIfRow` are conditional updates, and cancel/fail/retry use them. Pause/resume (and the generic `command` gate) are the gap.
-- [ADR 0046](../docs/decisions/0046-every-feature-has-an-e2e-test.md): the fix carries an e2e assertion the race never surfaces (the user's suite exercises pause and completion constantly).
+- [ADR 0046](../decisions/0046-every-feature-has-an-e2e-test.md): the fix carries an e2e assertion the race never surfaces (the user's suite exercises pause and completion constantly).
 
 ## Proposal
 
@@ -75,3 +74,4 @@ Added 2026-10-12 by the review (approved by the user):
 - 2026-10-12: review e2e (`e2e/tests/40-pause-queued.spec.ts`, fixtures `jfk-v.wav` ~121s and `jfk-w.wav` 2-6s): passed on arrival (review item 2's engine fix was already in), recorded as a regression pin. Proven to detect the bug: with `pauseTask`'s `runningHere` guard temporarily removed (not committed), the journey failed waiting for "jfk-v.wav transcribed" (240 s) — the running task stayed frozen.
 - 2026-10-13 (workspace): second review. The re-review claim (a pause's stop can run after the run ended, because `pauseTask` captured `runningHere` before its conditional write) was checked by probes and holds as an ordering, but review item 1's run-start gate open already makes its outcome a no-op: the next run's gate is open, so a stale close cannot hold it. Reproduced the accepted-pause-then-completion interleaving deterministically on the writer lock (`runningHere=true` → pause's write commits PAUSED → completion overwrites → the stop ran) and added it as a regression pin (green on arrival). A production change (re-read the run after the write, open the gate at each terminal status) was implemented, evaluated (273/0) and reverted: it changed nothing observable, and the run-scoped-gate variant deadlocked the worker at its own paused checkpoint. The item records the tightest window (stop after the run's terminal but before the next run's start) as needing a production seam; not added.
 - 2026-10-13: final verification, branch clean: `gradle check` 272/0; `gradle integrationTest` first run failed once in `AudioJoinIntegrationSpec` (the startup sweep deleting a COMPLETED task's work directory races the `/audio` joiner writing `join-N.flac` — pre-existing, load-dependent, unrelated to item 40; 5 later runs, main and branch, all green); frontend vitest 173/0, prettier clean, `tsc --noEmit` clean; e2e 40-atomic-transitions + 40-pause-queued 2/2 green. Status `in-review`.
+- 2026-10-13: merged into `main` (head `d1273efb`) after the second review and the user's approval. Spec and final test list moved here from `roadmap/40-atomic-task-transitions.md`; the follow-up that is deliberately not in this item (the pause's stop landing between the run's terminal and the next run's start) is recorded in the second-review entry above.
