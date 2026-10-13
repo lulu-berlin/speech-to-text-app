@@ -276,7 +276,10 @@ class ProcessingEngineSpec :
 
         given("a leftover work directory the startup sweep cannot remove, and one queued task") {
             `when`("the engine starts, and the device probe fails while the task is suspended") {
-                then("the sweep's and the probe's warnings carry no taskId key; the task's own lines carry its id") {
+                then("the sweep's and the probe's warnings carry no taskId key; the task's own lines carry its id").config(
+                    // Root bypasses directory permissions, so the premise does not hold (containers, CI).
+                    enabledIf = { System.getProperty("user.name") != "root" },
+                ) {
                     withEngineDatabase { dataDir, db ->
                         withCapturedLogs("stt.engine.ProcessingEngine") { engineWarnings ->
                             withCapturedLogs("stt.transcribe.DeviceProbe") { probeWarnings ->
