@@ -227,6 +227,91 @@ class ProcessingEngineAtomicTransitionsSpec :
             }
         }
 
+        given("a running task whose accepted pause's write commits before its completion's") {
+            `when`("the completion still wins (overwrites PAUSED), and the run's terminal opens its gate") {
+                then(
+                    "the next task, including its DIARIZING phase, runs to completion: the pause cannot hold the queue after the task it was issued for is gone",
+                ) {
+                    runTest {
+                        val dataDir = tempdir("stt-engine").toPath()
+                        val lock = CountingMutex()
+                        Database.open(dataDir, lock).use { db ->
+                            val fixture = engineUnderTest(TestDataDir(dataDir), db)
+                            // The worker runs A itself; B has speakers, so a wrongly closed pause gate shows
+                            // in DIARIZING. A has one chunk: the pause lands inside the run, and no further
+                            // checkpoint of A's own blocks on the closed gate afterwards — the run reaches
+                            // its terminal, which is the lifecycle under test.
+                            val first =
+                                enqueueTask(
+                                    fixture.tasks,
+                                    fixture.workDirectories,
+                                    "first.wav",
+                                    queuePosition = 0,
+                                    createdAt = 1,
+                                )
+                            val next =
+                                enqueueTask(
+                                    fixture.tasks,
+                                    fixture.workDirectories,
+                                    "next.wav",
+                                    queuePosition = 1,
+                                    createdAt = 2,
+                                    speakersMode = SpeakersMode.AUTO,
+                                )
+                            fixture.transcriber.segmentsByTask =
+                                mapOf(next to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hi ")))
+                            fixture.transcriber.hold = CompletableDeferred()
+                            fixture.transcriber.holdFrom = 2
+                            fixture.engine.start()
+                            taskIdOf(
+                                fixture.transcriber.entered
+                                    .receive()
+                                    .parent,
+                            ) shouldBe first
+
+                            // Hold the writer lock; the pause's conditional write queues first, then the
+                            // completion's write — the accepted-pause order (the pause wins its write, then
+                            // completion wins the race by overwriting PAUSED).
+                            val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 3L))
+                            val base = lock.lockCalls.value
+                            fixture.transcriber.hold = null // chunk 0 returns; chunk 1 follows
+                            val pause = async(Dispatchers.Default) { fixture.engine.pauseTask(first) }
+                            awaitLockCall(lock, base + 1)
+                            val completion = async(Dispatchers.Default) { fixture.tasks.setCompleted(first, 9_000L) }
+                            awaitLockCall(lock, base + 2)
+
+                            held.release()
+                            completion.await()
+                            // The pause's write queued first; which of the two writes commits first at the
+                            // lock is a scheduling detail, so the pause is either accepted (the completion
+                            // then overwrites PAUSED) or refused on an already-COMPLETED row. Either way
+                            // the invariant holds: the task ends COMPLETED and no dead started PAUSED row
+                            // is left.
+                            val outcome = pause.await()
+                            (
+                                outcome == TaskCommandOutcome.Accepted ||
+                                    outcome == TaskCommandOutcome.Illegal(TaskStatus.COMPLETED, TaskStatus.PAUSED)
+                            ).shouldBeTrue()
+                            statusOf(fixture, first) shouldBe TaskStatus.COMPLETED
+                            fixture.tasks.startedPaused() shouldBe null
+
+                            // The run's terminal reopened its gate: the next task starts and diarizes freely.
+                            // Both completions arrive (the worker's own publish for A and B's); the order
+                            // of those two events is not what this test pins.
+                            val completedIds = listOf(fixture.completed.receive(), fixture.completed.receive())
+                            completedIds.toSet() shouldBe setOf(first, next)
+                            fixture.diarizer.passedGate shouldBe true
+                            statusOf(fixture, next) shouldBe TaskStatus.COMPLETED
+                            held.outcome
+                                .await()
+                                .isFailure
+                                .shouldBeTrue()
+                        }
+                    }
+                }
+            }
+        }
+
         given("a pause that is accepted while its task's last process is already exiting") {
             `when`("the task still finishes") {
                 then("the next task, including its DIARIZING phase, runs to completion: the stale pause stalls nothing") {
