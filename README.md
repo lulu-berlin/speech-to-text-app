@@ -115,7 +115,7 @@ For working on the app without Nix: the repository's `./gradlew` downloads every
 
 Prerequisites:
 
-- **Java 17 or newer** to start Gradle (Gradle 9.8 runs on Java 17–27; tested with 25). The app itself is built and run with JDK 21, which Gradle downloads when your Java is another version.
+- **Java 21 or newer** (Gradle 9.8 itself runs on Java 17–27, but the backend compiles with `-Xjdk-release=21`, so a 17–20 launcher JVM cannot build it). The app is run with JDK 21, which Gradle downloads when your Java is another version.
 - **Linux**: glibc 2.38 or newer (Ubuntu 24.04+, Debian 13+, Fedora 39+) and the system libraries the prebuilt tools are linked against — only this path needs them; Nix, devenv and Docker bring their own:
   - whisper-cli: `libstdc++6`, `libgomp1` and the Vulkan loader `libvulkan1` (needed even without a GPU);
   - ffmpeg: `libasound2` (`libasound2t64` on Ubuntu 24.04+ and Debian 13), `libpulse0`, `libxcb1`, `libxcb-shm0` and `libudev1`.
