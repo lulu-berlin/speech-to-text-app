@@ -100,10 +100,12 @@ jobs:
       - name: gradle e2e
         run: ./gradlew e2e
 
-  # The three Nix checks are independent, so they run as three jobs in parallel with each other and
-  # with the other heavy jobs — all of them after the fast gate; each installs Nix and restores the
-  # shared store cache on its own runner (one job would run them back to back, and a cold run pays
-  # the full sum).
+  # The three Nix checks run in parallel, but GitHub Actions cache keys are immutable: the first
+  # job to save wins. Only `nix-build` writes the shared cache, because it materializes the full
+  # package closure including the expensive whisper-cpp Vulkan output; the other jobs restore it
+  # read-only. The cache key uses a new v2 namespace to get past the old small entry.
+  # Each of the three Nix jobs checks out the sources and restores the same store cache; only
+  # `nix-build` may write it (cache-nix-action saves in a post step that runs on `success()`).
   nix-devenv:
     name: Nix (devenv shell)
     runs-on: ubuntu-24.04
@@ -145,8 +147,13 @@ jobs:
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
     steps:
+      # The sources are required twice over: the toolchain's key step hashes flake.lock,
+      # devenv.lock, devenv.yaml, devenv.nix, nix/** and the pins in versions.json, and
+      # `nix build` builds the flake in the workspace.
       - uses: actions/checkout@v7
       - uses: ./.github/actions/nix-toolchain
+        with:
+          save-cache: 'true'
       - name: nix build
         run: nix build --print-build-logs
 
