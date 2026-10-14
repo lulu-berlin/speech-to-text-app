@@ -184,3 +184,27 @@ Windows machine, and the repo has no CI today.
   confirmed by the first 03:00 Europe/Berlin scheduled run from `main`; branch protection requires
   the single `CI (all checks)` job. Spec and final test list moved here from
   `roadmap/51-ci-verification.md`.
+
+- 2026-10-14 (root agent, run #13 follow-up): the two red legs before this were tests, not the
+  workflow — the e2e liveness probe sampled the transcription bar after the diarization wait (fixed
+  in `e2e/tests/03-upload-queue.spec.ts`), and `ClusteringSpec`'s shared-JVM heap sampler was
+  replaced by `ClusteringHeapIntegrationSpec` ([faster-clustering.md](faster-clustering.md)); both
+  landed in `main` as `656fcd04`. Run #13's only red leg was `Nix (build)`, which is item 47 (below).
+- 2026-10-14 (root agent, Nix store cache follow-up — branch `roadmap/51-nix-store-cache-v2`):
+  Actions cache keys are immutable, and all three parallel Nix jobs wrote the same key, so the first
+  successful post-job save could lock in an evaluation-only store (the `main` entry was 122 MB
+  against 2.2 GB on the PR ref) that a later `nix build` could never replace. `nix-toolchain` now
+  takes a `save-cache` input (default `false`) that only `nix-build` sets, the key is versioned
+  `nix-${runner.os}-v2-…` while `restore-prefixes-first-match: nix-${runner.os}-` still restores the
+  previous namespace once, and `gc-max-store-size-linux` stays 4G. A pending edit had also dropped
+  `actions/checkout@v7` from `nix-build`; restored, because the toolchain's key step hashes
+  `flake.lock`, `devenv.lock`, `devenv.yaml`, `devenv.nix`, `nix/**` and the `versions.json` pins,
+  and `nix build` builds the flake in the workspace. Both workflow files parse (PyYAML; the
+  `nix-devenv` job's `actionlint` is the syntax gate); the runs themselves are the verification.
+- 2026-10-14 (root agent, ordering): `cache-nix-action` saves in a post step gated on
+  `post-if: success()`, so the store is written only when the whole `nix-build` job succeeds. Until
+  roadmap item 47 ([47-atomic-transitions-spec-flaky.md](../../roadmap/47-atomic-transitions-spec-flaky.md),
+  the run #13 `nix build` failure at `ProcessingEngineAtomicTransitionsSpec.kt:302`) lands, no v2
+  entry can be written and every run re-fetches the closure: item 47 first, then a green `nix-build`
+  writes the store, then a second run proves the cache hit. Rebased onto the fresh `main`
+  (`4ecc968f`) as one commit for the PR (ADR 0050).

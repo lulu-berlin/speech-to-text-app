@@ -1,10 +1,16 @@
-# The Nix setup every Nix job needs (roadmap item 51): install Nix and restore/save the store. The
-# store cache is what keeps a warm run from recompiling whisper-cpp's Vulkan build and re-fetching
-# the models; the key covers the flake and devenv inputs plus the pins of what Nix fetches, so a pin
-# change starts a new entry and the prefix still restores the previous one. The Nix jobs share one
-# key on purpose: per-job entries would not fit the repository's 10 GB cache budget.
+# The Nix setup every Nix job needs (roadmap item 51): install Nix and restore the GitHub Actions store cache.
+# Only the job that runs `nix build` may save it: that job materializes the expensive whisper-cpp output.
+# Nix caches are immutable per key, so letting the parallel flake-check job save first would lock in a
+# small, evaluation-only store that the build job could never replace. The v2 namespace avoids that old
+# undersized key; the prefix still restores it once while the new full-store cache is being populated.
 name: Nix toolchain
-description: Install Nix and restore/save the Nix store cache, keyed on the flake, devenv and download pins
+description: Install Nix and restore (optionally save) the GitHub Actions Nix store cache
+
+inputs:
+  save-cache:
+    description: Allow this job to save the Nix store cache (only the nix-build job should)
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -20,10 +26,13 @@ runs:
         set -euo pipefail
         pins=$(jq -Sec '{downloads, models, fixtures, whisperCpp, ffmpeg}' versions.json)
         key=$( { cat flake.lock devenv.lock devenv.yaml devenv.nix $(find nix -type f | sort); printf '%s' "$pins"; } | sha256sum | cut -d' ' -f1)
-        echo "key=nix-${{ runner.os }}-$key" >> "$GITHUB_OUTPUT"
+        echo "key=nix-${{ runner.os }}-v2-$key" >> "$GITHUB_OUTPUT"
     - uses: nix-community/cache-nix-action@v7
       with:
         primary-key: ${{ steps.nix-cache-key.outputs.key }}
+        save: ${{ inputs.save-cache }}
+        # Read the prior namespace once, but write only to v2. This avoids an existing small key
+        # from blocking replacement by the completed `nix build` store.
         restore-prefixes-first-match: nix-${{ runner.os }}-
         # 4 GB, not 6: a key change transiently leaves the previous store entry alive next to the
         # Gradle, pnpm and downloads caches, and evicting those is what costs a cold run its models.
