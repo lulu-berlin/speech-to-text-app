@@ -88,6 +88,7 @@ graph TD
   11 --> 42[42 worker stability]
   11 --> 47[47 atomic-transitions spec flaky]
   51[51 CI verification ✓]:::done
+  51 --> 53[53 Nix store cache: one writer, keyed v2]
   51 --> 48[48 macOS support]
   05 --> 48
   16 --> 48
@@ -164,3 +165,4 @@ graph TD
 | [50 — Electron desktop app](50-electron-app.md) | spec-approved | 16 |
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md) | done | — |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | spec-approved | 12, 22 |
+| [53 — The Nix store cache: one writer per key, versioned past the stale entry](53-nix-store-cache-v2.md) | spec-approved | 51 |
