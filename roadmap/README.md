@@ -163,4 +163,4 @@ graph TD
 | [49 — Windows support](49-windows-support.md) | spec-approved | 33, 48, 51 |
 | [50 — Electron desktop app](50-electron-app.md) | spec-approved | 16 |
 | [51 — CI verification: first GitHub Actions workflow](51-ci-verification.md) | spec-approved | — |
-| [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | draft | 12, 22 |
+| [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | spec-approved | 12, 22 |

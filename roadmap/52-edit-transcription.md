@@ -1,6 +1,6 @@
 # 52 — Edit the transcription: correct a segment's text, with isolated segment playback
 
-Status: draft
+Status: spec-approved
 Depends on: [12](../docs/specs/http-api-and-sse.md) (done; the `/turns` contract), [22](../docs/specs/speaker-rename.md) (done; the COMPLETED-only in-place-edit precedent, SSE events, contract-first examples)
 Blocks: —
 
@@ -31,26 +31,31 @@ a segment is easy to play in isolation (its own window only) while the user edit
   CANCELED tasks are retried and their segments replaced, so they are not editable (same rule item
   22 uses).
 
-## Proposal
+## Decided (consultation, 2026-10-14)
 
-To be settled in the consultation. Starting point (the user's tentative design): an edit control
-per segment that opens the segment's text for editing inline in the transcript; beside it a play
-control that plays just that segment's window (`[startMs, endMs)`) so the user listens, then
-corrects.
+The user's design, confirmed: an edit control per segment opens the segment's text for editing
+inline in the transcript; beside it a play control that plays just that segment's window
+(`[startMs, endMs)`) so the user listens, then corrects.
 
 - **API** (extends item 12's contract; the item-22 precedent):
   - `TurnSegmentJson` gains `id` (contract change; `turns*.json` examples updated).
   - `PUT /api/tasks/{id}/segments/{segmentId}` with `{ "text": "…" }` → `200` with the updated
-    turns (or the updated turn); `404 not-found` (task or segment), `409 not-completed`.
-  - Text rules following item 22's amendment: the client trims; the API rejects empty/whitespace,
-    over-length, or control-character text (`400 invalid-segment-text`); stored as sent.
-  - Event: `segment-edited` → `{ id, segment: { id, startMs, endMs, text } }` after the write; the
-    open view updates in place — a text-only change needs no `/turns` refetch (unlike a merge).
-- **UI**: per segment, an "Edit" action opens an inline editor (a textarea pre-filled with the
-  segment's text; Save commits, Escape discards, Ctrl+Enter saves — exact keys in the
-  consultation), and a per-segment play control that seeks to `startMs`, plays, and pauses at
-  `endMs` (the existing click-to-seek keeps playing past the segment). A rejected save keeps the
-  old text and shows the error. Works for speakers-off tasks (speaker `null`) unchanged.
+    turns (or the updated turn); `404 not-found` (task or segment), `409 not-completed`
+    (**COMPLETED tasks only**, item 22's rule).
+  - Text rules (item 22's amendment style): **the client trims; the API rejects
+    empty/whitespace-only and control-character text (`400 invalid-segment-text`); no length cap;
+    stored as sent.**
+  - Event: `segment-edited` → `{ id, segment: { id, startMs, endMs, text } }` after the write;
+    **the open view updates in place — no `/turns` refetch** (a text edit is not a structural
+    change; only merges refetch).
+- **UI**: per segment, an "Edit" action opens an inline editor — **a textarea with explicit
+  Save/Cancel buttons; Ctrl+Enter saves, Escape discards** — and a **separate** per-segment play
+  control that seeks to `startMs`, plays, and **pauses at `endMs` (plays the window once)**; the
+  existing click-to-seek keeps playing past the segment (items 9/29/31 behavior and its tests
+  unchanged). A rejected save keeps the old text and shows the error. Works for speakers-off
+  tasks (speaker `null`) unchanged.
+- **Downloads (txt/srt/vtt) render the stored text, so edits appear in them with no renderer
+  change — expected and pinned by the test list.**
 - **Out of scope**: changing timings, splitting or joining segments, speaker reassignment (item
   22's merge covers speakers), server-side undo (the textarea's native undo suffices; a saved
   edit is just re-edited). Concurrent editors: last write wins, no optimistic locking.
@@ -59,28 +64,28 @@ corrects.
   the existing per-segment keys, so it is not triggered — but the item should keep the in-place
   update (no refetch) so it stays that way.
 
-## Open questions (to be answered in the consultation)
+## Open questions (answered 2026-10-14)
 
-- Which tasks are editable — COMPLETED only (item 22's rule), confirmed?
-- Text rules: max length (e.g. 2000 characters?), reject untrimmed like speaker names, or store
-  as sent with only empty rejected?
-- Save/cancel keys: explicit Save/Cancel buttons with Ctrl+Enter and Escape, or Enter-saves/blur-
-  cancels (risk: accidental loss)?
-- Isolated play: a separate play control per segment, or should clicking a segment change from
-  "plays from here to the end" to "plays just this segment"? Loop-until-stopped toggle?
-- After a save: in-place update from the `200`/event (no refetch) — confirmed?
-- Downloads (txt/srt/vtt) must show the edited text — confirmed as expected?
+- Which tasks are editable? → **COMPLETED only** (item 22's rule); others `409 not-completed`.
+- Text rules? → **The client trims; the API rejects empty/whitespace-only and control characters;
+  no length cap; stored as sent.**
+- Save/cancel keys? → **Explicit Save/Cancel buttons; Ctrl+Enter saves, Escape discards** — no
+  accidental loss on blur, multi-line edits work.
+- Isolated play? → **A separate per-segment play control that plays `[startMs, endMs)` once**;
+  click-to-seek unchanged (plays past the segment).
+- After a save? → **In-place update from the `200`/`segment-edited` event; no `/turns` refetch.**
+- Downloads? → **They show the edited text** (the item's test list pins it).
 
 ## Test list (proposed; behaviors only)
 
 - [ ] Editing a COMPLETED task's segment stores the new text; `/turns` and the view show it
 - [ ] Editing a QUEUED or FAILED task's segment returns 409 `not-completed`; unknown task or segment returns 404
-- [ ] Text rules: empty, whitespace-only, over-length, or control-character text is rejected 400 and leaves the stored text; a valid text is stored as sent (per the consultation)
+- [ ] Text rules: empty, whitespace-only, or control-character text (client-trimmed) is rejected 400 and leaves the stored text; a valid text is stored as sent — no length cap
 - [ ] A speakers-off task's segment edits the same way (no speaker attached)
 - [ ] The edit emits `segment-edited` after the write with the new segment; an open view updates in place without refetching `/turns`
 - [ ] The downloads (txt, srt, vtt) contain the edited text after the edit
-- [ ] (view) An Edit control opens an inline editor pre-filled with the segment's text; Save commits and Escape discards; a rejected save keeps the old text and shows the error
-- [ ] (view) The per-segment play control plays only the segment's window — starts at its startMs and stops at its endMs; the normal player behavior (click-to-seek, full-clip playback) is unchanged
+- [ ] (view) An Edit control opens an inline textarea pre-filled with the segment's text; Save (button or Ctrl+Enter) commits, Escape discards; a rejected save keeps the old text and shows the error
+- [ ] (view) The per-segment play control plays exactly the segment's window once — starts at its startMs and stops at its endMs; the normal player behavior (click-to-seek, full-clip playback) is unchanged
 - [ ] (e2e, ADR 0046) Against the real backend, editing a segment updates the view and the downloaded txt
 - [ ] (must not break) The suites, the contract-shape checks (`turns*.json` gains the segment id) and the e2e journey stay green
 
@@ -95,3 +100,8 @@ corrects.
 
 - 2026-10-14: filed from the user's request (edit button per segment; play the segment in
   isolation while editing — the typical copy-edit flow).
+- 2026-10-14: consultation — COMPLETED tasks only; client trims, API rejects empty/whitespace-only
+  and control characters, no length cap, stored as sent; inline textarea with Save/Cancel buttons
+  (Ctrl+Enter saves, Escape discards); a separate per-segment play control playing the window
+  once (click-to-seek unchanged); in-place update from the `200`/`segment-edited` event without a
+  `/turns` refetch; downloads reflect edits. Test list approved; status `spec-approved`.
