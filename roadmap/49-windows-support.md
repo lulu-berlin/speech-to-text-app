@@ -78,6 +78,9 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 - [ ] Device selection works with the GPU-enabled build (or, on CPU-only CI, the flag path is
       verified and documented as CPU-first)
 - [ ] README documents Windows support and the bootstrap path
+- [ ] (CI, inherited from 51 on 2026-10-14) This item adds its Windows leg to
+      `.github/workflows/ci.yml`; it runs on the nightly schedule and on this item's PRs; no Nix job
+      exists on Windows
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green
 

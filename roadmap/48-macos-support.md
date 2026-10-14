@@ -89,6 +89,9 @@ To be settled at the first test-list item, starting from the decisions above:
       binary, not 1.9.x assumptions)
 - [ ] (CI, macOS) The e2e journey (queue, history, settings, reorder, pause/cancel) is green on macOS
 - [ ] (CI or user-verified) `nix build`/`nix run` and the devenv shell work on darwin
+- [ ] (CI, inherited from 51 on 2026-10-14) This item adds its macOS legs (ARM, Intel per the open
+      question) to `.github/workflows/ci.yml`; they run on the nightly schedule and on this item's
+      PRs, and include the darwin Nix build above
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and the
       Linux e2e stay green
 

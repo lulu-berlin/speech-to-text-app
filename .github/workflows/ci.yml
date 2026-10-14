@@ -1,0 +1,170 @@
+# Continuous verification (roadmap item 51). Linux runs on pushes to main and on pull requests;
+# the pinned tool versions come from the committed versions.json (the flake's pins, item 33)
+# through the shared toolchain actions in .github/actions/. No secrets.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Nightly at 03:00 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry.
+  # Until items 48/49 add their platform legs, the nightly runs the Linux tree, so the trigger
+  # itself is exercised. GitHub runs a scheduled workflow only from the default branch.
+  schedule:
+    - cron: '0 3 * * *'
+      timezone: 'Europe/Berlin'
+
+permissions:
+  contents: read
+
+# A newer commit on a PR supersedes the older run; every main commit keeps its own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend-check:
+    name: Backend (gradle check)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+      # The root wrapper pins Gradle 9.8.0; -p backend runs the standalone backend build,
+      # the same build the devenv's `cd backend && gradle check` runs.
+      - name: gradle check
+        run: ./gradlew -p backend check
+
+  frontend-check:
+    name: Frontend (pnpm test, pnpm build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+      - name: pnpm test
+        run: pnpm test
+      - name: pnpm build
+        run: pnpm build
+
+  backend-integration:
+    name: Backend (gradle integrationTest)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      # The Integration-tagged tests run the real binaries and models. The root task fetches them
+      # (sha256-verified from versions.json) into $GRADLE_USER_HOME/stt-app, which the downloads
+      # cache reuses on later runs. `setsid` (the process-tree kill, ADR 0020) ships with
+      # ubuntu-24.04.
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+          system-libs: 'true'
+      - name: gradle integrationTest
+        run: ./gradlew integrationTest
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+          system-libs: 'true'
+      # Chromium's system libraries and the e2e package come from the build's own task, which is what
+      # the invoke-it-as-root check exists for: it installs `playwright install-deps chromium` when it
+      # runs as root and installs the package with the Gradle-managed pnpm, so the pnpm and Playwright
+      # versions and the Chromium package list stay in e2e/package.json, versions.json and the task
+      # instead of being repeated here. The chown hands back what root wrote: the Gradle home,
+      # e2e/node_modules and the project directories.
+      - name: Install Chromium's system libraries and the e2e package
+        run: |
+          set -euo pipefail
+          gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+          sudo env HOME="$HOME" PATH="$PATH" JAVA_HOME="$JAVA_HOME" GRADLE_USER_HOME="$gradle_home" \
+            ./gradlew e2eSystemDeps --no-daemon
+          sudo chown -R "$(id -u):$(id -g)" "$gradle_home" "$GITHUB_WORKSPACE"
+      - name: gradle e2e
+        run: ./gradlew e2e
+
+  # The three Nix checks are independent, so they run as three jobs in parallel with each other and
+  # with the other heavy jobs — all of them after the fast gate; each installs Nix and restores the
+  # shared store cache on its own runner (one job would run them back to back, and a cold run pays
+  # the full sum).
+  nix-devenv:
+    name: Nix (devenv shell)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/nix-toolchain
+      # The repository pins every tool in devenv.nix and flake.nix; the devenv CLI itself is the
+      # bootstrap (ADR 0010) and is not pinned there, so it comes from nixpkgs, the same way a
+      # developer's machine installs it.
+      - name: Install the devenv CLI
+        run: nix profile install nixpkgs#devenv
+      # The workflows are linted with the actionlint the devenv pins (ADR 0010), so a YAML mistake or
+      # a bad `${{ … }}` expression fails in CI instead of at the next push — the reason
+      # `pkgs.actionlint` was added. actionlint 1.7.12 checks workflow files only, so the composite
+      # `action.yml` files are still reviewed by hand.
+      - name: actionlint the workflows
+        run: devenv shell -- actionlint .github/workflows/*.yml
+      # The dev shell's own test list (devenv.nix enterTest): node, JDK 21 with Gradle and Kotlin,
+      # whisper-cli, ffmpeg, sqlite3, curl, jq and the model hashes.
+      - name: devenv test
+        run: devenv test
+
+  nix-flake-check:
+    name: Nix (flake check)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/nix-toolchain
+      - name: nix flake check
+        run: nix flake check --print-build-logs
+
+  nix-build:
+    name: Nix (build)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/nix-toolchain
+      - name: nix build
+        run: nix build --print-build-logs
+
+  # The one required check for branch protection: it waits for every other job and fails when any of
+  # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
+  # renaming a job cannot silently un-gate merges.
+  ci:
+    name: CI (all checks)
+    needs: [backend-check, frontend-check, backend-integration, e2e, nix-devenv, nix-flake-check, nix-build]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Report the job results
+        run: |
+          echo "job results: ${{ join(needs.*.result, ' ') }}"
+      - name: Every job succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "at least one job failed or was cancelled" >&2
+          exit 1

@@ -1,0 +1,30 @@
+# The Nix setup every Nix job needs (roadmap item 51): install Nix and restore/save the store. The
+# store cache is what keeps a warm run from recompiling whisper-cpp's Vulkan build and re-fetching
+# the models; the key covers the flake and devenv inputs plus the pins of what Nix fetches, so a pin
+# change starts a new entry and the prefix still restores the previous one. The Nix jobs share one
+# key on purpose: per-job entries would not fit the repository's 10 GB cache budget.
+name: Nix toolchain
+description: Install Nix and restore/save the Nix store cache, keyed on the flake, devenv and download pins
+
+runs:
+  using: composite
+  steps:
+    - uses: cachix/install-nix-action@v31
+    # No `hashFiles` here: the key is a sha256 over the same inputs, computed the way the
+    # jvm-toolchain composite computes the downloads key.
+    - name: Compute the Nix store cache key
+      id: nix-cache-key
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        pins=$(jq -Sec '{downloads, models, fixtures, whisperCpp, ffmpeg}' versions.json)
+        key=$( { cat flake.lock devenv.lock devenv.yaml devenv.nix $(find nix -type f | sort); printf '%s' "$pins"; } | sha256sum | cut -d' ' -f1)
+        echo "key=nix-${{ runner.os }}-$key" >> "$GITHUB_OUTPUT"
+    - uses: nix-community/cache-nix-action@v7
+      with:
+        primary-key: ${{ steps.nix-cache-key.outputs.key }}
+        restore-prefixes-first-match: nix-${{ runner.os }}-
+        # 4 GB, not 6: a key change transiently leaves the previous store entry alive next to the
+        # Gradle, pnpm and downloads caches, and evicting those is what costs a cold run its models.
+        gc-max-store-size-linux: 4G
