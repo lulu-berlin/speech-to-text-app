@@ -21,10 +21,13 @@ a pull request the human creates: GitHub keeps the review, checks and audit trai
 - **On approval the root agent prepares the branch for the PR**: it rebases the branch onto the
   current `main` in the worktree and squashes the branch's commits into one commit (subject names
   the item, imperative).
-- **The human ships it**: the user pushes the branch, creates the pull request, and merges it on
-  GitHub (the branch is a single commit on top of `main`, so any PR merge strategy lands one
-  commit). If the user prefers, the root agent pushes the branch for them — never `main` (the
-  existing no-agent-push-to-main rule is unchanged).
+- **The human ships it**: only the human pushes code to GitHub. The user pushes the branch,
+  creates the pull request, and merges it on GitHub (the branch is a single commit on top of
+  `main`, so any PR merge strategy lands one commit).
+- **Agents are read-only on GitHub**: the repository is public — agents may view whatever is
+  publicly accessible, but make no changes: no pushes (not the branch, not `main`), no pull
+  request creation or commenting, no merges. Every GitHub-side mutation is performed by the human
+  (or by CI, which runs on the human's pushes).
 - **Bookkeeping after the PR lands**: the root agent syncs `main` with `git pull --ff-only`
   (applying GitHub's result, not merging), moves the spec and final test list into
   `docs/specs/<area>.md`, deletes the roadmap file, updates `roadmap/README.md`, and removes the
@@ -41,6 +44,8 @@ a pull request the human creates: GitHub keeps the review, checks and audit trai
   until the squash. The final test list stays the record in `docs/specs/`.
 - Once item 51's CI lands, PR checks gate merges automatically instead of relying on local runs.
 - Local `main` never diverges from `origin/main` beyond GitHub's own merge, so the post-merge
-  sync stays a clean fast-forward; the `git pull --ff-only` is bookkeeping, not an agent merge.
+  sync stays a clean fast-forward; the `git pull --ff-only` is bookkeeping, not an agent merge —
+  it fetches public origin and changes only the local clone.
+- Agents have no write path to GitHub at all: the only GitHub-side actors are the human and CI.
 - The human is the last gate for every item; item-approval diffs shown by the root agent and the
   PR are the same tree, so no double review is implied.

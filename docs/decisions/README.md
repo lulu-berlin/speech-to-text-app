@@ -60,5 +60,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0047 | [External tools are resolved from PATH; no tool-path variables](0047-external-tools-resolved-from-path.md) | accepted, withdraws item 16's `STT_WHISPER_CLI`/`STT_FFMPEG` | 2026-10-11 |
 | 0048 | [The task's id in the logging context (MDC) and named engine coroutines](0048-task-id-in-logging-context-and-named-coroutines.md) | accepted | 2026-10-12 |
 | 0049 | [Gradle 9.8 in every build path; the root wrapper is for humans without Nix](0049-gradle-9-everywhere-root-wrapper-for-humans.md) | accepted, scopes 0014's "no Gradle wrapper" | 2026-10-12 |
-| 0050 | [Roadmap items merge via human pull requests on GitHub; the root agent never merges](0050-pr-merge-on-github.md) | accepted, amends AGENTS.md § Workflow step 8 | 2026-10-14 |
+| 0050 | [Roadmap items merge via human pull requests on GitHub; the root agent never merges](0050-pr-merge-on-github.md) | accepted, amends AGENTS.md § Workflow step 8 and § Non-negotiable rules (human-only pushes to GitHub) | 2026-10-14 |
 

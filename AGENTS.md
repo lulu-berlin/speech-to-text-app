@@ -9,7 +9,7 @@ A web app that transcribes uploaded audio files with speaker diarization. Backen
 
 ## Non-negotiable rules
 
-- **No code change is valid without the user's explicit approval.** Specs and test lists are approved before coding; every refactor is approved individually; diffs are approved before merging into `main`. Agents never merge, push, or rewrite `main` on their own.
+- **No code change is valid without the user's explicit approval.** Specs and test lists are approved before coding; every refactor is approved individually; diffs are approved before merging into `main`. Agents never push to GitHub and make no changes there: the repository is public, so agents may only view what is publicly accessible; only the human pushes, creates pull requests, and merges ([ADR 0050](docs/decisions/0050-pr-merge-on-github.md)).
 - **TDD is mandatory** and follows Kent Beck's Canon TDD exactly as written in [§ Canon TDD](#canon-tdd).
 - **Every spec and decision is documented.** Specs live in `roadmap/<NN-slug>.md` while pending and move to `docs/specs/<area>.md` when done; decisions are ADRs in [docs/decisions/](docs/decisions/README.md).
 - **No Python in the app, build, or tests.** [docs/oracle/transcribe.py](docs/oracle/transcribe.py) is the reference oracle only: read it to port behavior; never run it from the app, build, or tests ([ADR 0002](docs/decisions/0002-no-python-oracle-only.md)).
