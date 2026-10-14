@@ -1,7 +1,7 @@
 # 48 — macOS support
 
 Status: spec-approved
-Depends on: [05](../docs/specs/process-runner.md) (done), [16](../docs/specs/nix-flake-package.md) (done), [45](45-selectable-gpus.md) (spec-approved; macOS GPU surface must not conflict), [51](51-ci-verification.md) (draft; the macOS CI runners that verify this item — if 51 is declined, verification falls back to user-provided Mac access)
+Depends on: [05](../docs/specs/process-runner.md) (done), [16](../docs/specs/nix-flake-package.md) (done), [45](../docs/specs/device-selection.md) (done; macOS GPU surface must not conflict), [51](../docs/specs/ci-verification.md) (done; the macOS CI runners that verify this item)
 Blocks: — [49](49-windows-support.md), [50](50-electron-app.md)
 
 ## Goal
@@ -35,7 +35,7 @@ Filed 2026-10-13 from a portability pass over `main` (verified reads, nothing ex
   and `/proc/../stat`; macOS has no /proc, so e2e stop/cleanup would fail and leave the daemon.
 - **Portable already** — `versions.json` carries darwin-arm64/x64 whisper-cli (CoreML) and ffmpeg
   artifacts; sqlite-jdbc and onnxruntime use per-OS bundled natives; data paths are `Path.of`-based.
-- **No CI exists** in the repository; verification infrastructure itself is [51](51-ci-verification.md).
+- **CI exists now**: item 51's workflow runs the Linux stack on every push and pull request; the macOS runners this item adds extend it ([51](../docs/specs/ci-verification.md)).
 
 ## Decided (consultation, 2026-10-13)
 
@@ -49,7 +49,7 @@ Filed 2026-10-13 from a portability pass over `main` (verified reads, nothing ex
 - **devenv on macOS is in scope**: `devenv up` and the dev shell work on darwin, with Linux-only
   packages (`setsid` util-linux, vulkan-tools) gated by system.
 - **CI is the verification path** (no local Mac): macOS ARM runners run the unit, Integration and
-  e2e suites plus the Nix build per [51](51-ci-verification.md).
+  e2e suites plus the Nix build per [51](../docs/specs/ci-verification.md).
 - **DeviceArgs**: verify `--no-gpu`/`--device N` against the actually-pinned whisper-cli build as
   part of the GPU work (the `DeviceArgs.kt` 1.9.x-vs-1.8.4 mismatch row leaves the known-issues
   backlog for this item).

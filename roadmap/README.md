@@ -10,7 +10,7 @@ Pending work, one file per item. Every item is specified, given a test list, and
 - `spec-approved`: proposal, open questions, and test list approved by the user (dated line in the item's Approval log).
 - `in-progress`: being implemented in `workspaces/<NN-slug>` on branch `roadmap/<NN-slug>` (status set in the worktree's copy).
 - `in-review`: full diff presented to the user.
-- `done`: merged into `main`; file removed from `roadmap/`, its row links to the spec in `docs/specs/`.
+- `done`: the item was approved; its squashed PR branch already carries the finished state — the spec and final test list in `docs/specs/<area>.md`, this file's row pointing there, and the roadmap file deleted — so `main` holds no roadmap copy from the merge on.
 
 ## Dependency graph
 
@@ -87,7 +87,7 @@ graph TD
   12 --> 41[41 upload hardening]
   11 --> 42[42 worker stability]
   11 --> 47[47 atomic-transitions spec flaky]
-  51[51 CI verification]
+  51[51 CI verification ✓]:::done
   51 --> 48[48 macOS support]
   05 --> 48
   16 --> 48
@@ -101,7 +101,7 @@ graph TD
   11 --> 43[43 diarization memory]
   38 --> 44[44 audio in database]
   11 --> 44
-  11 --> 45[45 selectable GPUs]
+  11 --> 45[45 selectable GPUs ✓]:::done
   32 --> 45
   12 --> 44
   11 --> 46[46 contextual logging ✓]:::done
@@ -156,11 +156,11 @@ graph TD
 | [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | spec-approved | 11 |
 | [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
 | [44 — Store the full audio in the database; drop the file cache](44-audio-in-database.md) | spec-approved | 11, 12, 38 |
-| [45 — Make both GPUs selectable: enumerate physical Vulkan devices](45-selectable-gpus.md) | spec-approved | 11, 32 |
+| [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md) | done | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
 | [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](47-atomic-transitions-spec-flaky.md) | spec-approved | 11 |
 | [48 — macOS support](48-macos-support.md) | spec-approved | 05, 16, 45, 51 |
 | [49 — Windows support](49-windows-support.md) | spec-approved | 33, 48, 51 |
 | [50 — Electron desktop app](50-electron-app.md) | spec-approved | 16 |
-| [51 — CI verification: first GitHub Actions workflow](51-ci-verification.md) | spec-approved | — |
+| [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md) | done | — |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | spec-approved | 12, 22 |

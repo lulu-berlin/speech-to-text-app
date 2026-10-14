@@ -1,7 +1,7 @@
 # 45 — Make both GPUs selectable: enumerate physical Vulkan devices
 
-Status: in-review
-Depends on: [11](../docs/specs/processing-engine.md) (done), [32](../docs/specs/settings-page.md) (done; the device setting and the probe)
+Status: done (roadmap item 45, merged 2026-10-14)
+Depends on: [11 — Processing engine](processing-engine.md) (done), [32 — Settings page](settings-page.md) (done; the device setting and the probe)
 Blocks: —
 
 ## Goal
@@ -31,7 +31,7 @@ To be settled in the consultation. Starting point:
 - The physical list's order? → **Not a decision**: the indices are defined by the order the probe prints (ggml's enumeration on that boot), so `gpu:N` always means "the Nth device the probe listed"; the page shows the same list. (The question was noise; removed.)
 - Per-run env plumbing? → ~~A per-call `env GGML_VK_VISIBLE_DEVICES=<index>` wrapper~~ **Withdrawn 2026-10-14**: it rested on the "single ggml device" misreading; `--device N` selects `Vulkan<N>` directly (see Already decided).
 
-## Test list (proposed; behaviors only)
+## Test list (approved 2026-10-12 with the spec; every item green at merge)
 
 - [x] The probe lists every physical Vulkan GPU whisper-cli can see, with its name (user's machine: AMD and NVIDIA; a GPU-less machine: none — cpu and auto only)
 - [x] Choosing `gpu:N` runs that task's whisper-cli on `Vulkan<N>`, the GPU the probe listed as N: the running whisper-cli has `--device N` and runs on that GPU (`ps`, `nvidia-smi`, amdgpu `gpu_busy_percent`; user-verified on the user's machine for both GPUs). (discovered 2026-10-14: the app logs no whisper-cli output on success, so the run's log cannot show the backend; user chose the process/GPU observation over a new log line)
@@ -72,3 +72,9 @@ To be settled in the consultation. Starting point:
   (it removes the joiner). If item 44 lands first, this branch's rebase drops the row and re-runs
   `gradle check integrationTest`; if this branch lands first, item 44's rebase does the same from
   its side. The branch is squashed to one commit on top of `main` (ADR 0050) for the PR.
+- 2026-10-14: merged into `main` (head `bde42e59`, PR #2) after the user approved the diff. The
+  root agent's review found no blocking defect; two changes rode along in the squash: the device
+  line's index is read with `toIntOrNull()`, so a garbled or future-format line cannot throw out of
+  the probe into `Main.main` (new unit spec `VulkanDeviceLinesSpec`, red on the old parser), and the
+  branch's `AudioJoinIntegrationSpec` backlog row stays until item 44's merge retires it. Spec and
+  final test list moved here from `roadmap/45-selectable-gpus.md`.

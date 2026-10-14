@@ -1,7 +1,7 @@
 # 49 — Windows support
 
 Status: spec-approved
-Depends on: [33](../docs/specs/gradle-bootstrap.md) (done; the no-Nix path), [48](48-macos-support.md) (spec-approved; its portable process-control seam is the foundation), [51](51-ci-verification.md) (draft; a Windows CI runner verifies — local virtualization is the fallback)
+Depends on: [33](../docs/specs/gradle-bootstrap.md) (done; the no-Nix path), [48](48-macos-support.md) (spec-approved; its portable process-control seam is the foundation), [51](../docs/specs/ci-verification.md) (done; a Windows CI runner verifies — local virtualization is the fallback)
 Blocks: — [50](50-electron-app.md)
 
 ## Goal
@@ -44,7 +44,7 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 - **GPU support is in scope**: a GPU-enabled Windows whisper-cli build and working device selection;
   the compute backend (CUDA vs DirectML vs Vulkan) is chosen during implementation, with the
   DeviceArgs flags verified against that build.
-- **Verification**: local virtualization plus a GitHub Actions Windows runner per [51](51-ci-verification.md).
+- **Verification**: local virtualization plus a GitHub Actions Windows runner per [51](../docs/specs/ci-verification.md).
 - **Delivery**: `gradlew.bat` bootstrap + a `.cmd` launcher, zip layout, pinned sha-verified Windows
   artifacts in versions.nix.
 
