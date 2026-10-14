@@ -27,7 +27,7 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 | Speakers | `speakers.json` | `200` of `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge` and `DELETE /api/tasks/{id}/speakers/merges` (item 22) |
 | Speakers event | `speakers-renamed.json`, `speakers-merged.json` | events `speakers-renamed` and `speakers-merged` (item 22) |
 | Heartbeat | `heartbeat.json` | event `heartbeat`: sent after 5 s without any other event; carries no state (item 29, [ADR 0044](../decisions/0044-sse-heartbeat-and-client-watchdog.md)) |
-| Settings | `settings.json`, `settings.fixed.json`, `settings.fallback.json` | `GET /api/settings`; `200` of `PUT /api/settings` and `DELETE /api/settings/device-fallback` (item 32) |
+| Settings | `settings.json`, `settings.fixed.json`, `settings.fallback.json` | `GET /api/settings`; `200` of `PUT /api/settings` and `DELETE /api/settings/device-fallback` (item 32; `gpuNames` added by item 45) |
 | Settings event | `settings-updated.json`, `settings-updated.defaults.json`, `settings-updated.fallback.json` | event `settings-updated` (item 32) |
 | Error | `error.json`, `error.invalid-language.json` (mock addition, item 14), `error.invalid-device.json` (item 32) | every error response except `duplicate-audio` |
 | Error (duplicate) | `error.duplicate-audio.json` | `409 duplicate-audio` of `POST /api/tasks` |

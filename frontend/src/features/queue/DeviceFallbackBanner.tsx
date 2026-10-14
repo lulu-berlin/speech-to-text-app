@@ -1,5 +1,6 @@
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
 import { TextButton } from '../../shared/ui/TextButton';
+import { deviceLabel } from '../../shared/ui/deviceLabel';
 
 // The global CPU-fallback banner (item 32): the engine switched the chosen GPU to the CPU
 // because whisper-cli could not use it. The notice survives reloads and restarts until it is
@@ -7,16 +8,18 @@ import { TextButton } from '../../shared/ui/TextButton';
 // fallback while the user is looking at the queue is announced.
 export function DeviceFallbackBanner({
   device,
+  gpuNames,
   dismissing,
   onDismiss,
 }: {
   device: string;
+  gpuNames: Record<string, string>;
   dismissing: boolean;
   onDismiss: () => void;
 }) {
   return (
     <ErrorCallout
-      title={`${deviceLabel(device)} was unavailable`}
+      title={`${deviceLabel(device, gpuNames)} was unavailable`}
       detail="Transcription switched to the CPU. The device setting is now CPU; to use it again, choose it on the Settings page."
       action={
         <TextButton disabled={dismissing} onClick={onDismiss}>
@@ -25,17 +28,4 @@ export function DeviceFallbackBanner({
       }
     />
   );
-}
-
-// A device of the settings' value space (item 32: `auto`, `cpu`, `gpu:<index>`) as people
-// read it: "Auto", "CPU", "GPU 1". An unknown value is shown as it is.
-function deviceLabel(device: string): string {
-  if (device === 'auto') {
-    return 'Auto';
-  }
-  if (device === 'cpu') {
-    return 'CPU';
-  }
-  const gpu = /^gpu:(\d+)$/.exec(device);
-  return gpu === null ? device : `GPU ${gpu[1]}`;
 }

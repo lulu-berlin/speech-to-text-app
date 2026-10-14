@@ -6,5 +6,9 @@
   "speakersCount": null,
   "maxSpeakers": 8,
   "deviceFallback": null,
-  "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"]
+  "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"],
+  "gpuNames": {
+    "gpu:0": "NVIDIA GeForce RTX 3060",
+    "gpu:1": "AMD Radeon RX 6600"
+  }
 }

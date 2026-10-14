@@ -10,6 +10,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -65,6 +66,10 @@ class SettingsRoutesSpec :
                             .jsonArray
                             .map { it.jsonPrimitive.content }
                             .shouldBe(listOf("cpu", "auto"))
+                        body
+                            .getValue("gpuNames")
+                            .jsonObject
+                            .shouldBe(emptyMap<String, JsonElement>())
                     }
                 }
             }

@@ -11,6 +11,7 @@ import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { TextButton } from '../../shared/ui/TextButton';
 import { TextLink } from '../../shared/ui/TextLink';
 import { controlStyle } from '../../shared/ui/controlStyle';
+import { deviceLabel } from '../../shared/ui/deviceLabel';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { settingsMachine } from '../../shared/state/settingsMachine';
@@ -42,19 +43,6 @@ function clampCount(raw: string, fallback: number): number {
     return fallback;
   }
   return Math.min(20, Math.max(1, parsed));
-}
-
-// A device of the settings' value space (item 32: `auto`, `cpu`, `gpu:<index>`) as people
-// read it: "Auto", "CPU", "GPU 1". An unknown value is shown as it is.
-function deviceLabel(device: string): string {
-  if (device === 'auto') {
-    return 'Auto';
-  }
-  if (device === 'cpu') {
-    return 'CPU';
-  }
-  const gpu = /^gpu:(\d+)$/.exec(device);
-  return gpu === null ? device : `GPU ${gpu[1]}`;
 }
 
 // The Settings page (item 32): shows the stored settings and the devices to choose from,
@@ -111,7 +99,7 @@ export function SettingsView() {
       value !== null &&
       !choices.some((choice) => choice.value === value)
     ) {
-      choices.push({ value, label: deviceLabel(value) });
+      choices.push({ value, label: deviceLabel(value, stored?.gpuNames ?? {}) });
     }
   }
 

@@ -47,6 +47,7 @@ export const settingsMachine = setup({
                 : {
                     ...event.update,
                     availableDevices: context.settings.availableDevices,
+                    gpuNames: context.settings.gpuNames,
                   },
             error: null,
           }),
@@ -65,6 +66,7 @@ export const settingsMachine = setup({
                     ...event.settings,
                     deviceFallback: context.settings?.deviceFallback ?? null,
                     availableDevices: context.settings?.availableDevices ?? [],
+                    gpuNames: context.settings?.gpuNames ?? {},
                   },
                   rejections: context.rejections + 1,
                 },

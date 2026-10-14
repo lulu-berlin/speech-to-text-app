@@ -380,6 +380,7 @@ export function QueueView() {
         {stored?.deviceFallback != null ? (
           <DeviceFallbackBanner
             device={stored.deviceFallback}
+            gpuNames={stored.gpuNames}
             dismissing={settings.matches({ loaded: 'dismissing' })}
             onDismiss={() => sendSettings({ type: 'DISMISS' })}
           />

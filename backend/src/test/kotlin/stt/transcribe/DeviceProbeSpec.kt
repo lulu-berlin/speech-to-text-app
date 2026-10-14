@@ -11,10 +11,10 @@ import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Roadmap item 32, cycle 2: the startup device probe — [DeviceProbe] runs whisper-cli once and parses the GPUs it
- * reports on stderr (`%s: found GPU device N: <description> (type: …, cnt: …)`, libwhisper; identical in 1.8.4 and 1.9.2). The stand-ins
- * exit 1, as whisper-cli does after failing to read the probe's `/dev/null` input. CPU-only output and a missing
- * executable yield no GPU. Real subprocesses, hence Integration (ADR 0021).
+ * Roadmap items 32 and 45: the startup device probe — [DeviceProbe] runs whisper-cli once and parses the physical
+ * Vulkan GPUs its ggml backend enumerates on stderr (`ggml_vulkan: N = <name> (<driver>) | uma: …`, whisper.cpp
+ * 1.8.4). The stand-ins exit 1, as whisper-cli does after failing to read the probe's `/dev/null` input. CPU-only
+ * output and a missing executable yield no GPU. Real subprocesses, hence Integration (ADR 0021).
  */
 class DeviceProbeSpec :
     BehaviorSpec({
@@ -22,21 +22,30 @@ class DeviceProbeSpec :
 
         val model = Path.of("/nonexistent-model.bin")
 
-        given("a whisper-cli stand-in reporting two GPUs, then failing on the input") {
+        given("a whisper-cli stand-in whose Vulkan backend sees two physical GPUs behind its one ggml device") {
             `when`("the probe runs it") {
-                then("it parses GPU 0 and GPU 1 with their descriptions, in order") {
+                then("it lists both physical GPUs with their names, in the order ggml printed them") {
+                    // The user's machine, verbatim (item 45, 2026-10-13/14): libwhisper stops at the selected device,
+                    // so with the probe's default `--device 0` it prints only Vulkan0 although ggml has Vulkan0 and Vulkan1.
                     val stderr =
                         listOf(
-                            "load_backend: loaded Vulkan backend from /nix/store/x-whisper-cpp-1.9.2/lib/libggml-vulkan.so",
-                            "whisper_backend_init_gpu: found GPU device 0: NVIDIA GeForce RTX 3060 (type: 2, cnt: 1)",
-                            "whisper_backend_init_gpu: found GPU device 1: AMD Radeon RX 6600 (type: 1, cnt: 2)",
+                            "ggml_vulkan: Found 2 Vulkan devices:",
+                            "ggml_vulkan: 0 = AMD Ryzen 9 6900HS Creator Edition (RADV REMBRANDT) (radv) | uma: 1 | fp16: 1 | bf16: 0 | warp size: 32 | shared memory: 65536 | int dot: 1 | matrix cores: none",
+                            "ggml_vulkan: 1 = NVIDIA GeForce RTX 3050 Laptop GPU (NVIDIA) | uma: 0 | fp16: 1 | bf16: 1 | warp size: 32 | shared memory: 49152 | int dot: 1 | matrix cores: NV_coopmat2",
+                            "whisper_backend_init_gpu: device 0: Vulkan0 (type: 2)",
+                            "whisper_backend_init_gpu: found GPU device 0: Vulkan0 (type: 2, cnt: 0)",
                             "error: failed to read audio file '/dev/null'",
                         )
                     val whisperCli = fakeWhisperCli(tempdir("stt-probe").toPath(), stderr, exitCode = 1)
 
                     val gpus = withTimeout(10.seconds) { DeviceProbe(ProcessRunner(), model, whisperCli.toString()).gpus() }
 
-                    gpus.shouldBe(listOf(GpuDevice(0, "NVIDIA GeForce RTX 3060"), GpuDevice(1, "AMD Radeon RX 6600")))
+                    gpus.shouldBe(
+                        listOf(
+                            GpuDevice(0, "AMD Ryzen 9 6900HS Creator Edition (RADV REMBRANDT)"),
+                            GpuDevice(1, "NVIDIA GeForce RTX 3050 Laptop GPU"),
+                        ),
+                    )
                 }
             }
         }

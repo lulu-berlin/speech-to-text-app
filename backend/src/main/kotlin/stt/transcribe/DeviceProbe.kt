@@ -7,17 +7,17 @@ import stt.process.ProcessResult
 import stt.process.ProcessRunner
 import java.nio.file.Path
 
-/** One GPU the startup device probe found: its index (whisper-cli's `--device N`) and its description. */
+/** One physical GPU the startup device probe found: its index in ggml's Vulkan enumeration and its name. */
 data class GpuDevice(
     val index: Int,
-    val description: String,
+    val name: String,
 )
 
 /**
- * The startup device probe (roadmap item 32): runs whisper-cli once and parses the GPUs it reports on
- * stderr. whisper-cli prints them while initializing the context, before it reads the audio — the input
- * only has to exist (`/dev/null` decodes to nothing), so the probe costs one model load and any exit code
- * still carries the lines. A failed probe (whisper-cli missing, ...) reports no GPU, so the app still
+ * The startup device probe (roadmap items 32, 45): runs whisper-cli once and parses the physical Vulkan GPUs
+ * its ggml backend enumerates on stderr. whisper-cli prints them while initializing, before it reads the audio —
+ * the input only has to exist (`/dev/null` decodes to nothing), so the probe costs one model load and any exit
+ * code still carries the lines. A failed probe (whisper-cli missing, ...) reports no GPU, so the app still
  * starts and the Settings page offers CPU and auto.
  */
 class DeviceProbe internal constructor(
@@ -28,7 +28,7 @@ class DeviceProbe internal constructor(
 ) {
     constructor(runner: ProcessRunner, model: Path) : this(runner, model, "whisper-cli")
 
-    /** The GPUs whisper-cli reported, in line order; empty when it reports none or the probe fails. */
+    /** The physical GPUs whisper-cli's Vulkan backend enumerated, in line order; empty when there is none or the probe fails. */
     suspend fun gpus(): List<GpuDevice> {
         val result =
             try {
@@ -39,7 +39,7 @@ class DeviceProbe internal constructor(
                 logger.warn("Device probe failed; assuming no GPU: {}", e.toString())
                 ProcessResult(exitCode = -1, stdout = emptyList(), stderr = emptyList())
             }
-        return parseGpuLines(result.stderr)
+        return parseVulkanDeviceLines(result.stderr)
     }
 
     private companion object {
@@ -47,18 +47,23 @@ class DeviceProbe internal constructor(
     }
 }
 
-/** The marker of whisper-cli's per-GPU line, from libwhisper's `%s: found GPU device %zu: %s (type: %d, cnt: %d)` (identical in 1.8.4 and 1.9.2). */
-private const val GPU_LINE_MARKER = "found GPU device "
+/**
+ * ggml-vulkan's per-device line, `ggml_vulkan: %zu = %s (%s) | uma: %d | …` (index, device name, driver name;
+ * whisper.cpp 1.8.4). A device name may itself end in parentheses (`AMD … (RADV REMBRANDT)`), so the name is
+ * everything up to the last parenthesized group before ` | uma: `.
+ */
+private val VULKAN_DEVICE_LINE = Regex("""ggml_vulkan: (\d+) = (.+) \([^()]*\) \| uma: """)
 
 /**
- * Parses the GPUs of whisper-cli's stderr: the lines `…: found GPU device <n>: <description> (type: <t>, cnt: <c>)`,
- * in line order. The CPU backend's `device <n>: CPU (type: 0)` line is not a GPU line, and any other line is ignored.
+ * Parses the physical GPUs of whisper-cli's stderr: ggml-vulkan's per-device lines, in line order; GPU N here is
+ * ggml device `Vulkan<N>`, which `--device N` selects. Its `Found N Vulkan devices:` header, libwhisper's
+ * `device …`/`found GPU device …` lines (printed only up to the selected device) and any other line are ignored —
+ * including one whose index is no machine integer, so a garbled line never throws ([stt.Main] probes before it
+ * starts the server) and the probe reports the devices it could read.
  */
-internal fun parseGpuLines(stderr: List<String>): List<GpuDevice> =
+internal fun parseVulkanDeviceLines(stderr: List<String>): List<GpuDevice> =
     stderr.mapNotNull { line ->
-        val start = line.indexOf(GPU_LINE_MARKER)
-        if (start < 0) return@mapNotNull null
-        val rest = line.substring(start + GPU_LINE_MARKER.length)
-        val index = rest.substringBefore(":").toIntOrNull() ?: return@mapNotNull null
-        GpuDevice(index, rest.substringAfter(": ").substringBefore(" (type: "))
+        val match = VULKAN_DEVICE_LINE.find(line) ?: return@mapNotNull null
+        val index = match.groupValues[1].toIntOrNull() ?: return@mapNotNull null
+        GpuDevice(index, match.groupValues[2])
     }
