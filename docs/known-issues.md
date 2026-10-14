@@ -36,6 +36,7 @@ leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-fla
 | Blocking file calls off `Dispatchers.IO`: `Files.write(listFile)` (joiner), `Files.createTempFile` (audio cache) run on the route's default dispatcher | LOW | `audio/FfmpegAudioJoiner.kt:54-56`; `http/JoinedAudioCache.kt:36` | Cache half disappears with item 44 |
 | `STT_DEVICE` / `STT_THREADS` silently ignored (superseded by the settings table, item 32) | LOW | `config/Config.kt:25-62`; `config/Device.kt` | **Decision needed**: document as retired, or fail fast |
 | Diarized `.txt` speaker header case diverges from the oracle: app `[Speaker 1]`, oracle `[speaker 1]` (srt/vtt match) | LOW | `outputs/RenderTxt.kt:20-27` vs `docs/oracle/transcribe.py:419-426` | **Decision needed**: align app to oracle, or update oracle/docs |
+| Diarization mis-separates speakers: sometimes distinct speakers come out under one id, sometimes one speaker is split across ids. Split has the merge remedy; unseparated has none (no split tool), and re-running reproduces the same clustering for the same input | MED | user report 2026-10-14; `diarization/Clustering.kt:8-11,30-36` (auto count = `SPEAKER_DISTANCE_THRESHOLD` 0.5448 from 18 LibriSpeech clips of 6 readers, else largest-gap cut in the last `maxSpeakers` gaps) | CAM++ embedding quality × hard-coded heuristics; levers: recalibrate the threshold on real recordings, per-task tuning, or the existing fixed-speaker-count mode — plan as a roadmap item if pursued |
 
 ## Frontend
 
