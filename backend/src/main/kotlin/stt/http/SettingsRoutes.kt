@@ -19,7 +19,7 @@ import stt.db.SpeakersMode
 import stt.engine.ProcessingEngine
 import stt.transcribe.GpuDevice
 
-/** The body of `GET /api/settings` and the `200` of the settings writes (item 32's contract, `docs/api/settings*.json`). */
+/** The body of `GET /api/settings` and the `200` of the settings writes (items 32 and 45's contract, `docs/api/settings*.json`). */
 @Serializable
 data class SettingsJson(
     val device: String,
@@ -30,6 +30,8 @@ data class SettingsJson(
     val maxSpeakers: Int,
     val deviceFallback: String?,
     val availableDevices: List<String>,
+    /** Each offered `gpu:<index>` → the GPU's name from the startup probe (item 45). */
+    val gpuNames: Map<String, String>,
 )
 
 /** The `settings-updated` payload (item 32, `docs/api/settings-updated*.json`): the settings without the device choices. */
@@ -131,9 +133,16 @@ private fun SettingsRequest.validate(): Validated {
     return Validated.Valid(Settings(parsedDevice, threads, defaultLanguage, mode, speakersCount, maxSpeakers))
 }
 
-/** The stored settings as the contract's JSON; the choices are `cpu` and `auto` always, then each of [gpus] as `gpu:<index>`. */
-internal fun Settings.toJson(gpus: List<GpuDevice>): SettingsJson =
-    SettingsJson(
+/**
+ * The stored settings as the contract's JSON; the choices are `cpu` and `auto` always, then each of [gpus] as
+ * `gpu:<index>`, which [SettingsJson.gpuNames] maps to its name.
+ */
+internal fun Settings.toJson(gpus: List<GpuDevice>): SettingsJson {
+    // The GPU choices are gpuNames' keys, so the list and the names cannot drift apart. This relies on insertion
+    // order: `associate` builds a LinkedHashMap (documented by Kotlin), whose keys iterate in the probe's order, so
+    // availableDevices lists the GPUs as the probe reported them. A sorted or hash-ordered map would break that.
+    val gpuNames = gpus.associate { Device.Gpu(it.index).dbValue() to it.name }
+    return SettingsJson(
         device = device.dbValue(),
         threads = threads,
         defaultLanguage = defaultLanguage,
@@ -141,8 +150,10 @@ internal fun Settings.toJson(gpus: List<GpuDevice>): SettingsJson =
         speakersCount = speakersCount,
         maxSpeakers = defaultMaxSpeakers,
         deviceFallback = deviceFallback?.dbValue(),
-        availableDevices = listOf(Device.Cpu.dbValue(), Device.Auto.dbValue()) + gpus.map { Device.Gpu(it.index).dbValue() },
+        availableDevices = listOf(Device.Cpu.dbValue(), Device.Auto.dbValue()) + gpuNames.keys,
+        gpuNames = gpuNames,
     )
+}
 
 /** The stored settings as the `settings-updated` payload: the settings without the device choices. */
 internal fun Settings.toEventJson(): SettingsEventJson =

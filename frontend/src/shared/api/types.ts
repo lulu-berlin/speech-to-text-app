@@ -135,15 +135,19 @@ export interface Settings {
   maxSpeakers: number;
   deviceFallback: string | null;
   availableDevices: string[];
+  // The probe's name for each offered GPU, keyed by `gpu:<index>` (`{}` without a GPU); the
+  // Settings page labels each GPU with it. Fixed by the startup probe, so it is not in
+  // settings-updated.
+  gpuNames: Record<string, string>;
 }
 
 // What a settings write (PUT /api/settings) sends: the settings without the device
 // choices and without the fallback notice, which the write clears (item 32's contract).
-export type SettingsUpdate = Omit<Settings, 'availableDevices' | 'deviceFallback'>;
+export type SettingsUpdate = Omit<Settings, 'availableDevices' | 'deviceFallback' | 'gpuNames'>;
 
 // What the settings-updated event carries: every field of the settings except the device
 // choices — the fallback notice can change live, and belongs here.
-export type SettingsNotice = Omit<Settings, 'availableDevices'>;
+export type SettingsNotice = Omit<Settings, 'availableDevices' | 'gpuNames'>;
 
 // Error body: { error, message } plus taskId for duplicate-audio only.
 export interface ApiErrorBody {

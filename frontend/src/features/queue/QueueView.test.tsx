@@ -156,9 +156,12 @@ describe('the queue view CPU-fallback banner', () => {
     await screen.findByText('lecture.m4a');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-    // settings-updated.fallback.json: the engine switched gpu:1 to the CPU.
+    // settings-updated.fallback.json: the engine switched gpu:1 to the CPU. The name comes
+    // from the fetched settings (settings.json's gpuNames), not the event.
     events.send('settings-updated', settingsUpdatedFallback);
-    expect(await screen.findByRole('alert')).toHaveTextContent('GPU 1 was unavailable');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'GPU 1 — AMD Radeon RX 6600 was unavailable',
+    );
   });
 });
 

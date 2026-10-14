@@ -41,7 +41,7 @@ describe('the settings page', () => {
       Array.from(screen.getByLabelText('Device').querySelectorAll('option')).map(
         (option) => option.textContent,
       ),
-    ).toEqual(['CPU', 'Auto', 'GPU 0', 'GPU 1']);
+    ).toEqual(['CPU', 'Auto', 'GPU 0 — NVIDIA GeForce RTX 3060', 'GPU 1 — AMD Radeon RX 6600']);
     expect(screen.getByLabelText('Threads')).toHaveValue(6);
     expect(screen.getByLabelText('Speakers')).toHaveValue('fixed');
     expect(screen.getByLabelText('Speaker count')).toHaveValue(3);

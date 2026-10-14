@@ -19,12 +19,25 @@ test('the settings the user saves survive a restart and the queue runs with them
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   const device = page.locator('#device');
   await expect(device).toHaveValue('auto');
-  // CPU and Auto are always offered; the probe's GPUs may be there too, formatted "GPU N".
+  // CPU and Auto are always offered; the probe's GPUs may be there too, labeled
+  // "GPU N — <name>" (item 45).
   await expect
     .poll(async () => page.locator('#device option').allTextContents())
     .toEqual(expect.arrayContaining(['CPU', 'Auto']));
-  for (const text of await page.locator('#device option').allTextContents()) {
-    expect(text).toMatch(/^(CPU|Auto|GPU \d+)$/);
+  const optionTexts = await page.locator('#device option').allTextContents();
+  for (const text of optionTexts) {
+    expect(text).toMatch(/^(CPU|Auto|GPU \d+( — .+)?)$/);
+  }
+  // Where the probe reported GPUs, each option is labeled with the probe's name for it
+  // (item 45); with no GPU — this suite must not assume one — the loop is vacuous.
+  const gpuNames = await page.evaluate(async () => {
+    const settings = (await fetch('/api/settings').then((r) => r.json())) as {
+      gpuNames: Record<string, string>;
+    };
+    return settings.gpuNames;
+  });
+  for (const [key, name] of Object.entries(gpuNames)) {
+    expect(optionTexts).toContain(`GPU ${key.replace('gpu:', '')} — ${name}`);
   }
 
   // Save a change: CPU, 2 threads, German, 3 fixed speakers, max 12.
