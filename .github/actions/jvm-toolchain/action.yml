@@ -1,0 +1,72 @@
+# The JDK and Gradle setup every JVM job needs (roadmap item 51). The pinned versions come from the
+# committed versions.json (the flake's pins, item 33). `cache-read-only: false` because
+# gradle/actions otherwise only writes the Gradle cache on the default branch, so every pull-request
+# run would resolve the whole dependency graph cold and never populate the cache.
+name: JVM toolchain
+description: Read versions.json, set up the pinned JDK and Gradle, and optionally install the runtime tools' libraries and cache their downloads
+
+inputs:
+  downloads-cache:
+    description: Cache $GRADLE_USER_HOME/stt-app — the sha256-verified tools, models, fixtures and browsers
+    required: false
+    default: 'false'
+  system-libs:
+    description: Install the apt libraries the prebuilt whisper-cli and ffmpeg are linked against
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # A job's `defaults.run.working-directory` does not reach a composite action, but versions.json
+    # must be read from the repository root, so the directory is explicit.
+    # The pin is a nixpkgs JDK version (21.0.12.1+1) that Temurin has no build for, so the patch
+    # level is passed (21.0.12) and the vendor's build of that release is installed: the same Java
+    # release the flake and the bootstrap's foojay toolchain resolve, not an arbitrary 21.x patch.
+    - name: Read pinned JDK
+      id: versions
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        jdk=$(jq -er '.jdk' versions.json)
+        echo "jdk-version=$(cut -d. -f1-3 <<<"$jdk")" >> "$GITHUB_OUTPUT"
+    - uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: ${{ steps.versions.outputs.jdk-version }}
+    - uses: gradle/actions/setup-gradle@v6
+      with:
+        cache-read-only: false
+    # The list lives in the build (`./gradlew runtimeSystemDeps`), so this step, the README and the
+    # task cannot drift. The task installs as root here; the chown hands back the Gradle home and the
+    # project directories it wrote as root.
+    - name: Install the managed tools' system libraries
+      if: inputs.system-libs == 'true'
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+        sudo env HOME="$HOME" PATH="$PATH" JAVA_HOME="$JAVA_HOME" GRADLE_USER_HOME="$gradle_home" \
+          ./gradlew runtimeSystemDeps --no-daemon
+        sudo chown -R "$(id -u):$(id -g)" "$gradle_home" "$GITHUB_WORKSPACE"
+    # The key covers only what the bootstrap downloads — the tools, models and fixtures and their
+    # pins, not the nixpkgs-derived versions — so a nixpkgs bump does not throw away the ~1 GB of
+    # models; the node/pnpm/gradle installs live in version-suffixed directories and re-download on
+    # their own. The restore-key keeps whatever an older key downloaded.
+    - name: Compute the downloads cache key
+      if: inputs.downloads-cache == 'true'
+      id: downloads
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        pins=$(jq -Sec '{downloads, models, fixtures, whisperCpp, ffmpeg}' versions.json)
+        echo "key=stt-downloads-${{ runner.os }}-$(printf '%s' "$pins" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@v6
+      if: inputs.downloads-cache == 'true'
+      with:
+        path: ~/.gradle/stt-app
+        key: ${{ steps.downloads.outputs.key }}
+        restore-keys: stt-downloads-${{ runner.os }}-

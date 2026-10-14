@@ -1,6 +1,6 @@
 # 42 — Worker stability: no per-task exception may leave the task stuck or kill the queue
 
-Status: draft
+Status: spec-approved
 Depends on: [11](../docs/specs/processing-engine.md) (done)
 Blocks: —
 
@@ -15,19 +15,17 @@ Whatever a single task's run throws — during setup, a phase, or a repository c
 - Cancellation must stay distinct from ordinary failure (the existing `catch (e: CancellationException) { throw e }` is the contract to preserve).
 - [ADR 0046](../docs/decisions/0046-every-feature-has-an-e2e-test.md): the fix carries an e2e assertion that the queue survives an unexpected task failure.
 
-## Proposal
+## Decided (consultation, 2026-10-13)
 
-To be settled in the consultation. Starting point: move all task-specific setup inside the guarded path (settings and work-dir creation join the try), so any failure marks the task FAILED as today's `runTask` does; add a worker-loop guard around `runInJob` so a still-unexpected exception can never end the loop without logging (and recovering the task as failure if it is not already terminal).
-
-## Open questions (to be answered in the consultation)
-
-- For an exception the phases do not catch: FAILED with the message (today's rule), and the loop always continues — the exact boundary of the guard.
+- **Guarded path**: every task-specific step — `setRunningIfQueued`, the settings lookup (item 32), setup, `runInJob`'s phases and finalization — is inside the guarded path; any non-cancellation throw there marks the task FAILED with the message (today's rule) and the worker continues.
+- **Loop guard**: `workerLoop()` wraps `runInJob` so an exception the guarded path itself cannot absorb (a failure inside the failure path, e.g. a repository call while recording the failure) still logs with task context, leaves the task in a terminal state (FAILED if not already terminal), and continues to the next queued task — the loop never dies.
+- **Cancellation stays distinct**: `CancellationException` is rethrown (item 11/36 contract); only shutdown ends the loop.
 
 ## Test list (proposed; behaviors only)
 
 - [ ] A settings read that throws marks the task FAILED (not stuck RUNNING), and the next queued task still runs
-- [ ] A work-directory creation failure marks the task FAILED and the worker continues
 - [ ] An unexpected exception in a phase fails the task and the worker takes the next queued task — the loop never dies
+- [ ] An exception thrown while recording a failure (inside the failure path itself) still leaves the task in a terminal state and the worker continues
 - [ ] Cancellation stays an interruption (task resumes on recovery), never a FAILED (no regression of item 11/36 semantics)
 - [ ] (e2e, ADR 0046) Against the real backend, a task that fails mid-run does not stop subsequent tasks
 - [ ] (must not break) The engine suites (`ProcessingEngineFailureSpec`, …) stay green
@@ -40,3 +38,4 @@ To be settled in the consultation. Starting point: move all task-specific setup 
 ## Approval log
 
 - 2026-10-12: filed from the third-party review's finding 3 after code triage (setup outside the guarded try; `job.join()` propagates into `workerLoop()`).
+- 2026-10-13: consultation — guarded path covers all task setup through finalization; loop guard recovers a failure of the failure path (terminal state + log + continue); `CancellationException` stays rethrown. Work-directory failure test item dropped (item 44 deletes per-task work directories); added the failure-path item. Test list approved; status `spec-approved`.

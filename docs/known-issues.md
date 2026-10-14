@@ -36,6 +36,7 @@ leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-fla
 | Blocking file calls off `Dispatchers.IO`: `Files.write(listFile)` (joiner), `Files.createTempFile` (audio cache) run on the route's default dispatcher | LOW | `audio/FfmpegAudioJoiner.kt:54-56`; `http/JoinedAudioCache.kt:36` | Cache half disappears with item 44 |
 | `STT_DEVICE` / `STT_THREADS` silently ignored (superseded by the settings table, item 32) | LOW | `config/Config.kt:25-62`; `config/Device.kt` | **Decision needed**: document as retired, or fail fast |
 | Diarized `.txt` speaker header case diverges from the oracle: app `[Speaker 1]`, oracle `[speaker 1]` (srt/vtt match) | LOW | `outputs/RenderTxt.kt:20-27` vs `docs/oracle/transcribe.py:419-426` | **Decision needed**: align app to oracle, or update oracle/docs |
+| Diarization mis-separates speakers: sometimes distinct speakers come out under one id, sometimes one speaker is split across ids. Split has the merge remedy; unseparated has none (no split tool), and re-running reproduces the same clustering for the same input | MED | user report 2026-10-14; `diarization/Clustering.kt:8-11,30-36` (auto count = `SPEAKER_DISTANCE_THRESHOLD` 0.5448 from 18 LibriSpeech clips of 6 readers, else largest-gap cut in the last `maxSpeakers` gaps) | CAM++ embedding quality × hard-coded heuristics; levers: recalibrate the threshold on real recordings, per-task tuning, or the existing fixed-speaker-count mode — plan as a roadmap item if pursued |
 
 ## Frontend
 
@@ -50,6 +51,7 @@ leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-fla
 | Duplicated helpers: `errorMessage` re-implemented in SettingsView (shared `types.ts` has it), `clampCount` pasted in QueueView/SettingsView (one omits the radix), the actor `.stop()/.start()` restart idiom handwritten three times | LOW | `features/settings/SettingsView.tsx:231-233`; `features/queue/QueueView.tsx:153`; `TaskRow.tsx`/`HistoryRow.tsx`/`TaskTranscriptView.tsx` | Extract to `shared` |
 | `uploadTask` assigns `xhr.upload.onprogress` unguarded — throws where XHR upload is unsupported | LOW | `shared/api/client.ts` (~`uploadTask`) | `xhr.upload?.onprogress = …` |
 | Turn rows keyed by array index; a merge RELOAD replaces the whole array, weakening reconciliation | LOW | `features/history/TranscriptTurns.tsx` | Stable key (startMs + speakerId) |
+| A long filename breaks a queue item line's layout: `RowName` contains it only with `overflow-wrap: anywhere` (no nowrap/ellipsis), so a long name wraps mid-word into a multi-line block and the row grows tall and ragged beside the status/controls — usable, but ugly (same helper renders upload rows) | LOW | user report 2026-10-14; `features/queue/rowParts.ts:20-23`; `TaskRow.tsx:192`; `QueueView.tsx:468` | Single-line truncation with `text-overflow: ellipsis` (`title` for the full name); check the History rows' name rendering for the same pattern |
 
 ## Tests
 
@@ -72,6 +74,7 @@ leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-fla
 | whisper/speaker model sha256s duplicated as "independent" expected hashes in `devenv.nix enterTest`; a model bump in `nix/models.nix` leaves `devenv test` silently stale or failing | LOW | `devenv.nix` (~:160-167); `nix/models.nix` | Derive from models.nix |
 | Managed node/pnpm home path and the node/pnpm versions.json parse constructed independently in root and frontend `build.gradle.kts` — drift breaks PATH silently | LOW | root `build.gradle.kts` (`nodeInstallDir`); `frontend/build.gradle.kts` (`node.workDir`) | One shared source of truth |
 | README § "The app as it ships, from source" runs `gradle run` without the three required env vars; works only inside the devenv shell, fails startup outside it (AGENTS.md states the requirement, the README does not) | LOW | README.md vs `config/Config.kt` | Show the full invocation or point at the shell |
+| CI backend job can fail spuriously on upstream rate limiting: resolving the Kotlin plugin BOM on a cold Gradle home returned `429 Too Many Requests` from `repo.maven.apache.org`, failing the configuration phase before any task ran; the same commit passed on re-run | LOW | `.github/workflows/ci.yml:38`; run #1 attempt 1 job `116006313314` (`gradle check`, 0:30; `kotlin-gradle-plugins-bom:2.3.21.pom` → 429), attempt 2 green | **Decision needed**: accept-and-re-run, or add resolve-retry. Item 51's workflow sets `cache-read-only: false`, so PR runs restore and write the Gradle cache too; a 429 needs a cold resolution (a new gradle-home key, or a lost cache) |
 
 ---
 

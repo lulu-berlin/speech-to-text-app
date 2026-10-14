@@ -15,6 +15,8 @@ cd workspaces/<NN-slug> && direnv allow   # each worktree has its own .devenv st
 
 ## Remove (after the branch is merged into `main`)
 
+The branch is merged via a pull request on GitHub ([ADR 0050](../docs/decisions/0050-pr-merge-on-github.md)); after the PR lands, the root agent syncs `main` and removes the worktree and branch:
+
 ```sh
 git worktree remove workspaces/<NN-slug> && git branch -d roadmap/<NN-slug>
 ```

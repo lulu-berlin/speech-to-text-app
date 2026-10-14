@@ -120,11 +120,14 @@ Prerequisites:
   - whisper-cli: `libstdc++6`, `libgomp1` and the Vulkan loader `libvulkan1` (needed even without a GPU);
   - ffmpeg: `libasound2` (`libasound2t64` on Ubuntu 24.04+ and Debian 13), `libpulse0`, `libxcb1`, `libxcb-shm0` and `libudev1`.
 
-  On Ubuntu 24.04, with Java and git:
+  The list is owned by `./gradlew runtimeSystemDeps`, so this README, the bootstrap and CI cannot
+  drift. The integration tests depend on it, so a host that is missing a library fails there with the
+  exact `sudo apt-get install …` line instead of a loader error inside a test; running the task as
+  root installs the libraries. On Ubuntu 24.04, with Java and git:
 
   ```sh
-  sudo apt-get install -y openjdk-25-jdk-headless git \
-    libgomp1 libvulkan1 libasound2t64 libpulse0 libxcb1 libxcb-shm0 libudev1 libstdc++6
+  sudo apt-get install -y openjdk-25-jdk-headless git
+  ./gradlew runtimeSystemDeps
   ```
 
 - **macOS**: `setsid` (the app starts whisper-cli and ffmpeg through it), from Homebrew's `util-linux`, which does not put it on `PATH` by itself:

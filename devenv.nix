@@ -56,6 +56,11 @@ in
     # replaced it (it hard-codes nixpkgs' default gradle, 8.14.4).
     pkgs.kotlin
     pkgs.kotlin-language-server
+
+    # Workflow linting (roadmap item 51): `actionlint .github/workflows/*.yml` checks the
+    # workflow and the local composite actions in .github/actions/ before a push (GitHub only
+    # reports YAML errors once a run starts). Nix-level result is user-verified (ADR 0010).
+    pkgs.actionlint
   ];
 
   # https://devenv.sh/languages/

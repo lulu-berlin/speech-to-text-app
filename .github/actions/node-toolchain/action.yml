@@ -1,0 +1,34 @@
+# The Node and pnpm setup the frontend and e2e jobs need (roadmap item 51). The pinned versions
+# come from the committed versions.json — the flake's pins (item 33) — so CI and the Gradle
+# bootstrap run the same Node and pnpm (pnpm's major is tied to the lockfile format, ADR 0012).
+name: Node toolchain
+description: Read versions.json and install the pinned Node and pnpm, caching the given lockfile's store
+
+inputs:
+  cache-dependency-path:
+    description: The lockfile whose contents hash keys the pnpm store cache (frontend/ or e2e/)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # versions.json must be read from the repository root; `frontend-check` sets a job-level
+    # `defaults.run.working-directory`, which does not reach a composite action, so be explicit.
+    # `jq -e` fails the step on a missing or null pin instead of handing a literal `null` to the
+    # actions below.
+    - name: Read pinned Node and pnpm
+      id: versions
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        echo "node=$(jq -er '.node' versions.json)" >> "$GITHUB_OUTPUT"
+        echo "pnpm=$(jq -er '.pnpm' versions.json)" >> "$GITHUB_OUTPUT"
+    - uses: actions/setup-node@v7
+      with:
+        node-version: ${{ steps.versions.outputs.node }}
+    - uses: pnpm/action-setup@v6
+      with:
+        version: ${{ steps.versions.outputs.pnpm }}
+        cache: true
+        cache_dependency_path: ${{ inputs.cache-dependency-path }}
