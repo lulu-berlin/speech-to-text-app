@@ -116,6 +116,16 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform {
         includeEngines("kotest")
     }
+    // Gradle launches a test worker with gradle-worker.jar plus the project's own output
+    // directories, so java.class.path inside the test JVM has no dependency jars. A spec that
+    // forks a JVM (ClusteringHeapIntegrationSpec) needs the test runtime classpath, which only
+    // the build knows.
+    systemProperty(
+        "stt.test.runtimeClasspath",
+        sourceSets.test
+            .get()
+            .runtimeClasspath.asPath,
+    )
 }
 
 // Unit default: `gradle test`/`gradle check` run no Integration-tagged tests
