@@ -27,29 +27,32 @@ test('uploads several clips, queues them in order, and shows status, phase and b
   await expect(a.getByText(/Chunking|Transcribing|Diarizing/)).toBeVisible();
   await expect(a.getByRole('progressbar', { name: 'Transcription' })).toBeVisible();
   await expect(a.getByText(/\d+%/)).toBeVisible();
+  // The progress is live: sample the transcription value from the moment the bars appear — the
+  // row is still CHUNKING or TRANSCRIBING. The diarization bar below renders only once DIARIZING
+  // starts, and by then the transcription value is already 100 (the engine weights the composite
+  // progress and every chunk is DONE), so a sample taken after that wait could never move. Two
+  // distinct observations — 0 → 25 → … → 100, or 0 → 100 for a one-chunk clip — prove the bar is
+  // live; a bar stuck at 0 or at 100 never produces them.
+  const transcription = a.getByRole('progressbar', { name: 'Transcription' });
+  const seen = new Set<string>();
+  await expect
+    .poll(
+      async () => {
+        const now = await transcription.getAttribute('aria-valuenow');
+        if (now !== null) {
+          seen.add(now);
+        }
+        return seen.size;
+      },
+      { timeout: 60_000 },
+    )
+    .toBeGreaterThan(1);
+
   // The diarization bar joins the row once it applies, and shows its stage label.
   await expect(a.getByRole('progressbar', { name: 'Speaker diarization' })).toBeVisible({
     timeout: 60_000,
   });
   await expect(a.getByText(/Embedding \d+%|Clustering \d+%/)).toBeVisible({ timeout: 60_000 });
-
-  // The progress is live: the running row's transcription value moves (or the row leaves
-  // RUNNING) instead of sitting still.
-  const transcription = a.getByRole('progressbar', { name: 'Transcription' });
-  const first = Number(await transcription.getAttribute('aria-valuenow'));
-  await expect
-    .poll(async () => {
-      const running = await a
-        .getByText('RUNNING', { exact: true })
-        .isVisible()
-        .catch(() => false);
-      if (!running) {
-        return -1;
-      }
-      const now = await transcription.getAttribute('aria-valuenow');
-      return now === null ? -1 : Number(now);
-    })
-    .not.toBe(first);
 
   // The queue drains in order (the engine runs one task at a time): each finish notice
   // appears when its task completes — a's before b's, b's before c's. Completed rows
