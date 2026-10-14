@@ -51,6 +51,7 @@ leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-fla
 | Duplicated helpers: `errorMessage` re-implemented in SettingsView (shared `types.ts` has it), `clampCount` pasted in QueueView/SettingsView (one omits the radix), the actor `.stop()/.start()` restart idiom handwritten three times | LOW | `features/settings/SettingsView.tsx:231-233`; `features/queue/QueueView.tsx:153`; `TaskRow.tsx`/`HistoryRow.tsx`/`TaskTranscriptView.tsx` | Extract to `shared` |
 | `uploadTask` assigns `xhr.upload.onprogress` unguarded — throws where XHR upload is unsupported | LOW | `shared/api/client.ts` (~`uploadTask`) | `xhr.upload?.onprogress = …` |
 | Turn rows keyed by array index; a merge RELOAD replaces the whole array, weakening reconciliation | LOW | `features/history/TranscriptTurns.tsx` | Stable key (startMs + speakerId) |
+| A long filename breaks a queue item line's layout: `RowName` contains it only with `overflow-wrap: anywhere` (no nowrap/ellipsis), so a long name wraps mid-word into a multi-line block and the row grows tall and ragged beside the status/controls — usable, but ugly (same helper renders upload rows) | LOW | user report 2026-10-14; `features/queue/rowParts.ts:20-23`; `TaskRow.tsx:192`; `QueueView.tsx:468` | Single-line truncation with `text-overflow: ellipsis` (`title` for the full name); check the History rows' name rendering for the same pattern |
 
 ## Tests
 
