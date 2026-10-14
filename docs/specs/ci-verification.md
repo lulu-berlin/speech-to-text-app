@@ -1,8 +1,8 @@
 # 51 — CI verification: first GitHub Actions workflow
 
-Status: in-review
+Status: done (roadmap item 51, merged 2026-10-14)
 Depends on: — (infrastructure; nothing to build on)
-Blocks: — [48](48-macos-support.md) and [49](49-windows-support.md) (their CI-runner verification)
+Blocks: — [48](../../roadmap/48-macos-support.md) and [49](../../roadmap/49-windows-support.md) (their CI-runner verification)
 
 ## Goal
 
@@ -64,7 +64,7 @@ Windows machine, and the repo has no CI today.
 3. Secrets: none (no deployment yet). Report trend flakiness to the known-issues backlog per its
    Maintenance rules.
 
-## Test list (proposed; behaviors only)
+## Test list (approved 2026-10-14 with the spec; all items green except the nightly trigger)
 
 - [x] A pushed commit (to `main` or a PR) runs the workflow and the Linux fast gate passes
       `gradle check` + `pnpm test` + `pnpm build` with warm caches in a sensible time
@@ -174,3 +174,13 @@ Windows machine, and the repo has no CI today.
   `runtimeSystemDeps` block still shows the non-root invocation. The known-issues 429 row now
   records that PR runs restore *and* write the Gradle cache. Branch protection must require the
   single `CI (all checks)` job. Squashed to one commit on top of `main` (ADR 0050) for the PR.
+- 2026-10-14: merged into `main` (head `f2137e92`, PR #1) after the user approved the diff; the run
+  that verified it is the PR's own (8/8 jobs green, `CI (all checks)` 3 s). Two review rounds had
+  preceded it with no correctness defect: the fast-gate gating plus the aggregate check, the
+  patch-level JDK pin, `LC_CTYPE` in the bootstrap environment, the narrowed cache keys (download
+  pins only) with the 4 GB store cap, the e2e job delegating its installs to the build's
+  `e2eSystemDeps`, the guarded pin reads, `integrationTest` depending on `runtimeSystemDeps` and
+  `actionlint` running over the workflows all landed in the squash. Item 5 (the nightly trigger) is
+  confirmed by the first 03:00 Europe/Berlin scheduled run from `main`; branch protection requires
+  the single `CI (all checks)` job. Spec and final test list moved here from
+  `roadmap/51-ci-verification.md`.

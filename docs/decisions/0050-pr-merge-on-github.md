@@ -18,9 +18,14 @@ a pull request the human creates: GitHub keeps the review, checks and audit trai
 - **The root agent reviews, it does not merge.** After the workspace agent finishes an item and
   sets `Status: in-review`, the root agent presents `git diff main...roadmap/<NN-slug>` and the
   test output as today (AGENTS.md step 7). Changes requested → a new workspace session, unchanged.
-- **On approval the root agent prepares the branch for the PR**: it rebases the branch onto the
-  current `main` in the worktree and squashes the branch's commits into one commit (subject names
-  the item, imperative).
+- **Every branch pushed as a PR is one commit.** The root agent rebases the branch onto the current
+  `main` in the worktree and squashes it to a single commit (subject names the item, or the change,
+  imperative) before handing it over — a roadmap item branch, post-merge bookkeeping, a fix alike.
+  A branch with more than one commit on top of `main` is not pushed.
+- **On approval a roadmap item branch also carries the item's finished state in that commit**: the
+  roadmap file's `Status: done`, its spec and final test list in `docs/specs/<area>.md`, the
+  roadmap file deleted, and `roadmap/README.md`'s row and graph node updated. The merge is what
+  makes the state final.
 - **The human ships it**: only the human pushes code to GitHub. The user pushes the branch,
   creates the pull request, and merges it on GitHub (the branch is a single commit on top of
   `main`, so any PR merge strategy lands one commit).
@@ -28,10 +33,9 @@ a pull request the human creates: GitHub keeps the review, checks and audit trai
   publicly accessible, but make no changes: no pushes (not the branch, not `main`), no pull
   request creation or commenting, no merges. Every GitHub-side mutation is performed by the human
   (or by CI, which runs on the human's pushes).
-- **Bookkeeping after the PR lands**: the root agent syncs `main` with `git pull --ff-only`
-  (applying GitHub's result, not merging), moves the spec and final test list into
-  `docs/specs/<area>.md`, deletes the roadmap file, updates `roadmap/README.md`, and removes the
-  worktree and branch (workspaces/README.md § Remove).
+- **After the PR lands**: the root agent syncs `main` with `git pull --ff-only` (applying GitHub's
+  result, not merging) and removes the worktree and branch (workspaces/README.md § Remove); the
+  spec move and the index update already rode in the PR's commit.
 - Applies to every roadmap item from now on, including the in-progress workspaces (44, 45, 50,
   51); their approvals remain valid — only the landing mechanism changes.
 - Review feedback on the open PR that requires code changes follows the existing loop (back to the
@@ -39,9 +43,10 @@ a pull request the human creates: GitHub keeps the review, checks and audit trai
   user's discretion.
 
 ## Consequences
-- Every landing item is exactly one commit on `main`, and every merge is a GitHub pull request
-  the human controls; the per-cycle `Test:`/`Refactor:` commits live only on the workspace branch
-  until the squash. The final test list stays the record in `docs/specs/`.
+- Every landing PR is exactly one commit on `main` — the squash requirement covers bookkeeping and
+  fix branches too — and every merge is a GitHub pull request the human controls; the per-cycle
+  `Test:`/`Refactor:` commits live only on the workspace branch until the squash. The final test
+  list stays the record in `docs/specs/`.
 - Once item 51's CI lands, PR checks gate merges automatically instead of relying on local runs.
 - Local `main` never diverges from `origin/main` beyond GitHub's own merge, so the post-merge
   sync stays a clean fast-forward; the `git pull --ff-only` is bookkeeping, not an agent merge —
