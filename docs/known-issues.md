@@ -16,11 +16,11 @@ problems; it never goes away and it is not a roadmap item.
   of) touching the area.
 
 Rules for the roadmap: issues currently planned by roadmap items are deliberately absent here —
-[41 upload hardening](roadmap/41-upload-hardening.md) (size cap, multi-part spool overwrite,
-duplicate-race 500), [42 worker stability](roadmap/42-worker-stability.md) (task setup outside the
-guarded try), [43 diarization memory](roadmap/43-diarization-memory.md) (transient PCM copies),
-[44 audio in database](roadmap/44-audio-in-database.md) (joined-audio file cache, per-task mutex
-leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-flaky.md).
+[41 upload hardening](../roadmap/41-upload-hardening.md) (size cap, multi-part spool overwrite,
+duplicate-race 500), [42 worker stability](../roadmap/42-worker-stability.md) (task setup outside the
+guarded try), [43 diarization memory](../roadmap/43-diarization-memory.md) (transient PCM copies),
+[44 audio in database](../roadmap/44-audio-in-database.md) (joined-audio file cache, per-task mutex
+leak).
 
 ## Backend runtime
 
@@ -65,6 +65,10 @@ leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-fla
 | `OnnxRuntimeSpec` loads the native ONNX Runtime and asserts CPU provider availability without the Integration tag the suite uses for environment-backed tests | LOW | `diarization/OnnxRuntimeSpec.kt:8-14` | **Decision needed**: tag Integration (borderline vs ADR 0021) |
 | Two `internal fun segment(...)` test builders, same purpose, different packages, diverged signatures | LOW | `outputs/TestSegments.kt`; `diarization/TestSegments.kt` | One shared helper |
 | Drop-oldest SSE overflow tested only on `sendEvents`, never through the real request path — the subscribed flow's buffering integration is untested | LOW | `http/EventsOverflowSpec.kt:9-14` | Route-level falling-behind-subscriber test |
+| `15-screenshots` must take eight screenshots — with a viewport and theme switch — inside the ~77 s seed clip's live window, before it clicks Cancel on that row; a fast machine or a slow shot loop leaves no row to cancel | MED | `e2e/tests/15-screenshots.spec.ts:42-63` | Pause the queue once `Transcribing` is visible (the seeded row then waits instead of finishing), or gate the shots on the seed's phase |
+| `06-playback`'s nothing-happens assertions are fixed sleeps (`waitForTimeout(500)`, `(1_500)`) and one waits for visible playback advance within 10 s: a regression landing after the window is a false pass, and a loaded machine can fail the advance | LOW | `e2e/tests/06-playback.spec.ts:74,80,91,113`; `:87` (`expect.poll(…, { timeout: 10_000 }).not.toBe(started)`) | Bind to signals (`audio.currentTime` deltas, pause/scroll events) instead of sleeps |
+| `17-follow-mode`'s hidden-checks sleep 500 ms and its follow-scroll poll window is 5 s — fixed-time assumptions around an otherwise signal-based loop | LOW | `e2e/tests/17-follow-mode.spec.ts:80,143`; `e2e/tests/gifs-record.spec.ts:296` (same shape) | Replace the hidden-check sleeps with a scroll-settled poll |
+| `gifs-record` (standalone, `pnpm record:gifs`; ignored by the journey — `e2e/playwright.config.ts:12`) sleeps 500/1000/4000 ms, has a negative window after one, and runs under a 900 s config timeout | LOW | `e2e/tests/gifs-record.spec.ts:187,242,293,298,327`; `e2e/playwright.gifs.config.ts:15` | Not CI-gating; align it with the journey's signal-based waits the next time it is touched. Item 47 fixed the same class in `03-upload-queue`, `17-audio-while-transcribing` and `40-atomic-transitions` |
 
 ## Build, packaging, docs
 
@@ -77,6 +81,7 @@ leak), [47 atomic-transitions spec flaky](roadmap/47-atomic-transitions-spec-fla
 | Managed node/pnpm home path and the node/pnpm versions.json parse constructed independently in root and frontend `build.gradle.kts` — drift breaks PATH silently | LOW | root `build.gradle.kts` (`nodeInstallDir`); `frontend/build.gradle.kts` (`node.workDir`) | One shared source of truth |
 | README § "The app as it ships, from source" runs `gradle run` without the three required env vars; works only inside the devenv shell, fails startup outside it (AGENTS.md states the requirement, the README does not) | LOW | README.md vs `config/Config.kt` | Show the full invocation or point at the shell |
 | CI backend job can fail spuriously on upstream rate limiting: resolving the Kotlin plugin BOM on a cold Gradle home returned `429 Too Many Requests` from `repo.maven.apache.org`, failing the configuration phase before any task ran; the same commit passed on re-run | LOW | `.github/workflows/ci.yml:38`; run #1 attempt 1 job `116006313314` (`gradle check`, 0:30; `kotlin-gradle-plugins-bom:2.3.21.pom` → 429), attempt 2 green | **Decision needed**: accept-and-re-run, or add resolve-retry. Item 51's workflow sets `cache-read-only: false`, so PR runs restore and write the Gradle cache too; a 429 needs a cold resolution (a new gradle-home key, or a lost cache) |
+| `docs/check-links.mjs` runs only on `README.md` and `docs/architecture.md` (AGENTS § Commands), so every other document's relative links go unchecked: `docs/known-issues.md`'s roadmap pointer list carried four links missing their `../` and resolving to `docs/roadmap/*` until 2026-10-15 | LOW | `docs/check-links.mjs`; AGENTS.md § Commands; `docs/known-issues.md:18-23` (fixed) | Run the checker over every `docs/**/*.md` and `roadmap/*.md` in the docs command and the CI job |
 
 ---
 

@@ -2,15 +2,49 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { QUEUE_CLIPS } from '../lib/backend.mjs';
 import { appLive, expectLiveQueue, rowOrder, uploadClips } from './helpers/ui';
 
+declare global {
+  interface Window {
+    // The distinct transcription percentages the recorder below has seen for the sampled row.
+    transcriptionValues: Set<string>;
+  }
+}
+
 // A task's pending row by its filename.
 function row(page: Page, filename: string): Locator {
   return page.getByRole('listitem').filter({ hasText: filename });
+}
+
+// Records the transcription percentages the pending row for `filename` shows, from before its task
+// starts until the test reads the set: the sampler runs in the page on every attribute change, so it
+// sees the bar's whole life. A poll started after the row's state has been awaited can arrive when the
+// clip — about a second of whisper on one chunk — is already done, which is how CI run 38661372993 saw
+// a single value. A bar stuck at 0 or at 100 still records one value and still fails.
+async function recordTranscriptionPercentages(page: Page, filename: string): Promise<void> {
+  await page.evaluate((name) => {
+    window.transcriptionValues = new Set<string>();
+    const sample = () => {
+      const bars = document.querySelectorAll('[role="progressbar"][aria-label="Transcription"]');
+      for (const bar of bars) {
+        if (bar.closest('li')?.textContent?.includes(name)) {
+          window.transcriptionValues.add(bar.getAttribute('aria-valuenow') ?? '');
+        }
+      }
+    };
+    new MutationObserver(sample).observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['aria-valuenow'],
+    });
+    sample();
+  }, filename);
 }
 
 test('uploads several clips, queues them in order, and shows status, phase and both progress bars live', async ({
   page,
 }) => {
   await appLive(page);
+  await recordTranscriptionPercentages(page, 'jfk-a.wav');
   await uploadClips(page, QUEUE_CLIPS);
 
   // The dropped files are worked through one at a time, so the queue gets them in order;
@@ -27,25 +61,12 @@ test('uploads several clips, queues them in order, and shows status, phase and b
   await expect(a.getByText(/Chunking|Transcribing|Diarizing/)).toBeVisible();
   await expect(a.getByRole('progressbar', { name: 'Transcription' })).toBeVisible();
   await expect(a.getByText(/\d+%/)).toBeVisible();
-  // The progress is live: sample the transcription value from the moment the bars appear — the
-  // row is still CHUNKING or TRANSCRIBING. The diarization bar below renders only once DIARIZING
-  // starts, and by then the transcription value is already 100 (the engine weights the composite
-  // progress and every chunk is DONE), so a sample taken after that wait could never move. Two
-  // distinct observations — 0 → 25 → … → 100, or 0 → 100 for a one-chunk clip — prove the bar is
-  // live; a bar stuck at 0 or at 100 never produces them.
-  const transcription = a.getByRole('progressbar', { name: 'Transcription' });
-  const seen = new Set<string>();
+  // The progress is live: the recorder has seen more than one percentage for a's bar since before the
+  // uploads — 0 → 25 → … → 100, or 0 → 100 for a one-chunk clip — so a bar stuck at 0 or at 100 still
+  // fails. It is a claim about what the bar did, not about when the test looked, which is what the
+  // sampled-window version got wrong (CI run 38661372993, 2026-10-15).
   await expect
-    .poll(
-      async () => {
-        const now = await transcription.getAttribute('aria-valuenow');
-        if (now !== null) {
-          seen.add(now);
-        }
-        return seen.size;
-      },
-      { timeout: 60_000 },
-    )
+    .poll(() => page.evaluate(() => window.transcriptionValues.size), { timeout: 60_000 })
     .toBeGreaterThan(1);
 
   // The diarization bar joins the row once it applies, and shows its stage label.

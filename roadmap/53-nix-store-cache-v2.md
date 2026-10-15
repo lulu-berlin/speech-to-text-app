@@ -23,7 +23,7 @@ re-fetching the ~1.3 GiB closure on every push.
 - `nix-community/cache-nix-action@v7` (action.yml read at SHA `7df957e3`) saves in a post step gated
   on `post-if: success()`, so a red `nix-build` writes nothing at all. Run #38650675971
   (`main`, `656fcd04`) had exactly that: `Nix (build)` red at
-  `ProcessingEngineAtomicTransitionsSpec.kt:302` — roadmap [47](47-atomic-transitions-spec-flaky.md)
+  `ProcessingEngineAtomicTransitionsSpec.kt:302` — roadmap [47](../docs/specs/atomic-transitions-spec-flaky.md)
   — while the same commit's CI fast gate passed; its post-job save was skipped.
 - The toolchain's own key step needs the checkout: it hashes `flake.lock`, `devenv.lock`,
   `devenv.yaml`, `devenv.nix`, `nix/**` and the `versions.json` pins under `set -euo pipefail`, and

@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { ATOMIC_NEXT_CLIP, ATOMIC_RACE_CLIP } from '../lib/backend.mjs';
-import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import {
+  appLive,
+  expectCompletedOrCanceled,
+  goTo,
+  rowOf,
+  unlessGone,
+  uploadClips,
+} from './helpers/ui';
 
 // The race (roadmap item 40): task commands used to be a read-check followed by an
 // unconditional write, so a pause landing after the task had finished overwrote the
@@ -20,29 +27,40 @@ test('rapid pause/resume/cancel near completion never blocks the queue or sticks
   const raced = rowOf(page, ATOMIC_RACE_CLIP);
   await expect(raced.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
 
-  // Pause/resume in quick succession while the worker is mid-run, each confirmed by the
-  // row's button flip (the Pause/Resume buttons are mutually exclusive: Resume appears
-  // only while the task is paused). A completion may legally win under a resume — the
-  // row leaves the queue — so the loop ends early then instead of failing on the
-  // button that no longer exists.
-  for (let i = 0; i < 3 && (await raced.count()) > 0; i++) {
-    await raced.getByRole('button', { name: `Pause ${ATOMIC_RACE_CLIP}` }).click();
-    await expect(raced.getByRole('button', { name: `Resume ${ATOMIC_RACE_CLIP}` })).toBeVisible();
-    await raced.getByRole('button', { name: `Resume ${ATOMIC_RACE_CLIP}` }).click();
-    const pauseBack = raced.getByRole('button', { name: `Pause ${ATOMIC_RACE_CLIP}` });
-    await pauseBack
-      .waitFor({ state: 'visible', timeout: 20_000 })
-      .catch(async () => expect(raced).toHaveCount(0));
+  // Pause/resume in quick succession while the worker is mid-run, each confirmed by the row's
+  // button flip (the Pause/Resume buttons are mutually exclusive: Resume appears only while the
+  // task is paused). A completion may legally win over either command — the row then leaves the
+  // queue — so every step runs through `unlessGone`, which accepts a failure only once the row is
+  // gone: neither `count()` nor `isVisible()` is atomic against the task finishing, and a pause
+  // that wins its write can still lose to the completion (the race item 40 fixed).
+  const button = (name: string) => raced.getByRole('button', { name });
+  for (let i = 0; i < 3; i++) {
+    const pause = button(`Pause ${ATOMIC_RACE_CLIP}`);
+    if (!(await unlessGone(raced, () => pause.click({ timeout: 5_000 })))) break;
+    const resume = button(`Resume ${ATOMIC_RACE_CLIP}`);
+    const resumed = await unlessGone(raced, async () => {
+      await expect(resume).toBeVisible({ timeout: 20_000 });
+      await resume.click();
+    });
+    if (!resumed) break;
+    const runningAgain = await unlessGone(raced, () =>
+      pause.waitFor({ state: 'visible', timeout: 20_000 }),
+    );
+    if (!runningAgain) break;
   }
 
-  // Cancel with the confirmation dialog, while the task is still in the queue; if the
-  // transcription already finished, there is nothing left to cancel.
-  if ((await raced.count()) > 0) {
-    await raced.getByRole('button', { name: `Cancel ${ATOMIC_RACE_CLIP}` }).click();
-    await page
-      .getByRole('dialog', { name: `Cancel ${ATOMIC_RACE_CLIP}?` })
-      .getByRole('button', { name: 'Cancel task' })
-      .click();
+  // Cancel with the confirmation dialog, while the task is still in the queue; if the transcription
+  // already finished, there is nothing left to cancel. Both clicks run in one guarded step: a completion
+  // landing between the click that opens the dialog and the confirmation that closes it takes the row and
+  // the dialog with it, which is an outcome, not a failure.
+  if (await raced.count()) {
+    await unlessGone(raced, async () => {
+      await button(`Cancel ${ATOMIC_RACE_CLIP}`).click({ timeout: 5_000 });
+      await page
+        .getByRole('dialog', { name: `Cancel ${ATOMIC_RACE_CLIP}?` })
+        .getByRole('button', { name: 'Cancel task' })
+        .click({ timeout: 5_000 });
+    });
   }
 
   // The task leaves the queue: exactly one of completion or cancel won — never a stuck
@@ -50,12 +68,7 @@ test('rapid pause/resume/cancel near completion never blocks the queue or sticks
   await expect(raced).toHaveCount(0, { timeout: 120_000 });
   await expect(pauseQueue).not.toBeChecked();
   await goTo(page, 'History');
-  const racedCard = rowOf(page, ATOMIC_RACE_CLIP);
-  await expect(
-    racedCard
-      .getByText('COMPLETED', { exact: true })
-      .or(racedCard.getByText('CANCELED', { exact: true })),
-  ).toBeVisible();
+  await expectCompletedOrCanceled(page, ATOMIC_RACE_CLIP);
 
   // The queue kept working: the follow-up upload still transcribes to completion.
   await goTo(page, 'Queue');

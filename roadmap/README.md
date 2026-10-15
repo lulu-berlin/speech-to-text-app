@@ -86,7 +86,7 @@ graph TD
   11 --> 40[40 atomic task transitions ✓]:::done
   12 --> 41[41 upload hardening]
   11 --> 42[42 worker stability]
-  11 --> 47[47 atomic-transitions spec flaky]
+  11 --> 47[47 atomic-transitions spec flaky ✓]:::done
   51[51 CI verification ✓]:::done
   51 --> 53[53 Nix store cache: one writer, keyed v2]
   51 --> 48[48 macOS support]
@@ -159,7 +159,7 @@ graph TD
 | [44 — Store the full audio in the database; drop the file cache](44-audio-in-database.md) | spec-approved | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md) | done | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
-| [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](47-atomic-transitions-spec-flaky.md) | spec-approved | 11 |
+| [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](../docs/specs/atomic-transitions-spec-flaky.md) | done | 11 |
 | [48 — macOS support](48-macos-support.md) | spec-approved | 05, 16, 45, 51 |
 | [49 — Windows support](49-windows-support.md) | spec-approved | 33, 48, 51 |
 | [50 — Electron desktop app](50-electron-app.md) | spec-approved | 16 |
