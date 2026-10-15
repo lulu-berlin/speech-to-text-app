@@ -15,8 +15,8 @@ class ProcessingEngineFailureSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val tasks = fixture.tasks
-                        val first = enqueueTask(tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueueTask(tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        val first = enqueueTask(tasks, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(tasks, "second.wav", queuePosition = 1, createdAt = 2)
                         val message = "whisper-cli failed on chunk-0.flac (exit 2):\nerror: input file not found"
                         fixture.transcriber.failNext = TranscriptionException(message)
 

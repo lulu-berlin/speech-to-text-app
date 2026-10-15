@@ -29,7 +29,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0021 | [Integration tests: Kotest tags and `gradle integrationTest`](0021-integration-tests-kotest-tags-gradle-task.md) | accepted | 2026-10-06 |
 | 0022 | [Kotlin compiler runs inside the Gradle daemon](0022-kotlin-compiler-in-process.md)      | accepted | 2026-10-06 |
 | 0023 | [Persistence may import feature-owned value types](0023-persistence-may-import-feature-value-types.md) | accepted | 2026-10-06 |
-| 0024 | [Audio storage: original kept only until chunking, chunks stored as FLAC](0024-audio-storage-original-until-chunking-flac-chunks.md) | accepted | 2026-10-07 |
+| 0024 | [Audio storage: original kept only until chunking, chunks stored as FLAC](0024-audio-storage-original-until-chunking-flac-chunks.md) | superseded by [0052](0052-canonical-clip-in-database-chunks-as-windows.md) | 2026-10-07 |
 | 0025 | [Nix build uses Gradle's default JVM memory settings](0025-nix-build-gradle-default-jvm-memory.md) | accepted | 2026-10-08 |
 | 0026 | [No rule for where test fixtures live](0026-no-rule-for-test-fixture-location.md)          | accepted | 2026-10-09 |
 | 0027 | [Automatic speaker count allows one speaker](0027-auto-speaker-count-allows-one-speaker.md) | accepted | 2026-10-09 |
@@ -55,10 +55,12 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 
 | 0044 | [SSE heartbeat event and client inactivity watchdog](0044-sse-heartbeat-and-client-watchdog.md) | accepted, extends item 12's event list | 2026-10-11 |
 
-| 0045 | [The joined playback FLAC is re-encoded (losslessly)](0045-joined-playback-flac-reencoded.md) | accepted, amends 0024's playback join | 2026-10-11 |
+| 0045 | [The joined playback FLAC is re-encoded (losslessly)](0045-joined-playback-flac-reencoded.md) | superseded by [0052](0052-canonical-clip-in-database-chunks-as-windows.md) | 2026-10-11 |
 | 0046 | [Every app feature has an end-to-end test](0046-every-feature-has-an-e2e-test.md) | accepted | 2026-10-11 |
 | 0047 | [External tools are resolved from PATH; no tool-path variables](0047-external-tools-resolved-from-path.md) | accepted, withdraws item 16's `STT_WHISPER_CLI`/`STT_FFMPEG` | 2026-10-11 |
 | 0048 | [The task's id in the logging context (MDC) and named engine coroutines](0048-task-id-in-logging-context-and-named-coroutines.md) | accepted | 2026-10-12 |
 | 0049 | [Gradle 9.8 in every build path; the root wrapper is for humans without Nix](0049-gradle-9-everywhere-root-wrapper-for-humans.md) | accepted, scopes 0014's "no Gradle wrapper" | 2026-10-12 |
 | 0050 | [Roadmap items merge via human pull requests on GitHub; the root agent never merges](0050-pr-merge-on-github.md) | accepted, amends AGENTS.md § Workflow step 8 and § Non-negotiable rules (human-only pushes to GitHub) | 2026-10-14 |
+| 0051 | [Existing databases rebuild the canonical clip inside a Flyway migration](0051-canonical-clip-backfill-migration.md) | accepted; the upgrade rebuilds each chunked task's clip (V10), then drops the per-chunk audio (V11) | 2026-10-14 |
+| 0052 | [Audio storage: one canonical clip per task in the database; chunks are windows into it](0052-canonical-clip-in-database-chunks-as-windows.md) | accepted, supersedes 0024 and 0045 | 2026-10-14 |
 

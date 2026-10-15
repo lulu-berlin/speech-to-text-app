@@ -21,7 +21,6 @@ class ProcessingEngineEventsSpec :
                         val task =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "task.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
@@ -77,8 +76,8 @@ class ProcessingEngineEventsSpec :
                 then("a queue-updated is emitted after each membership change, matching the database") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        val first = enqueueTask(fixture.tasks, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(fixture.tasks, "second.wav", queuePosition = 1, createdAt = 2)
 
                         // pause, reorder behind the worker's back, then resume: every membership or
                         // order change while the queue is paused is still reported.

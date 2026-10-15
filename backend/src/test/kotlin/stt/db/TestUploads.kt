@@ -1,11 +1,7 @@
 package stt.db
 
-import stt.audio.ExportedChunk
-import stt.audio.PlannedChunk
 import java.io.IOException
 import java.io.InputStream
-import java.nio.file.Files
-import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -49,20 +45,20 @@ internal class FailingAfter(
 }
 
 /**
- * Wraps [source] and records, on every read, how many bytes it has delivered that are not yet
- * in the spool files under [tmpDir]: the bytes the writer holds in memory at that moment.
+ * Wraps [source] and records, on every read, how many bytes it has delivered that are not yet stored in [db]'s
+ * original parts (item 44): the bytes the writer holds in memory at that moment.
  */
-internal class SpoolWatchingSource(
+internal class StagingWatchingSource(
     private val source: InputStream,
-    private val tmpDir: Path,
+    private val db: Database,
 ) : InputStream() {
     private var delivered = 0L
-    var largestUnspooled = 0L
+    var largestUnstaged = 0L
         private set
 
     private fun watch() {
-        val spooled = Files.list(tmpDir).use { files -> files.mapToLong { Files.size(it) }.sum() }
-        largestUnspooled = maxOf(largestUnspooled, delivered - spooled)
+        val staged = singleValue(db, "SELECT coalesce(sum(length(bytes)), 0) FROM original_audio_part").toLong()
+        largestUnstaged = maxOf(largestUnstaged, delivered - staged)
     }
 
     override fun read(): Int = throw UnsupportedOperationException("read in windows")
@@ -87,16 +83,3 @@ internal fun sha256Hex(input: InputStream): String {
     }
     return HexFormat.of().formatHex(digest.digest())
 }
-
-/** [plan] exported as one small stand-in FLAC file per chunk, `<name>-<idx>.flac` under [dir]. */
-internal fun exportedChunks(
-    dir: Path,
-    name: String,
-    vararg plan: PlannedChunk,
-): List<ExportedChunk> =
-    plan.mapIndexed {
-        idx,
-        chunk,
-        ->
-        ExportedChunk(chunk, Files.write(dir.resolve("$name-$idx.flac"), byteArrayOf(idx.toByte())))
-    }

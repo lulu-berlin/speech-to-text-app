@@ -24,9 +24,16 @@ import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import stt.audio.Chunker
 import stt.audio.PcmDecoder
+import stt.audio.SAMPLES_PER_MS
+import stt.audio.WindowCutter
+import stt.audio.toCanonicalRows
 import stt.config.Config
 import stt.config.Device
 import stt.config.dbValue
+import stt.db.AudioHeaderRepository
+import stt.db.AudioRepository
+import stt.db.AudioSecondRepository
+import stt.db.CanonicalClipRepository
 import stt.db.Chunk
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
@@ -34,6 +41,7 @@ import stt.db.DiarizationStage
 import stt.db.MergeOutcome
 import stt.db.QueueStateRepository
 import stt.db.RenameOutcome
+import stt.db.ScratchDir
 import stt.db.SegmentRepository
 import stt.db.Settings
 import stt.db.SettingsRepository
@@ -41,7 +49,6 @@ import stt.db.SpeakersMode
 import stt.db.StoredTask
 import stt.db.TaskPhase
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.pause.PauseGate
 import stt.process.ProcessControl
 import stt.queue.TaskStatus
@@ -50,11 +57,11 @@ import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSettings
 import stt.transcribe.resumePrompt
 import stt.transcribe.taskProgress
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 
 /**
  * The processing engine (roadmap item 11): one worker coroutine that drives queued tasks through their
@@ -69,16 +76,21 @@ class ProcessingEngine internal constructor(
     private val config: Config,
     private val tasks: TaskRepository,
     private val chunks: ChunkRepository,
+    private val audio: AudioRepository,
+    private val audioHeaders: AudioHeaderRepository,
+    private val audioSeconds: AudioSecondRepository,
+    private val clipAudio: CanonicalClipRepository,
     private val segments: SegmentRepository,
     private val queueState: QueueStateRepository,
     /** Read once per task as it starts (item 32): its device and thread count hold for the whole run. */
     private val settings: SettingsRepository,
-    private val workDirectories: TaskWorkDirectories,
+    private val scratchDir: ScratchDir,
     private val chunker: Chunker,
     private val transcriber: Transcriber,
     private val processControl: ProcessControl,
     private val diarizer: Diarizer,
     private val pcmDecoder: PcmDecoder,
+    private val windowCutter: WindowCutter,
 ) {
     private val transcription = ChunkTranscription(transcriber, segments)
 
@@ -126,7 +138,7 @@ class ProcessingEngine internal constructor(
     fun start() {
         scope.launch(CoroutineName("engine-worker")) {
             tasks.recoverRunning()
-            cleanupWorkDirectories()
+            scratchDir.clear()
             workerLoop()
         }
     }
@@ -257,8 +269,7 @@ class ProcessingEngine internal constructor(
         if (status in PENDING_DELETE) cancelTask(id)
         withContext(NonCancellable) {
             tasks.delete(id)
-            deleteCachedAudio(id)
-            removeWorkDir(id)
+            removeScratch(id)
             _events.emit(Event.TaskDeleted(id))
         }
         queueUpdated()
@@ -307,14 +318,6 @@ class ProcessingEngine internal constructor(
     }
 
     /**
-     * Removes the task's cached joined FLAC (`$STT_DATA_DIR/tmp/<id>.flac`, item 12's `/audio` cache), best
-     * effort: the file lives outside the database, and a failure to remove it only wastes disk until the next
-     * startup empties `tmp/` (the spec's cache lifecycle).
-     */
-    private suspend fun deleteCachedAudio(id: Long) =
-        deleteFileBestEffort(workDirectories.cachedAudio(id), "cached audio of task $id", "the next startup empties tmp/")
-
-    /**
      * Retries a FAILED or CANCELED task: it is queued at the end with its error cleared and runs again
      * like after a restart — the stored plan is reused, DONE chunks are skipped, the interrupted chunk is
      * rerun and diarization replaces the stored speakers (item 09). A COMPLETED task cannot be retried
@@ -345,7 +348,7 @@ class ProcessingEngine internal constructor(
             withContext(NonCancellable) {
                 runningJob(id)?.cancelAndJoin()
                 val canceled = tasks.cancelIfPossible(id, now())
-                pruneWorkDir(id)
+                removeScratch(id)
                 if (canceled) publish(id)
                 if (canceled) queueUpdated()
             }
@@ -488,9 +491,6 @@ class ProcessingEngine internal constructor(
         // The settings as the task starts (item 32): every chunk and the diarization of this run use them, so a
         // change applies from the next task the engine starts and a running (or paused) task keeps its device.
         val run = settings.get()
-        // The work directory is scratch; a task whose terminal status (item 15) cleaned it up must get it
-        // back before it writes chunk copies and decoded PCM again.
-        withContext(Dispatchers.IO) { Files.createDirectories(workDirectories.workDir(id)) }
         publish(id)
         try {
             chunkAudio(id)
@@ -500,48 +500,78 @@ class ProcessingEngine internal constructor(
             throw e
         } catch (e: Exception) {
             val failed = tasks.failIfRunning(id, e.message ?: e.toString(), now())
-            pruneWorkDir(id)
+            removeScratch(id)
             if (failed) publish(id)
             if (failed) queueUpdated()
             return
         }
         tasks.setCompleted(id, now())
-        removeCompletedWorkDir(id)
+        removeScratch(id)
         publish(id)
         queueUpdated()
     }
 
     /**
-     * CHUNKING (ADR 0024): decode, plan and export the task's chunks into its work directory, store the
-     * decoded duration and the plan with every chunk FLAC, and only then delete the original, which after
-     * that commit is no longer the only copy of the audio.
+     * CHUNKING (ADR 0024): decode, plan and export the task's chunks into its scratch directory, store the
+     * decoded duration, then the plan with every chunk FLAC and the canonical clip in one transaction, and only
+     * then delete the original from the database, which after that commit is no longer the only copy of the
+     * audio. The written-out original and the chunker's scratch exist only for this phase (item 44): they are
+     * removed on every path — success, failure, cancel — not left for the rest of the task's run.
      */
     private suspend fun chunkAudio(id: Long) {
         tasks.setPhase(id, TaskPhase.CHUNKING)
         publish(id)
-        val source = workDirectories.source(id)
-        // A stored plan means a previous run chunked this task: reuse the stored chunks (ADR 0004); a crash
-        // between the plan's commit and the original's deletion can still have left the original behind,
-        // and it is redundant now. Only first-time chunking needs it, as the only copy of the audio until
-        // the plan is committed (ADR 0024).
-        if (chunks.findByTask(id).isNotEmpty()) {
-            deleteLeftoverOriginal(source)
+        // A stored plan with its whole clip (header and rows) means a previous run chunked this task: they are
+        // reused (ADR 0004), and the original, redundant now, is dropped if it is still there. Anything less is
+        // what an interrupted run of an earlier version left: the task is chunked again from its original.
+        if (chunks.findByTask(id).isNotEmpty() && audioHeaders.read(id) != null && audioSeconds.count(id) > 0) {
+            audio.deleteOriginal(id)
             return
         }
-        check(withContext(Dispatchers.IO) { Files.exists(source) }) {
-            "the task's original audio is missing at $source"
+        val source = scratchDir.originalFile(id)
+        val chunkerDir = scratchDir.chunkerDir(id)
+        try {
+            writeOriginal(id, source)
+            val chunked = chunker.chunk(source, chunkerDir)
+            tasks.setDurationMs(id, chunked.durationMs)
+            chunks.storeChunked(id, chunked.chunks, chunked.canonical.header, chunked.canonical.toCanonicalRows())
+            // The canonical clip is now the task's stored audio: the original upload is no longer needed.
+            audio.deleteOriginal(id)
+        } finally {
+            withContext(NonCancellable) {
+                deleteTree(chunkerDir)
+                withContext(Dispatchers.IO) { Files.deleteIfExists(source) }
+            }
         }
-        val chunked = chunker.chunk(source, workDirectories.workDir(id))
-        tasks.setDurationMs(id, chunked.durationMs)
-        chunks.storePlan(id, chunked.chunks)
-        withContext(Dispatchers.IO) { Files.deleteIfExists(source) }
+    }
+
+    /**
+     * Writes the task's original upload from the database to [source] for the chunker (item 44). It is written under
+     * a temporary name and moved into place, so a failed write never leaves a truncated original behind. Fails
+     * naming [source] when the database holds no original.
+     */
+    private suspend fun writeOriginal(
+        id: Long,
+        source: Path,
+    ) {
+        withContext(Dispatchers.IO) {
+            val partial = source.resolveSibling("${source.fileName}.part")
+            try {
+                Files.newOutputStream(partial).use { audio.copyOriginalTo(id, it) }
+                Files.move(partial, source, StandardCopyOption.ATOMIC_MOVE)
+            } catch (e: NoSuchElementException) {
+                throw IllegalStateException("the task's original audio is missing at $source", e)
+            } finally {
+                Files.deleteIfExists(partial)
+            }
+        }
     }
 
     /**
      * TRANSCRIBING (ADR 0004): each chunk in `idx` order that is not DONE yet, with the previous chunk's
-     * stored text as the prompt. The chunk's FLAC is written from the database for whisper-cli and removed
-     * again once the chunk is stored (item 07). Each chunk first passes the pause gate: a pause that missed
-     * the previous chunk's exiting process (a freeze only reaches a process in flight) still stops the task
+     * stored text as the prompt. The chunk's input is cut from the stored canonical clip for whisper-cli and
+     * removed again once the chunk is stored (items 07, 44). Each chunk first passes the pause gate: a pause that
+     * missed the previous chunk's exiting process (a freeze only reaches a process in flight) still stops the task
      * before its next whisper-cli run, until it is resumed.
      */
     private suspend fun transcribeChunks(
@@ -552,7 +582,6 @@ class ProcessingEngine internal constructor(
         tasks.setPhase(id, TaskPhase.TRANSCRIBING)
         publish(id)
         val stored = chunks.findByTask(id)
-        val workDir = workDirectories.workDir(id)
         // whisper's -pp lines arrive on a non-suspending callback, so the chunks run in a child coroutine
         // and report over a channel, which this coroutine drains, persists and publishes in order.
         val reports = Channel<TranscriptionReport?>(Channel.UNLIMITED)
@@ -560,17 +589,20 @@ class ProcessingEngine internal constructor(
         var current = run
         coroutineScope {
             launch {
+                // The whisper inputs are transient files in the app's scratch directory (item 44), one per
+                // chunk; the task's directory is created once for the whole run.
+                val scratch = scratchDir.taskDir(id)
                 for (chunk in stored) {
                     if (chunk.status == ChunkStatus.DONE) continue
                     pauseGate.checkpoint()
-                    val audio = workDir.resolve("chunk-${chunk.idx}.flac")
-                    writeChunkFlac(id, chunk.idx, audio)
+                    val audio = scratch.resolve("chunk-${chunk.idx}.flac")
+                    writeChunkInput(id, chunk, audio)
                     transcription.transcribe(
                         taskId = id,
                         chunk = chunk,
                         settings = settingsFor(task, current),
                         audio = audio,
-                        outputPrefix = workDir.resolve("chunk-${chunk.idx}"),
+                        outputPrefix = scratch.resolve("chunk-${chunk.idx}"),
                         prompt = resumePrompt(segments, id, chunk.idx),
                         onProgress = { fraction -> reports.trySend(TranscriptionReport(chunk.idx, fraction)) },
                         onGpuUnavailable = { current = fallBackToCpu(id, current) },
@@ -627,7 +659,7 @@ class ProcessingEngine internal constructor(
         // The contract (item 12): progress is 0 before diarization starts, 1 once the speakers are stored,
         // with no stage left over. The reports in between are each persisted and then published.
         diarizationProgress(id, null, 0.0)
-        val pcm = rebuildPcm(id)
+        val pcm = clipPcm(id)
         val reports = Channel<DiarizationReport?>(Channel.UNLIMITED)
         coroutineScope {
             launch {
@@ -652,23 +684,28 @@ class ProcessingEngine internal constructor(
     }
 
     /**
-     * Rebuilds the task's whole-file PCM from its stored chunk FLACs, each decoded and concatenated in
-     * `idx` order (ADR 0024). Only the stored chunks are read, so a restart changes nothing; the work
-     * directory is scratch.
+     * The task's whole-file PCM, decoded from its stored canonical clip (item 44): the clip is materialized
+     * from the database to one transient scratch file, decoded to a second, and both are removed on every
+     * path. No chunk FLAC is read, so a task whose per-chunk copies are gone still diarizes, and a restart
+     * decodes the same stored bytes.
      */
-    private suspend fun rebuildPcm(id: Long): FloatArray {
-        val workDir = workDirectories.workDir(id)
-        val pcm = ByteArrayOutputStream()
-        for (chunk in chunks.findByTask(id)) {
-            val flac = workDir.resolve("chunk-${chunk.idx}.flac")
-            writeChunkFlac(id, chunk.idx, flac)
-            val decoded = workDir.resolve("chunk-${chunk.idx}.f32")
-            pcmDecoder.decode(flac, decoded)
-            withContext(Dispatchers.IO) { pcm.writeBytes(Files.readAllBytes(decoded)) }
+    private suspend fun clipPcm(id: Long): FloatArray {
+        val clip = scratchDir.clipFile(id)
+        val decoded = scratchDir.clipPcm(id)
+        try {
+            withContext(Dispatchers.IO) {
+                Files.newOutputStream(clip).use { out -> clipAudio.copyTo(id, 0, clipAudio.size(id), out) }
+            }
+            pcmDecoder.decode(clip, decoded)
+            val bytes = withContext(Dispatchers.IO) { Files.readAllBytes(decoded) }
+            val floats = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
+            return FloatArray(floats.remaining()) { floats.get() }
+        } finally {
+            withContext(NonCancellable + Dispatchers.IO) {
+                Files.deleteIfExists(clip)
+                Files.deleteIfExists(decoded)
+            }
         }
-        val bytes = pcm.toByteArray()
-        val floats = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
-        return FloatArray(floats.remaining()) { floats.get() }
     }
 
     /** Persists a diarization stage report and then publishes it, so the database leads the event. */
@@ -689,133 +726,56 @@ class ProcessingEngine internal constructor(
         )
     }
 
-    /** Deletes a leftover original of a task whose plan is already stored; best effort, as it changes nothing. */
-    private suspend fun deleteLeftoverOriginal(source: Path) =
-        deleteFileBestEffort(source, "the leftover original", "the startup cleanup removes it")
-
-    /**
-     * Removes [file] best effort: a failure is logged with [what] and [consequence] and never propagates,
-     * so a leftover file can never turn a task's success path into an error.
-     */
-    private suspend fun deleteFileBestEffort(
-        file: Path,
-        what: String,
-        consequence: String,
-    ) {
-        try {
-            withContext(Dispatchers.IO) { Files.deleteIfExists(file) }
-        } catch (e: Exception) {
-            logger.warn("Could not delete {} {}; {}: {}", file, what, consequence, e.toString())
-        }
-    }
-
-    /**
-     * Startup sweep (item 15): the work directory of every pending task is kept (an unchunked one holds
-     * the only copy of its original); a FAILED or CANCELED task keeps only an unchunked original, for a
-     * retry; COMPLETED, deleted and leftover directories are removed. Each directory is best effort, so
-     * one failure never skips the rest.
-     */
-    private suspend fun cleanupWorkDirectories() {
-        val root = workDirectories.workRoot()
-        val dirs =
-            withContext(Dispatchers.IO) {
-                if (Files.isDirectory(root)) Files.list(root).use { it.toList() } else emptyList()
-            }
-        dirs.forEach { dir -> cleanupTaskDirectory(dir) }
-    }
-
-    /** Applies the sweep's rule to one work directory, named by its task's id. */
-    private suspend fun cleanupTaskDirectory(dir: Path) {
-        val id = dir.fileName.toString().toLongOrNull() ?: return
-        try {
-            val task = tasks.find(id)?.task
-            if (task == null) {
-                deleteTree(dir)
-            } else {
-                when (task.status) {
-                    TaskStatus.COMPLETED -> {
-                        deleteTree(dir)
-                    }
-
-                    TaskStatus.FAILED, TaskStatus.CANCELED -> {
-                        if (chunks.findByTask(id).isEmpty()) pruneWorkDir(id) else deleteTree(dir)
-                    }
-
-                    else -> {
-                        Unit
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Could not clean up the work directory {}; skipped: {}", dir, e.toString())
-        }
-    }
-
-    /** Removes [dir] and everything in it, including [dir] itself. */
+    /** Removes [dir] and everything in it, including [dir] itself; a directory that is not there is left alone. */
     private suspend fun deleteTree(dir: Path) {
         withContext(Dispatchers.IO) {
+            if (!Files.isDirectory(dir)) return@withContext
             Files.walk(dir).use { paths ->
                 paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
             }
         }
     }
 
-    /** Removes the task's work directory now that it is COMPLETED; best effort, the startup sweep is the backstop. */
-    private suspend fun removeCompletedWorkDir(id: Long) {
-        val dir = workDirectories.workDir(id)
+    /**
+     * Removes the task's scratch directory — the chunker's scratch, the materialized original, the whisper
+     * inputs and any decoded clip — once the task has ended: COMPLETED, FAILED, CANCELED or deleted. Best
+     * effort, like every cleanup here: a failure only leaves files the startup [ScratchDir.clear] sweeps.
+     */
+    private suspend fun removeScratch(id: Long) {
+        val dir = scratchDir.taskDirPath(id)
         try {
             deleteTree(dir)
         } catch (e: Exception) {
-            logger.warn("Could not remove the completed task's work directory {}: {}", dir, e.toString())
+            logger.warn("Could not remove task {}'s scratch directory {}: {}", id, dir, e.toString())
         }
     }
 
     /**
-     * Removes the deleted task's work directory; best effort like the cached audio, so a failed removal
-     * only leaves a directory the startup sweep removes (the sweep's orphan rule, item 15).
+     * Writes [chunk]'s audio to [target], where whisper-cli reads it (item 44): the clip's header and the one-second
+     * rows the chunk's window touches go to a transient window file, and [windowCutter] cuts the chunk's samples
+     * from it. The window file is removed on every path.
      */
-    private suspend fun removeWorkDir(id: Long) {
-        val dir = workDirectories.workDir(id)
-        try {
-            deleteTree(dir)
-        } catch (e: Exception) {
-            logger.warn("Could not remove deleted task $id's work directory {}: {}", dir, e.toString())
-        }
-    }
-
-    /**
-     * Removes everything in the task's work directory except its original (ADR 0024): the chunker's decoded
-     * PCM and exported chunks, and the copies written for whisper-cli. A task that was never chunked keeps
-     * its original, which for a FAILED or CANCELED task is the only copy of the audio (a retry needs it); a
-     * chunked task has no original left. Best effort: a leftover file is logged and removed by the startup
-     * cleanup instead, so it cannot turn a finished cancel or failure into an error.
-     */
-    private suspend fun pruneWorkDir(id: Long) {
-        val workDir = workDirectories.workDir(id)
-        val source = workDirectories.source(id)
-        try {
-            withContext(Dispatchers.IO) {
-                if (!Files.isDirectory(workDir)) return@withContext
-                Files.walk(workDir).use { paths ->
-                    paths
-                        .filter { it != workDir && it != source }
-                        .sorted(Comparator.reverseOrder())
-                        .forEach { Files.deleteIfExists(it) }
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Could not prune the work directory {}; the startup cleanup removes it: {}", workDir, e.toString())
-        }
-    }
-
-    /** Writes chunk [idx]'s stored FLAC to [target], where whisper-cli reads it (ADR 0024). */
-    private suspend fun writeChunkFlac(
+    private suspend fun writeChunkInput(
         id: Long,
-        idx: Int,
+        chunk: Chunk,
         target: Path,
     ) {
-        withContext(Dispatchers.IO) {
-            Files.newOutputStream(target).use { chunks.copyFlacTo(id, idx, it) }
+        val firstSecond = (chunk.startMs / 1_000).toInt()
+        val endSecond = ((chunk.endMs + 999) / 1_000).toInt()
+        val offsetMs = firstSecond * 1_000L
+        val window = target.resolveSibling("${target.fileName}.window")
+        try {
+            withContext(Dispatchers.IO) {
+                Files.newOutputStream(window).use { out -> clipAudio.copySecondsTo(id, firstSecond, endSecond, out) }
+            }
+            windowCutter.cut(
+                window,
+                fromSample = (chunk.startMs - offsetMs) * SAMPLES_PER_MS,
+                toSample = (chunk.endMs - offsetMs) * SAMPLES_PER_MS,
+                target = target,
+            )
+        } finally {
+            withContext(NonCancellable + Dispatchers.IO) { Files.deleteIfExists(window) }
         }
     }
 

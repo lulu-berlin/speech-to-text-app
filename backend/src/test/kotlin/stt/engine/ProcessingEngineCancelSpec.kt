@@ -18,8 +18,8 @@ class ProcessingEngineCancelSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val tasks = fixture.tasks
-                        val first = enqueueTask(tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueueTask(tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        val first = enqueueTask(tasks, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(tasks, "second.wav", queuePosition = 1, createdAt = 2)
 
                         val release = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = release
@@ -55,8 +55,8 @@ class ProcessingEngineCancelSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val tasks = fixture.tasks
-                        val running = enqueueTask(tasks, fixture.workDirectories, "running.wav", queuePosition = 0, createdAt = 1)
-                        val queued = enqueueTask(tasks, fixture.workDirectories, "queued.wav", queuePosition = 1, createdAt = 2)
+                        val running = enqueueTask(tasks, "running.wav", queuePosition = 0, createdAt = 1)
+                        val queued = enqueueTask(tasks, "queued.wav", queuePosition = 1, createdAt = 2)
 
                         val release = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = release
@@ -89,7 +89,7 @@ class ProcessingEngineCancelSpec :
                 then("the cancel returns only once the process is gone and CANCELED is stored") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
 
                         val death = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = CompletableDeferred()

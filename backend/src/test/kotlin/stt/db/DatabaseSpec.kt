@@ -15,6 +15,7 @@ import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import org.flywaydb.core.Flyway
+import stt.queue.TaskStatus
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
@@ -60,13 +61,13 @@ class DatabaseSpec :
 
         given("an empty data directory") {
             `when`("opening the database for the first time") {
-                then("stt.db is created, V1 to V7 apply, and a reopen applies nothing and preserves rows") {
+                then("stt.db is created, V1 to V12 apply, and a reopen applies nothing and preserves rows") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
 
                         Database.open(dataDir).use { first ->
                             tableNames(first).shouldContainAll(expectedTables)
-                            migratedCount(first).shouldBe(7)
+                            migratedCount(first).shouldBe(12)
                             first.connection
                                 .createStatement()
                                 .use { st ->
@@ -82,7 +83,7 @@ class DatabaseSpec :
 
                         Database.open(dataDir).use { second ->
                             rowCount(second, "tasks").shouldBe(1)
-                            migratedCount(second).shouldBe(7)
+                            migratedCount(second).shouldBe(12)
                         }
                     }
                 }
@@ -91,15 +92,17 @@ class DatabaseSpec :
 
         given("a database migrated to V1 only, holding a task with its audio row, a chunk, and an audio page") {
             `when`("the database is opened") {
-                then("V2 applies: audio_parts is gone, chunk_audio exists, and the task, its audio row and its chunk are kept") {
+                then("V2 onwards apply: audio_parts is gone, and the task, its audio row and its chunk are kept") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
                         migrateTo(dataDir, version = "1", v1Rows)
 
                         Database.open(dataDir).use { db ->
                             tableNames(db).shouldNotContain("audio_parts")
-                            tableNames(db).shouldContainAll("chunk_audio")
-                            taskRepository(db, dataDir).find(1L).shouldBe(StoredTask(1L, queuedTask("kept.wav", createdAt = 1L)))
+                            // The task is kept; having no stored audio after the upgrade (no clip, no original), V12
+                            // gives up on it as not migrated.
+                            TaskRepository(db).find(1L)?.task?.let { it.originalFilename to it.status } shouldBe
+                                ("kept.wav" to TaskStatus.FAILED)
                             AudioRepository(db).metadata(1L).shouldBe(AudioMetadata(sizeBytes = 3L, sha256 = "aa"))
                             ChunkRepository(db)
                                 .findByTask(1L)
@@ -210,10 +213,7 @@ class DatabaseSpec :
                         val payloadSize = 1_048_577
                         val wal = dataDir.resolve("stt.db-wal")
                         Database.open(dataDir, Mutex(), journalSizeLimit = limit).use { db ->
-                            taskRepository(
-                                db,
-                                dataDir,
-                            ).insert(queuedTask("large.wav", createdAt = 1L).copy(error = "x".repeat(payloadSize)))
+                            TaskRepository(db).insert(queuedTask("large.wav", createdAt = 1L).copy(error = "x".repeat(payloadSize)))
                             // Every byte of the row is in a WAL frame until a checkpoint copies it into stt.db.
                             Files.size(wal).shouldBeGreaterThanOrEqual(payloadSize.toLong())
 
@@ -254,27 +254,6 @@ class DatabaseSpec :
             }
         }
 
-        given("no chunk with id 42 and idx 0") {
-            `when`("inserting a chunk_audio row for it") {
-                then("it is rejected; the same row is accepted once that chunk exists") {
-                    withDatabase { db ->
-                        val chunkAudioInsert = "INSERT INTO chunk_audio (task_id, idx, flac) VALUES (42, 0, x'00')"
-
-                        shouldThrow<java.sql.SQLException> { db.writeTransaction { exec(chunkAudioInsert) } }
-
-                        insertTask(db, 42)
-                        db.writeTransaction {
-                            exec(
-                                "INSERT INTO chunks (task_id, idx, start_ms, end_ms, status) VALUES (42, 0, 0, 1000, 'PENDING')",
-                            )
-                        }
-                        db.writeTransaction { exec(chunkAudioInsert) }
-                        rowCount(db, "chunk_audio").shouldBe(1)
-                    }
-                }
-            }
-        }
-
         given("task rows with an invalid status, an invalid phase, or an upper-case speakers_mode") {
             `when`("inserting them") {
                 then("each is rejected; the same row with valid values is accepted") {
@@ -306,25 +285,6 @@ class DatabaseSpec :
 
                         Files.isDirectory(dataDir).shouldBeTrue()
                         Files.isRegularFile(dataDir.resolve("stt.db")).shouldBeTrue()
-                    }
-                }
-            }
-        }
-
-        given("a data directory whose tmp/ holds files left by a crashed upload, next to another file") {
-            `when`("opening the database") {
-                then("the files in tmp/ are removed and tmp/ stays; files outside tmp/ are kept") {
-                    runTest {
-                        val dataDir = tempdir("stt-db").toPath()
-                        val tmpDir = Files.createDirectories(dataDir.resolve("tmp"))
-                        Files.writeString(tmpDir.resolve("upload-1.part"), "stale")
-                        Files.writeString(tmpDir.resolve("upload-2.part"), "stale")
-                        Files.writeString(dataDir.resolve("keep.txt"), "not a temp file")
-
-                        Database.open(dataDir).close()
-
-                        entries(tmpDir).shouldBeEmpty()
-                        Files.readString(dataDir.resolve("keep.txt")).shouldBe("not a temp file")
                     }
                 }
             }
@@ -372,13 +332,14 @@ private val expectedTables =
     listOf(
         "tasks",
         "audio",
-        "chunk_audio",
         "chunks",
         "segments",
         "speakers",
         "speaker_merge",
         "queue_state",
         "settings",
+        "original_audio",
+        "original_audio_part",
         "flyway_schema_history",
     )
 

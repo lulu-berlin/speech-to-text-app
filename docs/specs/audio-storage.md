@@ -1,6 +1,6 @@
 # Audio storage: originals in the work directory, chunks as FLAC
 
-Status: done (roadmap item 18, merged 2026-10-07)
+Status: done (roadmap item 18, merged 2026-10-07); superseded by roadmap item 44 ([ADR 0052](../decisions/0052-canonical-clip-in-database-chunks-as-windows.md)): the original streams into the database and is deleted after chunking, each task's audio is one canonical clip in the database, chunks are windows into it, and `chunk_audio` and the work directories are gone (V11). This spec is the record of item 18.
 Depends on: [03 — database schema](database-schema.md)
 
 ## Goal

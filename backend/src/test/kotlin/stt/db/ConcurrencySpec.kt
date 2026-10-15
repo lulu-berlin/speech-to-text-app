@@ -19,16 +19,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import stt.audio.ExportedChunk
 import stt.audio.PlannedChunk
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/** The writer lock, read connections, and upload spooling under concurrent use (ADR 0017, ADR 0024). */
+/** The writer lock, read connections, and upload staging under concurrent use (ADR 0017, ADR 0024). */
 class ConcurrencySpec :
     BehaviorSpec({
 
@@ -40,7 +37,7 @@ class ConcurrencySpec :
                         val dataDir = tempdir("stt-db").toPath()
                         Database.open(dataDir, lock).use { db ->
                             coroutineScope {
-                                val tasks = taskRepository(db, dataDir)
+                                val tasks = TaskRepository(db)
                                 val heldWrite = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 1L))
 
                                 val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
@@ -70,12 +67,11 @@ class ConcurrencySpec :
                 then("each read completes and sees only the committed state") {
                     withDatabase { db ->
                         coroutineScope {
-                            val tasks = taskRepository(db, dataDir)
+                            val tasks = TaskRepository(db)
                             val chunks = ChunkRepository(db)
                             val stored = queuedTask("stored.wav", createdAt = 1L)
                             val id = tasks.createFromUpload(stored, "abc".byteInputStream())
-                            val flacFile = Files.write(dataDir.resolve("chunk-0.flac"), "flac".toByteArray())
-                            chunks.storePlan(id, listOf(ExportedChunk(PlannedChunk(0L, 1_000L), flacFile)))
+                            storePlan(db, id, listOf(PlannedChunk(0L, 1_000L)))
                             val heldWrite = holdWriteTransaction(db, queuedTask("uncommitted.wav", createdAt = 2L))
 
                             try {
@@ -87,9 +83,6 @@ class ConcurrencySpec :
                                         chunks
                                             .findByTask(id)
                                             .shouldBe(listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.PENDING)))
-                                        val flac = ByteArrayOutputStream()
-                                        chunks.copyFlacTo(id, 0, flac)
-                                        flac.toString(Charsets.UTF_8).shouldBe("flac")
                                         SegmentRepository(db).findByTask(id).shouldBe(emptyList())
                                         // sha256("abc"): the FIPS 180-2 test vector.
                                         AudioRepository(db)
@@ -123,7 +116,7 @@ class ConcurrencySpec :
                         val dataDir = tempdir("stt-db").toPath()
                         Database.open(dataDir).use { db ->
                             coroutineScope {
-                                val tasks = taskRepository(db, dataDir)
+                                val tasks = TaskRepository(db)
                                 val source = StallingFailingSource()
                                 val creation =
                                     async { runCatching { tasks.createFromUpload(queuedTask("failing.wav", createdAt = 1L), source) } }

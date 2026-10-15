@@ -8,8 +8,10 @@
 // of the gradle launcher pid the harness holds — so stops find and kill the app JVM by
 // its arguments (appJvmPid), not by the group alone.
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -174,14 +176,13 @@ export async function choosePort() {
   });
 }
 
-// The files the backend keeps for a task outside the database: its cached joined FLAC
-// ($STT_DATA_DIR/tmp/<id>.flac, built on the first /audio request) and its work
-// directory. The restart test checks the same paths.
-export function cachedAudioPath(dataDir, taskId) {
-  return join(dataDir, 'tmp', `${taskId}.flac`);
-}
-export function workDirPath(dataDir, taskId) {
-  return join(dataDir, 'work', taskId);
+// The scratch the backend keeps for a task outside the database: one directory per data directory under
+// the OS temp dir (`java.io.tmpdir/stt-<fingerprint of STT_DATA_DIR>`), one subdirectory per task. It holds
+// the chunker's scratch, whisper's inputs and the clip decoded for diarization, and it is removed when the
+// task ends — every task's audio lives in the database (item 44).
+export function scratchDirPath(dataDir, taskId) {
+  const fingerprint = createHash('sha256').update(dataDir).digest('hex').slice(0, 16);
+  return join(tmpdir(), `stt-${fingerprint}`, String(taskId));
 }
 
 // Waits until /api/health answers (startup) or, with `down: true`, until it stops

@@ -4,16 +4,15 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import stt.db.AudioRepository
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
+import stt.db.rowCount
 import stt.queue.TaskStatus
-import java.nio.file.Files
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -24,11 +23,11 @@ class ProcessingEngineRestartSpec :
                 then("it runs the task again, skipping the DONE chunk") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
-                        // The crash state: a stored two-chunk plan, chunk 0 DONE with its segments, the original
-                        // already deleted, and the task left RUNNING (ADR 0004).
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+                        // The crash state: a stored two-chunk plan with its clip, chunk 0 DONE with its segments, the
+                        // original already deleted, and the task left RUNNING (ADR 0004).
                         val chunks = ChunkRepository(db)
-                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
+                        storeChunkedPlan(fixture, chunks, task, chunkCount = 2)
                         SegmentRepository(db).completeChunk(
                             task,
                             chunkIdx = 0,
@@ -37,7 +36,7 @@ class ProcessingEngineRestartSpec :
                                     Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
                                 ),
                         )
-                        withContext(Dispatchers.IO) { Files.deleteIfExists(fixture.workDirectories.source(task)) }
+                        AudioRepository(db).deleteOriginal(task)
                         fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
 
                         fixture.engine.start()
@@ -56,9 +55,9 @@ class ProcessingEngineRestartSpec :
                 then("it resumes from its stored plan without the original") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         val chunks = ChunkRepository(db)
-                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
+                        storeChunkedPlan(fixture, chunks, task, chunkCount = 2)
                         SegmentRepository(db).completeChunk(
                             task,
                             chunkIdx = 0,
@@ -67,7 +66,7 @@ class ProcessingEngineRestartSpec :
                                     Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
                                 ),
                         )
-                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(task)) }
+                        AudioRepository(db).deleteOriginal(task)
 
                         // The original is not needed: the plan is reused and the DONE chunk is not
                         // transcribed again.
@@ -81,23 +80,23 @@ class ProcessingEngineRestartSpec :
                 }
             }
         }
-        given("a task whose plan is stored but whose original was left behind by a crash") {
+        given("a task whose plan and clip are stored but whose original was left behind by a crash") {
             `when`("a new engine runs it") {
                 then("it resumes from the stored plan and deletes the leftover original") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         val chunks = ChunkRepository(db)
-                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
-                        // The crash between the plan's commit and the original's deletion: the original is
-                        // still there, though the stored chunks already make it redundant.
-                        Files.exists(fixture.workDirectories.source(task)) shouldBe true
+                        // The crash between the clip's commit and the original's deletion: the original is
+                        // still there, though the stored clip already makes it redundant.
+                        storeChunkedPlan(fixture, chunks, task, chunkCount = 2)
+                        rowCount(db, "original_audio") shouldBe 1
 
                         fixture.engine.start()
                         fixture.completed.receive() shouldBe task
 
                         statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
-                        Files.exists(fixture.workDirectories.source(task)) shouldBe false
+                        rowCount(db, "original_audio") shouldBe 0
                     }
                 }
             }
@@ -110,7 +109,6 @@ class ProcessingEngineRestartSpec :
                         val started =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "started.wav",
                                 queuePosition = 1,
                                 createdAt = 1,
@@ -119,16 +117,15 @@ class ProcessingEngineRestartSpec :
                         val ahead =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "ahead.wav",
                                 queuePosition = 0,
                                 createdAt = 2,
                                 speakersMode = SpeakersMode.AUTO,
                             )
-                        // The crash state of a started, mid-transcription pause: plan stored, chunk 0 DONE,
+                        // The crash state of a started, mid-transcription pause: plan and clip stored, chunk 0 DONE,
                         // original gone, status PAUSED with its phase and start time.
                         val chunks = ChunkRepository(db)
-                        chunks.storePlan(started, exportedPlan(fixture, started, chunkCount = 2))
+                        storeChunkedPlan(fixture, chunks, started, chunkCount = 2)
                         SegmentRepository(db).completeChunk(
                             started,
                             chunkIdx = 0,
@@ -137,7 +134,7 @@ class ProcessingEngineRestartSpec :
                                     Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
                                 ),
                         )
-                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(started)) }
+                        AudioRepository(db).deleteOriginal(started)
                         fixture.tasks.setRunningIfQueued(started, startedAt = 1_000L)
                         fixture.tasks.setStatus(started, TaskStatus.PAUSED)
                         fixture.tasks.setPhase(started, TaskPhase.TRANSCRIBING)
@@ -166,9 +163,9 @@ class ProcessingEngineRestartSpec :
                 then("the task stays PAUSED, and resumes only on an explicit resume, rerunning its interrupted chunk") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         val chunks = ChunkRepository(db)
-                        chunks.storePlan(task, exportedPlan(fixture, task, chunkCount = 2))
+                        storeChunkedPlan(fixture, chunks, task, chunkCount = 2)
                         SegmentRepository(db).completeChunk(
                             task,
                             chunkIdx = 0,
@@ -177,7 +174,7 @@ class ProcessingEngineRestartSpec :
                                     Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
                                 ),
                         )
-                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(task)) }
+                        AudioRepository(db).deleteOriginal(task)
                         fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L)
                         fixture.tasks.setStatus(task, TaskStatus.PAUSED)
                         fixture.tasks.setPhase(task, TaskPhase.TRANSCRIBING)

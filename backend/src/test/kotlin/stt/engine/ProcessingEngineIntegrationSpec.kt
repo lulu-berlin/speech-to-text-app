@@ -9,7 +9,6 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
-import kotlinx.coroutines.delay
 import stt.Integration
 import stt.config.Config
 import stt.config.realSpeakerModelPath
@@ -17,7 +16,6 @@ import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.SegmentRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.http.sttApp
 import stt.queue.TaskStatus
@@ -26,8 +24,6 @@ import stt.withCapturedLogs
 import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.TimeSource
 
 class ProcessingEngineIntegrationSpec :
     BehaviorSpec({
@@ -50,8 +46,7 @@ class ProcessingEngineIntegrationSpec :
                             application { sttApp(config) }
                             startApplication()
                             val db = application.dependencies.resolve<Database>()
-                            val workDirectories = TaskWorkDirectories(dataDir)
-                            val tasks = TaskRepository(db, workDirectories)
+                            val tasks = TaskRepository(db)
                             val segments = SegmentRepository(db)
 
                             val ids =
@@ -63,11 +58,8 @@ class ProcessingEngineIntegrationSpec :
                                 }
                             application.dependencies.resolve<ProcessingEngine>().wake()
 
-                            val deadline = TimeSource.Monotonic.markNow() + 5.minutes
-                            while (ids.any { tasks.find(it)?.task?.status in setOf(TaskStatus.QUEUED, TaskStatus.RUNNING) } &&
-                                deadline.hasNotPassedNow()
-                            ) {
-                                delay(200.milliseconds)
+                            awaitUntil(every = 200.milliseconds) {
+                                ids.none { tasks.find(it)?.task?.status in setOf(TaskStatus.QUEUED, TaskStatus.RUNNING) }
                             }
 
                             for (id in ids) {
@@ -84,7 +76,7 @@ class ProcessingEngineIntegrationSpec :
                                 stored.joinToString("") { it.text }.isNotBlank() shouldBe true
                                 val speakerIds = stored.map { it.speakerId.shouldNotBeNull() }
                                 segments.findSpeakers(id).map { it.speakerId } shouldBe speakerIds.distinct().sorted()
-                                Files.exists(workDirectories.workDir(id)).shouldBeFalse()
+                                Files.exists(config.dataDir.resolve("work")).shouldBeFalse()
                             }
                         }
                         // One session per application run, reused for the second task.

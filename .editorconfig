@@ -14,6 +14,10 @@ indent_size = 4
 indent_style = space
 indent_size = 4
 
+# Flyway names its class migrations `V<version>__<Description>`; the tool's contract wins over Kotlin naming.
+[backend/src/main/kotlin/stt/db/migration/*.kt]
+ktlint_standard_class-naming = disabled
+
 [*.{ts,tsx,js,jsx,json,yml,yaml,md}]
 indent_style = space
 indent_size = 2

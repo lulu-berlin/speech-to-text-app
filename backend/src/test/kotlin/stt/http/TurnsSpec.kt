@@ -19,7 +19,6 @@ import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.Task
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 import java.nio.file.Path
@@ -36,7 +35,7 @@ class TurnsSpec :
             Database.open(dataDir).use { db ->
                 QueueStateRepository(db).setPaused(true)
                 val id =
-                    TaskRepository(db, TaskWorkDirectories(dataDir))
+                    TaskRepository(db)
                         .createFromUpload(task, "${task.originalFilename} bytes".toByteArray().inputStream())
                 SegmentRepository(db).apply {
                     insertAll(id, segments)

@@ -13,7 +13,6 @@ import kotlinx.coroutines.delay
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.engine.ProcessingEngine
 import stt.queue.TaskStatus
@@ -34,7 +33,7 @@ class EngineWiringSpec :
                     val id =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            TaskRepository(db, TaskWorkDirectories(dataDir)).insert(
+                            TaskRepository(db).insert(
                                 queuedTask("crashed.wav", createdAt = 1).copy(
                                     status = TaskStatus.RUNNING,
                                     queuePosition = 0,
@@ -47,7 +46,7 @@ class EngineWiringSpec :
                         application { sttApp(stt.config.testConfig(dataDir)) }
                         startApplication()
                         db = application.dependencies.resolve<Database>()
-                        val tasks = TaskRepository(db, TaskWorkDirectories(dataDir))
+                        val tasks = TaskRepository(db)
 
                         // Nothing in the test touches the engine before this: only the app's startup can recover the task.
                         // The paused queue keeps the recovered task from starting, so no real ffmpeg runs.

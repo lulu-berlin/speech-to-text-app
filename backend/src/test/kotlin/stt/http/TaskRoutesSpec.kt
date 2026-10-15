@@ -34,11 +34,10 @@ import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.db.sha256Hex
 import stt.queue.TaskStatus
-import java.io.File
+import java.io.ByteArrayOutputStream
 
 class TaskRoutesSpec :
     BehaviorSpec({
@@ -78,7 +77,7 @@ class TaskRoutesSpec :
 
         given("an upload and a paused queue") {
             `when`("posting it to /api/tasks") {
-                then("201 is returned and the task is QUEUED at the end of the queue, its original kept, no audio bytes in the database") {
+                then("201 is returned and the task is QUEUED at the end of the queue, its original stored in the database") {
                     val bytes = "FAKE WAV CONTENT".repeat(100).toByteArray()
                     val sha256 = sha256Hex(bytes.inputStream())
                     val dataDir = tempdir("stt-data").toPath()
@@ -113,8 +112,7 @@ class TaskRoutesSpec :
 
                         val expectedSha256 = sha256Hex(bytes.inputStream())
                         Database.open(dataDir).use { db ->
-                            val workDirectories = TaskWorkDirectories(dataDir)
-                            val tasks = TaskRepository(db, workDirectories)
+                            val tasks = TaskRepository(db)
                             val details = tasks.details(id)
                             details.shouldNotBeNull()
                             details.task.status.name
@@ -123,7 +121,10 @@ class TaskRoutesSpec :
                             details.hasAudio.shouldBeFalse()
                             details.transcribedUntilMs.shouldBeNull()
                             details.task.queuePosition.shouldNotBeNull()
-                            File(workDirectories.source(id).toString()).readBytes().shouldBe(bytes)
+                            ByteArrayOutputStream()
+                                .also { AudioRepository(db).copyOriginalTo(id, it) }
+                                .toByteArray()
+                                .shouldBe(bytes)
                             AudioRepository(db).metadata(id)!!.sha256.shouldBe(expectedSha256)
                             ChunkRepository(db).findByTask(id).shouldBeEmpty()
                         }
@@ -147,8 +148,7 @@ class TaskRoutesSpec :
                     ): Long =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            val workDirectories = TaskWorkDirectories(dataDir)
-                            val tasks = TaskRepository(db, workDirectories)
+                            val tasks = TaskRepository(db)
                             val id =
                                 tasks.createFromUpload(
                                     queuedTask(name, createdAt = 1).copy(
@@ -207,7 +207,7 @@ class TaskRoutesSpec :
                         Database.open(dataDir).use { db ->
                             // The paused queue keeps the engine from starting the task, so no real ffmpeg runs.
                             QueueStateRepository(db).setPaused(true)
-                            TaskRepository(db, TaskWorkDirectories(dataDir)).createFromUpload(
+                            TaskRepository(db).createFromUpload(
                                 queuedTask("memo.wav", createdAt = 1_791_538_200_000).copy(
                                     queuePosition = 0,
                                     language = "de",

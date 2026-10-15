@@ -26,7 +26,6 @@ import stt.withCapturedLogs
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.PosixFilePermissions
 import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineSpec :
@@ -37,8 +36,8 @@ class ProcessingEngineSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val tasks = fixture.tasks
-                        val first = enqueueTask(tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueueTask(tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        val first = enqueueTask(tasks, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(tasks, "second.wav", queuePosition = 1, createdAt = 2)
 
                         fixture.engine.start()
 
@@ -56,21 +55,18 @@ class ProcessingEngineSpec :
             }
         }
 
-        given("a completed task whose work directory still exists") {
+        given("a completed task") {
             `when`("deleting it") {
-                then("the task row, its cached audio and its work directory are gone") {
+                then("the task row is gone") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        // enqueueTask seeds `work/<id>/source`, the state a COMPLETED task's prune leaves
-                        // (ADR 0024). The engine is not started, so only the delete path can remove it.
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "doomed.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "doomed.wav", queuePosition = 0, createdAt = 1)
                         fixture.tasks.setCompleted(task, finishedAt = 1_000L)
 
                         fixture.engine.deleteTask(task) shouldBe TaskCommandOutcome.Accepted
 
                         fixture.tasks.find(task) shouldBe null
-                        Files.exists(fixture.workDirectories.workDir(task)).shouldBeFalse()
-                        Files.exists(fixture.workDirectories.cachedAudio(task)).shouldBeFalse()
+                        Files.exists(dataDir.dataDir.resolve("work")).shouldBeFalse()
                     }
                 }
             }
@@ -82,9 +78,9 @@ class ProcessingEngineSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val tasks = fixture.tasks
-                        val first = enqueueTask(tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueueTask(tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
-                        val third = enqueueTask(tasks, fixture.workDirectories, "third.wav", queuePosition = 2, createdAt = 3)
+                        val first = enqueueTask(tasks, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(tasks, "second.wav", queuePosition = 1, createdAt = 2)
+                        val third = enqueueTask(tasks, "third.wav", queuePosition = 2, createdAt = 3)
 
                         val release = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = release
@@ -117,7 +113,7 @@ class ProcessingEngineSpec :
                         withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { events ->
                             val fixture = engineUnderTest(dataDir, db)
                             val task =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "tagged.wav", queuePosition = 0, createdAt = 1)
+                                enqueueTask(fixture.tasks, "tagged.wav", queuePosition = 0, createdAt = 1)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe task
 
@@ -140,7 +136,6 @@ class ProcessingEngineSpec :
                                 val task =
                                     enqueueTask(
                                         fixture.tasks,
-                                        fixture.workDirectories,
                                         "switching.wav",
                                         queuePosition = 0,
                                         createdAt = 1,
@@ -170,7 +165,7 @@ class ProcessingEngineSpec :
                         withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { events ->
                             val fixture = engineUnderTest(dataDir, db)
                             val task =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "reader.wav", queuePosition = 0, createdAt = 1)
+                                enqueueTask(fixture.tasks, "reader.wav", queuePosition = 0, createdAt = 1)
                             fixture.transcriber.progressScript = listOf(0.5, 1.0)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe task
@@ -190,7 +185,7 @@ class ProcessingEngineSpec :
                         withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { events ->
                             val fixture = engineUnderTest(dataDir, db)
                             val task =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "failing.wav", queuePosition = 0, createdAt = 1)
+                                enqueueTask(fixture.tasks, "failing.wav", queuePosition = 0, createdAt = 1)
                             fixture.transcriber.failNext = TranscriptionException("boom")
                             fixture.engine.start()
 
@@ -218,9 +213,9 @@ class ProcessingEngineSpec :
                             withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { transcriberEvents ->
                                 val fixture = engineUnderTest(dataDir, db)
                                 val first =
-                                    enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                                    enqueueTask(fixture.tasks, "first.wav", queuePosition = 0, createdAt = 1)
                                 val second =
-                                    enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                                    enqueueTask(fixture.tasks, "second.wav", queuePosition = 1, createdAt = 2)
                                 val hold = CompletableDeferred<Unit>()
                                 fixture.transcriber.hold = hold
                                 fixture.engine.start()
@@ -260,8 +255,8 @@ class ProcessingEngineSpec :
                 then("each task's work runs in a coroutine named task-<its id>") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        val first = enqueueTask(fixture.tasks, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(fixture.tasks, "second.wav", queuePosition = 1, createdAt = 2)
                         fixture.engine.start()
                         fixture.completed.receive() shouldBe first
                         fixture.completed.receive() shouldBe second
@@ -274,65 +269,41 @@ class ProcessingEngineSpec :
             }
         }
 
-        given("a leftover work directory the startup sweep cannot remove, and one queued task") {
-            `when`("the engine starts, and the device probe fails while the task is suspended") {
-                then("the sweep's and the probe's warnings carry no taskId key; the task's own lines carry its id").config(
-                    // Root bypasses directory permissions, so the premise does not hold (containers, CI).
-                    enabledIf = { System.getProperty("user.name") != "root" },
-                ) {
+        given("one queued task and a device probe that fails while the task is suspended") {
+            `when`("the engine starts and the probe runs") {
+                then("the probe's warning carries no taskId key; the task's own lines carry its id") {
                     withEngineDatabase { dataDir, db ->
-                        withCapturedLogs("stt.engine.ProcessingEngine") { engineWarnings ->
-                            withCapturedLogs("stt.transcribe.DeviceProbe") { probeWarnings ->
-                                withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { transcriberEvents ->
-                                    val fixture = engineUnderTest(dataDir, db)
-                                    // No task 999 exists, so the sweep deletes its directory; a read-only
-                                    // subdirectory makes that fail, and the sweep warns and skips it.
-                                    val locked = fixture.workDirectories.workDir(999).resolve("locked")
-                                    Files.createDirectories(locked)
-                                    Files.writeString(locked.resolve("kept"), "x")
-                                    Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("r-x------"))
-                                    try {
-                                        val task =
-                                            enqueueTask(
-                                                fixture.tasks,
-                                                fixture.workDirectories,
-                                                "task.wav",
-                                                queuePosition = 0,
-                                                createdAt = 1,
-                                            )
-                                        val hold = CompletableDeferred<Unit>()
-                                        fixture.transcriber.hold = hold
-                                        fixture.engine.start()
-                                        taskIdOf(
-                                            fixture.transcriber.entered
-                                                .receive()
-                                                .parent,
-                                        ) shouldBe task
+                        withCapturedLogs("stt.transcribe.DeviceProbe") { probeWarnings ->
+                            withCapturedLogs("stt.engine.FakeTranscriber", Level.INFO) { transcriberEvents ->
+                                val fixture = engineUnderTest(dataDir, db)
+                                val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+                                val hold = CompletableDeferred<Unit>()
+                                fixture.transcriber.hold = hold
+                                fixture.engine.start()
+                                taskIdOf(
+                                    fixture.transcriber.entered
+                                        .receive()
+                                        .parent,
+                                ) shouldBe task
 
-                                        // The task's job is suspended; the probe (no whisper-cli: the spawn throws,
-                                        // no process starts) runs in a coroutine of the engine's scope.
-                                        val probe =
-                                            DeviceProbe(
-                                                ProcessRunner(2.seconds) { throw IOException("no whisper-cli") },
-                                                Path.of("/m.bin"),
-                                                "/whisper-cli",
-                                            )
-                                        backgroundScope.launch { probe.gpus() }.join()
-                                        hold.complete(Unit)
-                                        fixture.completed.receive() shouldBe task
+                                // The task's job is suspended; the probe (no whisper-cli: the spawn throws,
+                                // no process starts) runs in a coroutine of the engine's scope.
+                                val probe =
+                                    DeviceProbe(
+                                        ProcessRunner(2.seconds) { throw IOException("no whisper-cli") },
+                                        Path.of("/m.bin"),
+                                        "/whisper-cli",
+                                    )
+                                backgroundScope.launch { probe.gpus() }.join()
+                                hold.complete(Unit)
+                                fixture.completed.receive() shouldBe task
 
-                                        engineWarnings.map { it.formattedMessage.substringBefore(";") } shouldBe
-                                            listOf("Could not clean up the work directory ${fixture.workDirectories.workDir(999)}")
-                                        probeWarnings.map { it.formattedMessage.substringBefore(";") } shouldBe
-                                            listOf("Device probe failed")
-                                        (engineWarnings + probeWarnings).forEach { event ->
-                                            event.getMDCPropertyMap() shouldNotContainKey "taskId"
-                                        }
-                                        assertTaskIdOnEveryEvent(transcriberEvents, task)
-                                    } finally {
-                                        Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwx------"))
-                                    }
+                                probeWarnings.map { it.formattedMessage.substringBefore(";") } shouldBe
+                                    listOf("Device probe failed")
+                                probeWarnings.forEach { event ->
+                                    event.getMDCPropertyMap() shouldNotContainKey "taskId"
                                 }
+                                assertTaskIdOnEveryEvent(transcriberEvents, task)
                             }
                         }
                     }
@@ -345,7 +316,7 @@ class ProcessingEngineSpec :
                 then("the worker runs as engine-worker beside task-<id>, and stays after the task's job is gone") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         val hold = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = hold
                         fixture.engine.start()

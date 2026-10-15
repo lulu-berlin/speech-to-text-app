@@ -10,92 +10,45 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
-import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
-import stt.audio.AudioJoiner
-import stt.audio.PlannedChunk
-import stt.db.ChunkRepository
-import stt.db.Database
-import stt.db.QueueStateRepository
-import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
-import stt.db.exportedChunks
-import stt.db.queuedTask
-import stt.queue.TaskStatus
-import java.nio.file.Files
-import java.nio.file.Path
 
 class AudioRangeSpec :
     BehaviorSpec({
 
-        /** A joiner that records its calls and writes a fixed payload to the target: the route's seam. */
-        class RecordingJoiner : AudioJoiner {
-            val payload = ByteArray(100) { ('a'.code + it % 26).toByte() }
-
-            override suspend fun join(
-                taskId: Long,
-                target: Path,
-            ) {
-                Files.write(target, payload)
-            }
-        }
-
-        given("a task with a cached joined FLAC of 100 bytes (queue paused)") {
+        given("a task with a stored canonical clip of 100 bytes (queue paused)") {
             `when`("requesting byte ranges of its audio") {
                 then("206 is returned with the requested bytes and the right Content-Range") {
                     val dataDir = tempdir("stt-data").toPath()
-                    val id =
-                        Database.open(dataDir).use { db ->
-                            QueueStateRepository(db).setPaused(true)
-                            val workDirectories = TaskWorkDirectories(dataDir)
-                            val id =
-                                TaskRepository(db, workDirectories).createFromUpload(
-                                    queuedTask("memo.wav", createdAt = 1).copy(
-                                        queuePosition = 0,
-                                        status = TaskStatus.COMPLETED,
-                                        finishedAt = 1_000,
-                                    ),
-                                    "audio bytes".toByteArray().inputStream(),
-                                )
-                            ChunkRepository(db).storePlan(
-                                id,
-                                exportedChunks(dataDir, "task-$id", PlannedChunk(0L, 1_000L)),
-                            )
-                            id
-                        }
-                    val joiner = RecordingJoiner()
+                    val clip = testClip()
+                    val id = taskWithTestClip(dataDir, clip)
 
                     testApplication {
-                        application {
-                            dependencies.provide<AudioJoiner> { joiner }
-                            sttApp(stt.config.testConfig(dataDir))
-                        }
+                        application { sttApp(stt.config.testConfig(dataDir)) }
 
-                        // No range: the whole file, as before.
+                        // No range: the whole clip, as before.
                         val whole = client.get("/api/tasks/$id/audio")
                         whole.status shouldBe HttpStatusCode.OK
                         whole.contentType()?.withoutParameters() shouldBe ContentType.parse("audio/flac")
-                        whole.bodyAsBytes() shouldBe joiner.payload
+                        whole.bodyAsBytes() shouldBe clip.bytes
 
-                        // Compose the expected slice from the payload itself and check headers by hand.
+                        clip.bytes.size shouldBe 100
+                        val size = clip.bytes.size
+
+                        // Compose the expected slice from the clip itself and check headers by hand.
                         suspend fun range(
                             value: String,
                             start: Long,
                             end: Long,
-                            status: HttpStatusCode = HttpStatusCode.PartialContent,
                         ) {
-                            val response =
-                                client.get("/api/tasks/$id/audio") {
-                                    header(HttpHeaders.Range, value)
-                                }
-                            response.status shouldBe status
-                            if (status == HttpStatusCode.PartialContent) {
-                                response.headers[HttpHeaders.ContentRange] shouldBe "bytes $start-$end/${joiner.payload.size}"
-                                response.bodyAsBytes() shouldBe joiner.payload.copyOfRange(start.toInt(), end.toInt() + 1)
-                            }
+                            val response = client.get("/api/tasks/$id/audio") { header(HttpHeaders.Range, value) }
+                            response.status shouldBe HttpStatusCode.PartialContent
+                            response.headers[HttpHeaders.ContentRange] shouldBe "bytes $start-$end/$size"
+                            response.bodyAsBytes() shouldBe clip.bytes.copyOfRange(start.toInt(), (end + 1).toInt())
                         }
 
                         range("bytes=0-3", 0, 3)
+                        // Crosses the boundary between the first and second stored rows (offset 50).
+                        range("bytes=45-55", 45, 55)
                         range("bytes=90-", 90, 99)
                         range("bytes=-8", 92, 99)
                         range("bytes=0-0", 0, 0)
@@ -106,7 +59,31 @@ class AudioRangeSpec :
                                 header(HttpHeaders.Range, "bytes=200-300")
                             }
                         unsatisfiable.status shouldBe HttpStatusCode.RequestedRangeNotSatisfiable
-                        unsatisfiable.headers[HttpHeaders.ContentRange] shouldBe "bytes */${joiner.payload.size}"
+                        unsatisfiable.headers[HttpHeaders.ContentRange] shouldBe "bytes */$size"
+                    }
+                }
+            }
+        }
+
+        given("a task with a stored canonical clip of 100 bytes (queue paused), requested whole and by range") {
+            `when`("its audio is served")
+            {
+                then("each response declares its length: 100 for the whole clip, 11 for bytes=45-55") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val clip = testClip()
+                    val id = taskWithTestClip(dataDir, clip)
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+
+                        val whole = client.get("/api/tasks/$id/audio")
+                        whole.headers[HttpHeaders.ContentLength] shouldBe "100"
+                        whole.bodyAsBytes().size shouldBe 100
+
+                        // bytes=45-55 is 55 − 45 + 1 = 11 bytes.
+                        val part = client.get("/api/tasks/$id/audio") { header(HttpHeaders.Range, "bytes=45-55") }
+                        part.headers[HttpHeaders.ContentLength] shouldBe "11"
+                        part.bodyAsBytes().size shouldBe 11
                     }
                 }
             }

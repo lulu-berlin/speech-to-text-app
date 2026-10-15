@@ -10,7 +10,6 @@ import kotlinx.coroutines.delay
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 import java.util.concurrent.atomic.AtomicBoolean
@@ -27,7 +26,7 @@ class EngineShutdownNormalStopSpec :
                     val id =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            TaskRepository(db, TaskWorkDirectories(dataDir)).insert(
+                            TaskRepository(db).insert(
                                 queuedTask("crashed.wav", createdAt = 1).copy(
                                     status = TaskStatus.RUNNING,
                                     queuePosition = 0,
@@ -43,7 +42,7 @@ class EngineShutdownNormalStopSpec :
                         application { sttApp(stt.config.testConfig(dataDir)) }
                         startApplication()
                         db = application.dependencies.resolve<Database>()
-                        val tasks = TaskRepository(db, TaskWorkDirectories(dataDir))
+                        val tasks = TaskRepository(db)
 
                         // Nothing in the test touches the engine: only the app's startup can recover the
                         // task. The paused queue keeps it from starting, so no real ffmpeg runs.

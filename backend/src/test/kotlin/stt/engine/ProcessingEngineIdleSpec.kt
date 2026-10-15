@@ -25,7 +25,7 @@ class ProcessingEngineIdleSpec :
                         fixture.chunker.workDirs.shouldBeEmpty()
                         val idleTime = testScheduler.currentTime
 
-                        val id = enqueueTask(fixture.tasks, fixture.workDirectories, "idle.wav", queuePosition = 0, createdAt = 1)
+                        val id = enqueueTask(fixture.tasks, "idle.wav", queuePosition = 0, createdAt = 1)
                         fixture.engine.wake()
 
                         fixture.completed.receive() shouldBe id

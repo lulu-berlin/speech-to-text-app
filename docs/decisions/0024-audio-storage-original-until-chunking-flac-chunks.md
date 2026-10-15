@@ -1,6 +1,6 @@
 # 0024 — Audio storage: original upload kept only until chunking, chunks stored as FLAC
 
-Status: accepted, playback join amended by [0045](0045-joined-playback-flac-reencoded.md) · Date: 2026-10-07 · Supersedes: [0005](0005-audio-as-sqlite-blob.md), [0018](0018-audio-payload-paged-blobs.md)
+Status: superseded by [0052](0052-canonical-clip-in-database-chunks-as-windows.md) (was accepted, playback join amended by [0045](0045-joined-playback-flac-reencoded.md)) · Date: 2026-10-07 · Supersedes: [0005](0005-audio-as-sqlite-blob.md), [0018](0018-audio-payload-paged-blobs.md)
 
 ## Context
 ADR 0005 stored the uploaded audio as a SQLite BLOB; ADR 0018 paged it into 1 MiB `audio_parts` rows and kept it after completion for history playback, so the database held every original upload in full. Processing only ever uses the audio as 16 kHz mono: whisper-cli transcribes ~5-minute chunks (ADR 0004), and the speaker model reads 16 kHz PCM (ADR 0003). Playback of speech does not need the original quality.

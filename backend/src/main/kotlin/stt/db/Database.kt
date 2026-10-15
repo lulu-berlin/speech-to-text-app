@@ -9,6 +9,8 @@ import org.jetbrains.exposed.v1.core.DatabaseConfig
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.sqlite.SQLiteConfig
+import stt.db.migration.V10__BackfillCanonicalClip
+import stt.db.migration.V12__GiveUpUnmigratedTasks
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import java.nio.file.Files
@@ -34,8 +36,6 @@ class Database private constructor(
      */
     internal val connection: Connection,
     url: String,
-    /** `$STT_DATA_DIR/tmp`: upload spool files live here until they are moved into a task's work directory after their commit, or deleted (ADR 0024). */
-    internal val tmpDir: Path,
     // One connection carries one transaction at a time: a concurrent commit or rollback
     // would otherwise also commit or roll back the other caller's work. Not reentrant:
     // a transaction body must not call writeTransaction() again. Injectable so a test can observe it.
@@ -100,41 +100,44 @@ class Database private constructor(
         ): Database =
             withContext(Dispatchers.IO) {
                 val url = "jdbc:sqlite:${dataDir.resolve("stt.db")}"
-                val tmpDir = dataDir.resolve("tmp")
-                val connection = openConnection(dataDir, tmpDir, url, journalSizeLimit)
+                val connection = openConnection(dataDir, url, journalSizeLimit)
                 try {
                     Flyway
                         .configure()
                         .dataSource(url, null, null)
-                        .load()
+                        // SQL migrations are resources under db/migration. The class migrations need the data
+                        // directory and are registered here (ADR 0051): V10's clip backfill, whose scratch is the app's
+                        // own, which every start empties, and V12, which gives up on tasks whose audio was not migrated
+                        // and removes the pre-item-44 work/ and tmp/ directories.
+                        .locations("classpath:db/migration")
+                        .javaMigrations(
+                            V10__BackfillCanonicalClip(ScratchDir(dataDir).dir.resolve("backfill")),
+                            V12__GiveUpUnmigratedTasks(dataDir),
+                        ).load()
                         .migrate()
                 } catch (e: Exception) {
                     connection.close()
                     throw dataDirFailure(MIGRATION_FAILED_ERROR, dataDir, e)
                 }
-                Database(connection, url, tmpDir, transactionLock)
+                Database(connection, url, transactionLock)
             }
 
         /** Connects inside the prepared data directory, then applies the pragmas in ADR 0017 order. */
         private fun openConnection(
             dataDir: Path,
-            tmpDir: Path,
             url: String,
             journalSizeLimit: Long,
-        ): Connection = connectInDataDir(dataDir, tmpDir, url).also { applyPragmas(it, dataDir, journalSizeLimit) }
+        ): Connection = connectInDataDir(dataDir, url).also { applyPragmas(it, dataDir, journalSizeLimit) }
 
         /**
-         * Creates [dataDir] and [tmpDir] when missing, removes the spool files a crashed upload left
-         * in [tmpDir], and connects to [url]; any failure names STT_DATA_DIR.
+         * Creates [dataDir] when missing and connects to [url]; any failure names STT_DATA_DIR.
          */
         private fun connectInDataDir(
             dataDir: Path,
-            tmpDir: Path,
             url: String,
         ): Connection =
             try {
-                Files.createDirectories(tmpDir)
-                Files.list(tmpDir).use { stale -> stale.forEach(Files::delete) }
+                Files.createDirectories(dataDir)
                 DriverManager.getConnection(url)
             } catch (e: Exception) {
                 throw dataDirFailure(DATA_DIR_UNUSABLE_ERROR, dataDir, e)

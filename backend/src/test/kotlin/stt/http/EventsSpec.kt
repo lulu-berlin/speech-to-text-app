@@ -10,7 +10,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 
@@ -28,7 +27,7 @@ class EventsSpec :
                     val (queued, completed) =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            val tasks = TaskRepository(db, TaskWorkDirectories(dataDir))
+                            val tasks = TaskRepository(db)
                             val queued =
                                 tasks.createFromUpload(
                                     queuedTask("a.wav", createdAt = 1).copy(queuePosition = 0),

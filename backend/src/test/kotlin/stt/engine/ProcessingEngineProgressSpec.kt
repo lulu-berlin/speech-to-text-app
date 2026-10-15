@@ -11,7 +11,7 @@ class ProcessingEngineProgressSpec :
                 then("it reports progress weighted by chunk duration as task-progress and ends at 1") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         fixture.chunker.chunkCount = 2
                         fixture.transcriber.progressScript = listOf(0.0, 0.5, 1.0)
 

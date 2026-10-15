@@ -25,9 +25,9 @@ class ProcessingEngineSettingsSpec :
                         val defaults = settings.get()
                         settings.update(defaults.copy(device = Device.Gpu(1), threads = 6))
                         val first =
-                            enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", 0, 1, speakersMode = SpeakersMode.AUTO)
+                            enqueueTask(fixture.tasks, "first.wav", 0, 1, speakersMode = SpeakersMode.AUTO)
                         val second =
-                            enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", 1, 2, speakersMode = SpeakersMode.AUTO)
+                            enqueueTask(fixture.tasks, "second.wav", 1, 2, speakersMode = SpeakersMode.AUTO)
                         fixture.chunker.chunkCount = 2
                         val hello = listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello "))
                         fixture.transcriber.segmentsByTask = mapOf(first to hello, second to hello)
@@ -63,8 +63,8 @@ class ProcessingEngineSettingsSpec :
                         val fixture = engineUnderTest(dataDir, db)
                         val settings = SettingsRepository(db)
                         settings.update(settings.get().copy(device = Device.Gpu(1), threads = 6))
-                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", 0, 1)
-                        val second = enqueueTask(fixture.tasks, fixture.workDirectories, "second.wav", 1, 2)
+                        val first = enqueueTask(fixture.tasks, "first.wav", 0, 1)
+                        val second = enqueueTask(fixture.tasks, "second.wav", 1, 2)
                         fixture.chunker.chunkCount = 2
                         fixture.transcriber.gpuUnavailable = true
 
