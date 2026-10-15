@@ -106,6 +106,32 @@ export function rowOf(page: Page, filename: string): Locator {
   return page.getByRole('listitem').filter({ hasText: filename });
 }
 
+// The terminal badge a task legitimately has when a command raced its finish: COMPLETED (the run won) or
+// CANCELED (the command won). FAILED, and a task that never left the queue, fail the assertion.
+export async function expectCompletedOrCanceled(
+  page: Page,
+  filename: string,
+  timeout = 120_000,
+): Promise<void> {
+  const card = rowOf(page, filename);
+  await expect(
+    card.getByText('COMPLETED', { exact: true }).or(card.getByText('CANCELED', { exact: true })),
+  ).toBeVisible({ timeout });
+}
+
+// Runs a row action a task finishing can legally interrupt: [step] is attempted, and a failure is accepted
+// only if [row] has left the queue by then (its absence is asserted, so anything else stays loud). Returns
+// whether the step ran, so a caller can end a loop on a legal completion.
+export async function unlessGone(row: Locator, step: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await step();
+    return true;
+  } catch {
+    await expect(row).toHaveCount(0);
+    return false;
+  }
+}
+
 // The task id behind a History card, from its link to the transcript.
 export async function taskIdOf(page: Page, filename: string): Promise<string> {
   const href = await rowOf(page, filename)

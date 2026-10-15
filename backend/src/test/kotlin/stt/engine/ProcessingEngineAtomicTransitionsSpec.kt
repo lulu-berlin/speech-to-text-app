@@ -296,10 +296,17 @@ class ProcessingEngineAtomicTransitionsSpec :
                             fixture.tasks.startedPaused() shouldBe null
 
                             // The run's terminal reopened its gate: the next task starts and diarizes freely.
-                            // Both completions arrive (the worker's own publish for A and B's); the order
-                            // of those two events is not what this test pins.
-                            val completedIds = listOf(fixture.completed.receive(), fixture.completed.receive())
-                            completedIds.toSet() shouldBe setOf(first, next)
+                            // A's COMPLETED can be published more than once — the accepted pause's publish
+                            // reads the row back, and the manual setCompleted (which does not publish) can
+                            // commit COMPLETED before that read — so which of the two publishes lands first,
+                            // and how many land, is scheduling, not behaviour. Wait for both ids to appear in
+                            // the events; duplicates and order are tolerated, an absent id is not.
+                            val published = mutableSetOf<Long>()
+                            pumpUntil(10.seconds) {
+                                published += drain(fixture.completed)
+                                published.containsAll(setOf(first, next))
+                            }
+                            published shouldBe setOf(first, next)
                             fixture.diarizer.passedGate shouldBe true
                             statusOf(fixture, next) shouldBe TaskStatus.COMPLETED
                             held.outcome
