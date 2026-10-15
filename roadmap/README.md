@@ -100,7 +100,7 @@ graph TD
   22 --> 52[52 edit transcription]
   12 --> 52
   11 --> 43[43 diarization memory]
-  38 --> 44[44 audio in database]
+  38 --> 44[44 audio in database ✓]:::done
   11 --> 44
   11 --> 45[45 selectable GPUs ✓]:::done
   32 --> 45
@@ -156,7 +156,7 @@ graph TD
 | [41 — Upload hardening: duplicate race, size limit, spool cleanup](41-upload-hardening.md) | draft | 12 |
 | [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | spec-approved | 11 |
 | [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
-| [44 — Store the full audio in the database; drop the file cache](44-audio-in-database.md) | spec-approved | 11, 12, 38 |
+| [44 — Store the full audio in the database; drop the file cache](../docs/specs/audio-in-database.md) | done | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md) | done | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
 | [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](../docs/specs/atomic-transitions-spec-flaky.md) | done | 11 |

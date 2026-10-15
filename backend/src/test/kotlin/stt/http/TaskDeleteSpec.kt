@@ -2,14 +2,12 @@ package stt.http
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
-import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.ktor.client.request.delete
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
-import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -17,7 +15,6 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
-import kotlinx.coroutines.delay
 import stt.audio.PlannedChunk
 import stt.db.ChunkRepository
 import stt.db.Database
@@ -25,19 +22,13 @@ import stt.db.QueueStateRepository
 import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
-import stt.db.exportedChunks
 import stt.db.queuedTask
+import stt.db.storePlan
 import stt.queue.TaskStatus
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 class TaskDeleteSpec :
     BehaviorSpec({
-        given("a finished task holding segments, chunk audio, a work directory and a cached audio file") {
+        given("a finished task holding segments and chunk audio") {
             `when`("deleting it") {
                 then("204 is returned, everything is gone, and the same file can be uploaded again") {
                     val bytes = "THE DELETE TEST AUDIO".repeat(10).toByteArray()
@@ -45,8 +36,7 @@ class TaskDeleteSpec :
                     var id = 0L
                     Database.open(dataDir).use { db ->
                         QueueStateRepository(db).setPaused(true)
-                        val workDirectories = TaskWorkDirectories(dataDir)
-                        val tasks = TaskRepository(db, workDirectories)
+                        val tasks = TaskRepository(db)
                         id =
                             tasks.createFromUpload(
                                 queuedTask("doomed.wav", createdAt = 1).copy(
@@ -56,8 +46,7 @@ class TaskDeleteSpec :
                                 ),
                                 bytes.inputStream(),
                             )
-                        val chunkFiles = exportedChunks(dataDir, "task-$id", PlannedChunk(0L, 1_000L), PlannedChunk(1_000L, 2_000L))
-                        ChunkRepository(db).storePlan(id, chunkFiles)
+                        storePlan(db, id, listOf(PlannedChunk(0L, 1_000L), PlannedChunk(1_000L, 2_000L)))
                         SegmentRepository(db).insertAll(
                             id,
                             listOf(
@@ -65,40 +54,20 @@ class TaskDeleteSpec :
                                 Segment(chunkIdx = 1, seq = 0, startMs = 1_000, endMs = 1_500, text = "world", speakerId = null),
                             ),
                         )
-                        // What `GET /api/tasks/{id}/audio` would have cached (item 15 builds the cache).
-                        Files.write(workDirectories.cachedAudio(id), "cached flac bytes".toByteArray())
                         id
                     }
 
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }
-                        val workDirectories = TaskWorkDirectories(dataDir)
-                        // The engine's startup sweep removes a COMPLETED task's work directory — but only
-                        // once the first request boots the application (cycle 11: running DELETE first
-                        // masked the bug, because the sweep had removed the seeded directory before the
-                        // delete path ran). Boot the app with a request, and wait until the sweep has
-                        // verifiably run on the seeded directory.
-                        client.get("/api/queue")
-                        val deadline = TimeSource.Monotonic.markNow() + 5.seconds
-                        while (Files.exists(workDirectories.workDir(id)) && deadline.hasNotPassedNow()) {
-                            delay(20.milliseconds)
-                        }
-                        Files.exists(workDirectories.workDir(id)).shouldBeFalse()
-                        // Now only the delete path can remove this directory.
-                        Files.createDirectories(workDirectories.source(id).parent)
-                        Files.writeString(workDirectories.source(id), "the seeded original")
                         val response = client.delete("/api/tasks/$id")
                         response.status shouldBe HttpStatusCode.NoContent
                         response.bodyAsText().shouldBe("")
                     }
 
                     Database.open(dataDir).use { db ->
-                        val workDirectories = TaskWorkDirectories(dataDir)
-                        TaskRepository(db, workDirectories).find(id).shouldBeNull()
+                        TaskRepository(db).find(id).shouldBeNull()
                         SegmentRepository(db).findByTask(id).shouldBeEmpty()
                         ChunkRepository(db).findByTask(id).shouldBeEmpty()
-                        Files.exists(workDirectories.workDir(id)).shouldBeFalse()
-                        Files.exists(workDirectories.cachedAudio(id)).shouldBeFalse()
                     }
 
                     // The same bytes are no longer a duplicate: the `audio` row went with the task.

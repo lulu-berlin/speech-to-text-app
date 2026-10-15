@@ -16,7 +16,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 import java.nio.file.Path
@@ -31,7 +30,7 @@ class TaskCommandsIllegalSpec :
         ): Long =
             Database.open(dataDir).use { db ->
                 QueueStateRepository(db).setPaused(true)
-                TaskRepository(db, TaskWorkDirectories(dataDir)).createFromUpload(
+                TaskRepository(db).createFromUpload(
                     queuedTask(filename, createdAt = 1).copy(
                         queuePosition = 0,
                         status = status,

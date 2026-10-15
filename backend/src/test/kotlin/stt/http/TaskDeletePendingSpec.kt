@@ -17,7 +17,6 @@ import kotlinx.coroutines.withTimeout
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.engine.Event
 import stt.engine.ProcessingEngine
@@ -33,7 +32,7 @@ class TaskDeletePendingSpec :
                     val id =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            TaskRepository(db, TaskWorkDirectories(dataDir)).createFromUpload(
+                            TaskRepository(db).createFromUpload(
                                 queuedTask("pending.wav", createdAt = 1).copy(queuePosition = 0),
                                 "pending bytes".toByteArray().inputStream(),
                             )
@@ -70,7 +69,7 @@ class TaskDeletePendingSpec :
                     }
 
                     Database.open(dataDir).use { db ->
-                        TaskRepository(db, TaskWorkDirectories(dataDir)).find(id) shouldBe null
+                        TaskRepository(db).find(id) shouldBe null
                     }
                 }
             }

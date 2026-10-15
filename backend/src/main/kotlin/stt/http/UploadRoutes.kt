@@ -11,21 +11,21 @@ import io.ktor.server.routing.routing
 import stt.config.Config
 import stt.db.AudioRepository
 import stt.db.Database
-import stt.db.SpooledUpload
+import stt.db.StagedUpload
 import stt.db.TaskRepository
-import stt.db.spoolChannel
+import stt.db.discardStaged
+import stt.db.stageChannel
 import stt.engine.ProcessingEngine
-import java.nio.file.Files
 
 /**
  * The upload endpoint (item 12): a multipart POST /api/tasks with a `file` part and the optional form fields
- * `language`, `speakers` and `maxSpeakers`. The file part is consumed into the spool at parse time, window by
- * window ([Database.spoolChannel], ADR 0024) — never read fully into memory — and [UploadRequest] validates
- * the request afterwards; a rejection is a 400 with its error code and the spool is discarded. A valid
- * request is decided with the spool's own digest: the bytes are already known → `409 duplicate-audio` naming
- * the existing task (nothing stored); otherwise the task and its audio metadata are committed in one
- * transaction ([TaskRepository.createFromSpooled]) and the original moved into the task's work directory (no
- * audio bytes reach the database). A created task is announced and taken at once ([ProcessingEngine.taskCreated]:
+ * `language`, `speakers` and `maxSpeakers`. The file part is consumed into the database at parse time, window by
+ * window ([Database.stageChannel], item 44) — never read fully into memory, never written to a file — and
+ * [UploadRequest] validates the request afterwards; a rejection is a 400 with its error code and the staged
+ * original is discarded. A valid request is decided with the upload's own digest: the bytes are already known →
+ * `409 duplicate-audio` naming the existing task (nothing stored); otherwise the task, its audio metadata and its
+ * original are committed in one transaction ([TaskRepository.createFromStaged]). A created task is announced and
+ * taken at once ([ProcessingEngine.taskCreated]:
  * `task-updated` and `queue-updated` on the events stream, then the worker is woken). Answers `201` with the
  * created task.
  */
@@ -38,7 +38,7 @@ fun Application.uploadRoutes(config: Config) {
         post("/api/tasks") {
             var filename: String? = null
             var contentType: String? = null
-            var spooled: SpooledUpload? = null
+            var staged: StagedUpload? = null
             val fields = mutableMapOf<String, String>()
             val multipart = call.receiveMultipart()
             while (true) {
@@ -48,7 +48,7 @@ fun Application.uploadRoutes(config: Config) {
                         filename = part.originalFileName
                         contentType = part.contentType?.toString()
                         // Consumed here, in windows, so the channel is fully read while the part is alive.
-                        spooled = db.spoolChannel(part.provider())
+                        staged = db.stageChannel(part.provider())
                     }
 
                     is PartData.FormItem -> {
@@ -71,7 +71,7 @@ fun Application.uploadRoutes(config: Config) {
                     is UploadRequest.Either.Valid -> {
                         // A Valid request always carried a file part (UploadRequest rejects a missing one).
                         val file =
-                            spooled ?: return@post call.respondError(
+                            staged ?: return@post call.respondError(
                                 HttpStatusCode.BadRequest,
                                 "missing-file",
                                 "No file part named \"file\" in the multipart body",
@@ -93,7 +93,7 @@ fun Application.uploadRoutes(config: Config) {
                                     createdAt = System.currentTimeMillis(),
                                     queuePosition = tasks.nextQueuePosition(),
                                 )
-                            val id = tasks.createFromSpooled(task, file)
+                            val id = tasks.createFromStaged(task, file)
                             // A new upload is an engine event: clients learn of it only from the events stream,
                             // and the worker suspends while the queue is empty, so it must be woken here (item 29).
                             engine.taskCreated(id)
@@ -102,8 +102,8 @@ fun Application.uploadRoutes(config: Config) {
                     }
                 }
             } finally {
-                // Deletes the spool unless createFromSpooled already moved it into the task's work directory.
-                spooled?.let { Files.deleteIfExists(it.file) }
+                // Discards the staged original unless createFromStaged already attached it to its task.
+                staged?.let { db.discardStaged(it) }
             }
         }
     }

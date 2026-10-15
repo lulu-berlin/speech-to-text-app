@@ -3,13 +3,13 @@ package stt.audio
 import java.nio.file.Path
 
 /**
- * Decodes a source, plans its chunks at silences, and exports each chunk as FLAC (ADR 0004, ADR 0024).
- * The seam the engine drives (roadmap item 11); [AudioChunker] is the ffmpeg implementation.
+ * Encodes a source to the canonical clip and plans its chunks at silences (ADR 0004, item 44). The seam the engine
+ * drives (roadmap item 11); [AudioChunker] is the ffmpeg implementation.
  */
 interface Chunker {
-    /** Chunks [source] into FLAC files in [workDir] and returns the decoded duration and the exported chunks. */
+    /** Chunks [source], using [scratchDir] for its transient files; returns the duration, the windows and the clip. */
     suspend fun chunk(
         source: Path,
-        workDir: Path,
+        scratchDir: Path,
     ): ChunkedAudio
 }

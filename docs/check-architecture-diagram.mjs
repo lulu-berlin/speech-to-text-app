@@ -26,7 +26,7 @@ const boxes = {
   ],
   DB: [[`${STT}/db/Database.kt`, /resolve\("stt\.db"\)/]],
   Speaker: [[`${STT}/diarization/SpeakerModel.kt`, /OrtEnvironment\.getEnvironment\(\)/]],
-  Files: [[`${STT}/db/TaskWorkDirectories.kt`, /resolve\("work"\)[\s\S]*resolve\("tmp"\)/]],
+  Files: [[`${STT}/db/ScratchDir.kt`, /System\.getProperty\("java\.io\.tmpdir"\)/]],
   FFmpeg: [[`${STT}/audio/Ffmpeg.kt`, /"ffmpeg"/]],
   Whisper: [[`${STT}/transcribe/ChunkTranscriber.kt`, /"whisper-cli"/]],
 };
@@ -46,22 +46,13 @@ const arrows = {
     [`${STT}/http/QueueRoutes.kt`, /engine\./],
   ],
   'Routes->DB': [[`${STT}/http/TaskRoutes.kt`, /TaskRepository by dependencies/]],
-  'Routes->Files': [
-    [`${STT}/http/UploadRoutes.kt`, /spoolChannel/],
-    [`${STT}/http/AudioRoutes.kt`, /cache\.getOrBuild\(/],
-  ],
-  'Routes->FFmpeg': [
-    [`${STT}/http/AudioRoutes.kt`, /joiner\.join\(/],
-    [`${STT}/http/SttApp.kt`, /FfmpegAudioJoiner\(/],
-    [`${STT}/audio/FfmpegAudioJoiner.kt`, /FFMPEG/],
-  ],
   'Engine->DB': [[ENGINE, /private val tasks: TaskRepository/]],
   'Engine->SSE': [
     [ENGINE, /_events\.emit\(/],
     [`${STT}/http/EventStream.kt`, /ProcessingEngine/],
     [`${STT}/http/EventsRoutes.kt`, /EventStream by dependencies/],
   ],
-  'Engine->Files': [[ENGINE, /workDirectories\.workDir\(/]],
+  'Engine->Files': [[ENGINE, /scratchDir\.(taskDir|chunkerDir|clipFile)\(/]],
   'Engine->FFmpeg': [
     [ENGINE, /chunker\.chunk\(/],
     [ENGINE_MODULE, /AudioChunker\(/],

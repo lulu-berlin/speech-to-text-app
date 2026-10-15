@@ -16,12 +16,16 @@ import stt.config.Device
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSegment
 import stt.transcribe.WhisperSettings
+import java.nio.file.Files
 import java.nio.file.Path
 
 /** A [Transcriber] that returns no segments and never spawns whisper-cli; records every call. */
 internal class FakeTranscriber : Transcriber {
     /** The audio file of every call, in call order. */
     val audioFiles = mutableListOf<Path>()
+
+    /** The number of `*.flac` inputs beside the audio file when each call started (item 44: exactly one). */
+    val inputsAtCall = mutableListOf<Int>()
 
     /** The whisper-cli settings of every call, in call order (item 32: device and threads per run). */
     val settings = mutableListOf<WhisperSettings>()
@@ -85,6 +89,9 @@ internal class FakeTranscriber : Transcriber {
             // A line logged from inside Dispatchers.IO — the chunk/file work thread (item 46's dispatcher test) —
             // the MDC must travel with the coroutine across the switch.
             withContext(Dispatchers.IO) { logger.info("chunk io for {}", audio) }
+            inputsAtCall.add(
+                Files.list(audio.parent).use { files -> files.filter { it.fileName.toString().endsWith(".flac") }.count().toInt() },
+            )
             audioFiles.add(audio)
             this.settings.add(settings)
             entered.send(audio)

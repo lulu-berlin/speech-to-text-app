@@ -1,67 +1,33 @@
 package stt.db
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
-import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
-import stt.audio.ExportedChunk
-import java.io.OutputStream
-import java.nio.file.Files
+import stt.audio.PlannedChunk
 
 class ChunkRepository(
     private val db: Database,
 ) {
     /**
-     * Stores [taskId]'s chunk plan together with every chunk's FLAC in one write transaction (ADR 0024):
-     * a chunk's `idx` is its position in [chunks], every chunk starts PENDING, and each FLAC is read
-     * from its exported file, one file in memory at a time. Any failure (e.g. a missing file) stores nothing.
+     * Stores a chunking run's whole result in one write transaction (item 44): [taskId]'s chunk windows and the
+     * canonical clip's [header] and one-second [rows]. Whatever an interrupted earlier run stored for the task is
+     * replaced, so a stored plan always comes with its whole clip.
      */
-    suspend fun storePlan(
+    suspend fun storeChunked(
         taskId: Long,
-        chunks: List<ExportedChunk>,
+        chunks: List<PlannedChunk>,
+        header: ByteArray,
+        rows: List<CanonicalAudio>,
     ) {
         db.writeTransaction {
-            chunks.forEachIndexed { idx, chunk ->
-                ChunksTable.insert {
-                    it[ChunksTable.taskId] = taskId
-                    it[ChunksTable.idx] = idx
-                    it[startMs] = chunk.planned.startMs
-                    it[endMs] = chunk.planned.endMs
-                    it[status] = ChunkStatus.PENDING
-                }
-                ChunkAudioTable.insert {
-                    it[ChunkAudioTable.taskId] = taskId
-                    it[ChunkAudioTable.idx] = idx
-                    it[flac] = ExposedBlob(Files.readAllBytes(chunk.file))
-                }
-            }
+            ChunksTable.deleteWhere { ChunksTable.taskId eq taskId }
+            AudioHeaderTable.deleteWhere { AudioHeaderTable.taskId eq taskId }
+            insertPlan(taskId, chunks)
+            insertHeader(taskId, header)
+            replaceCanonicalRows(taskId, rows)
         }
-    }
-
-    /**
-     * Writes chunk [idx]'s FLAC of task [taskId] to [target] (one BLOB, read on its own read-only
-     * connection, which is closed before [target] is written); [target] is not closed.
-     * Throws [NoSuchElementException] when the chunk has no stored FLAC.
-     */
-    suspend fun copyFlacTo(
-        taskId: Long,
-        idx: Int,
-        target: OutputStream,
-    ) {
-        val flac =
-            db.readTransaction {
-                ChunkAudioTable
-                    .select(ChunkAudioTable.flac)
-                    .where { (ChunkAudioTable.taskId eq taskId) and (ChunkAudioTable.idx eq idx) }
-                    .singleOrNull()
-                    ?.get(ChunkAudioTable.flac)
-                    ?.bytes
-            } ?: throw NoSuchElementException("no stored FLAC for chunk $idx of task $taskId")
-        withContext(Dispatchers.IO) { target.write(flac) }
     }
 
     /** The task's chunks in `idx` order. */
@@ -80,4 +46,20 @@ class ChunkRepository(
                     )
                 }
         }
+}
+
+/** Inserts [taskId]'s plan inside the caller's transaction: a chunk's `idx` is its position in [chunks], every chunk starts PENDING. */
+internal fun JdbcTransaction.insertPlan(
+    taskId: Long,
+    chunks: List<PlannedChunk>,
+) {
+    chunks.forEachIndexed { idx, chunk ->
+        ChunksTable.insert {
+            it[ChunksTable.taskId] = taskId
+            it[ChunksTable.idx] = idx
+            it[startMs] = chunk.startMs
+            it[endMs] = chunk.endMs
+            it[status] = ChunkStatus.PENDING
+        }
+    }
 }

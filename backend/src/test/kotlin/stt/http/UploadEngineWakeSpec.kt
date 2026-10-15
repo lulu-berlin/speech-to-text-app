@@ -22,7 +22,6 @@ import stt.config.realSpeakerModelPath
 import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.queue.TaskStatus
 import stt.transcribe.transcriptFixtures
 import java.nio.file.Files
@@ -53,10 +52,7 @@ class UploadEngineWakeSpec :
                         application { sttApp(config) }
                         startApplication()
                         val tasks =
-                            TaskRepository(
-                                application.dependencies.resolve<Database>(),
-                                TaskWorkDirectories(dataDir),
-                            )
+                            TaskRepository(application.dependencies.resolve<Database>())
                         val response =
                             client.submitFormWithBinaryData(
                                 url = "/api/tasks",

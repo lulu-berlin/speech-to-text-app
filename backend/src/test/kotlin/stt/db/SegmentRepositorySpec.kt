@@ -12,7 +12,7 @@ class SegmentRepositorySpec :
             `when`("reading the task's segments back") {
                 then("they come back in seq order, only for that task") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
+                        val tasks = TaskRepository(db)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
@@ -48,7 +48,7 @@ class SegmentRepositorySpec :
             `when`("reading the task's segments back") {
                 then("they come back in (chunk_idx, seq) order") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
+                        val tasks = TaskRepository(db)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
 
@@ -81,16 +81,13 @@ class SegmentRepositorySpec :
             `when`("the chunk is completed with its segments, once validly and once with a segment the database rejects") {
                 then("a chunk's segments and its DONE status are stored together or not at all") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
+                        val tasks = TaskRepository(db)
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val failingTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
-                        chunks.storePlan(taskId, exportedChunks(dataDir, "talk", PlannedChunk(0L, 30_000L), PlannedChunk(30_000L, 60_000L)))
-                        chunks.storePlan(
-                            failingTaskId,
-                            exportedChunks(dataDir, "other", PlannedChunk(0L, 30_000L), PlannedChunk(30_000L, 60_000L)),
-                        )
+                        storePlan(db, taskId, listOf(PlannedChunk(0L, 30_000L), PlannedChunk(30_000L, 60_000L)))
+                        storePlan(db, failingTaskId, listOf(PlannedChunk(0L, 30_000L), PlannedChunk(30_000L, 60_000L)))
                         // Chunk 0 was transcribed earlier; raw SQL in a committed write transaction stands in for that.
                         db.writeTransaction { exec("UPDATE chunks SET status = 'DONE' WHERE idx = 0") }
 
@@ -121,8 +118,8 @@ class SegmentRepositorySpec :
                     withDatabase { db ->
                         val chunks = ChunkRepository(db)
                         val segments = SegmentRepository(db)
-                        val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
-                        chunks.storePlan(taskId, exportedChunks(dataDir, "talk", PlannedChunk(0L, 30_000L)))
+                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
+                        storePlan(db, taskId, listOf(PlannedChunk(0L, 30_000L)))
                         val plan = listOf(Chunk(idx = 0, startMs = 0L, endMs = 30_000L, status = ChunkStatus.PENDING))
 
                         val orphan = Segment(chunkIdx = 5, seq = 0, startMs = 150_000L, endMs = 152_000L, text = " Lost.", speakerId = null)
@@ -139,7 +136,7 @@ class SegmentRepositorySpec :
             `when`("its speakers are stored, first with one speaker id too few, then with one per segment") {
                 then("the short list stores nothing; the full list stores every segment's speaker id and the speakers as 'Speaker N'") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
+                        val tasks = TaskRepository(db)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
@@ -168,7 +165,7 @@ class SegmentRepositorySpec :
                 then("each store replaces the previous speaker ids and speakers; a speaker no longer used is gone") {
                     withDatabase { db ->
                         val segments = SegmentRepository(db)
-                        val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
+                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
                         segments.insertAll(taskId, threeSegments)
                         segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
 
@@ -190,7 +187,7 @@ class SegmentRepositorySpec :
             `when`("speaker 1 of the first task is renamed to Alice") {
                 then("only that speaker's name changes: the segments and every other speaker are untouched") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
+                        val tasks = TaskRepository(db)
                         val segments = SegmentRepository(db)
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
@@ -222,7 +219,7 @@ class SegmentRepositorySpec :
             `when`("segments that name a speaker are inserted") {
                 then("the database rejects a speaker id the segment's own task does not have, and accepts one it has") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
+                        val tasks = TaskRepository(db)
                         val segments = SegmentRepository(db)
                         val taskT = tasks.insert(queuedTask("t.wav", createdAt = 1L))
                         val taskU = tasks.insert(queuedTask("u.wav", createdAt = 2L))

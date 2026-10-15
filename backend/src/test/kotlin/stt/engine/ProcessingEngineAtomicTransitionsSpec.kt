@@ -2,7 +2,6 @@ package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
-import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
@@ -15,9 +14,9 @@ import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.db.TestDataDir
 import stt.db.queuedTask
+import stt.db.rowCount
 import stt.queue.TaskStatus
 import stt.transcribe.WhisperSegment
-import java.nio.file.Files
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -36,7 +35,7 @@ class ProcessingEngineAtomicTransitionsSpec :
                         Database.open(dataDir, lock).use { db ->
                             val fixture = engineUnderTest(TestDataDir(dataDir), db)
                             val task =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                                enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                             fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
 
                             // Hold the writer lock; the completion (the worker's terminal write) queues first,
@@ -64,7 +63,7 @@ class ProcessingEngineAtomicTransitionsSpec :
 
                             // The queue keeps working: the next task still runs to completion.
                             val second =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
+                                enqueueTask(fixture.tasks, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe second
                             held.outcome
@@ -86,7 +85,7 @@ class ProcessingEngineAtomicTransitionsSpec :
                         Database.open(dataDir, lock).use { db ->
                             val fixture = engineUnderTest(TestDataDir(dataDir), db)
                             val task =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                                enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                             fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
                             fixture.tasks.setStatus(task, TaskStatus.PAUSED)
                             fixture.tasks.setPhase(task, TaskPhase.TRANSCRIBING)
@@ -114,7 +113,7 @@ class ProcessingEngineAtomicTransitionsSpec :
 
                             // The queue stays live: the canceled task left it, and a next task still completes.
                             val second =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
+                                enqueueTask(fixture.tasks, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe second
                             held.outcome
@@ -135,11 +134,10 @@ class ProcessingEngineAtomicTransitionsSpec :
                         val lock = CountingMutex()
                         Database.open(dataDir, lock).use { db ->
                             val fixture = engineUnderTest(TestDataDir(dataDir), db)
-                            // The "file": the task's work directory and the original inside it.
+                            // The "file": the task's stored original, which goes with its rows.
                             val task =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
-                            val workDir = fixture.workDirectories.workDir(task)
-                            Files.exists(workDir).shouldBeTrue()
+                                enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+                            rowCount(db, "original_audio") shouldBe 1
                             fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
 
                             // Hold the writer lock; the completion (the worker's terminal write) queues
@@ -160,7 +158,7 @@ class ProcessingEngineAtomicTransitionsSpec :
                             completion.await()
                             removal.await() shouldBe TaskCommandOutcome.Accepted
                             fixture.tasks.find(task) shouldBe null
-                            Files.exists(workDir).shouldBeFalse()
+                            rowCount(db, "original_audio") shouldBe 0
 
                             // The deletion is the task's last word: it is published once, and nothing
                             // referring to the id — not even the completion — re-appears after it.
@@ -188,7 +186,7 @@ class ProcessingEngineAtomicTransitionsSpec :
                         Database.open(dataDir, lock).use { db ->
                             val fixture = engineUnderTest(TestDataDir(dataDir), db)
                             val task =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                                enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                             fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L).shouldBeTrue()
 
                             // Hold the writer lock; the cancel's conditional write queues first, then the
@@ -214,7 +212,7 @@ class ProcessingEngineAtomicTransitionsSpec :
 
                             // The queue stays live: the canceled task left it, and a next task still completes.
                             val second =
-                                enqueueTask(fixture.tasks, fixture.workDirectories, "next.wav", queuePosition = 1, createdAt = 3)
+                                enqueueTask(fixture.tasks, "next.wav", queuePosition = 1, createdAt = 3)
                             fixture.engine.start()
                             fixture.completed.receive() shouldBe second
                             held.outcome
@@ -244,7 +242,6 @@ class ProcessingEngineAtomicTransitionsSpec :
                             val first =
                                 enqueueTask(
                                     fixture.tasks,
-                                    fixture.workDirectories,
                                     "first.wav",
                                     queuePosition = 0,
                                     createdAt = 1,
@@ -252,7 +249,6 @@ class ProcessingEngineAtomicTransitionsSpec :
                             val next =
                                 enqueueTask(
                                     fixture.tasks,
-                                    fixture.workDirectories,
                                     "next.wav",
                                     queuePosition = 1,
                                     createdAt = 2,
@@ -324,12 +320,11 @@ class ProcessingEngineAtomicTransitionsSpec :
                 then("the next task, including its DIARIZING phase, runs to completion: the stale pause stalls nothing") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                        val first = enqueueTask(fixture.tasks, "first.wav", queuePosition = 0, createdAt = 1)
                         // The next task has speakers, so its DIARIZING phase passes the pause gate.
                         val next =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "next.wav",
                                 queuePosition = 1,
                                 createdAt = 2,

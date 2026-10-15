@@ -17,7 +17,6 @@ import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 
@@ -30,8 +29,7 @@ class TranscriptDownloadSpec :
                     val id =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            val workDirectories = TaskWorkDirectories(dataDir)
-                            val tasks = TaskRepository(db, workDirectories)
+                            val tasks = TaskRepository(db)
                             val id =
                                 tasks.createFromUpload(
                                     queuedTask("memo.wav", createdAt = 1).copy(
@@ -104,7 +102,7 @@ class TranscriptDownloadSpec :
                     val id =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            val tasks = TaskRepository(db, TaskWorkDirectories(dataDir))
+                            val tasks = TaskRepository(db)
                             val id =
                                 tasks.createFromUpload(
                                     queuedTask("off.wav", createdAt = 1).copy(

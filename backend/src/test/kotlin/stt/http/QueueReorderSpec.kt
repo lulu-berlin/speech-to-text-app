@@ -18,7 +18,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 
 class QueueReorderSpec :
@@ -30,7 +29,7 @@ class QueueReorderSpec :
                     val ids =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            val tasks = TaskRepository(db, TaskWorkDirectories(dataDir))
+                            val tasks = TaskRepository(db)
                             listOf("a.wav", "b.wav", "c.wav").mapIndexed { index, name ->
                                 tasks.createFromUpload(
                                     queuedTask(name, createdAt = index.toLong() + 1).copy(queuePosition = index),

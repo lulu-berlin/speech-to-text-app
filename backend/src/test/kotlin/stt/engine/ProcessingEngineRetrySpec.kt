@@ -4,16 +4,15 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import stt.db.AudioRepository
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
 import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
+import stt.db.rowCount
 import stt.queue.TaskStatus
-import java.nio.file.Files
 import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineRetrySpec :
@@ -26,17 +25,16 @@ class ProcessingEngineRetrySpec :
                         val failed =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "failed.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
                                 speakersMode = SpeakersMode.AUTO,
                             )
-                        val queued = enqueueTask(fixture.tasks, fixture.workDirectories, "queued.wav", queuePosition = 1, createdAt = 2)
+                        val queued = enqueueTask(fixture.tasks, "queued.wav", queuePosition = 1, createdAt = 2)
                         val chunks = ChunkRepository(db)
-                        // The failed task's crash state: plan stored, chunk 0 DONE with its segments, the
+                        // The failed task's crash state: plan and clip stored, chunk 0 DONE with its segments, the
                         // original gone, and the task FAILED while transcribing.
-                        chunks.storePlan(failed, exportedPlan(fixture, failed, chunkCount = 2))
+                        storeChunkedPlan(fixture, chunks, failed, chunkCount = 2)
                         SegmentRepository(db).completeChunk(
                             failed,
                             chunkIdx = 0,
@@ -45,7 +43,7 @@ class ProcessingEngineRetrySpec :
                                     Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
                                 ),
                         )
-                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(failed)) }
+                        AudioRepository(db).deleteOriginal(failed)
                         fixture.tasks.setRunningIfQueued(failed, startedAt = 1_000L)
                         fixture.tasks.setPhase(failed, TaskPhase.TRANSCRIBING)
                         fixture.tasks.failIfRunning(failed, "whisper-cli failed on chunk-1.flac (exit 2)", finishedAt = 9_000L)
@@ -78,16 +76,15 @@ class ProcessingEngineRetrySpec :
             }
         }
 
-        given("a task that failed before chunking, whose original was kept for the retry") {
+        given("a task that failed before chunking, whose stored original was kept for the retry") {
             `when`("it is retried") {
-                then("it is chunked again from the kept original and completes") {
+                then("it is chunked again from the stored original and completes") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         fixture.tasks.setStatus(task, TaskStatus.FAILED)
-                        val source = fixture.workDirectories.source(task)
                         val chunks = ChunkRepository(db)
-                        Files.exists(source) shouldBe true
+                        rowCount(db, "original_audio") shouldBe 1
                         chunks.findByTask(task).shouldBeEmpty()
 
                         fixture.engine.start()
@@ -97,7 +94,7 @@ class ProcessingEngineRetrySpec :
                         statusOf(fixture, task) shouldBe TaskStatus.COMPLETED
                         fixture.transcriber.audioFiles.map { it.fileName.toString() } shouldBe listOf("chunk-0.flac")
                         chunks.findByTask(task).map { it.status } shouldBe listOf(ChunkStatus.DONE)
-                        Files.exists(source) shouldBe false
+                        rowCount(db, "original_audio") shouldBe 0
                     }
                 }
             }
@@ -108,7 +105,7 @@ class ProcessingEngineRetrySpec :
                 then("the retry is refused and nothing changes") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         fixture.engine.start()
                         fixture.completed.receive() shouldBe task
                         val completed =

@@ -5,9 +5,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.withContext
 import stt.db.ChunkRepository
 import stt.db.DiarizationStage
 import stt.db.SegmentRepository
@@ -15,7 +13,6 @@ import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.queue.TaskStatus
 import stt.transcribe.WhisperSegment
-import java.nio.file.Files
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -29,7 +26,6 @@ class ProcessingEngineDiarizationSpec :
                         val speech =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "speech.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
@@ -38,7 +34,6 @@ class ProcessingEngineDiarizationSpec :
                         val silence =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "silence.wav",
                                 queuePosition = 1,
                                 createdAt = 2,
@@ -66,7 +61,6 @@ class ProcessingEngineDiarizationSpec :
                         val task =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "task.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
@@ -94,7 +88,6 @@ class ProcessingEngineDiarizationSpec :
                         val task =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "task.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
@@ -136,7 +129,6 @@ class ProcessingEngineDiarizationSpec :
                         val task =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "task.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
@@ -145,7 +137,6 @@ class ProcessingEngineDiarizationSpec :
                         val off =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "off.wav",
                                 queuePosition = 1,
                                 createdAt = 2,
@@ -187,15 +178,14 @@ class ProcessingEngineDiarizationSpec :
             }
         }
 
-        given("two tasks with the same stored chunks, one chunked by this run and one before it") {
+        given("two tasks with the same stored clip, one chunked by this run and one before it") {
             `when`("the engine diarizes both") {
-                then("each gets a whole-file PCM rebuilt from its stored chunk FLACs, identical across the restart") {
+                then("each gets a whole-file PCM decoded from its stored clip, identical across the restart") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val restarted =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "restarted.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
@@ -204,16 +194,14 @@ class ProcessingEngineDiarizationSpec :
                         val fresh =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "fresh.wav",
                                 queuePosition = 1,
                                 createdAt = 2,
                                 speakersMode = SpeakersMode.AUTO,
                             )
-                        // The "restart" task was chunked by a previous engine: its plan is stored and its
-                        // original is gone. The other is chunked by this run.
-                        ChunkRepository(db).storePlan(restarted, exportedPlan(fixture, restarted, chunkCount = 2))
-                        withContext(Dispatchers.IO) { Files.delete(fixture.workDirectories.source(restarted)) }
+                        // The "restart" task was chunked by a previous engine: its plan and its canonical clip
+                        // are stored and its original is gone. The other is chunked by this run.
+                        storeChunkedPlan(fixture, ChunkRepository(db), restarted, chunkCount = 2)
                         fixture.chunker.chunkCount = 2
                         fixture.transcriber.segmentsByTask =
                             mapOf(
@@ -225,11 +213,13 @@ class ProcessingEngineDiarizationSpec :
                         fixture.completed.receive() shouldBe restarted
                         fixture.completed.receive() shouldBe fresh
 
-                        val expected = listOf(1.0.toFloat(), 2.0.toFloat(), 2.0.toFloat())
+                        // Diarization decodes each task's stored canonical clip once — never the per-chunk
+                        // copies the old reconstruction read (item 44).
+                        val expected = fixture.pcmDecoder.clipPcm.toList()
                         fixture.diarizer.diarized shouldBe listOf(restarted, fresh)
                         fixture.diarizer.pcms.map { it.toList() } shouldBe listOf(expected, expected)
                         fixture.pcmDecoder.decoded.map { it.fileName.toString() } shouldBe
-                            listOf("chunk-0.flac", "chunk-1.flac", "chunk-0.flac", "chunk-1.flac")
+                            listOf("canonical.flac", "canonical.flac")
                     }
                 }
             }
@@ -243,7 +233,6 @@ class ProcessingEngineDiarizationSpec :
                         val task =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "task.wav",
                                 queuePosition = 0,
                                 createdAt = 1,

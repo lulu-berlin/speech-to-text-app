@@ -81,8 +81,7 @@ for (const path of migrations) {
 const events = new Set(stringLiterals([`${STT}/http/EventsRoutes.kt`]));
 const dataDirLiterals = stringLiterals([
   `${STT}/db/Database.kt`,
-  `${STT}/db/TaskWorkDirectories.kt`,
-  `${STT}/db/UploadSpool.kt`,
+  `${STT}/db/ScratchDir.kt`,
 ]);
 
 // Commands the overview names, each with what makes it real.

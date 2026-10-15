@@ -11,28 +11,27 @@ import stt.db.Database
 import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.entries
+import stt.db.rowCount
 import stt.queue.TaskStatus
 import stt.transcribe.WhisperSegment
-import java.nio.file.Files
 import java.nio.file.Path
 
 class ProcessingEngineCleanupSpec :
     BehaviorSpec({
         given("a task whose chunk plan cannot be stored, so it fails before chunking finished") {
             `when`("the engine gives up on it") {
-                then("its original is kept and nothing else of its work directory is") {
+                then("its scratch directory is removed and its stored original is kept") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         fixture.chunker.unwritablePlanFor = task
-                        val workDir = fixture.workDirectories.workDir(task)
 
                         fixture.engine.start()
                         fixture.failed.receive() shouldBe task
 
                         statusOf(fixture, task) shouldBe TaskStatus.FAILED
-                        Files.exists(fixture.workDirectories.source(task)) shouldBe true
-                        entries(workDir).map { it.fileName.toString() } shouldBe listOf("source")
+                        rowCount(db, "original_audio") shouldBe 1
+                        entries(fixture.scratchDir.taskDirPath(task)) shouldBe emptyList()
                     }
                 }
             }
@@ -40,11 +39,10 @@ class ProcessingEngineCleanupSpec :
 
         given("a two-chunk task being transcribed when it is cancelled") {
             `when`("the cancel finishes") {
-                then("the chunk already done keeps its segments, the interrupted one has none, and the work directory is empty") {
+                then("the chunk already done keeps its segments, the interrupted one has none, and its scratch directory is removed") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
-                        val workDir = fixture.workDirectories.workDir(task)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         fixture.chunker.chunkCount = 2
                         fixture.transcriber.segmentsByTask =
                             mapOf(task to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
@@ -66,8 +64,7 @@ class ProcessingEngineCleanupSpec :
                         chunksOf(db, task).map { it.status } shouldBe listOf(ChunkStatus.DONE, ChunkStatus.PENDING)
                         segmentsOf(db, task) shouldBe
                             listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null))
-                        entries(workDir) shouldBe emptyList()
-                        Files.exists(fixture.workDirectories.source(task)) shouldBe false
+                        entries(fixture.scratchDir.taskDirPath(task)) shouldBe emptyList()
                     }
                 }
             }

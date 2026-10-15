@@ -16,7 +16,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 
@@ -29,7 +28,7 @@ class TranscriptDownloadErrorsSpec :
                     val (completed, queued, failed) =
                         Database.open(dataDir).use { db ->
                             QueueStateRepository(db).setPaused(true)
-                            val tasks = TaskRepository(db, TaskWorkDirectories(dataDir))
+                            val tasks = TaskRepository(db)
                             listOf(
                                 TaskStatus.COMPLETED to "done.wav",
                                 TaskStatus.QUEUED to "todo.wav",

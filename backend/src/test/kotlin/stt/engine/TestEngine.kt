@@ -20,19 +20,23 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import stt.audio.ExportedChunk
 import stt.audio.PlannedChunk
+import stt.audio.toCanonicalRows
 import stt.config.testConfig
+import stt.db.AudioHeaderRepository
+import stt.db.AudioRepository
+import stt.db.AudioSecondRepository
+import stt.db.CanonicalClipRepository
 import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
+import stt.db.ScratchDir
 import stt.db.SegmentRepository
 import stt.db.SettingsRepository
 import stt.db.SpeakersMode
 import stt.db.Task
 import stt.db.TaskPhase
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.TestDataDir
 import stt.db.insertTaskRow
 import stt.db.queuedTask
@@ -47,13 +51,14 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /** One engine and everything a spec drives around it (fake chunker and transcriber, repositories, events). */
 internal class EngineFixture(
-    val workDirectories: TaskWorkDirectories,
+    val scratchDir: ScratchDir,
     val tasks: TaskRepository,
     val chunker: FakeChunker,
     val transcriber: FakeTranscriber,
     val processControl: FakeProcessControl,
     val diarizer: FakeDiarizer,
     val pcmDecoder: FakePcmDecoder,
+    val windowCutter: FakeWindowCutter,
     val engine: ProcessingEngine,
     /** The ids of the tasks that reach COMPLETED, in order. */
     val completed: ReceiveChannel<Long>,
@@ -74,28 +79,34 @@ internal fun TestScope.engineUnderTest(
     dataDir: TestDataDir,
     db: Database,
 ): EngineFixture {
-    val workDirectories = TaskWorkDirectories(dataDir.dataDir)
-    val tasks = TaskRepository(db, workDirectories)
+    val scratchDir = ScratchDir(dataDir.dataDir)
+    val tasks = TaskRepository(db)
     val chunker = FakeChunker()
     val transcriber = FakeTranscriber()
     val processControl = FakeProcessControl()
     val diarizer = FakeDiarizer()
     val pcmDecoder = FakePcmDecoder()
+    val windowCutter = FakeWindowCutter()
     val engine =
         ProcessingEngine(
             scope = backgroundScope,
             config = testConfig(dataDir.dataDir),
             tasks = tasks,
             chunks = ChunkRepository(db),
+            audio = AudioRepository(db),
+            audioHeaders = AudioHeaderRepository(db),
+            audioSeconds = AudioSecondRepository(db),
+            clipAudio = CanonicalClipRepository(db),
             segments = SegmentRepository(db),
             queueState = QueueStateRepository(db),
             settings = SettingsRepository(db),
-            workDirectories = workDirectories,
+            scratchDir = scratchDir,
             chunker = chunker,
             transcriber = transcriber,
             processControl = processControl,
             diarizer = diarizer,
             pcmDecoder = pcmDecoder,
+            windowCutter = windowCutter,
         )
     val completed = Channel<Long>(Channel.UNLIMITED)
     val failed = Channel<Long>(Channel.UNLIMITED)
@@ -124,13 +135,14 @@ internal fun TestScope.engineUnderTest(
         }
     }
     return EngineFixture(
-        workDirectories,
+        scratchDir,
         tasks,
         chunker,
         transcriber,
         processControl,
         diarizer,
         pcmDecoder,
+        windowCutter,
         engine,
         completed,
         failed,
@@ -139,27 +151,21 @@ internal fun TestScope.engineUnderTest(
     )
 }
 
-/** Inserts a QUEUED task at [queuePosition] with an original in its work directory, as an upload does (ADR 0024). */
+/** Inserts a QUEUED task at [queuePosition] whose original is stored in the database, as an upload does. */
 internal suspend fun enqueueTask(
     tasks: TaskRepository,
-    workDirectories: TaskWorkDirectories,
     filename: String,
     queuePosition: Int,
     createdAt: Long,
     speakersMode: SpeakersMode = SpeakersMode.OFF,
-): Long {
-    val id =
-        tasks.insert(
-            queuedTask(filename, createdAt).copy(queuePosition = queuePosition, speakersMode = speakersMode),
-        )
-    val source = workDirectories.source(id)
-    Files.createDirectories(source.parent)
-    Files.writeString(source, "fake source audio")
-    return id
-}
+): Long =
+    tasks.createFromUpload(
+        queuedTask(filename, createdAt).copy(queuePosition = queuePosition, speakersMode = speakersMode),
+        "fake source audio of $filename".toByteArray().inputStream(),
+    )
 
-/** The id of the task a work path belongs to: `<dataDir>/work/<id>[/…]` (ADR 0024). */
-internal fun taskIdOf(workPath: Path): Long = workPath.fileName.toString().toLong()
+/** The id of the task a scratch path belongs to: its nearest `<scratch>/<id>` ancestor, itself included (item 44). */
+internal fun taskIdOf(path: Path): Long = generateSequence(path) { it.parent }.firstNotNullOf { it.fileName?.toString()?.toLongOrNull() }
 
 /** The stored status of a task. */
 internal suspend fun statusOf(
@@ -236,19 +242,33 @@ internal fun <T> drain(channel: ReceiveChannel<T>): List<T> =
         }
     }
 
-/** Writes [chunkCount] FLAC files for a task's plan, as a previous run would have left them. */
-internal suspend fun exportedPlan(
+/** A plan of [chunkCount] consecutive one-second windows, as the fake chunker plans them. */
+internal fun plannedWindows(chunkCount: Int): List<PlannedChunk> =
+    (0 until chunkCount).map { idx -> PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L) }
+
+/** Every regular file under [root], at any depth; none when [root] does not exist. */
+internal fun filesUnder(root: Path): List<Path> =
+    if (!Files.isDirectory(root)) {
+        emptyList()
+    } else {
+        Files.walk(root).use { paths -> paths.filter { Files.isRegularFile(it) }.toList() }
+    }
+
+/**
+ * Stores [task]'s plan of [chunkCount] chunks together with the fake chunker's canonical clip, in one transaction:
+ * what a finished CHUNKING phase leaves in the database (item 44).
+ */
+internal suspend fun storeChunkedPlan(
     fixture: EngineFixture,
+    chunks: ChunkRepository,
     task: Long,
     chunkCount: Int,
-): List<ExportedChunk> {
-    val workDir = fixture.workDirectories.workDir(task)
-    return (0 until chunkCount).map { idx ->
-        val file = workDir.resolve("chunk-$idx.flac")
-        Files.writeString(file, "fake flac")
-        ExportedChunk(PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L), file)
-    }
-}
+) = chunks.storeChunked(
+    task,
+    plannedWindows(chunkCount),
+    fixture.chunker.canonical.header,
+    fixture.chunker.canonical.toCanonicalRows(),
+)
 
 // Deterministic race machinery (roadmap item 40): the atomic-transition specs interleave two commands by
 // holding the writer lock, queuing the losing write first and the winner's write second, and releasing —

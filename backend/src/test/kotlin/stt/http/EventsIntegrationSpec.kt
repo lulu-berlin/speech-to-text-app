@@ -13,7 +13,6 @@ import stt.config.realSpeakerModelPath
 import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.transcribe.transcriptFixtures
 import java.io.ByteArrayInputStream
@@ -34,7 +33,7 @@ class EventsIntegrationSpec :
                     val (whisperModel, jfk) = transcriptFixtures()
                     val dataDir = tempdir("stt-events").toPath()
                     Database.open(dataDir).use { db ->
-                        TaskRepository(db, TaskWorkDirectories(dataDir)).createFromUpload(
+                        TaskRepository(db).createFromUpload(
                             queuedTask("jfk.wav", createdAt = 1).copy(queuePosition = 0),
                             ByteArrayInputStream(Files.readAllBytes(jfk)),
                         )

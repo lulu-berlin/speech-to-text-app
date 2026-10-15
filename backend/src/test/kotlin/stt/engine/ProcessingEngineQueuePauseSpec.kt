@@ -13,8 +13,8 @@ class ProcessingEngineQueuePauseSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val tasks = fixture.tasks
-                        val first = enqueueTask(tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
-                        val second = enqueueTask(tasks, fixture.workDirectories, "second.wav", queuePosition = 1, createdAt = 2)
+                        val first = enqueueTask(tasks, "first.wav", queuePosition = 0, createdAt = 1)
+                        val second = enqueueTask(tasks, "second.wav", queuePosition = 1, createdAt = 2)
 
                         val release = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = release
@@ -47,7 +47,7 @@ class ProcessingEngineQueuePauseSpec :
                 then("its process is frozen and continued, and the task still completes") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val first = enqueueTask(fixture.tasks, fixture.workDirectories, "first.wav", queuePosition = 0, createdAt = 1)
+                        val first = enqueueTask(fixture.tasks, "first.wav", queuePosition = 0, createdAt = 1)
 
                         val release = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = release

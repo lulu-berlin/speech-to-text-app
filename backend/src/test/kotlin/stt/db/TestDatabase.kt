@@ -21,12 +21,6 @@ internal fun TestConfiguration.withDatabase(block: suspend TestDataDir.(Database
         }
     }
 
-/** A [TaskRepository] for [db] whose work directories lie in [db]'s data directory [dataDir]. */
-internal fun taskRepository(
-    db: Database,
-    dataDir: Path,
-) = TaskRepository(db, TaskWorkDirectories(dataDir))
-
 /** The entries of [dir], in no particular order; none when [dir] does not exist. */
 internal fun entries(dir: Path): List<Path> = if (Files.exists(dir)) Files.list(dir).use { it.toList() } else emptyList()
 

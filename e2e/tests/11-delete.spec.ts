@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { DELETE_CLIP, cachedAudioPath, loadState, workDirPath } from '../lib/backend.mjs';
+import { DELETE_CLIP, loadState, scratchDirPath } from '../lib/backend.mjs';
 import { goTo, rowOf, taskIdOf, uploadAndOpen, uploadClips } from './helpers/ui';
 
 test('deleting a task removes it from History and frees its file for re-upload', async ({
@@ -9,16 +9,16 @@ test('deleting a task removes it from History and frees its file for re-upload',
   test.setTimeout(300_000);
   const dataDir = loadState().dataDir;
 
-  // A completed task whose transcript was opened: the player's /audio built the cache.
+  // A completed task whose transcript was opened: the player's /audio serves the clip stored
+  // in the database, so no playback file exists on disk.
   await uploadAndOpen(page, DELETE_CLIP);
   await goTo(page, 'History');
   const card = rowOf(page, DELETE_CLIP);
   const id = await taskIdOf(page, DELETE_CLIP);
-  await expect.poll(() => existsSync(cachedAudioPath(dataDir, id))).toBe(true);
 
   // Delete asks first; confirming removes the card, for good (a reload brings the list
-  // back from the server), and the cached audio with it. A completed task's work
-  // directory went when it completed and stays gone.
+  // back from the server). A completed task's work directory went when it completed and
+  // stays gone.
   await card.getByRole('button', { name: 'Delete' }).click();
   await page
     .getByRole('dialog', { name: 'Delete task?' })
@@ -29,8 +29,7 @@ test('deleting a task removes it from History and frees its file for re-upload',
   await expect(page.getByText('Live', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
   await expect(card).toHaveCount(0);
-  expect(existsSync(cachedAudioPath(dataDir, id))).toBe(false);
-  expect(existsSync(workDirPath(dataDir, id))).toBe(false);
+  expect(existsSync(scratchDirPath(dataDir, id))).toBe(false);
 
   // The same bytes upload again as a new task (the deleted row no longer holds their
   // hash): accepted with no duplicate notice, and transcribed to completion. The card

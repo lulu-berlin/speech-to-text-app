@@ -192,11 +192,10 @@ Everything the app keeps — the queue, the transcripts, the speaker names and t
 
 Inside it:
 
-- `stt.db` — the SQLite database, with `stt.db-wal` and `stt.db-shm` next to it (write-ahead log). It holds the tasks, the transcripts, the speakers, the settings and the audio of every task that has been split into chunks.
-- `work/` — per-task scratch space; the uploaded original stays here until the task has been split into chunks.
-- `tmp/` — upload spools and the playback cache; cleared on every start.
+- `stt.db` — the SQLite database, with `stt.db-wal` and `stt.db-shm` next to it (write-ahead log). It holds the tasks, the transcripts, the speakers, the settings and every task's audio: the whole recording as one canonical FLAC (an upload's original lives here only while the task is being chunked).
+- The app's working scratch — the materialized original, the decoded audio, whisper's inputs — lives outside it, under the OS temp directory; the app removes it as it works and empties it on every start.
 
-**Backup**: stop the app, then copy the whole directory (`tmp/` may be left out). Restore by copying it back while the app is stopped. Copying only `stt.db` is not enough: the write-ahead log and the originals in `work/` are part of the state ([ADR 0017](docs/decisions/0017-database-location-and-connection-contract.md), [ADR 0024](docs/decisions/0024-audio-storage-original-until-chunking-flac-chunks.md)). If the app stops while a task runs, that task continues from its last finished chunk on the next start.
+**Backup**: stop the app, then copy `stt.db` — once the app has stopped cleanly, that one file holds the whole history and every task's audio (the write-ahead log is folded into it on a clean stop). Restore by copying it back while the app is stopped. If the app did not stop cleanly, copy `stt.db-wal` and `stt.db-shm` along with it: the write-ahead log is then still part of the state ([ADR 0017](docs/decisions/0017-database-location-and-connection-contract.md)). If the app stops while a task runs, that task continues from its last finished chunk on the next start.
 
 With Docker, back up the volume while the app is stopped, and restore it the same way (the restored files belong to the container's user, uid 1000):
 
@@ -206,6 +205,8 @@ docker run --rm -v stt-data:/data:ro -v "$PWD":/backup alpine:3 tar czf /backup/
 # restore: docker run --rm --user 1000:1000 -v stt-data:/data -v "$PWD":/backup alpine:3 tar xzf /backup/stt-data.tar.gz -C /data
 docker compose start
 ```
+
+**Upgrading a data directory from before the audio moved into the database** (roadmap item 44): the first start converts it. Every finished or partly transcribed task keeps its audio and its transcript. A task that had not been cut into chunks yet — still queued, paused, interrupted while chunking, or canceled or failed before it — kept its upload as a file, which is not carried over: it ends *failed* with "This task's audio from before the upgrade was not migrated. Delete the task and upload the file again." The old `work/` and `tmp/` directories are removed ([ADR 0051](docs/decisions/0051-canonical-clip-backfill-migration.md)).
 
 ## Documentation
 

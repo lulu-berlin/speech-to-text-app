@@ -1,6 +1,6 @@
 # Audio request 500: the joiner shares the engine's single-flight runner
 
-Status: done (roadmap item 37, merged 2026-10-12)
+Status: done (roadmap item 37, merged 2026-10-12); the joiner it isolated was removed by roadmap item 44 ([ADR 0052](../decisions/0052-canonical-clip-in-database-chunks-as-windows.md)): `/audio` streams the stored canonical clip from the database and runs no process
 Depends on: [15 — History UI](frontend-history-ui.md) (done; the transcript player's `/audio` join)
 Blocks: [35 — README and architecture overview](readme-and-architecture.md) (its playback GIF opens transcripts while the queue may run)
 

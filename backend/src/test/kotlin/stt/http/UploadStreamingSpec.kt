@@ -2,7 +2,6 @@ package stt.http
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
-import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.ktor.client.request.forms.formData
@@ -20,19 +19,18 @@ import stt.db.Database
 import stt.db.GeneratedBytes
 import stt.db.MIB
 import stt.db.QueueStateRepository
-import stt.db.SpoolWatchingSource
+import stt.db.StagingWatchingSource
+import stt.db.TaskRepository
 import stt.db.UploadOutcome
-import stt.db.entries
 import stt.db.queuedTask
 import stt.db.rowCount
 import stt.db.sha256Hex
-import stt.db.taskRepository
 import stt.db.withDatabase
 
 /**
  * The review finding (2026-10-10): uploads must be streamed to the spool, no full in-memory copy, and the
  * duplicate check must still answer 409 with the existing task's id when the spooled bytes match. Observation
- * point agreed with the user (option 1): the spool path is driven with a [SpoolWatchingSource] (the item-18
+ * point agreed with the user (option 1): the spool path is driven with a [StagingWatchingSource] (the item-18
  * pattern) so the largest in-memory window stays <= the 1 MiB spool window, the stored sha256 equals the
  * input's true digest, and a duplicate creates nothing; plus a full HTTP upload of ~2.5x the window.
  */
@@ -44,9 +42,9 @@ class UploadStreamingSpec :
                 then("the largest in-memory window stays <= 1 MiB and the stored sha256 equals the input's") {
                     withDatabase { db ->
                         val size = 2L * MIB + 12_345
-                        val source = SpoolWatchingSource(GeneratedBytes(size), db.tmpDir)
+                        val source = StagingWatchingSource(GeneratedBytes(size), db)
                         val outcome =
-                            taskRepository(db, dataDir)
+                            TaskRepository(db)
                                 .createFromUploadOrDuplicate(
                                     queuedTask("long.wav", createdAt = 1).copy(queuePosition = 0),
                                     source,
@@ -54,7 +52,7 @@ class UploadStreamingSpec :
 
                         (outcome as UploadOutcome.Created).sha256 shouldBe sha256Hex(GeneratedBytes(size))
                         outcome.sizeBytes shouldBe size
-                        source.largestUnspooled.shouldBeLessThanOrEqual(MIB.toLong())
+                        source.largestUnstaged.shouldBeLessThanOrEqual(MIB.toLong())
                     }
                 }
             }
@@ -64,7 +62,7 @@ class UploadStreamingSpec :
             `when`("the same bytes are spooled again with the real duplicate lookup") {
                 then("Duplicate names the existing task and nothing new is stored") {
                     withDatabase { db ->
-                        val tasks = taskRepository(db, dataDir)
+                        val tasks = TaskRepository(db)
                         val bytes = "duplicate me".toByteArray()
                         val first =
                             tasks.createFromUploadOrDuplicate(
@@ -85,7 +83,7 @@ class UploadStreamingSpec :
                             )
                         rowCount(db, "tasks") shouldBe 1
                         rowCount(db, "audio") shouldBe 1
-                        entries(dataDir.resolve("work")) shouldHaveSize 1
+                        rowCount(db, "original_audio") shouldBe 1
                     }
                 }
             }

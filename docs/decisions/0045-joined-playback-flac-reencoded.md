@@ -1,6 +1,6 @@
 # 0045 — The joined playback FLAC is re-encoded (losslessly)
 
-Status: accepted, amends the playback clause of [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) · Date: 2026-10-11
+Status: superseded by [0052](0052-canonical-clip-in-database-chunks-as-windows.md) (was accepted, amending the playback clause of [0024](0024-audio-storage-original-until-chunking-flac-chunks.md); playback now serves the stored clip, with no join) · Date: 2026-10-11
 
 ## Context
 

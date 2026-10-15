@@ -1,6 +1,6 @@
 # HTTP API and SSE
 
-Status: done (roadmap item 12, merged 2026-10-10)
+Status: done (roadmap item 12, merged 2026-10-10); audio storage, playback and delete amended by roadmap item 44 ([ADR 0052](../decisions/0052-canonical-clip-in-database-chunks-as-windows.md))
 Depends on: [10 — Output formats](output-formats.md), [11 — Processing engine](processing-engine.md)
 
 ## Goal
@@ -27,6 +27,7 @@ Expose the queue and the transcription history over a REST API for all commands 
   - Only files whose extension is on the allow-list are accepted. The extension is checked case-insensitively, and the content type is ignored, because browsers often send generic types. The allow-list: `mp3 wav flac ogg oga opus m4a aac wma aif aiff amr webm mp4 m4v mov mkv mka 3gp`. Video files are accepted because ffmpeg extracts their audio track.
   - A file on the list that ffmpeg still cannot decode becomes a FAILED task with a readable error at CHUNKING (item 11).
   - There is no size limit. The file part is streamed (no full in-memory copy) into `TaskRepository.createFromUpload` (item 18): it is spooled with its `size_bytes`/`sha256` computed on the way, the task and its `audio` row are committed, and the original is moved to the task's work directory. No audio bytes go into the database. A failed spool (e.g. disk full) leaves no task.
+    - *Since item 44 ([ADR 0052](../decisions/0052-canonical-clip-in-database-chunks-as-windows.md)): the file part is streamed into the database as it arrives — staged window by window (at most 1 MiB in memory) into `original_audio`/`original_audio_part` while `size_bytes`/`sha256` are computed — and attached to its task in the transaction that creates the task and its `audio` row (`TaskRepository.createFromStaged`). No spool file and no work directory exist; a failed or rejected upload leaves none of its bytes in the database. The original is deleted once the task's clip is stored at CHUNKING.*
   - The task is created QUEUED at the end of the queue. Returns `201` with the task.
   - A file whose bytes duplicate an existing task is rejected with `409` `duplicate-audio`, and the body names the existing task's id (see Contract).
 - **Tasks.** `GET /api/tasks` (list without audio), `GET /api/tasks/{id}`.
@@ -37,11 +38,13 @@ Expose the queue and the transcription history over a REST API for all commands 
     - the task row, which cascades to its segments, chunks, chunk audio, and its `audio` row (so the same file can be uploaded again);
     - its work directory;
     - its cached joined FLAC.
+  - *Since item 44 ([ADR 0052](../decisions/0052-canonical-clip-in-database-chunks-as-windows.md)): there is no chunk audio, work directory or joined FLAC; the cascade removes the task's stored clip (`audio_header`, `audio_second`) and any staged original, and its scratch under the OS temp dir is removed.*
   - `204`, or `404` for an unknown id. Emits `task-deleted`, plus `queue-updated` if the task was pending.
 - **Queue.** `GET /api/queue` (paused flag + ordered task ids), `POST /api/queue/pause`, `POST /api/queue/resume`, `PUT /api/queue/order` with body `{ "taskIds": [...] }`: the full ordered list of non-terminal task ids. A different set → `409`.
 - **Transcript download.** `GET /api/tasks/{id}/transcript?format=txt|srt|vtt` (json dropped 2026-10-09, [ADR 0035](../decisions/0035-no-json-download.md)), rendered on demand by item 10's renderers, served as an attachment with the matching content type. Only for COMPLETED tasks; any other status → `409 not-completed` (partial results of FAILED/CANCELED tasks are kept only for a retry).
 - **Turns for the transcript view.** `GET /api/tasks/{id}/turns` returns the task's speakers (id and stored name) and item 09's speaker turns, each with its segments, so turn merging exists only in Kotlin. Turns reference their speaker by `speakerId`, so a later rename changes one name and no turn. The JSON download stays the oracle format.
 - **Audio.**
+  - *Since item 44 ([ADR 0052](../decisions/0052-canonical-clip-in-database-chunks-as-windows.md)): `/audio` serves the task's stored canonical clip straight from the database — header row plus one-second rows, byte for byte — with Range support and `Content-Length`; no join, no re-encode, no cache, no `tmp/`. A task without a stored clip → `404 no-audio`; `hasAudio` means a clip header is stored. The bullets below describe item 12's original design.*
   - `GET /api/tasks/{id}/audio` joins the task's stored chunk FLACs in `idx` order with ffmpeg's concat demuxer into one FLAC, served as `audio/flac` (16 kHz mono, ADR 0024). The join re-encodes losslessly (`-c:a flac`; amended 2026-10-11 by [ADR 0045](../decisions/0045-joined-playback-flac-reencoded.md), was `-c copy`), so the file declares its full length and its frame positions run on across chunks, which seeking needs.
   - The joined file is built once into `$STT_DATA_DIR/tmp/<task-id>.flac`: written under a temporary name and renamed, one build per task at a time.
   - It is served with HTTP Range support, so the browser can seek and item 15 can offer click-to-seek.
@@ -73,7 +76,7 @@ The JSON shapes the frontend builds against.
     - `maxSpeakers` (number)
     - `durationMs` (number, or null before chunking)
     - `sizeBytes` (number)
-    - `hasAudio` (boolean): whether the task has stored chunk FLACs, i.e. whether `GET /api/tasks/{id}/audio` serves audio (added 2026-10-09, item 15 consultation)
+    - `hasAudio` (boolean): whether `GET /api/tasks/{id}/audio` serves audio (added 2026-10-09, item 15 consultation); since item 44, whether the task's canonical clip is stored (its header row), until then whether it had stored chunk FLACs
     - `transcriptionProgress` (0–1)
     - `diarizationStage` (`EMBEDDING|CLUSTERING|null`)
     - `diarizationProgress` (0–1, or null)
@@ -88,6 +91,7 @@ The JSON shapes the frontend builds against.
     - null for QUEUED tasks (also after a retry or a restart) and COMPLETED tasks.
   - `transcribedUntilMs` is computed from the stored segments (no new column). Segments are committed per chunk (ADR 0004), so a retry resumes at the first chunk not DONE, which starts at or after this time. At most one chunk is redone.
   - `hasAudio` is computed from the stored chunk audio (no new column). It is false until chunking has stored the chunk FLACs, and stays false for a task cancelled or failed before that; it becomes true in the same transaction that stores the chunks (item 18), so `task-updated` reports it.
+    - *Since item 44 ([ADR 0052](../decisions/0052-canonical-clip-in-database-chunks-as-windows.md)): `hasAudio` is whether the task's canonical clip header is stored (`audio_header`, no new column). It is false until CHUNKING stores the clip and stays false for a task cancelled or failed before that; it becomes true in the transaction that stores the chunk windows together with the clip, so `task-updated` reports it.*
 - **Task list** (`GET /api/tasks`): `{ "tasks": [Task] }`. Pending tasks come first, in queue order, then finished tasks, newest `finishedAt` first.
 - **Queue:** `{ "paused": boolean, "taskIds": [number] }` (pending tasks in queue order).
 - **Responses by route:**
@@ -130,7 +134,7 @@ The JSON shapes the frontend builds against.
   | Status | Codes |
   | ------ | ----- |
   | `400` | `missing-file`, `unsupported-format`, `invalid-language`, `invalid-speakers`, `invalid-max-speakers`, `invalid-transcript-format`, `invalid-speaker-name`, `invalid-merge` (item 22), `invalid-device`, `invalid-threads` (item 32) |
-  | `404` | `not-found` (unknown task; unknown speaker of a task, item 22), `no-audio` (task without stored chunks) |
+  | `404` | `not-found` (unknown task; unknown speaker of a task, item 22), `no-audio` (task without a stored clip; before item 44, without stored chunks) |
   | `409` | `illegal-transition`, `reorder-mismatch`, `duplicate-audio` (with `taskId`), `not-completed` (turns, transcript, or a speaker rename, merge or reset of a task that is not COMPLETED), `duplicate-speaker-name` (item 22) |
   | `500` | `internal` |
 - **Mock additions from item 13** (added 2026-10-09): the frontend workspace added [`docs/api/task.paused.json`](../api/task.paused.json) and [`docs/api/task.canceled.json`](../api/task.canceled.json), because no example had those statuses, and it recorded where its mocks must deviate from this contract. That list is the "Mock additions to settle with item 12" section of [the frontend foundation spec](frontend-foundation.md); this item's route tests adopt the two examples and settle each deviation (item 21 verifies the rest end to end).

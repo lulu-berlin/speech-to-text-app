@@ -15,7 +15,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 import java.nio.file.Path
@@ -31,7 +30,7 @@ class TaskCommandsSpec :
             Database.open(dataDir).use { db ->
                 // Paused: the engine must not process any of the seeded tasks during the test.
                 QueueStateRepository(db).setPaused(true)
-                TaskRepository(db, TaskWorkDirectories(dataDir)).createFromUpload(
+                TaskRepository(db).createFromUpload(
                     queuedTask(filename, createdAt = 1).copy(
                         queuePosition = 0,
                         status = status,
@@ -45,7 +44,7 @@ class TaskCommandsSpec :
             id: Long,
         ): String? =
             Database.open(dataDir).use { db ->
-                TaskRepository(db, TaskWorkDirectories(dataDir))
+                TaskRepository(db)
                     .find(id)
                     ?.task
                     ?.status

@@ -20,7 +20,7 @@ flowchart LR
     DB[("SQLite<br/>stt.db")]
     Speaker["CAM++ speaker model<br/>(ONNX Runtime)"]
   end
-  Files[("work/ and tmp/<br/>in the data directory")]
+  Files[("the app's scratch<br/>(OS temp dir)")]
   FFmpeg["ffmpeg"]
   Whisper["whisper-cli"]
 
@@ -28,8 +28,6 @@ flowchart LR
   SSE -- "snapshot + events" --> UI
   Routes -- "task and queue commands" --> Engine
   Routes -- "reads" --> DB
-  Routes -- "spool uploads, playback cache" --> Files
-  Routes -- "join chunks for playback" --> FFmpeg
   Engine -- "persists every change" --> DB
   Engine -- "publishes events" --> SSE
   Engine -- "scratch files" --> Files
@@ -41,7 +39,7 @@ flowchart LR
 - **The browser** shows the queue, the history, a transcript with its player, and the settings. It changes things only through HTTP requests and learns about every change from one live event stream.
 - **The HTTP routes** accept uploads and commands, answer reads from the database, and serve the built frontend.
 - **The processing engine** is a single worker that takes the next queued task and runs it to the end: cut the audio into chunks with ffmpeg, transcribe each chunk with whisper-cli, then find the speakers with the CAM++ model. It writes every change to the database first and then announces it as an event.
-- **The database** is one SQLite file in the data directory; next to it, `work/` and `tmp/` hold files that are only needed for a while.
+- **The database** is one SQLite file in the data directory; it also holds every task's canonical clip — the whole recording in one format — so playback needs no file. The data directory holds that one file and its write-ahead log: everything else the app needs on disk is scratch under the OS temp directory, removed as it is used.
 
 Everything runs as one process with structured coroutines: one application scope, blocking work (JDBC, files, subprocesses) on the IO dispatcher. The stack and the monorepo layout are [ADR 0001](decisions/0001-stack-and-monorepo.md); the backend is split into feature packages wired with Ktor's dependency injection ([ADR 0013](decisions/0013-backend-feature-packages-kotlin-di.md)).
 
@@ -63,7 +61,7 @@ The backend packages under `backend/src/main/kotlin/stt/`:
 | `http` | routes, the live event stream, static frontend |
 | `engine` | the processing engine and its events |
 | `queue` | task statuses, the allowed transitions, the queue rules |
-| `audio` | ffmpeg: decoding, chunk planning and export, joining chunks for playback |
+| `audio` | ffmpeg: the canonical clip, chunk planning, and cutting each chunk's whisper input from the clip |
 | `transcribe` | whisper-cli: the command line, progress, segments |
 | `diarization` | the CAM++ model, embeddings and speaker clustering |
 | `outputs` | the `.txt`, `.srt` and `.vtt` renderers |
@@ -88,19 +86,19 @@ The phases of a running task, in order, are `CHUNKING`, `TRANSCRIBING` and `DIAR
 
 ### Upload
 
-The browser sends the file as a multipart upload. The backend streams it into a spool file under `tmp/` while it computes its size and SHA-256, without ever holding the whole file in memory. The upload is checked (extension, language, speaker options); a file whose bytes are already in the database is answered with `409 duplicate-audio` and a link to the existing task. Otherwise the task and its audio record are committed in one transaction, the spool file is moved to `work/<task-id>/source`, and the task joins the end of the queue as `QUEUED`.
+The browser sends the file as a multipart upload. The backend writes it into the database window by window as it arrives (1 MiB at a time, as a staged original with no task yet) while it computes its size and SHA-256, so the whole file is never held in memory and never written to a file. The upload is checked (extension, language, speaker options); a file whose bytes are already in the database is answered with `409 duplicate-audio` and a link to the existing task, and the staged original is deleted. Otherwise the task, its audio record and the original's attachment to the task are committed in one transaction, and the task joins the end of the queue as `QUEUED`.
 
 ### Chunking
 
-The engine picks the queued task with the lowest queue position and marks it `RUNNING`. ffmpeg decodes the original to 16 kHz mono, detects silences, and the planner cuts the recording into chunks of about five minutes at quiet points. Each chunk is stored in the database as a FLAC file, and the original is deleted once the plan is committed ([ADR 0024](decisions/0024-audio-storage-original-until-chunking-flac-chunks.md)).
+The engine picks the queued task with the lowest queue position and marks it `RUNNING`. It materializes the stored original into the app's scratch directory, where ffmpeg decodes it to 16 kHz mono and encodes the whole recording to one canonical FLAC — the clip every chunk is a window of. Silences are detected and the planner cuts the recording into chunks of about five minutes at quiet points; a chunk is only its start and end time. The clip and the plan are stored in the database in one transaction, and the original is deleted once they are committed ([ADR 0052](decisions/0052-canonical-clip-in-database-chunks-as-windows.md)).
 
 ### Transcribing
 
-Each chunk goes through whisper-cli in turn, with the end of the previous chunk's text as a prompt so sentences continue naturally. The segments of a chunk are stored together with the chunk's `DONE` mark, so a chunk is either fully done or not at all. whisper-cli reports its progress, and the engine turns it into the task's progress bar ([ADR 0004](decisions/0004-chunked-transcription-sigstop-pause.md)).
+Each chunk goes through whisper-cli in turn, with the end of the previous chunk's text as a prompt so sentences continue naturally. whisper-cli's input is cut from the stored clip — the seconds the chunk's window touches, trimmed to its exact samples — into the scratch directory, and removed after the chunk. The segments of a chunk are stored together with the chunk's `DONE` mark, so a chunk is either fully done or not at all. whisper-cli reports its progress, and the engine turns it into the task's progress bar ([ADR 0004](decisions/0004-chunked-transcription-sigstop-pause.md)).
 
 ### Diarizing
 
-Unless speakers are switched off, the engine rebuilds the whole recording from the stored chunks and hands it to the speaker diarizer. The CAM++ model computes an embedding (a voice fingerprint) for short windows of speech; clustering groups similar windows into speakers ([ADR 0003](decisions/0003-kotlin-diarization-campplus-onnx.md), [ADR 0037](decisions/0037-nearest-neighbor-chain-for-speaker-clustering.md)). Each segment gets its speaker, and the speakers are stored as "Speaker 1", "Speaker 2", … — names the user can change later.
+Unless speakers are switched off, the engine decodes the whole recording from the task's stored clip and hands its PCM to the speaker diarizer. The CAM++ model computes an embedding (a voice fingerprint) for short windows of speech; clustering groups similar windows into speakers ([ADR 0003](decisions/0003-kotlin-diarization-campplus-onnx.md), [ADR 0037](decisions/0037-nearest-neighbor-chain-for-speaker-clustering.md)). Each segment gets its speaker, and the speakers are stored as "Speaker 1", "Speaker 2", … — names the user can change later.
 
 ### Done
 
@@ -115,7 +113,7 @@ The task becomes `COMPLETED` and its scratch directory is removed. The transcrip
 
 ### Restart
 
-If the app stops while a task runs, the next start puts every `RUNNING` task back to `QUEUED`; the worker then continues it from the last chunk that was `DONE`. The start also empties `tmp/` and removes scratch directories that are no longer needed.
+If the app stops while a task runs, the next start puts every `RUNNING` task back to `QUEUED`; the worker then continues it from the last chunk that was `DONE`. The start also empties the app's scratch directory outside the data directory — a task's scratch is disposable, so nothing has to survive a restart — and deletes any upload a crash left half-stored in the database, which no task had claimed.
 
 The statuses and transitions are [docs/specs/queue-domain-model.md](specs/queue-domain-model.md); the engine, phases and restart behavior are [docs/specs/processing-engine.md](specs/processing-engine.md); chunking is [docs/specs/audio-decoding-and-chunking.md](specs/audio-decoding-and-chunking.md); transcription is [docs/specs/whisper-transcription.md](specs/whisper-transcription.md); diarization is [docs/specs/speaker-embeddings.md](specs/speaker-embeddings.md) and [docs/specs/diarization.md](specs/diarization.md); the downloads are [docs/specs/output-formats.md](specs/output-formats.md).
 
@@ -123,7 +121,7 @@ The statuses and transitions are [docs/specs/queue-domain-model.md](specs/queue-
 
 | Step | Path |
 | --- | --- |
-| Upload route and spooling | [`http/UploadRoutes.kt`](../backend/src/main/kotlin/stt/http/UploadRoutes.kt), [`db/UploadSpool.kt`](../backend/src/main/kotlin/stt/db/UploadSpool.kt) |
+| Upload route and staging | [`http/UploadRoutes.kt`](../backend/src/main/kotlin/stt/http/UploadRoutes.kt), [`db/StagedUpload.kt`](../backend/src/main/kotlin/stt/db/StagedUpload.kt) |
 | Statuses and transitions | [`queue/TaskStatus.kt`](../backend/src/main/kotlin/stt/queue/TaskStatus.kt), [`queue/TaskQueue.kt`](../backend/src/main/kotlin/stt/queue/TaskQueue.kt) |
 | The worker and all task commands | [`engine/ProcessingEngine.kt`](../backend/src/main/kotlin/stt/engine/ProcessingEngine.kt) |
 | Chunking (ffmpeg) | [`audio/AudioChunker.kt`](../backend/src/main/kotlin/stt/audio/AudioChunker.kt), [`audio/ChunkPlanner.kt`](../backend/src/main/kotlin/stt/audio/ChunkPlanner.kt), [`audio/AudioDecoder.kt`](../backend/src/main/kotlin/stt/audio/AudioDecoder.kt) |
@@ -141,8 +139,11 @@ All state is in one SQLite database, `stt.db`, in the data directory (`STT_DATA_
 | --- | --- | --- |
 | `tasks` | task | file name, status, phase, queue position, language and speaker options, progress, error, timestamps |
 | `audio` | task | size and SHA-256 of the upload (the SHA-256 is unique: the duplicate check) |
-| `chunks` | chunk of a task | start and end time, `PENDING` or `DONE` |
-| `chunk_audio` | chunk of a task | the chunk's audio as FLAC |
+| `original_audio` | upload | the task it belongs to (none while the upload is still arriving) |
+| `original_audio_part` | 1 MiB of an upload | the upload's bytes, in order |
+| `chunks` | chunk of a task | its window into the clip (start and end time), `PENDING` or `DONE` |
+| `audio_header` | task | the canonical clip's FLAC header |
+| `audio_second` | second of a task's clip | that second's FLAC frames (the header plus every row in order is the clip) |
 | `segments` | transcribed sentence | start and end time, text, speaker |
 | `speakers` | speaker of a task | the speaker's name |
 | `speaker_merge` | merged speaker | which speaker it was merged into |
@@ -153,20 +154,19 @@ Deleting a task deletes everything it owns (the foreign keys cascade).
 
 Next to the database:
 
-- `work/<task-id>/` — scratch space of a task: the uploaded original (`source`) until chunking, the decoded audio, the chunk files whisper-cli reads, whisper-cli's JSON output. Removed when the task is finished.
-- `tmp/` — upload spools and the joined playback file of a transcript (`tmp/<task-id>.flac`, built on the first play). Emptied on every start.
+- The OS temp directory holds the app's scratch: one directory per data directory, one subdirectory per task, holding the materialized original, the chunker's canonical encode, the whisper input per chunk, and the clip decoded for diarization; the upgrade's backfill works there too. Everything is removed as it is used, and the whole scratch is emptied on every start.
 
-The whole directory is the unit to back up — see [the README](../README.md#where-your-data-lives).
+After a clean stop, `stt.db` alone is the unit to back up — see [the README](../README.md#where-your-data-lives).
 
-The schema is [docs/specs/database-schema.md](specs/database-schema.md) (later changes: [ADR 0024](decisions/0024-audio-storage-original-until-chunking-flac-chunks.md) for audio, [ADR 0028](decisions/0028-speakers-table-and-segment-speaker-id.md) for speakers); the files on disk are [docs/specs/audio-storage.md](specs/audio-storage.md).
+The schema is [docs/specs/database-schema.md](specs/database-schema.md) (later changes: [ADR 0052](decisions/0052-canonical-clip-in-database-chunks-as-windows.md) for audio, [ADR 0028](decisions/0028-speakers-table-and-segment-speaker-id.md) for speakers).
 
 **Where in the code**
 
 | Part | Path |
 | --- | --- |
-| Migrations | [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/) (`V1__init.sql` … `V7__settings_device_fallback.sql`) |
+| Migrations | [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/) (`V1__init.sql` … `V9__canonical_audio.sql`, then `V11__drop_chunk_audio.sql`) and the class migration [`V10__BackfillCanonicalClip.kt`](../backend/src/main/kotlin/stt/db/migration/V10__BackfillCanonicalClip.kt), which `db/Database.kt` registers |
 | Opening the database, pragmas, migrations | [`db/Database.kt`](../backend/src/main/kotlin/stt/db/Database.kt) |
-| Every file path in the data directory | [`db/TaskWorkDirectories.kt`](../backend/src/main/kotlin/stt/db/TaskWorkDirectories.kt) |
+| The app's scratch directory and its paths | [`db/ScratchDir.kt`](../backend/src/main/kotlin/stt/db/ScratchDir.kt) |
 | Repositories | [`db/TaskRepository.kt`](../backend/src/main/kotlin/stt/db/TaskRepository.kt), [`db/ChunkRepository.kt`](../backend/src/main/kotlin/stt/db/ChunkRepository.kt), [`db/SegmentRepository.kt`](../backend/src/main/kotlin/stt/db/SegmentRepository.kt), [`db/SettingsRepository.kt`](../backend/src/main/kotlin/stt/db/SettingsRepository.kt) |
 
 ## 4. The API and live updates
@@ -200,7 +200,7 @@ The full contract — every field and error code — is [docs/specs/http-api-and
 | --- | --- |
 | Routes | [`http/TaskRoutes.kt`](../backend/src/main/kotlin/stt/http/TaskRoutes.kt), [`http/TaskCommandRoutes.kt`](../backend/src/main/kotlin/stt/http/TaskCommandRoutes.kt), [`http/QueueRoutes.kt`](../backend/src/main/kotlin/stt/http/QueueRoutes.kt), [`http/TranscriptRoutes.kt`](../backend/src/main/kotlin/stt/http/TranscriptRoutes.kt), [`http/AudioRoutes.kt`](../backend/src/main/kotlin/stt/http/AudioRoutes.kt), [`http/SpeakerRoutes.kt`](../backend/src/main/kotlin/stt/http/SpeakerRoutes.kt), [`http/SettingsRoutes.kt`](../backend/src/main/kotlin/stt/http/SettingsRoutes.kt), [`http/HealthRoutes.kt`](../backend/src/main/kotlin/stt/http/HealthRoutes.kt) |
 | The event stream | [`http/EventsRoutes.kt`](../backend/src/main/kotlin/stt/http/EventsRoutes.kt), [`http/EventStream.kt`](../backend/src/main/kotlin/stt/http/EventStream.kt), [`engine/Event.kt`](../backend/src/main/kotlin/stt/engine/Event.kt) |
-| Playback file | [`http/JoinedAudioCache.kt`](../backend/src/main/kotlin/stt/http/JoinedAudioCache.kt), [`audio/FfmpegAudioJoiner.kt`](../backend/src/main/kotlin/stt/audio/FfmpegAudioJoiner.kt) |
+| Playback (the stored clip) | [`http/AudioRoutes.kt`](../backend/src/main/kotlin/stt/http/AudioRoutes.kt), [`db/CanonicalClipRepository.kt`](../backend/src/main/kotlin/stt/db/CanonicalClipRepository.kt) |
 | Frontend client | [`frontend/src/shared/api/client.ts`](../frontend/src/shared/api/client.ts), [`frontend/src/shared/api/types.ts`](../frontend/src/shared/api/types.ts) |
 | Mock server over the examples | [`frontend/src/shared/api/handlers.ts`](../frontend/src/shared/api/handlers.ts), [`frontend/src/shared/api/fixtures.ts`](../frontend/src/shared/api/fixtures.ts) |
 

@@ -1,8 +1,5 @@
 package stt.db
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -21,28 +18,18 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
 import stt.queue.TaskStatus
 import java.io.InputStream
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 class TaskRepository(
     private val db: Database,
-    private val workDirectories: TaskWorkDirectories,
 ) {
     /** Saves [task] and returns its generated id. */
     suspend fun insert(task: Task): Long = db.writeTransaction { insertTaskRow(task) }
 
     /**
-     * Saves [task] for an [upload] (ADR 0024): the upload is spooled to a temp file first (no lock
-     * held while it is read), then the task and its audio metadata are written in one short
-     * transaction, so audio content that already exists (UNIQUE sha256) rejects the whole creation.
-     * After the commit the spool file is moved to the task's original ([TaskWorkDirectories.source]),
-     * so the task's `audio` row outlives the original; no audio bytes go into the database.
-     * [upload] is read on Dispatchers.IO and not closed.
-     *
-     * If creating the work directory or moving the spool fails after the commit, the task is deleted
-     * again — its `audio` row goes with it, so a retry with the same bytes is not rejected as a
-     * duplicate — the work directory is removed best-effort, and the original exception is rethrown.
+     * Saves [task] for an [upload] (item 44): the upload is written into the database as a staged original, window
+     * by window (no lock held while it is read), then the task, its audio metadata and the original's attachment are
+     * written in one short transaction, so audio content that already exists (UNIQUE sha256) rejects the whole
+     * creation and leaves no original behind. No file is written. [upload] is read on Dispatchers.IO and not closed.
      */
     suspend fun createFromUpload(
         task: Task,
@@ -50,86 +37,36 @@ class TaskRepository(
     ): Long = (createFromUploadOrDuplicate(task, upload) as UploadOutcome.Created).id
 
     /**
-     * Spools [upload] once and decides with the spool's own digest: when [duplicateTaskId] finds a task
+     * Stages [upload] once and decides with its own digest: when [duplicateTaskId] finds a task
      * holding the same bytes, nothing is stored and [UploadOutcome.Duplicate] reports it; otherwise the task
-     * is committed from the spool. The spool is deleted unless committed, whichever branch runs. No full
-     * in-memory copy of the upload exists.
+     * is committed with the staged original. The staged original is deleted unless committed, whichever branch
+     * runs. No full in-memory copy of the upload exists.
      */
     suspend fun createFromUploadOrDuplicate(
         task: Task,
         upload: InputStream,
         duplicateTaskId: suspend (String) -> Long? = { null },
-    ): UploadOutcome = db.withSpooledUpload(upload) { spooled -> commitOrDuplicate(task, spooled, duplicateTaskId) }
+    ): UploadOutcome = db.withStagedUpload(upload) { staged -> commitOrDuplicate(task, staged, duplicateTaskId) }
 
     private suspend fun commitOrDuplicate(
         task: Task,
-        spooled: SpooledUpload,
+        staged: StagedUpload,
         duplicateTaskId: suspend (String) -> Long?,
     ): UploadOutcome =
-        duplicateTaskId(spooled.sha256)?.let { UploadOutcome.Duplicate(it, spooled.sha256, spooled.sizeBytes) }
-            ?: UploadOutcome.Created(createFromSpooled(task, spooled), spooled.sha256, spooled.sizeBytes)
+        duplicateTaskId(staged.sha256)?.let { UploadOutcome.Duplicate(it, staged.sha256, staged.sizeBytes) }
+            ?: UploadOutcome.Created(createFromStaged(task, staged), staged.sha256, staged.sizeBytes)
 
     /**
-     * Inserts [task] and its audio metadata from the spooled bytes, then moves the original into the task's
-     * work directory. Runs under NonCancellable on Dispatchers.IO, so a canceled caller still gets its
-     * original, and the whole move is on one filesystem (same data directory), so the rename is atomic.
-     * Item 12's upload route calls this after spooling the part's channel itself ([Database.spoolChannel]).
+     * Inserts [task], its audio metadata and the attachment of its staged original in one transaction. Item 12's
+     * upload route calls this after staging the part's channel itself ([Database.stageChannel]).
      */
-    internal suspend fun createFromSpooled(
+    internal suspend fun createFromStaged(
         task: Task,
-        spooled: SpooledUpload,
-    ): Long {
-        val taskId =
-            db.writeTransaction {
-                insertTaskRow(task).also { taskId -> insertAudioRow(taskId, spooled) }
-            }
-        // Committed: the task's original must reach its work directory even if the caller is canceled now.
-        try {
-            moveToOriginal(taskId, spooled.file)
-        } catch (e: Exception) {
-            // The task row is committed by now; undo it, even for a canceled caller, so a rejected
-            // upload leaves nothing behind: NonCancellable for the same reason the move uses it.
-            withContext(NonCancellable) {
-                runCatching {
-                    db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq taskId } }
-                    deleteWorkDir(taskId)
-                }.onFailure { e.addSuppressed(it) }
-            }
-            throw e
+        staged: StagedUpload,
+    ): Long =
+        db.writeTransaction {
+            insertTaskRow(task).also { taskId -> insertAudioRow(taskId, staged) }
         }
-        return taskId
-    }
-
-    /**
-     * Creates the task's work directory and moves the committed upload's spool file into it as the
-     * original. Runs under NonCancellable on Dispatchers.IO, so a canceled caller still gets its original,
-     * and the whole move is on one filesystem (same data directory), so the rename is atomic.
-     */
-    private suspend fun moveToOriginal(
-        taskId: Long,
-        spool: Path,
-    ) {
-        withContext(NonCancellable + Dispatchers.IO) {
-            Files.createDirectories(workDirectories.workDir(taskId))
-            Files.move(spool, workDirectories.source(taskId), StandardCopyOption.ATOMIC_MOVE)
-        }
-    }
-
-    /**
-     * Removes a task's work directory and everything in it, best-effort: a failure is reported by the
-     * caller's normal error path, never here. After the upload cleanup the database rows are already gone,
-     * so a leftover directory cannot block a retry's `audio` row; item 11's engine cleanup is the backstop.
-     */
-    private suspend fun deleteWorkDir(taskId: Long) {
-        try {
-            withContext(Dispatchers.IO) {
-                Files.list(workDirectories.workDir(taskId)).use { files -> files.forEach(Files::delete) }
-                Files.delete(workDirectories.workDir(taskId))
-            }
-        } catch (_: Exception) {
-            // Best effort only.
-        }
-    }
 
     suspend fun find(id: Long): StoredTask? =
         db.readTransaction {
@@ -495,10 +432,11 @@ private fun ResultRow.toDetails(): TaskDetails {
         id = id,
         task = toTask(),
         sizeBytes = this[AudioTable.sizeBytes],
+        // A task has audio once its canonical clip's header is stored (item 44); the clip is what `/audio` serves.
         hasAudio =
-            !ChunkAudioTable
-                .select(ChunkAudioTable.taskId)
-                .where { ChunkAudioTable.taskId eq id }
+            !AudioHeaderTable
+                .select(AudioHeaderTable.taskId)
+                .where { AudioHeaderTable.taskId eq id }
                 .empty(),
         transcribedUntilMs =
             SegmentsTable

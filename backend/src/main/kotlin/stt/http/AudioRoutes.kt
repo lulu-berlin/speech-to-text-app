@@ -7,29 +7,25 @@ import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
-import io.ktor.server.response.respondBytes
-import io.ktor.server.response.respondFile
+import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.RoutingCall
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import stt.audio.AudioJoiner
+import stt.db.CanonicalClipRepository
 import stt.db.TaskRepository
-import java.io.File
-import java.io.RandomAccessFile
 
 /**
- * The audio download (item 12): `GET /api/tasks/{id}/audio` serves the task's stored chunk FLACs joined into
- * one FLAC (`audio/flac`, 16 kHz mono, ADR 0024), built once into the `tmp/<task-id>.flac` cache. A task
- * without stored chunks (not chunked yet, or cancelled/failed before that) answers `404 no-audio`; the task's
- * `hasAudio` tells the client in advance. A single `Range` request (as browsers send for seeking) is answered
- * with `206` and exactly the requested bytes; an unsatisfiable one with `416`.
+ * The audio download (item 12, item 44): `GET /api/tasks/{id}/audio` serves the task's canonical clip — the
+ * stored 16 kHz mono FLAC (ADR 0024 replaced, a canonical FLAC is seekable as-is) — as `audio/flac`, straight
+ * from the database: the header row plus its one-second rows in order are the encoded file byte for byte. No
+ * join, no re-encode and no cache file exist; the database holds the only copy. A task without a canonical clip
+ * (not chunked yet, or cancelled/failed before that) answers `404 no-audio`; the task's `hasAudio` tells the
+ * client in advance. A single `Range` request (as browsers send for seeking) is answered with `206` and exactly
+ * the requested bytes; an unsatisfiable one with `416`.
  */
 fun Application.audioRoutes() {
     val tasks: TaskRepository by dependencies
-    val joiner: AudioJoiner by dependencies
-    val cache: JoinedAudioCache by dependencies
+    val clip: CanonicalClipRepository by dependencies
     routing {
         get("/api/tasks/{id}/audio") {
             val id = call.parameters["id"]?.toLongOrNull()
@@ -45,26 +41,30 @@ fun Application.audioRoutes() {
                 return@get call.respondError(
                     HttpStatusCode.NotFound,
                     "no-audio",
-                    "Task $id has no stored chunk audio",
+                    "Task ${details.id} has no stored audio",
                 )
             }
-            val file = cache.getOrBuild(details.id) { target -> joiner.join(details.id, target) }
-            call.respondAudioFile(file.toFile())
+            call.respondCanonicalAudio(details.id, clip)
         }
     }
 }
 
 /**
- * Serves the cached joined FLAC, honoring one `Range` header (single range, `bytes=a-b`, `bytes=a-`, `bytes=-n`;
- * the case-sensitive `bytes=` unit is what clients send). Without a range the whole file is served as before.
+ * Serves the task's stored canonical clip, honoring one `Range` header (single range, `bytes=a-b`, `bytes=a-`,
+ * `bytes=-n`; the case-sensitive `bytes=` unit is what clients send). Without a range the whole clip is served.
+ * The body is streamed from the stored parts, so no range — however large — is buffered in heap; its length is
+ * declared up front (`Content-Length`), so a client knows the download's size.
  */
-private suspend fun RoutingCall.respondAudioFile(file: File) {
-    val size = file.length()
+private suspend fun RoutingCall.respondCanonicalAudio(
+    taskId: Long,
+    clip: CanonicalClipRepository,
+) {
+    val size = clip.size(taskId)
     response.header(HttpHeaders.AcceptRanges, "bytes")
     val range = request.headers[HttpHeaders.Range]
     if (range == null) {
         response.header(HttpHeaders.ContentType, "audio/flac")
-        respondFile(file)
+        respondOutputStream(ContentType("audio", "flac"), contentLength = size) { clip.copyTo(taskId, 0, size, this) }
         return
     }
     val slice = parseByteRange(range, size)
@@ -74,15 +74,10 @@ private suspend fun RoutingCall.respondAudioFile(file: File) {
         return
     }
     val (start, end) = slice
-    val bytes =
-        withContext(Dispatchers.IO) {
-            RandomAccessFile(file, "r").use { raf ->
-                raf.seek(start)
-                ByteArray((end - start + 1).toInt()).also { raf.readFully(it) }
-            }
-        }
     response.header(HttpHeaders.ContentRange, "bytes $start-$end/$size")
-    respondBytes(bytes, ContentType("audio", "flac"), HttpStatusCode.PartialContent)
+    respondOutputStream(ContentType("audio", "flac"), HttpStatusCode.PartialContent, contentLength = end - start + 1) {
+        clip.copyTo(taskId, start, end + 1, this)
+    }
 }
 
 /** Parses one `bytes` range against [size], or null when malformed or outside the file (→ `416`). */

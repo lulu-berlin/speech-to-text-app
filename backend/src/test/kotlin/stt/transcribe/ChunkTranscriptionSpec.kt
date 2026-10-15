@@ -16,9 +16,9 @@ import stt.db.ChunkStatus
 import stt.db.Database
 import stt.db.Segment
 import stt.db.SegmentRepository
-import stt.db.exportedChunks
+import stt.db.TaskRepository
 import stt.db.queuedTask
-import stt.db.taskRepository
+import stt.db.storePlan
 import stt.process.ProcessRunner
 import stt.withCapturedLogs
 import java.nio.file.Files
@@ -127,8 +127,8 @@ private suspend fun insertTaskPlanningChunk1(
     db: Database,
     dataDir: Path,
 ): Long {
-    val taskId = taskRepository(db, dataDir).insert(queuedTask("talk.wav", createdAt = 1L))
-    val plan = exportedChunks(dataDir, "talk", PlannedChunk(0L, 30_000L), PlannedChunk(CHUNK_1.startMs, CHUNK_1.endMs))
-    ChunkRepository(db).storePlan(taskId, plan)
+    val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
+    val plan = listOf(PlannedChunk(0L, 30_000L), PlannedChunk(CHUNK_1.startMs, CHUNK_1.endMs))
+    storePlan(db, taskId, plan)
     return taskId
 }

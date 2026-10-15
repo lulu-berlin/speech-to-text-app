@@ -17,7 +17,7 @@ class ProcessingEngineTaskPauseSpec :
                 then("its process is frozen and continued, its status follows, and it still completes") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
 
                         val release = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = release
@@ -56,7 +56,7 @@ class ProcessingEngineTaskPauseSpec :
                 then("it is refused with the reason and nothing changes") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
 
                         // QUEUED allows only pause, so a resume is refused before the task has ever run.
                         fixture.engine.resumeTask(task) shouldBe
@@ -89,7 +89,7 @@ class ProcessingEngineTaskPauseSpec :
                 then("the chunking process is frozen and continued, and the task still completes") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
 
                         val release = CompletableDeferred<Unit>()
                         fixture.chunker.hold = release
@@ -127,13 +127,12 @@ class ProcessingEngineTaskPauseSpec :
                         val running =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "running.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
                                 speakersMode = SpeakersMode.AUTO,
                             )
-                        val queued = enqueueTask(fixture.tasks, fixture.workDirectories, "queued.wav", queuePosition = 1, createdAt = 2)
+                        val queued = enqueueTask(fixture.tasks, "queued.wav", queuePosition = 1, createdAt = 2)
                         fixture.transcriber.segmentsByTask =
                             mapOf(running to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
 
@@ -176,13 +175,12 @@ class ProcessingEngineTaskPauseSpec :
                         val running =
                             enqueueTask(
                                 fixture.tasks,
-                                fixture.workDirectories,
                                 "running.wav",
                                 queuePosition = 0,
                                 createdAt = 1,
                                 speakersMode = SpeakersMode.AUTO,
                             )
-                        val queued = enqueueTask(fixture.tasks, fixture.workDirectories, "queued.wav", queuePosition = 1, createdAt = 2)
+                        val queued = enqueueTask(fixture.tasks, "queued.wav", queuePosition = 1, createdAt = 2)
                         fixture.transcriber.segmentsByTask =
                             mapOf(running to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hello ")))
 
@@ -227,7 +225,7 @@ class ProcessingEngineTaskPauseSpec :
                 then("no further process starts: it stops before its next chunk, PAUSED, until resumed, then completes") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
-                        val task = enqueueTask(fixture.tasks, fixture.workDirectories, "task.wav", queuePosition = 0, createdAt = 1)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
                         fixture.chunker.chunkCount = 2
 
                         val release = CompletableDeferred<Unit>()

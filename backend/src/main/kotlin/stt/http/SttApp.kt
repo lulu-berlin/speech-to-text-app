@@ -14,17 +14,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import stt.audio.AudioJoiner
-import stt.audio.FfmpegAudioJoiner
 import stt.config.Config
 import stt.db.AudioRepository
+import stt.db.CanonicalClipRepository
 import stt.db.ChunkRepository
 import stt.db.Database
 import stt.db.QueueStateRepository
+import stt.db.ScratchDir
 import stt.db.SegmentRepository
 import stt.db.SettingsRepository
 import stt.db.TaskRepository
-import stt.db.TaskWorkDirectories
+import stt.db.discardUnclaimedStaged
 import stt.engine.processingEngine
 import stt.process.ProcessRunner
 import stt.transcribe.GpuDevice
@@ -47,18 +47,17 @@ fun Application.sttApp(
     // The events bridge runs for the application's lifetime (ADR 0007/0038): a scope under the app's job.
     val eventsScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext[Job]) + Dispatchers.Default)
     dependencies {
-        provide<Database> { Database.open(config.dataDir) }
-        provide<TaskWorkDirectories> { TaskWorkDirectories(config.dataDir) }
-        provide<TaskRepository> { TaskRepository(resolve(), resolve()) }
+        // A staged original no task claimed is what a crash mid-upload leaves (item 44); DI opens the database
+        // at startup, before any route serves, so none of these belongs to an upload still in flight.
+        provide<Database> { Database.open(config.dataDir).also { it.discardUnclaimedStaged() } }
+        provide<ScratchDir> { ScratchDir(config.dataDir) }
+        provide<TaskRepository> { TaskRepository(resolve()) }
         provide<AudioRepository> { AudioRepository(resolve()) }
         provide<QueueStateRepository> { QueueStateRepository(resolve()) }
         provide<SettingsRepository> { SettingsRepository(resolve()) }
         provide<SegmentRepository> { SegmentRepository(resolve()) }
         provide<ChunkRepository> { ChunkRepository(resolve()) }
-        provide<JoinedAudioCache> { JoinedAudioCache(resolve()) }
-        // The joiner makes its own ProcessRunner per join (item 37): it must never share the engine's
-        // single-flight runner, which would answer 500 while a task transcribes.
-        provide<AudioJoiner> { FfmpegAudioJoiner(resolve(), resolve()) }
+        provide<CanonicalClipRepository> { CanonicalClipRepository(resolve()) }
         provide<EventStream> { NumberedEventStream(resolve(), eventsScope) }
         require(DependencyKey<Database>())
     }

@@ -14,12 +14,12 @@ class ProcessingEnginePhaseSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val recovered =
-                            enqueueTask(fixture.tasks, fixture.workDirectories, "recovered.wav", queuePosition = 1, createdAt = 1)
+                            enqueueTask(fixture.tasks, "recovered.wav", queuePosition = 1, createdAt = 1)
                         val completes =
-                            enqueueTask(fixture.tasks, fixture.workDirectories, "completes.wav", queuePosition = 0, createdAt = 2)
-                        val failed = enqueueTask(fixture.tasks, fixture.workDirectories, "failed.wav", queuePosition = 2, createdAt = 3)
-                        val canceled = enqueueTask(fixture.tasks, fixture.workDirectories, "canceled.wav", queuePosition = 3, createdAt = 4)
-                        val retried = enqueueTask(fixture.tasks, fixture.workDirectories, "retried.wav", queuePosition = 4, createdAt = 5)
+                            enqueueTask(fixture.tasks, "completes.wav", queuePosition = 0, createdAt = 2)
+                        val failed = enqueueTask(fixture.tasks, "failed.wav", queuePosition = 2, createdAt = 3)
+                        val canceled = enqueueTask(fixture.tasks, "canceled.wav", queuePosition = 3, createdAt = 4)
+                        val retried = enqueueTask(fixture.tasks, "retried.wav", queuePosition = 4, createdAt = 5)
                         // Terminal states with the phase they stopped in; recovered is a crash left RUNNING.
                         fixture.tasks.setPhase(failed, TaskPhase.TRANSCRIBING)
                         fixture.tasks.setStatus(failed, TaskStatus.FAILED)
