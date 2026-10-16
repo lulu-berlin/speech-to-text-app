@@ -99,13 +99,16 @@ graph TD
   16 --> 50[50 Electron desktop app]
   22 --> 52[52 edit transcription]
   12 --> 52
-  11 --> 43[43 diarization memory]
+  11 --> 43[43 diarization memory: stream speaker windows]
   38 --> 44[44 audio in database ✓]:::done
   11 --> 44
   11 --> 45[45 selectable GPUs ✓]:::done
   32 --> 45
   12 --> 44
   11 --> 46[46 contextual logging ✓]:::done
+  47 --> 55[55 atomic-transitions lock probe]
+  50 --> 56[56 prebuilt Linux x86_64 bundle Mesa]
+  57[57 desktop-nix-e2e container failure] --> 50
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -155,7 +158,7 @@ graph TD
 | [40 — Task transitions are not atomic (pause/resume race a finishing task)](../docs/specs/atomic-task-transitions.md) | done | 11 |
 | [41 — Upload hardening: duplicate race, size limit, spool cleanup](41-upload-hardening.md) | draft | 12 |
 | [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | spec-approved | 11 |
-| [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
+| [43 — Diarization memory: stream speaker windows from the stored clip](43-diarization-memory.md) | spec-approved | 11 |
 | [44 — Store the full audio in the database; drop the file cache](../docs/specs/audio-in-database.md) | done | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md) | done | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
@@ -166,3 +169,6 @@ graph TD
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md) | done | — |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | spec-approved | 12, 22 |
 | [53 — The Nix store cache: one writer per key, versioned past the stale entry](53-nix-store-cache-v2.md) | spec-approved | 51 |
+| [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](55-atomic-transitions-lock-probe.md) | spec-approved | — |
+| [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](56-desktop-bundle-mesa-artifact.md) | spec-approved | 50 |
+| [57 — Diagnose and fix the desktop-nix-e2e container exit 6](57-desktop-nix-e2e-container-failure.md) | spec-approved | — |
