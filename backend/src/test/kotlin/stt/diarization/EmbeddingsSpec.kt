@@ -36,7 +36,7 @@ class EmbeddingsSpec :
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val segments = listOf(segment(0, 100), segment(4000, 4500), segment(9000, 10_000))
 
-                        val embeddings = Embeddings(model).embed(FloatArray(0), segments)
+                        val embeddings = Embeddings(model).embed(pcmSource(FloatArray(0)), segments)
 
                         embeddings.size.shouldBe(3)
                         embeddings.forEach { embedding ->
@@ -64,11 +64,11 @@ class EmbeddingsSpec :
                         val embedder = Embeddings(model)
                         val segments = listOf(segment(0, 1200), segment(3000, 4800), segment(10_000, 11_200))
 
-                        val embeddings = embedder.embed(pcm, segments)
+                        val embeddings = embedder.embed(pcmSource(pcm), segments)
 
                         embeddings.size.shouldBe(3)
                         embeddings.indices.forEach { index ->
-                            val alone = embedder.embed(pcm, listOf(segments[index]))[0]
+                            val alone = embedder.embed(pcmSource(pcm), listOf(segments[index]))[0]
                             embeddings[index].indices.forEach { component ->
                                 embeddings[index][component].shouldBe(alone[component].plusOrMinus(1e-4f))
                             }
@@ -89,7 +89,7 @@ class EmbeddingsSpec :
                         val gate = PauseGate()
                         val job =
                             async {
-                                embedder.embed(pcm, listOf(segment(0, 1200), segment(30_000, 31_200)), gate) { done, _ ->
+                                embedder.embed(pcmSource(pcm), listOf(segment(0, 1200), segment(30_000, 31_200)), gate) { done, _ ->
                                     if (done == 1) gate.pause()
                                 }
                             }
@@ -119,7 +119,7 @@ class EmbeddingsSpec :
                             lateinit var job: Deferred<Array<FloatArray>>
                             job =
                                 async(start = CoroutineStart.LAZY) {
-                                    embedder.embed(pcm, segments, gate) { done, _ ->
+                                    embedder.embed(pcmSource(pcm), segments, gate) { done, _ ->
                                         windowsDone.add(done)
                                         if (done == 1) job.cancel()
                                     }
@@ -143,7 +143,10 @@ class EmbeddingsSpec :
                     val pcms = decodeLibrispeech(tempdir("librispeech").toPath(), LIBRISPEECH_IDS)
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
-                        val (speakerA1, speakerA2, speakerB) = pcms.values.map { pcm -> embedder.embed(pcm, listOf(wholeClip(pcm)))[0] }
+                        val (speakerA1, speakerA2, speakerB) =
+                            pcms.values.map { pcm ->
+                                embedder.embed(pcmSource(pcm), listOf(wholeClip(pcm)))[0]
+                            }
 
                         val same = dotInFloat(speakerA1, speakerA2)
                         val different = listOf(dotInFloat(speakerA1, speakerB), dotInFloat(speakerA2, speakerB))
@@ -164,8 +167,8 @@ class EmbeddingsSpec :
                     val pcms = decodeLibrispeech(tempdir("librispeech").toPath(), LIBRISPEECH_IDS)
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val embedder = Embeddings(model)
-                        val whole = pcms.mapValues { (_, pcm) -> embedder.embed(pcm, listOf(wholeClip(pcm)))[0] }
-                        val excerpts = pcms.mapValues { (_, pcm) -> embedder.embed(pcm, listOf(segment(2000, 2600)))[0] }
+                        val whole = pcms.mapValues { (_, pcm) -> embedder.embed(pcmSource(pcm), listOf(wholeClip(pcm)))[0] }
+                        val excerpts = pcms.mapValues { (_, pcm) -> embedder.embed(pcmSource(pcm), listOf(segment(2000, 2600)))[0] }
 
                         val speaker = { id: String -> id.substringBefore('-') }
                         for ((id, excerpt) in excerpts) {
@@ -193,7 +196,7 @@ class EmbeddingsSpec :
                     segmentInt16.sumOf { abs(it) }.shouldBe(8_935_266)
 
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
-                        val embedding = Embeddings(model).embed(pcm, listOf(segment(2000, 2600)))[0]
+                        val embedding = Embeddings(model).embed(pcmSource(pcm), listOf(segment(2000, 2600)))[0]
 
                         SHERPA_ONNX_REFERENCE.size.shouldBe(512)
                         // sherpa-onnx returns the raw embedding; ours has unit length, so cosine = dot / |reference|.

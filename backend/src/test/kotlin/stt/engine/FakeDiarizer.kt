@@ -8,6 +8,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import stt.db.DiarizationStage
 import stt.db.StoredTask
+import stt.diarization.PcmSource
 import stt.pause.PauseGate
 
 /** Records the tasks whose DIARIZING phase it ran, without loading any model. */
@@ -28,8 +29,8 @@ internal class FakeDiarizer : Diarizer {
     var passedGate = false
         private set
 
-    /** The whole-file PCM of every call, in order. */
-    val pcms = mutableListOf<FloatArray>()
+    /** The audio source of every call, in order (item 43: the clip the call reads its windows from). */
+    val sources = mutableListOf<PcmSource>()
 
     /** The speaker-model thread count of every call, in order (item 32). */
     val threads = mutableListOf<Int?>()
@@ -37,7 +38,7 @@ internal class FakeDiarizer : Diarizer {
     override suspend fun diarize(
         task: StoredTask,
         gate: PauseGate,
-        pcm: FloatArray,
+        audio: PcmSource,
         threads: Int?,
         onStage: (DiarizationStage) -> Unit,
         onProgress: (Double) -> Unit,
@@ -47,7 +48,7 @@ internal class FakeDiarizer : Diarizer {
         withContext(Dispatchers.Default) { logger.info("embedding task {}", task.id) }
         diarized.add(task.id)
         this.threads.add(threads)
-        pcms.add(pcm)
+        sources.add(audio)
         entered.send(task.id)
         hold?.await()
         onStage(DiarizationStage.EMBEDDING)

@@ -31,12 +31,12 @@ class SpeakerThresholdSpec :
                         val whole =
                             ids.map { id ->
                                 id to
-                                    embedder.embed(pcms.getValue(id), listOf(segment(0, pcms.getValue(id).size / 16L)))[0]
+                                    embedder.embed(pcmSource(pcms.getValue(id)), listOf(segment(0, pcms.getValue(id).size / 16L)))[0]
                             }
                         val excerpts =
                             ids
                                 .filter { pcms.getValue(it).size / 16L >= 5_500 }
-                                .map { id -> id to embedder.embed(pcms.getValue(id), listOf(segment(500, 5_500)))[0] }
+                                .map { id -> id to embedder.embed(pcmSource(pcms.getValue(id)), listOf(segment(500, 5_500)))[0] }
 
                         for ((name, items) in listOf("whole clips" to whole, "5 s excerpts" to excerpts)) {
                             withClue("$name (threshold $SPEAKER_DISTANCE_THRESHOLD)") {

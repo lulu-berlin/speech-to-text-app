@@ -180,7 +180,7 @@ class ProcessingEngineDiarizationSpec :
 
         given("two tasks with the same stored clip, one chunked by this run and one before it") {
             `when`("the engine diarizes both") {
-                then("each gets a whole-file PCM decoded from its stored clip, identical across the restart") {
+                then("each gets its stored clip as a window source, giving the same samples across the restart") {
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val restarted =
@@ -213,13 +213,16 @@ class ProcessingEngineDiarizationSpec :
                         fixture.completed.receive() shouldBe restarted
                         fixture.completed.receive() shouldBe fresh
 
-                        // Diarization decodes each task's stored canonical clip once — never the per-chunk
-                        // copies the old reconstruction read (item 44).
+                        // Diarization streams its speaker windows out of each task's stored canonical clip
+                        // (item 43) — never the per-chunk copies the old reconstruction read (item 44). The
+                        // window source of each run reads the same clip, so the same range gives the same
+                        // samples, and the clip's own sample count comes from its stored header.
                         val expected = fixture.pcmDecoder.clipPcm.toList()
                         fixture.diarizer.diarized shouldBe listOf(restarted, fresh)
-                        fixture.diarizer.pcms.map { it.toList() } shouldBe listOf(expected, expected)
+                        fixture.diarizer.sources.map { it.totalSamples } shouldBe listOf(16_000, 16_000)
+                        fixture.diarizer.sources.map { it.samples(0, expected.size).toList() } shouldBe listOf(expected, expected)
                         fixture.pcmDecoder.decoded.map { it.fileName.toString() } shouldBe
-                            listOf("canonical.flac", "canonical.flac")
+                            listOf("diarize-window.flac", "diarize-window.flac")
                     }
                 }
             }

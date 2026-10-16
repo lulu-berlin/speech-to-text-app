@@ -8,6 +8,7 @@ import stt.audio.Chunker
 import stt.audio.FlacRow
 import stt.audio.FlacRows
 import stt.audio.PlannedChunk
+import stt.audio.fakeCanonicalHeader
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -28,10 +29,10 @@ internal class FakeChunker : Chunker {
     /** How many chunks every call plans. */
     var chunkCount: Int = 1
 
-    /** The canonical clip every call plans (item 44): a small header and one one-frame second. */
+    /** The canonical clip every call plans (item 44): a header naming [CLIP_SAMPLES] samples and one one-second row. */
     var canonical: FlacRows =
         FlacRows(
-            header = "fake-canonical-header".toByteArray(),
+            header = fakeCanonicalHeader(CLIP_SAMPLES),
             rows = listOf(FlacRow(second = 0, frames = listOf("fake-frame".toByteArray()))),
         )
 
@@ -66,3 +67,6 @@ internal class FakeChunker : Chunker {
             ChunkedAudio(durationMs = planned.last().endMs, chunks = planned, canonical = clip)
         }
 }
+
+/** The stand-in clip's length: one second, the one one-second row [FakeChunker] plans. */
+private const val CLIP_SAMPLES = 16_000

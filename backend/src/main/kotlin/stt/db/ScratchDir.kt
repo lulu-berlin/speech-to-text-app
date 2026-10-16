@@ -10,9 +10,9 @@ import java.util.HexFormat
 /**
  * The app's ephemeral scratch directory (item 44): one directory per data directory, under the OS temp dir,
  * `java.io.tmpdir/stt-<fingerprint>/`. Everything a task needs on disk but must not keep lives here — the
- * chunker's scratch (the original written out for decoding, the canonical encode, the decoded PCM, the
- * exported chunks), the transient per-chunk whisper inputs and the clip decoded for diarization — one
- * directory per task under [taskDir]. Keying it to the data directory keeps one app instance out of another's
+ * chunker's scratch (the original written out for decoding, the canonical encode and decoded PCM, the
+ * exported chunks), the transient per-chunk whisper inputs and the diarization window decoded from the clip —
+ * one directory per task under [taskDir]. Keying it to the data directory keeps one app instance out of another's
  * files, and it is emptied at startup so a crash's leftovers never survive. Every method that touches the disk
  * suspends and runs on [Dispatchers.IO] (AGENTS.md: blocking I/O only there).
  */
@@ -34,11 +34,11 @@ internal class ScratchDir(
     /** The task's original upload, materialized from the database for the chunker (item 44). */
     suspend fun originalFile(id: Long): Path = taskDir(id).resolve("source")
 
-    /** The task's transient copy of its stored canonical clip, materialized for one decode (item 44). */
-    suspend fun clipFile(id: Long): Path = taskDir(id).resolve("canonical.flac")
+    /** The stored clip's rows one diarization window needs, materialized as the FLAC the decoder reads (item 43). */
+    suspend fun diarizeWindow(id: Long): Path = taskDir(id).resolve("diarize-window.flac")
 
-    /** The PCM [clipFile] decodes to. */
-    suspend fun clipPcm(id: Long): Path = taskDir(id).resolve("canonical.f32")
+    /** The PCM [diarizeWindow] decodes to. */
+    suspend fun diarizePcm(id: Long): Path = taskDir(id).resolve("diarize-window.f32")
 
     /** Removes everything in the scratch directory best-effort, so a crash's leftovers never survive a restart. */
     suspend fun clear() {
