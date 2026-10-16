@@ -106,7 +106,7 @@ graph TD
   32 --> 45
   12 --> 44
   11 --> 46[46 contextual logging ✓]:::done
-  47 --> 55[55 atomic-transitions lock probe]
+  47 --> 55[55 atomic-transitions lock probe ✓]:::done
   50 --> 56[56 prebuilt Linux x86_64 bundle Mesa]
   57[57 desktop-nix-e2e container failure] --> 50
   classDef done fill:#d4edda,stroke:#2e7d32
@@ -169,6 +169,6 @@ graph TD
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md) | done | — |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | spec-approved | 12, 22 |
 | [53 — The Nix store cache: one writer per key, versioned past the stale entry](53-nix-store-cache-v2.md) | spec-approved | 51 |
-| [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](55-atomic-transitions-lock-probe.md) | spec-approved | — |
+| [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md) | done | — |
 | [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](56-desktop-bundle-mesa-artifact.md) | spec-approved | 50 |
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](57-desktop-nix-e2e-container-failure.md) | spec-approved | — |
