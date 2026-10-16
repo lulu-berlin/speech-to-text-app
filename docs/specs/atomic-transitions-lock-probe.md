@@ -1,7 +1,7 @@
 # 55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent
 
-Status: in-review
-Depends on: — (item [47](../docs/specs/atomic-transitions-spec-flaky.md) is done and fixed a different failure
+Status: done (roadmap item 55, merged 2026-10-16 as PR #10)
+Depends on: — (item [47](atomic-transitions-spec-flaky.md) is done and fixed a different failure
 of the same scenario)
 Blocks: —
 
@@ -169,3 +169,6 @@ exactly as they are.
   `docs/known-issues.md` § Tests, with `TestEngine.kt`'s probe comments no longer claiming "is queued";
   (2) `CountingMutex.lockCalls` dropped — only `CountingMutexSpec` read it — and that spec now shows its
   precondition as both writers recorded (`writers == {first, second}`) before either wait starts.
+- 2026-10-16: merged on GitHub as PR #10 (`113ed428`, one squashed commit). Spec and final test list moved
+  to `docs/specs/atomic-transitions-lock-probe.md`; status done. Item 50's `desktop-bundle` job verifies it
+  once PR #9 rebases onto `main`.
