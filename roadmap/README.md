@@ -99,7 +99,7 @@ graph TD
   16 --> 50[50 Electron desktop app]
   22 --> 52[52 edit transcription]
   12 --> 52
-  11 --> 43[43 diarization memory]
+  11 --> 43[43 diarization memory: stream speaker windows]
   38 --> 44[44 audio in database ✓]:::done
   11 --> 44
   11 --> 45[45 selectable GPUs ✓]:::done
@@ -155,7 +155,7 @@ graph TD
 | [40 — Task transitions are not atomic (pause/resume race a finishing task)](../docs/specs/atomic-task-transitions.md) | done | 11 |
 | [41 — Upload hardening: duplicate race, size limit, spool cleanup](41-upload-hardening.md) | draft | 12 |
 | [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue](42-worker-stability.md) | spec-approved | 11 |
-| [43 — Diarization peak memory: drop the intermediate PCM copies](43-diarization-memory.md) | draft | 11 |
+| [43 — Diarization memory: stream speaker windows from the stored clip](43-diarization-memory.md) | spec-approved | 11 |
 | [44 — Store the full audio in the database; drop the file cache](../docs/specs/audio-in-database.md) | done | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md) | done | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
