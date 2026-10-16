@@ -8,16 +8,20 @@ data class SplitFlac(
     val header: ByteArray,
     val frames: List<ByteArray>,
 ) {
-    /**
-     * The clip's sample count, from STREAMINFO — the header's first block, which FLAC requires: its 36-bit total at
-     * bit 108 of the block's data (after the 4-byte marker and the 4-byte block header). The canonical encode writes
-     * to a file, so the count is filled in (a pipe would leave it 0).
-     */
+    /** The clip's sample count, from STREAMINFO ([streamInfoTotalSamples]). */
     val totalSamples: Long
-        get() {
-            fun byte(i: Int) = header[i].toLong() and 0xFF
-            return ((byte(21) and 0x0F) shl 32) or (byte(22) shl 24) or (byte(23) shl 16) or (byte(24) shl 8) or byte(25)
-        }
+        get() = streamInfoTotalSamples(header)
+}
+
+/**
+ * The clip's exact sample count: the total `header`'s STREAMINFO declares. STREAMINFO is the header's first
+ * block, which FLAC requires: its 36-bit total sits at bit 108 of the block's data (after the 4-byte marker and
+ * the 4-byte block header). The canonical encode writes to a file, so the count is filled in (a pipe would leave
+ * it 0), and [FlacSplitter] refuses frames that do not hold exactly that many samples.
+ */
+internal fun streamInfoTotalSamples(header: ByteArray): Long {
+    fun byte(i: Int) = header[i].toLong() and 0xFF
+    return ((byte(21) and 0x0F) shl 32) or (byte(22) shl 24) or (byte(23) shl 16) or (byte(24) shl 8) or byte(25)
 }
 
 /**

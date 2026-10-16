@@ -26,6 +26,7 @@ import stt.audio.Chunker
 import stt.audio.PcmDecoder
 import stt.audio.SAMPLES_PER_MS
 import stt.audio.WindowCutter
+import stt.audio.streamInfoTotalSamples
 import stt.audio.toCanonicalRows
 import stt.config.Config
 import stt.config.Device
@@ -49,6 +50,7 @@ import stt.db.SpeakersMode
 import stt.db.StoredTask
 import stt.db.TaskPhase
 import stt.db.TaskRepository
+import stt.diarization.PcmSource
 import stt.pause.PauseGate
 import stt.process.ProcessControl
 import stt.queue.TaskStatus
@@ -57,8 +59,6 @@ import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSettings
 import stt.transcribe.resumePrompt
 import stt.transcribe.taskProgress
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -645,8 +645,9 @@ class ProcessingEngine internal constructor(
 
     /**
      * DIARIZING: skipped when the speakers are off (`speakers_mode = off` asks for no labels) and when the
-     * task has no segments (there is nothing to label; item 09 skips it then too). Otherwise the whole-file
-     * PCM is rebuilt from the stored chunks (ADR 0024), and the [Diarizer] assigns and stores the speakers.
+     * task has no segments (there is nothing to label; item 09 skips it then too). Otherwise the task's stored
+     * canonical clip (item 44) is handed to the [Diarizer] as a [PcmSource], which reads each speaker window out
+     * of it (item 43) instead of a whole-file PCM, and assigns and stores the speakers.
      */
     private suspend fun diarize(
         id: Long,
@@ -659,7 +660,7 @@ class ProcessingEngine internal constructor(
         // The contract (item 12): progress is 0 before diarization starts, 1 once the speakers are stored,
         // with no stage left over. The reports in between are each persisted and then published.
         diarizationProgress(id, null, 0.0)
-        val pcm = clipPcm(id)
+        val audio = clipPcmSource(id)
         val reports = Channel<DiarizationReport?>(Channel.UNLIMITED)
         coroutineScope {
             launch {
@@ -667,7 +668,7 @@ class ProcessingEngine internal constructor(
                 diarizer.diarize(
                     task,
                     pauseGate,
-                    pcm,
+                    audio,
                     run.threads,
                     onStage = { stage.value = it },
                     onProgress = { value -> reports.trySend(DiarizationReport(stage.value, value)) },
@@ -684,28 +685,27 @@ class ProcessingEngine internal constructor(
     }
 
     /**
-     * The task's whole-file PCM, decoded from its stored canonical clip (item 44): the clip is materialized
-     * from the database to one transient scratch file, decoded to a second, and both are removed on every
-     * path. No chunk FLAC is read, so a task whose per-chunk copies are gone still diarizes, and a restart
-     * decodes the same stored bytes.
+     * The task's audio for diarization (item 43): a [ClipPcmSource] over its stored canonical clip (item 44), so
+     * the [Diarizer] reads each speaker window's samples out of the clip instead of a whole-file PCM. The clip's
+     * total sample count is its stored header's STREAMINFO — the count the whole-clip decode had, so a segment
+     * near or past the clip's end windows as it did. No chunk FLAC is read, so a task whose per-chunk copies are
+     * gone still diarizes, and a restart reads the same stored bytes.
      */
-    private suspend fun clipPcm(id: Long): FloatArray {
-        val clip = scratchDir.clipFile(id)
-        val decoded = scratchDir.clipPcm(id)
-        try {
-            withContext(Dispatchers.IO) {
-                Files.newOutputStream(clip).use { out -> clipAudio.copyTo(id, 0, clipAudio.size(id), out) }
-            }
-            pcmDecoder.decode(clip, decoded)
-            val bytes = withContext(Dispatchers.IO) { Files.readAllBytes(decoded) }
-            val floats = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
-            return FloatArray(floats.remaining()) { floats.get() }
-        } finally {
-            withContext(NonCancellable + Dispatchers.IO) {
-                Files.deleteIfExists(clip)
-                Files.deleteIfExists(decoded)
-            }
-        }
+    private suspend fun clipPcmSource(id: Long): PcmSource {
+        val header =
+            audioHeaders.read(id)
+                ?: throw NoSuchElementException("task $id has no stored canonical clip")
+        val samples = streamInfoTotalSamples(header)
+        // Sample positions are Int everywhere in the windowing (`ms * 16` included), so a clip that cannot be
+        // addressed by them fails here rather than wrapping silently: 2^31 samples are 37 h of 16 kHz audio.
+        check(samples <= Int.MAX_VALUE) { "task $id's clip holds $samples samples, more than a sample position can address" }
+        return ClipPcmSource(
+            taskId = id,
+            totalSamples = samples.toInt(),
+            clipAudio = clipAudio,
+            pcmDecoder = pcmDecoder,
+            scratchDir = scratchDir,
+        )
     }
 
     /** Persists a diarization stage report and then publishes it, so the database leads the event. */

@@ -36,7 +36,7 @@ internal class SpeakerDiarizer(
     override suspend fun diarize(
         task: StoredTask,
         gate: PauseGate,
-        pcm: FloatArray,
+        audio: PcmSource,
         threads: Int?,
         onStage: (DiarizationStage) -> Unit,
         onProgress: (Double) -> Unit,
@@ -44,7 +44,7 @@ internal class SpeakerDiarizer(
         val taskSegments = segments.findByTask(task.id)
         onStage(DiarizationStage.EMBEDDING)
         onProgress(0.0)
-        val vectors = embeddings(threads).embed(pcm, taskSegments, gate) { done, total -> onProgress(done.toDouble() / total) }
+        val vectors = embeddings(threads).embed(audio, taskSegments, gate) { done, total -> onProgress(done.toDouble() / total) }
         onStage(DiarizationStage.CLUSTERING)
         onProgress(0.0)
         val k = if (task.task.speakersMode == SpeakersMode.FIXED) task.task.speakersCount else null

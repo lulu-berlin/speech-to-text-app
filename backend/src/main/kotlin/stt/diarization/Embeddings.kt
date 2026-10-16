@@ -27,20 +27,22 @@ internal class Embeddings(
     private val outputName = model.session.getOutputNames().single()
 
     /**
-     * One embedding per [segments] segment, in segment order. Empty [pcm] yields every embedding all zeros
-     * (oracle `embed_windows` with `total <= 0`), without touching the session.
+     * One embedding per [segments] segment, in segment order. A clip with no samples ([PcmSource.totalSamples] 0)
+     * yields every embedding all zeros (oracle `embed_windows` with `total <= 0`), without touching the session.
      *
-     * Cancellation of this coroutine is checked before every window, so a cancel lands at the next window
-     * boundary (inference itself blocks). [gate] (ADR 0004) is checked at the same boundary: while it is paused
-     * the embedding suspends between windows. [onWindowDone] reports `(windows done, total windows)` after each window.
+     * Each segment's window is read from [pcm] by range (item 43), so only one window is in heap at a time and the
+     * clip is never materialized. Cancellation of this coroutine is checked before every window, so a cancel lands
+     * at the next window boundary (inference itself blocks). [gate] (ADR 0004) is checked at the same boundary:
+     * while it is paused the embedding suspends between windows. [onWindowDone] reports `(windows done, total
+     * windows)` after each window.
      */
     suspend fun embed(
-        pcm: FloatArray,
+        pcm: PcmSource,
         segments: List<Segment>,
         gate: PauseGate? = null,
         onWindowDone: Progress = { _, _ -> },
     ): Array<FloatArray> {
-        if (pcm.isEmpty()) {
+        if (pcm.totalSamples == 0) {
             return Array(segments.size) { FloatArray(model.metadata.outputDim) }
         }
         val embeddings = ArrayList<FloatArray>(segments.size)

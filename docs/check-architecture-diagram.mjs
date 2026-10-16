@@ -12,6 +12,7 @@ const STT = 'backend/src/main/kotlin/stt';
 const CLIENT = 'frontend/src/shared/api/client.ts';
 const ENGINE = `${STT}/engine/ProcessingEngine.kt`;
 const ENGINE_MODULE = `${STT}/engine/EngineModule.kt`;
+const CLIP_PCM_SOURCE = `${STT}/engine/ClipPcmSource.kt`;
 
 // Box id → what makes it a real component: [file, pattern] pairs that must all match.
 const boxes = {
@@ -52,7 +53,10 @@ const arrows = {
     [`${STT}/http/EventStream.kt`, /ProcessingEngine/],
     [`${STT}/http/EventsRoutes.kt`, /EventStream by dependencies/],
   ],
-  'Engine->Files': [[ENGINE, /scratchDir\.(taskDir|chunkerDir|clipFile)\(/]],
+  'Engine->Files': [
+    [ENGINE, /scratchDir\.(taskDir|chunkerDir)\(/],
+    [CLIP_PCM_SOURCE, /scratchDir\.diarize(Window|Pcm)\(/],
+  ],
   'Engine->FFmpeg': [
     [ENGINE, /chunker\.chunk\(/],
     [ENGINE_MODULE, /AudioChunker\(/],

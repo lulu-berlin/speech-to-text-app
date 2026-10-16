@@ -32,7 +32,7 @@ class LibriSpeechDiarizationSpec :
                         }
 
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
-                        val embeddings = Embeddings(model).embed(pcm, segments)
+                        val embeddings = Embeddings(model).embed(pcmSource(pcm), segments)
                         val speakerIds = speakerIds(segments, embeddings, k = null, maxSpeakers = 8)
 
                         speakerIds.shouldBe(listOf(0, 0, 1, 1, 0, 0))

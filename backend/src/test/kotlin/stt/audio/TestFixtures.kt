@@ -65,3 +65,19 @@ internal suspend fun toS16(
     ProcessRunner().run(command).expectSuccess("convert $input to raw s16le")
     return Files.readAllBytes(raw).also { Files.delete(raw) }
 }
+
+/**
+ * A stand-in canonical FLAC header declaring [totalSamples] samples, for fakes that must look like a stored clip
+ * without encoding one: its only meaningful bytes are the 36-bit STREAMINFO total, at bit 108 of the block's data,
+ * which is where [streamInfoTotalSamples] reads the clip's sample count.
+ */
+internal fun fakeCanonicalHeader(totalSamples: Int): ByteArray {
+    val total = totalSamples.toLong()
+    return "fake-canonical-header".toByteArray().copyOf(26).also { header ->
+        header[21] = ((total shr 32) and 0x0F).toByte()
+        header[22] = ((total shr 24) and 0xFF).toByte()
+        header[23] = ((total shr 16) and 0xFF).toByte()
+        header[24] = ((total shr 8) and 0xFF).toByte()
+        header[25] = (total and 0xFF).toByte()
+    }
+}
