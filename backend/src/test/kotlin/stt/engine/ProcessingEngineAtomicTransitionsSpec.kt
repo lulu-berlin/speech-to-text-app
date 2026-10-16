@@ -5,8 +5,6 @@ import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.test.runTest
 import stt.db.Database
@@ -40,15 +38,13 @@ class ProcessingEngineAtomicTransitionsSpec :
 
                             // Hold the writer lock; the completion (the worker's terminal write) queues first,
                             // then the pause's write. The pause's read gate already passed on RUNNING, and its
-                            // write waits behind the completion — reads use their own connections. The count of
-                            // lock calls is read after every setup write, so the racers are observed relative to
-                            // it; each runs on Dispatchers.Default, independent of the test scheduler.
+                            // write waits behind the completion — reads use their own connections. Each racer is
+                            // queued with queueWrite, which waits for that racer's own write to reach the lock, not
+                            // for a count of lock calls; each runs on Dispatchers.Default, independent of the test
+                            // scheduler.
                             val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 2L))
-                            val base = lock.lockCalls.value
-                            val completion = async(Dispatchers.Default) { fixture.tasks.setCompleted(task, 9_000L) }
-                            awaitLockCall(lock, base + 1)
-                            val pause = async(Dispatchers.Default) { fixture.engine.pauseTask(task) }
-                            awaitLockCall(lock, base + 2)
+                            val completion = queueWrite(lock, "completion") { fixture.tasks.setCompleted(task, 9_000L) }
+                            val pause = queueWrite(lock, "pause") { fixture.engine.pauseTask(task) }
 
                             // Release: the completion commits first, so the pause's write lands on a task that
                             // is no longer pausable. It must be refused, never written over.
@@ -94,11 +90,8 @@ class ProcessingEngineAtomicTransitionsSpec :
                             // resume's. The resume's read gate already passed on PAUSED, and its write waits
                             // behind the cancel — reads use their own connections.
                             val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 2L))
-                            val base = lock.lockCalls.value
-                            val cancel = async(Dispatchers.Default) { fixture.engine.cancelTask(task) }
-                            awaitLockCall(lock, base + 1)
-                            val resume = async(Dispatchers.Default) { fixture.engine.resumeTask(task) }
-                            awaitLockCall(lock, base + 2)
+                            val cancel = queueWrite(lock, "cancel") { fixture.engine.cancelTask(task) }
+                            val resume = queueWrite(lock, "resume") { fixture.engine.resumeTask(task) }
 
                             // Release: the cancel commits first, so the resume's write lands on a task that is
                             // no longer PAUSED. It must be refused — a resume that lost must not unfreeze the
@@ -146,11 +139,9 @@ class ProcessingEngineAtomicTransitionsSpec :
                             // the row's delete is sequenced behind the cancel's write, so queueing the
                             // completion and the cancel's write is enough to fix the whole order.
                             val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 2L))
-                            val base = lock.lockCalls.value
-                            val completion = async(Dispatchers.Default) { fixture.tasks.setCompleted(task, 9_000L) }
-                            awaitLockCall(lock, base + 1)
-                            val removal = async(Dispatchers.Default) { fixture.engine.deleteTask(task) }
-                            awaitLockCall(lock, base + 2) // the cancel's conditional write
+                            val completion = queueWrite(lock, "completion") { fixture.tasks.setCompleted(task, 9_000L) }
+                            // The delete's queued write is its cancel's conditional write.
+                            val removal = queueWrite(lock, "delete") { fixture.engine.deleteTask(task) }
 
                             // Release: the completion commits COMPLETED first, so the cancel loses — a
                             // finished task cannot be cancelled — and the row still goes: delete wins.
@@ -193,11 +184,8 @@ class ProcessingEngineAtomicTransitionsSpec :
                             // pause's. The pause's read gate already passed on RUNNING, and its write waits
                             // behind the cancel — reads use their own connections.
                             val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 2L))
-                            val base = lock.lockCalls.value
-                            val cancel = async(Dispatchers.Default) { fixture.engine.cancelTask(task) }
-                            awaitLockCall(lock, base + 1)
-                            val pause = async(Dispatchers.Default) { fixture.engine.pauseTask(task) }
-                            awaitLockCall(lock, base + 2)
+                            val cancel = queueWrite(lock, "cancel") { fixture.engine.cancelTask(task) }
+                            val pause = queueWrite(lock, "pause") { fixture.engine.pauseTask(task) }
 
                             // Release: the cancel commits CANCELED first, so the pause's write lands on a
                             // task that is no longer pausable. It must be refused — and freeze nothing: a
@@ -269,12 +257,9 @@ class ProcessingEngineAtomicTransitionsSpec :
                             // completion's write — the accepted-pause order (the pause wins its write, then
                             // completion wins the race by overwriting PAUSED).
                             val held = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 3L))
-                            val base = lock.lockCalls.value
                             fixture.transcriber.hold = null // chunk 0 returns; chunk 1 follows
-                            val pause = async(Dispatchers.Default) { fixture.engine.pauseTask(first) }
-                            awaitLockCall(lock, base + 1)
-                            val completion = async(Dispatchers.Default) { fixture.tasks.setCompleted(first, 9_000L) }
-                            awaitLockCall(lock, base + 2)
+                            val pause = queueWrite(lock, "pause") { fixture.engine.pauseTask(first) }
+                            val completion = queueWrite(lock, "completion") { fixture.tasks.setCompleted(first, 9_000L) }
 
                             held.release()
                             completion.await()

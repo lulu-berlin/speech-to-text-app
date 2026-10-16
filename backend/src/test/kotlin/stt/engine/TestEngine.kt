@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
@@ -19,7 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import stt.audio.PlannedChunk
 import stt.audio.toCanonicalRows
 import stt.config.testConfig
@@ -46,6 +47,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -275,14 +278,33 @@ internal suspend fun storeChunkedPlan(
 // the lock grants waiters in FIFO order, so the commit order is the launch order and the test is exact,
 // not probabilistic.
 
-/** A [Mutex] that counts its lock() calls, so a test can see a caller start waiting for it. */
+/**
+ * Names a coroutine that takes the writer lock: a race spec launches each racing write with its own
+ * [LockWriter], so it can wait for exactly that write to queue. A context element, not the coroutine's
+ * `Job`: `withContext` replaces the `Job` (the cancel's write runs under `NonCancellable`) but keeps the
+ * element, and the engine worker's own writes never carry one.
+ */
+internal class LockWriter(
+    private val name: String,
+) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<LockWriter>
+
+    override fun toString() = name
+}
+
+/**
+ * A [Mutex] that records which [LockWriter]s have called lock(), so a test can see a racing write reach it.
+ * The record is taken just before the call joins the lock's queue, not after (a known gap, see
+ * docs/known-issues.md § Tests).
+ */
 internal class CountingMutex(
     private val delegate: Mutex = Mutex(),
 ) : Mutex by delegate {
-    val lockCalls = MutableStateFlow(0)
+    /** The writers that have called lock(); it only grows, so a wait for one writer cannot miss it. */
+    val writers = MutableStateFlow<Set<LockWriter>>(emptySet())
 
     override suspend fun lock(owner: Any?) {
-        lockCalls.update { it + 1 }
+        currentCoroutineContext()[LockWriter]?.let { writer -> writers.update { it + writer } }
         delegate.lock(owner)
     }
 }
@@ -322,14 +344,30 @@ internal suspend fun CoroutineScope.holdWriteTransaction(
 }
 
 /**
- * Waits until the writer lock has been called [call] times: the operation launched before this wait is
- * now waiting on the lock, so it cannot commit before another operation launched after this wait.
+ * Waits until [writer] has called the writer lock: the write it launched is about to wait on the lock, so
+ * it is (barring the record-before-enqueue gap on [CountingMutex]) ahead of any write launched after this
+ * wait. Fails naming [writer] after [timeout].
  */
 internal suspend fun awaitLockCall(
     lock: CountingMutex,
-    call: Int,
+    writer: LockWriter,
+    timeout: Duration = PROBE_TIMEOUT_MS.milliseconds,
 ) {
-    withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { lock.lockCalls.first { it == call } } }
+    withContext(Dispatchers.Default) { withTimeoutOrNull(timeout) { lock.writers.first { writer in it } } }
+        ?: throw AssertionError("writer $writer has not called lock() within $timeout")
+}
+
+/**
+ * Launches [write] on Dispatchers.Default as its own [LockWriter] named [name] and returns once that write
+ * has called the writer lock, so it commits before any write launched after it (see [awaitLockCall]).
+ */
+internal suspend fun <T> CoroutineScope.queueWrite(
+    lock: CountingMutex,
+    name: String,
+    write: suspend CoroutineScope.() -> T,
+): Deferred<T> {
+    val writer = LockWriter(name)
+    return async(Dispatchers.Default + writer, block = write).also { awaitLockCall(lock, writer) }
 }
 
 // The waits above bound the real-time probes: a probe waits for something that must happen, and the held
