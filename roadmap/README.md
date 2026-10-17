@@ -88,7 +88,7 @@ graph TD
   11 --> 42[42 worker stability]
   11 --> 47[47 atomic-transitions spec flaky ✓]:::done
   51[51 CI verification ✓]:::done
-  51 --> 53[53 Nix store cache: one writer, keyed v2]
+  51 --> 53[53 Nix store cache: one writer, keyed v2 ✓]:::done
   51 --> 48[48 macOS support]
   05 --> 48
   16 --> 48
@@ -112,6 +112,8 @@ graph TD
   47 --> 55[55 atomic-transitions lock probe ✓]:::done
   50 --> 56[56 prebuilt Linux x86_64 bundle Mesa]
   57[57 desktop-nix-e2e container failure ✓]:::done --> 50
+  58[58 atomic-transitions completion waits]
+  59[59 UI/UX polish]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -171,8 +173,10 @@ graph TD
 | [50 — Electron desktop app](../docs/specs/electron-desktop-app.md) | done | 16 |
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md) | done | — |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | spec-approved | 12, 22 |
-| [53 — The Nix store cache: one writer per key, versioned past the stale entry](53-nix-store-cache-v2.md) | spec-approved | 51 |
+| [53 — The Nix store cache: one writer per key, versioned past the stale entry](../docs/specs/nix-store-cache.md) | done | 51 |
 | [54 — TypeScript for the remaining hand-written JavaScript](54-typescript-for-the-remaining-scripts.md) | draft | — |
 | [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md) | done | — |
 | [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](56-desktop-bundle-mesa-artifact.md) | spec-approved | 50 |
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md) | done | — |
+| [58 — The atomic-transitions spec's completion waits still have real-time windows](58-atomic-transitions-spec-completion-window.md) | spec-approved | — |
+| [59 — UI/UX polish: compact header, view hierarchy, task-row progress, history affordances](59-ui-ux-polish.md) | spec-approved | — |
