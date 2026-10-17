@@ -18,13 +18,14 @@ problems; it never goes away and it is not a roadmap item.
 Rules for the roadmap: issues currently planned by roadmap items are deliberately absent here —
 [41 upload hardening](../roadmap/41-upload-hardening.md) (size cap, multi-part spool overwrite,
 duplicate-race 500), [42 worker stability](../roadmap/42-worker-stability.md) (task setup outside the
-guarded try; cancel/pause/delete racing a task's start).
+guarded try; cancel/pause/delete racing a task's start),
+[60 exception-handling policy](../roadmap/60-exception-handling-policy.md) (the task-failure path's
+throwable logging).
 
 ## Backend runtime
 
 | Issue | Sev | Evidence | Notes |
 | ----- | --- | -------- | ----- |
-| Task-failure path never logs the throwable — only `e.message` is persisted; and when `failIfRunning` loses the race to a cancel, nothing is recorded or logged at all | MED | `ProcessingEngine.kt:501-506` | Log with the item-46 MDC context in addition to the DB write |
 | Upload acceptance is the client-supplied filename extension only; content type is read and ignored, no magic-byte sniffing — any bytes renamed `x.mp3` pass `201` and fail later at ffmpeg decode | MED | `backend/src/main/kotlin/stt/http/UploadRequest.kt:44-58` | Content validity only; size cap / multi-part / 409 are item 41 |
 | Hottest queries scan without an index: `tasks.status` and `tasks.queue_position` unindexed (`TasksTable`: PK only); `nextQueued`, `pendingOrderedIds`, `startedPaused`, `nextQueuePosition`, `retryIfPossible` all filter/sort on them | MED | `backend/src/main/resources/db/migration/V1__init.sql`; `db/TaskRepository.kt:102-151` | Add indexes in a new migration |
 | `listDetails` runs two extra queries per task (`audio_header` exists, `segments` max end) in a read transaction — O(N) per list / snapshot | LOW | `db/TaskRepository.kt:428-447` | One grouped query, or materialize duration |
