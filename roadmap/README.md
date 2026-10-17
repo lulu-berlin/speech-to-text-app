@@ -114,6 +114,7 @@ graph TD
   57[57 desktop-nix-e2e container failure ✓]:::done --> 50
   58[58 atomic-transitions completion waits]
   59[59 UI/UX polish]
+  60[60 exception-handling policy]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -180,3 +181,4 @@ graph TD
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md) | done | — |
 | [58 — The atomic-transitions spec's completion waits still have real-time windows](58-atomic-transitions-spec-completion-window.md) | spec-approved | — |
 | [59 — UI/UX polish: compact header, view hierarchy, task-row progress, history affordances](59-ui-ux-polish.md) | spec-approved | — |
+| [60 — Exception-handling policy: no catch-all swallows a throwable silently](60-exception-handling-policy.md) | spec-approved | 42 |
