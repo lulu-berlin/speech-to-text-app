@@ -35,11 +35,12 @@ How it works inside — the components, the life of a task, the data model, the 
 | | Who it is for | Status |
 | --- | --- | --- |
 | [Packaged app with Nix](#packaged-app-with-nix) | Using the app | available |
+| [Desktop app](#desktop-app) | Using the app in its own window, without a browser | available on Linux |
 | [Development environment (devenv)](#development-environment-devenv) | Working on the app | available |
 | [Docker](#docker) | Using the app without Nix | available |
 | [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | available |
 
-All ways need **Linux on x86-64**; the Gradle path also has macOS builds, untested. A GPU is optional: whisper.cpp runs on any GPU with a **Vulkan** driver and falls back to the CPU otherwise. The first build of the package, the development shell or the Docker image downloads about 600 MB of models.
+All ways need **Linux on x86-64**; the Gradle path also has macOS builds, untested. A GPU is optional: whisper.cpp runs on any GPU with a **Vulkan** driver and falls back to the CPU otherwise. The first build of the package, the development shell or the Docker image downloads about 600 MB of models; the desktop app downloads them on its first start.
 
 ### Packaged app with Nix
 
@@ -52,6 +53,71 @@ nix run .
 ```
 
 Then open <http://localhost:8080>. `nix build .` builds the same app into `./result/bin/stt-app` without starting it. Details: [docs/specs/nix-flake-package.md](docs/specs/nix-flake-package.md).
+
+### Desktop app
+
+The same app in its own window: the window shows the UI that a bundled backend serves, and nothing needs a browser, a server or a port you choose. It comes in three forms with the same behavior; pick the one your machine can run:
+
+| Form | For | Build it with | Needs on the machine |
+| --- | --- | --- | --- |
+| [`.deb`](#deb-debian-and-ubuntu) | Debian 13+, Ubuntu 23.10+ | `pnpm --dir desktop dist` | apt (it installs what the package declares) |
+| [Nix package](#nix-package) | NixOS, or any Linux with Nix | `nix run .#desktop` | Nix |
+| [Single-file bundle](#single-file-bundle-any-distribution) | any Linux on x86-64, also without glibc | `nix build .#desktop-bundle` | `sh`, `tar`, `zstd`, unprivileged user namespaces |
+
+What all three do:
+
+- **First start**: a screen says "Preparing the speech analysis models…" and downloads the two pinned models (about 600 MB, from GitHub releases only) into `${XDG_CACHE_HOME:-~/.cache}/stt-app/models`, checks each file's sha256 and offers **Retry** if a download fails; later starts reuse them. A model you set yourself with `STT_WHISPER_MODEL` or `STT_SPEAKER_MODEL` is used instead, and when the pinned models are already in a Nix store, they are taken from there.
+- **Your data** is in the same directory as the Nix package's and `./gradlew run`'s, so all of them share one history ([Where your data lives](#where-your-data-lives)).
+- **Private by default**: the backend listens only on `127.0.0.1`, on a free port picked at each start, and the window itself cannot reach the network ([ADR 0055](docs/decisions/0055-desktop-window-has-no-network-path.md)).
+- **Quitting** the window stops the backend and every whisper.cpp and ffmpeg process it started.
+
+Compared with the [Nix package](#packaged-app-with-nix) and [Docker](#docker), which serve the app at <http://localhost:8080> to any browser (with Docker, to the network you publish it on), the desktop app is one user's window app: the same backend, the same data format, no server to keep running.
+
+#### `.deb` (Debian and Ubuntu)
+
+Build it from the repository (JDK 21, Node.js and pnpm; the [development shell](#development-environment-devenv) provides all of them):
+
+```sh
+./gradlew -p backend installDist          # in the devenv shell: cd backend && gradle installDist
+pnpm --dir frontend install && pnpm --dir frontend build
+pnpm --dir desktop install && pnpm --dir desktop fetch:jdk && pnpm --dir desktop dist
+sudo apt install ./desktop/dist/stt-app_0.1.0_amd64.deb
+stt-app
+```
+
+The package carries its own Java runtime, whisper.cpp and ffmpeg; its whisper.cpp build needs glibc 2.38 or newer, hence Debian 13+ and Ubuntu 23.10+ (tested on Ubuntu 24.04). It uses the system's Vulkan driver for the GPU (not covered by the desktop tests).
+
+#### Nix package
+
+```sh
+nix run .#desktop
+```
+
+`nix build .#desktop` builds it into `./result/bin/stt-app` without starting it. On NixOS it uses the system's GPU drivers (tested with an AMD and an NVIDIA GPU).
+
+#### Single-file bundle (any distribution)
+
+```sh
+nix build .#desktop-bundle                  # or: nix bundle --bundler .#desktop .#packages.x86_64-linux.desktop
+./result/bin/stt-app-bundle
+```
+
+One file of about 400 MB that a machine without Nix can run — copy `result/bin/stt-app-bundle` there. On its first start it unpacks itself once into `${XDG_CACHE_HOME:-~/.cache}/stt-app-bundle/` (about 1.2 GB) and then runs the app in a [bubblewrap](https://github.com/containers/bubblewrap) namespace that shows the whole machine — your files, with your permissions — except `/nix`, which is the bundle's own ([ADR 0053](docs/decisions/0053-linux-desktop-deb-flake-package-bundle.md)). It needs no root, no glibc of the host (tested on Alpine) and no packages besides `tar` and `zstd`, but it does need **unprivileged user namespaces**: Ubuntu 24.04 restricts them by default (AppArmor), and there the `.deb` is the way. On NixOS use the Nix package instead.
+
+The bundle brings its own fonts (IBM Plex, which has no fonts for 15 of whisper's scripts yet — see [Known issues](docs/known-issues.md)) and its own GPU drivers for transcription:
+
+| GPU | In the bundle | Tested |
+| --- | --- | --- |
+| AMD | Mesa RADV, shipped | yes (Radeon 680M, Ubuntu container) |
+| NVIDIA with NVIDIA's driver | the installed driver, borrowed (it must match the kernel module) | yes (RTX 3050, Ubuntu container, driver 595.71.05) |
+| NVIDIA with `nouveau` | Mesa NVK, shipped | no |
+| Intel | Mesa ANV, shipped | no |
+
+The window itself is drawn on the CPU; only transcription uses the GPU.
+
+#### Testing the desktop app
+
+Each form has its packaged end-to-end suite, run in a clean container from the development shell: `pnpm --dir e2e test:desktop` (the `.deb`, after building it), `test:desktop:nix` and `test:desktop:bundle`; on a machine with that GPU also `test:desktop:bundle:amd` and `test:desktop:bundle:nvidia`.
 
 ### Development environment (devenv)
 
@@ -164,7 +230,7 @@ Where things live:
 
 ## Configuration
 
-The backend is configured with environment variables. The Nix package, the development shell and `./gradlew run`/`dev` set all of them; you only set them yourself to change something.
+The backend is configured with environment variables. The Nix package, the development shell, `./gradlew run`/`dev` and the desktop app set all of them; you only set them yourself to change something.
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
@@ -173,6 +239,7 @@ The backend is configured with environment variables. The Nix package, the devel
 | `STT_SPEAKER_MODEL` | yes | The CAM++ speaker-embedding model (ONNX) used for diarization ([ADR 0003](docs/decisions/0003-kotlin-diarization-campplus-onnx.md)). |
 | `STT_PORT` | no | The HTTP port, default `8080`. |
 | `STT_STATIC_DIR` | no | A built frontend (`frontend/dist`) to serve. Unset, the backend serves only the API. |
+| `STT_HOST` | no | The interface the backend listens on, default `0.0.0.0` (every interface). The desktop app sets `127.0.0.1`. |
 
 A missing required variable or an invalid port stops the app at startup with a message naming it. `whisper-cli` and `ffmpeg` are run from `PATH` ([ADR 0047](docs/decisions/0047-external-tools-resolved-from-path.md)).
 
@@ -185,6 +252,7 @@ Everything the app keeps — the queue, the transcripts, the speaker names and t
 | How you run it | Data directory |
 | --- | --- |
 | Nix package | `$STT_DATA_DIR` if set, else `${XDG_DATA_HOME:-~/.local/share}/stt-app` |
+| Desktop app (`.deb`, Nix package, bundle) | `$STT_DATA_DIR` if set, else `${XDG_DATA_HOME:-~/.local/share}/stt-app` |
 | `devenv up` and the devenv shell | `.devenv/state/stt` inside the repository (git-ignored, survives restarts) |
 | `gradle run` | `$STT_DATA_DIR`, which you choose |
 | `./gradlew run` and `./gradlew dev` | `$STT_DATA_DIR` if set, else `${XDG_DATA_HOME:-~/.local/share}/stt-app` |
@@ -223,4 +291,5 @@ docker compose start
 The app is licensed under the [BSD 3-Clause License](LICENSE). Third-party material:
 
 - **Test fixtures** — clips from the LibriSpeech ASR corpus (CC BY 4.0); see [docs/attributions.md](docs/attributions.md).
-- **Models** — the whisper.cpp model ([ADR 0008](docs/decisions/0008-default-whisper-model.md)) and the CAM++ speaker model ([ADR 0003](docs/decisions/0003-kotlin-diarization-campplus-onnx.md)) are downloaded from their publishers at build time, not stored in the repository; their sources are pinned in [`nix/models.nix`](nix/models.nix).
+- **Models** — the whisper.cpp model ([ADR 0008](docs/decisions/0008-default-whisper-model.md)) and the CAM++ speaker model ([ADR 0003](docs/decisions/0003-kotlin-diarization-campplus-onnx.md)) are downloaded at build time (the desktop app: at its first start), not stored in the repository: the whisper model from this repository's GitHub release `desktop-models-v1`, a byte-identical mirror of its publisher's file, and the CAM++ model from its publisher's GitHub release; both are pinned in [`nix/models.nix`](nix/models.nix).
+- **Desktop bundle** — it carries the IBM Plex fonts (SIL Open Font License 1.1) and Mesa's Vulkan drivers (MIT); NVIDIA's driver is not shipped but borrowed from the machine it runs on.

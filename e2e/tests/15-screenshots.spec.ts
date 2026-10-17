@@ -41,6 +41,12 @@ test('captures the acceptance screenshots', async ({ page }) => {
   const running = rowOf(page, SHOT_CLIP);
   await expect(running.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
   await expect(running.getByRole('progressbar').first()).toBeVisible();
+  // Hold the seed (item 57): a paused queue freezes its whisper process (ADR 0004), so the
+  // row stays "Transcribing" however long the shots take — the tiny model can otherwise
+  // finish the ~77 s clip before the test reaches Cancel. The shots show the switch on.
+  const pause = page.getByRole('switch', { name: 'Pause the queue' });
+  await pause.click();
+  await expect(pause).toBeChecked();
 
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -48,7 +54,7 @@ test('captures the acceptance screenshots', async ({ page }) => {
     }
   }
 
-  // An upload in flight while the seed still runs; it queues behind the seed.
+  // An upload in flight while the seed is held; it queues behind the seed.
   await page.setInputFiles('input[type="file"]', [join(fixturesDir, SHOT_UPLOAD_CLIP)]);
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -56,9 +62,8 @@ test('captures the acceptance screenshots', async ({ page }) => {
     }
   }
 
-  // Cancel the running seed right away: its card lands in History, the worker frees
-  // up, and the queued mate transcribes. Waiting for the mate first would let the
-  // ~77 s seed finish on its own and leave no row to cancel.
+  // Cancel the held seed: its card lands in History. Resuming the queue then lets the
+  // queued mate transcribe on the freed worker.
   await page.setViewportSize(DESKTOP_VIEWPORT);
   await running.getByRole('button', { name: `Cancel ${SHOT_CLIP}` }).click();
   await page
@@ -66,6 +71,8 @@ test('captures the acceptance screenshots', async ({ page }) => {
     .getByRole('button', { name: 'Cancel task' })
     .click();
   await expect(running).toHaveCount(0);
+  await pause.click();
+  await expect(pause).not.toBeChecked();
   await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
 
   // History with the canceled card.

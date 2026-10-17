@@ -101,7 +101,7 @@ class ProcessingEngineRestartIntegrationSpec :
                         String(audio.bodyAsBytes(), 0, 4, Charsets.US_ASCII) shouldBe "fLaC"
 
                         dataDirEntries(dataDir).filterNot { it in DATABASE_FILES }.shouldBeEmpty()
-                        scratchFiles(ScratchDir(dataDir)).shouldBeEmpty()
+                        filesUnder(ScratchDir(dataDir).dir).shouldBeEmpty()
                     }
                 }
             }
@@ -112,11 +112,3 @@ private val DATABASE_FILES = setOf("stt.db", "stt.db-wal", "stt.db-shm")
 
 /** The names of everything directly in [dataDir], files and directories alike. */
 private fun dataDirEntries(dataDir: Path): List<String> = Files.list(dataDir).use { paths -> paths.map { it.fileName.toString() }.toList() }
-
-/** Every regular file left in the app's scratch directory. */
-private fun scratchFiles(scratch: ScratchDir): List<Path> =
-    if (!Files.isDirectory(scratch.dir)) {
-        emptyList()
-    } else {
-        Files.walk(scratch.dir).use { paths -> paths.filter { Files.isRegularFile(it) }.toList() }
-    }

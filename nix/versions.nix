@@ -55,5 +55,16 @@ in {
         sha256 = "917327cd6178e7ecddd4fb9dd5981cb4c5f04631a06dc0bd81cfe0377b1f3705";
       };
     };
+
+    # The JDK 21 tarball whose jmods the desktop staging links with jlink (roadmap item 50):
+    # the Temurin build of the flake's jdk version, so the jlink image is a generic Linux
+    # one that runs without Nix. The flake renders `downloads` (and only that) into
+    # versions.json, so the same pin also lives in versions.json's downloads section.
+    "temurin-jdk" = {
+      "linux-x64" = {
+        url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz";
+        sha256 = "ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94";
+      };
+    };
   };
 }

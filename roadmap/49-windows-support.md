@@ -1,8 +1,8 @@
 # 49 — Windows support
 
 Status: spec-approved
-Depends on: [33](../docs/specs/gradle-bootstrap.md) (done; the no-Nix path), [48](48-macos-support.md) (spec-approved; its portable process-control seam is the foundation), [51](../docs/specs/ci-verification.md) (done; a Windows CI runner verifies — local virtualization is the fallback)
-Blocks: — [50](50-electron-app.md)
+Depends on: [33](../docs/specs/gradle-bootstrap.md) (done; the no-Nix path), [48](48-macos-support.md) (spec-approved; its portable process-control seam is the foundation), [51](../docs/specs/ci-verification.md) (done; a Windows CI runner verifies — local virtualization is the fallback), [50](../docs/specs/electron-desktop-app.md) (done; the Linux desktop app and its packaged specs, which the Windows packaged-app item extends)
+Blocks: —
 
 ## Goal
 
@@ -81,6 +81,10 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 - [ ] (CI, inherited from 51 on 2026-10-14) This item adds its Windows leg to
       `.github/workflows/ci.yml`; it runs on the nightly schedule and on this item's PRs; no Nix job
       exists on Windows
+- [ ] (e2e, CI Windows, moved from item 50 on 2026-10-15) The packaged desktop app runs on Windows
+      with its per-user paths: item 50's packaged specs (journey, quit without orphan processes,
+      first run with the model download and its persistence, download failure with Retry) pass
+      against the installed Windows build
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green
 
@@ -97,3 +101,6 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 - 2026-10-13: consultation — checkpoint pause at chunk boundaries; GPU-enabled whisper-cli in scope
   (backend chosen at implementation); verification via virtualization + CI runner (dependency 51);
   delivery `gradlew.bat` + `.cmd` zip. Status: spec-approved.
+- 2026-10-15: item 50's test item "The packaged app runs on macOS and Windows with their per-user
+  paths" moved here (Windows half) by the user's decision, so item 50 could ship Linux first;
+  dependency on 50 added, 50 removed from "Blocks".

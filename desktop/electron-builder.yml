@@ -1,0 +1,81 @@
+# Roadmap item 50: the Linux desktop artifact is a .deb (decided 2026-10-14 — Ubuntu 23.10+
+# blocks the Chromium sandbox for unpacked archives; a root install keeps it on). The app
+# files are staged by stage.ts into dist/stage/** (backend installDist lib/, frontend
+# dist/, the jlink image, whisper-cli and ffmpeg) and packaged by electron-builder. Data, not
+# code (ADR 0054): the app's own code is the tsc output in build/.
+#
+# Resources layout inside the package (extraResources are copied below resources/):
+#   jre/           jlink runtime image (bin/java + lib/)
+#   backend/lib/   installDist's dependency jars + stt-backend jar
+#   ui/            frontend/dist
+#   tools/         whisper-cli, ffmpeg (+ its libav* libs) and the LD_LIBRARY_PATH wrapper
+#   versions.json  the pinned tools and models the app reads at run time (stage.ts copies the
+#                  repository's flake-rendered file; STT_MODELS_FILE overrides it in tests)
+appId: app.stt.desktop
+productName: Speech-to-Text
+directories:
+  output: dist
+  buildResources: dist/stage
+files:
+  - build/**/*.js
+  - build/**/*.cjs
+  - progress.html
+  - package.json
+extraResources:
+  - from: dist/stage/jre
+    to: jre
+  - from: dist/stage/backend
+    to: backend
+  - from: dist/stage/ui
+    to: ui
+  - from: dist/stage/tools
+    to: tools
+  - from: dist/stage/versions.json
+    to: versions.json
+linux:
+  target:
+    - target: deb
+      arch: [x64]
+  category: AudioVideo
+  # /usr/bin/stt-app is a symlink into /opt/Speech-to-Text (the after-install script).
+  executableName: stt-app
+deb:
+  priority: optional
+  maintainer: Lulu Hever <lulu.berlin.2023@gmail.com>
+  fpm: ['--deb-user=root', '--deb-group=root']
+  # The full dependency set: electron-builder's own defaults (GTK/NSS etc., which its
+  # after-install and AppArmor profile assume) plus the libraries the prebuilt
+  # whisper-cli (libstdc++6, libgomp1, Vulkan loader) and ffmpeg (ALSA, Pulse, XCB,
+  # udev) are linked against. Only the prebuilt Linux tools need these (ADR 0047
+  # documents the same list for the Gradle bootstrap). Custom depends replace the
+  # defaults, so both sets are named.
+  depends:
+    # The glibc floor (measured 2026-10-15): the whisper-cli prebuild and its libggml-base/
+    # libggml-vulkan need GLIBC_2.38 (Electron 2.25, bytedeco ffmpeg 2.35, the jlink JRE 2.15), so
+    # apt refuses the .deb on an older distribution instead of installing an app whose every
+    # transcription fails with "GLIBC_2.38 not found": Ubuntu 23.10+ and Debian 13+ only.
+    - libc6 (>= 2.38)
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libgbm1
+    # libasound2t64 first: on Ubuntu 24.04+ `libasound2` is a *virtual* package whose only
+    # provider is liboss4-salsa-asound2 (universe) — a shim whose libasound.so.2 lacks
+    # snd_device_name_get_hint (ALSA >= 1.0.27), so Electron dies at startup with
+    # "symbol lookup error: undefined symbol: snd_device_name_get_hint, version ALSA_0.9"
+    # (seen in the packaged e2e 2026-10-14). libasound2t64 is the real library there; the
+    # alternative keeps Debian 12 and Ubuntu 22.04 (real libasound2, no t64 suffix) working.
+    - libasound2t64 | libasound2
+    - libgomp1
+    - libvulkan1
+    - libstdc++6
+    - libpulse0
+    - libxcb1
+    - libxcb-shm0
+    - libudev1

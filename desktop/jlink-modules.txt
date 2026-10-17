@@ -1,0 +1,17 @@
+# The modules of the app's Java runtime, one per line (roadmap item 50). Both packages build
+# their JRE with jlink over these and nothing else — the .deb from the pinned Temurin JDK's jmods
+# (desktop/stage.ts, where this list replaced an inline copy) and the flake package from nixpkgs'
+# jdk (nix/desktop.nix, pkgs.jre_minimal) — so one list decides both runtimes.
+# Derived by jdeps from the backend's jars (2026-10-14) and smoke-verified in the packaged e2e: a
+# module the runtime actually needs fails a real run loudly, and goes on this list.
+java.base
+java.logging
+java.management
+java.naming
+java.sql
+java.xml
+jdk.crypto.ec
+jdk.jfr
+jdk.localedata
+jdk.unsupported
+jdk.zipfs

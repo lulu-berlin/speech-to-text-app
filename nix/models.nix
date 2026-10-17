@@ -7,7 +7,7 @@
 let
   entries = {
     whisper = {
-      url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin";
+      url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-models-v1/ggml-large-v3-turbo-q5_0.bin";
       sha256 = "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2";
     };
 

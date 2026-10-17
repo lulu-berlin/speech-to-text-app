@@ -43,8 +43,12 @@ import stt.db.insertTaskRow
 import stt.db.queuedTask
 import stt.queue.TaskStatus
 import java.io.IOException
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.AbstractCoroutineContextElement
@@ -249,13 +253,37 @@ internal fun <T> drain(channel: ReceiveChannel<T>): List<T> =
 internal fun plannedWindows(chunkCount: Int): List<PlannedChunk> =
     (0 until chunkCount).map { idx -> PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L) }
 
-/** Every regular file under [root], at any depth; none when [root] does not exist. */
-internal fun filesUnder(root: Path): List<Path> =
-    if (!Files.isDirectory(root)) {
-        emptyList()
-    } else {
-        Files.walk(root).use { paths -> paths.filter { Files.isRegularFile(it) }.toList() }
-    }
+/**
+ * Every regular file under [root], at any depth; none when [root] does not exist. A file or directory deleted while
+ * the walk runs counts as gone: specs poll scratch trees that the engine is clearing at the same time.
+ */
+internal fun filesUnder(root: Path): List<Path> {
+    val files = mutableListOf<Path>()
+    if (!Files.isDirectory(root)) return files
+    Files.walkFileTree(
+        root,
+        object : SimpleFileVisitor<Path>() {
+            override fun visitFile(
+                file: Path,
+                attrs: BasicFileAttributes,
+            ): FileVisitResult {
+                if (Files.isRegularFile(file)) files.add(file)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun visitFileFailed(
+                file: Path,
+                exc: IOException,
+            ): FileVisitResult = if (exc is NoSuchFileException) FileVisitResult.CONTINUE else throw exc
+
+            override fun postVisitDirectory(
+                dir: Path,
+                exc: IOException?,
+            ): FileVisitResult = if (exc == null || exc is NoSuchFileException) FileVisitResult.CONTINUE else throw exc
+        },
+    )
+    return files
+}
 
 /**
  * Stores [task]'s plan of [chunkCount] chunks together with the fake chunker's canonical clip, in one transaction:

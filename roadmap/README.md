@@ -96,9 +96,12 @@ graph TD
   33 --> 49[49 Windows support]
   48 --> 49
   51 --> 49
-  16 --> 50[50 Electron desktop app]
+  16 --> 50[50 Electron desktop app ✓]:::done
+  50 --> 48
+  50 --> 49
   22 --> 52[52 edit transcription]
   12 --> 52
+  54[54 TypeScript for the remaining scripts]
   11 --> 43[43 diarization memory ✓]:::done
   38 --> 44[44 audio in database ✓]:::done
   11 --> 44
@@ -108,7 +111,7 @@ graph TD
   11 --> 46[46 contextual logging ✓]:::done
   47 --> 55[55 atomic-transitions lock probe ✓]:::done
   50 --> 56[56 prebuilt Linux x86_64 bundle Mesa]
-  57[57 desktop-nix-e2e container failure] --> 50
+  57[57 desktop-nix-e2e container failure ✓]:::done --> 50
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -163,12 +166,13 @@ graph TD
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md) | done | 11, 32 |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md) | done | 11 |
 | [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](../docs/specs/atomic-transitions-spec-flaky.md) | done | 11 |
-| [48 — macOS support](48-macos-support.md) | spec-approved | 05, 16, 45, 51 |
-| [49 — Windows support](49-windows-support.md) | spec-approved | 33, 48, 51 |
-| [50 — Electron desktop app](50-electron-app.md) | spec-approved | 16 |
+| [48 — macOS support](48-macos-support.md) | spec-approved | 05, 16, 45, 50, 51 |
+| [49 — Windows support](49-windows-support.md) | spec-approved | 33, 48, 50, 51 |
+| [50 — Electron desktop app](../docs/specs/electron-desktop-app.md) | done | 16 |
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md) | done | — |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md) | spec-approved | 12, 22 |
 | [53 — The Nix store cache: one writer per key, versioned past the stale entry](53-nix-store-cache-v2.md) | spec-approved | 51 |
+| [54 — TypeScript for the remaining hand-written JavaScript](54-typescript-for-the-remaining-scripts.md) | draft | — |
 | [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md) | done | — |
 | [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](56-desktop-bundle-mesa-artifact.md) | spec-approved | 50 |
-| [57 — Diagnose and fix the desktop-nix-e2e container exit 6](57-desktop-nix-e2e-container-failure.md) | spec-approved | — |
+| [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md) | done | — |

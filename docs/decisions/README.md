@@ -13,7 +13,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0005 | [Uploaded audio stored as SQLite BLOB](0005-audio-as-sqlite-blob.md)                    | superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) | 2026-10-05 |
 | 0006 | [Exposed, Flyway, and Kotest](0006-exposed-flyway-kotest.md)                            | accepted | 2026-10-05 |
 | 0007 | [Server-Sent Events for live updates](0007-sse-live-updates.md)                          | accepted | 2026-10-05 |
-| 0008 | [Default whisper model](0008-default-whisper-model.md)                                  | accepted | 2026-10-05 |
+| 0008 | [Default whisper model](0008-default-whisper-model.md)                                  | accepted, source moved to this repository's mirror (2026-10-15, [0055](0055-desktop-window-has-no-network-path.md)) | 2026-10-05 |
 | 0009 | [Approval-gated Canon TDD workflow](0009-approval-gated-canon-tdd-workflow.md)          | accepted | 2026-10-05 |
 | 0010 | [Development toolchain in devenv](0010-development-toolchain.md)                        | accepted | 2026-10-05 |
 | 0011 | [One omp instance per roadmap workspace](0011-one-omp-instance-per-workspace.md)        | accepted | 2026-10-05 |
@@ -63,4 +63,8 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0050 | [Roadmap items merge via human pull requests on GitHub; the root agent never merges](0050-pr-merge-on-github.md) | accepted, amends AGENTS.md § Workflow step 8 and § Non-negotiable rules (human-only pushes to GitHub) | 2026-10-14 |
 | 0051 | [Existing databases rebuild the canonical clip inside a Flyway migration](0051-canonical-clip-backfill-migration.md) | accepted; the upgrade rebuilds each chunked task's clip (V10), then drops the per-chunk audio (V11) | 2026-10-14 |
 | 0052 | [Audio storage: one canonical clip per task in the database; chunks are windows into it](0052-canonical-clip-in-database-chunks-as-windows.md) | accepted, supersedes 0024 and 0045 | 2026-10-14 |
+| 0053 | [The Linux desktop app ships as a `.deb`, a flake package and a `nix bundle`; the Nix store is a model cache](0053-linux-desktop-deb-flake-package-bundle.md) | accepted | 2026-10-15 |
+| 0054 | [No hand-written JavaScript: we write TypeScript, JavaScript only comes out of it](0054-no-hand-written-javascript.md) | accepted | 2026-10-15 |
+| 0055 | [The desktop window has no network path: its own file and the loopback backend, nothing else](0055-desktop-window-has-no-network-path.md) | accepted | 2026-10-15 |
+| 0056 | [Which shell a script starts with: `env` only where Nix is absent, pinned store interpreters otherwise](0056-shebang-env-only-outside-nix.md) | accepted | 2026-10-15 |
 

@@ -1,90 +1,149 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { QUEUE_CLIPS } from '../lib/backend.mjs';
-import { appLive, expectLiveQueue, rowOrder, uploadClips } from './helpers/ui';
+import { appLive, expectLiveQueue, uploadClips } from './helpers/ui';
+
+// What one pending row showed at one moment: its text and the names of its progress bars.
+interface RowState {
+  text: string;
+  bars: string[];
+}
+
+// The pending list at one moment: each watched row's index among the list items (-1 while it is
+// not rendered) and its state (null while it is not pending).
+interface QueueState {
+  order: number[];
+  rows: (RowState | null)[];
+}
 
 declare global {
   interface Window {
-    // The distinct transcription percentages the recorder below has seen for the sampled row.
+    // Every distinct state of the watched rows the recorder below has seen, in order.
+    queueStates: QueueState[];
+    // The distinct transcription percentages the recorder has seen for the first watched row.
     transcriptionValues: Set<string>;
+    // The watched files whose finish notice has appeared, in the order they appeared.
+    noticeOrder: string[];
   }
 }
 
-// A task's pending row by its filename.
-function row(page: Page, filename: string): Locator {
-  return page.getByRole('listitem').filter({ hasText: filename });
-}
-
-// Records the transcription percentages the pending row for `filename` shows, from before its task
-// starts until the test reads the set: the sampler runs in the page on every attribute change, so it
-// sees the bar's whole life. A poll started after the row's state has been awaited can arrive when the
-// clip — about a second of whisper on one chunk — is already done, which is how CI run 38661372993 saw
-// a single value. A bar stuck at 0 or at 100 still records one value and still fails.
-async function recordTranscriptionPercentages(page: Page, filename: string): Promise<void> {
-  await page.evaluate((name) => {
+// Records what the pending rows for `names` show, from before their tasks start until the test
+// reads it: the sampler runs in the page on every DOM change, so it sees each row's whole life. A
+// check that waits for a state to be on screen can arrive after a short clip has already left it —
+// CI run 38661372993 saw a single transcription percentage that way, and run 38848511391 missed
+// the diarization stage label of a clip diarized in 0.3 s — so the assertions are claims about what
+// the rows showed, not about when the test looked. A bar stuck at 0 or at 100 still records one
+// percentage and still fails.
+async function recordQueue(page: Page, names: string[]): Promise<void> {
+  await page.evaluate((watched) => {
+    window.queueStates = [];
     window.transcriptionValues = new Set<string>();
+    window.noticeOrder = [];
+    const pending = /QUEUED|RUNNING|PAUSED/;
+    let last = '';
     const sample = () => {
-      const bars = document.querySelectorAll('[role="progressbar"][aria-label="Transcription"]');
-      for (const bar of bars) {
-        if (bar.closest('li')?.textContent?.includes(name)) {
-          window.transcriptionValues.add(bar.getAttribute('aria-valuenow') ?? '');
+      const items = [...document.querySelectorAll('li')];
+      const rows = watched.map((name) => {
+        const item = items.find(
+          (li) => li.textContent?.includes(name) && pending.test(li.textContent),
+        );
+        if (item === undefined) {
+          return null;
+        }
+        const bars = [...item.querySelectorAll('[role="progressbar"]')].map(
+          (bar) => bar.getAttribute('aria-label') ?? '',
+        );
+        if (name === watched[0]) {
+          const transcription = item.querySelector(
+            '[role="progressbar"][aria-label="Transcription"]',
+          );
+          if (transcription !== null) {
+            window.transcriptionValues.add(transcription.getAttribute('aria-valuenow') ?? '');
+          }
+        }
+        return { text: item.textContent ?? '', bars };
+      });
+      const order = watched.map((name) =>
+        items.findIndex((li) => li.textContent?.includes(name) ?? false),
+      );
+      const state = { order, rows };
+      const key = JSON.stringify(state);
+      if (key !== last) {
+        last = key;
+        window.queueStates.push(state);
+      }
+      const text = document.body.textContent ?? '';
+      for (const name of watched) {
+        if (!window.noticeOrder.includes(name) && text.includes(`${name} transcribed`)) {
+          window.noticeOrder.push(name);
         }
       }
     };
     new MutationObserver(sample).observe(document.documentElement, {
       subtree: true,
       childList: true,
+      characterData: true,
       attributes: true,
       attributeFilter: ['aria-valuenow'],
     });
     sample();
-  }, filename);
+  }, QUEUE_CLIPS);
 }
 
 test('uploads several clips, queues them in order, and shows status, phase and both progress bars live', async ({
   page,
 }) => {
   await appLive(page);
-  await recordTranscriptionPercentages(page, 'jfk-a.wav');
+  await recordQueue(page, QUEUE_CLIPS);
   await uploadClips(page, QUEUE_CLIPS);
 
-  // The dropped files are worked through one at a time, so the queue gets them in order;
-  // the pending list keeps that order.
-  await expect.poll(async () => rowOrder(page, QUEUE_CLIPS)).toEqual([0, 1, 2]);
-
-  // While the first clip runs, the second still waits: the engine walks the queue in
-  // order. The running row shows its status badge, one of the three phase labels, and
-  // both progress bars — the transcription percentage as a visible value.
-  const a = row(page, 'jfk-a.wav');
-  const b = row(page, 'jfk-b.wav');
-  await expect(a.getByText('RUNNING', { exact: true })).toBeVisible({ timeout: 60_000 });
-  await expect(b.getByText('QUEUED', { exact: true })).toBeVisible();
-  await expect(a.getByText(/Chunking|Transcribing|Diarizing/)).toBeVisible();
-  await expect(a.getByRole('progressbar', { name: 'Transcription' })).toBeVisible();
-  await expect(a.getByText(/\d+%/)).toBeVisible();
-  // The progress is live: the recorder has seen more than one percentage for a's bar since before the
-  // uploads — 0 → 25 → … → 100, or 0 → 100 for a one-chunk clip — so a bar stuck at 0 or at 100 still
-  // fails. It is a claim about what the bar did, not about when the test looked, which is what the
-  // sampled-window version got wrong (CI run 38661372993, 2026-10-15).
+  // The queue drains in order (the engine runs one task at a time): each finish notice appears
+  // when its task completes — a's, then b's, then c's. Once the queue is empty, the drop zone
+  // returns to its empty state.
   await expect
-    .poll(() => page.evaluate(() => window.transcriptionValues.size), { timeout: 60_000 })
-    .toBeGreaterThan(1);
-
-  // The diarization bar joins the row once it applies, and shows its stage label.
-  await expect(a.getByRole('progressbar', { name: 'Speaker diarization' })).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(a.getByText(/Embedding \d+%|Clustering \d+%/)).toBeVisible({ timeout: 60_000 });
-
-  // The queue drains in order (the engine runs one task at a time): each finish notice
-  // appears when its task completes — a's before b's, b's before c's. Completed rows
-  // leave the pending list the moment they finish, so the notices are the completion
-  // signal. Once the queue is empty, the drop zone returns to its empty state.
-  const notice = (name: string) => page.getByText(`${name} transcribed`);
-  await expect(notice('jfk-a.wav')).toBeVisible({ timeout: 120_000 });
-  await expect(notice('jfk-b.wav')).not.toBeVisible();
-  await expect(notice('jfk-c.wav')).not.toBeVisible();
-  await expect(notice('jfk-b.wav')).toBeVisible();
-  await expect(notice('jfk-c.wav')).not.toBeVisible();
-  await expect(notice('jfk-c.wav')).toBeVisible();
+    .poll(() => page.evaluate(() => window.noticeOrder), { timeout: 240_000 })
+    .toEqual(QUEUE_CLIPS);
   await expectLiveQueue(page);
+
+  // What the pending list showed on the way there, from the recorder.
+  const states = await page.evaluate(() => window.queueStates);
+  const saw = (holds: (rows: (RowState | null)[], order: number[]) => boolean) =>
+    states.some(({ rows, order }) => holds(rows, order));
+  const shows = (row: RowState | null | undefined, text: string | RegExp) =>
+    row != null && (typeof text === 'string' ? row.text.includes(text) : text.test(row.text));
+
+  // The dropped files are worked through one at a time, so the queue got them in order; the
+  // pending list kept that order.
+  expect(
+    saw((_, order) => order.join() === '0,1,2'),
+    'the three rows pending in upload order',
+  ).toBe(true);
+  // While the first clip ran, the second waited: the engine walks the queue in order.
+  expect(
+    saw((rows) => shows(rows[0], 'RUNNING') && shows(rows[1], 'QUEUED')),
+    'jfk-a.wav RUNNING while jfk-b.wav was QUEUED',
+  ).toBe(true);
+  // The running row showed its status badge, one of the three phase labels, and its
+  // transcription bar with the percentage as a visible value.
+  expect(
+    saw(
+      ([a]) =>
+        shows(a, 'RUNNING') &&
+        shows(a, /Chunking|Transcribing|Diarizing/) &&
+        a?.bars.includes('Transcription') === true &&
+        shows(a, /\d+%/),
+    ),
+    'jfk-a.wav RUNNING with a phase label, its transcription bar and a percentage',
+  ).toBe(true);
+  // The progress was live: more than one percentage for a's bar — 0 → 25 → … → 100, or 0 → 100
+  // for a one-chunk clip — so a bar stuck at 0 or at 100 fails.
+  expect(await page.evaluate(() => window.transcriptionValues.size)).toBeGreaterThan(1);
+  // The diarization bar joined the row once it applied, and showed its stage label.
+  expect(
+    saw(
+      ([a]) =>
+        a?.bars.includes('Speaker diarization') === true &&
+        shows(a, /Embedding \d+%|Clustering \d+%/),
+    ),
+    'jfk-a.wav with its diarization bar and stage label',
+  ).toBe(true);
 });
