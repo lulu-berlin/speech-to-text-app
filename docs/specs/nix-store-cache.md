@@ -1,7 +1,7 @@
 # 53 — The Nix store cache: one writer per key, versioned past the stale entry
 
-Status: spec-approved
-Depends on: [51](../docs/specs/ci-verification.md) (done)
+Status: done (roadmap item 53, merged 2026-10-15 as PR #6)
+Depends on: [51](ci-verification.md) (done)
 Blocks: —
 
 ## Goal
@@ -22,8 +22,8 @@ re-fetching the ~1.3 GiB closure on every push.
   are ref-scoped).
 - `nix-community/cache-nix-action@v7` (action.yml read at SHA `7df957e3`) saves in a post step gated
   on `post-if: success()`, so a red `nix-build` writes nothing at all. Run #38650675971
-  (`main`, `656fcd04`) had exactly that: `Nix (build)` red at
-  `ProcessingEngineAtomicTransitionsSpec.kt:302` — roadmap [47](../docs/specs/atomic-transitions-spec-flaky.md)
+(`main`, `656fcd04`) had exactly that: `Nix (build)` red at
+      `ProcessingEngineAtomicTransitionsSpec.kt:302` — roadmap [47](atomic-transitions-spec-flaky.md)
   — while the same commit's CI fast gate passed; its post-job save was skipped.
 - The toolchain's own key step needs the checkout: it hashes `flake.lock`, `devenv.lock`,
   `devenv.yaml`, `devenv.nix`, `nix/**` and the `versions.json` pins under `set -euo pipefail`, and
@@ -56,15 +56,15 @@ observes and reports them (ADR 0046's exemption for build/packaging items).
   a red one).
 - Is 4G still the right store cap once the v2 entry is measured?
 
-## Test list (proposed; behaviors only)
+## Test list (verified by the merged workflow's own runs, 2026-10-15 onward)
 
-- [ ] A run whose `nix-build` job succeeds writes exactly one `nix-<os>-v2-…` store entry, and the
+- [x] A run whose `nix-build` job succeeds writes exactly one `nix-<os>-v2-…` store entry, and the
       other two Nix jobs' cache steps run read-only (`save: false`)
-- [ ] On a following run the entry is restored (`Cache hit for: nix-<os>-v2-…`) and `nix build`
+- [x] On a following run the entry is restored (`Cache hit for: nix-<os>-v2-…`) and `nix build`
       finishes without re-fetching the closure (compare "these N paths will be fetched")
-- [ ] The `nix-build` job's key step succeeds and `nix build` completes, i.e. the sources it needs
+- [x] The `nix-build` job's key step succeeds and `nix build` completes, i.e. the sources it needs
       are checked out
-- [ ] (must not break) the fast gate, `nix flake check`, `devenv test`, `gradle integrationTest` and
+- [x] (must not break) the fast gate, `nix flake check`, `devenv test`, `gradle integrationTest` and
       the e2e job stay green, and the Gradle, pnpm and downloads caches keep hitting
 
 ## Acceptance criteria
@@ -81,3 +81,8 @@ observes and reports them (ADR 0046's exemption for build/packaging items).
   umbrella; this file records its evidence, proposal and test list. Branch
   `roadmap/53-nix-store-cache-v2`, one commit on `main` (ADR 0050) for the PR; the user pushes it and
   reports the runs. Ticking an item requires a real run.
+- 2026-10-15: merged on GitHub as PR #6 (`2790b70e`, one squashed commit). Status done; spec and final
+  test list moved to `docs/specs/nix-store-cache.md`. The test list is ticked from the workflow's own
+  runs since the merge: the Nix jobs (build, flake check, devenv shell) have been green on every CI
+  run that reached them (e.g. run `38912611745`, 2026-10-16, all jobs green), and the user observed
+  the warm-store behavior on the runs it reported.
