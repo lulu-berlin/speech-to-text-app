@@ -1,7 +1,7 @@
 # 56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64
 
 Status: spec-approved
-Depends on: [50](50-electron-app.md) (the bundle output this artifact accelerates)
+Depends on: [50](../docs/specs/electron-desktop-app.md) (the bundle output this artifact accelerates)
 Blocks: —
 
 ## Goal

@@ -1,0 +1,8 @@
+minimumReleaseAgeExclude:
+  - electron@44.7.1
+
+# No dependency's install script runs: electron-builder downloads (and checksums) the
+# Electron release it packages itself, and electron-winstaller is Windows-only.
+allowBuilds:
+  electron: false
+  electron-winstaller: false

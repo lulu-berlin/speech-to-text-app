@@ -9,6 +9,8 @@ import java.nio.file.Path
  * `STT_DATA_DIR` is required: unset or empty fails fast (ADR 0017); it has no default.
  * `STT_SPEAKER_MODEL` (the CAM++ ONNX model, ADR 0003) is required: unset or empty fails fast.
  * `STT_WHISPER_MODEL` (the whisper.cpp model file, ADR 0008) is required the same way.
+ * `STT_HOST` defaults to `0.0.0.0` (every installation served on the LAN); the desktop app
+ * (roadmap item 50) sets it to `127.0.0.1` so its API is never reachable from the network.
  * The compute device and the thread count are not configuration: they are stored settings (roadmap item 32),
  * so `STT_DEVICE` and `STT_THREADS` are not read.
  */
@@ -17,6 +19,7 @@ data class Config(
     val speakerModel: Path,
     val whisperModel: Path,
     val port: Int = 8080,
+    val host: String = "0.0.0.0",
     val staticDir: Path? = null,
 ) {
     companion object {
@@ -43,6 +46,7 @@ data class Config(
                 speakerModel = Path.of(speakerModel),
                 whisperModel = Path.of(whisperModel),
                 port = port,
+                host = env["STT_HOST"]?.takeIf { it.isNotEmpty() } ?: "0.0.0.0",
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
             )
         }

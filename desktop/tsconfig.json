@@ -1,0 +1,22 @@
+{
+  "//": "The Electron main process and its preload (ADR 0054): compiled to build/, which the packages ship.",
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "build"
+  },
+  "include": [
+    "src/main.ts",
+    "src/backend.ts",
+    "src/models.ts",
+    "src/preload.cts",
+    "src/bridge.d.ts"
+  ]
+}

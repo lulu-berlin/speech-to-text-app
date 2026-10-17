@@ -11,11 +11,20 @@
 # option is still named WHISPER_FFMPEG there, so the flag is a no-op and whisper-cli is
 # built without ffmpeg libs (it reads the backend's FLAC chunks through its bundled
 # miniaudio). The source hash is the NAR hash of the v1.8.4 tarball.
+#
+# `withSDL = false` (found 2026-10-15 by `nix why-depends` on the desktop closure): the
+# default builds whisper.cpp's SDL example too, which alone dragged SDL2 -> sdl2-compat ->
+# sdl3 -> zenity -> libadwaita -> gtk4 -> gstreamer -> gst-plugins-bad -> flite, freepats,
+# chromaprint, python3 and pipewire into the package — ~330 MiB for an example nothing runs.
+# Only whisper-cli is used (ADR 0047), and it is not the SDL one.
 { pkgs }:
 let
   tag = (import ./versions.nix).whisperCppTag;
 in
-(pkgs.whisper-cpp.override { vulkanSupport = true; }).overrideAttrs {
+(pkgs.whisper-cpp.override {
+  vulkanSupport = true;
+  withSDL = false;
+}).overrideAttrs {
   version = tag;
   src = pkgs.fetchFromGitHub {
     owner = "ggml-org";

@@ -98,6 +98,16 @@ class ConfigSpec :
             }
         }
 
+        given("an environment with STT_HOST unset, empty, or set") {
+            `when`("loading configuration") {
+                then("unset or empty binds every interface (the historical default); a set host wins (desktop item 50)") {
+                    Config.fromEnv(TEST_REQUIRED_ENV).host.shouldBe("0.0.0.0")
+                    Config.fromEnv(TEST_REQUIRED_ENV + ("STT_HOST" to "")).host.shouldBe("0.0.0.0")
+                    Config.fromEnv(TEST_REQUIRED_ENV + ("STT_HOST" to "127.0.0.1")).host.shouldBe("127.0.0.1")
+                }
+            }
+        }
+
         given("STT_DEVICE and STT_THREADS set to values that used to stop startup") {
             `when`("configuration is loaded") {
                 then("it loads exactly as without them: the device and thread count live only in the stored settings (item 32)") {

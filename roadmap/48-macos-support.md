@@ -1,8 +1,8 @@
 # 48 — macOS support
 
 Status: spec-approved
-Depends on: [05](../docs/specs/process-runner.md) (done), [16](../docs/specs/nix-flake-package.md) (done), [45](../docs/specs/device-selection.md) (done; macOS GPU surface must not conflict), [51](../docs/specs/ci-verification.md) (done; the macOS CI runners that verify this item)
-Blocks: — [49](49-windows-support.md), [50](50-electron-app.md)
+Depends on: [05](../docs/specs/process-runner.md) (done), [16](../docs/specs/nix-flake-package.md) (done), [45](../docs/specs/device-selection.md) (done; macOS GPU surface must not conflict), [51](../docs/specs/ci-verification.md) (done; the macOS CI runners that verify this item), [50](../docs/specs/electron-desktop-app.md) (done; the Linux desktop app and its packaged specs, which the macOS packaged-app item extends)
+Blocks: — [49](49-windows-support.md)
 
 ## Goal
 
@@ -92,6 +92,10 @@ To be settled at the first test-list item, starting from the decisions above:
 - [ ] (CI, inherited from 51 on 2026-10-14) This item adds its macOS legs (ARM, Intel per the open
       question) to `.github/workflows/ci.yml`; they run on the nightly schedule and on this item's
       PRs, and include the darwin Nix build above
+- [ ] (e2e, CI macOS, moved from item 50 on 2026-10-15) The packaged desktop app runs on macOS with
+      its per-user paths: item 50's packaged specs (journey, quit without orphan processes, first
+      run with the model download and its persistence, download failure with Retry) pass against
+      the installed macOS build
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and the
       Linux e2e stay green
 
@@ -109,3 +113,6 @@ To be settled at the first test-list item, starting from the decisions above:
 - 2026-10-13: consultation — both architectures; GPU (Metal) in scope; direct-child kill on darwin;
   devenv on macOS in scope; CI is the verification path (added dependency 51); DeviceArgs mismatch
   absorbed to be verified. Status: spec-approved.
+- 2026-10-15: item 50's test item "The packaged app runs on macOS and Windows with their per-user
+  paths" moved here (macOS half) by the user's decision, so item 50 could ship Linux first;
+  dependency on 50 added, 50 removed from "Blocks".

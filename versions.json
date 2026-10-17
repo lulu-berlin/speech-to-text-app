@@ -27,6 +27,12 @@
         "sha256": "d89e59ee9a0acd4bcadaadd31edcb60a079a6929a3e06293c1cca7751d3563ed",
         "url": "https://github.com/jiang1997/whisper.cpp-release/releases/download/v1.8.4/whisper-1.8.4-linux-x64.tar.gz"
       }
+    },
+    "temurin-jdk": {
+      "linux-x64": {
+        "sha256": "ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz"
+      }
     }
   },
   "ffmpeg": "8.1",
@@ -45,7 +51,7 @@
     },
     "whisper": {
       "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
-      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
+      "url": "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-models-v1/ggml-large-v3-turbo-q5_0.bin"
     },
     "whisperTinyEn": {
       "sha256": "921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f",

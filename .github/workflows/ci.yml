@@ -14,6 +14,10 @@ on:
   schedule:
     - cron: '0 3 * * *'
       timezone: 'Europe/Berlin'
+    # Weekly (Mondays) at 04:00 Europe/Berlin: the model-host smoke job below is gated on this cron
+    # string, so the rest of the scheduled work stays nightly (ADR 0055).
+    - cron: '0 4 * * 1'
+      timezone: 'Europe/Berlin'
 
 permissions:
   contents: read
@@ -100,6 +104,164 @@ jobs:
       - name: gradle e2e
         run: ./gradlew e2e
 
+  # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds
+  # the .deb, apt installs it as a user would (its declared Depends pull the runtime libraries the
+  # bundled Electron, whisper-cli and ffmpeg are linked against), and the packaged specs run
+  # against the installed /usr/bin/stt-app under Xvfb. The runner is the clean machine here;
+  # e2e/desktop/run-in-docker.ts (the dev entry point) exists for hosts whose /nix/store supplies
+  # the node, Xvfb and fixtures it insists on, which is why CI does not go through the container.
+  desktop-e2e:
+    name: Desktop (packaged .deb e2e)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      # The JDK is also what jlink links the bundled runtime image from; the prepare tasks below
+      # bring the pinned tools, models and fixtures into the ~/.gradle/stt-app cache the other jobs
+      # share (one key, the same pins).
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: |
+            desktop/pnpm-lock.yaml
+            e2e/pnpm-lock.yaml
+      - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron, fpm)
+        uses: actions/cache@v6
+        with:
+          path: |
+            desktop/dist/downloads
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
+          restore-keys: desktop-downloads-${{ runner.os }}-
+      - name: Build the backend, the UI, the tools and the fixtures
+        run: |
+          set -euo pipefail
+          ./gradlew -p backend installDist
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend build
+          ./gradlew prepareRuntime prepareE2eFixtures
+      - name: Install the desktop and e2e packages
+        run: |
+          set -euo pipefail
+          pnpm --dir desktop install --frozen-lockfile
+          pnpm --dir e2e install --frozen-lockfile
+      # ADR 0054: the desktop package's own gate (prettier + tsc over the app and its scripts) and
+      # the type check of the desktop harness and specs, before anything is built from them.
+      - name: Check the desktop package and specs (format, types)
+        run: |
+          set -euo pipefail
+          pnpm --dir desktop test
+          pnpm --dir e2e exec tsc -p desktop/tsconfig.json
+      # electron-builder fetches its own fpm and Electron here: USE_SYSTEM_FPM is the devenv's
+      # Nix-shell workaround (ADR 0010) and is deliberately not set in CI.
+      - name: Build the .deb
+        run: |
+          set -euo pipefail
+          pnpm --dir desktop fetch:jdk
+          pnpm --dir desktop dist
+      # The .deb's glibc floor (2.38): apt in a stock ubuntu:22.04 container (glibc 2.35) must
+      # refuse it naming libc6. The 24.04 half is this runner's install and the specs below.
+      - name: Check that apt refuses the .deb below its glibc floor
+        run: pnpm --dir e2e test:desktop:deb-floor
+      - name: Install the .deb and Xvfb the way a user would
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ./desktop/dist/stt-app_*_amd64.deb xvfb
+      # The specs read the same pinned fixtures and models the other jobs use, from the Gradle
+      # cache. The file names are globbed — the build prefixes them with the pin's sha256, and that
+      # naming must not be duplicated here — while the sha256 values the first-run spec asserts
+      # against come from versions.json.
+      - name: Export the fixture and model environment
+        run: |
+          set -euo pipefail
+          cache="${GRADLE_USER_HOME:-$HOME/.gradle}/stt-app"
+          tiny=$(find "$cache/models" -maxdepth 1 -name '*ggml-tiny.en.bin' -print -quit)
+          speaker=$(find "$cache/models" -maxdepth 1 -name '*campplus*voxceleb_16k.onnx' -print -quit)
+          jfk=$(find "$cache/fixtures" -maxdepth 1 -name '*jfk.wav' -print -quit)
+          for file in "$tiny" "$speaker" "$jfk"; do
+            [ -n "$file" ] || { echo "a pinned fixture or model is missing from $cache" >&2; exit 1; }
+          done
+          {
+            echo "TEST_WHISPER_TINY_EN_MODEL=$tiny"
+            echo "STT_SPEAKER_MODEL=$speaker"
+            echo "TEST_JFK_WAV=$jfk"
+            echo "TEST_WHISPER_TINY_EN_SHA256=$(jq -er '.models.whisperTinyEn.sha256' versions.json)"
+            echo "TEST_SPEAKER_SHA256=$(jq -er '.models.speaker.sha256' versions.json)"
+          } >> "$GITHUB_ENV"
+      # The exact-model-host spec (14) needs raw.githubusercontent.com to lead back to its own
+      # loopback fixture (the container harness passes docker --add-host instead). Nothing after
+      # this step fetches from that host.
+      - name: Map raw.githubusercontent.com to loopback for the model-host spec
+        run: echo '127.0.0.1 raw.githubusercontent.com' | sudo tee -a /etc/hosts
+      # Xvfb: Electron needs a display even headless, and the specs assert the window it opens.
+      # The specs run from e2e/, the way the container harness runs them from /e2e: the desktop
+      # config's testDir is relative to it.
+      - name: Run the packaged desktop e2e
+        working-directory: e2e
+        run: xvfb-run -a pnpm exec playwright test -c playwright.desktop.config.ts
+
+  # The desktop app's flake package (ADR 0053), tested the way `pnpm --dir e2e test:desktop:nix`
+  # tests it on a developer's machine: `nix build .#desktop` on the runner, then the same packaged
+  # specs in a stock ubuntu:24.04 container that installs nothing — the app runs from the
+  # read-only /nix/store mount, its closure being its whole runtime. The devenv shell supplies what
+  # the harness insists on (the store-path fixtures, node, Xvfb, pnpm). The runner is Ubuntu 24.04
+  # with AppArmor, so this job is also where Chromium's sandbox meets the user-namespace
+  # restriction that store-installed Electron (no setuid helper) has to live with.
+  desktop-nix-e2e:
+    name: Desktop (flake package e2e)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/nix-toolchain
+      - name: Install the devenv CLI
+        run: nix profile install nixpkgs#devenv
+      - name: Build the flake package and run the packaged desktop e2e against it
+        run: >-
+          devenv shell -- bash -euo pipefail -c
+          'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:nix'
+
+  # The desktop bundle (ADR 0053), tested the way `pnpm --dir e2e test:desktop:bundle` tests it on a
+  # developer's machine: `nix build .#desktop-bundle` on the runner, then the packaged specs in a
+  # stock alpine:3.20 container with only zstd and tar added — no Nix, no glibc. The GPU suites
+  # (test:desktop:bundle:amd, :nvidia) need a GPU and run on a developer's machine: no runner has
+  # one. The bundle's Vulkan-only Mesa is not in cache.nixos.org, so it compiles here on every run
+  # (docs/known-issues.md). Two runner preparations: every spec launch unpacks the bundle into a
+  # fresh HOME (~1.2 GB each, ~10 GB in the container), so preinstalled toolchains this job does not
+  # use are removed first; and the bundle needs unprivileged user namespaces (its README
+  # requirement), which Ubuntu 24.04's AppArmor can restrict — the `.deb` is the answer for such
+  # hosts, so the runner is made a host that meets the bundle's requirement.
+  # It is deliberately not in the `ci` aggregator's needs: the job still runs on every push and
+  # reports its result, but it must not gate merges until roadmap 55 (the flaky backend pin its
+  # build hits, docs/known-issues.md) and the Vulkan-only Mesa's binary cache land.
+  desktop-bundle-e2e:
+    name: Desktop (bundle e2e)
+    runs-on: ubuntu-24.04
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - name: Free disk space for the unpacked bundles
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Allow unprivileged user namespaces (the bundle's host requirement)
+        run: |
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - uses: ./.github/actions/nix-toolchain
+      - name: Install the devenv CLI
+        run: nix profile install nixpkgs#devenv
+      - name: Build the bundle and run the packaged desktop e2e against it
+        run: >-
+          devenv shell -- bash -euo pipefail -c
+          'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:bundle'
+
   # The three Nix checks run in parallel, but GitHub Actions cache keys are immutable: the first
   # job to save wins. Only `nix-build` writes the shared cache, because it materializes the full
   # package closure including the expensive whisper-cpp Vulkan output; the other jobs restore it
@@ -157,12 +319,33 @@ jobs:
       - name: nix build
         run: nix build --print-build-logs
 
+
+  # The pinned model downloads are the only requests the app itself makes (ADR 0055). A provider can
+  # move its CDN under us, so once a week this walks each pin's redirect chain with a ranged GET and
+  # fails naming the hop that left the allowlist — before a user's first run finds out. It reads
+  # versions.json and needs no build, so it is a two-second job. Deliberately not in the `ci`
+  # aggregator: a weekly network check must not gate a pull request.
+  model-hosts:
+    name: Pinned model hosts resolve
+    if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - name: Check the model download hosts
+        run: node desktop/check-model-hosts.ts
+
   # The one required check for branch protection: it waits for every other job and fails when any of
   # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
-  # renaming a job cannot silently un-gate merges.
+  # renaming a job cannot silently un-gate merges. `desktop-bundle-e2e` is the one deliberate
+  # exception (its own comment says until when); a job absent from this list cannot gate merges, so
+  # adding it back is the one-line change that re-requires it.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, backend-integration, e2e, nix-devenv, nix-flake-check, nix-build]
+    needs: [backend-check, frontend-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, nix-devenv, nix-flake-check, nix-build]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

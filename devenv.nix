@@ -61,6 +61,13 @@ in
     # workflow and the local composite actions in .github/actions/ before a push (GitHub only
     # reports YAML errors once a run starts). Nix-level result is user-verified (ADR 0010).
     pkgs.actionlint
+    # Desktop app (roadmap item 50): electron-builder builds the Linux .deb with fpm. Its
+    # own fpm download is a generic Linux build that cannot run in a Nix shell, so the
+    # store's fpm is used instead (USE_SYSTEM_FPM below). xvfb-run gives the packaged-app
+    # e2e its X display inside the stock ubuntu container, which reaches it through the
+    # read-only /nix/store mount — nothing test-only is installed into that machine.
+    pkgs.fpm
+    pkgs.xvfb-run
   ];
 
   # https://devenv.sh/languages/
@@ -102,6 +109,10 @@ in
   # fixed, git-ignored location (.gitignore covers .devenv*), so the queue and history
   # survive `devenv up` restarts; the packaged app sets its own STT_DATA_DIR (flake.nix).
   env.STT_DATA_DIR = "${config.devenv.state}/stt";
+
+  # Roadmap item 50: electron-builder runs `fpm` from PATH (pkgs.fpm above) instead of
+  # downloading its own.
+  env.USE_SYSTEM_FPM = "true";
 
   # https://devenv.sh/processes/
   # Roadmap item 34 (dev mode): `devenv up` runs the whole app for development — the Vite

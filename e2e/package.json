@@ -4,12 +4,20 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node check-playwright.mjs && prettier --check . && playwright test",
+    "test": "node check-playwright.mjs && prettier --check . && tsc -p desktop/tsconfig.json && playwright test",
     "record:gifs": "playwright test --config=playwright.gifs.config.ts",
+    "test:desktop": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts",
+    "test:desktop:nix": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts --nix",
+    "test:desktop:bundle": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts --bundle",
+    "test:desktop:bundle:amd": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts --bundle --amd-gpu",
+    "test:desktop:bundle:nvidia": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts --bundle --nvidia-gpu",
+    "test:desktop:deb-floor": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts --deb-floor",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "prettier": "^3.9.9"
+    "@types/node": "^24.19.2",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2"
   }
 }

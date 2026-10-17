@@ -306,6 +306,9 @@ export async function startBackend({ port, dataDir }) {
         STT_DATA_DIR: dataDir,
         STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,
         STT_PORT: String(port),
+        // The command may be the packaged wrapper (which sets its own static dir) or a bare
+        // backend (`java -cp …`, `./gradlew run`), which serves 404 at `/` without this.
+        STT_STATIC_DIR: process.env.STT_STATIC_DIR ?? frontendDist,
       },
       stdio: ['ignore', 'inherit', 'inherit'],
     });

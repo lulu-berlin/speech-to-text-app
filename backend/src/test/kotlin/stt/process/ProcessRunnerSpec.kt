@@ -7,7 +7,6 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.comparables.shouldBeLessThan
-import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -22,6 +21,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import stt.Integration
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -162,12 +163,47 @@ class ProcessRunnerSpec :
                         }
                     try {
                         withTimeout(10.seconds) { sawThree.await() }
-                        pauseAndExpectFrozen(runner, delivered)
+                        pauseAndExpectFrozen(runner)
 
                         threshold.set(underLock(delivered) { delivered.last().toInt() })
                         runner.resume()
 
                         withTimeout(10.seconds) { nextAfterResume.await() }.shouldBe(threshold.get() + 1)
+                    } finally {
+                        job.cancelAndJoin()
+                    }
+                }
+            }
+        }
+
+        given("a counting shell loop whose reader is slower than its output") {
+            `when`("the runner is paused while written lines still wait to be read") {
+                then("the loop writes no new line while paused, and the lines it already wrote are still delivered") {
+                    // Item 57: the paused-output check must not depend on how fast the reader drains.
+                    val runner = ProcessRunner()
+                    val delivered = mutableListOf<String>()
+                    val sawThree = CompletableDeferred<Unit>()
+                    val job =
+                        launch {
+                            runner.run(
+                                countingLoop(),
+                                onStdoutLine = { line ->
+                                    // Three times slower than the loop writes, so lines pile up in the pipe.
+                                    Thread.sleep(SLOW_READ_MS)
+                                    underLock(delivered) { delivered.add(line) }
+                                    if (line == "3") sawThree.complete(Unit)
+                                },
+                            )
+                        }
+                    try {
+                        withTimeout(10.seconds) { sawThree.await() }
+                        val beforePause = underLock(delivered) { delivered.size }
+                        pauseAndExpectFrozen(runner)
+
+                        // The stopped loop adds nothing, but the lines it wrote before the stop still arrive, in order.
+                        pollUntil { underLock(delivered) { delivered.size } > beforePause }
+                        val drained = underLock(delivered) { delivered.toList() }
+                        drained.shouldBe((1..drained.size).map(Int::toString))
                     } finally {
                         job.cancelAndJoin()
                     }
@@ -393,10 +429,19 @@ class ProcessRunnerSpec :
         given("a descendant that left the process group and still holds the output pipes") {
             `when`("the run is cancelled") {
                 then("run returns promptly with CancellationException") {
+                    // Item 57: on a loaded machine the descendant leaves the group late; the 0.3 s delay before
+                    // its setsid makes that the rule. The shell reports the pids only once the descendant's process
+                    // group (field 5 of /proc/<pid>/stat) is no longer the shell's, so the cancel comes after the escape.
                     val outcome =
                         cancelAfterFirstLine(
                             ProcessRunner(gracePeriod = 300.milliseconds),
-                            listOf("sh", "-c", "setsid sleep 1000 & echo \$\$ \$!; wait"),
+                            listOf(
+                                "sh",
+                                "-c",
+                                "(sleep 0.3; exec setsid sleep 1000) & " +
+                                    "while [ \"\$(cut -d' ' -f5 /proc/\$!/stat)\" = \"\$\$\" ]; do sleep 0.01; done; " +
+                                    "echo \$\$ \$!; wait",
+                            ),
                         )
 
                     outcome.thrown.shouldBeInstanceOf<CancellationException>()
@@ -453,7 +498,7 @@ class ProcessRunnerSpec :
                             }
                         }
 
-                        pauseAndExpectFrozen(runner, delivered)
+                        pauseAndExpectFrozen(runner)
                     } finally {
                         job.cancelAndJoin()
                     }
@@ -522,6 +567,9 @@ private fun countingLoop(headStart: Duration = Duration.ZERO): List<String> {
     return listOf("sh", "-c", "${delay}i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done")
 }
 
+/** How long the slow reader takes per line: three times the counting loop's 50 ms. */
+private const val SLOW_READ_MS = 150L
+
 /**
  * Delays the creation of the run's process group by 0.5 s: the built `setsid <cmd…>` is started through
  * `sh -c 'sleep 0.5; exec "$@"'`, so the direct child stays in the JVM's group until it execs setsid.
@@ -550,17 +598,45 @@ private inline fun <T> killingReportedPids(
         if (pids.isCompleted) pids.getCompleted().forEach(::killForcibly)
     }
 
-/** Pauses [runner] and asserts that at most one more line (one already in flight) reaches [delivered] within 0.5 s. */
-private suspend fun pauseAndExpectFrozen(
-    runner: ProcessRunner,
-    delivered: MutableList<String>,
-) {
+/**
+ * Pauses [runner] and waits until its run is frozen at the source: every process of the run's tree is stopped (a
+ * zombie child writes nothing either), so no new line can be written, however many lines the reader has yet to
+ * drain. The tree is the test JVM's live descendants: `setsid` execs into the command, and the scenarios run one
+ * at a time.
+ */
+private suspend fun pauseAndExpectFrozen(runner: ProcessRunner) {
     runner.pause()
-    val frozenCount = underLock(delivered) { delivered.size }
-    delay(500.milliseconds)
-    val windowCount = underLock(delivered) { delivered.size }
-    (windowCount - frozenCount).shouldBeLessThanOrEqualTo(1)
+    pollUntil {
+        val states = runTree().mapNotNull(::processState)
+        'T' in states && states.all { it == 'T' || it == 'Z' }
+    }
 }
+
+/** Checks [condition] every 10 ms until it holds; fails with a timeout after 10 s. */
+private suspend fun pollUntil(condition: () -> Boolean) {
+    withTimeout(10.seconds) {
+        while (!condition()) delay(10.milliseconds)
+    }
+}
+
+/** The pids of the processes this JVM started that are still alive: the current run's tree. */
+private fun runTree(): List<Long> =
+    ProcessHandle
+        .current()
+        .descendants()
+        .filter(ProcessHandle::isAlive)
+        .map(ProcessHandle::pid)
+        .toList()
+
+/** The state letter in `/proc/<pid>/stat` (R running, S sleeping, T stopped, Z zombie, …); null once it is gone. */
+private fun processState(pid: Long): Char? =
+    runCatching {
+        Files
+            .readString(Path.of("/proc/$pid/stat"))
+            .substringAfterLast(')')
+            .trim()
+            .first()
+    }.getOrNull()
 
 /**
  * Runs [runner] against [command], waits for the first line (the pid line) to arrive, invokes

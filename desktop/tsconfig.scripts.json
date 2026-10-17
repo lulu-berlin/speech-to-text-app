@@ -1,0 +1,18 @@
+{
+  "//": "Build scripts Node runs directly as .ts (ADR 0054): type-checked only, never compiled.",
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["stage.ts", "fetch-jdk.ts", "verified-download.ts", "check-model-hosts.ts"]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "stt-app",
+  "productName": "Speech-to-Text",
+  "description": "Transcribes audio files with speaker diarization",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "build/main.js",
+  "author": "Lulu Hever <lulu.berlin.2023@gmail.com>",
+  "homepage": "https://github.com/lulu-berlin/speech-to-text-app",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.renderer.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.scripts.json",
+    "fetch:jdk": "node fetch-jdk.ts",
+    "check:model-hosts": "node check-model-hosts.ts",
+    "dist": "pnpm run build && node stage.ts && electron-builder --config electron-builder.yml --linux deb --x64",
+    "test": "prettier --check . && pnpm run typecheck",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "electron": "44.7.1",
+    "electron-builder": "26.15.3",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2"
+  }
+}

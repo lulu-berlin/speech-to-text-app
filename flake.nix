@@ -176,9 +176,16 @@
         runHook postInstall
       '';
     });
+
+    # The desktop app (roadmap item 50, ADR 0053): Electron on the same backend, UI and tools.
+    desktop = import ./nix/desktop.nix {
+      inherit pkgs nixpkgs sourceOf backend frontend whisperCpp;
+    };
   in {
     packages.x86_64-linux = {
-      inherit backend frontend;
+      inherit backend frontend desktop;
+      # The desktop app as one self-contained executable (nix/desktop-bundle.nix, ADR 0053).
+      desktop-bundle = import ./nix/desktop-bundle.nix {inherit pkgs desktop;};
 
       # `nix build .` builds both parts and provides bin/stt-app, which
       # starts the backend serving the bundled frontend. A real derivation (not
@@ -240,8 +247,8 @@
       #     additive, so a CDI-mounted NVIDIA ICD still loads. A renamed ICD fails the build.
       #   - LD_LIBRARY_PATH, only when /dev/nvidiactl exists: the libraries NVIDIA's
       #     CDI-mounted driver links (libGLX_nvidia needs libX11 and more; the CDI mount brings
-      #     only the driver and glibc), mirroring nixpkgs' nvidia-x11 libPath. The driver's
-      #     RUNPATH names the host's store paths, so they are found only this way.
+      #     only the driver and glibc), nix/nvidia-driver-libs.nix — shared with the desktop
+      #     bundle, which borrows a host's NVIDIA driver the same way.
       # - bin/sh: bash, for `docker compose exec stt-app sh`.
       # - usr/local/bin/curl: the compose healthcheck's tool.
       # - etc/passwd, etc/group, etc/nsswitch.conf: root and the app user stt (uid/gid 1000).
@@ -251,21 +258,7 @@
           "intel_icd"
           "intel_hasvk_icd"
         ];
-        nvidiaLibPath = pkgs.lib.makeLibraryPath [
-          pkgs.libdrm
-          pkgs.libxext
-          pkgs.libx11
-          pkgs.libxv
-          pkgs.libxrandr
-          pkgs.libxcb
-          pkgs.zlib
-          pkgs.stdenv.cc.cc
-          pkgs.wayland
-          pkgs.libgbm
-          pkgs.libGL
-          pkgs.openssl
-          pkgs.dbus
-        ];
+        nvidiaLibPath = pkgs.lib.makeLibraryPath (import ./nix/nvidia-driver-libs.nix pkgs);
         entrypoint = pkgs.writeShellScript "stt-app-docker-entrypoint" ''
           export VK_ADD_DRIVER_FILES=${pkgs.lib.concatStringsSep ":" vkIcds}
           if [ -e /dev/nvidiactl ]; then
@@ -292,6 +285,26 @@
       program = pkgs.lib.getExe self.packages.${system}.default;
       meta.description = "Start the Speech-to-Text app";
     };
+
+    # `nix run .#desktop` opens the desktop app (roadmap item 50).
+    apps.x86_64-linux.desktop = {
+      type = "app";
+      program = pkgs.lib.getExe self.packages.${system}.desktop;
+      meta.description = "Open the Speech-to-Text desktop app";
+    };
+
+    # `nix run .#desktop-bundle` unpacks and runs the single-file bundle (roadmap item 50).
+    apps.x86_64-linux.desktop-bundle = {
+      type = "app";
+      program = pkgs.lib.getExe self.packages.${system}.desktop-bundle;
+      meta.description = "Run the self-contained Speech-to-Text desktop bundle";
+    };
+
+    # `nix bundle --bundler .#desktop .#packages.x86_64-linux.desktop` produces the same file: the
+    # bundler interface is `bundlers.<system>.<name> = drv: drv'`, and the derivation takes the
+    # package to bundle as its argument.
+    bundlers.x86_64-linux.desktop = drv:
+      import ./nix/desktop-bundle.nix {inherit pkgs; desktop = drv;};
 
     # ADR 0036: the devenv's nixpkgs input is the flake's locked nixpkgs. `nix flake
     # check` fails when the revs drift; `devenv update` rewrites devenv.lock to
@@ -333,6 +346,29 @@
       fi
       echo ok > $out
     '';
+
+    # Roadmap item 50 (ADR 0053): the desktop package's closure holds no model. The app downloads
+    # the models on first start or takes them from the store at their fixed-output paths, so the
+    # package — and a `nix bundle` made from it — stays ~600 MB smaller. A pinned model is
+    # recognised by its file name (the URL's last segment, the name fetchurl gives it), so a model
+    # brought in any other way is caught too. $out is the closure's size report: every store path
+    # with its size, largest first, and the total (`cat result` after building the check).
+    checks.x86_64-linux.desktop-model-free = let
+      modelNames = map (pin: baseNameOf pin.url) (builtins.attrValues models.meta);
+      modelPattern = pkgs.lib.concatMapStringsSep "|" pkgs.lib.escapeRegex modelNames;
+      closure = pkgs.closureInfo {rootPaths = [desktop];};
+    in
+      pkgs.runCommand "desktop-model-free" { } ''
+        found=$(grep -E -- '-(${modelPattern})$' ${closure}/store-paths || true)
+        if [ -n "$found" ]; then
+          echo "desktop-model-free: the desktop closure holds a pinned model:" >&2
+          echo "$found" >&2
+          exit 1
+        fi
+        xargs du -sb < ${closure}/store-paths | sort -rn \
+          | awk '{ total += $1; printf "%9.1f MiB  %s\n", $1 / 1048576, $2 }
+                 END { printf "%9.1f MiB  total (%d store paths)\n", total / 1048576, NR }' > $out
+      '';
 
     # Regenerates the committed versions.json from the flake's versions (ADR 0010: the
     # user runs this; writes to the checkout the command is run from).

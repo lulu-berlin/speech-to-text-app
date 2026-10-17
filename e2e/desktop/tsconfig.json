@@ -1,0 +1,19 @@
+{
+  "//": "Item 50's TypeScript in e2e (ADR 0054): the docker harness (run directly by Node) and the desktop specs (run by Playwright). Type-checked only. The older e2e scripts are item 54's; allowJs lets the specs' shared helpers import them untyped meanwhile.",
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true,
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["run-in-docker.ts", "../desktop-tests/**/*.ts", "../playwright.desktop.config.ts"]
+}

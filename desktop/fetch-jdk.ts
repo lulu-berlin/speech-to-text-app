@@ -1,0 +1,34 @@
+// Downloads and extracts the pinned Temurin JDK (versions.json) into desktop/dist/jdk,
+// whose jmods stage.ts links with jlink. sha256-verified like every tool download in this
+// repository (verified-download.ts, ./gradlew prepareRuntime).
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { downloadVerified, pin } from './verified-download.ts';
+
+const desktopRoot = dirname(fileURLToPath(import.meta.url));
+const targetDir = join(desktopRoot, 'dist', 'jdk');
+
+const fail = (message: string): never => {
+  console.error(`fetch:jdk: ${message}`);
+  process.exit(1);
+};
+
+// The cache name is the one this script has always used, so an existing entry in
+// dist/downloads is reused instead of re-downloading the ~200 MB tarball.
+const { sha256 } = pin('temurin-jdk', 'fetch:jdk');
+const tarball = downloadVerified({
+  key: 'temurin-jdk',
+  label: 'fetch:jdk',
+  cacheName: `temurin-${sha256.slice(0, 12)}.tar.gz`,
+});
+
+rmSync(targetDir, { recursive: true, force: true });
+mkdirSync(targetDir, { recursive: true });
+const result = spawnSync('tar', ['-xzf', tarball, '-C', targetDir, '--strip-components=1'], {
+  stdio: 'inherit',
+});
+if (result.status !== 0) fail('extraction failed');
+if (!existsSync(join(targetDir, 'jmods'))) fail('extracted JDK has no jmods');
+console.log('fetch:jdk: Temurin JDK ready at desktop/dist/jdk');

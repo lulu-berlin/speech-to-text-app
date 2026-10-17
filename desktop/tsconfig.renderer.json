@@ -1,0 +1,14 @@
+{
+  "//": "The download screen's script (ADR 0054): a classic browser script, compiled to build/progress.js.",
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": [],
+    "rootDir": "src",
+    "outDir": "build"
+  },
+  "include": ["src/progress.ts", "src/bridge.d.ts"]
+}

@@ -18,7 +18,9 @@ fun main() {
     // The startup device probe (item 32): whisper-cli is asked once which GPUs it can use; the Settings page offers them.
     val gpus = runBlocking { DeviceProbe(ProcessRunner(), config.whisperModel).gpus() }
     bootLogger.info("Device probe: {} GPU(s) {}", gpus.size, gpus)
-    embeddedServer(Netty, port = config.port) {
+    // The host is part of the configuration (desktop item 50: 127.0.0.1 when STT_HOST says
+    // so; every other path keeps the default 0.0.0.0).
+    embeddedServer(Netty, host = config.host, port = config.port) {
         sttApp(config, gpus)
     }.start(wait = true)
 }
