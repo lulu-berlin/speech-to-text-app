@@ -3,7 +3,7 @@
 # bin/stt-app (bin/speech-to-text-app before item 16): a java wrapper that defaults
 # STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended), defaults
 # both models from nix/models.nix (a user-set value wins), and puts the pinned
-# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
+# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1 headless, setsid and coreutils first on PATH (ADR 0047).
 # `docker-root` is the Docker image's root filesystem (roadmap item 19, see Dockerfile).
 # Nix evaluation happens on the user's machine - this file is unverified here.
 #
@@ -28,6 +28,10 @@
     models = import ./nix/models.nix {inherit pkgs;};
     whisperCpp = import ./nix/whisper-cpp.nix {inherit pkgs;};
 
+    # The app's ffmpeg (roadmap item 61): nixpkgs' cached headless variant of 8.1.2, the one the
+    # desktop, the server package and the devenv ship; the version manifest reads it too.
+    ffmpeg = pkgs.ffmpeg_8-headless;
+
     # Gradle 9.8 (nixpkgs' gradle_9) on the runtime JDK 21 (pkgs.jdk = pkgs.jre's JDK):
     # the same Gradle as the devenv and the committed wrapper (item 33, ADR 0049). 9.x
     # is the first line that runs on Java 25 (8.14's embedded Kotlin cannot parse it);
@@ -50,7 +54,7 @@
       pnpm = pkgs.pnpm_11.version;
       gradle = gradle.version;
       jdk = pkgs.jre.version;
-      ffmpeg = pkgs.lib.versions.majorMinor pkgs.ffmpeg_8.version;
+      ffmpeg = pkgs.lib.versions.majorMinor ffmpeg.version;
       whisperCpp = data.whisperCppTag;
       models = models.meta;
       downloads = data.downloads;
@@ -254,14 +258,15 @@
           # suite swaps in the tiny whisper model).
           # --prefix PATH: the backend runs whisper-cli, ffmpeg and setsid by name (ADR 0047);
           # the package's own tools come first, so a caller's PATH (e.g. the devenv's
-          # whisper-cli) cannot replace them. ffmpeg_8, not nixpkgs' default ffmpeg (9.0 at
-          # the locked rev): item 33's Gradle bootstrap syncs ffmpeg to the 8.1 branch.
+          # whisper-cli) cannot replace them. nixpkgs' ffmpeg_8-headless: the cached variant of
+          # 8.1, the branch item 33's Gradle bootstrap syncs to, not nixpkgs' default ffmpeg
+          # (9.0 at the locked rev) and not the "small" variant (roadmap item 61).
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
             --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
             --set-default STT_WHISPER_MODEL ${models.whisper} \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
-            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp pkgs.ffmpeg_8 pkgs.util-linux pkgs.coreutils]} \
+            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp ffmpeg pkgs.util-linux pkgs.coreutils]} \
             --set CLASSPATH "$CP" \
             --add-flags "stt.MainKt"
           runHook postInstall
@@ -404,6 +409,54 @@
         xargs du -sb < ${closure}/store-paths | sort -rn \
           | awk '{ total += $1; printf "%9.1f MiB  %s\n", $1 / 1048576, $2 }
                  END { printf "%9.1f MiB  total (%d store paths)\n", total / 1048576, NR }' > $out
+      '';
+
+    # Roadmap item 61: one ffmpeg everywhere, and it is nixpkgs' cached `ffmpeg_8-headless` —
+    # the desktop's tools (and so the bundle's), the server package's PATH (and so docker-root's
+    # closure) and the devenv's `ffmpeg` (user-run: devenv.nix is outside this flake). The desktop's
+    # choice is asserted at evaluation (passthru), so that regression fails `nix flake check`
+    # without building the app; built, the check proves the desktop's tools symlink, the server
+    # package's wrapper PATH and docker-root's closure all name it.
+    checks.x86_64-linux.ffmpeg-headless = let
+      lib = pkgs.lib;
+      headless = ffmpeg.bin;
+      server = self.packages.${system}.default;
+    in
+      assert lib.assertMsg (desktop.ffmpeg.outPath == headless.outPath)
+      "ffmpeg-headless: the desktop ships ${desktop.ffmpeg.outPath}, not nixpkgs' ${headless.outPath}";
+      pkgs.runCommand "ffmpeg-headless" {} ''
+        fail() { echo "ffmpeg-headless: $1" >&2; exit 1; }
+        desktop=$(readlink -f ${desktop}/share/stt-app/resources/tools/bin/ffmpeg)
+        [ "$desktop" = ${headless}/bin/ffmpeg ] || fail "the desktop's tools ffmpeg is $desktop, not ${headless}/bin/ffmpeg"
+        grep -qF ${headless}/bin ${server}/bin/stt-app || fail "the server package's wrapper does not name ${headless}/bin"
+        grep -qxF ${headless} ${pkgs.closureInfo {rootPaths = [self.packages.${system}.docker-root];}}/store-paths \
+          || fail "docker-root's closure does not hold ${headless}"
+        echo ok > $out
+      '';
+
+    # Roadmap item 61: the shipped ffmpeg's closure holds none of the GStreamer/GTK-4 cluster —
+    # headless reaches no sdl2-compat → sdl3 → pipewire → gstreamer → python3 chain (measured
+    # 2026-10-18 on the pre-switch stock ffmpeg_8: `nix why-depends /nix/store/ss9dmg3n…-ffmpeg-8.1.2-bin
+    # …/python3-3.14.7`; that closure also held flite, gst-plugins-bad and gtk4). ffmpeg-headless
+    # above pins this package as the one the desktop, the server package and docker-root ship, so
+    # the group is unreachable from ffmpeg in all three. A package's own closure may still hold a
+    # member through an unrelated referrer (docker-root → nixpkgs Mesa → python3), which is not the
+    # behavior this item removes. Names are matched by prefix: flite is "flite-2.2-lib" and gtk4
+    # "gtk4-4.22.4", which a version-anchored pattern misses (the item-50 lesson).
+    checks.x86_64-linux.ffmpeg-no-gstreamer-gtk = let
+      lib = pkgs.lib;
+      closure = pkgs.closureInfo {rootPaths = [ffmpeg.bin];};
+      group = ["python3" "gtk4" "gst-plugins-bad" "flite" "pipewire"];
+      pattern = "-(${lib.concatStringsSep "|" group})-";
+    in
+      pkgs.runCommand "ffmpeg-no-gstreamer-gtk" {} ''
+        found=$(grep -E -- '${pattern}' ${closure}/store-paths || true)
+        if [ -n "$found" ]; then
+          echo "ffmpeg-no-gstreamer-gtk: the GStreamer/GTK-4 cluster is in the shipped ffmpeg's closure:" >&2
+          echo "$found" >&2
+          exit 1
+        fi
+        echo ok > $out
       '';
 
     # Roadmap item 56: the bundle's Vulkan-only Mesa may come from a prebuilt release asset only on

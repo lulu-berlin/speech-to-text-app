@@ -2,7 +2,7 @@
 
 Status: spec-approved
 Depends on: [56](../docs/specs/desktop-bundle-mesa-artifact.md) (done; the pattern this item
-generalizes), [61](61-headless-ffmpeg.md) (in progress; its headless baseline and its committed
+generalizes), [61](../docs/specs/headless-ffmpeg.md) (done; its headless baseline and its committed
 format fixtures are reused here)
 Blocks: —
 

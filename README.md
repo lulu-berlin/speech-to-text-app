@@ -123,6 +123,8 @@ Each form has its packaged end-to-end suite, run in a clean container from the d
 
 Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell). The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
 
+The shell's `ffmpeg` is nixpkgs' headless variant, the same package the app ships (roadmap item 61), so it has no `ffplay`; use another player to listen to a file.
+
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git
 cd speech-to-text-app
