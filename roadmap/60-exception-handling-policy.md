@@ -76,11 +76,19 @@ Sites that already follow the policy — no action, recorded so the audit is dur
 Sites that swallow or lose information — this item's work (still under Evidence; the Decided section
 above records the one decision made so far):
 
-- `engine/ProcessingEngine.kt:501` (`catch (e: Exception)` in the task-failure path): the throwable
-  is persisted as `e.message ?: e.toString()` and **never logged**; when `failIfRunning` loses the
-  race to a cancel, nothing is recorded or logged at all. Already a MED row in `docs/known-issues.md`
-  (`ProcessingEngine.kt:501-506`). Item 42 is reworking this exact region right now (its loop guard
-  around `runTask`); this item starts after 42 lands (see Decided).
+- **The task-failure path, as item 42 reworked it** (`runTask` → `recordFailure`, `ProcessingEngine.kt:602-615`
+  on 42's branch; `catch (e: Exception)` at `:501` on `main` today): item 42 already logs the write's
+  refusal with both throwables (`addSuppressed`), which is what this item's MED row asked for; what
+  remains is that a refusal the repository reports as `false` (the failure write lost to a cancel, a
+  pause or a completion) is still recorded and logged nowhere. **Two findings from item 42's main-tree
+  review (2026-10-18, the user: they belong here):** (a) the refusal's log line says the task "keeps
+  its status (a RUNNING task waits for a restart's recovery)", which is right for RUNNING but hides
+  that a QUEUED task whose start failed is picked up again at once — if the failure write is refused
+  as well, the worker spins on it (ADR 0058's Consequences record the case; no test covers it);
+  (b) the worker's next-task read guard (`nextTaskOrNull`, `:454-462`) catches `Exception`, while the
+  phase guard catches `Throwable` (item 42's decision that an `Error` from a phase fails the task), so
+  an `Error` from the reads still ends the worker loop — the policy this item writes has to say which
+  type each guard takes, and align them deliberately.
 - `transcribe/DeviceProbe.kt:38` (`catch (e: Exception)`): any probe failure becomes an empty list
   with a warn line carrying only `e.toString()` — no stack. The result is then presented as "no
   GPU": `Main.kt:20` logs "Device probe: 0 GPU(s)"; `http/SettingsRoutes.kt` returns
@@ -96,10 +104,10 @@ above records the one decision made so far):
   control flow for a bad stored value, but `runCatching` discards *every* `Throwable` — a bug in the
   parser would be indistinguishable from bad input. Narrowing candidate.
 
-Related shape checked and fine: the engine's phase guard rethrows `CancellationException` before its
-`catch (e: Exception)` (`ProcessingEngine.kt:497-501`); the item-42 guard adds the same split for
-`Throwable`. No `runCatching` in production code wraps suspending calls (the two uses above are pure
-functions).
+Related shape checked: the engine's phase guard rethrows `CancellationException` before its
+`catch (e: Throwable)` (item 42: an `Error` from a phase fails the task); the item-42 read guard
+`nextTaskOrNull` rethrows it before a `catch (e: Exception)` — the asymmetry finding (b) above. No
+`runCatching` in production code wraps suspending calls (the two uses above are pure functions).
 
 ## Proposal
 
@@ -166,3 +174,13 @@ decided: yes, the grep-based check above.
 - 2026-10-17: spec and test list approved by the user as worded above. Status: spec-approved. Filed
   on `main` through a docs PR (with the MED backlog row removed); its workspace starts after item 42
   lands.
+
+- 2026-10-18: amended from item 42's main-tree review, at the user's direction ("exception handling
+  should be done in roadmap item 60"): the task-failure bullet is re-anchored to 42's reworked code
+  (`recordFailure`, which now logs the refusal with both throwables) and names what 42 leaves (the
+  silent refusal-as-`false`), plus two findings — the refusal log line's misleading status wording
+  and the queued task's spin when the failure write is refused too, and the read guard's
+  `Exception`-only catch where the phase guard takes `Throwable`. Item 42's branch records both
+  findings and drops the two backlog rows this item would otherwise have needed. The approved test
+  list is unchanged: the test-list items for (a) and (b) are agreed when this item starts, after 42
+  lands. Status stays spec-approved.
