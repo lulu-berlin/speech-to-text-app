@@ -21,9 +21,9 @@ enum class TaskStatus {
 
     /**
      * Whether the transition `this` → [to] is in the spec's per-task table
-     * (roadmap item 04, as amended by item 11 for retry). The whole-queue guard on
-     * `QUEUED → RUNNING` (at most one running task) lives on the queue aggregate,
-     * not here.
+     * (roadmap item 04, as amended by item 11 for retry and by item 42 for a task whose
+     * process is gone or whose start itself fails, ADR 0057/0058). The whole-queue guard on
+     * `QUEUED → RUNNING` (at most one running task) lives on the queue aggregate, not here.
      */
     fun canTransitionTo(to: TaskStatus): Boolean = to in allowedTargets[this].orEmpty()
 
@@ -34,8 +34,8 @@ enum class TaskStatus {
         /** Spec's allowed targets per source; a source absent here has no transition at all. */
         private val allowedTargets: Map<TaskStatus, Set<TaskStatus>> =
             mapOf(
-                QUEUED to setOf(RUNNING, PAUSED, CANCELED),
-                RUNNING to setOf(PAUSED, COMPLETED, FAILED, CANCELED),
+                QUEUED to setOf(RUNNING, PAUSED, FAILED, CANCELED),
+                RUNNING to setOf(QUEUED, PAUSED, COMPLETED, FAILED, CANCELED),
                 PAUSED to setOf(QUEUED, CANCELED),
                 FAILED to setOf(QUEUED),
                 CANCELED to setOf(QUEUED),

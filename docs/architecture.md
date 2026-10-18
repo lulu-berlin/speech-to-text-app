@@ -75,8 +75,8 @@ A task is one uploaded file on its way to a transcript. Its **status** says wher
 
 | Status | Meaning | Can become |
 | --- | --- | --- |
-| `QUEUED` | waiting its turn | `RUNNING`, `PAUSED`, `CANCELED` |
-| `RUNNING` | being processed | `PAUSED`, `COMPLETED`, `FAILED`, `CANCELED` |
+| `QUEUED` | waiting its turn | `RUNNING`, `PAUSED`, `FAILED` (its start failed), `CANCELED` |
+| `RUNNING` | being processed | `QUEUED` (its process was killed), `PAUSED`, `COMPLETED`, `FAILED`, `CANCELED` |
 | `PAUSED` | stopped by the user, keeps its place | `QUEUED`, `CANCELED` |
 | `COMPLETED` | transcript ready | — |
 | `FAILED` | an error stopped it | `QUEUED` (retry) |

@@ -1,8 +1,8 @@
 # 60 — Exception-handling policy: no catch-all swallows a throwable silently
 
 Status: spec-approved
-Depends on: [42](42-worker-stability.md) (in progress; decided 2026-10-17 — this item starts after
-42 lands, because its guard reworks the same failure path)
+Depends on: [42](../docs/specs/worker-stability.md) (done; this item starts after 42 lands, because
+its guard reworks the same failure path)
 Blocks: —
 
 ## Goal

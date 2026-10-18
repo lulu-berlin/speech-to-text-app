@@ -46,7 +46,7 @@ class ProcessingEngineRetrySpec :
                         AudioRepository(db).deleteOriginal(failed)
                         fixture.tasks.setRunningIfQueued(failed, startedAt = 1_000L)
                         fixture.tasks.setPhase(failed, TaskPhase.TRANSCRIBING)
-                        fixture.tasks.failIfRunning(failed, "whisper-cli failed on chunk-1.flac (exit 2)", finishedAt = 9_000L)
+                        fixture.tasks.failIfPending(failed, "whisper-cli failed on chunk-1.flac (exit 2)", finishedAt = 9_000L)
 
                         // Paused, so the retried task stays queued and its cleared state is observable.
                         fixture.engine.pauseQueue()

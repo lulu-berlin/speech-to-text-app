@@ -1,6 +1,7 @@
 package stt.engine
 
 import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.nulls.shouldNotBeNull
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -81,10 +82,13 @@ internal class EngineFixture(
  * Builds the engine under test against [db] with the fakes and a channel of COMPLETED task ids. The
  * worker is not started yet, so a spec enqueues first or starts on an empty queue. The subscription is
  * started undispatched, so it is in place before the caller can start the worker and no event is missed.
+ * The engine runs in [scope]; a spec that quits the app, as `EngineModule`'s cleanup does, passes a scope of
+ * its own to cancel.
  */
 internal fun TestScope.engineUnderTest(
     dataDir: TestDataDir,
     db: Database,
+    scope: CoroutineScope = backgroundScope,
 ): EngineFixture {
     val scratchDir = ScratchDir(dataDir.dataDir)
     val tasks = TaskRepository(db)
@@ -96,7 +100,7 @@ internal fun TestScope.engineUnderTest(
     val windowCutter = FakeWindowCutter()
     val engine =
         ProcessingEngine(
-            scope = backgroundScope,
+            scope = scope,
             config = testConfig(dataDir.dataDir),
             tasks = tasks,
             chunks = ChunkRepository(db),
@@ -173,6 +177,37 @@ internal suspend fun enqueueTask(
 
 /** The id of the task a scratch path belongs to: its nearest `<scratch>/<id>` ancestor, itself included (item 44). */
 internal fun taskIdOf(path: Path): Long = generateSequence(path) { it.parent }.firstNotNullOf { it.fileName?.toString()?.toLongOrNull() }
+
+/** The stored row of a task, which must exist. */
+internal suspend fun storedTaskOf(
+    fixture: EngineFixture,
+    task: Long,
+): Task =
+    fixture.tasks
+        .find(task)
+        ?.task
+        .shouldNotBeNull()
+
+/**
+ * The statuses [task]'s published updates went through, in order, each change once: its phase and progress publishes
+ * repeat the status, so consecutive repeats are dropped. Drains [EngineFixture.events].
+ */
+internal fun statusesOf(
+    fixture: EngineFixture,
+    task: Long,
+): List<TaskStatus> =
+    drain(fixture.events)
+        .filterIsInstance<Event.TaskUpdated>()
+        .filter { it.task.id == task }
+        .map { it.task.task.status }
+        .fold(emptyList()) { seen, status -> if (seen.lastOrNull() == status) seen else seen + status }
+
+/** The file name of the chunk the transcriber starts next, for a spec waiting for a known chunk to begin. */
+internal suspend fun nextChunkEntered(transcriber: FakeTranscriber): String =
+    transcriber.entered
+        .receive()
+        .fileName
+        .toString()
 
 /** The stored status of a task. */
 internal suspend fun statusOf(

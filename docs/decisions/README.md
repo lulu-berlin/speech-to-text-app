@@ -67,4 +67,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0054 | [No hand-written JavaScript: we write TypeScript, JavaScript only comes out of it](0054-no-hand-written-javascript.md) | accepted | 2026-10-15 |
 | 0055 | [The desktop window has no network path: its own file and the loopback backend, nothing else](0055-desktop-window-has-no-network-path.md) | accepted | 2026-10-15 |
 | 0056 | [Which shell a script starts with: `env` only where Nix is absent, pinned store interpreters otherwise](0056-shebang-env-only-outside-nix.md) | accepted | 2026-10-15 |
-
+| 0057 | [A RUNNING task whose process is gone goes back to QUEUED](0057-running-task-without-process-is-queued.md) | accepted | 2026-10-17 |
+| 0058 | [A QUEUED task whose start write fails is FAILED](0058-queued-task-whose-start-fails-is-failed.md) | accepted | 2026-10-18 |

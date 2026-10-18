@@ -37,7 +37,7 @@ Responses without a body (`204` of `DELETE /api/tasks/{id}`), the transcript dow
 ## Task transition table
 
 `task-transitions.json` is contract data, not a response. It lists:
-- `transitions`: the allowed status transitions per status (item 04, amended by item 11 for retry);
+- `transitions`: the allowed status transitions per status (item 04, amended by item 11 for retry, by item 42 for a RUNNING task whose process was killed, and by item 42 again for a QUEUED task whose start failed, ADR 0057/0058);
 - `commands`: for each task command endpoint, the statuses it accepts and the status it requests.
 
 Delete is not a transition and works on any task.

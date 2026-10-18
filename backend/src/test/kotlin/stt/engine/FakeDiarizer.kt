@@ -25,6 +25,12 @@ internal class FakeDiarizer : Diarizer {
     /** When set, every call waits for it before returning; a test clears it to let later calls run through. */
     var hold: CompletableDeferred<Unit>? = null
 
+    /**
+     * When set, the next call throws it once its hold is released, like a diarization whose decoder's ffmpeg failed
+     * or was killed; then it is cleared.
+     */
+    var failNext: Throwable? = null
+
     /** Whether a call has come back from the engine's gate, so a test can see it was held there. */
     var passedGate = false
         private set
@@ -51,6 +57,10 @@ internal class FakeDiarizer : Diarizer {
         sources.add(audio)
         entered.send(task.id)
         hold?.await()
+        failNext?.let { failure ->
+            failNext = null
+            throw failure
+        }
         onStage(DiarizationStage.EMBEDDING)
         onProgress(0.0)
         onProgress(0.5)
