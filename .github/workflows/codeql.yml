@@ -1,0 +1,67 @@
+# CodeQL code scanning (advanced setup).
+#
+# Why not default setup: the root Gradle build is a composite build (settings.gradle.kts:
+# includeBuild("backend") and :frontend), so CodeQL's autobuild runs `gradle testClasses` at the
+# root, where no such task exists ("Task 'testClasses' not found in root project 'stt-app' and
+# its subprojects"). Kotlin has no `build-mode: none` (only Java does), so the Java/Kotlin
+# analysis must build the code: this workflow compiles the backend the way the CI jobs do
+# (`./gradlew -p backend check`), with `testClasses` as the smallest task that compiles the main
+# and test Kotlin sources CodeQL extracts. JavaScript/TypeScript needs no build.
+#
+# The JDK and Gradle come from the pinned versions.json through the shared toolchain action, so
+# the analysis runs on the same JDK as every other job. Advanced setup and default setup cannot
+# both be enabled: disable default setup (Settings -> Advanced Security -> CodeQL analysis ->
+# Switch to advanced) before this workflow runs.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Weekly, Monday 03:30 Europe/Berlin (after the nightly CI run): CodeQL's own schedule.
+  schedule:
+    - cron: '30 3 * * 1'
+      timezone: 'Europe/Berlin'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+# A newer commit on a PR supersedes the older run; every main commit keeps its own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Kotlin cannot be extracted without a build (Java could use `none`).
+          - language: java-kotlin
+            build-mode: manual
+          # The frontend, e2e and desktop TypeScript; interpreted, no build needed.
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+      - if: matrix.language == 'java-kotlin'
+        uses: ./.github/actions/jvm-toolchain
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - if: matrix.build-mode == 'manual'
+        name: Compile the backend for extraction
+        # --no-daemon: CodeQL's tracer cannot see a build delegated to an existing Gradle
+        # daemon (CodeQL CLI docs, "Java project built using Gradle").
+        run: ./gradlew -p backend testClasses --no-daemon
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:${{ matrix.language }}'
