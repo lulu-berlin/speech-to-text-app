@@ -85,3 +85,11 @@ Whatever a single task's run throws — during setup, a phase, or a repository c
 - 2026-10-18: main-tree review (user: the root agent fixes docs; no behavior change). Test-list item 10 (item 40's pause-vs-completion rule, the line above) was still unticked while the entry before this one called the list complete — **correcting that entry**: the line is now ticked, naming `ProcessingEngineAtomicTransitionsSpec` "a pause that is accepted while its task's last process is already exiting" (`:303-340`), which asserts it and is green. The root agent re-ran the four affected specs (StartRace 3, FailureSpec 8, WorkerLoop 1, AtomicTransitions 6; 18 tests, 0 failures) and `ktlintCheck`; the ADR index's blank line between 0057 and 0058 was removed (it split the table). Two exception-handling findings from the review go to [item 60](../../roadmap/60-exception-handling-policy.md) instead of here (the user): `recordFailure`'s log line says the task stays RUNNING, which is wrong for a QUEUED task whose start failed (and the worker retries such a task at once if the failure write is refused too), and the worker's read guard catches `Exception` where the phase guard catches `Throwable`. Status stays in-review.
 
 - 2026-10-18: main-tree review approved; moved to `docs/specs/worker-stability.md` with `Status: done`, squashed to one commit on top of `main` (ADR 0050).
+
+- 2026-10-18: the full e2e suite caught a real defect in this item's e2e spec, which had only been run
+  alone: the suite shares one backend, so by the last spec 30 earlier tasks were listed, and the setup
+  assertion expected the task list to equal this spec's two uploads — it could never pass in the suite
+  (it polled for 60 s and failed). Fixed to ask that both uploads are present, naming any missing:
+  `42-worker-stability.spec.ts:10-22`. Verified in the failing order — `03-upload-queue.spec.ts` then
+  `42-worker-stability.spec.ts` in one Playwright run: 2 passed, 31.9 s. The behavioral claims (the
+  broken task FAILED with its error, the healthy one COMPLETED) are unchanged.

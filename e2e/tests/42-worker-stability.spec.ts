@@ -8,16 +8,18 @@ test('a task that fails mid-run does not stop the queue', async ({ page }) => {
   await uploadClips(page, [STABILITY_BROKEN_CLIP, STABILITY_CLIP]);
 
   // Both uploads must have become tasks before leaving the Queue view: an upload still in flight when the
-  // view unmounts is cancelled.
+  // view unmounts is cancelled. The suite shares one backend, so the earlier journeys' tasks are listed
+  // too; ask only that these two are present, naming any that are not.
   await expect
     .poll(
       async () => {
         const body = await (await page.request.get(appUrl('/api/tasks'))).json();
-        return body.tasks.map((task: { filename: string }) => task.filename).sort();
+        const names: string[] = body.tasks.map((task: { filename: string }) => task.filename);
+        return [STABILITY_BROKEN_CLIP, STABILITY_CLIP].filter((name) => !names.includes(name));
       },
       { timeout: 60_000 },
     )
-    .toEqual([STABILITY_BROKEN_CLIP, STABILITY_CLIP].sort());
+    .toEqual([]);
 
   // The undecodable file fails in CHUNKING: History shows it FAILED with its stored error.
   await goTo(page, 'History');
