@@ -187,6 +187,42 @@
       # The desktop app as one self-contained executable (nix/desktop-bundle.nix, ADR 0053).
       desktop-bundle = import ./nix/desktop-bundle.nix {inherit pkgs desktop;};
 
+      # Roadmap item 56: the release asset for the bundle's Vulkan-only Mesa on this system, with the
+      # pin to paste into nix/desktop-artifacts.nix. The user builds it (the source Mesa is an
+      # input, so it must be in the store) and uploads the tar to a `desktop-mesa-<n>` release of
+      # this repository; agents never publish. `pin.nix` carries the sha256, the source's out path
+      # and its direct references, printed with `cat result/pin.nix`.
+      desktop-bundle-mesa-asset = let
+        mesa = (import ./nix/desktop-mesa.nix {inherit pkgs;}).source;
+        name = "${mesa.name}-${system}.tar.zst";
+      in
+        pkgs.runCommand "stt-bundle-mesa-asset" {
+          __structuredAttrs = true;
+          nativeBuildInputs = [pkgs.zstd pkgs.coreutils pkgs.jq];
+          exportReferencesGraph.graph = [mesa];
+        } ''
+          mkdir $out
+          tar -cf - --hard-dereference --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+            --owner=0 --group=0 --mode=u+rw,uga+r -C ${mesa} . \
+            | zstd -19 -T0 -o $out/${name}
+          references=$(
+            jq -r --arg self ${mesa} '.graph[] | select(.path == $self) | .references[] | select(. != $self)' \
+              $NIX_ATTRS_JSON_FILE
+          )
+          {
+            echo "  mesaVulkan.${system} = {"
+            echo "    url = \"https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-mesa-v1/${name}\";"
+            echo "    sha256 = \"$(sha256sum $out/${name} | cut -d' ' -f1)\";"
+            echo "    storePath = \"${mesa}\";"
+            echo "    references = ["
+            echo "$references" | sed 's/^/      "/; s/$/"/'
+            echo "    ];"
+            echo "  };"
+          } > $out/pin.nix
+          echo "asset: $out/${name}"
+          cat $out/pin.nix
+        '';
+
       # `nix build .` builds both parts and provides bin/stt-app, which
       # starts the backend serving the bundled frontend. A real derivation (not
       # symlinkJoin) so the wrapper can hard-code the store paths via makeWrapper.
@@ -369,6 +405,165 @@
           | awk '{ total += $1; printf "%9.1f MiB  %s\n", $1 / 1048576, $2 }
                  END { printf "%9.1f MiB  total (%d store paths)\n", total / 1048576, NR }' > $out
       '';
+
+    # Roadmap item 56: the bundle's Vulkan-only Mesa may come from a prebuilt release asset only on
+    # a system that has one registered; any other system builds it from source. Checked for
+    # aarch64-linux, which has none: its bundle Mesa must be the source derivation itself.
+    # Evaluation only (nixpkgs' cross package set), so nothing for aarch64 is built.
+    checks.x86_64-linux.desktop-mesa-unregistered-system = let
+      aarch64 = import ./nix/desktop-mesa.nix {pkgs = pkgs.pkgsCross.aarch64-multiplatform;};
+    in
+      assert pkgs.lib.assertMsg (aarch64.mesa.outPath == aarch64.source.outPath)
+      "desktop-mesa-unregistered-system: aarch64-linux has no artifact entry, so its bundle Mesa must be the source derivation ${aarch64.source.outPath}, got ${aarch64.mesa.outPath}";
+        pkgs.runCommand "desktop-mesa-unregistered-system" {} ''
+          echo ok > $out
+        '';
+
+    # Roadmap item 56: a registered Mesa artifact that is missing or does not match its sha256 pin
+    # fails, naming the asset and its pin (url and sha256), and the registered Mesa never builds the
+    # source derivation. Offline and deterministic: the asset's own fetch step runs against a
+    # `file://` fixture in the store, once under a deliberately wrong sha256 and once at a URL with
+    # no file behind it; both must fail and name the pin. And, checked at evaluation, the source
+    # Mesa's .drv is a direct input of none of the registered Mesa's own derivations (the unpack,
+    # the asset, its fetch script). Not the whole build graph: exporting a .drv's closure makes Nix
+    # build every output in it, the source Mesa's included.
+    checks.x86_64-linux.desktop-mesa-artifact-integrity = let
+      fixture = pkgs.writeText "stt-bundle-mesa-vulkan-fixture.tar.zst" "not the release asset";
+      registered = url: let
+        mesas = import ./nix/desktop-mesa.nix {
+          inherit pkgs;
+          artifacts.mesaVulkan.${system} = {
+            inherit url;
+            # Deliberately wrong: no file hashes to all zeros.
+            sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+            # A pin is a literal (as in nix/desktop-artifacts.nix), so no context on the path.
+            storePath = builtins.unsafeDiscardStringContext mesas.source.outPath;
+            references = [];
+          };
+        };
+      in
+        mesas;
+      cases = {
+        mismatched = registered "file://${fixture}";
+        missing = registered "file://${fixture}.missing";
+      };
+      expectFailure = label: mesas: let
+        asset = mesas.mesa.asset;
+      in ''
+        if out=$TMPDIR/${label} ${asset.fetch} 2> ${label}.err; then
+          echo "desktop-mesa-artifact-integrity: the ${label} artifact was accepted" >&2
+          exit 1
+        fi
+        for expected in ${pkgs.lib.escapeShellArgs [asset.name asset.url asset.sha256]}; do
+          if ! grep -qF -- "$expected" ${label}.err; then
+            echo "desktop-mesa-artifact-integrity: the ${label} artifact's error does not name '$expected':" >&2
+            cat ${label}.err >&2
+            exit 1
+          fi
+        done
+      '';
+      directInputs = drv: builtins.attrNames (builtins.getContext (builtins.toJSON drv.drvAttrs));
+      sourceDrv = builtins.unsafeDiscardStringContext cases.mismatched.source.drvPath;
+      registeredMesa = cases.mismatched.mesa;
+      ownDerivations = [registeredMesa registeredMesa.asset registeredMesa.asset.fetch];
+    in
+      assert pkgs.lib.assertMsg (!pkgs.lib.any (drv: pkgs.lib.elem sourceDrv (directInputs drv)) ownDerivations)
+      "desktop-mesa-artifact-integrity: a registered Mesa's own derivations depend on the source Mesa ${sourceDrv}";
+        pkgs.runCommand "desktop-mesa-artifact-integrity" {} ''
+          ${pkgs.lib.concatStrings (pkgs.lib.mapAttrsToList expectFailure cases)}
+          echo ok > $out
+        '';
+
+    # Roadmap item 56: a registered Mesa artifact made from another source build than this flake's —
+    # its pinned storePath is not the source Mesa's out path, as after a nixpkgs bump or an edit of
+    # the override — fails at evaluation, so nothing is fetched or compiled. Nix cannot read an
+    # evaluation error's text, so nix/desktop-mesa.nix also exposes the text it throws (`pinError`),
+    # which must name the asset, its url, sha256 and storePath, and the source's out path.
+    checks.x86_64-linux.desktop-mesa-stale-pin = let
+      lib = pkgs.lib;
+      fixture = pkgs.writeText "stt-bundle-mesa-vulkan-fixture.tar.zst" "not the release asset";
+      pin = {
+        url = "file://${fixture}";
+        sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+        # Deliberately not the source Mesa's out path.
+        storePath = "/nix/store/00000000000000000000000000000000-stt-bundle-mesa-vulkan-26.2.4";
+        references = [];
+      };
+      mesas = import ./nix/desktop-mesa.nix {
+        inherit pkgs;
+        artifacts.mesaVulkan.${system} = pin;
+      };
+      evaluated = builtins.tryEval mesas.mesa.outPath;
+      message = mesas.pinError or "";
+      named = map builtins.unsafeDiscardStringContext [
+        (baseNameOf pin.url)
+        pin.url
+        pin.sha256
+        pin.storePath
+        mesas.source.outPath
+      ];
+      unnamed = lib.filter (expected: !lib.hasInfix expected message) named;
+    in
+      assert lib.assertMsg (!evaluated.success)
+      "desktop-mesa-stale-pin: a pin made from ${pin.storePath} evaluated to ${toString evaluated.value}";
+      assert lib.assertMsg (unnamed == [])
+      "desktop-mesa-stale-pin: the stale pin's error does not name ${lib.concatStringsSep ", " unnamed}; it reads: ${message}";
+        pkgs.runCommand "desktop-mesa-stale-pin" {} ''
+          echo ok > $out
+        '';
+
+    # Roadmap item 56: on x86_64-linux the bundle's Vulkan-only Mesa is the pinned release asset, not
+    # the source build, and only that system is registered; a system with no entry builds from
+    # source (checked above). Built, it must keep the three Vulkan drivers with their manifests
+    # pointing into itself, name no store path of the build it was made from, refer only to its pins
+    # and itself, and carry no LLVM.
+    checks.x86_64-linux.desktop-mesa-prebuilt = let
+      lib = pkgs.lib;
+      artifacts = import ./nix/desktop-artifacts.nix;
+      registered = builtins.attrNames artifacts.mesaVulkan;
+      pinned = artifacts.mesaVulkan.${system} or null;
+      mesas = import ./nix/desktop-mesa.nix {inherit pkgs;};
+      directInputs = drv: builtins.attrNames (builtins.getContext (builtins.toJSON drv.drvAttrs));
+      sourceDrv = builtins.unsafeDiscardStringContext mesas.source.drvPath;
+      references = map (p: lib.unsafeDiscardStringContext "${p}") pinned.references;
+      mesaIcds = "${mesas.mesa}/share/vulkan/icd.d";
+    in
+      assert lib.assertMsg (registered == [system])
+      "desktop-mesa-prebuilt: this item registers only ${system}, but nix/desktop-artifacts.nix registers ${lib.concatStringsSep ", " registered}";
+      assert lib.assertMsg (pinned != null)
+      "desktop-mesa-prebuilt: nix/desktop-artifacts.nix has no mesaVulkan.${system} entry, so the bundle Mesa is the source build ${mesas.mesa.outPath}";
+      assert lib.assertMsg (mesas.mesa.outPath != mesas.source.outPath)
+      "desktop-mesa-prebuilt: the bundle's ${system} Mesa is the source derivation ${mesas.source.outPath}, not the prebuilt asset";
+      assert lib.assertMsg (!lib.any (drv: lib.elem sourceDrv (directInputs drv)) [mesas.mesa mesas.mesa.asset mesas.mesa.asset.fetch])
+      "desktop-mesa-prebuilt: the prebuilt Mesa's own derivations depend on the source Mesa ${sourceDrv}";
+        pkgs.runCommand "desktop-mesa-prebuilt" {nativeBuildInputs = [pkgs.jq];} ''
+          fail() {
+            echo "desktop-mesa-prebuilt: $1" >&2
+            exit 1
+          }
+          for driver in radeon intel nouveau; do
+            manifest=${mesaIcds}/''${driver}_icd.x86_64.json
+            library=$(jq -r .ICD.library_path "$manifest")
+            case "$library" in
+              ${mesas.mesa}/lib/*) [ -f "$library" ] || fail "$manifest names $library, which is missing" ;;
+              *) fail "$manifest names $library, outside the prebuilt Mesa" ;;
+            esac
+          done
+          if grep -rlaF ${lib.escapeShellArg pinned.storePath} ${mesas.mesa}; then
+            fail "the prebuilt Mesa still names ${pinned.storePath}, the build it was made from"
+          fi
+          if ! stray=$(bash ${./nix/store-path-scan.sh} ${mesas.mesa} ${lib.escapeShellArgs references}); then
+            fail "the prebuilt Mesa names store paths that are not pinned references: $stray"
+          fi
+          # Nix records references only among a derivation's inputs, so a pin that is not an input
+          # silently drops out of the closure the bundle's payload is built from: assert each one
+          # is there. (Found 2026-10-18: ten of the thirteen were missing from the bundle.)
+          for reference in ${lib.escapeShellArgs references}; do
+            grep -qxF "$reference" ${pkgs.closureInfo {rootPaths = [mesas.mesa];}}/store-paths ||
+              fail "the prebuilt Mesa's closure is missing its pinned reference $reference"
+          done
+          echo ok > $out
+        '';
 
     # Regenerates the committed versions.json from the flake's versions (ADR 0010: the
     # user runs this; writes to the checkout the command is run from).
