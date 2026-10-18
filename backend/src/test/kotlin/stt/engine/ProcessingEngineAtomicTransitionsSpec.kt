@@ -246,6 +246,10 @@ class ProcessingEngineAtomicTransitionsSpec :
                                 mapOf(next to listOf(WhisperSegment(startMs = 0, endMs = 1_000, text = " hi ")))
                             fixture.transcriber.hold = CompletableDeferred()
                             fixture.transcriber.holdFrom = 2
+                            // The next task's DIARIZING phase waits until the release below, 11 s after the
+                            // wait starts: longer than the 10 s real-time window it must outlast.
+                            val diarizing = CompletableDeferred<Unit>()
+                            fixture.diarizer.hold = diarizing
                             fixture.engine.start()
                             taskIdOf(
                                 fixture.transcriber.entered
@@ -282,11 +286,8 @@ class ProcessingEngineAtomicTransitionsSpec :
                             // commit COMPLETED before that read — so which of the two publishes lands first,
                             // and how many land, is scheduling, not behaviour. Wait for both ids to appear in
                             // the events; duplicates and order are tolerated, an absent id is not.
-                            val published = mutableSetOf<Long>()
-                            pumpUntil(10.seconds) {
-                                published += drain(fixture.completed)
-                                published.containsAll(setOf(first, next))
-                            }
+                            backgroundScope.releaseAfter(11.seconds, diarizing)
+                            val published = awaitCompleted(fixture.completed, setOf(first, next))
                             published shouldBe setOf(first, next)
                             fixture.diarizer.passedGate shouldBe true
                             statusOf(fixture, next) shouldBe TaskStatus.COMPLETED
@@ -320,6 +321,10 @@ class ProcessingEngineAtomicTransitionsSpec :
 
                         val release = CompletableDeferred<Unit>()
                         fixture.transcriber.hold = release
+                        // The next task's DIARIZING phase waits until the release below, 4 s after the
+                        // wait starts: longer than the 3 s real-time window it must outlast.
+                        val diarizing = CompletableDeferred<Unit>()
+                        fixture.diarizer.hold = diarizing
                         fixture.engine.start()
                         taskIdOf(
                             fixture.transcriber.entered
@@ -332,7 +337,8 @@ class ProcessingEngineAtomicTransitionsSpec :
                         // process has exited: the task still finishes, and completion wins over the pause.
                         fixture.transcriber.hold = null
                         release.complete(Unit)
-                        pumpUntil(3.seconds) { statusOf(fixture, next) == TaskStatus.COMPLETED }
+                        backgroundScope.releaseAfter(4.seconds, diarizing)
+                        awaitCompleted(fixture.completed, setOf(next))
                         statusOf(fixture, first) shouldBe TaskStatus.COMPLETED
                         fixture.diarizer.passedGate shouldBe true
                         statusOf(fixture, next) shouldBe TaskStatus.COMPLETED

@@ -51,4 +51,31 @@ class CountingMutexSpec :
                 }
             }
         }
+        given("a writer held between its record and its wait") {
+            `when`("a later writer reaches the lock meanwhile") {
+                then("the held writer is still served first") {
+                    runTest {
+                        val lock = CountingMutex()
+                        val order = mutableListOf<String>()
+                        lock.lock() // the test holds the lock, so both writers queue behind it
+                        val first = LockWriter("first")
+                        val second = LockWriter("second")
+                        val hold = CompletableDeferred<Unit>()
+                        lock.holdBeforeWait = hold
+                        launch(first) { lock.withLock { order += "first" } }
+                        runCurrent()
+                        // The hold catches the first writer after its record, before its wait.
+                        lock.writers.value shouldBe setOf(first)
+                        lock.holdBeforeWait = null
+                        launch(second) { lock.withLock { order += "second" } }
+                        awaitLockCall(lock, second)
+
+                        hold.complete(Unit)
+                        lock.unlock()
+                        runCurrent()
+                        order shouldBe listOf("first", "second")
+                    }
+                }
+            }
+        }
     })
