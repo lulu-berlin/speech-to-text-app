@@ -29,7 +29,8 @@ Open — candidates:
 
 1. Move every path to the nixpkgs release (1.9.2), if a matching prebuild exists for the Gradle
    bootstrap, and use a cached nixpkgs output — only if one without SDL is cached.
-2. A pinned prebuilt artifact through item 56's mechanism (single output, as for Mesa).
+2. A pinned prebuilt artifact through item 62's shared `nix/prebuilt-artifact.nix` helper (single
+   output, as for Mesa).
 3. Accept the compile time.
 
 ## Open questions
@@ -37,7 +38,6 @@ Open — candidates:
 - Is `whisper-cpp-vulkan` (with SDL) in cache.nixos.org at the pin, and how much does its SDL
   closure add compared with an artifact of our build?
 - Does a 1.9.2 prebuild exist for every platform the Gradle bootstrap serves (`nix/versions.nix`)?
-- Shared artifact helper with items 56 and 62?
 
 ## Test list
 
