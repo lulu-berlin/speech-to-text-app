@@ -112,7 +112,7 @@ graph TD
   47 --> 55[55 atomic-transitions lock probe ✓]:::done
   50 --> 56[56 prebuilt Linux x86_64 bundle Mesa ✓]:::done
   57[57 desktop-nix-e2e container failure ✓]:::done --> 50
-  58[58 atomic-transitions completion waits]
+  58[58 atomic-transitions completion waits ✓]:::done
   59[59 UI/UX polish]
   42 --> 60[60 exception-handling policy]
   61[61 headless ffmpeg] --> 62[62 audio-only ffmpeg artifact]
@@ -182,7 +182,7 @@ graph TD
 | [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md) | done | — |
 | [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](../docs/specs/desktop-bundle-mesa-artifact.md) | done | 50 |
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md) | done | — |
-| [58 — The atomic-transitions spec's completion waits still have real-time windows](58-atomic-transitions-spec-completion-window.md) | spec-approved | — |
+| [58 — The atomic-transitions spec's completion waits still have real-time windows](../docs/specs/atomic-transitions-completion-waits.md) | done | — |
 | [59 — UI/UX polish: compact header, view hierarchy, task-row progress, history affordances](59-ui-ux-polish.md) | spec-approved | — |
 | [60 — Exception-handling policy: no catch-all swallows a throwable silently](60-exception-handling-policy.md) | spec-approved | 42 |
 | [61 — Ship nixpkgs' cached headless ffmpeg](61-headless-ffmpeg.md) | spec-approved | — |

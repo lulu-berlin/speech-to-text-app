@@ -2,6 +2,8 @@ package stt.engine
 
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.nulls.shouldNotBeNull
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -284,6 +286,47 @@ internal fun <T> drain(channel: ReceiveChannel<T>): List<T> =
         }
     }
 
+/**
+ * Completes [held] after [window] of real time, off the test scheduler: a hold that must outlast a
+ * real-time window has to run on [Dispatchers.Default], where `runTest` cannot advance it.
+ */
+internal fun CoroutineScope.releaseAfter(
+    window: Duration,
+    held: CompletableDeferred<Unit>,
+) {
+    launch(Dispatchers.Default) {
+        delay(window)
+        held.complete(Unit)
+    }
+}
+
+/**
+ * Receives COMPLETED task ids until every id in [ids] has arrived and returns the ids it received;
+ * duplicates and order are tolerated. [bound] is a safety bound, not a behavioural wait: a slow engine
+ * never reaches it, and a stuck one fails with an [AssertionError] naming the ids that never arrived.
+ * The bound runs on [Dispatchers.Default], so the test scheduler's virtual time cannot expire it.
+ */
+internal suspend fun awaitCompleted(
+    completed: ReceiveChannel<Long>,
+    ids: Set<Long>,
+    bound: Duration = COMPLETION_SAFETY_BOUND,
+): Set<Long> {
+    val received = mutableSetOf<Long>()
+    val finished =
+        withContext(Dispatchers.Default) {
+            withTimeoutOrNull(bound) {
+                while (!received.containsAll(ids)) received += completed.receive()
+                true
+            }
+        }
+    if (finished == null) {
+        throw AssertionError(
+            "task(s) ${ids - received} did not complete within $bound; completed ids received: $received",
+        )
+    }
+    return received
+}
+
 /** A plan of [chunkCount] consecutive one-second windows, as the fake chunker plans them. */
 internal fun plannedWindows(chunkCount: Int): List<PlannedChunk> =
     (0 until chunkCount).map { idx -> PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L) }
@@ -357,8 +400,8 @@ internal class LockWriter(
 
 /**
  * A [Mutex] that records which [LockWriter]s have called lock(), so a test can see a racing write reach it.
- * The record is taken just before the call joins the lock's queue, not after (a known gap, see
- * docs/known-issues.md § Tests).
+ * Each call takes a ticket in the same critical section as its record and is served in ticket order, so a
+ * thread preempted right after its record cannot be overtaken by a later writer.
  */
 internal class CountingMutex(
     private val delegate: Mutex = Mutex(),
@@ -366,9 +409,65 @@ internal class CountingMutex(
     /** The writers that have called lock(); it only grows, so a wait for one writer cannot miss it. */
     val writers = MutableStateFlow<Set<LockWriter>>(emptySet())
 
+    /**
+     * Test-only: suspends a writer after it takes its ticket and before it waits for its turn, so a spec
+     * can preempt it in that gap on purpose.
+     */
+    @Volatile
+    var holdBeforeWait: CompletableDeferred<Unit>? = null
+
+    private val state = Any()
+    private val waiters = ArrayDeque<CompletableDeferred<Unit>>()
+    private var held = false
+
     override suspend fun lock(owner: Any?) {
-        currentCoroutineContext()[LockWriter]?.let { writer -> writers.update { it + writer } }
-        delegate.lock(owner)
+        val writer = currentCoroutineContext()[LockWriter]
+        val turn = CompletableDeferred<Unit>()
+        synchronized(state) {
+            writer?.let { calling -> writers.update { current -> current + calling } }
+            if (held) {
+                waiters.addLast(turn)
+            } else {
+                held = true
+                turn.complete(Unit)
+            }
+        }
+        try {
+            holdBeforeWait?.await()
+            turn.await()
+            delegate.lock(owner)
+        } catch (e: CancellationException) {
+            // A cancelled waiter must not stall the tickets behind it: drop its ticket, or pass on a turn it
+            // was already granted (delegate.lock is cancellation-safe, so it never holds the lock here).
+            synchronized(state) {
+                if (turn.isCompleted) {
+                    releaseTurn()
+                } else {
+                    waiters.remove(turn)
+                }
+            }
+            throw e
+        }
+    }
+
+    override fun unlock(owner: Any?) {
+        delegate.unlock(owner)
+        synchronized(state) {
+            releaseTurn()
+        }
+    }
+
+    /** Releases the held turn and serves the next ticket; the caller holds [state]. */
+    private fun releaseTurn() {
+        held = false
+        serveNext()
+    }
+
+    /** Grants the turn to the next ticket; the caller holds [state]. */
+    private fun serveNext() {
+        val next = waiters.removeFirstOrNull() ?: return
+        held = true
+        next.complete(Unit)
     }
 }
 
@@ -407,9 +506,8 @@ internal suspend fun CoroutineScope.holdWriteTransaction(
 }
 
 /**
- * Waits until [writer] has called the writer lock: the write it launched is about to wait on the lock, so
- * it is (barring the record-before-enqueue gap on [CountingMutex]) ahead of any write launched after this
- * wait. Fails naming [writer] after [timeout].
+ * Waits until [writer] has taken its ticket on the writer lock, so the write it launched is ahead of any
+ * write launched after this wait. Fails naming [writer] after [timeout].
  */
 internal suspend fun awaitLockCall(
     lock: CountingMutex,
@@ -437,3 +535,7 @@ internal suspend fun <T> CoroutineScope.queueWrite(
 // transaction's safety bound outlasts every probe, so a stalled release cannot let a probe pass behind it.
 private const val PROBE_TIMEOUT_MS = 10_000L
 private const val STALL_SAFETY_TIMEOUT_MS = 30_000L
+
+// A completion wait outlasts any load an engine test can meet and stays below runTest's own 60 s timeout,
+// so a genuinely stuck task fails naming itself before the framework's anonymous timeout does.
+private val COMPLETION_SAFETY_BOUND: Duration = 45_000.milliseconds
