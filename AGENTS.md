@@ -87,10 +87,11 @@ Frontend (pnpm — ADR 0012):
 - `pnpm build` — `tsc --noEmit` + `vite build` (output: `frontend/dist/`).
 - `pnpm dev` — Vite dev server; proxies `/api` to `http://localhost:8080`.
 
-Documentation (Node, run from the repository root; run them after changing `README.md` or `docs/architecture.md`, or code the overview names):
+Documentation (Node, run from the repository root; run them after changing `README.md` or `docs/architecture.md`, code the overview names, or backend exception handling):
 
 - `node docs/check-links.mjs README.md docs/architecture.md` — every relative link, `#anchor` and image resolves.
 - `node docs/check-architecture-names.mjs && node docs/check-architecture-diagram.mjs` — every code name in the architecture overview exists in the code, and its diagram's boxes and arrows are real components and calls.
+- `node docs/check-exceptions.ts` — every broad `catch` in `backend/src/main/kotlin` rethrows, logs its throwable, or carries `// exceptions: swallow-ok <reason>`, and no `runCatching` remains; `node --test docs/check-exceptions.test.ts` covers the check itself.
 
 ## Git
 

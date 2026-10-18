@@ -5,6 +5,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import stt.process.ProcessResult
 import stt.process.ProcessRunner
+import java.io.IOException
 import java.nio.file.Path
 
 /** One physical GPU the startup device probe found: its index in ggml's Vulkan enumeration and its name. */
@@ -14,32 +15,58 @@ data class GpuDevice(
 )
 
 /**
+ * The probe's outcome: the physical GPUs whisper-cli enumerated (none is a true "no GPU"), or the launch failure
+ * that stopped the probe (item 60: a failed probe is a failure, never a "no GPU" claim).
+ */
+sealed interface DeviceProbeOutcome {
+    data class Probed(
+        val gpus: List<GpuDevice>,
+    ) : DeviceProbeOutcome
+
+    /** whisper-cli could not be launched; [message] is the JVM's reason (missing, not executable, …). */
+    data class LaunchFailed(
+        val message: String,
+    ) : DeviceProbeOutcome
+}
+
+/**
  * The startup device probe (roadmap items 32, 45): runs whisper-cli once and parses the physical Vulkan GPUs
  * its ggml backend enumerates on stderr. whisper-cli prints them while initializing, before it reads the audio —
  * the input only has to exist (`/dev/null` decodes to nothing), so the probe costs one model load and any exit
- * code still carries the lines. A failed probe (whisper-cli missing, ...) reports no GPU, so the app still
- * starts and the Settings page offers CPU and auto.
+ * code still carries the lines. A launch failure (`IOException`: whisper-cli missing or not executable) is logged
+ * with its throwable and reported as [DeviceProbeOutcome.LaunchFailed], so the app still starts and the Settings page
+ * offers CPU and auto; any other throwable propagates and fails startup (item 60), and cancellation is rethrown.
  */
 class DeviceProbe internal constructor(
-    private val runner: ProcessRunner,
+    /** The runner seam: production passes [ProcessRunner.run]; a test throws or answers directly. */
+    private val run: suspend (List<String>) -> ProcessResult,
     private val model: Path,
     /** The whisper-cli executable. A seam so tests can stand in a script for whisper-cli (like [ChunkTranscriber]). */
     private val executable: String,
 ) {
-    constructor(runner: ProcessRunner, model: Path) : this(runner, model, "whisper-cli")
+    constructor(
+        runner: ProcessRunner,
+        model: Path,
+    ) : this({ command -> runner.run(command) }, model, "whisper-cli")
 
-    /** The physical GPUs whisper-cli's Vulkan backend enumerated, in line order; empty when there is none or the probe fails. */
-    suspend fun gpus(): List<GpuDevice> {
+    internal constructor(
+        runner: ProcessRunner,
+        model: Path,
+        executable: String,
+    ) : this({ command -> runner.run(command) }, model, executable)
+
+    /** The probe's outcome; see [DeviceProbeOutcome]. */
+    suspend fun probe(): DeviceProbeOutcome {
         val result =
             try {
-                runner.run(listOf(executable, "-m", model.toString(), "-f", "/dev/null"))
+                run(listOf(executable, "-m", model.toString(), "-f", "/dev/null"))
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                logger.warn("Device probe failed; assuming no GPU: {}", e.toString())
-                ProcessResult(exitCode = -1, stdout = emptyList(), stderr = emptyList())
+            } catch (e: IOException) {
+                logger.warn("Device probe failed; {}", e.message ?: e.toString(), e)
+                return DeviceProbeOutcome.LaunchFailed(e.message ?: e.toString())
             }
-        return parseVulkanDeviceLines(result.stderr)
+        return DeviceProbeOutcome.Probed(parseVulkanDeviceLines(result.stderr))
     }
 
     private companion object {

@@ -61,7 +61,11 @@ class ProcessingEngineWhisperInputIntegrationSpec :
                         val run = realAudioEngine(dataDir, db, fixtures)
                         val id = run.tasks.createFromUpload(queuedTask("noise.wav", createdAt = 1), Files.newInputStream(source))
                         run.engine.start()
-                        pumpUntil(3.minutes) { statusOf(run.tasks, id) == TaskStatus.COMPLETED }
+                        // The status is written before endRun removes the run's scratch, so wait for both.
+                        pumpUntil(3.minutes) {
+                            statusOf(run.tasks, id) == TaskStatus.COMPLETED &&
+                                filesUnder(run.scratchDir.taskDirPath(id)).isEmpty()
+                        }
 
                         statusOf(run.tasks, id) shouldBe TaskStatus.COMPLETED
                         val chunks = ChunkRepository(db).findByTask(id)
@@ -95,7 +99,11 @@ class ProcessingEngineWhisperInputIntegrationSpec :
                         run.transcriber.failOnCall = 0
                         val id = run.tasks.createFromUpload(queuedTask("noise.wav", createdAt = 1), Files.newInputStream(source))
                         run.engine.start()
-                        pumpUntil(1.minutes) { statusOf(run.tasks, id) == TaskStatus.FAILED }
+                        // FAILED is written before endRun removes the run's scratch, so wait for both.
+                        pumpUntil(1.minutes) {
+                            statusOf(run.tasks, id) == TaskStatus.FAILED &&
+                                filesUnder(run.scratchDir.taskDirPath(id)).isEmpty()
+                        }
 
                         statusOf(run.tasks, id) shouldBe TaskStatus.FAILED
                         run.transcriber.inputs.size shouldBe 1

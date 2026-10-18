@@ -32,6 +32,8 @@ data class SettingsJson(
     val availableDevices: List<String>,
     /** Each offered `gpu:<index>` → the GPU's name from the startup probe (item 45). */
     val gpuNames: Map<String, String>,
+    /** The startup probe's launch failure when it could not run (item 60); null when it succeeded. */
+    val deviceProbeError: String?,
 )
 
 /** The `settings-updated` payload (item 32, `docs/api/settings-updated*.json`): the settings without the device choices. */
@@ -58,16 +60,20 @@ data class SettingsRequest(
 )
 
 /**
- * The settings endpoints (item 32): read them with the GPUs the startup probe reported as choices; write them as a
- * whole — validated in contract order, stored (which clears the CPU-fallback notice), answered and published as
- * `settings-updated`; or dismiss the CPU-fallback notice, answered and published the same way.
+ * The settings endpoints (item 32): read them with the GPUs the startup probe reported as choices and its
+ * launch failure, if any (item 60); write them as a whole — validated in contract order, stored (which clears
+ * the CPU-fallback notice), answered and published as `settings-updated`; or dismiss the CPU-fallback notice,
+ * answered and published the same way.
  */
-fun Application.settingsRoutes(gpus: List<GpuDevice>) {
+fun Application.settingsRoutes(
+    gpus: List<GpuDevice>,
+    deviceProbeError: String? = null,
+) {
     val settings: SettingsRepository by dependencies
     val engine: ProcessingEngine by dependencies
     routing {
         get("/api/settings") {
-            call.respond(settings.get().toJson(gpus))
+            call.respond(settings.get().toJson(gpus, deviceProbeError))
         }
 
         put("/api/settings") {
@@ -79,7 +85,7 @@ fun Application.settingsRoutes(gpus: List<GpuDevice>) {
                 is Validated.Valid -> {
                     settings.update(request.settings)
                     engine.settingsUpdated(request.settings)
-                    call.respond(request.settings.toJson(gpus))
+                    call.respond(request.settings.toJson(gpus, deviceProbeError))
                 }
             }
         }
@@ -87,7 +93,7 @@ fun Application.settingsRoutes(gpus: List<GpuDevice>) {
         delete("/api/settings/device-fallback") {
             val dismissed = settings.dismissDeviceFallback()
             engine.settingsUpdated(dismissed)
-            call.respond(dismissed.toJson(gpus))
+            call.respond(dismissed.toJson(gpus, deviceProbeError))
         }
     }
 }
@@ -107,11 +113,15 @@ private sealed interface Validated {
 /** Validates in contract order: device, threads, language, speakers, max speakers; the first failure wins. */
 private fun SettingsRequest.validate(): Validated {
     val parsedDevice =
-        runCatching { parseStoredDevice(device) }.getOrNull()
-            ?: return Validated.Rejected(
-                "invalid-device",
-                "device must be auto, cpu, or gpu:<index> with an index >= 0, got \"$device\"",
-            )
+        try {
+            parseStoredDevice(device)
+        } catch (_: IllegalArgumentException) {
+            // The bad-value failure is expected; any other throwable is a bug and becomes a 500.
+            null
+        } ?: return Validated.Rejected(
+            "invalid-device",
+            "device must be auto, cpu, or gpu:<index> with an index >= 0, got \"$device\"",
+        )
     if (threads != null && threads < 1) {
         return Validated.Rejected("invalid-threads", "threads must be null or a number >= 1, got $threads")
     }
@@ -137,7 +147,10 @@ private fun SettingsRequest.validate(): Validated {
  * The stored settings as the contract's JSON; the choices are `cpu` and `auto` always, then each of [gpus] as
  * `gpu:<index>`, which [SettingsJson.gpuNames] maps to its name.
  */
-internal fun Settings.toJson(gpus: List<GpuDevice>): SettingsJson {
+internal fun Settings.toJson(
+    gpus: List<GpuDevice>,
+    deviceProbeError: String? = null,
+): SettingsJson {
     // The GPU choices are gpuNames' keys, so the list and the names cannot drift apart. This relies on insertion
     // order: `associate` builds a LinkedHashMap (documented by Kotlin), whose keys iterate in the probe's order, so
     // availableDevices lists the GPUs as the probe reported them. A sorted or hash-ordered map would break that.
@@ -152,6 +165,7 @@ internal fun Settings.toJson(gpus: List<GpuDevice>): SettingsJson {
         deviceFallback = deviceFallback?.dbValue(),
         availableDevices = listOf(Device.Cpu.dbValue(), Device.Auto.dbValue()) + gpuNames.keys,
         gpuNames = gpuNames,
+        deviceProbeError = deviceProbeError,
     )
 }
 

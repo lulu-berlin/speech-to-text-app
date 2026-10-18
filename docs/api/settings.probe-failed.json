@@ -1,0 +1,12 @@
+{
+  "device": "auto",
+  "threads": null,
+  "defaultLanguage": "auto",
+  "speakersMode": "auto",
+  "speakersCount": null,
+  "maxSpeakers": 8,
+  "deviceFallback": null,
+  "availableDevices": ["cpu", "auto"],
+  "gpuNames": {},
+  "deviceProbeError": "Executable not found: whisper-cli"
+}

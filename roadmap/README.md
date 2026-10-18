@@ -114,7 +114,7 @@ graph TD
   57[57 desktop-nix-e2e container failure ✓]:::done --> 50
   58[58 atomic-transitions completion waits ✓]:::done
   59[59 UI/UX polish]
-  42 --> 60[60 exception-handling policy]
+  42 --> 60[60 exception-handling policy ✓]:::done
   61[61 headless ffmpeg ✓]:::done --> 62[62 audio-only ffmpeg artifact]
   56 --> 62
   63[63 whisper-cpp build time]
@@ -185,7 +185,7 @@ graph TD
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md) | done | — |
 | [58 — The atomic-transitions spec's completion waits still have real-time windows](../docs/specs/atomic-transitions-completion-waits.md) | done | — |
 | [59 — UI/UX polish: compact header, view hierarchy, task-row progress, history affordances](59-ui-ux-polish.md) | spec-approved | — |
-| [60 — Exception-handling policy: no catch-all swallows a throwable silently](60-exception-handling-policy.md) | spec-approved | 42 |
+| [60 — Exception-handling policy: no catch-all swallows a throwable silently](../docs/specs/exception-handling-policy.md) | done | 42 |
 | [61 — Ship nixpkgs' cached headless ffmpeg](../docs/specs/headless-ffmpeg.md) | done | — |
 | [62 — An audio-only ffmpeg, shipped as a pinned prebuilt artifact](62-audio-only-ffmpeg-artifact.md) | spec-approved | 56, 61 |
 | [63 — Stop compiling whisper-cpp on every uncached machine](63-whisper-cpp-build-time.md) | draft | — |

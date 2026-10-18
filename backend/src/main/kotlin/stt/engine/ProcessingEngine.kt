@@ -141,6 +141,12 @@ class ProcessingEngine internal constructor(
     internal var beforeTaskStarts: (suspend () -> Unit)? = null
 
     /**
+     * Called before each next-task lookup, before any read. Null in production; a spec sets it to make a lookup throw
+     * (item 60's read guard).
+     */
+    internal var beforeNextTaskLookup: (suspend () -> Unit)? = null
+
+    /**
      * Starts the single worker coroutine, named `engine-worker` (item 46); it runs until [scope] is cancelled.
      * Before it picks anything up, tasks whose crash left them RUNNING are queued again (ADR 0004), so the
      * worker resumes them from their stored plans instead of leaving them stuck.
@@ -447,21 +453,24 @@ class ProcessingEngine internal constructor(
 
     /**
      * [nextTask], with a failure of its reads absorbed: the worker must survive one — a database momentarily
-     * unreadable, or a stored value it cannot decode — and look again at the next wakeup, never retrying at once
-     * (item 42). The failure is logged with the reason [reasonOf] gives its kind. Cancellation is not absorbed:
+     * unreadable, a stored value it cannot decode, or an `Error` from a read (the phase guard takes `Throwable` too;
+     * item 60) — and look again at the next wakeup, never retrying at once (item 42). The failure is logged with the
+     * reason [reasonOf] gives its kind. Cancellation is not absorbed:
      * `java.util.concurrent.CancellationException` is an `IllegalStateException`, so it is rethrown first.
      */
     private suspend fun nextTaskOrNull(): StoredTask? =
         try {
+            beforeNextTaskLookup?.invoke()
             nextTask()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // exceptions: swallow-ok loggedLookupFailure logs it with the lookup's reason
             loggedLookupFailure(reasonOf(e), e)
         }
 
     /** Why a lookup failed, by kind: the database cannot be read, a stored value cannot be decoded, or anything else. */
-    private fun reasonOf(failure: Exception): String =
+    private fun reasonOf(failure: Throwable): String =
         when (failure) {
             is SQLException -> "the database cannot be read"
 
@@ -480,7 +489,7 @@ class ProcessingEngine internal constructor(
      */
     private fun loggedLookupFailure(
         reason: String,
-        failure: Exception,
+        failure: Throwable,
     ): StoredTask? {
         logger.error("Could not look for the next task: {}; waiting for the next wakeup", reason, failure)
         return null
@@ -542,16 +551,20 @@ class ProcessingEngine internal constructor(
      * Runs one task through its phases, in order, and leaves it COMPLETED. Any failure other than a cancel —
      * in its setup (the settings read, item 42) or a phase (a non-zero exit, unreadable output, a missing
      * file) — leaves it FAILED with the failure's message, and the job ends normally, so the worker moves on
-     * to the next task. When the database refuses to record that failure, it is logged with both errors and the
+     * to the next task. The failure is logged with its stack (the task's id is in the MDC context) before it
+     * is recorded. When the database refuses to record that failure, it is logged with both errors and the
      * task stays RUNNING until a restart's recovery re-queues it; the worker still moves on. A process of the run
      * killed by SIGTERM while the app keeps running is an interruption, not a failure: no process works on the
      * task any more, so it goes back to QUEUED and the worker runs it again from its interrupted chunk (item 42).
      */
     private suspend fun runTask(task: StoredTask) {
         val id = task.id
+        // Whether this run got past its start: a start write that threw left the task QUEUED (or newer), never RUNNING.
+        var started = false
         try {
             // Refused when the task stopped being QUEUED after the worker picked it (a cancel won the race).
             if (!tasks.setRunningIfQueued(id, now())) return
+            started = true
             // The settings as the task starts (item 32): every chunk and the diarization of this run use them, so a
             // change applies from the next task the engine starts and a running (or paused) task keeps its device.
             val run = settings.get()
@@ -570,7 +583,8 @@ class ProcessingEngine internal constructor(
         } catch (e: Throwable) {
             // Any Throwable, an Error included (a native library that failed to load): left uncaught it would
             // leave the task RUNNING with no worker inside it (item 42).
-            endRun(id, written = recordFailure(id, e))
+            logger.error("Task {} failed", id, e)
+            endRun(id, written = recordFailure(id, e, started))
             return
         }
         tasks.setCompleted(id, now())
@@ -595,21 +609,36 @@ class ProcessingEngine internal constructor(
     /**
      * Stores [failure]'s message as the FAILED status of the task's run — QUEUED when its start itself failed, since
      * the RUNNING write is what threw, or RUNNING; true when it was written. When the database refuses the write, it is
-     * logged with both errors and nothing more is written: a RUNNING task stays RUNNING and a QUEUED one stays QUEUED
-     * until a restart's recovery re-queues it (item 42). Only the database's refusal is caught; anything else ends
-     * only this task's job.
+     * logged with both errors and nothing more is written: a run that [started] stays RUNNING until a restart recovers
+     * it; one whose start failed never left QUEUED, so it stays QUEUED and the worker takes it again at once (item 42;
+     * item 60's log names that status). A write refused because a command already stored a newer status is logged with
+     * the failure (item 60): the failure itself is the only record of what went wrong. Only the database's refusal is
+     * caught; anything else ends only this task's job.
      */
     private suspend fun recordFailure(
         id: Long,
         failure: Throwable,
-    ): Boolean =
-        try {
-            tasks.failIfPending(id, failure.message ?: failure.toString(), now())
-        } catch (recording: SQLException) {
-            recording.addSuppressed(failure)
-            logger.error("Could not record task {}'s failure; it stays RUNNING until a restart recovers it", id, recording)
-            false
+        started: Boolean,
+    ): Boolean {
+        val written =
+            try {
+                tasks.failIfPending(id, failure.message ?: failure.toString(), now())
+            } catch (recording: SQLException) {
+                recording.addSuppressed(failure)
+                val kept =
+                    if (started) {
+                        "it stays RUNNING until a restart recovers it"
+                    } else {
+                        "it stays QUEUED and is retried at once"
+                    }
+                logger.error("Could not record task {}'s failure; {}", id, kept, recording)
+                return false
+            }
+        if (!written) {
+            logger.error("Could not record task {}'s failure: the task kept a newer status", id, failure)
         }
+        return written
+    }
 
     /**
      * CHUNKING (ADR 0024): decode, plan and export the task's chunks into its scratch directory, store the
@@ -848,14 +877,15 @@ class ProcessingEngine internal constructor(
     /**
      * Removes the task's scratch directory — the chunker's scratch, the materialized original, the whisper
      * inputs and any decoded clip — once the task has ended: COMPLETED, FAILED, CANCELED or deleted. Best
-     * effort, like every cleanup here: a failure only leaves files the startup [ScratchDir.clear] sweeps.
+     * effort, like every cleanup here: a failure only leaves files the startup [ScratchDir.clear] sweeps, and is
+     * logged with its throwable (item 60).
      */
     private suspend fun removeScratch(id: Long) {
         val dir = scratchDir.taskDirPath(id)
         try {
             deleteTree(dir)
         } catch (e: Exception) {
-            logger.warn("Could not remove task {}'s scratch directory {}: {}", id, dir, e.toString())
+            logger.warn("Could not remove task {}'s scratch directory {}", id, dir, e)
         }
     }
 

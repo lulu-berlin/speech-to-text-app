@@ -59,6 +59,20 @@ jobs:
       - name: pnpm build
         run: pnpm build
 
+  docs-check:
+    name: Docs (exception policy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: node docs/check-exceptions.ts
+        run: node docs/check-exceptions.ts
+      - name: node --test docs/check-exceptions.test.ts
+        run: node --test docs/check-exceptions.test.ts
+
   backend-integration:
     name: Backend (gradle integrationTest)
     runs-on: ubuntu-24.04
@@ -346,7 +360,7 @@ jobs:
   # (its own comment says why); a job absent from this list cannot gate merges.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build]
+    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

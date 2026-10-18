@@ -47,7 +47,7 @@ class SettingsUpdateSpec :
                         // By hand: the written fields, plus the choices cpu, auto and the two reported GPUs, named as `gpus` reports them.
                         val expected =
                             Json.parseToJsonElement(
-                                """{ "device": "gpu:1", "threads": 6, "defaultLanguage": "de", "speakersMode": "fixed", "speakersCount": 3, "maxSpeakers": 12, "deviceFallback": null, "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"], "gpuNames": { "gpu:0": "NVIDIA GeForce RTX 3060", "gpu:1": "AMD Radeon RX 6600" } }""",
+                                """{ "device": "gpu:1", "threads": 6, "defaultLanguage": "de", "speakersMode": "fixed", "speakersCount": 3, "maxSpeakers": 12, "deviceFallback": null, "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"], "gpuNames": { "gpu:0": "NVIDIA GeForce RTX 3060", "gpu:1": "AMD Radeon RX 6600" }, "deviceProbeError": null }""",
                             )
                         answered shouldBe expected
 
