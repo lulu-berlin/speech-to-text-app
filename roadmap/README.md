@@ -186,5 +186,5 @@ graph TD
 | [59 — UI/UX polish: compact header, view hierarchy, task-row progress, history affordances](59-ui-ux-polish.md) | spec-approved | — |
 | [60 — Exception-handling policy: no catch-all swallows a throwable silently](60-exception-handling-policy.md) | spec-approved | 42 |
 | [61 — Ship nixpkgs' cached headless ffmpeg](61-headless-ffmpeg.md) | spec-approved | — |
-| [62 — An audio-only ffmpeg, shipped as a pinned prebuilt artifact](62-audio-only-ffmpeg-artifact.md) | draft | 56, 61 |
+| [62 — An audio-only ffmpeg, shipped as a pinned prebuilt artifact](62-audio-only-ffmpeg-artifact.md) | spec-approved | 56, 61 |
 | [63 — Stop compiling whisper-cpp on every uncached machine](63-whisper-cpp-build-time.md) | draft | — |
