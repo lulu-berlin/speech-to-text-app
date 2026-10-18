@@ -8,6 +8,7 @@ import { ThemedProviders } from '../../test/render';
 import { server } from '../../test/server';
 import settingsFallback from '../../../../docs/api/settings.fallback.json';
 import settingsFixed from '../../../../docs/api/settings.fixed.json';
+import settingsProbeFailed from '../../../../docs/api/settings.probe-failed.json';
 import settingsUpdatedDefaults from '../../../../docs/api/settings-updated.defaults.json';
 import { SettingsView } from './SettingsView';
 
@@ -96,6 +97,24 @@ describe('the settings page', () => {
     fireEvent.change(screen.getByLabelText('Device'), { target: { value: 'tpu' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText(/device must be auto, cpu/)).toBeInTheDocument();
+  });
+
+  it('shows a callout naming a failed device probe', async () => {
+    server.use(http.get('/api/settings', () => HttpResponse.json(settingsProbeFailed)));
+    renderSettings();
+    await waitFor(() => expect(screen.getByLabelText('Device')).toHaveValue('auto'));
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent('The device probe failed');
+    expect(notice).toHaveTextContent('Executable not found: whisper-cli');
+  });
+
+  it('shows no probe notice for a successful probe', async () => {
+    server.use(http.get('/api/settings', () => HttpResponse.json(settingsFixed)));
+    renderSettings();
+    await settingsLoaded();
+
+    expect(screen.queryByText('The device probe failed')).not.toBeInTheDocument();
   });
 
   it('follows a settings-updated from another tab', async () => {

@@ -74,4 +74,22 @@ class SettingsRoutesSpec :
                 }
             }
         }
+        given("the app started after a failed device probe") {
+            `when`("GET /api/settings") {
+                then("the answer carries the probe failure and still offers cpu and auto, with no GPU") {
+                    val dataDir = tempdir("stt-settings").toPath()
+
+                    testApplication {
+                        application {
+                            sttApp(stt.config.testConfig(dataDir), deviceProbeError = "Executable not found: whisper-cli")
+                        }
+
+                        val response = client.get("/api/settings")
+                        response.status shouldBe HttpStatusCode.OK
+                        val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                        body shouldBe apiExample("settings.probe-failed.json")
+                    }
+                }
+            }
+        }
     })

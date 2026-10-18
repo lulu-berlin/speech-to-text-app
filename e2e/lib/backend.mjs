@@ -299,7 +299,11 @@ export function killGroup(pid) {
 // binary. Its wrapper serves the bundled frontend and defaults the models, but a
 // user-set STT_WHISPER_MODEL (the tiny model) and STT_DATA_DIR still win, so the
 // journey is identical.
-export async function startBackend({ port, dataDir }) {
+//
+// `env` overrides the child's environment before the fixed data dir, port and models — item 60's
+// probe-failure spec strips whisper-cli from PATH for its own backend (a second one on a free port;
+// the shared backend is untouched).
+export async function startBackend({ port, dataDir, env = {} }) {
   checkPreconditions();
   const backendCmd = process.env.E2E_BACKEND_CMD;
   if (backendCmd) {
@@ -311,6 +315,7 @@ export async function startBackend({ port, dataDir }) {
       detached: true, // own session + process group: a group kill reaches the wrapper and the app JVM
       env: {
         ...process.env,
+        ...env,
         STT_DATA_DIR: dataDir,
         STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,
         STT_PORT: String(port),
@@ -333,6 +338,7 @@ export async function startBackend({ port, dataDir }) {
     detached: true, // own session + process group: a group kill reaches gradle and the app JVM
     env: {
       ...process.env,
+      ...env,
       STT_DATA_DIR: dataDir,
       STT_STATIC_DIR: frontendDist,
       STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,

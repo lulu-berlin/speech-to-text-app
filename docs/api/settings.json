@@ -10,5 +10,6 @@
   "gpuNames": {
     "gpu:0": "NVIDIA GeForce RTX 3060",
     "gpu:1": "AMD Radeon RX 6600"
-  }
+  },
+  "deviceProbeError": null
 }

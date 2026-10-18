@@ -36,11 +36,13 @@ import java.io.File
  * the DI plugin itself, so a test may provide overrides before calling this.
  * The Database is required, so DI opens it at startup rather than on first use
  * (ADR 0017); DI closes it when the application stops. [gpus] are the GPUs the
- * startup device probe reported (item 32; `main` runs the probe), offered by `GET /api/settings`.
+ * startup device probe reported (item 32; `main` runs the probe), offered by `GET /api/settings`;
+ * [deviceProbeError] is that probe's launch failure when it could not run (item 60).
  */
 fun Application.sttApp(
     config: Config,
     gpus: List<GpuDevice> = emptyList(),
+    deviceProbeError: String? = null,
 ) {
     install(ContentNegotiation) { json() }
     internalErrorHandler()
@@ -61,6 +63,7 @@ fun Application.sttApp(
         provide<EventStream> { NumberedEventStream(resolve(), eventsScope) }
         require(DependencyKey<Database>())
     }
+    settingsRoutes(gpus, deviceProbeError)
     processingEngine(config)
     healthRoutes()
     taskRoutes()

@@ -135,6 +135,9 @@ export function SettingsView() {
           {settings.context.error !== null ? (
             <ErrorCallout title={errorMessage(settings.context.error)} />
           ) : null}
+          {stored !== null && stored.deviceProbeError !== null ? (
+            <ErrorCallout title="The device probe failed" detail={stored.deviceProbeError} />
+          ) : null}
           <Field label="Device" htmlFor="device">
             <Select id="device" value={device} onChange={(event) => setDevice(event.target.value)}>
               {choices.map((choice) => (

@@ -2,8 +2,9 @@ package stt.transcribe
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
-import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.withTimeout
 import stt.Integration
 import stt.process.ProcessRunner
@@ -14,7 +15,8 @@ import kotlin.time.Duration.Companion.seconds
  * Roadmap items 32 and 45: the startup device probe — [DeviceProbe] runs whisper-cli once and parses the physical
  * Vulkan GPUs its ggml backend enumerates on stderr (`ggml_vulkan: N = <name> (<driver>) | uma: …`, whisper.cpp
  * 1.8.4). The stand-ins exit 1, as whisper-cli does after failing to read the probe's `/dev/null` input. CPU-only
- * output and a missing executable yield no GPU. Real subprocesses, hence Integration (ADR 0021).
+ * output is a successful zero-GPU probe; a missing executable is a reported launch failure (item 60). Real
+ * subprocesses, hence Integration (ADR 0021).
  */
 class DeviceProbeSpec :
     BehaviorSpec({
@@ -38,14 +40,15 @@ class DeviceProbeSpec :
                         )
                     val whisperCli = fakeWhisperCli(tempdir("stt-probe").toPath(), stderr, exitCode = 1)
 
-                    val gpus = withTimeout(10.seconds) { DeviceProbe(ProcessRunner(), model, whisperCli.toString()).gpus() }
+                    val outcome = withTimeout(10.seconds) { DeviceProbe(ProcessRunner(), model, whisperCli.toString()).probe() }
 
-                    gpus.shouldBe(
-                        listOf(
-                            GpuDevice(0, "AMD Ryzen 9 6900HS Creator Edition (RADV REMBRANDT)"),
-                            GpuDevice(1, "NVIDIA GeForce RTX 3050 Laptop GPU"),
-                        ),
-                    )
+                    outcome shouldBe
+                        DeviceProbeOutcome.Probed(
+                            listOf(
+                                GpuDevice(0, "AMD Ryzen 9 6900HS Creator Edition (RADV REMBRANDT)"),
+                                GpuDevice(1, "NVIDIA GeForce RTX 3050 Laptop GPU"),
+                            ),
+                        )
                 }
             }
         }
@@ -62,20 +65,20 @@ class DeviceProbeSpec :
                         )
                     val whisperCli = fakeWhisperCli(tempdir("stt-probe").toPath(), stderr, exitCode = 1)
 
-                    val gpus = withTimeout(10.seconds) { DeviceProbe(ProcessRunner(), model, whisperCli.toString()).gpus() }
+                    val outcome = withTimeout(10.seconds) { DeviceProbe(ProcessRunner(), model, whisperCli.toString()).probe() }
 
-                    gpus.shouldBeEmpty()
+                    outcome shouldBe DeviceProbeOutcome.Probed(emptyList())
                 }
             }
         }
 
         given("whisper-cli is missing") {
             `when`("the probe runs it") {
-                then("the probe tolerates the failure and reports no GPU, so the app still starts") {
-                    val gpus =
-                        withTimeout(10.seconds) { DeviceProbe(ProcessRunner(), model, "/nonexistent-whisper-cli").gpus() }
+                then("the launch failure is reported with its message, not as an empty device list") {
+                    val outcome = withTimeout(10.seconds) { DeviceProbe(ProcessRunner(), model, "/nonexistent-whisper-cli").probe() }
 
-                    gpus.shouldBeEmpty()
+                    val failed = outcome.shouldBeInstanceOf<DeviceProbeOutcome.LaunchFailed>()
+                    failed.message shouldContain "/nonexistent-whisper-cli"
                 }
             }
         }

@@ -23,10 +23,13 @@ fun Application.internalErrorHandler() {
             if (cause is CancellationException) throw cause
             this@internalErrorHandler.log.error("Unhandled exception while serving ${context.request.path()}", cause)
             // The response may already be committed (e.g. a mid-stream SSE failure): then the clean 500 cannot
-            // be written and the original failure must surface.
-            runCatching {
+            // be written and the original failure must surface, carrying the failed write as suppressed.
+            try {
                 context.respond(HttpStatusCode.InternalServerError, ApiError("internal", "Unexpected server error"))
-            }.getOrElse { throw cause }
+            } catch (response: Throwable) {
+                cause.addSuppressed(response)
+                throw cause
+            }
         }
     }
 }

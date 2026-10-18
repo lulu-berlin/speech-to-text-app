@@ -294,7 +294,7 @@ class ProcessingEngineSpec :
                                         Path.of("/m.bin"),
                                         "/whisper-cli",
                                     )
-                                backgroundScope.launch { probe.gpus() }.join()
+                                backgroundScope.launch { probe.probe() }.join()
                                 hold.complete(Unit)
                                 fixture.completed.receive() shouldBe task
 
