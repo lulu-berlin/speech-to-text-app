@@ -324,19 +324,32 @@ class TaskRepository(
         }
 
     /**
-     * Marks a RUNNING task FAILED with [error] and records when it finished. Only RUNNING can fail (item
-     * 04's table), so a failure that races a cancel cannot overwrite CANCELED. Returns whether the row was
-     * written; the phase the task stopped in stays (item 12's contract: "failed while transcribing").
+     * Marks a pending task FAILED with [error] and records when it finished: a RUNNING task, or a QUEUED one whose
+     * start itself failed (item 42 — the write that would have made it RUNNING threw). Neither a finished task nor a
+     * PAUSED or CANCELED one is touched, so a failure that races a cancel cannot overwrite CANCELED. Returns whether
+     * the row was written; the phase the task stopped in stays (item 12's contract: "failed while transcribing").
      */
-    suspend fun failIfRunning(
+    suspend fun failIfPending(
         id: Long,
         error: String,
         finishedAt: Long,
     ): Boolean =
-        updateTaskIf(id, TasksTable.status eq TaskStatus.RUNNING) {
+        updateTaskIf(id, TasksTable.status inList failableFrom) {
             it[TasksTable.status] = TaskStatus.FAILED
             it[TasksTable.error] = error
             it[TasksTable.finishedAt] = finishedAt
+        }
+
+    /**
+     * Puts a RUNNING task back in the queue whose process was killed while the app keeps running (item 42): QUEUED
+     * at its own `queue_position`, its phase cleared (item 12's contract: a queued task has no phase), as restart
+     * recovery does for every RUNNING task. Only RUNNING is written, so a pause or cancel that won the race keeps
+     * its status. Returns whether the row was written.
+     */
+    suspend fun requeueIfRunning(id: Long): Boolean =
+        updateTaskIf(id, TasksTable.status eq TaskStatus.RUNNING) {
+            it[TasksTable.status] = TaskStatus.QUEUED
+            it[TasksTable.phase] = null
         }
 
     /** Writes [body] to task [id]'s row only while [condition] holds, inside the caller's transaction. */
@@ -497,3 +510,6 @@ private val cancellableFrom = TaskStatus.entries.filter { it.canTransitionTo(Tas
 
 /** The statuses a task can be paused from (item 04's table: QUEUED, RUNNING). */
 private val pausableFrom = TaskStatus.entries.filter { it.canTransitionTo(TaskStatus.PAUSED) }
+
+/** The statuses a task can fail from (item 04's table: QUEUED, RUNNING — item 42 added QUEUED). */
+private val failableFrom = TaskStatus.entries.filter { it.canTransitionTo(TaskStatus.FAILED) }

@@ -17,10 +17,8 @@ problems; it never goes away and it is not a roadmap item.
 
 Rules for the roadmap: issues currently planned by roadmap items are deliberately absent here —
 [41 upload hardening](../roadmap/41-upload-hardening.md) (size cap, multi-part spool overwrite,
-duplicate-race 500), [42 worker stability](../roadmap/42-worker-stability.md) (task setup outside the
-guarded try; cancel/pause/delete racing a task's start),
-[60 exception-handling policy](../roadmap/60-exception-handling-policy.md) (the task-failure path's
-throwable logging).
+duplicate-race 500), [60 exception-handling policy](../roadmap/60-exception-handling-policy.md) (the
+task-failure path's throwable logging).
 
 ## Backend runtime
 

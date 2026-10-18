@@ -85,7 +85,7 @@ graph TD
   39[39 devenv/doc drift: playwright comment ✓]:::done
   11 --> 40[40 atomic task transitions ✓]:::done
   12 --> 41[41 upload hardening]
-  11 --> 42[42 worker stability]
+  11 --> 42[42 worker stability ✓]:::done
   11 --> 47[47 atomic-transitions spec flaky ✓]:::done
   51[51 CI verification ✓]:::done
   51 --> 53[53 Nix store cache: one writer, keyed v2 ✓]:::done
@@ -166,7 +166,7 @@ graph TD
 | [39 — devenv/doc drift: the playwright version comment](../docs/specs/playwright-version-sync.md) | done | 16 |
 | [40 — Task transitions are not atomic (pause/resume race a finishing task)](../docs/specs/atomic-task-transitions.md) | done | 11 |
 | [41 — Upload hardening: duplicate race, size limit, spool cleanup](41-upload-hardening.md) | draft | 12 |
-| [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue, and no command may race a task's start](42-worker-stability.md) | spec-approved | 11 |
+| [42 — Worker stability: no per-task exception may leave the task stuck or kill the queue, and no command may race a task's start](../docs/specs/worker-stability.md) | done | 11 |
 | [43 — Diarization memory: stream speaker windows from the stored clip](../docs/specs/diarization-memory.md) | done | 11 |
 | [44 — Store the full audio in the database; drop the file cache](../docs/specs/audio-in-database.md) | done | 11, 12, 38 |
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md) | done | 11, 32 |

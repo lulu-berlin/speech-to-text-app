@@ -65,6 +65,8 @@ export const FIXTURE_CLIPS = [
   'jfk-u.wav', // 6-9s, item 40's queue-is-live follow-up
   'jfk-v.wav', // the sample looped 11x, ~121s, item 40's pause-queued running clip
   'jfk-w.wav', // 2-6s, item 40's pause-queued clip
+  'jfk-stability.wav', // 5-11s, item 42's queue-survives-a-failure clip
+  'broken-stability.wav', // item 42's undecodable fixture
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -116,6 +118,12 @@ export const ATOMIC_NEXT_CLIP = FIXTURE_CLIPS[26]; // 6-9s
 // other test loops the sample 11x, and 2-6s is no existing trim.
 export const PAUSE_QUEUED_RUNNING_CLIP = FIXTURE_CLIPS[27]; // the sample looped 11x, ~121s
 export const PAUSE_QUEUED_CLIP = FIXTURE_CLIPS[28]; // 2-6s
+
+// Item 42's queue-survives-a-failure journey (ADR 0046): the sample's 5-11s trim, which is no other
+// test's clip, and its own undecodable fixture (a second upload of broken.wav or broken-2.wav would be
+// 409 once those are FAILED tasks).
+export const STABILITY_CLIP = FIXTURE_CLIPS[29];
+export const STABILITY_BROKEN_CLIP = FIXTURE_CLIPS[30];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];

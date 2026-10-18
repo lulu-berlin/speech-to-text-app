@@ -3,6 +3,7 @@ package stt.engine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -10,10 +11,12 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.sync.Mutex
@@ -62,6 +65,7 @@ import stt.transcribe.taskProgress
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.sql.SQLException
 
 /**
  * The processing engine (roadmap item 11): one worker coroutine that drives queued tasks through their
@@ -129,6 +133,12 @@ class ProcessingEngine internal constructor(
 
     private val runningLock = Mutex()
     private var running: Running? = null
+
+    /**
+     * Called while the worker starts a task: after its job is launched and before the job is registered in [running].
+     * Null in production; a spec sets it to hold the worker in that instant (item 42's start race).
+     */
+    internal var beforeTaskStarts: (suspend () -> Unit)? = null
 
     /**
      * Starts the single worker coroutine, named `engine-worker` (item 46); it runs until [scope] is cancelled.
@@ -238,17 +248,19 @@ class ProcessingEngine internal constructor(
      */
     suspend fun resumeTask(id: Long): TaskCommandOutcome =
         command(id, TaskStatus.QUEUED) {
-            val runningHere = runningJob(id) != null
-            if (tasks.resumeIfPaused(id, if (runningHere) TaskStatus.RUNNING else TaskStatus.QUEUED)) {
+            // In place only when the registered run has actually started: a task paused in the worker's start window
+            // (item 42) has a registered job that never ran and `startedAt` still null, so writing RUNNING would leave
+            // it owned by nobody. Written QUEUED, that run takes it as soon as its job starts — so its gate is opened
+            // too, and a wake covers the case where it has already ended.
+            val running = runningJob(id) != null
+            val started = running && tasks.find(id)?.task?.startedAt != null
+            if (tasks.resumeIfPaused(id, if (started) TaskStatus.RUNNING else TaskStatus.QUEUED)) {
                 publish(id)
-                if (runningHere) {
-                    continueCurrentRun()
-                } else {
-                    // No runner: the task was paused while queued, or across a restart. The worker picks it
-                    // up when it looks again (a started PAUSED task it waits on, directly) and moves it to
-                    // RUNNING itself, as for any task.
-                    wake()
-                }
+                // The controls belong to the registered run: reopening the gate lets a run that has not started take
+                // the task, and continuing the process resumes one paused mid-run.
+                if (running) continueCurrentRun()
+                // The worker picks the task up when it looks again — after this run ends, or when an idle one wakes.
+                wake()
                 TaskCommandOutcome.Accepted
             } else {
                 lostTransition(id, TaskStatus.QUEUED)
@@ -424,13 +436,54 @@ class ProcessingEngine internal constructor(
 
     private suspend fun workerLoop() {
         while (true) {
-            val next = nextTask()
+            val next = nextTaskOrNull()
             if (next == null) {
                 wakeups.receive()
             } else {
                 runInJob(next)
             }
         }
+    }
+
+    /**
+     * [nextTask], with a failure of its reads absorbed: the worker must survive one — a database momentarily
+     * unreadable, or a stored value it cannot decode — and look again at the next wakeup, never retrying at once
+     * (item 42). The failure is logged with the reason [reasonOf] gives its kind. Cancellation is not absorbed:
+     * `java.util.concurrent.CancellationException` is an `IllegalStateException`, so it is rethrown first.
+     */
+    private suspend fun nextTaskOrNull(): StoredTask? =
+        try {
+            nextTask()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            loggedLookupFailure(reasonOf(e), e)
+        }
+
+    /** Why a lookup failed, by kind: the database cannot be read, a stored value cannot be decoded, or anything else. */
+    private fun reasonOf(failure: Exception): String =
+        when (failure) {
+            is SQLException -> "the database cannot be read"
+
+            // SpeakersMode.fromDbValue has no entry for an unknown name, and Exposed's enumeration columns throw an
+            // IllegalStateException for a stored name that is no member (TasksTable's status, phase, diarization stage).
+            is NoSuchElementException, is IllegalStateException -> "a stored task value cannot be decoded"
+
+            is ClassCastException -> "a stored task value has an unexpected type"
+
+            else -> "an unexpected failure"
+        }
+
+    /**
+     * Logs why the lookup failed — no task is involved, so no task is touched — and returns no task, so the worker
+     * waits for the next wakeup: a persistent failure cannot spin it.
+     */
+    private fun loggedLookupFailure(
+        reason: String,
+        failure: Exception,
+    ): StoredTask? {
+        logger.error("Could not look for the next task: {}; waiting for the next wakeup", reason, failure)
+        return null
     }
 
     /**
@@ -442,17 +495,23 @@ class ProcessingEngine internal constructor(
      * pause) must not hold the next task's DIARIZING phase. The gate opens before the run is registered
      * in [running], so a [pauseTask] that sees this task running closes it after the reset, never before.
      * A paused queue is honoured before this: [nextTask] starts nothing while the queue is paused.
+     *
+     * The job is launched lazily and registered in [running] before it ever runs: a cancel, pause or delete that
+     * arrives while the worker starts the task finds it there, exactly as a moment later (item 42's start race).
+     * Started eagerly, the job could already be inside its run when no command could see it.
      */
     private suspend fun runInJob(task: StoredTask) {
         pauseGate.resume()
         val job =
-            scope.launch(CoroutineName("task-${task.id}")) {
+            scope.launch(CoroutineName("task-${task.id}"), start = CoroutineStart.LAZY) {
                 withTaskLoggingContext(task.id) {
                     runTask(task)
                 }
             }
         runningLock.withLock { running = Running(task.id, job) }
         try {
+            beforeTaskStarts?.invoke()
+            job.start()
             job.join()
         } finally {
             runningLock.withLock { running = null }
@@ -480,36 +539,77 @@ class ProcessingEngine internal constructor(
     private suspend fun runningJob(id: Long): Job? = runningLock.withLock { running?.takeIf { it.id == id }?.job }
 
     /**
-     * Runs one task through its phases, in order, and leaves it COMPLETED. Any failure other than a cancel
-     * (a non-zero exit, unreadable output, a missing file) leaves it FAILED with the failure's message, and
-     * the job ends normally, so the worker moves on to the next task.
+     * Runs one task through its phases, in order, and leaves it COMPLETED. Any failure other than a cancel —
+     * in its setup (the settings read, item 42) or a phase (a non-zero exit, unreadable output, a missing
+     * file) — leaves it FAILED with the failure's message, and the job ends normally, so the worker moves on
+     * to the next task. When the database refuses to record that failure, it is logged with both errors and the
+     * task stays RUNNING until a restart's recovery re-queues it; the worker still moves on. A process of the run
+     * killed by SIGTERM while the app keeps running is an interruption, not a failure: no process works on the
+     * task any more, so it goes back to QUEUED and the worker runs it again from its interrupted chunk (item 42).
      */
     private suspend fun runTask(task: StoredTask) {
         val id = task.id
-        // Refused when the task stopped being QUEUED after the worker picked it (a cancel won the race).
-        if (!tasks.setRunningIfQueued(id, now())) return
-        // The settings as the task starts (item 32): every chunk and the diarization of this run use them, so a
-        // change applies from the next task the engine starts and a running (or paused) task keeps its device.
-        val run = settings.get()
-        publish(id)
         try {
+            // Refused when the task stopped being QUEUED after the worker picked it (a cancel won the race).
+            if (!tasks.setRunningIfQueued(id, now())) return
+            // The settings as the task starts (item 32): every chunk and the diarization of this run use them, so a
+            // change applies from the next task the engine starts and a running (or paused) task keeps its device.
+            val run = settings.get()
+            publish(id)
             chunkAudio(id)
             transcribeChunks(id, task, run)
             diarize(id, task, run)
         } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            val failed = tasks.failIfRunning(id, e.message ?: e.toString(), now())
-            removeScratch(id)
-            if (failed) publish(id)
-            if (failed) queueUpdated()
+            // The task's own coroutine is cancelled: the app quits (the next start's recovery re-queues the task),
+            // or a cancel or delete stops the run.
+            if (!currentCoroutineContext().isActive) throw e
+            // Otherwise a process was killed while the app keeps running (ProcessRunner surfaces SIGTERM as a
+            // cancellation, item 34). Conditional on RUNNING, so a pause or cancel that won the race keeps its status.
+            endRun(id, written = tasks.requeueIfRunning(id))
+            return
+        } catch (e: Throwable) {
+            // Any Throwable, an Error included (a native library that failed to load): left uncaught it would
+            // leave the task RUNNING with no worker inside it (item 42).
+            endRun(id, written = recordFailure(id, e))
             return
         }
         tasks.setCompleted(id, now())
-        removeScratch(id)
-        publish(id)
-        queueUpdated()
+        endRun(id, written = true)
     }
+
+    /**
+     * Ends a run after its final status write: the run's scratch is removed on every path (item 44), and the task and
+     * the queue are published only when the write was [written] — a refused conditional write changed nothing.
+     */
+    private suspend fun endRun(
+        id: Long,
+        written: Boolean,
+    ) {
+        removeScratch(id)
+        if (written) {
+            publish(id)
+            queueUpdated()
+        }
+    }
+
+    /**
+     * Stores [failure]'s message as the FAILED status of the task's run — QUEUED when its start itself failed, since
+     * the RUNNING write is what threw, or RUNNING; true when it was written. When the database refuses the write, it is
+     * logged with both errors and nothing more is written: a RUNNING task stays RUNNING and a QUEUED one stays QUEUED
+     * until a restart's recovery re-queues it (item 42). Only the database's refusal is caught; anything else ends
+     * only this task's job.
+     */
+    private suspend fun recordFailure(
+        id: Long,
+        failure: Throwable,
+    ): Boolean =
+        try {
+            tasks.failIfPending(id, failure.message ?: failure.toString(), now())
+        } catch (recording: SQLException) {
+            recording.addSuppressed(failure)
+            logger.error("Could not record task {}'s failure; it stays RUNNING until a restart recovers it", id, recording)
+            false
+        }
 
     /**
      * CHUNKING (ADR 0024): decode, plan and export the task's chunks into its scratch directory, store the
@@ -582,45 +682,63 @@ class ProcessingEngine internal constructor(
         tasks.setPhase(id, TaskPhase.TRANSCRIBING)
         publish(id)
         val stored = chunks.findByTask(id)
-        // whisper's -pp lines arrive on a non-suspending callback, so the chunks run in a child coroutine
-        // and report over a channel, which this coroutine drains, persists and publishes in order.
-        val reports = Channel<TranscriptionReport?>(Channel.UNLIMITED)
         // The run's settings; they switch to the CPU if whisper-cli reports the chosen GPU unusable (item 32).
         var current = run
-        coroutineScope {
-            launch {
-                // The whisper inputs are transient files in the app's scratch directory (item 44), one per
-                // chunk; the task's directory is created once for the whole run.
-                val scratch = scratchDir.taskDir(id)
-                for (chunk in stored) {
-                    if (chunk.status == ChunkStatus.DONE) continue
-                    pauseGate.checkpoint()
-                    val audio = scratch.resolve("chunk-${chunk.idx}.flac")
-                    writeChunkInput(id, chunk, audio)
-                    transcription.transcribe(
-                        taskId = id,
-                        chunk = chunk,
-                        settings = settingsFor(task, current),
-                        audio = audio,
-                        outputPrefix = scratch.resolve("chunk-${chunk.idx}"),
-                        prompt = resumePrompt(segments, id, chunk.idx),
-                        onProgress = { fraction -> reports.trySend(TranscriptionReport(chunk.idx, fraction)) },
-                        onGpuUnavailable = { current = fallBackToCpu(id, current) },
-                    )
-                }
-                // The null report is the terminator: everything before it has been sent.
-                reports.trySend(null)
-            }
-            var doneIdx = -1
-            while (true) {
-                val report = reports.receive() ?: break
-                // The child transcribes chunks in order, so a report for a higher chunk means every chunk
+        var doneIdx = -1
+        reportingWhile<TranscriptionReport>(
+            persist = { report ->
+                // The chunks are transcribed in order, so a report for a higher chunk means every chunk
                 // before it is DONE; item 07's weighted progress is evaluated against that knowledge.
                 if (report.chunkIdx > doneIdx) doneIdx = report.chunkIdx
                 val chunks =
                     stored.map { chunk -> if (chunk.idx < doneIdx) chunk.copy(status = ChunkStatus.DONE) else chunk }
                 transcriptionProgress(id, chunks, report.chunkIdx, report.fraction)
+            },
+        ) { report ->
+            // The whisper inputs are transient files in the app's scratch directory (item 44), one per
+            // chunk; the task's directory is created once for the whole run.
+            val scratch = scratchDir.taskDir(id)
+            for (chunk in stored) {
+                if (chunk.status == ChunkStatus.DONE) continue
+                pauseGate.checkpoint()
+                val audio = scratch.resolve("chunk-${chunk.idx}.flac")
+                writeChunkInput(id, chunk, audio)
+                transcription.transcribe(
+                    taskId = id,
+                    chunk = chunk,
+                    settings = settingsFor(task, current),
+                    audio = audio,
+                    outputPrefix = scratch.resolve("chunk-${chunk.idx}"),
+                    prompt = resumePrompt(segments, id, chunk.idx),
+                    // whisper's -pp lines arrive on a non-suspending callback.
+                    onProgress = { fraction -> report(TranscriptionReport(chunk.idx, fraction)) },
+                    onGpuUnavailable = { current = fallBackToCpu(id, current) },
+                )
             }
+        }
+    }
+
+    /**
+     * Runs [work], whose reports arrive on a non-suspending callback, while a child coroutine hands each report to
+     * [persist], in order. The work runs in the scope's own body, so any throw of it — the cancellation of a killed
+     * process included (item 42) — cancels the drain and propagates; a work in the child would end a drain waiting
+     * in the parent only by failing, never by a cancellation. On success it returns once every report is persisted.
+     */
+    private suspend fun <R : Any> reportingWhile(
+        persist: suspend (R) -> Unit,
+        work: suspend (report: (R) -> Unit) -> Unit,
+    ) {
+        val reports = Channel<R?>(Channel.UNLIMITED)
+        coroutineScope {
+            launch {
+                while (true) {
+                    val report = reports.receive() ?: break
+                    persist(report)
+                }
+            }
+            work { report -> reports.trySend(report) }
+            // The null report is the terminator: everything before it has been sent.
+            reports.trySend(null)
         }
     }
 
@@ -661,25 +779,16 @@ class ProcessingEngine internal constructor(
         // with no stage left over. The reports in between are each persisted and then published.
         diarizationProgress(id, null, 0.0)
         val audio = clipPcmSource(id)
-        val reports = Channel<DiarizationReport?>(Channel.UNLIMITED)
-        coroutineScope {
-            launch {
-                val stage = MutableStateFlow<DiarizationStage?>(null)
-                diarizer.diarize(
-                    task,
-                    pauseGate,
-                    audio,
-                    run.threads,
-                    onStage = { stage.value = it },
-                    onProgress = { value -> reports.trySend(DiarizationReport(stage.value, value)) },
-                )
-                // The null report is the terminator: everything before it has been sent.
-                reports.trySend(null)
-            }
-            while (true) {
-                val report = reports.receive() ?: break
-                diarizationProgress(id, report.stage, report.value)
-            }
+        val stage = MutableStateFlow<DiarizationStage?>(null)
+        reportingWhile<DiarizationReport>(persist = { report -> diarizationProgress(id, report.stage, report.value) }) { report ->
+            diarizer.diarize(
+                task,
+                pauseGate,
+                audio,
+                run.threads,
+                onStage = { stage.value = it },
+                onProgress = { value -> report(DiarizationReport(stage.value, value)) },
+            )
         }
         diarizationProgress(id, null, 1.0)
     }

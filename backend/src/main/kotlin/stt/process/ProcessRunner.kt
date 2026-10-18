@@ -84,8 +84,9 @@ class ProcessRunner internal constructor(
                 val exitCode = awaitExit(process)
                 // A SIGTERM death is an interruption, not a failure: shutdown or an external TERM killed
                 // the tree while the caller waited (roadmap item 34, discovered). Surface it as a
-                // cancellation so the engine leaves the task RUNNING for restart recovery (ADR 0004)
-                // instead of recording FAILED — this covers whisper-cli and ffmpeg alike.
+                // cancellation so the engine never records FAILED: it puts the task back to QUEUED and runs it
+                // again (item 42), or, when the app is quitting, leaves it to the next start's recovery
+                // (ADR 0004) — this covers whisper-cli and ffmpeg alike.
                 if (exitCode == SIGTERM_EXIT_CODE) {
                     throw CancellationException("process was terminated by SIGTERM (exit $SIGTERM_EXIT_CODE)")
                 }
