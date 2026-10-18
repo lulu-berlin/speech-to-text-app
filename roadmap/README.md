@@ -118,6 +118,7 @@ graph TD
   61[61 headless ffmpeg] --> 62[62 audio-only ffmpeg artifact]
   56 --> 62
   63[63 whisper-cpp build time]
+  50 --> 64[64 evaluate Tauri]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -188,3 +189,4 @@ graph TD
 | [61 — Ship nixpkgs' cached headless ffmpeg](61-headless-ffmpeg.md) | spec-approved | — |
 | [62 — An audio-only ffmpeg, shipped as a pinned prebuilt artifact](62-audio-only-ffmpeg-artifact.md) | spec-approved | 56, 61 |
 | [63 — Stop compiling whisper-cpp on every uncached machine](63-whisper-cpp-build-time.md) | draft | — |
+| [64 — Evaluate Tauri as the desktop shell](64-tauri-evaluation.md) | spec-approved | 50 |
