@@ -231,15 +231,17 @@ jobs:
   # developer's machine: `nix build .#desktop-bundle` on the runner, then the packaged specs in a
   # stock alpine:3.20 container with only zstd and tar added — no Nix, no glibc. The GPU suites
   # (test:desktop:bundle:amd, :nvidia) need a GPU and run on a developer's machine: no runner has
-  # one. The bundle's Vulkan-only Mesa is not in cache.nixos.org, so it compiles here on every run
-  # (docs/known-issues.md). Two runner preparations: every spec launch unpacks the bundle into a
+  # one. The bundle's Vulkan-only Mesa comes from the pinned release asset (roadmap item 56, a
+  # prerelease whose sha256 is in nix/desktop-artifacts.nix), so it is fetched here, not compiled.
+  # Two runner preparations: every spec launch unpacks the bundle into a
   # fresh HOME (~1.2 GB each, ~10 GB in the container), so preinstalled toolchains this job does not
   # use are removed first; and the bundle needs unprivileged user namespaces (its README
   # requirement), which Ubuntu 24.04's AppArmor can restrict — the `.deb` is the answer for such
   # hosts, so the runner is made a host that meets the bundle's requirement.
-  # It is deliberately not in the `ci` aggregator's needs: the job still runs on every push and
-  # reports its result, but it must not gate merges until roadmap 55 (the flaky backend pin its
-  # build hits, docs/known-issues.md) and the Vulkan-only Mesa's binary cache land.
+  # It gates merges through the `ci` aggregator: roadmap 55 fixed the flaky writer-lock probe and
+  # item 56 took the Mesa build out of this job, the two conditions its first version named. The
+  # Nix build here runs the backend's `gradle check`, so item 58's real-time completion waits can
+  # still fail it — as they can the already-required `desktop-nix-e2e` and `nix-build`.
   desktop-bundle-e2e:
     name: Desktop (bundle e2e)
     runs-on: ubuntu-24.04
@@ -340,12 +342,11 @@ jobs:
 
   # The one required check for branch protection: it waits for every other job and fails when any of
   # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
-  # renaming a job cannot silently un-gate merges. `desktop-bundle-e2e` is the one deliberate
-  # exception (its own comment says until when); a job absent from this list cannot gate merges, so
-  # adding it back is the one-line change that re-requires it.
+  # renaming a job cannot silently un-gate merges. `model-hosts` is the one deliberate exception
+  # (its own comment says why); a job absent from this list cannot gate merges.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, nix-devenv, nix-flake-check, nix-build]
+    needs: [backend-check, frontend-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
