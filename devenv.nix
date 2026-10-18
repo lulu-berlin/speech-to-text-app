@@ -19,9 +19,10 @@ in
     # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks
     # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see
     # nix/whisper-cpp.nix); standalone ffmpeg is handy for trimming/merging audio
-    # before transcription. ffmpeg_8, like the package (no drift; item 33's Gradle
-    # bootstrap syncs 8.1 too).
-    pkgs.ffmpeg_8
+    # before transcription. nixpkgs' ffmpeg_8-headless, the package the app ships (roadmap
+    # item 61; item 33's Gradle bootstrap syncs 8.1 too). The shell has no `ffplay`: the
+    # headless variant does not build it.
+    pkgs.ffmpeg_8-headless
     
     # Diagnostics: `vulkaninfo --summary` verifies the GPU is visible to Vulkan
     pkgs.vulkan-tools

@@ -12,9 +12,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
 
-/** ffprobe's view of the canonical clip (item 44): FLAC, 16-bit, 16 kHz, mono. */
-private val FLAC_16_BIT_16K_MONO = mapOf("codec_name" to "flac", "sample_fmt" to "s16", "sample_rate" to "16000", "channels" to "1")
-
 class AudioChunkerSpec :
     BehaviorSpec({
         tags(Integration)
@@ -144,24 +141,4 @@ private suspend fun chunkNoise(
     Files.write(storedFile, stored)
     toS16(storedFile, workDir).shouldBe(sourceSamples)
     return chunked
-}
-
-/** The audio stream's codec, sample format, sample rate and channel count as reported by ffprobe. */
-private suspend fun streamInfo(file: Path): Map<String, String> {
-    val command =
-        listOf(
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "a:0",
-            "-show_entries",
-            "stream=codec_name,sample_fmt,sample_rate,channels",
-            "-of",
-            "default=noprint_wrappers=1",
-            file.toString(),
-        )
-    val result = withTimeout(30.seconds) { ProcessRunner().run(command) }
-    check(result.exitCode == 0) { "ffprobe failed: ${result.stderr}" }
-    return result.stdout.associate { line -> line.substringBefore('=') to line.substringAfter('=') }
 }
