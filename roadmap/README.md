@@ -110,11 +110,12 @@ graph TD
   12 --> 44
   11 --> 46[46 contextual logging ✓]:::done
   47 --> 55[55 atomic-transitions lock probe ✓]:::done
-  50 --> 56[56 prebuilt Linux x86_64 bundle Mesa]
+  50 --> 56[56 prebuilt Linux x86_64 bundle Mesa ✓]:::done
   57[57 desktop-nix-e2e container failure ✓]:::done --> 50
   58[58 atomic-transitions completion waits]
   59[59 UI/UX polish]
-  60[60 exception-handling policy]
+  42 --> 60[60 exception-handling policy]
+  56 --> 61[61 prebuilt bundle ffmpeg]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -177,8 +178,9 @@ graph TD
 | [53 — The Nix store cache: one writer per key, versioned past the stale entry](../docs/specs/nix-store-cache.md) | done | 51 |
 | [54 — TypeScript for the remaining hand-written JavaScript](54-typescript-for-the-remaining-scripts.md) | draft | — |
 | [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md) | done | — |
-| [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](56-desktop-bundle-mesa-artifact.md) | spec-approved | 50 |
+| [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](../docs/specs/desktop-bundle-mesa-artifact.md) | done | 50 |
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md) | done | — |
 | [58 — The atomic-transitions spec's completion waits still have real-time windows](58-atomic-transitions-spec-completion-window.md) | spec-approved | — |
 | [59 — UI/UX polish: compact header, view hierarchy, task-row progress, history affordances](59-ui-ux-polish.md) | spec-approved | — |
 | [60 — Exception-handling policy: no catch-all swallows a throwable silently](60-exception-handling-policy.md) | spec-approved | 42 |
+| [61 — Prebuild the desktop's ffmpeg for Linux x86_64](61-desktop-ffmpeg-artifact.md) | draft | 56 |
