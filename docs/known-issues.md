@@ -15,15 +15,11 @@ problems; it never goes away and it is not a roadmap item.
 - Rows marked **decision needed** are open questions, not code fixes; resolve them when (or instead
   of) touching the area.
 
-Rules for the roadmap: issues currently planned by roadmap items are deliberately absent here —
-[41 upload hardening](../roadmap/41-upload-hardening.md) (size cap, multi-part spool overwrite,
-duplicate-race 500).
-
 ## Backend runtime
 
 | Issue | Sev | Evidence | Notes |
 | ----- | --- | -------- | ----- |
-| Upload acceptance is the client-supplied filename extension only; content type is read and ignored, no magic-byte sniffing — any bytes renamed `x.mp3` pass `201` and fail later at ffmpeg decode | MED | `backend/src/main/kotlin/stt/http/UploadRequest.kt:44-58` | Content validity only; size cap / multi-part / 409 are item 41 |
+| Upload acceptance is the client-supplied filename extension only; content type is read and ignored, no magic-byte sniffing — any bytes renamed `x.mp3` pass `201` and fail later at ffmpeg decode | MED | `backend/src/main/kotlin/stt/http/UploadRequest.kt:44-58` | Content validity only |
 | Hottest queries scan without an index: `tasks.status` and `tasks.queue_position` unindexed (`TasksTable`: PK only); `nextQueued`, `pendingOrderedIds`, `startedPaused`, `nextQueuePosition`, `retryIfPossible` all filter/sort on them | MED | `backend/src/main/resources/db/migration/V1__init.sql`; `db/TaskRepository.kt:102-151` | Add indexes in a new migration |
 | `listDetails` runs two extra queries per task (`audio_header` exists, `segments` max end) in a read transaction — O(N) per list / snapshot | LOW | `db/TaskRepository.kt:428-447` | One grouped query, or materialize duration |
 | CHUNKING holds the whole canonical clip in heap two to three times: the encoded FLAC is read whole (`Files.readAllBytes`), the splitter copies the header and every frame out of it, and `toCanonicalRows` joins each second's frames into another array — a 90 min clip is several hundred MB transient, while serving and diarization stream one row at a time | LOW | `audio/AudioChunker.kt:72`; `audio/FlacSplitter.kt:99,107`; `audio/FlacRows.kt:36` via `engine/ProcessingEngine.kt:537` | Split from a file channel, or build the one-second rows during the frame walk; found in item 44's review 2026-10-15, not fixed there. Measured 2026-10-16 (item 43's long-clip run, heap after GC): a 20 min 16 kHz mono clip reaches 100 MB right after upload (25.8 s JVM uptime), and a 1200 s fixture reproduced 110 MB in the sandbox — the same run's diarization phase stayed at 20–23 MB |

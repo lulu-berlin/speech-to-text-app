@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.core.max
 import org.jetbrains.exposed.v1.core.statements.UpdateStatement
+import org.jetbrains.exposed.v1.exceptions.ExposedSQLException
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -18,6 +19,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
 import stt.queue.TaskStatus
 import java.io.InputStream
+import java.sql.SQLException
 
 class TaskRepository(
     private val db: Database,
@@ -29,12 +31,24 @@ class TaskRepository(
      * Saves [task] for an [upload] (item 44): the upload is written into the database as a staged original, window
      * by window (no lock held while it is read), then the task, its audio metadata and the original's attachment are
      * written in one short transaction, so audio content that already exists (UNIQUE sha256) rejects the whole
-     * creation and leaves no original behind. No file is written. [upload] is read on Dispatchers.IO and not closed.
+     * creation with an [SQLException] naming the task that holds it, and leaves no original behind. No file is
+     * written. [upload] is read on Dispatchers.IO and not closed.
      */
     suspend fun createFromUpload(
         task: Task,
         upload: InputStream,
-    ): Long = (createFromUploadOrDuplicate(task, upload) as UploadOutcome.Created).id
+    ): Long =
+        db.withStagedUpload(upload) { staged ->
+            when (val outcome = createFromStaged(task, staged)) {
+                is UploadOutcome.Created -> {
+                    outcome.id
+                }
+
+                is UploadOutcome.Duplicate -> {
+                    throw SQLException("The audio content is already stored by task ${outcome.existingId}")
+                }
+            }
+        }
 
     /**
      * Stages [upload] once and decides with its own digest: when [duplicateTaskId] finds a task
@@ -54,19 +68,39 @@ class TaskRepository(
         duplicateTaskId: suspend (String) -> Long?,
     ): UploadOutcome =
         duplicateTaskId(staged.sha256)?.let { UploadOutcome.Duplicate(it, staged.sha256, staged.sizeBytes) }
-            ?: UploadOutcome.Created(createFromStaged(task, staged), staged.sha256, staged.sizeBytes)
+            ?: createFromStaged(task, staged)
 
     /**
-     * Inserts [task], its audio metadata and the attachment of its staged original in one transaction. Item 12's
-     * upload route calls this after staging the part's channel itself ([Database.stageChannel]).
+     * Test-only seam (item 41): runs at the start of [createFromStaged], between the upload route's duplicate
+     * pre-check and its insert, so a concurrent identical upload can be pinned deterministically. Unset in
+     * production.
+     */
+    internal var beforeCreateFromStaged: (suspend () -> Unit)? = null
+
+    /**
+     * Inserts [task], its audio metadata and the attachment of its staged original in one transaction, and reports
+     * [UploadOutcome.Duplicate] when those bytes were committed concurrently: `audio.sha256` is unique, so the loser
+     * of an upload race hits that constraint and is answered with the winning task (item 41). Item 12's upload route
+     * calls this after staging the part's channel itself ([Database.stageChannel]).
      */
     internal suspend fun createFromStaged(
         task: Task,
         staged: StagedUpload,
-    ): Long =
-        db.writeTransaction {
-            insertTaskRow(task).also { taskId -> insertAudioRow(taskId, staged) }
+    ): UploadOutcome {
+        beforeCreateFromStaged?.invoke()
+        return try {
+            UploadOutcome.Created(
+                id = db.writeTransaction { insertTaskRow(task).also { taskId -> insertAudioRow(taskId, staged) } },
+                sha256 = staged.sha256,
+                sizeBytes = staged.sizeBytes,
+            )
+        } catch (e: ExposedSQLException) {
+            // Only audio.sha256's unique constraint is a duplicate (item 41); any other failure is rethrown.
+            if (!e.hasMessageContaining(AUDIO_SHA256_UNIQUE)) throw e
+            val winner = AudioRepository(db).taskIdOfSha256(staged.sha256) ?: throw e
+            UploadOutcome.Duplicate(winner, staged.sha256, staged.sizeBytes)
         }
+    }
 
     suspend fun find(id: Long): StoredTask? =
         db.readTransaction {
@@ -411,6 +445,13 @@ class TaskRepository(
         db.writeTransaction { TasksTable.deleteWhere { TasksTable.id eq id } }
     }
 }
+
+/** The SQLite message of the one unique constraint an upload can hit (item 41): one task per audio content. */
+private const val AUDIO_SHA256_UNIQUE = "UNIQUE constraint failed: audio.sha256"
+
+/** Whether this throwable or any of its causes has [text] in its message. */
+private fun Throwable.hasMessageContaining(text: String): Boolean =
+    generateSequence(this) { it.cause }.any { it.message?.contains(text) == true }
 
 /** Inserts the `tasks` row inside the current transaction and returns its generated id. */
 internal fun JdbcTransaction.insertTaskRow(task: Task): Long =
