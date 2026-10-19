@@ -1,0 +1,4 @@
+{
+  "error": "upload-too-large",
+  "message": "The upload exceeds the maximum size of 1 GiB"
+}

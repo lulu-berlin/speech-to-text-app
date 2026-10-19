@@ -108,6 +108,26 @@ class ConfigSpec :
             }
         }
 
+        given("an environment with STT_MAX_UPLOAD_BYTES unset, set, or invalid") {
+            `when`("loading configuration") {
+                then("it defaults to 1 GiB, a set value is part of it, and a non-positive or non-numeric value fails naming it") {
+                    Config.fromEnv(TEST_REQUIRED_ENV).maxUploadBytes.shouldBe(1_073_741_824L)
+                    Config
+                        .fromEnv(TEST_REQUIRED_ENV + ("STT_MAX_UPLOAD_BYTES" to "1048576"))
+                        .maxUploadBytes
+                        .shouldBe(1_048_576L)
+                    for (bad in listOf("0", "-1", "many")) {
+                        val error =
+                            shouldThrow<IllegalArgumentException> {
+                                Config.fromEnv(TEST_REQUIRED_ENV + ("STT_MAX_UPLOAD_BYTES" to bad))
+                            }
+                        error.message.shouldContain("STT_MAX_UPLOAD_BYTES")
+                        error.message.shouldContain(bad)
+                    }
+                }
+            }
+        }
+
         given("STT_DEVICE and STT_THREADS set to values that used to stop startup") {
             `when`("configuration is loaded") {
                 then("it loads exactly as without them: the device and thread count live only in the stored settings (item 32)") {

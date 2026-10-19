@@ -21,6 +21,7 @@ export { default as speakers } from '../../../../docs/api/speakers.json';
 export { default as error } from '../../../../docs/api/error.json';
 export { default as errorDuplicateAudio } from '../../../../docs/api/error.duplicate-audio.json';
 export { default as errorInvalidLanguage } from '../../../../docs/api/error.invalid-language.json';
+export { default as errorUploadTooLarge } from '../../../../docs/api/error.upload-too-large.json';
 export { default as taskTransitions } from '../../../../docs/api/task-transitions.json';
 export { default as languages } from '../../../../docs/api/languages.json';
 export { default as settings } from '../../../../docs/api/settings.json';

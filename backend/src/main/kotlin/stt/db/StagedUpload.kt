@@ -51,12 +51,15 @@ internal suspend fun <T> Database.withStagedUpload(
  * of [STAGE_WINDOW_BYTES] — never the whole part at once — and computing size and sha256 on the way, so no full
  * in-memory copy of the upload exists and no file is written. Unlike [withStagedUpload] the caller owns the
  * staged original: it is attached to its task on commit, or discarded ([discardStaged]) when the request is
- * rejected. A failed read discards it here.
+ * rejected. A failed read — including the upload outgrowing [maxBytes] (item 41) — discards it here.
  */
-internal suspend fun Database.stageChannel(source: ByteReadChannel): StagedUpload {
+internal suspend fun Database.stageChannel(
+    source: ByteReadChannel,
+    maxBytes: Long = Long.MAX_VALUE,
+): StagedUpload {
     val originalId = stageOriginal()
     try {
-        return stage(originalId, source)
+        return stage(originalId, source, maxBytes)
     } catch (e: Throwable) {
         deleteUnclaimedOriginal(originalId)
         throw e
@@ -103,6 +106,7 @@ private suspend fun Database.appendPart(
 private suspend fun Database.stage(
     originalId: Long,
     source: ByteReadChannel,
+    maxBytes: Long,
 ): StagedUpload {
     val digest = MessageDigest.getInstance("SHA-256")
     var sizeBytes = 0L
@@ -111,6 +115,8 @@ private suspend fun Database.stage(
         // At most one window is in memory; the next read waits for more of the part (or EOF).
         val bytes = source.readBuffer(STAGE_WINDOW_BYTES.toLong()).readByteArray()
         if (bytes.isEmpty()) break
+        // Rejected before a window that would cross the limit is written (item 41).
+        if (sizeBytes + bytes.size > maxBytes) throw UploadTooLargeException()
         digest.update(bytes)
         appendPart(originalId, seq++, bytes)
         sizeBytes += bytes.size

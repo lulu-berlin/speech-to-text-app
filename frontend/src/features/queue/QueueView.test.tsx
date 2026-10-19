@@ -8,6 +8,7 @@ import {
   error as errorFixture,
   errorDuplicateAudio,
   errorInvalidLanguage,
+  errorUploadTooLarge,
   queue as queueFixture,
   taskCanceled,
   taskCompleted,
@@ -1139,5 +1140,55 @@ describe('upload errors', () => {
 
     // Only the three supported files reached the server, in drop order.
     expect(seen).toEqual(['audio/mpeg', 'audio/ogg', 'audio/wav']);
+  });
+
+  it("shows a too-large and a multi-file refusal as the server's message on the file's row, adding no task", async () => {
+    server.use(
+      http.post('/api/tasks', async ({ request }) => {
+        const body = await request.text();
+        const contentType = body.match(/Content-Type: ([^\r]+)/)?.[1] ?? '';
+        if (contentType === 'audio/wav') {
+          return HttpResponse.json(errorUploadTooLarge, { status: 413 });
+        }
+        return HttpResponse.json(
+          { error: 'multiple-files', message: 'Only one file may be uploaded per request' },
+          { status: 400 },
+        );
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+    const pending = screen.getByRole('list', { name: 'Pending tasks' });
+    const pendingBefore = within(pending).getAllByRole('listitem').length;
+
+    const files = [
+      new File(['x'], 'big.wav', { type: 'audio/wav' }),
+      new File(['x'], 'two.mp3', { type: 'audio/mpeg' }),
+    ];
+    fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
+
+    const uploads = screen.getByRole('list', { name: 'Uploads' });
+
+    // Both codes render the server's message through the generic error path.
+    await waitFor(() => {
+      const row = within(uploads)
+        .getAllByRole('listitem')
+        .find((item) => item.textContent?.includes('big.wav'));
+      expect(
+        within(row as HTMLElement).getByText('The upload exceeds the maximum size of 1 GiB'),
+      ).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const row = within(uploads)
+        .getAllByRole('listitem')
+        .find((item) => item.textContent?.includes('two.mp3'));
+      expect(
+        within(row as HTMLElement).getByText('Only one file may be uploaded per request'),
+      ).toBeInTheDocument();
+    });
+
+    // Neither refusal became a task.
+    expect(within(pending).getAllByRole('listitem')).toHaveLength(pendingBefore);
   });
 });

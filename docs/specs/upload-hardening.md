@@ -1,7 +1,7 @@
 # 41 — Upload hardening: duplicate race, size limit, spool cleanup
 
-Status: spec-approved
-Depends on: [12](../docs/specs/http-api-and-sse.md) (done; the upload endpoint)
+Status: done (roadmap item 41, approved 2026-10-18)
+Depends on: [12](http-api-and-sse.md) (done; the upload endpoint)
 Blocks: —
 
 ## Goal
@@ -27,7 +27,7 @@ original behind.
     in the `finally` (`:104-107`). The staging loop also sits **outside** the guarded `try`, so a
     read failure or client disconnect during it leaks the staged original until the startup sweep
     (`StagedUpload.discardUnclaimedStaged`).
-- [ADR 0046](../docs/decisions/0046-every-feature-has-an-e2e-test.md): the fix carries an e2e
+- [ADR 0046](../decisions/0046-every-feature-has-an-e2e-test.md): the fix carries an e2e
   assertion for the duplicate-race behavior.
 - The frontend already handles `duplicate-audio` inline (a link to the existing task) and
   `unsupported-format`; other error codes render the server's message
@@ -41,6 +41,9 @@ original behind.
   rejected with `413` and the new error code `upload-too-large`, whose message names the limit;
   the check runs from `Content-Length` when present (before staging) and while streaming for
   chunked bodies. No task is created and the staged bytes are deleted.
+  The limit bounds the file part's bytes; `Content-Length` also counts the multipart envelope, so a
+  request that declares a body over the limit is refused outright — an upload of exactly the limit is
+  accepted when it arrives chunked (decided 2026-10-18, option a).
 - **Duplicates keep the pre-check and add a translated constraint** (the user): the fast
   `409 duplicate-audio` stays; `createFromStaged` catches the unique violation, reads the winning
   task by sha256 and answers the same `409 duplicate-audio` naming it. The unique constraint stays
@@ -73,22 +76,24 @@ original behind.
 
 ## Test list (approved 2026-10-18; behaviors only)
 
-- [ ] An upload larger than the configured limit is rejected with `413 upload-too-large` naming the
+- [x] An upload larger than the configured limit is rejected with `413 upload-too-large` naming the
       limit, no task is created and no staged original remains — for a declared `Content-Length`
       and for a chunked body without one
-- [ ] An upload of exactly the limit is accepted
-- [ ] Two simultaneous identical uploads answer exactly one `201` and one `409 duplicate-audio`
+- [x] An upload of exactly the limit is accepted
+- [x] Two simultaneous identical uploads answer exactly one `201` and one `409 duplicate-audio`
       naming the winning task — never a `500`; the losing request leaves no staged original (the
       integration seam holds the request between the check and the insert)
-- [ ] A multipart body carrying a second file part is rejected with `400 multiple-files`, the first
+- [x] A multipart body carrying a second file part is rejected with `400 multiple-files`, the first
       file is not kept and no staged original remains
-- [ ] Every staged original is deleted on success, on rejection, on cancellation (client
+- [x] Every staged original is deleted on success, on rejection, on cancellation (client
       disconnect) and on a mid-stream failure; no unclaimed original remains after each path
-- [ ] The new error codes are in the API contract docs and the queue view renders their server
+- [x] The new error codes are in the API contract docs and the queue view renders their server
       messages inline, leaving no row and no task
-- [ ] (e2e, ADR 0046) Against the real backend, two concurrent identical uploads leave one task and
+- [x] (e2e, ADR 0046) Against the real backend, two concurrent identical uploads leave one task and
       show one `201` and one `409` (the duplicate message with its link), never a `500`
-- [ ] (must not break) The upload suites (`UploadDuplicateSpec`, `UploadStreamingSpec`, …), the rest
+- [x] (discovered) `STT_MAX_UPLOAD_BYTES` defaults to 1 GiB, and a zero, negative or non-numeric
+      value fails startup naming the variable
+- [x] (must not break) The upload suites (`UploadDuplicateSpec`, `UploadStreamingSpec`, …), the rest
       of `gradle check`, the frontend suites and the existing e2e journey stay green; the
       extension-only acceptance row in `docs/known-issues.md` stays open (out of scope)
 
@@ -111,3 +116,16 @@ original behind.
   staging guarded, cleanup under `NonCancellable`, and an e2e with two concurrent identical uploads
   (one `201`, one `409`, never `500`). Test list approved as worded above. Status: spec-approved.
   Filed on `main` through a docs PR.
+
+- 2026-10-18: implementation — the configurable limit (`STT_MAX_UPLOAD_BYTES`, 1 GiB), the duplicate
+  translation at `audio.sha256`, the `multiple-files` refusal and one globally guarded multipart
+  loop. Discoveries: an upload of exactly the limit is accepted only chunked (a declared
+  `Content-Length` counts the multipart envelope), and a staging-loop failure could not be produced
+  through the Ktor test client (parser failures land inside the part channel that `stageChannel`
+  already cleans), so cancellation is pinned through the `afterFilePartStaged` test seam. Status:
+  in-review.
+
+- 2026-10-18: root-agent review and the user's approval of the diff ("Let's land it"), the
+  discovered config-validation test item included. Verified: `gradle check`, the four new upload
+  specs, the frontend suite with prettier and tsc, and the docs link check; the e2e spec was
+  reviewed but not run here. Landed as the item's single squash commit.

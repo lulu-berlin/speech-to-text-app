@@ -67,6 +67,7 @@ export const FIXTURE_CLIPS = [
   'jfk-w.wav', // 2-6s, item 40's pause-queued clip
   'jfk-stability.wav', // 5-11s, item 42's queue-survives-a-failure clip
   'broken-stability.wav', // item 42's undecodable fixture
+  'jfk-race.wav', // 8-11s, item 41's concurrent-upload race
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -124,6 +125,10 @@ export const PAUSE_QUEUED_CLIP = FIXTURE_CLIPS[28]; // 2-6s
 // 409 once those are FAILED tasks).
 export const STABILITY_CLIP = FIXTURE_CLIPS[29];
 export const STABILITY_BROKEN_CLIP = FIXTURE_CLIPS[30];
+
+// Item 41's upload-hardening race (ADR 0046): the sample's 8-11s trim, which is no other test's clip.
+// The spec uploads it twice at once and then once more through the UI, for the duplicate link.
+export const UPLOAD_RACE_CLIP = FIXTURE_CLIPS[31];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];

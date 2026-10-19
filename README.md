@@ -242,8 +242,9 @@ The backend is configured with environment variables. The Nix package, the devel
 | `STT_PORT` | no | The HTTP port, default `8080`. |
 | `STT_STATIC_DIR` | no | A built frontend (`frontend/dist`) to serve. Unset, the backend serves only the API. |
 | `STT_HOST` | no | The interface the backend listens on, default `0.0.0.0` (every interface). The desktop app sets `127.0.0.1`. |
+| `STT_MAX_UPLOAD_BYTES` | no | The largest upload in bytes, default 1 GiB (`1073741824`). An upload over it is refused with `413` `upload-too-large`; the limit bounds the file part's bytes, and a request that declares a larger body is refused outright. |
 
-A missing required variable or an invalid port stops the app at startup with a message naming it. `whisper-cli` and `ffmpeg` are run from `PATH` ([ADR 0047](docs/decisions/0047-external-tools-resolved-from-path.md)).
+A missing required variable, an invalid port or an invalid upload size stops the app at startup with a message naming it. `whisper-cli` and `ffmpeg` are run from `PATH` ([ADR 0047](docs/decisions/0047-external-tools-resolved-from-path.md)).
 
 The compute device (automatic, CPU or a specific GPU), the number of threads and the defaults for new uploads (language, speakers) are not environment variables: they are set on the app's **Settings** page and stored in the database ([docs/specs/settings-page.md](docs/specs/settings-page.md)).
 

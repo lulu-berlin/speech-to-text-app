@@ -29,10 +29,14 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 | Heartbeat | `heartbeat.json` | event `heartbeat`: sent after 5 s without any other event; carries no state (item 29, [ADR 0044](../decisions/0044-sse-heartbeat-and-client-watchdog.md)) |
 | Settings | `settings.json`, `settings.fixed.json`, `settings.fallback.json` | `GET /api/settings`; `200` of `PUT /api/settings` and `DELETE /api/settings/device-fallback` (item 32; `gpuNames` added by item 45) |
 | Settings event | `settings-updated.json`, `settings-updated.defaults.json`, `settings-updated.fallback.json` | event `settings-updated` (item 32) |
-| Error | `error.json`, `error.invalid-language.json` (mock addition, item 14), `error.invalid-device.json` (item 32) | every error response except `duplicate-audio` |
+| Error | `error.json`, `error.invalid-language.json` (mock addition, item 14), `error.invalid-device.json` (item 32), `error.upload-too-large.json` (item 41) | every error response except `duplicate-audio` |
 | Error (duplicate) | `error.duplicate-audio.json` | `409 duplicate-audio` of `POST /api/tasks` |
 
 Responses without a body (`204` of `DELETE /api/tasks/{id}`), the transcript downloads (item 10's formats) and `/audio` (FLAC) have no example here.
+
+The upload endpoint's item-41 refusals use the Error shape: `413 upload-too-large` (the message names the configured
+limit, `error.upload-too-large.json`) and `400 multiple-files` (a second file part; the first is discarded). The
+queue view renders both server messages inline without special-casing the codes.
 
 ## Task transition table
 
