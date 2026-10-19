@@ -24,7 +24,6 @@ import stt.db.SegmentRepository
 import stt.db.TaskRepository
 import stt.db.singleValue
 import stt.engine.awaitUntil
-import stt.process.ProcessRunner
 import stt.queue.TaskStatus
 import stt.transcribe.transcriptFixtures
 import java.nio.file.Files
@@ -187,8 +186,8 @@ class AudioMigrationSpec :
     })
 
 /**
- * Requests task [taskId]'s audio, checks it is served as `audio/flac`, and returns its sample count as ffprobe reads
- * it from the served bytes (written to a file under [fixtures]).
+ * Requests task [taskId]'s audio, checks it is served as `audio/flac`, and returns its sample count from
+ * the served FLAC's STREAMINFO (written to a file under [fixtures]).
  */
 private suspend fun ApplicationTestBuilder.servedSamples(
     taskId: Long,
@@ -199,7 +198,7 @@ private suspend fun ApplicationTestBuilder.servedSamples(
     response.contentType()?.withoutParameters() shouldBe ContentType.parse("audio/flac")
     val served = fixtures.resolve("served-$taskId.flac")
     Files.write(served, response.bodyAsBytes())
-    return ffprobe(ProcessRunner(), served, "stream=duration_ts").single().toLong()
+    return flacSamples(served)
 }
 
 /**

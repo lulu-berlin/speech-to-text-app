@@ -7,6 +7,7 @@
 let
   models = import ./nix/models.nix { inherit pkgs; };
   testFixtures = import ./nix/test-fixtures.nix { inherit pkgs; };
+  ffmpeg = (import ./nix/ffmpeg.nix { inherit pkgs; }).ffmpeg;
 in
 {
   # https://devenv.sh/packages/
@@ -19,10 +20,10 @@ in
     # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks
     # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see
     # nix/whisper-cpp.nix); standalone ffmpeg is handy for trimming/merging audio
-    # before transcription. nixpkgs' ffmpeg_8-headless, the package the app ships (roadmap
-    # item 61; item 33's Gradle bootstrap syncs 8.1 too). The shell has no `ffplay`: the
-    # headless variant does not build it.
-    pkgs.ffmpeg_8-headless
+    # before transcription. The shell ships the app's audio-only static ffmpeg from the
+    # pinned desktop-ffmpeg-v2 asset (roadmap item 62; item 33's Gradle bootstrap syncs 8.1
+    # too): only `ffmpeg`, no `ffplay` or `ffprobe`.
+    ffmpeg
     
     # Diagnostics: `vulkaninfo --summary` verifies the GPU is visible to Vulkan
     pkgs.vulkan-tools

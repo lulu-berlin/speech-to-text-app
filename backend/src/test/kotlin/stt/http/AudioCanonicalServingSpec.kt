@@ -15,7 +15,7 @@ import stt.Integration
 import stt.audio.FlacRows
 import stt.audio.FlacSplitter
 import stt.audio.encodeCanonical
-import stt.audio.generate
+import stt.audio.sineWav
 import stt.audio.toCanonicalRows
 import stt.db.Database
 import stt.db.QueueStateRepository
@@ -47,7 +47,7 @@ class AudioCanonicalServingSpec :
                     // 2.0 s of 440 Hz at 16 kHz mono, encoded exactly as the app encodes a canonical clip:
                     // 32 000 samples = eight 4 000-sample frames = two one-second rows, by hand.
                     val source = fixtures.resolve("source.wav")
-                    generate(source, "sine=frequency=440:duration=2.0", "-ar", "16000", "-ac", "1")
+                    sineWav(source, seconds = 2.0, sampleRate = 16_000, channels = 1)
                     val canonical = fixtures.resolve("canonical.flac")
                     encodeCanonical(runner, source, canonical)
                     val clipBytes = Files.readAllBytes(canonical)
@@ -84,7 +84,7 @@ class AudioCanonicalServingSpec :
                         // A browser reads the duration from the header: 2.0 s × 16 000 samples/s, by hand.
                         val served = fixtures.resolve("served.flac")
                         Files.write(served, whole.bodyAsBytes())
-                        ffprobe(runner, served, "stream=duration_ts").single().toLong() shouldBe 32_000L
+                        flacSamples(served) shouldBe 32_000L
 
                         val size = clipBytes.size.toLong()
 

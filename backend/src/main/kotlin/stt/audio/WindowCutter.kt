@@ -39,6 +39,7 @@ class FfmpegWindowCutter(
                         "error",
                         "-i",
                         window.toString(),
+                        "-vn",
                         "-af",
                         "atrim=start_sample=$fromSample:end_sample=$toSample",
                         "-ac",

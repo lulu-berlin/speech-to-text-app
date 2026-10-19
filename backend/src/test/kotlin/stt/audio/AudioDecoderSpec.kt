@@ -25,7 +25,7 @@ class AudioDecoderSpec :
                 then("the PCM file holds mono 16 kHz float32 samples and the duration is the sample count / 16 ms") {
                     val workDir = tempdir("stt-audio").toPath()
                     val source = workDir.resolve("source.wav")
-                    generate(source, "sine=frequency=440:sample_rate=44100:duration=2.5", "-ac", "2")
+                    sineWav(source, seconds = 2.5, channels = 2)
                     val pcm = workDir.resolve("audio.f32")
 
                     val durationMs = decode(source, pcm)
@@ -33,7 +33,7 @@ class AudioDecoderSpec :
                     // 2.5 s × 16 000 samples/s = 40 000 samples; × 4 bytes (float32, one channel) = 160 000 bytes.
                     Files.size(pcm).shouldBe(160_000L)
                     durationMs.shouldBe(2_500L) // 40 000 samples / 16 samples per ms
-                    // lavfi sine has amplitude 1/8: read as little-endian float32, the peak is ≈ 0.125.
+                    // The generated sine has amplitude 1/8: read as little-endian float32, the peak is ≈ 0.125.
                     peak(pcm).shouldBeBetween(0.12, 0.13, 0.0)
                 }
             }
@@ -58,7 +58,7 @@ class AudioDecoderSpec :
                 then("decoding fails with \"no audio decoded\"") {
                     val workDir = tempdir("stt-audio").toPath()
                     val source = workDir.resolve("source.wav")
-                    generate(source, "anullsrc=r=44100:cl=stereo", "-t", "0")
+                    emptyWav(source)
 
                     val error = shouldThrow<AudioDecodeException> { decode(source) }
 

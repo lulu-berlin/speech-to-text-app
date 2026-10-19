@@ -1,24 +1,18 @@
 package stt.http
 
+import stt.audio.flacStreamInfo
+import stt.audio.streamInfoTotalSamples
 import stt.process.ProcessRunner
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** One ffprobe `-show_entries` query on [file]'s audio stream: one value per line. */
-internal suspend fun ffprobe(
-    runner: ProcessRunner,
-    file: Path,
-    entries: String,
-): List<String> {
-    val result =
-        runner.run(
-            listOf("ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", entries, "-of", "csv=p=0", file.toString()),
-        )
-    check(result.exitCode == 0) { "ffprobe failed: ${result.stderr}" }
-    return result.stdout.filter { it.isNotBlank() }
-}
+/** The exact sample count the served canonical FLAC's STREAMINFO declares. */
+internal fun flacSamples(file: Path): Long = streamInfoTotalSamples(Files.readAllBytes(file))
 
-/** Decodes [file] to raw s16le in [raw] and returns its sample count — what decoding really yields. */
+/** The first audio packet's offset: the end of the FLAC metadata blocks. */
+internal fun flacAudioStart(file: Path): Long = flacStreamInfo(file).audioStart.toLong()
+
+/** Decodes [file] to raw f32le in [raw] and returns its sample count — what decoding really yields. */
 internal suspend fun decodeSamples(
     runner: ProcessRunner,
     raw: Path,
@@ -26,8 +20,8 @@ internal suspend fun decodeSamples(
 ): Long {
     val result =
         runner.run(
-            listOf("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", file.toString(), "-f", "s16le", raw.toString()),
+            listOf("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", file.toString(), "-f", "f32le", raw.toString()),
         )
     check(result.exitCode == 0) { "ffmpeg decode failed: ${result.stderr}" }
-    return Files.size(raw) / 2
+    return Files.size(raw) / 4
 }

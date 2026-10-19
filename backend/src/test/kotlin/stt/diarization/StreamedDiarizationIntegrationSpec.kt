@@ -9,11 +9,10 @@ import io.kotest.matchers.shouldBe
 import stt.Integration
 import stt.audio.AudioChunker
 import stt.audio.AudioDecoder
-import stt.audio.FFMPEG
 import stt.audio.SAMPLES_PER_MS
-import stt.audio.expectSuccess
 import stt.audio.toCanonicalRows
 import stt.audio.toS16
+import stt.audio.writeWav
 import stt.config.realSpeakerModelPath
 import stt.db.CanonicalClipRepository
 import stt.db.ChunkRepository
@@ -157,22 +156,18 @@ private suspend fun storedRecording(
     val boundariesMs = clipBytes.runningFold(0L) { offset, bytes -> offset + bytes.size / 2 }.map { it / SAMPLES_PER_MS }
 
     val recording = work.resolve("recording.wav")
-    val concat =
-        FFMPEG + listOf("-y", "-loglevel", "error") +
-            RECORDING_IDS.flatMap { listOf("-i", clips.resolve("$it.flac").toString()) } +
-            listOf(
-                "-filter_complex",
-                "concat=n=${RECORDING_IDS.size}:v=0:a=1",
-                "-ar",
-                "16000",
-                "-ac",
-                "1",
-                "-c:a",
-                "pcm_s16le",
-                recording.toString(),
-            )
-    runner.run(concat).expectSuccess("concat the LibriSpeech clips")
-    // The concat is lossless and holds exactly the three clips: the fixture is what it claims.
+    val all = ByteArray(totalSamples * 2)
+    var offset = 0
+    clipBytes.forEach { bytes ->
+        bytes.copyInto(all, offset)
+        offset += bytes.size
+    }
+    val samples =
+        ShortArray(totalSamples) { index ->
+            ((all[index * 2].toInt() and 0xFF) or (all[index * 2 + 1].toInt() shl 8)).toShort()
+        }
+    writeWav(recording, 16_000, 1, samples)
+    // The concatenation is lossless and holds exactly the three clips: the fixture is what it claims.
     (toS16(recording, work).size / 2) shouldBe totalSamples
 
     val chunking = work.resolve("chunking")

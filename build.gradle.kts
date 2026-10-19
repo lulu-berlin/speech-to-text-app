@@ -268,13 +268,11 @@ tasks.register("prepareRuntime") {
                 throw GradleException("versions.json has no $label download for $platform (supported: linux-x64, darwin-x64, darwin-arm64)")
             }
             val exe = prepareTool(label, entry, label)
-            // An archive can ship more than one executable: the bytedeco ffmpeg jar carries ffmpeg and
-            // ffprobe — checked for all three pinned jars (linux-x64, darwin-arm64, darwin-x64) — and
-            // the integration tests run ffprobe. Gradle's zip copy drops the executable bit, so resolve
-            // every one of them through findExecutable, which restores it.
-            val executables =
-                (if (label == "ffmpeg") listOf("ffmpeg", "ffprobe") else listOf(exe.name))
-                    .map { findExecutable(exe.parentFile, it) }
+            // An archive can ship more than one executable: the bytedeco ffmpeg jar carries ffmpeg
+            // and ffprobe. Nothing runs ffprobe (the shipped ffmpeg does not have it), so only
+            // ffmpeg is resolved. Gradle's zip copy drops the executable bit, so findExecutable
+            // restores it.
+            val executables = listOf(findExecutable(exe.parentFile, exe.name))
             val binDir =
                 if (label == "ffmpeg" && requirePlatform().startsWith("linux")) {
                     linuxLibraryPathWrapper(executables)
