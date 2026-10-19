@@ -5,7 +5,7 @@ import { IconButton } from '../../shared/ui/IconButton';
 import { Row, Stack } from '../../shared/ui/layout';
 import { Slider } from '../../shared/ui/Slider';
 import { Surface } from '../../shared/ui/Surface';
-import { formatDuration } from './formatTask';
+import { formatDuration } from '../../shared/formatDuration';
 
 const ControlsRow = styled(Row)`
   justify-content: space-between;

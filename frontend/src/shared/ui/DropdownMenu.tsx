@@ -1,8 +1,10 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
 import { floatingPanel } from './floatingPanel';
 import { focusRing } from './focusRing';
+import { TooltipContent } from './Tooltip';
 
 export interface DropdownMenuItem {
   label: string;
@@ -15,6 +17,9 @@ export interface DropdownMenuProps {
   trigger: ReactNode;
   items: DropdownMenuItem[];
   align?: 'start' | 'end';
+  // A hint on hover and keyboard focus; the menu and tooltip triggers sit on the same
+  // element (item 59).
+  triggerTooltip?: string;
 }
 
 const Content = styled(Menu.Content)`
@@ -45,10 +50,27 @@ const Item = styled(Menu.Item)<{ $danger: boolean }>`
 
 // The per-task actions menu (queue rows): a floating panel of items on Radix's menu, so the
 // arrow keys, type-ahead and Enter selection come with the correct menuitem roles.
-export function DropdownMenu({ trigger, items, align = 'start' }: DropdownMenuProps) {
+export function DropdownMenu({
+  trigger,
+  items,
+  align = 'start',
+  triggerTooltip,
+}: DropdownMenuProps) {
+  const menuTrigger = <Menu.Trigger asChild>{trigger}</Menu.Trigger>;
   return (
     <Menu.Root>
-      <Menu.Trigger asChild>{trigger}</Menu.Trigger>
+      {triggerTooltip === undefined ? (
+        menuTrigger
+      ) : (
+        <TooltipPrimitive.Provider delayDuration={700}>
+          <TooltipPrimitive.Root>
+            <TooltipPrimitive.Trigger asChild>{menuTrigger}</TooltipPrimitive.Trigger>
+            <TooltipPrimitive.Portal>
+              <TooltipContent>{triggerTooltip}</TooltipContent>
+            </TooltipPrimitive.Portal>
+          </TooltipPrimitive.Root>
+        </TooltipPrimitive.Provider>
+      )}
       <Menu.Portal>
         <Content align={align}>
           {items.map((item) => (

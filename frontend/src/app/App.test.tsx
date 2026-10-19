@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -26,14 +26,10 @@ function renderAt(path: string) {
   );
 }
 
-// The header's mascot (item 31): the artwork is the header svg; it swaps between the
-// animated mascot and the small static logo depending on the shell's placeholder count.
-function headerMascot(): SVGElement {
+// The header's brand (item 59): the static corner mark, inside the home link next to the
+// product name.
+function headerBrand(): SVGElement {
   return required(required(screen.getByRole('banner')).querySelector('svg')) as SVGElement;
-}
-
-function headerMascotSize(): string {
-  return getComputedStyle(headerMascot()).width;
 }
 
 describe('the app root', () => {
@@ -63,26 +59,26 @@ describe('the app root', () => {
     expect(required(region.querySelector('svg')).getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('shows the stenographer animation next to the product name at the header size', async () => {
+  it('shows the stenographer mark next to the product name at the icon size, typing while a task runs', async () => {
     renderAt('/queue');
-    // The header shows its animated mascot (at the header size) once no placeholder is
-    // on screen; until the snapshot lands, the shell's loading region is that
-    // placeholder and the header shows the small static logo instead (item 31).
     await screen.findByText('Live');
 
     const title = screen.getByRole('heading', { name: 'Speech-to-Text' });
     const header = required(title.closest('header'));
-    const steno = required(header.querySelector('svg')) as SVGElement;
+    const brand = required(header.querySelector('svg')) as SVGElement;
 
-    // The mascot, inside its home link (item 31), sits directly before the product name.
+    // The mark and the product name sit inside the home link (item 31, item 59).
     const home = required(header.querySelector('a'));
-    expect(home).toContainElement(steno);
-    expect(home.nextElementSibling).toBe(title);
+    expect(home).toContainElement(brand);
+    expect(home).toContainElement(title);
 
-    // And it renders at the header size (the cropped artwork fills the box).
-    const style = getComputedStyle(steno);
-    expect(style.width).toBe(px(lightTheme.sizes.stenoHeader));
-    expect(style.height).toBe(px(lightTheme.sizes.stenoHeader));
+    // The mark renders at the icon size — at most 40 px (item 59).
+    const style = getComputedStyle(brand);
+    expect(style.width).toBe(px(lightTheme.sizes.stenoIcon));
+    expect(style.height).toBe(px(lightTheme.sizes.stenoIcon));
+    // The default snapshot has a running task, so the mark types (item 59, reversed on
+    // 2026-10-18 after the favicon proved too small to read).
+    expect(brand.getAttribute('class')).toContain('is-typing');
   });
 
   it('redirects / to /queue, shows the history and transcript views, and a not-found view otherwise', async () => {
@@ -306,6 +302,7 @@ describe('keyboard focus', () => {
     );
     const queue = renderAt('/queue');
     await screen.findByText('Live');
+    fireEvent.click(screen.getByRole('button', { name: 'Upload options' }));
     fireEvent.change(screen.getByRole('combobox', { name: 'Speakers' }), {
       target: { value: 'fixed' },
     });
@@ -357,7 +354,7 @@ describe('the phone layout', () => {
     const phone = `(max-width: ${lightTheme.breakpoints.sm})`;
 
     // The header: below the small breakpoint it wraps, and the navigation, connection
-    // indicator and theme control take a line of their own under the mascot and title.
+    // indicator and theme control take a line of their own under the brand and title.
     // jsdom cannot evaluate media queries, so the emitted rules are asserted.
     const queue = renderAt('/queue');
     await screen.findByText('Live');
@@ -370,8 +367,8 @@ describe('the phone layout', () => {
     expect(mediaRulesFor(controls, phone).map((rule) => rule.style.flexBasis)).toContain('100%');
 
     // A queue row: its controls line wraps, and the filename can shrink and break.
-    const badge = screen.getByText('RUNNING');
-    expect(getComputedStyle(required(badge.parentElement)).flexWrap).toBe('wrap');
+    const statusLine = screen.getByText(/Transcribing… 42%/);
+    expect(getComputedStyle(required(statusLine.parentElement)).flexWrap).toBe('wrap');
     const rowName = screen.getByText('lecture.m4a');
     expect(getComputedStyle(rowName).overflowWrap).toBe('anywhere');
     expect(getComputedStyle(rowName).minWidth).toBe('0px');
@@ -421,47 +418,26 @@ describe('the sticky header', () => {
   });
 });
 
-describe('the shrinking header', () => {
-  it('shows the full-size mascot at the top, shrinks to the compact size on scroll with a gated token transition, grows back at the top, and keeps typing while compact', async () => {
-    // The default snapshot has a running task, so the header's mascot types.
+describe('the compact header', () => {
+  it('shows the brand icon at the top and a text-only header once the page scrolls, and the icon returns at the top', async () => {
     renderAt('/queue');
     await screen.findByText('Live');
 
-    // At the top of the page the mascot is full-size and typing.
-    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoHeader));
-    expect(headerMascot().getAttribute('class')).toContain('is-typing');
+    // At the top of the page the corner mark is there.
+    expect(headerBrand()).toBeInTheDocument();
 
-    // The size change is animated: a transition on the mascot's width and height with
-    // the motion tokens, declared only inside the no-preference block (instant under
-    // reduced motion, like every animation).
-    const shrink = mediaRulesFor(headerMascot(), '(prefers-reduced-motion: no-preference)');
-    expect(shrink.flatMap((rule) => rule.style.transitionProperty.split(','))).toEqual(
-      expect.arrayContaining(['width', 'height']),
-    );
-    expect(shrink.map((rule) => rule.style.transitionDuration)).toContain(
-      lightTheme.motion.shrinkDuration,
-    );
-    expect(shrink.map((rule) => rule.style.transitionTimingFunction)).toContain(
-      lightTheme.motion.shrinkEasing,
-    );
-    const ungated = styleRules().filter(
-      (rule): rule is CSSStyleRule =>
-        rule instanceof CSSStyleRule &&
-        headerMascot().matches(rule.selectorText) &&
-        rule.style.transition !== '',
-    );
-    expect(ungated).toEqual([]);
-
-    // Once the page scrolls the mascot shrinks to the compact size, still typing.
+    // Once the page scrolls the header keeps the title and the navigation and drops the
+    // illustration entirely (item 59).
     Object.defineProperty(window, 'scrollY', { value: 200, configurable: true });
     fireEvent.scroll(window);
-    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoCompact));
-    expect(headerMascot().getAttribute('class')).toContain('is-typing');
+    await waitFor(() => expect(screen.getByRole('banner').querySelector('a svg')).toBeNull());
+    expect(screen.getByRole('heading', { name: 'Speech-to-Text' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
 
-    // Back at the top it grows to the full size again.
+    // Back at the top the mark returns.
     Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
     fireEvent.scroll(window);
-    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoHeader));
+    await waitFor(() => expect(headerBrand()).toBeInTheDocument());
 
     // jsdom's scrollY is a readonly prototype accessor; the own property shadows it and
     // is removed again, so later tests read the default.
@@ -521,15 +497,15 @@ describe('the navigation pills', () => {
   });
 });
 
-describe('the mascot home link', () => {
-  it('links the header mascot to / with an accessible name, and clicking it lands on the queue', async () => {
+describe('the brand home link', () => {
+  it('links the header mark to / with an accessible name, and clicking it lands on the queue', async () => {
     renderAt('/history');
     await screen.findByText('Live');
 
     const home = screen.getByRole('link', { name: 'Speech-to-Text home' });
     expect(home).toHaveAttribute('href', '/');
 
-    // The mascot stays decorative inside it: the link carries the name.
+    // The artwork stays decorative inside it: the link carries the name.
     const mascot = required(home.querySelector('svg')) as SVGElement;
     expect(mascot.getAttribute('aria-hidden')).toBe('true');
     expect(home).toContainElement(mascot);
@@ -540,7 +516,7 @@ describe('the mascot home link', () => {
       true,
     );
 
-    // A click on the mascot lands on the queue. Pressing Enter on the focused link is
+    // A click on the brand lands on the queue. Pressing Enter on the focused link is
     // the anchor's native activation (jsdom synthesizes no click for it, so the real
     // keyboard path is exercised in the e2e suite, item 7).
     fireEvent.click(home);
@@ -548,49 +524,10 @@ describe('the mascot home link', () => {
   });
 });
 
-describe('the one-mascot rule', () => {
-  it('shows the small static logo in the header while a placeholder shows the mascot, and the animated mascot otherwise — never two on screen', async () => {
-    // While connecting, the shell's loading region shows the placeholder mascot, so the
-    // header shows the small static logo: compact, resting, still the home link.
-    const queue = renderAt('/queue');
-    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoCompact));
-    expect(headerMascot().getAttribute('class')).not.toContain('is-typing');
-    expect(headerMascot().closest('a')).toHaveAttribute('aria-label', 'Speech-to-Text home');
-
-    // Once live with tasks there is no placeholder: the animated mascot returns at the
-    // full size, typing while the running task runs.
-    await screen.findByText('Live');
-    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoHeader));
-    expect(headerMascot().getAttribute('class')).toContain('is-typing');
-    queue.unmount();
-
-    // History with nothing finished while a task runs: the empty state shows the
-    // placeholder mascot, so the header's static logo returns even though a task runs —
-    // the rule follows the placeholder, not the running task.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          ['snapshot', { tasks: [taskRunning], queue: { paused: false, taskIds: [5] } }],
-        ]),
-      ),
-    );
-    const history = renderAt('/history');
-    await screen.findByText('No transcripts yet');
-    expect(headerMascotSize()).toBe(px(lightTheme.sizes.stenoCompact));
-    expect(headerMascot().getAttribute('class')).not.toContain('is-typing');
-    // The placeholder itself shows the mascot at the empty-state size.
-    const placeholder = required(
-      required(screen.getByText('No transcripts yet').parentElement).querySelector('svg'),
-    );
-    expect(getComputedStyle(placeholder).width).toBe(px(lightTheme.sizes.stenoEmpty));
-    history.unmount();
-  });
-});
-
 describe('reduced motion', () => {
   it('runs no animation or transition outside a prefers-reduced-motion gate', async () => {
-    // A running task makes the header's mascot type, so its animation rules land in the
-    // sheet; the loading primitives' pulses are rendered alongside.
+    // The loading primitives' pulses carry the sheet's gated motion rules; the header's
+    // brand is static (item 59), so no animation rule comes from it.
     renderAt('/queue');
     await screen.findByText('Live');
     renderThemed(

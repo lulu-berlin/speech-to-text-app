@@ -68,6 +68,19 @@ export const FIXTURE_CLIPS = [
   'jfk-stability.wav', // 5-11s, item 42's queue-survives-a-failure clip
   'broken-stability.wav', // item 42's undecodable fixture
   'jfk-race.wav', // 8-11s, item 41's concurrent-upload race
+  'jfk-x.wav', // 2-8s, item 59's favicon typing clip
+  'jfk-y.wav', // 3-6s, item 59's upload-options clip
+  'jfk-aa.wav', // the sample looped 16x, ~176s, item 59's running-row clip
+  'jfk-ab.wav', // 1-3s, item 59's queued-row clip
+  'jfk-ac.wav', // 9-11s, item 59's history-row clip
+  'broken-59.wav', // item 59's history-row retry fixture
+  'jfk-ad.wav', // the sample looped 4x, ~44s, item 59's row-controls clip
+  'jfk-ae.wav', // 7-9s, item 59's row-controls second clip
+  'jfk-af.wav', // the sample looped 3x, ~33s, item 59's single-bar row clip
+  'jfk-ag.wav', // the sample looped 13x, ~143s, item 59's elapsed-time row clip
+  'jfk-ah.wav', // the sample looped 5x, ~55s, item 59's phase-color row clip
+  'broken-59-status.wav', // item 59's status-page delete fixture
+  'jfk-ai.wav', // the sample looped 17x, ~187s, item 59's header-typing clip
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -129,6 +142,52 @@ export const STABILITY_BROKEN_CLIP = FIXTURE_CLIPS[30];
 // Item 41's upload-hardening race (ADR 0046): the sample's 8-11s trim, which is no other test's clip.
 // The spec uploads it twice at once and then once more through the UI, for the duplicate link.
 export const UPLOAD_RACE_CLIP = FIXTURE_CLIPS[31];
+
+// Item 59's favicon journey (ADR 0046): a short trim that starts and finishes quickly, so
+// the page's favicon can be watched switching while it runs and back when the queue is
+// idle; 2-8s is no other test's trim.
+export const FAVICON_CLIP = FIXTURE_CLIPS[32];
+
+// Item 59's upload-options journey: a short trim whose task exposes the batch options the
+// queue sent with it; 3-6s is no other test's trim.
+export const QUEUE_OPTIONS_CLIP = FIXTURE_CLIPS[33];
+
+// Item 59's task-row journey: a long clip that stays RUNNING long enough to watch its
+// phase line and percentage, and a short one queued behind it to pause.
+export const RUNNING_ROW_CLIP = FIXTURE_CLIPS[34];
+export const QUEUED_ROW_CLIP = FIXTURE_CLIPS[35];
+
+// Item 59's history-row journey: a short clip that reaches History, and an undecodable
+// file of its own to retry from there (the earlier broken fixtures are already FAILED
+// tasks by then, so a second upload would answer 409).
+export const HISTORY_ROW_CLIP = FIXTURE_CLIPS[36];
+export const HISTORY_BROKEN_CLIP = FIXTURE_CLIPS[37];
+
+// Item 59's row-controls journey: a long clip to leave RUNNING, and a short one behind it
+// whose pause/resume changes the allowed commands.
+export const ROW_CONTROLS_CLIP = FIXTURE_CLIPS[38];
+export const ROW_CONTROLS_SECOND_CLIP = FIXTURE_CLIPS[39];
+
+// Item 59's row-bars journey: a clip long enough to reach the diarizing phase while the
+// test watches the row's progress bars; 3x is no other test's loop count.
+export const BAR_ROW_CLIP = FIXTURE_CLIPS[40];
+
+// Item 59's row-elapsed journey: a long clip that stays running long enough for its
+// elapsed field to tick; 13x is no other test's loop count.
+export const ELAPSED_ROW_CLIP = FIXTURE_CLIPS[41];
+
+// Item 59's row-color journey: a clip whose chunking and transcribing phases are both
+// observable on one row; 5x is no other test's loop count.
+export const COLOR_ROW_CLIP = FIXTURE_CLIPS[42];
+
+// Item 59's status-page journey: an undecodable file of its own, so the failed status
+// page (and its Delete menu) can be exercised without colliding with the earlier
+// broken fixtures' FAILED tasks.
+export const STATUS_BROKEN_CLIP = FIXTURE_CLIPS[43];
+
+// Item 59's header-typing journey: a long clip that keeps a task RUNNING while the header
+// icon is watched, then cancelled so it does not hold up the later specs.
+export const HEADER_TYPING_CLIP = FIXTURE_CLIPS[44];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];

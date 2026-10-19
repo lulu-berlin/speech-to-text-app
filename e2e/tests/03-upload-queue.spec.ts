@@ -38,7 +38,9 @@ async function recordQueue(page: Page, names: string[]): Promise<void> {
     window.queueStates = [];
     window.transcriptionValues = new Set<string>();
     window.noticeOrder = [];
-    const pending = /QUEUED|RUNNING|PAUSED/;
+    // A pending row's marker: its badge for QUEUED/PAUSED, or the running status line
+    // (item 59 dropped the RUNNING badge in favour of "Transcribing… 42%").
+    const pending = /QUEUED|PAUSED|Chunking…|Transcribing…|Diarizing…/;
     let last = '';
     const sample = () => {
       const items = [...document.querySelectorAll('li')];
@@ -117,22 +119,23 @@ test('uploads several clips, queues them in order, and shows status, phase and b
     saw((_, order) => order.join() === '0,1,2'),
     'the three rows pending in upload order',
   ).toBe(true);
-  // While the first clip ran, the second waited: the engine walks the queue in order.
-  expect(
-    saw((rows) => shows(rows[0], 'RUNNING') && shows(rows[1], 'QUEUED')),
-    'jfk-a.wav RUNNING while jfk-b.wav was QUEUED',
-  ).toBe(true);
-  // The running row showed its status badge, one of the three phase labels, and its
-  // transcription bar with the percentage as a visible value.
+  // While the first clip ran, the second waited: the engine walks the queue in order. The
+  // running row's phase-with-percentage line is its running state (item 59: no badge).
   expect(
     saw(
-      ([a]) =>
-        shows(a, 'RUNNING') &&
-        shows(a, /Chunking|Transcribing|Diarizing/) &&
-        a?.bars.includes('Transcription') === true &&
-        shows(a, /\d+%/),
+      (rows) =>
+        shows(rows[0], /Chunking…|Transcribing… \d+%|Diarizing… \d+%/) && shows(rows[1], 'QUEUED'),
     ),
-    'jfk-a.wav RUNNING with a phase label, its transcription bar and a percentage',
+    'jfk-a.wav running while jfk-b.wav was QUEUED',
+  ).toBe(true);
+  expect(
+    saw((rows) => shows(rows[0], 'RUNNING')),
+    'no RUNNING badge on the row',
+  ).toBe(false);
+  // Its transcription bar is there, and the status line carries the percentage.
+  expect(
+    saw(([a]) => a?.bars.includes('Transcription') === true && shows(a, /\d+%/)),
+    'jfk-a.wav with its status line and its transcription bar',
   ).toBe(true);
   // The progress was live: more than one percentage for a's bar — 0 → 25 → … → 100, or 0 → 100
   // for a one-chunk clip — so a bar stuck at 0 or at 100 fails.

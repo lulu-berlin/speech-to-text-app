@@ -57,6 +57,17 @@ export default async function globalSetup() {
     { args: ['-ss', '2', '-t', '4'], file: FIXTURE_CLIPS[28] }, // 2-6s, item 40's pause-queued clip
     { args: ['-ss', '5', '-t', '6'], file: FIXTURE_CLIPS[29] }, // 5-11s, item 42's queue-survives-a-failure clip
     { args: ['-ss', '8', '-t', '3'], file: FIXTURE_CLIPS[31] }, // 8-11s, item 41's concurrent-upload race
+    { args: ['-ss', '2', '-t', '6'], file: FIXTURE_CLIPS[32] }, // 2-8s, item 59's favicon typing clip
+    { args: ['-ss', '3', '-t', '3'], file: FIXTURE_CLIPS[33] }, // 3-6s, item 59's upload-options clip
+    { args: ['-stream_loop', '15'], file: FIXTURE_CLIPS[34] }, // ~176s, item 59's running-row clip
+    { args: ['-ss', '1', '-t', '2'], file: FIXTURE_CLIPS[35] }, // 1-3s, item 59's queued-row clip
+    { args: ['-ss', '9', '-t', '2'], file: FIXTURE_CLIPS[36] }, // 9-11s, item 59's history-row clip
+    { args: ['-stream_loop', '3'], file: FIXTURE_CLIPS[38] }, // ~44s, item 59's row-controls clip
+    { args: ['-ss', '7', '-t', '2'], file: FIXTURE_CLIPS[39] }, // 7-9s, item 59's row-controls second clip
+    { args: ['-stream_loop', '2'], file: FIXTURE_CLIPS[40] }, // ~33s, item 59's single-bar row clip
+    { args: ['-stream_loop', '12'], file: FIXTURE_CLIPS[41] }, // ~143s, item 59's elapsed-time row clip
+    { args: ['-stream_loop', '4'], file: FIXTURE_CLIPS[42] }, // ~55s, item 59's phase-color row clip
+    { args: ['-stream_loop', '16'], file: FIXTURE_CLIPS[44] }, // ~187s, item 59's header-typing clip
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);
@@ -97,6 +108,14 @@ export default async function globalSetup() {
   writeFileSync(
     join(fixturesDir, FIXTURE_CLIPS[30]),
     "not audio either — item 42's queue-survives-a-failure fixture\n".repeat(256),
+  );
+  writeFileSync(
+    join(fixturesDir, FIXTURE_CLIPS[37]),
+    "still not audio — item 59's history-row retry fixture\n".repeat(256),
+  );
+  writeFileSync(
+    join(fixturesDir, FIXTURE_CLIPS[43]),
+    "still not audio — item 59's status-page delete fixture\n".repeat(256),
   );
   const port = await choosePort();
   saveState({ port, dataDir, fixturesDir });

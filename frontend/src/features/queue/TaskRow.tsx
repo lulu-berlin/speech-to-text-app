@@ -1,12 +1,14 @@
 import type { LucideIcon } from 'lucide-react';
 import { GripVertical, MoreVertical, Pause, Play, X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { HTMLAttributes, Ref } from 'react';
 import { useMachine } from '@xstate/react';
 import { css, styled } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
 import type { Task, TaskPhase } from '../../shared/api/types';
+import type { ThemeTokens } from '../../shared/theme/theme';
+import { formatDuration } from '../../shared/formatDuration';
 import { isAllowedCommand } from '../../shared/state/transitions';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { DiarizationProgressBar } from '../../shared/ui/DiarizationProgressBar';
@@ -19,6 +21,7 @@ import { StatusBadge } from '../../shared/ui/StatusBadge';
 import { Row, Stack } from '../../shared/ui/layout';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { rowActionMachine } from './rowActionMachine';
+import { Tooltip } from '../../shared/ui/Tooltip';
 import { RowContent, RowControls, RowName } from './rowParts';
 
 // The phase a task is in, as a text label next to its status (none while queued).
@@ -28,8 +31,16 @@ const PHASE_LABELS: Record<NonNullable<TaskPhase>, string> = {
   DIARIZING: 'Diarizing',
 };
 
-const RowPhase = styled.span`
-  color: ${(props) => props.theme.colors.textMuted};
+// The status line's color says which phase the task is in (item 59): preparing (chunking)
+// is muted, transcribing takes the active status color, diarizing the done one.
+const PHASE_COLORS = {
+  CHUNKING: (theme: ThemeTokens) => theme.colors.textMuted,
+  TRANSCRIBING: (theme: ThemeTokens) => theme.colors.status.active.text,
+  DIARIZING: (theme: ThemeTokens) => theme.colors.status.done.text,
+} as const;
+
+const RowPhase = styled.span<{ $phase: NonNullable<TaskPhase> }>`
+  color: ${(props) => PHASE_COLORS[props.$phase](props.theme)};
   font-size: ${(props) => props.theme.fontSizes.small};
 `;
 
@@ -57,12 +68,12 @@ const SortableRow = styled(ListRow)<{ $lifted: boolean }>`
           z-index: 1;
           transition: none;
           background: ${props.theme.colors.surfaceRaised};
-          box-shadow: ${props.theme.shadows.card};
+          box-shadow: ${props.theme.shadows.raised};
 
           &:focus-within {
             box-shadow:
               0 0 0 ${props.theme.borderWidths.ring} ${props.theme.colors.focusRing},
-              ${props.theme.shadows.card};
+              ${props.theme.shadows.raised};
           }
         `
       : ''}
@@ -126,6 +137,35 @@ export function TaskRow({
   // processed, and the task can be retried from History).
   const confirmCancel =
     task.status === 'RUNNING' || (task.status === 'PAUSED' && task.startedAt !== null);
+
+  // A running task shows one human line instead of the phase text + RUNNING badge pair
+  // (item 59): the phase with its percentage, or just the phase while chunking has none.
+  const running = task.status === 'RUNNING';
+  // The running line also carries the elapsed time (item 59): a one-second tick keeps it
+  // moving while the task runs, counted from the engine's start.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running || task.startedAt === null) {
+      return;
+    }
+    setNowMs(Date.now());
+    const tick = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(tick);
+  }, [running, task.startedAt]);
+  const transcriptionPercent = Math.round(task.transcriptionProgress * 100);
+  const diarizationPercent = Math.round((task.diarizationProgress ?? 0) * 100);
+  const phaseStatus =
+    task.phase === null
+      ? null
+      : task.phase === 'CHUNKING'
+        ? `${PHASE_LABELS[task.phase]}…`
+        : `${PHASE_LABELS[task.phase]}… ${
+            task.phase === 'DIARIZING' ? diarizationPercent : transcriptionPercent
+          }%`;
+  const elapsed =
+    task.startedAt === null ? null : formatDuration(Math.max(0, nowMs - task.startedAt));
+  const runningStatus =
+    phaseStatus === null ? null : elapsed === null ? phaseStatus : `${phaseStatus} · ${elapsed}`;
 
   // A finished command applies its returned task to the live state (idempotent with the
   // server's own events); a finished delete removes the task.
@@ -191,36 +231,44 @@ export function TaskRow({
         <RowContent>
           <RowName>{task.filename}</RowName>
           <RowControls>
-            {task.phase !== null ? <RowPhase>{PHASE_LABELS[task.phase]}</RowPhase> : null}
-            <StatusBadge status={task.status} />
+            {running && runningStatus !== null && task.phase !== null ? (
+              <RowPhase $phase={task.phase}>{runningStatus}</RowPhase>
+            ) : task.phase !== null ? (
+              <RowPhase $phase={task.phase}>{PHASE_LABELS[task.phase]}</RowPhase>
+            ) : null}
+            {running ? null : <StatusBadge status={task.status} />}
             {dragHandleProps !== undefined ? (
-              <IconButton
-                icon={GripVertical}
-                label={`Reorder ${task.filename}`}
-                {...dragHandleProps}
-              />
+              <Tooltip label={`Reorder ${task.filename}`}>
+                <IconButton
+                  icon={GripVertical}
+                  label={`Reorder ${task.filename}`}
+                  {...dragHandleProps}
+                />
+              </Tooltip>
             ) : null}
             {CONTROLS.filter(({ command }) => isAllowedCommand(command, task.status)).map(
               ({ command, icon, verb }) => (
-                <IconButton
-                  key={command}
-                  icon={icon}
-                  label={`${verb} ${task.filename}`}
-                  onClick={() =>
-                    send({
-                      type: 'ACTIVATE',
-                      action: command,
-                      status: task.status,
-                      confirm: command === 'cancel' && confirmCancel,
-                    })
-                  }
-                />
+                <Tooltip key={command} label={`${verb} ${task.filename}`}>
+                  <IconButton
+                    icon={icon}
+                    label={`${verb} ${task.filename}`}
+                    onClick={() =>
+                      send({
+                        type: 'ACTIVATE',
+                        action: command,
+                        status: task.status,
+                        confirm: command === 'cancel' && confirmCancel,
+                      })
+                    }
+                  />
+                </Tooltip>
               ),
             )}
             <DropdownMenu
               trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
               align="end"
               items={menuItems}
+              triggerTooltip={`Actions for ${task.filename}`}
             />
           </RowControls>
         </RowContent>
@@ -234,8 +282,13 @@ export function TaskRow({
               : String(deleteState.context.error)}
           </RowActionError>
         ) : null}
-        <ProgressBar value={task.transcriptionProgress} label="Transcription" />
-        {task.diarizationProgress !== null ? (
+        <ProgressBar
+          value={task.transcriptionProgress}
+          label="Transcription"
+          indeterminate={running && task.phase === 'CHUNKING'}
+          showValue={!running}
+        />
+        {task.phase === 'DIARIZING' && task.diarizationProgress !== null ? (
           <DiarizationProgressBar
             stage={task.diarizationStage}
             progress={task.diarizationProgress}

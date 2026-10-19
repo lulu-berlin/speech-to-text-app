@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
+import { MoreVertical } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
@@ -10,6 +11,9 @@ import { MetaText, PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { focusRing } from '../../shared/ui/focusRing';
+import { DropdownMenu } from '../../shared/ui/DropdownMenu';
+import type { DropdownMenuItem } from '../../shared/ui/DropdownMenu';
+import { IconButton } from '../../shared/ui/IconButton';
 import { LoadingState } from '../../shared/ui/LoadingState';
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
 import { TextLink } from '../../shared/ui/TextLink';
@@ -17,7 +21,8 @@ import { turnsMachine } from './turnsMachine';
 import { segmentAtTime } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
-import { formatDuration, formatTaskMeta } from './formatTask';
+import { formatDuration } from '../../shared/formatDuration';
+import { formatTaskMeta } from './formatTask';
 import { TranscriptTurns } from './TranscriptTurns';
 import { AudioPlayer } from './AudioPlayer';
 import { playbackMachine } from './playbackMachine';
@@ -135,6 +140,20 @@ export function TaskTranscriptView() {
       navigate('/history');
     }
   }, [deleteState, navigate]);
+
+  // Delete leaves the reading row (item 59): it lives behind the transcript's actions menu
+  // and still runs through the shared confirmation. A finished or failed dialog machine is
+  // restarted first, as the row and history flows do.
+  const requestDelete = () => {
+    if (deleteState.matches('failed') || deleteState.matches('done')) {
+      deleteActor.stop();
+      deleteActor.start();
+    }
+    deleteSend({ type: 'REQUEST' });
+  };
+  const transcriptMenuItems: DropdownMenuItem[] = [
+    { label: 'Delete', danger: true, onSelect: requestDelete },
+  ];
 
   // The turns of a completed task load through turnsMachine (only a completed task has
   // turns; the backend answers 409 not-completed otherwise): once per task, again when the
@@ -365,19 +384,11 @@ export function TaskTranscriptView() {
           {audioBlock}
           <Row gap="sm">
             <RetryButton task={task} />
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => {
-                if (deleteState.matches('failed') || deleteState.matches('done')) {
-                  deleteActor.stop();
-                  deleteActor.start();
-                }
-                deleteSend({ type: 'REQUEST' });
-              }}
-            >
-              Delete
-            </Button>
+            <DropdownMenu
+              trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
+              align="end"
+              items={transcriptMenuItems}
+            />
           </Row>
           {deleteState.matches('failed') ? (
             <Text>Delete failed: {errorMessage(deleteState.context.error)}</Text>
@@ -406,19 +417,11 @@ export function TaskTranscriptView() {
               {format.toUpperCase()}
             </DownloadLink>
           ))}
-          <Button
-            type="button"
-            variant="danger"
-            onClick={() => {
-              if (deleteState.matches('failed') || deleteState.matches('done')) {
-                deleteActor.stop();
-                deleteActor.start();
-              }
-              deleteSend({ type: 'REQUEST' });
-            }}
-          >
-            Delete
-          </Button>
+          <DropdownMenu
+            trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
+            align="end"
+            items={transcriptMenuItems}
+          />
         </Row>
         {turns !== null && turns.speakers.length > 0 ? (
           // Item 22: the panel edits the effective speakers; a stored change replaces the

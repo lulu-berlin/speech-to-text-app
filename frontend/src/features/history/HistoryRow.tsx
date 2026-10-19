@@ -20,16 +20,18 @@ import { isAllowedCommand } from '../../shared/state/transitions';
 import { formatTaskMeta } from './formatTask';
 
 const Filename = styled.span`
-  color: ${(props) => props.theme.colors.text};
+  color: inherit;
   font-weight: ${(props) => props.theme.fontWeights.medium};
 `;
 
-// The card's title link: it can shrink beside the badge and breaks anywhere (item 25).
+// The card's title link (item 59): visibly a link — accent text, underlined — so the way
+// into the transcript reads as one; it can shrink beside the badge and breaks anywhere
+// (item 25).
 const TaskLink = styled(Link)`
   min-width: 0;
   overflow-wrap: anywhere;
-  color: inherit;
-  text-decoration: none;
+  color: ${(props) => props.theme.colors.accent};
+  text-decoration-line: underline;
 
   ${focusRing}
 `;
@@ -126,7 +128,7 @@ export function HistoryRow({ task }: { task: Task }) {
             </TextButton>
           ) : null}
           <TextButton
-            $tone="danger"
+            $tone="quiet"
             onClick={() => {
               if (deleteState.matches('failed') || deleteState.matches('done')) {
                 deleteActor.stop();

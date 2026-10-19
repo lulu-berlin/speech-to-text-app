@@ -387,14 +387,14 @@ describe('the transcript view', () => {
 
     // While playing, follow mode scrolls the active segment; the browser honors the
     // target's scroll margin for every scrolled ancestor, so the segment's top margin
-    // reserves the compact header's height (the compact mascot plus the border, all
-    // tokens) and keeps it clear of the sticky header (item 31).
+    // reserves the compact header's height (the text-only header plus its border, all
+    // tokens) and keeps it clear of the sticky header (item 31, item 59).
     audio.currentTime = 1.0;
     fireEvent(audio, new Event('timeupdate'));
     const active = required(document.querySelector('[data-active]'));
     expect(getComputedStyle(active).scrollMarginTop).toBe(
       `${
-        Number.parseFloat(lightTheme.sizes.stenoCompact) * 16 +
+        Number.parseFloat(lightTheme.sizes.compactHeader) * 16 +
         Number.parseFloat(lightTheme.borderWidths.thin) * 16
       }px`,
     );
@@ -413,10 +413,11 @@ describe('the transcript view', () => {
     // transcribedUntilMs 298650 -> 04:58
     expect(screen.getByText(/04:58/)).toBeInTheDocument();
 
-    // The error message, Retry and Delete controls, and (hasAudio) the player.
+    // The error message, Retry and the actions menu (Delete sits there in item 59), and
+    // (hasAudio) the player.
     expect(screen.getByText(/failed to allocate memory/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions for call.ogg' })).toBeInTheDocument();
     expect(screen.getByLabelText('Audio for call.ogg')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
   });
@@ -441,7 +442,7 @@ describe('the transcript view', () => {
     // CANCELED carries error: null, so no error message.
     expect(screen.queryByText(/failed to allocate/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Actions for / })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: /transcript/i })).not.toBeInTheDocument();
   });
 
@@ -512,7 +513,10 @@ describe('the transcript view', () => {
     );
     await renderTranscript('4'); // task 4 is FAILED.
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    fireEvent.pointerDown(await screen.findByRole('button', { name: 'Actions for call.ogg' }), {
+      button: 0,
+    });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     let dialog = screen.getByRole('dialog');
     expect(dialog).toHaveTextContent('call.ogg');
 
@@ -522,7 +526,10 @@ describe('the transcript view', () => {
     expect(deleted).toEqual([]);
 
     // Confirming sends DELETE /api/tasks/4 and lands back on the history list.
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Actions for call.ogg' }), {
+      button: 0,
+    });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     dialog = screen.getByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(
@@ -542,7 +549,11 @@ describe('the transcript view', () => {
     );
     await renderTranscript('3'); // task 3 is COMPLETED.
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    fireEvent.pointerDown(
+      await screen.findByRole('button', { name: 'Actions for interview.mp3' }),
+      { button: 0 },
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveTextContent('interview.mp3');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
@@ -800,7 +811,7 @@ describe('the transcript loading states', () => {
     expect(getComputedStyle(mascot).width).toBe(px(lightTheme.sizes.stenoEmpty));
     expect(getComputedStyle(label).color).toBe(asRgb(lightTheme.colors.textMuted));
     expect(screen.getByRole('link', { name: 'Download transcript (txt)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions for interview.mp3' })).toBeInTheDocument();
     expect(screen.queryByText('Good morning.')).not.toBeInTheDocument();
 
     // The turns arrive and take its place.

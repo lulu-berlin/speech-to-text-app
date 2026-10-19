@@ -11,16 +11,17 @@ import {
   uploadClips,
 } from './helpers/ui';
 
-// The acceptance of the finished shell (roadmap item 31, ADR 0046): the sticky header
-// that stays in view and shrinks on scroll, the background-pill navigation, the mascot's
-// home link, and the one-mascot rule — with the new shell's screenshots (light/dark,
-// phone/desktop), saved under e2e/screenshots/ for the user's visual approval. The suite
-// runs this file last in its one-worker journey: item 15 cancelled its seed and its mate
-// finished, so the queue starts empty — this spec asserts exactly that as its
-// precondition — and this spec's own long clip owns the rest of the state.
+// The acceptance of the finished shell (roadmap item 31, ADR 0046; item 59 for the brand
+// and the compact header): the sticky header that stays in view and turns text-only on
+// scroll, its static 40 px brand mark, the background-pill navigation and the brand's home
+// link — with the new shell's screenshots (light/dark, phone/desktop), saved under
+// e2e/screenshots/ for the user's visual approval. The suite runs this file after the
+// queue journey: item 15 cancelled its seed and its mate finished, so the queue starts
+// empty — this spec asserts exactly that as its precondition — and this spec's own long
+// clip owns the rest of the state.
 const THEME_STEP = 4;
 
-test('the finished shell: sticky shrinking header, nav pills, mascot home link, one mascot', async ({
+test('the finished shell: sticky header, nav pills, brand home link, text-only compact header', async ({
   page,
 }) => {
   test.setTimeout(420_000);
@@ -46,11 +47,12 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
     await page.screenshot({ path: `screenshots/${name}-${theme}-${width}.png` });
   };
 
+  // The brand mark (item 59): the artwork's viewBox, whatever its size. Lucide icons in
+  // the controls carry their own viewBox, so only the brand matches.
   const headerMascot = page.locator(`header ${MASCOT}`);
-  const headerMascotWidth = async () => (await headerMascot.boundingBox())?.width;
 
-  // The empty queue: the placeholder shows the mascot at the empty size and the header
-  // the small static logo at the compact size — the animated mascot appears only once.
+  // The empty queue: the placeholder shows the full illustration at the empty size, and
+  // the header its static 40 px brand mark (item 59).
   await appLive(page);
   await expect(
     page.getByText('No tasks yet — drop audio files here, or click to choose them'),
@@ -61,10 +63,9 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   await expect(dropZoneMascot).toBeVisible();
   expect((await dropZoneMascot.boundingBox())?.width).toBe(px(8.75));
   await expect(headerMascot).toBeVisible();
-  // The compact size is reached through an entrance animation, so poll until it settles
-  // (the same idiom the transcript-scrolled check below uses).
-  await expect.poll(headerMascotWidth).toBe(px(4));
-  await expect(page.locator('.is-typing')).toHaveCount(0);
+  // Item 59: a 40 px icon; it types only while a task runs (none here).
+  expect((await headerMascot.boundingBox())?.height).toBe(px(2.5));
+  await expect(page.locator('header .is-typing')).toHaveCount(0);
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
       await shot(
@@ -110,13 +111,15 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   await expect(page.getByRole('heading', { name: 'Queue' })).toBeVisible();
 
   // This spec's own long clip: while it transcribes, the queue is not empty, so the
-  // header shows the full-size animated mascot again (it types, too — a task runs).
+  // header shows its brand mark again — typing, while the task runs (item 59, reversed
+  // 2026-10-18: the 40 px mark carries the animation).
   await uploadClips(page, [HEADER_CLIP]);
   const running = rowOf(page, HEADER_CLIP);
   await expect(running.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(headerMascot).toBeVisible();
-  expect(await headerMascotWidth()).toBe(px(7.5));
+  expect((await headerMascot.boundingBox())?.height).toBe(px(2.5));
+  await expect(page.locator('header .is-typing')).toHaveCount(1);
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
       await shot(
@@ -130,10 +133,10 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
   await expect(page.getByText(`${HEADER_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
 
   // The transcript: short viewports so the page itself scrolls (the window scroll
-  // drives the header's shrink; the transcript region scrolls internally otherwise).
-  // Scrolling down keeps the sticky header in view and shrinks its mascot to the
-  // compact size; it grows back at the top. The compact mascot keeps rest (nothing is
-  // running here), and the shrink transition is settled by the poll.
+  // drives the header's compact form; the transcript region scrolls internally
+  // otherwise). Scrolling down keeps the sticky header in view and drops its
+  // illustration — the compact header is text-only (item 59) — and the mark returns at
+  // the top.
   await openTranscript(page, HEADER_CLIP);
   // The heading renders before the turns load; only the region makes the page tall
   // enough to scroll, so wait for it.
@@ -146,19 +149,18 @@ test('the finished shell: sticky shrinking header, nav pills, mascot home link, 
       .poll(() => page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight))
       .toBe(true);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await expect.poll(headerMascotWidth).toBe(px(4));
-    await expect(headerMascot).toBeInViewport();
+    await expect(headerMascot).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Speech-to-Text' })).toBeInViewport();
     for (const theme of ['light', 'dark'] as const) {
       await shot('shell-transcript-scrolled', width, theme, viewport);
     }
   }
   await page.setViewportSize(DESKTOP_VIEWPORT);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expect.poll(headerMascotWidth).toBe(px(7.5));
+  await expect(headerMascot).toBeVisible();
 });
 
-// The compact (4rem) and full (7.5rem) header mascot sizes, as the browser reports
-// bounding boxes in CSS pixels at the default 16 px root font size.
+// The shell's icon size (item 59) and the empty drop zone's illustration, as the browser
+// reports bounding boxes in CSS pixels at the default 16 px root font size.
 function px(rem: number): number {
   return rem * 16;
 }
