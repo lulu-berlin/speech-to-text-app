@@ -27,7 +27,7 @@ internal class CanonicalClip(
  * chunk FLACs into the same form.
  */
 internal val CANONICAL_FLAC_ARGS =
-    listOf("-ar", SAMPLE_RATE.toString(), "-ac", "1", "-sample_fmt", "s16", "-c:a", "flac", "-frame_size", "4000")
+    listOf("-vn", "-ar", SAMPLE_RATE.toString(), "-ac", "1", "-sample_fmt", "s16", "-c:a", "flac", "-frame_size", "4000")
 
 /** Encodes [source] to the canonical 16 kHz mono FLAC (item 44): every frame exactly 4000 samples (250 ms). */
 internal suspend fun encodeCanonical(
@@ -84,6 +84,7 @@ class AudioChunker(
                     listOf(
                         "-i",
                         source.toString(),
+                        "-vn",
                         "-af",
                         "silencedetect=noise=$SILENCE_NOISE:d=$SILENCE_MIN_SECONDS",
                         "-f",

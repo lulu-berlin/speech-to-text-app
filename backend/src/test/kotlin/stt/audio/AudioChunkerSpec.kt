@@ -23,8 +23,12 @@ class AudioChunkerSpec :
                 ) {
                     val workDir = tempdir("stt-audio").toPath()
                     val source = workDir.resolve("source.wav")
-                    val silent = "between(t,200,202)+between(t,289,291)+between(t,599,601)"
-                    generate(source, "aevalsrc='if($silent,0,0.5*sin(2*PI*440*t))':s=44100:d=660")
+                    toneWav(
+                        source,
+                        seconds = 660.0,
+                        sampleRate = 44_100,
+                        silences = listOf(200.0 to 202.0, 289.0 to 291.0, 599.0 to 601.0),
+                    )
 
                     val chunked = withTimeout(120.seconds) { AudioChunker(ProcessRunner()).chunk(source, workDir) }
 
@@ -48,7 +52,7 @@ class AudioChunkerSpec :
                 then("the old canonical FLAC is overwritten with the 16 kHz mono clip, stored row by row") {
                     val workDir = tempdir("stt-audio").toPath()
                     val source = workDir.resolve("source.wav")
-                    generate(source, "sine=frequency=440:sample_rate=44100:duration=3")
+                    sineWav(source, seconds = 3.0, sampleRate = 44_100)
                     Files.writeString(workDir.resolve("canonical.flac"), "stale")
 
                     val chunked = withTimeout(60.seconds) { AudioChunker(ProcessRunner()).chunk(source, workDir) }

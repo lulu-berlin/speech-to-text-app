@@ -16,7 +16,7 @@ import stt.Integration
 import stt.audio.FlacRows
 import stt.audio.FlacSplitter
 import stt.audio.encodeCanonical
-import stt.audio.generate
+import stt.audio.sineWav
 import stt.audio.toCanonicalRows
 import stt.db.Database
 import stt.db.QueueStateRepository
@@ -46,7 +46,7 @@ class AudioLongPlaybackSpec :
                     // 100 s of 440 Hz at 16 kHz mono: past item 38's ~90 s stall point, and 100 000 ms is
                     // 400 whole 250 ms frames, so the canonical split has no partial frame (by hand).
                     val source = fixtures.resolve("source.wav")
-                    generate(source, "sine=frequency=440:duration=100", "-ar", "16000", "-ac", "1")
+                    sineWav(source, seconds = 100.0, sampleRate = 16_000, channels = 1)
                     val canonical = fixtures.resolve("canonical.flac")
                     encodeCanonical(runner, source, canonical)
                     val clipBytes = Files.readAllBytes(canonical)
@@ -83,7 +83,7 @@ class AudioLongPlaybackSpec :
 
                         // The player's timeline (the task's durationMs, 100 s) is what the file declares and
                         // what it really decodes to: 100 s × 16 000 samples/s, by hand.
-                        ffprobe(runner, served, "stream=duration_ts").single().toLong() shouldBe 1_600_000L
+                        flacSamples(served) shouldBe 1_600_000L
                         decodeSamples(runner, fixtures.resolve("served.raw"), served) shouldBe 1_600_000L
 
                         // A browser's end-seek: the last 8 KiB. The served file's own header plus those bytes
@@ -95,7 +95,7 @@ class AudioLongPlaybackSpec :
                         tail.headers[HttpHeaders.ContentRange] shouldBe "bytes $tailStart-${size - 1}/$size"
                         tail.bodyAsBytes() shouldBe clipBytes.copyOfRange(tailStart.toInt(), size.toInt())
 
-                        val headerSize = ffprobe(runner, served, "packet=pos").first().toLong()
+                        val headerSize = flacAudioStart(served)
                         val probe = fixtures.resolve("tail-probe.flac")
                         Files.write(probe, clipBytes.copyOf(headerSize.toInt()).plus(tail.bodyAsBytes()))
                         decodeSamples(runner, fixtures.resolve("tail.raw"), probe) shouldBeGreaterThan 0L

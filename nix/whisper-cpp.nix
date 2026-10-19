@@ -12,6 +12,11 @@
 # built without ffmpeg libs (it reads the backend's FLAC chunks through its bundled
 # miniaudio). The source hash is the NAR hash of the v1.8.4 tarball.
 #
+# `withFFmpegSupport = false` (roadmap item 62): nixpkgs' recipe otherwise wraps the unused
+# `bin/whisper-server` with nixpkgs' ffmpeg and adds it as a build input; whisper-cli needs
+# neither. With it off, the only ffmpeg in every shipped closure is the app's pinned
+# audio-only artifact.
+#
 # `withSDL = false` (found 2026-10-15 by `nix why-depends` on the desktop closure): the
 # default builds whisper.cpp's SDL example too, which alone dragged SDL2 -> sdl2-compat ->
 # sdl3 -> zenity -> libadwaita -> gtk4 -> gstreamer -> gst-plugins-bad -> flite, freepats,
@@ -24,6 +29,7 @@ in
 (pkgs.whisper-cpp.override {
   vulkanSupport = true;
   withSDL = false;
+  withFFmpegSupport = false;
 }).overrideAttrs {
   version = tag;
   src = pkgs.fetchFromGitHub {

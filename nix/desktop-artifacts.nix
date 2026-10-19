@@ -1,7 +1,7 @@
-# Prebuilt artifacts of the desktop bundle (roadmap item 56): GitHub Release assets of this
-# repository, uploaded by the user, each pinned by url and sha256. Keyed by artifact, then by Nix
-# system (`pkgs.stdenv.hostPlatform.system`); a system without an entry builds the artifact from
-# source. Pure data, read by nix/desktop-mesa.nix.
+# Prebuilt artifacts of the desktop bundle and the app (roadmap items 56 and 62): GitHub Release
+# assets of this repository, uploaded by the user, each pinned by url and sha256. Keyed by artifact,
+# then by Nix system (`pkgs.stdenv.hostPlatform.system`); a system without an entry builds the
+# artifact from source. Pure data, read by nix/desktop-mesa.nix and nix/ffmpeg.nix.
 {
   # The bundle's Vulkan-only Mesa, per system: { url; sha256; storePath; references; } — storePath
   # is the out path of the source build the asset was made from, references that output's direct
@@ -25,5 +25,15 @@
       "/nix/store/znrm90algr0fvnnnp130am1qfg59nl1f-libx11-1.8.13"
       "/nix/store/zrkqwk0989k5wa1gn3cjb76jfga3d8i3-expat-2.8.5"
     ];
+  };
+
+  # The audio-only static ffmpeg (roadmap item 62): one binary, no ffprobe. Its only store-path
+  # reference is its own build path (the `configuration:` line), which the re-link rewrites, so the
+  # references list is empty.
+  ffmpeg.x86_64-linux = {
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2-x86_64-linux.tar.zst";
+    sha256 = "945db2902395cfc3a5c002de35fbddc4b3ea14de76ee50d5b3bbfbce98fc184c";
+    storePath = "/nix/store/2pqr6g1ll2dzj7p87cz5a6w8amv2pp22-ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2";
+    references = [];
   };
 }

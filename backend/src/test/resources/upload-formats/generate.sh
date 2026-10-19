@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# The upload-format fixtures (roadmap item 61): one 0.5 s file per extension the app accepts
-# (backend/src/main/resources/allowed-extensions.json). UploadFormatsSpec decodes each through the
-# real chunker; the canonical FLAC's duration varies a little with lossy codecs' priming (0.46-0.54 s).
+# The upload-format fixtures (roadmap items 61 and 62): one 0.5 s file per extension the app accepts
+# (backend/src/main/resources/allowed-extensions.json), plus the accepted-upload variants the 19
+# fixtures do not cover (24-bit PCM, big-endian 32-bit PCM, big-endian float, LATM AAC). The format
+# checks decode each through the real chunker or the shipped ffmpeg; the canonical FLAC's duration
+# varies a little with lossy codecs' priming (0.46-0.54 s).
 #
 # Generated 2026-10-18 with ffmpeg 8.1.2 from the flake's nixpkgs pin (494ce7fd), run from this
 # directory. sample.amr needs an AMR-NB encoder, which the small and headless variants do not
@@ -37,3 +39,9 @@ ffmpeg -y -loglevel error "${video[@]}" -c:v libx264 -preset ultrafast -crf 30 -
 ffmpeg -y -loglevel error "${video[@]}" -c:v libx264 -preset ultrafast -crf 30 -pix_fmt yuv420p -c:a aac -b:a 32k -shortest sample.3gp
 ffmpeg -y -loglevel error "${video[@]}" -c:v libvpx-vp9 -b:v 50k -c:a libopus -b:a 32k -shortest sample.webm
 ffmpeg -y -loglevel error "${video[@]}" -c:v libx264 -preset ultrafast -crf 30 -pix_fmt yuv420p -c:a aac -b:a 32k -shortest sample.mkv
+
+# Roadmap item 62's rework: accepted uploads beyond the 19 extension fixtures.
+ffmpeg -y -loglevel error "${tone[@]}" -c:a pcm_s24le variant-24bit.wav
+ffmpeg -y -loglevel error "${tone[@]}" -c:a pcm_s32be -f matroska variant-pcm32be.mka
+ffmpeg -y -loglevel error "${tone[@]}" -c:a pcm_f32be variant-f32be.aiff
+ffmpeg -y -loglevel error "${tone[@]}" -c:a aac -b:a 64k -f latm variant-latm.aac

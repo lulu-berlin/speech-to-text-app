@@ -2,7 +2,7 @@
 
 Status: done (roadmap item 61, approved 2026-10-18)
 Depends on: —
-Blocks: [62](../../roadmap/62-audio-only-ffmpeg-artifact.md)
+Blocks: [62](audio-only-ffmpeg.md)
 
 ## Goal
 

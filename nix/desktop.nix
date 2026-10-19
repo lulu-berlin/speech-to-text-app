@@ -14,6 +14,7 @@
   backend,
   frontend,
   whisperCpp,
+  ffmpeg,
 }: let
   electronPin = import ./electron.nix;
   packageJson = builtins.fromJSON (builtins.readFile ../desktop/package.json);
@@ -112,17 +113,9 @@
   });
 
   # The tools the backend runs by name (ADR 0047), where backend.ts puts them first on PATH.
-  #
-  # nixpkgs' ffmpeg_8-headless (roadmap item 61): the cached variant of the same 8.1.2 build,
-  # without Pulse input, SDL2 and ffplay. The GStreamer/GTK-4 cluster had exactly two entry
-  # points — whisper-cpp's SDL example (`withSDL = false`, nix/whisper-cpp.nix) and ffmpeg's
-  # `ffplay`/SDL2 (the former override cut them; "small" builds both). Measured 2026-10-15 with
-  # `nix why-depends --all`: cutting either one alone left the other feeding `sdl2-compat`, and
-  # with both cut the cluster (sdl2-compat → sdl3 → zenity → libadwaita → gtk4 → gstreamer →
-  # gst-plugins-bad → flite, freepats, chromaprint, python3, openal-soft → pipewire) lost its last
-  # referrer. The backend runs the ffmpeg CLI only: decode to mono f32 PCM, `silencedetect`/`atrim`,
-  # FLAC out.
-  ffmpeg = pkgs.ffmpeg_8-headless;
+  # `ffmpeg` is the flake's audio-only prebuilt artifact (roadmap item 62), the same binary the
+  # server package and the devenv shell ship; the backend runs its CLI only: decode to mono f32
+  # PCM, `silencedetect`/`atrim`, FLAC out, and the V10 concat backfill.
   tools = pkgs.runCommand "stt-desktop-tools" {} ''
     mkdir -p $out/bin
     ln -s ${whisperCpp}/bin/whisper-cli $out/bin/whisper-cli
@@ -158,7 +151,8 @@ in
       description = "Speech-to-Text desktop app (Electron)";
       mainProgram = "stt-app";
     };
-    # Roadmap item 61: the ffmpeg this app's tools carry, so the flake's `ffmpeg-headless` check
-    # can assert the choice at evaluation, without building the app.
+    # Roadmap item 62: the audio-only ffmpeg this app's tools carry, so the flake's
+    # `ffmpeg-audio-only-everywhere` check can assert the choice at evaluation, without building the
+    # app.
     passthru.ffmpeg = ffmpeg;
   }

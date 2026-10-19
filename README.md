@@ -123,7 +123,9 @@ Each form has its packaged end-to-end suite, run in a clean container from the d
 
 Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell). The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
 
-The shell's `ffmpeg` is nixpkgs' headless variant, the same package the app ships (roadmap item 61), so it has no `ffplay`; use another player to listen to a file.
+The shell's `ffmpeg` is the app's audio-only static build from the pinned `desktop-ffmpeg-v2` asset (roadmap item 62), so it has neither `ffplay` nor `ffprobe`; use another player to listen to a file and another tool to probe media.
+
+The end-to-end fixture generator (`e2e/global-setup.mjs`) needs a full `ffmpeg` on `PATH` — the `wav` muxer, the `pcm_s16le` encoder and the `concat` filter; the shell's ffmpeg is the app's slim build, not a general-purpose one. Use `./gradlew e2e` (its managed tools) or prepend a Nix `ffmpeg_8-full` from the flake's pin when running `pnpm --dir e2e test` directly.
 
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git

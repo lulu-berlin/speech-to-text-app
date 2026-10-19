@@ -9,6 +9,7 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.delay
 import stt.Integration
+import stt.audio.toS16
 import stt.config.Config
 import stt.config.realSpeakerModelPath
 import stt.config.storeCpuDevice
@@ -56,7 +57,7 @@ class ProcessingEngineCanonicalStorageSpec :
                     // (the fixture's tested length, item 07), so 11 s × 16 000 samples/s = 176 000 samples; the
                     // canonical clip was decoded from the same original with the same ffmpeg, so the stored rows
                     // must reproduce that stream sample for sample.
-                    val expectedPcm = decodeS16(jfk, tempdir("stt-oracle").toPath())
+                    val expectedPcm = toS16(jfk, tempdir("stt-oracle").toPath())
 
                     testApplication {
                         application { sttApp(config) }
@@ -92,7 +93,7 @@ class ProcessingEngineCanonicalStorageSpec :
                         // Reassembled and decoded, the rows reproduce the oracle PCM, second by second.
                         val scratch = tempdir("stt-scratch").toPath()
                         val joined = joinRows(stored, rows, scratch.resolve("joined.flac"))
-                        decodeS16(joined, scratch).shouldBe(expectedPcm)
+                        toS16(joined, scratch).shouldBe(expectedPcm)
 
                         // After completion no audio file survives on disk: every regular file under the data
                         // directory is one of the database's own.
@@ -120,20 +121,4 @@ private fun joinRows(
     Files.write(target, header)
     rows.forEach { row -> Files.write(target, row.bytes, java.nio.file.StandardOpenOption.APPEND) }
     return target
-}
-
-/** ffmpeg's decode of [file] to raw s16le bytes, written into the writable [scratch] (the fixture lives in /nix/store). */
-private fun decodeS16(
-    file: Path,
-    scratch: Path,
-): ByteArray {
-    val raw = scratch.resolve(file.name + ".raw")
-    ffmpeg("-y", "-i", file.toString(), "-f", "s16le", raw.toString())
-    return Files.readAllBytes(raw)
-}
-
-private fun ffmpeg(vararg args: String) {
-    val process = ProcessBuilder(listOf("ffmpeg", "-hide_banner", "-loglevel", "error") + args).start()
-    process.waitFor()
-    check(process.exitValue() == 0) { "ffmpeg ${args.joinToString(" ")} failed" }
 }

@@ -3,7 +3,7 @@
 # bin/stt-app (bin/speech-to-text-app before item 16): a java wrapper that defaults
 # STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended), defaults
 # both models from nix/models.nix (a user-set value wins), and puts the pinned
-# whisper-cli 1.8.4 (Vulkan), ffmpeg 8.1 headless, setsid and coreutils first on PATH (ADR 0047).
+# whisper-cli 1.8.4 (Vulkan), the audio-only ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
 # `docker-root` is the Docker image's root filesystem (roadmap item 19, see Dockerfile).
 # Nix evaluation happens on the user's machine - this file is unverified here.
 #
@@ -28,9 +28,16 @@
     models = import ./nix/models.nix {inherit pkgs;};
     whisperCpp = import ./nix/whisper-cpp.nix {inherit pkgs;};
 
-    # The app's ffmpeg (roadmap item 61): nixpkgs' cached headless variant of 8.1.2, the one the
-    # desktop, the server package and the devenv ship; the version manifest reads it too.
-    ffmpeg = pkgs.ffmpeg_8-headless;
+    # The app's ffmpeg (roadmap item 62): the audio-only static build, shipped as the pinned
+    # prebuilt artifact on x86_64-linux (nix/ffmpeg.nix); the version manifest reads the source
+    # build's version (8.1.2, rendered as 8.1).
+    ffmpegArtifact = import ./nix/ffmpeg.nix {inherit pkgs;};
+    ffmpeg = ffmpegArtifact.ffmpeg;
+
+    # The release tag of the audio-only ffmpeg asset. The enable list changes the source build's out
+    # path, which invalidates the pinned asset, so a changed build gets a new tag (v2 after the
+    # audio-decoder rework; v1 is the first build).
+    ffmpegAssetTag = "desktop-ffmpeg-v2";
 
     # Gradle 9.8 (nixpkgs' gradle_9) on the runtime JDK 21 (pkgs.jdk = pkgs.jre's JDK):
     # the same Gradle as the devenv and the committed wrapper (item 33, ADR 0049). 9.x
@@ -54,7 +61,7 @@
       pnpm = pkgs.pnpm_11.version;
       gradle = gradle.version;
       jdk = pkgs.jre.version;
-      ffmpeg = pkgs.lib.versions.majorMinor ffmpeg.version;
+      ffmpeg = pkgs.lib.versions.majorMinor ffmpegArtifact.source.version;
       whisperCpp = data.whisperCppTag;
       models = models.meta;
       downloads = data.downloads;
@@ -183,7 +190,7 @@
 
     # The desktop app (roadmap item 50, ADR 0053): Electron on the same backend, UI and tools.
     desktop = import ./nix/desktop.nix {
-      inherit pkgs nixpkgs sourceOf backend frontend whisperCpp;
+      inherit pkgs nixpkgs sourceOf backend frontend whisperCpp ffmpeg;
     };
   in {
     packages.x86_64-linux = {
@@ -227,6 +234,38 @@
           cat $out/pin.nix
         '';
 
+      # Roadmap item 62: the release asset for the audio-only ffmpeg on this system, with the pin to
+      # paste into nix/desktop-artifacts.nix. The user builds it and uploads the tar to a
+      # `ffmpegAssetTag` release of this repository; agents never publish. `pin.nix` carries the
+      # sha256, the source's out path and its direct references, printed with `cat result/pin.nix`.
+      desktop-ffmpeg-asset = let
+        source = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
+        name = "${source.name}-${system}.tar.zst";
+      in
+        pkgs.runCommand "stt-ffmpeg-asset" {
+          __structuredAttrs = true;
+          nativeBuildInputs = [pkgs.zstd pkgs.coreutils pkgs.gnused pkgs.jq];
+          exportReferencesGraph.graph = [source];
+        } ''
+          mkdir $out
+          tar -cf - --hard-dereference --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --mode=u+rw,uga+r -C ${source} . | zstd -19 -T0 -o $out/${name}
+          references=$(
+            jq -r --arg self ${source} '.graph[] | select(.path == $self) | .references[] | select(. != $self)' $NIX_ATTRS_JSON_FILE
+          )
+          {
+            echo "  ffmpeg.${system} = {"
+            echo "    url = \"https://github.com/lulu-berlin/speech-to-text-app/releases/download/${ffmpegAssetTag}/${name}\";"
+            echo "    sha256 = \"$(sha256sum $out/${name} | cut -d' ' -f1)\";"
+            echo "    storePath = \"${source}\";"
+            echo "    references = ["
+            if [ -n "$references" ]; then echo "$references" | sed 's/^/      "/; s/$/"/'; fi
+            echo "    ];"
+            echo "  };"
+          } > $out/pin.nix
+          echo "asset: $out/${name}"
+          cat $out/pin.nix
+        '';
+
       # `nix build .` builds both parts and provides bin/stt-app, which
       # starts the backend serving the bundled frontend. A real derivation (not
       # symlinkJoin) so the wrapper can hard-code the store paths via makeWrapper.
@@ -258,9 +297,9 @@
           # suite swaps in the tiny whisper model).
           # --prefix PATH: the backend runs whisper-cli, ffmpeg and setsid by name (ADR 0047);
           # the package's own tools come first, so a caller's PATH (e.g. the devenv's
-          # whisper-cli) cannot replace them. nixpkgs' ffmpeg_8-headless: the cached variant of
-          # 8.1, the branch item 33's Gradle bootstrap syncs to, not nixpkgs' default ffmpeg
-          # (9.0 at the locked rev) and not the "small" variant (roadmap item 61).
+          # whisper-cli) cannot replace them. The audio-only ffmpeg from the pinned
+          # desktop-ffmpeg-v2 asset (roadmap item 62), the branch item 33's Gradle bootstrap
+          # syncs to (8.1), not nixpkgs' default ffmpeg (9.0 at the locked rev).
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
             --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
@@ -411,41 +450,20 @@
                  END { printf "%9.1f MiB  total (%d store paths)\n", total / 1048576, NR }' > $out
       '';
 
-    # Roadmap item 61: one ffmpeg everywhere, and it is nixpkgs' cached `ffmpeg_8-headless` —
-    # the desktop's tools (and so the bundle's), the server package's PATH (and so docker-root's
-    # closure) and the devenv's `ffmpeg` (user-run: devenv.nix is outside this flake). The desktop's
-    # choice is asserted at evaluation (passthru), so that regression fails `nix flake check`
-    # without building the app; built, the check proves the desktop's tools symlink, the server
-    # package's wrapper PATH and docker-root's closure all name it.
-    checks.x86_64-linux.ffmpeg-headless = let
-      lib = pkgs.lib;
-      headless = ffmpeg.bin;
-      server = self.packages.${system}.default;
-    in
-      assert lib.assertMsg (desktop.ffmpeg.outPath == headless.outPath)
-      "ffmpeg-headless: the desktop ships ${desktop.ffmpeg.outPath}, not nixpkgs' ${headless.outPath}";
-      pkgs.runCommand "ffmpeg-headless" {} ''
-        fail() { echo "ffmpeg-headless: $1" >&2; exit 1; }
-        desktop=$(readlink -f ${desktop}/share/stt-app/resources/tools/bin/ffmpeg)
-        [ "$desktop" = ${headless}/bin/ffmpeg ] || fail "the desktop's tools ffmpeg is $desktop, not ${headless}/bin/ffmpeg"
-        grep -qF ${headless}/bin ${server}/bin/stt-app || fail "the server package's wrapper does not name ${headless}/bin"
-        grep -qxF ${headless} ${pkgs.closureInfo {rootPaths = [self.packages.${system}.docker-root];}}/store-paths \
-          || fail "docker-root's closure does not hold ${headless}"
-        echo ok > $out
-      '';
-
-    # Roadmap item 61: the shipped ffmpeg's closure holds none of the GStreamer/GTK-4 cluster —
-    # headless reaches no sdl2-compat → sdl3 → pipewire → gstreamer → python3 chain (measured
-    # 2026-10-18 on the pre-switch stock ffmpeg_8: `nix why-depends /nix/store/ss9dmg3n…-ffmpeg-8.1.2-bin
-    # …/python3-3.14.7`; that closure also held flite, gst-plugins-bad and gtk4). ffmpeg-headless
-    # above pins this package as the one the desktop, the server package and docker-root ship, so
-    # the group is unreachable from ffmpeg in all three. A package's own closure may still hold a
-    # member through an unrelated referrer (docker-root → nixpkgs Mesa → python3), which is not the
-    # behavior this item removes. Names are matched by prefix: flite is "flite-2.2-lib" and gtk4
-    # "gtk4-4.22.4", which a version-anchored pattern misses (the item-50 lesson).
+    # Roadmap item 62: the shipped audio-only ffmpeg's closure holds none of the GStreamer/GTK-4
+    # cluster. The artifact is one static binary with no external libraries (item 61's headless
+    # variant reached no sdl2-compat → sdl3 → pipewire → gstreamer → python3 chain either; measured
+    # 2026-10-18 on the pre-switch stock ffmpeg_8: `nix why-depends
+    # /nix/store/ss9dmg3n…-ffmpeg-8.1.2-bin …/python3-3.14.7`; that closure also held flite,
+    # gst-plugins-bad and gtk4). The new check above pins this package as the one the desktop, the
+    # server package and docker-root ship, so the group is unreachable from it in all three. A
+    # package's own closure may still hold a member through an unrelated referrer (docker-root →
+    # nixpkgs Mesa → python3), which is not the behavior this removes. Names are matched by prefix:
+    # flite is "flite-2.2-lib" and gtk4 "gtk4-4.22.4", which a version-anchored pattern misses (the
+    # item-50 lesson).
     checks.x86_64-linux.ffmpeg-no-gstreamer-gtk = let
       lib = pkgs.lib;
-      closure = pkgs.closureInfo {rootPaths = [ffmpeg.bin];};
+      closure = pkgs.closureInfo {rootPaths = [ffmpeg];};
       group = ["python3" "gtk4" "gst-plugins-bad" "flite" "pipewire"];
       pattern = "-(${lib.concatStringsSep "|" group})-";
     in
@@ -457,6 +475,301 @@
           exit 1
         fi
         echo ok > $out
+      '';
+
+    # Roadmap item 62 (test-list item 2): the audio-only build the pinned artifact is made from — one
+    # static binary, no ffprobe or ffplay, and a configure line that names exactly the app's ffmpeg
+    # surface: the demuxers of the accepted extensions' containers plus `concat`, the audio decoders
+    # the app accepts, the `flac` encoder, the `flac`/`f32le`/`null` muxers, the
+    # `silencedetect`/`atrim`/`aresample` filters (with the buffer filters every graph needs) and the
+    # `file` protocol — and no video codecs, hwaccels, capture devices or network protocols. Unlike
+    # containment alone, the check parses every `--enable-<kind>=` value and compares the exact set
+    # (from nix/ffmpeg.nix), so an extra video decoder cannot pass and every added or missing
+    # component is named. The format check (item 3) proves the formats; this proves the build.
+    checks.x86_64-linux.ffmpeg-audio-only = let
+      lib = pkgs.lib;
+      config = import ./nix/ffmpeg.nix {inherit pkgs;};
+      audioOnly = config.source;
+      ffmpeg = "${audioOnly}/bin/ffmpeg";
+      # The same lists the build derives its `--enable-<kind>=` flags from, plus the plain flags and
+      # the tokens it must not carry; nix/ffmpeg-audio-only.sh compares the built configuration to
+      # them exactly.
+      expected = pkgs.writeText "ffmpeg-audio-only-expected" ''
+        flag --disable-everything
+        flag --disable-autodetect
+        flag --enable-static
+        flag --disable-shared
+        flag --enable-ffmpeg
+        flag --disable-ffprobe
+        flag --disable-ffplay
+        forbid --enable-lib
+        forbid --enable-network
+        forbid --enable-avdevice
+        ${lib.concatStrings (map ({kind, components}: "${kind} ${lib.concatStringsSep "," components}\n") config.enable)}
+      '';
+    in
+      pkgs.runCommand "ffmpeg-audio-only" {
+        nativeBuildInputs = [pkgs.binutils pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.gnused];
+      } ''
+        fail() {
+          echo "ffmpeg-audio-only: $1" >&2
+          exit 1
+        }
+        [ -x ${ffmpeg} ] || fail "${ffmpeg} is missing"
+        [ "$(ls ${audioOnly}/bin)" = ffmpeg ] || fail "bin/ holds more than ffmpeg: $(ls ${audioOnly}/bin)"
+        [ ! -e ${audioOnly}/bin/ffprobe ] || fail "the build ships bin/ffprobe"
+        [ ! -e ${audioOnly}/bin/ffplay ] || fail "the build ships bin/ffplay"
+        # Static: no library dependency and no program interpreter.
+        if ${pkgs.binutils}/bin/readelf -d ${ffmpeg} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q NEEDED; then
+          fail "the binary has dynamic library dependencies"
+        fi
+        if ${pkgs.binutils}/bin/readelf -l ${ffmpeg} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q INTERP; then
+          fail "the binary has a program interpreter"
+        fi
+        bash ${./nix/ffmpeg-audio-only.sh} ${ffmpeg} ${expected}
+        echo ok > $out
+      '';
+
+    # Roadmap item 62 (test-list item 7): the release-asset builder for the audio-only ffmpeg. The
+    # user builds `.#desktop-ffmpeg-asset` and uploads the tar to `desktop-ffmpeg-v2`; the pin it
+    # prints is what nix/desktop-artifacts.nix records. This check asserts the pin names this build
+    # (its store path and every direct reference) and the asset (its sha256 and release URL), so a
+    # wrong or stale pin cannot be uploaded unnoticed.
+    checks.x86_64-linux.ffmpeg-asset-pin = let
+      source = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
+      asset = self.packages.${system}.desktop-ffmpeg-asset;
+      name = "${source.name}-${system}.tar.zst";
+    in
+      pkgs.runCommand "ffmpeg-asset-pin" {
+        __structuredAttrs = true;
+        nativeBuildInputs = [pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.jq];
+        exportReferencesGraph.graph = [source];
+      } ''
+        fail() {
+          echo "ffmpeg-asset-pin: $1" >&2
+          exit 1
+        }
+        [ -s ${asset}/${name} ] || fail "the asset ${name} is missing"
+        [ -f ${asset}/pin.nix ] || fail "pin.nix is missing"
+        ${pkgs.gnugrep}/bin/grep -qF 'ffmpeg.${system} = {' ${asset}/pin.nix ||
+          fail "the pin has no ffmpeg.${system} entry"
+        ${pkgs.gnugrep}/bin/grep -qF 'releases/download/${ffmpegAssetTag}/${name}' ${asset}/pin.nix ||
+          fail "the pin's url does not name ${name} on ${ffmpegAssetTag}"
+        ${pkgs.gnugrep}/bin/grep -qF 'storePath = "${source}"' ${asset}/pin.nix ||
+          fail "the pin's storePath is not this build's ${source}"
+        got=$(sha256sum ${asset}/${name} | cut -d' ' -f1)
+        ${pkgs.gnugrep}/bin/grep -qF "sha256 = \"$got\"" ${asset}/pin.nix ||
+          fail "the pin's sha256 is not the asset's $got"
+        references=$(${pkgs.jq}/bin/jq -r --arg self ${source} \
+          '.graph[] | select(.path == $self) | .references[] | select(. != $self)' $NIX_ATTRS_JSON_FILE)
+        for reference in $references; do
+          ${pkgs.gnugrep}/bin/grep -qF "\"$reference\"" ${asset}/pin.nix ||
+            fail "the pin does not list the source's reference $reference"
+        done
+        listed=$(${pkgs.gnused}/bin/sed -n '/references = \[/,/\]/p' ${asset}/pin.nix | ${pkgs.gnugrep}/bin/grep -c '"/nix/store/' || true)
+        expected=$(printf '%s\n' "$references" | ${pkgs.gnugrep}/bin/grep -c '/nix/store/' || true)
+        [ "$listed" = "$expected" ] ||
+          fail "the pin lists $listed references, but the source has $expected"
+        echo ok > $out
+      '';
+
+    # Roadmap item 62 (test-list item 1): every x86_64-linux build ships the same audio-only ffmpeg —
+    # the desktop's tools (and so the bundle's), the server package's wrapper PATH (and so
+    # docker-root's closure) — as the pinned release asset, not a source build. The pin must be
+    # registered, the shipped derivation must not be the source build, and the consumers must
+    # resolve to the same binary. The devenv shell uses the same import; the empty-store dry-run
+    # proves no source ffmpeg is in the shipped graph.
+    checks.x86_64-linux.ffmpeg-audio-only-everywhere = let
+      lib = pkgs.lib;
+      artifacts = import ./nix/desktop-artifacts.nix;
+      ffmpegArtifact = import ./nix/ffmpeg.nix {inherit pkgs;};
+      ffmpeg = ffmpegArtifact.ffmpeg;
+      source = ffmpegArtifact.source;
+      server = self.packages.${system}.default;
+      dockerRoot = self.packages.${system}.docker-root;
+      pinned = artifacts.ffmpeg.${system} or null;
+    in
+      assert lib.assertMsg (pinned != null)
+      "ffmpeg-audio-only-everywhere: nix/desktop-artifacts.nix has no ffmpeg.${system} entry, so the ffmpeg is a source build";
+      assert lib.assertMsg (ffmpeg.outPath != source.outPath)
+      "ffmpeg-audio-only-everywhere: the shipped ffmpeg is the source build ${source.outPath}, not the prebuilt asset";
+      assert lib.assertMsg (desktop.ffmpeg.outPath == ffmpeg.outPath)
+      "ffmpeg-audio-only-everywhere: the desktop ships ${desktop.ffmpeg.outPath}, not the prebuilt ${ffmpeg.outPath}";
+        pkgs.runCommand "ffmpeg-audio-only-everywhere" {
+          nativeBuildInputs = [pkgs.coreutils pkgs.gnugrep];
+        } ''
+          fail() {
+            echo "ffmpeg-audio-only-everywhere: $1" >&2
+            exit 1
+          }
+          desktop=$(readlink -f ${desktop}/share/stt-app/resources/tools/bin/ffmpeg)
+          [ "$desktop" = ${ffmpeg}/bin/ffmpeg ] ||
+            fail "the desktop's tools ffmpeg is $desktop, not ${ffmpeg}/bin/ffmpeg"
+          grep -qF ${ffmpeg}/bin ${server}/bin/stt-app ||
+            fail "the server package's wrapper does not name ${ffmpeg}/bin"
+          grep -qxF ${ffmpeg} ${pkgs.closureInfo {rootPaths = [dockerRoot];}}/store-paths ||
+            fail "docker-root's closure does not hold ${ffmpeg}"
+          echo ok > $out
+        '';
+
+    # Roadmap item 62 (test-list item 3; the review's two additions): every extension the app accepts
+    # decodes to the canonical FLAC through the shipped artifact, and the proof cannot drift from
+    # `allowed-extensions.json`. nix/ffmpeg-upload-formats.sh validates each result from its own
+    # STREAMINFO — no ffprobe, which the artifact does not ship.
+    checks.x86_64-linux.ffmpeg-upload-formats = let
+      lib = pkgs.lib;
+      ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
+      extensions = builtins.fromJSON (builtins.readFile ./backend/src/main/resources/allowed-extensions.json);
+      fixtures = ./backend/src/test/resources/upload-formats;
+    in
+      pkgs.runCommand "ffmpeg-upload-formats" {
+        nativeBuildInputs = [pkgs.bash pkgs.coreutils];
+      } ''
+        bash ${./nix/ffmpeg-upload-formats.sh} ${ffmpeg}/bin/ffmpeg ${fixtures} ${lib.escapeShellArgs extensions}
+        echo ok > $out
+      '';
+
+    # Roadmap item 62 (test-list item 4): the app's other ffmpeg commands still work with the shipped
+    # artifact — f32le PCM decode, silencedetect to the null muxer, the atrim window cut and the V10
+    # concat backfill. nix/ffmpeg-app-uses.sh mirrors the app's argument lists; the atrim and concat
+    # results are checked from their FLAC STREAMINFO, without ffprobe.
+    checks.x86_64-linux.ffmpeg-app-uses = let
+      ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
+      fixtures = ./backend/src/test/resources/upload-formats;
+    in
+      pkgs.runCommand "ffmpeg-app-uses" {
+        nativeBuildInputs = [pkgs.bash pkgs.coreutils];
+      } ''
+        bash ${./nix/ffmpeg-app-uses.sh} ${ffmpeg}/bin/ffmpeg ${fixtures}
+        echo ok > $out
+      '';
+
+    # Roadmap item 62 (test-list item 5): the ffmpeg artifact's integrity gates, like the Mesa ones —
+    # a registered asset that is missing or does not match its sha256 fails naming the asset, url and
+    # sha256; an asset pinned to another source build fails at evaluation naming both paths; the
+    # stray-path scan fails on an unregistered path; the real prebuilt names no old build path, no
+    # stray path, and sits in its own runtime closure (its pinned references are empty).
+    checks.x86_64-linux.ffmpeg-artifact-integrity = let
+      lib = pkgs.lib;
+      zeros = "0000000000000000000000000000000000000000000000000000000000000000";
+      source = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
+      real = import ./nix/ffmpeg.nix {inherit pkgs;};
+      pin = (import ./nix/desktop-artifacts.nix).ffmpeg.${system};
+      fixture = pkgs.writeText "ffmpeg-asset-fixture.tar.zst" "not the release asset";
+      registered = url: (import ./nix/ffmpeg.nix {
+        inherit pkgs;
+        artifacts.ffmpeg.${system} = {
+          inherit url;
+          sha256 = zeros;
+          storePath = builtins.unsafeDiscardStringContext source.outPath;
+          references = [];
+        };
+      });
+      cases = {
+        mismatched = registered "file://${fixture}";
+        missing = registered "file://${fixture}.missing";
+      };
+      expectFailure = label: artifact: let
+        asset = artifact.ffmpeg.asset;
+      in ''
+        if out=$TMPDIR/${label} ${asset.fetch} 2> ${label}.err; then
+          fail "the ${label} artifact was accepted"
+        fi
+        for expected in ${lib.escapeShellArgs [asset.name asset.url asset.sha256]}; do
+          grep -qF -- "$expected" ${label}.err || fail "the ${label} artifact's error does not name $expected"
+        done
+      '';
+      stalePin = {
+        url = "file://${fixture}";
+        sha256 = zeros;
+        storePath = "/nix/store/00000000000000000000000000000000-ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2";
+        references = [];
+      };
+      stale = import ./nix/ffmpeg.nix {
+        inherit pkgs;
+        artifacts.ffmpeg.${system} = stalePin;
+      };
+      evaluated = builtins.tryEval stale.ffmpeg.outPath;
+      message = stale.pinError or "";
+      named = map builtins.unsafeDiscardStringContext [
+        (baseNameOf "file://${fixture}")
+        "file://${fixture}"
+        zeros
+        stalePin.storePath
+        source.outPath
+      ];
+      unnamed = lib.filter (expected: !lib.hasInfix expected message) named;
+    in
+      assert lib.assertMsg (!evaluated.success)
+      "ffmpeg-artifact-integrity: a pin made from ${stalePin.storePath} evaluated to ${toString evaluated.value}";
+      assert lib.assertMsg (unnamed == [])
+      "ffmpeg-artifact-integrity: the stale pin's error does not name ${lib.concatStringsSep ", " unnamed}; it reads: ${message}";
+        pkgs.runCommand "ffmpeg-artifact-integrity" {
+          nativeBuildInputs = [pkgs.coreutils pkgs.gnugrep];
+        } ''
+          fail() {
+            echo "ffmpeg-artifact-integrity: $1" >&2
+            exit 1
+          }
+          ${lib.concatStrings (lib.mapAttrsToList expectFailure cases)}
+          mkdir -p rogue allowed
+          printf '/nix/store/00000000000000000000000000000000-rogue\n' > rogue/x
+          if stray=$(bash ${./nix/store-path-scan.sh} rogue); then
+            fail "the scan accepted the unregistered path"
+          fi
+          echo "$stray" | grep -qF '00000000000000000000000000000000-rogue' ||
+            fail "the scan did not name the unregistered path: $stray"
+          ref=/nix/store/11111111111111111111111111111111-reference
+          printf '%s\n' "$ref" > allowed/x
+          bash ${./nix/store-path-scan.sh} allowed "$ref" || fail "the scan rejected a declared reference"
+          if grep -rlaF ${lib.escapeShellArg pin.storePath} ${real.ffmpeg}; then
+            fail "the prebuilt still names ${pin.storePath}, the build it was made from"
+          fi
+          bash ${./nix/store-path-scan.sh} ${real.ffmpeg} || fail "the prebuilt names a stray store path"
+          grep -qxF ${real.ffmpeg} ${pkgs.closureInfo {rootPaths = [real.ffmpeg];}}/store-paths ||
+            fail "the prebuilt is not in its own runtime closure"
+          echo ok > $out
+        '';
+
+    # Roadmap item 62 (test-list item 6): the artifact's runtime closure is the static binary alone,
+    # holds none of the video libraries the slim build drops, and it is the only ffmpeg in the
+    # server package's, docker-root's and the bundle's closures (the whisper-cpp fix). $out is the
+    # size report; the official item-61 comparison is `nix path-info -S` run by the user.
+    checks.x86_64-linux.ffmpeg-closure-slim = let
+      lib = pkgs.lib;
+      ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
+      roots = {
+        default = self.packages.${system}.default;
+        docker-root = self.packages.${system}.docker-root;
+        desktop-bundle = self.packages.${system}.desktop-bundle;
+      };
+      closures = lib.mapAttrs (_: root: pkgs.closureInfo {rootPaths = [root];}) roots;
+      artifactClosure = pkgs.closureInfo {rootPaths = [ffmpeg];};
+      dropped = ["x265" "libvpx" "libaom" "svt-av1" "dav1d" "x264"];
+      pattern = "-(${lib.concatStringsSep "|" (map lib.escapeRegex dropped)})-";
+    in
+      pkgs.runCommand "ffmpeg-closure-slim" {
+        nativeBuildInputs = [pkgs.coreutils pkgs.gnugrep pkgs.gawk];
+      } ''
+        fail() {
+          echo "ffmpeg-closure-slim: $1" >&2
+          exit 1
+        }
+        [ "$(wc -l < ${artifactClosure}/store-paths)" = 1 ] ||
+          fail "the artifact's runtime closure is not one path: $(cat ${artifactClosure}/store-paths)"
+        found=$(grep -E -- '${pattern}' ${artifactClosure}/store-paths || true)
+        [ -z "$found" ] || fail "the artifact's closure holds a dropped video library: $found"
+        ${lib.concatStrings (lib.mapAttrsToList (name: closure: ''
+          others=$(grep -E -- '-ffmpeg-' ${closure}/store-paths | grep -vxF ${ffmpeg} || true)
+          [ -z "$others" ] || fail "the ${name} closure holds another ffmpeg: $others"
+        '') closures)}
+        {
+          echo "ffmpeg artifact: $(du -sb ${ffmpeg} | cut -f1) bytes"
+          ${lib.concatStrings (lib.mapAttrsToList (name: closure: ''
+            echo "${name} closure: $(xargs du -sb < ${closure}/store-paths | awk '{s += $1} END {print s + 0}') bytes"
+          '') closures)}
+        } > $out
+        cat $out
       '';
 
     # Roadmap item 56: the bundle's Vulkan-only Mesa may come from a prebuilt release asset only on

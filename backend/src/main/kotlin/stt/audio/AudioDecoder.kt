@@ -23,6 +23,7 @@ class AudioDecoder(
                         "error",
                         "-i",
                         source.toString(),
+                        "-vn",
                         "-f",
                         "f32le",
                         "-ac",
