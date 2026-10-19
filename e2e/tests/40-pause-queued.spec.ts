@@ -22,7 +22,7 @@ test('pausing a queued upload leaves the transcribing one running; the paused on
   await expect(queued.getByText('QUEUED', { exact: true })).toBeVisible();
   await queued.getByRole('button', { name: `Pause ${PAUSE_QUEUED_CLIP}` }).click();
   await expect(queued.getByText('PAUSED', { exact: true })).toBeVisible();
-  await expect(running.getByText('RUNNING', { exact: true })).toBeVisible();
+  await expect(running.getByText(/Transcribing… \d+%/)).toBeVisible();
 
   // The transcribing task was not frozen: it still completes and leaves the queue.
   await expect(page.getByText(`${PAUSE_QUEUED_RUNNING_CLIP} transcribed`)).toBeVisible({

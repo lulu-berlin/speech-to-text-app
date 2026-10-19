@@ -59,3 +59,23 @@ describe.each([
     expect(contrast(colors.textMuted, colors.accentTint)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 });
+
+// Item 59, finding 8: dark mode kept near-black surfaces, so cards and the dragged row
+// merged into the page. A card is `surfaceRaised`; it must step clearly off both the page
+// and the resting surface, and its raised shadow must be a stronger step than a card's.
+describe('the dark theme elevation', () => {
+  it('the raised surface steps clearly off the page and the resting surface', () => {
+    expect(
+      contrast(darkTheme.colors.surfaceRaised, darkTheme.colors.background),
+    ).toBeGreaterThanOrEqual(1.5);
+    expect(
+      contrast(darkTheme.colors.surfaceRaised, darkTheme.colors.surface),
+    ).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it('carries a distinct raised shadow token', () => {
+    const shadows = darkTheme.shadows as unknown as Record<string, string>;
+    expect(shadows.raised).toBeDefined();
+    expect(shadows.raised).not.toBe(shadows.card);
+  });
+});

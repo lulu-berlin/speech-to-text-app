@@ -9,8 +9,8 @@ import { useMachine } from '@xstate/react';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import { styled } from 'styled-components';
-import { controlStyle } from '../../shared/ui/controlStyle';
-import { Field } from '../../shared/ui/Field';
+import { UploadOptionsPanel } from './UploadOptionsPanel';
+import type { SpeakersChoice } from './UploadOptionsPanel';
 import { TextLink } from '../../shared/ui/TextLink';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
@@ -25,14 +25,11 @@ import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
-import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { Switch } from '../../shared/ui/Switch';
-import { TextButton } from '../../shared/ui/TextButton';
-import { PlaceholderMascot } from '../../shared/brand/PlaceholderMascot';
+import { StenographerAnimation } from '../../shared/brand/StenographerAnimation';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
 import { settingsMachine } from '../../shared/state/settingsMachine';
-import { toggleMachine } from '../../shared/state/toggleMachine';
 import { queuePauseMachine } from './queuePauseMachine';
 import { reorderMachine } from './reorderMachine';
 import { RowContent, RowName } from './rowParts';
@@ -41,18 +38,6 @@ import { uploadBatchMachine } from './uploadBatchMachine';
 import type { UploadRow } from './uploadBatchMachine';
 import { isSupportedFormat } from './uploadValidation';
 
-// The upload options, one set for the whole batch (item 14): the language codes come
-// from docs/api/languages.json (contract data, ADR 0029), speakers is auto/off/fixed with
-// a count 1–20, max speakers 1–20 behind the advanced toggle.
-const LANGUAGE_OPTIONS = languages.languages.map((language) => ({
-  value: language.code,
-  label: language.name,
-}));
-
-const SPEAKERS_CHOICES = ['auto', 'off', 'fixed'] as const;
-
-export type SpeakersChoice = (typeof SPEAKERS_CHOICES)[number];
-
 // The statuses the queue list holds (item 14): a task with any other status has left the
 // queue (finished, failed or canceled) and belongs to History.
 const PENDING_STATUSES = ['QUEUED', 'RUNNING', 'PAUSED'] as const;
@@ -60,22 +45,10 @@ const PENDING_STATUSES = ['QUEUED', 'RUNNING', 'PAUSED'] as const;
 // A task leaving the queue finished shows a short notice with a link (item 16).
 const FINISHED_STATUSES = ['COMPLETED', 'FAILED', 'CANCELED'] as const;
 
-function isSpeakersChoice(value: string): value is SpeakersChoice {
-  return (SPEAKERS_CHOICES as readonly string[]).includes(value);
-}
-
 // Whether a task has left the queue finished (item 16); also narrows the status.
 function finishedStatus(status: TaskStatus): status is 'COMPLETED' | 'FAILED' | 'CANCELED' {
   return (FINISHED_STATUSES as readonly string[]).includes(status);
 }
-
-const Select = styled.select`
-  ${controlStyle}
-`;
-
-const NumberInput = styled.input`
-  ${controlStyle}
-`;
 
 // The drop zone: dashed on the surface fill; while files are dragged over it, a solid
 // accent border on the light accent tint (item 25).
@@ -105,8 +78,9 @@ const EmptyZoneContent = styled.span`
 `;
 
 // What the drop zone says: "Release to upload" while files are over it; otherwise the
-// empty state's guidance (with the mascot above it) or the compact line. The mascot stays
-// while dragging over the empty state.
+// empty state's guidance (with the typing mascot above it — item 59: nothing runs while the
+// queue is empty, so the piece is charm, not a running signal) or the compact line. The
+// mascot stays while dragging over the empty state.
 function DropZoneContent({ empty, over }: { empty: boolean; over: boolean }) {
   const label = over
     ? 'Release to upload'
@@ -118,7 +92,7 @@ function DropZoneContent({ empty, over }: { empty: boolean; over: boolean }) {
   }
   return (
     <EmptyZoneContent>
-      <PlaceholderMascot />
+      <StenographerAnimation size="empty" typing />
       {label}
     </EmptyZoneContent>
   );
@@ -147,16 +121,6 @@ const ReorderError = styled.p`
   margin: 0;
   color: ${(props) => props.theme.colors.danger};
 `;
-
-// The count inputs accept 1–20 only (item 12 contract): anything else is clamped, and a
-// non-numeric value keeps the previous one.
-function clampCount(raw: string, fallback: number): number {
-  const parsed = Number.parseInt(raw, 10);
-  if (Number.isNaN(parsed)) {
-    return fallback;
-  }
-  return Math.min(20, Math.max(1, parsed));
-}
 
 // The link target of a duplicate upload: the existing task's queue row while it is
 // pending, its transcript once it is finished. A task the state does not hold yet is
@@ -230,7 +194,6 @@ export function QueueView() {
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
   const [speakerCount, setSpeakerCount] = useState(2);
   const [maxSpeakers, setMaxSpeakers] = useState(8);
-  const [advanced, sendAdvanced] = useMachine(toggleMachine);
   const [upload, sendToUploader] = useMachine(uploadBatchMachine);
   const [settings, sendSettings] = useMachine(settingsMachine);
   const [reorder, sendReorder] = useMachine(reorderMachine, {
@@ -392,63 +355,6 @@ export function QueueView() {
             ))}
           </Stack>
         ) : null}
-        <Stack gap="md">
-          <Field label="Language" htmlFor="language">
-            <SearchableSelect
-              id="language"
-              label="Language"
-              options={LANGUAGE_OPTIONS}
-              value={language}
-              onChange={setLanguage}
-            />
-          </Field>
-          <Field label="Speakers" htmlFor="speakers">
-            <Select
-              id="speakers"
-              value={speakers}
-              onChange={(event) => {
-                const next = event.target.value;
-                if (isSpeakersChoice(next)) {
-                  setSpeakers(next);
-                }
-              }}
-            >
-              <option value="auto">auto</option>
-              <option value="off">off</option>
-              <option value="fixed">fixed</option>
-            </Select>
-          </Field>
-          {speakers === 'fixed' ? (
-            <Field label="Speaker count" htmlFor="speaker-count">
-              <NumberInput
-                id="speaker-count"
-                type="number"
-                min={1}
-                max={20}
-                value={speakerCount}
-                onChange={(event) => setSpeakerCount(clampCount(event.target.value, speakerCount))}
-              />
-            </Field>
-          ) : null}
-          <TextButton
-            aria-expanded={advanced.matches('open')}
-            onClick={() => sendAdvanced({ type: 'TOGGLE' })}
-          >
-            Advanced
-          </TextButton>
-          {advanced.matches('open') ? (
-            <Field label="Max speakers" htmlFor="max-speakers">
-              <NumberInput
-                id="max-speakers"
-                type="number"
-                min={1}
-                max={20}
-                value={maxSpeakers}
-                onChange={(event) => setMaxSpeakers(clampCount(event.target.value, maxSpeakers))}
-              />
-            </Field>
-          ) : null}
-        </Stack>
         <DropZone
           type="button"
           $over={dragOver}
@@ -461,6 +367,16 @@ export function QueueView() {
           <DropZoneContent empty={empty} over={dragOver} />
         </DropZone>
         <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
+        <UploadOptionsPanel
+          language={language}
+          onLanguageChange={setLanguage}
+          speakers={speakers}
+          onSpeakersChange={setSpeakers}
+          speakerCount={speakerCount}
+          onSpeakerCountChange={setSpeakerCount}
+          maxSpeakers={maxSpeakers}
+          onMaxSpeakersChange={setMaxSpeakers}
+        />
         {visibleRows.length > 0 ? (
           <List label="Uploads">
             {visibleRows.map((row) => (

@@ -101,14 +101,14 @@ export interface ThemeTokens {
     switchHeight: string;
     switchThumb: string;
     sliderThumb: string;
-    // The stenographer animation's sizes (item 17): the header instance and the
-    // empty-state instance. The artwork is cropped to its drawing (no margin), so the
-    // header reads clearly at 120 px; the empty-state instance is 140 px. The compact
-    // size is the header's once the page scrolls (item 31); the small static logo in
-    // the header while a placeholder shows the mascot uses it too.
-    stenoHeader: string;
-    stenoCompact: string;
+    // The stenographer artwork's sizes (item 17): the header's brand icon — a static mark
+    // in the corner, 40 px tall (item 59) — and the empty-state illustration. The
+    // compact header (item 59) is text-only, and its height is what the transcript's
+    // scroll margin reserves; on a phone the header wraps, so its compact form is taller.
+    stenoIcon: string;
     stenoEmpty: string;
+    compactHeader: string;
+    compactHeaderPhone: string;
     // The transcript's scroll region (item 15): tall enough to read, short enough that
     // the player stays on screen while the transcript follows playback.
     transcriptMaxHeight: string;
@@ -123,6 +123,9 @@ export interface ThemeTokens {
   // Elevation, as a literal shadow value (theme.ts may hold such values).
   shadows: {
     card: string;
+    // The stronger elevation of a surface lifted above its neighbours (the dragged queue
+    // row, item 59).
+    raised: string;
   };
   // Durations and easings for the built-in animations (theme.ts may hold such keywords).
   motion: {
@@ -133,12 +136,13 @@ export interface ThemeTokens {
     // A queue row sliding aside while another is dragged past it (item 25).
     slideDuration: string;
     slideEasing: string;
-    // The header shrinking to its compact size and growing back on scroll (item 31).
-    shrinkDuration: string;
-    shrinkEasing: string;
     // The navigation pill's hover and state transitions (item 31).
     navDuration: string;
     navEasing: string;
+    // The sweep of an indeterminate progress segment while a running task has no
+    // percentage yet (item 59).
+    indeterminateDuration: string;
+    indeterminateEasing: string;
   };
   // The type scale: sizes ascend, weights are the font's 400/500/600, line heights are
   // unitless (WCAG 1.4.12 asks for at least 1.5; the transcript reads more loosely).
@@ -199,9 +203,13 @@ const baseTokens = {
     switchHeight: '1.5rem',
     switchThumb: '1.25rem',
     sliderThumb: '1.25rem',
-    stenoHeader: '7.5rem',
-    stenoCompact: '4rem',
+    // 40 px: the user's cap for the header mark (item 59).
+    stenoIcon: '2.5rem',
     stenoEmpty: '8.75rem',
+    // The text-only compact header: its content plus the smaller block padding. The
+    // phone's wrapped form stacks the controls under the title.
+    compactHeader: '3.5rem',
+    compactHeaderPhone: '6.25rem',
     transcriptMaxHeight: '60vh',
     listboxMaxHeight: '16rem',
   },
@@ -246,10 +254,10 @@ const baseTokens = {
     pulseEasing: 'ease-in-out',
     slideDuration: '0.15s',
     slideEasing: 'ease-out',
-    shrinkDuration: '0.2s',
-    shrinkEasing: 'ease-out',
     navDuration: '0.15s',
     navEasing: 'ease-out',
+    indeterminateDuration: '1.2s',
+    indeterminateEasing: 'ease-in-out',
   },
 };
 
@@ -317,6 +325,7 @@ export const lightTheme: ThemeTokens = {
   },
   shadows: {
     card: '0 0.0625rem 0.125rem rgba(16, 24, 40, 0.08)',
+    raised: '0 0.25rem 0.75rem rgba(16, 24, 40, 0.12)',
   },
 };
 
@@ -325,7 +334,9 @@ export const darkTheme: ThemeTokens = {
   colors: {
     background: '#14161a',
     surface: '#1b1e23',
-    surfaceRaised: '#23272e',
+    // A clear elevation step off the page and the resting surface (item 59): 1.51:1 and
+    // 1.40:1, where the old value was 1.21:1 and 1.12:1.
+    surfaceRaised: '#32373f',
     text: '#e8e8e8',
     textMuted: '#a4acb8',
     border: '#3a3f47',
@@ -387,6 +398,7 @@ export const darkTheme: ThemeTokens = {
   },
   shadows: {
     card: '0 0.0625rem 0.25rem rgba(0, 0, 0, 0.4)',
+    raised: '0 0.5rem 1.5rem rgba(0, 0, 0, 0.55)',
   },
 };
 

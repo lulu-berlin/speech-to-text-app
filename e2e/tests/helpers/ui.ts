@@ -76,6 +76,39 @@ export async function openTranscript(page: Page, filename: string) {
   await expect(page.getByRole('heading', { name: filename })).toBeVisible();
 }
 
+// A completed transcript to read against the shared backend: a full journey usually has
+// the clip completed already (the earlier specs uploaded it), while a run of one file
+// alone starts from the fresh backend with the fixtures — so the clip is uploaded only
+// when History does not have it yet (re-uploading the same content answers 409).
+export async function ensureTranscript(page: Page, clip: string) {
+  await appLive(page);
+  await goTo(page, 'History');
+  // The list loads after the navigation, so wait briefly before deciding the clip is absent
+  // (an immediate isVisible() check raced the load in the full journey and triggered a
+  // duplicate upload).
+  const completed = rowOf(page, clip).getByText('COMPLETED', { exact: true });
+  const known = await completed
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (known) {
+    return;
+  }
+  await goTo(page, 'Queue');
+  await uploadClips(page, [clip]);
+  const transcribed = page.getByText(`${clip} transcribed`);
+  const duplicate = page.getByText(`${clip} Already uploaded`);
+  await expect(transcribed.or(duplicate)).toBeVisible({ timeout: 300_000 });
+  // A duplicate upload proves the task exists; it must be the completed transcript the
+  // caller expects.
+  if (await duplicate.isVisible()) {
+    await goTo(page, 'History');
+    await expect(rowOf(page, clip).getByText('COMPLETED', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
+  }
+}
+
 // Uploads one clip, waits until its finish notice says it is transcribed, and opens its
 // transcript from that notice.
 export async function uploadAndOpen(page: Page, clip: string) {
@@ -152,6 +185,6 @@ export async function apiTaskIdOf(page: Page, filename: string): Promise<number>
 }
 
 // Switches view through the header navigation (finish notices carry their own links).
-export async function goTo(page: Page, view: 'Queue' | 'History') {
+export async function goTo(page: Page, view: 'Queue' | 'History' | 'Settings') {
   await page.getByRole('navigation').getByRole('link', { name: view }).click();
 }

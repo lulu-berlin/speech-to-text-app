@@ -166,8 +166,9 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await appLive(page);
       await uploadClips(page, [SHOT_CLIP]);
       const running = rowOf(page, SHOT_CLIP);
-      await expect(running.getByText('RUNNING', { exact: true })).toBeVisible({ timeout: 120_000 });
-      await expect(running.getByText(/Chunking|Transcribing|Diarizing/)).toBeVisible();
+      await expect(running.getByText(/Transcribing… \d+%|Chunking…/)).toBeVisible({
+        timeout: 120_000,
+      });
       await expect(running.getByRole('progressbar', { name: 'Transcription' })).toBeVisible();
       await expect(running.getByText(/\d+%/)).toBeVisible();
 

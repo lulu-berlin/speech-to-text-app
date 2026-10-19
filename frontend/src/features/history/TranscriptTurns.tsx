@@ -4,7 +4,7 @@ import { speakerTint } from '../../shared/theme/speakerPalette';
 import { focusRing } from '../../shared/ui/focusRing';
 import { Stack } from '../../shared/ui/layout';
 import { Text } from '../../shared/ui/typography';
-import { formatDuration } from './formatTask';
+import { formatDuration } from '../../shared/formatDuration';
 
 // One turn of the reading column: its start time in a left gutter of one shared width,
 // and the speaker's name on its own line above the turn's text. On a phone the gutter
@@ -56,13 +56,20 @@ const SegmentButton = styled.span<{ $active: boolean }>`
   background: ${(props) => (props.$active ? props.theme.colors.accent : 'transparent')};
   color: ${(props) => (props.$active ? props.theme.colors.accentText : 'inherit')};
   cursor: pointer;
-  // Follow mode (item 31): the active segment is scrolled into view while playing, and
-  // the browser honors the target's scroll margin for every scrolled ancestor, so this
-  // top margin — the compact header's height, the compact mascot plus the border —
-  // keeps the playing segment clear of the sticky header.
+  // Follow mode (item 31, item 59): the active segment is scrolled into view while
+  // playing, and the browser honors the target's scroll margin for every scrolled
+  // ancestor, so this top margin — the text-only compact header's height plus its border
+  // — keeps the playing segment clear of the sticky header. The phone's wrapped header
+  // is taller, so it reserves more there.
   scroll-margin-top: calc(
-    ${(props) => props.theme.sizes.stenoCompact} + ${(props) => props.theme.borderWidths.thin}
+    ${(props) => props.theme.sizes.compactHeader} + ${(props) => props.theme.borderWidths.thin}
   );
+  @media (max-width: ${(props) => props.theme.breakpoints.sm}) {
+    scroll-margin-top: calc(
+      ${(props) => props.theme.sizes.compactHeaderPhone} +
+        ${(props) => props.theme.borderWidths.thin}
+    );
+  }
   ${focusRing}
 `;
 

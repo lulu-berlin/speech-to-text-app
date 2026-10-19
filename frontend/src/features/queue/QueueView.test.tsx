@@ -13,6 +13,7 @@ import {
   taskCanceled,
   taskCompleted,
   taskFailed,
+  taskDiarizing,
   taskPaused,
   taskQueued,
   taskRunning,
@@ -71,9 +72,16 @@ function stubRowLayout() {
   };
 }
 
+// The upload options sit in a disclosure under the drop zone (item 59); these tests open
+// it before reaching the fields.
+function openUploadOptions() {
+  fireEvent.click(screen.getByRole('button', { name: 'Upload options' }));
+}
+
 describe('the queue view upload options', () => {
   it('offers the languages from docs/api/languages.json with auto as the default, and bounds speakers and max speakers to 1–20', () => {
     renderQueue();
+    openUploadOptions();
 
     // The language select defaults to auto (languages.json's default).
     const language = screen.getByRole('combobox', { name: 'Language' });
@@ -118,6 +126,7 @@ describe('the queue view upload defaults', () => {
     // settings.fixed.json: German, 3 fixed speakers, 12 max speakers (item 32).
     server.use(http.get('/api/settings', () => HttpResponse.json(settingsFixed)));
     renderQueue();
+    openUploadOptions();
 
     await waitFor(() =>
       expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('german'),
@@ -221,6 +230,7 @@ describe('the queue view upload flow', () => {
     );
 
     renderQueue();
+    openUploadOptions();
 
     // The batch options: language de, speakers fixed 3, max speakers 10.
     fireEvent.click(screen.getByRole('combobox', { name: 'Language' }));
@@ -511,22 +521,24 @@ describe('the queue list', () => {
     expect(within(rows[2] as HTMLElement).getByText('QUEUED')).toBeInTheDocument();
   });
 
-  it('shows the status badge, the phase label and both progress bars on a row, and stacks the row on a narrow screen', async () => {
+  it('shows one status line with the phase and percentage, no RUNNING badge, one bar while transcribing, and stacks the row on a narrow screen', async () => {
     controllableEventStream();
 
     renderQueue();
 
     // The running task's row (docs/api/snapshot.json: RUNNING, TRANSCRIBING, 42%,
-    // diarization not started) carries the exact status, the phase label and both bars.
+    // diarization not started) carries one line instead of a badge: the phase and the
+    // percentage (item 59).
     await screen.findByText('lecture.m4a');
     const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
-    expect(within(lecture).getByText('RUNNING')).toBeInTheDocument();
-    expect(within(lecture).getByText('Transcribing')).toBeInTheDocument();
+    expect(within(lecture).getByText(/Transcribing… 42%/)).toBeInTheDocument();
+    expect(within(lecture).queryByText('RUNNING')).not.toBeInTheDocument();
     expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toBeInTheDocument();
-    expect(within(lecture).getByText('42%')).toBeInTheDocument();
+    // Chunking and transcribing keep one bar; the diarization bar joins only while
+    // diarizing (item 59).
     expect(
-      within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
-    ).toBeInTheDocument();
+      within(lecture).queryByRole('progressbar', { name: 'Speaker diarization' }),
+    ).not.toBeInTheDocument();
 
     // Below the small breakpoint the row's top line becomes a column: the filename on its
     // own line, the phase, status and controls on the line below, left-aligned.
@@ -536,12 +548,13 @@ describe('the queue list', () => {
     expect(narrowRules.map((rule) => rule.style.alignItems)).toContain('flex-start');
   });
 
-  it("updates a task's two progress bars from task-progress events; the diarization bar shows its stage and hides when diarization does not apply", async () => {
+  it('shows the diarization bar only while diarizing: its stage and progress update, and it hides when diarization does not apply', async () => {
     const events = controllableEventStream();
 
     renderQueue();
 
-    // The running task shows both bars from the snapshot's progress (42%, diarization 0).
+    // The snapshot's task is TRANSCRIBING (diarizationProgress 0.0, stage null): only the
+    // transcription bar shows, never a second empty one (item 59).
     await screen.findByText('lecture.m4a');
     const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
     expect(within(lecture).getByRole('progressbar', { name: 'Transcription' })).toHaveAttribute(
@@ -549,8 +562,16 @@ describe('the queue list', () => {
       '42',
     );
     expect(
-      within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
-    ).toHaveAttribute('aria-valuenow', '0');
+      within(lecture).queryByRole('progressbar', { name: 'Speaker diarization' }),
+    ).not.toBeInTheDocument();
+
+    // The task reaching its diarizing phase brings the bar in, with its stage.
+    events.send('task-updated', { ...taskDiarizing, id: 5, filename: 'lecture.m4a' });
+    await waitFor(() =>
+      expect(
+        within(lecture).getByRole('progressbar', { name: 'Speaker diarization' }),
+      ).toHaveAttribute('aria-valuetext', 'Clustering 37%'),
+    );
 
     // A progress event updates both bars; the diarization bar names its stage.
     events.send('task-progress', {
@@ -597,8 +618,8 @@ describe('the queue list', () => {
     await screen.findByText('lecture.m4a');
     const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
     const memo = screen.getByText('memo.wav').closest('li') as HTMLElement;
-    expect(within(lecture).getByText('RUNNING')).toBeInTheDocument();
-    expect(within(lecture).getByText('Transcribing')).toBeInTheDocument();
+    expect(within(lecture).getByText(/Transcribing… 42%/)).toBeInTheDocument();
+    expect(within(lecture).queryByText('RUNNING')).not.toBeInTheDocument();
     expect(within(memo).getByText('QUEUED')).toBeInTheDocument();
     expect(within(memo).queryByText(/Chunking|Transcribing|Diarizing/)).not.toBeInTheDocument();
 
@@ -691,7 +712,9 @@ describe('task controls', () => {
     fireEvent.click(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' }));
 
     // The resume response puts the task back to RUNNING; pause is offered again.
-    await waitFor(() => expect(within(lecture).getByText('RUNNING')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(lecture).getByText(/Transcribing… \d+%/)).toBeInTheDocument(),
+    );
     expect(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' })).toBeInTheDocument();
     expect(calls).toEqual(['pause 5', 'resume 5']);
   });
@@ -918,7 +941,7 @@ describe('the queue reorder', () => {
       await settle();
       const lifted = getComputedStyle(lecture);
       expect(lifted.backgroundColor).toBe(asRgb(lightTheme.colors.surfaceRaised));
-      expect(lifted.boxShadow).toContain(lightTheme.shadows.card);
+      expect(lifted.boxShadow).toContain(lightTheme.shadows.raised);
       expect(lifted.position).toBe('relative');
       expect(lifted.zIndex).toBe('1');
 

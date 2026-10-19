@@ -26,27 +26,29 @@ export const lightSpeakerTints: readonly string[] = [
   '#cc3562',
 ];
 
+// Item 59 lifted the dark raised surface to #32373f; the tints below it were re-derived
+// (mixed minimally toward white) to keep every speaker name at AA text contrast there.
 export const darkSpeakerTints: readonly string[] = [
   '#79b6f4',
-  '#f25c5c',
-  '#0da60d',
-  '#d359f2',
+  '#f57d7d',
+  '#3bb73b',
+  '#db79f4',
   '#e6a613',
   '#e699cf',
-  '#0d9f9f',
-  '#8b7ff5',
-  '#f14eaf',
+  '#39b0b0',
+  '#9f95f7',
+  '#f473c0',
   '#32ca7e',
   '#cb9ff7',
-  '#9e900d',
+  '#aea234',
   '#f6998e',
-  '#1394ea',
-  '#cf793f',
+  '#40a8ee',
+  '#d79060',
   '#a3acf8',
   '#11c3d7',
   '#9bbf0f',
-  '#b374dc',
-  '#da6b8c',
+  '#c08ce2',
+  '#e186a1',
 ];
 
 // A speaker's tint: the palette entry for its 0-based speaker index (item 12's speakerId),

@@ -87,9 +87,10 @@ test('the settings the user saves survive a restart and the queue runs with them
     await expect(page.locator('#threads')).toHaveValue('2');
     await expect(page.getByRole('combobox', { name: 'Language' })).toHaveValue('german');
     await goTo(page, 'Queue');
+    // The upload options live in a disclosure below the drop zone (item 59).
+    await page.getByRole('button', { name: 'Upload options' }).click();
     await expect(page.getByRole('combobox', { name: 'Language' })).toHaveValue('german');
     await expect(page.locator('#speakers')).toHaveValue('fixed');
-    await expect(page.getByRole('button', { name: /advanced/i })).toBeVisible();
     await page.getByRole('button', { name: /advanced/i }).click();
     await expect(page.locator('#max-speakers')).toHaveValue('12');
 

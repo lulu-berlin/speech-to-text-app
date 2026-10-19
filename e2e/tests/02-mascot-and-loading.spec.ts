@@ -2,14 +2,13 @@ import { expect, test } from '@playwright/test';
 import { appUrl } from '../lib/backend.mjs';
 import { MASCOT, mascotAbove } from './helpers/ui';
 
-test('shell, loading and empty regions show the mascot, resting while nothing runs', async ({
-  page,
-}) => {
-  // The shell's mascot; with nothing queued the piece rests (no is-typing anywhere).
+test('shell, loading and empty regions show the mascot', async ({ page }) => {
+  // The shell's mark; with nothing queued the header's artwork rests (item 59) — the
+  // empty drop zone's illustration is the one that types.
   await page.goto(appUrl('/'));
   await expect(page.locator(`header ${MASCOT}`)).toBeVisible();
   await expect(page.getByText('Live', { exact: true })).toBeVisible();
-  await expect(page.locator('.is-typing')).toHaveCount(0);
+  await expect(page.locator('header .is-typing')).toHaveCount(0);
 
   // "Connecting…" then "Reconnecting…": the first stream is held unanswered, so the
   // machine stays in its initial connecting state (an aborted stream would drop it to

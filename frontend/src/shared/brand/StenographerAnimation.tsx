@@ -3,11 +3,10 @@ import { css, keyframes, styled, useTheme } from 'styled-components';
 import type { Keyframes } from 'styled-components';
 import type { ThemeTokens } from '../theme/theme';
 
-// The artwork's style rules are nested under the component's own class (`&`), so the
-// generic class names (.word, .head) cannot reach elements outside the component.
+// The two places the artwork appears (item 59): the header's static corner icon and the
+// empty states' full illustration.
 const STENO_SIZE_TOKEN = {
-  header: 'stenoHeader',
-  compact: 'stenoCompact',
+  icon: 'stenoIcon',
   empty: 'stenoEmpty',
 } as const;
 
@@ -156,15 +155,6 @@ const StyledSvg = styled.svg<{ $size: StenographerSize }>`
   width: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
   height: ${(props) => props.theme.sizes[STENO_SIZE_TOKEN[props.$size]]};
 
-  // An instance whose size changes (the header shrinking on scroll, item 31) shrinks and
-  // grows with an animated transition under no-preference; under reduced motion the size
-  // switches instantly, so no rule applies.
-  @media (prefers-reduced-motion: no-preference) {
-    transition-property: width, height;
-    transition-duration: ${(props) => props.theme.motion.shrinkDuration};
-    transition-timing-function: ${(props) => props.theme.motion.shrinkEasing};
-  }
-
   // The sound waves exist only at their hidden base; the words are visible by default
   // (no opacity rule). So the resting and reduced-motion frames are one and the same:
   // a static pose with the words and no waves.
@@ -232,8 +222,11 @@ const StyledSvg = styled.svg<{ $size: StenographerSize }>`
 export interface StenographerAnimationProps {
   size?: StenographerSize;
   // Whether a task is running: true keeps the typing animations going; false rests the
-  // piece (the header reads this from the connection machine, item 17).
+  // piece (the empty queue's drop-zone illustration types, item 17 and item 59).
   typing?: boolean;
+  // Whether the pastel backdrop field is drawn. The header's corner mark sits directly on
+  // the header's background, so the icon omits it (item 59).
+  backdrop?: boolean;
 }
 
 // The brand mascot (item 17): a seated stenographer at a steno machine on a warm backdrop.
@@ -242,8 +235,9 @@ export interface StenographerAnimationProps {
 // everywhere it appears (the product name or the empty state's text carries the meaning),
 // so it is aria-hidden and carries no role or accessible name of its own.
 export function StenographerAnimation({
-  size = 'header',
+  size = 'empty',
   typing = false,
+  backdrop = true,
 }: StenographerAnimationProps) {
   const theme = useTheme();
   const i = theme.illustration;
@@ -260,10 +254,12 @@ export function StenographerAnimation({
       aria-hidden="true"
     >
       <defs>
-        <radialGradient id={defId('bg')} cx="50%" cy="40%" r="60%">
-          <stop offset="0%" stopColor={i.backdropFrom} />
-          <stop offset="100%" stopColor={i.backdropTo} />
-        </radialGradient>
+        {backdrop ? (
+          <radialGradient id={defId('bg')} cx="50%" cy="40%" r="60%">
+            <stop offset="0%" stopColor={i.backdropFrom} />
+            <stop offset="100%" stopColor={i.backdropTo} />
+          </radialGradient>
+        ) : null}
         <linearGradient id={defId('machineFront')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={i.machineFrom} />
           <stop offset="100%" stopColor={i.machineTo} />
@@ -278,9 +274,9 @@ export function StenographerAnimation({
         </linearGradient>
       </defs>
 
-      {/* Background: a full-bleed field (the artwork's warm disc became a rectangle so
-          the frame has no transparent corners or clipped arcs) */}
-      <rect x="0" y="0" width="400" height="400" fill={`url(#${defId('bg')})`} />
+      {backdrop ? (
+        <rect x="0" y="0" width="400" height="400" fill={`url(#${defId('bg')})`} />
+      ) : null}
       <g>
         <circle className="spark" cx="342" cy="78" r="6" fill={i.accentPurpleSoft} />
         <circle className="spark" cx="60" cy="200" r="5" fill={i.accentYellow} />

@@ -365,6 +365,9 @@ describe('the history cards', () => {
     // The title row: the filename link on the left, the status badge on the right.
     const failed = rowOf('call.ogg');
     const link = within(failed).getByRole('link', { name: 'call.ogg' });
+    // The filename reads as a link (item 59): accent text, underlined.
+    expect(getComputedStyle(link).color).toBe(asRgb(lightTheme.colors.accent));
+    expect(getComputedStyle(link).textDecorationLine).toBe('underline');
     const badge = within(failed).getByText('FAILED');
     const titleRow = required(link.parentElement) as HTMLElement;
     expect(titleRow).toContainElement(badge);
@@ -377,13 +380,17 @@ describe('the history cards', () => {
     expect(required(errorLine.querySelector('svg')).closest('[aria-hidden="true"]')).not.toBeNull();
     expect(within(rowOf('interview.mp3')).queryByText(/failed/i)).not.toBeInTheDocument();
 
-    // The actions are quiet text buttons, right-aligned; Delete reads in danger.
+    // The actions are quiet text buttons, right-aligned; Retry keeps the accent weight while
+    // Delete stays muted until hovered, where it reads danger (item 59).
     const retry = within(failed).getByRole('button', { name: 'Retry' });
     const remove = within(failed).getByRole('button', { name: 'Delete' });
     expect(getComputedStyle(retry).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     expect(getComputedStyle(retry).color).toBe(asRgb(lightTheme.colors.accent));
     expect(getComputedStyle(remove).backgroundColor).toBe('rgba(0, 0, 0, 0)');
-    expect(getComputedStyle(remove).color).toBe(asRgb(lightTheme.colors.danger));
+    expect(getComputedStyle(remove).color).toBe(asRgb(lightTheme.colors.textMuted));
+    expect(stateRulesFor(remove, ':hover').map((rule) => rule.style.color)).toContain(
+      asRgb(lightTheme.colors.danger),
+    );
     expect(getComputedStyle(required(retry.parentElement)).justifyContent).toBe('flex-end');
 
     // Hover darkens the card's border to the control neutral and leaves its fill alone
