@@ -10,7 +10,7 @@ class ProcessTreeSignalsSpec :
                 then("pause sends SIGSTOP 17 and resume sends SIGCONT 19") {
                     val sent = mutableListOf<Int>()
                     val tree =
-                        ProcessTree(4242, childAlive = { false }, platform = ProcessPlatform.DARWIN) { _, signal ->
+                        ProcessTree(4242, childAlive = { true }, platform = ProcessPlatform.DARWIN) { _, signal ->
                             sent += signal
                             0
                         }

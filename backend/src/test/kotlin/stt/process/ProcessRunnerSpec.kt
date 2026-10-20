@@ -109,18 +109,19 @@ class ProcessRunnerSpec :
 
         given("a running shell whose background child is sleep 100") {
             `when`("the coroutine running it is cancelled") {
-                then("run throws CancellationException promptly, and only after the whole tree is dead") {
-                    val outcome =
-                        cancelAfterFirstLine(
-                            ProcessRunner(gracePeriod = 300.milliseconds),
-                            listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
-                        )
+                then("run throws CancellationException promptly, and only after the whole tree is dead")
+                    .config(enabled = ProcessPlatform.current().processGroups) {
+                        val outcome =
+                            cancelAfterFirstLine(
+                                ProcessRunner(gracePeriod = 300.milliseconds),
+                                listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
+                            )
 
-                    outcome.thrown.shouldBeInstanceOf<CancellationException>()
-                    outcome.aliveWhenRunThrew.shouldBe(emptyList())
-                    outcome.elapsed.shouldBeLessThan(2.seconds)
-                    outcome.pids.filter(::isAlive).shouldBeEmpty()
-                }
+                        outcome.thrown.shouldBeInstanceOf<CancellationException>()
+                        outcome.aliveWhenRunThrew.shouldBe(emptyList())
+                        outcome.elapsed.shouldBeLessThan(2.seconds)
+                        outcome.pids.filter(::isAlive).shouldBeEmpty()
+                    }
             }
         }
 
@@ -213,21 +214,22 @@ class ProcessRunnerSpec :
 
         given("a process tree stopped with SIGSTOP") {
             `when`("the coroutine running it is cancelled") {
-                then("run terminates the tree within the grace period and throws CancellationException") {
-                    val gracePeriod = 300.milliseconds
-                    val runner = ProcessRunner(gracePeriod)
-                    val outcome =
-                        cancelAfterFirstLine(
-                            runner,
-                            listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
-                            beforeCancel = { runner.pause() },
-                        )
+                then("run terminates the tree within the grace period and throws CancellationException")
+                    .config(enabled = ProcessPlatform.current().processGroups) {
+                        val gracePeriod = 300.milliseconds
+                        val runner = ProcessRunner(gracePeriod)
+                        val outcome =
+                            cancelAfterFirstLine(
+                                runner,
+                                listOf("sh", "-c", "sleep 100 & echo \$\$ \$!; wait"),
+                                beforeCancel = { runner.pause() },
+                            )
 
-                    outcome.thrown.shouldBeInstanceOf<CancellationException>()
-                    outcome.aliveWhenRunThrew.shouldBe(emptyList())
-                    outcome.elapsed.shouldBeLessThan(gracePeriod)
-                    outcome.pids.filter(::isAlive).shouldBeEmpty()
-                }
+                        outcome.thrown.shouldBeInstanceOf<CancellationException>()
+                        outcome.aliveWhenRunThrew.shouldBe(emptyList())
+                        outcome.elapsed.shouldBeLessThan(gracePeriod)
+                        outcome.pids.filter(::isAlive).shouldBeEmpty()
+                    }
             }
         }
 
@@ -395,59 +397,61 @@ class ProcessRunnerSpec :
 
         given("a callback that throws after the direct child has exited") {
             `when`("a descendant still runs in the process group") {
-                then("run fails with that exception and the descendant is already dead") {
-                    val pids = CompletableDeferred<List<Long>>()
-                    var thrown: IllegalStateException? = null
-                    var aliveWhenRunThrew: List<Long>? = null
-                    killingReportedPids(pids) {
-                        withTimeout(10.seconds) {
-                            try {
-                                ProcessRunner(gracePeriod = 300.milliseconds).run(
-                                    listOf("sh", "-c", "sleep 100 & echo \$\$ \$!"),
-                                    onStdoutLine = { line ->
-                                        val shell = parsePids(line).also(pids::complete).first()
-                                        ProcessHandle.of(shell).ifPresent { it.onExit().get(5, TimeUnit.SECONDS) }
-                                        // run sees the exit within milliseconds, but no observable event marks
-                                        // it having moved past the exit wait; the margin covers that step.
-                                        Thread.sleep(500)
-                                        throw IllegalStateException("boom")
-                                    },
-                                )
-                            } catch (e: IllegalStateException) {
-                                thrown = e
-                                aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
+                then("run fails with that exception and the descendant is already dead")
+                    .config(enabled = ProcessPlatform.current().processGroups) {
+                        val pids = CompletableDeferred<List<Long>>()
+                        var thrown: IllegalStateException? = null
+                        var aliveWhenRunThrew: List<Long>? = null
+                        killingReportedPids(pids) {
+                            withTimeout(10.seconds) {
+                                try {
+                                    ProcessRunner(gracePeriod = 300.milliseconds).run(
+                                        listOf("sh", "-c", "sleep 100 & echo \$\$ \$!"),
+                                        onStdoutLine = { line ->
+                                            val shell = parsePids(line).also(pids::complete).first()
+                                            ProcessHandle.of(shell).ifPresent { it.onExit().get(5, TimeUnit.SECONDS) }
+                                            // run sees the exit within milliseconds, but no observable event marks
+                                            // it having moved past the exit wait; the margin covers that step.
+                                            Thread.sleep(500)
+                                            throw IllegalStateException("boom")
+                                        },
+                                    )
+                                } catch (e: IllegalStateException) {
+                                    thrown = e
+                                    aliveWhenRunThrew = pids.getCompleted().filter(::isAlive)
+                                }
                             }
                         }
-                    }
 
-                    thrown?.message.shouldBe("boom")
-                    aliveWhenRunThrew.shouldBe(emptyList())
-                }
+                        thrown?.message.shouldBe("boom")
+                        aliveWhenRunThrew.shouldBe(emptyList())
+                    }
             }
         }
 
         given("a descendant that left the process group and still holds the output pipes") {
             `when`("the run is cancelled") {
-                then("run returns promptly with CancellationException") {
-                    // Item 57: on a loaded machine the descendant leaves the group late; the 0.3 s delay before
-                    // its setsid makes that the rule. The shell reports the pids only once the descendant's process
-                    // group (field 5 of /proc/<pid>/stat) is no longer the shell's, so the cancel comes after the escape.
-                    val outcome =
-                        cancelAfterFirstLine(
-                            ProcessRunner(gracePeriod = 300.milliseconds),
-                            listOf(
-                                "sh",
-                                "-c",
-                                "(sleep 0.3; exec setsid sleep 1000) & " +
-                                    "while [ \"\$(cut -d' ' -f5 /proc/\$!/stat)\" = \"\$\$\" ]; do sleep 0.01; done; " +
-                                    "echo \$\$ \$!; wait",
-                            ),
-                        )
+                then("run returns promptly with CancellationException")
+                    .config(enabled = ProcessPlatform.current().processGroups) {
+                        // Item 57: on a loaded machine the descendant leaves the group late; the 0.3 s delay before
+                        // its setsid makes that the rule. The shell reports the pids only once the descendant's process
+                        // group (field 5 of /proc/<pid>/stat) is no longer the shell's, so the cancel comes after the escape.
+                        val outcome =
+                            cancelAfterFirstLine(
+                                ProcessRunner(gracePeriod = 300.milliseconds),
+                                listOf(
+                                    "sh",
+                                    "-c",
+                                    "(sleep 0.3; exec setsid sleep 1000) & " +
+                                        "while [ \"\$(cut -d' ' -f5 /proc/\$!/stat)\" = \"\$\$\" ]; do sleep 0.01; done; " +
+                                        "echo \$\$ \$!; wait",
+                                ),
+                            )
 
-                    outcome.thrown.shouldBeInstanceOf<CancellationException>()
-                    outcome.elapsed.shouldBeLessThan(2.seconds)
-                    outcome.aliveWhenRunThrew.shouldBe(listOf(outcome.pids[1]))
-                }
+                        outcome.thrown.shouldBeInstanceOf<CancellationException>()
+                        outcome.elapsed.shouldBeLessThan(2.seconds)
+                        outcome.aliveWhenRunThrew.shouldBe(listOf(outcome.pids[1]))
+                    }
             }
         }
 
@@ -464,12 +468,13 @@ class ProcessRunnerSpec :
 
         given("a run whose caller is cancelled before the process group exists") {
             `when`("setsid creates the group only after the cancel") {
-                then("run throws CancellationException and the spawned process is already dead") {
-                    val run = cancelledFromSpawn(start = { delayGroupCreation(it).start() })
+                then("run throws CancellationException and the spawned process is already dead")
+                    .config(enabled = ProcessPlatform.current().processGroups) {
+                        val run = cancelledFromSpawn(start = { delayGroupCreation(it).start() })
 
-                    run.thrown.shouldBeInstanceOf<CancellationException>()
-                    run.aliveWhenRunThrew.shouldBe(false)
-                }
+                        run.thrown.shouldBeInstanceOf<CancellationException>()
+                        run.aliveWhenRunThrew.shouldBe(false)
+                    }
             }
         }
 
@@ -524,12 +529,13 @@ class ProcessRunnerSpec :
 
         given("a pause() issued before the process group exists") {
             `when`("setsid creates the group only after the pause") {
-                then("the process produces no output until resume(), then starts from its first line") {
-                    val run = pausedFromSpawn(start = { delayGroupCreation(it).start() }, command = countingLoop())
+                then("the process produces no output until resume(), then starts from its first line")
+                    .config(enabled = ProcessPlatform.current().processGroups) {
+                        val run = pausedFromSpawn(start = { delayGroupCreation(it).start() }, command = countingLoop())
 
-                    run.deliveredWhilePaused.shouldBeEmpty()
-                    run.firstLineAfterResume.shouldBe("1")
-                }
+                        run.deliveredWhilePaused.shouldBeEmpty()
+                        run.firstLineAfterResume.shouldBe("1")
+                    }
             }
         }
 

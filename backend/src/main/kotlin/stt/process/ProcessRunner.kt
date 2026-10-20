@@ -18,10 +18,12 @@ import kotlin.time.Duration.Companion.seconds
 
 class ProcessRunner internal constructor(
     private val gracePeriod: Duration,
+    /** The host platform's signals and process-group support; production uses the JVM's `os.name`. */
+    private val platform: ProcessPlatform = ProcessPlatform.current(),
     /** Starts the built process. A seam so tests can act inside the spawn window (ADR 0020). */
     private val startProcess: (ProcessBuilder) -> Process,
 ) : ProcessControl {
-    constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, ProcessBuilder::start)
+    constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, startProcess = ProcessBuilder::start)
 
     /**
      * Guards the per-run state ([inFlight], [currentTree], [paused]). Registering a tree and applying
@@ -70,8 +72,11 @@ class ProcessRunner internal constructor(
     ): ProcessResult {
         val executable = withContext(Dispatchers.IO) { resolveInPath(command[0]) }
         return coroutineScope {
-            val process = spawn(listOf("setsid", executable) + command.drop(1))
-            val tree = ProcessTree(process.pid(), process::isAlive)
+            // Linux owns a process group through setsid; Darwin has no setsid, so the run is the
+            // direct child alone and its signals target that pid.
+            val launch = if (platform.processGroups) listOf("setsid", executable) else listOf(executable)
+            val process = spawn(launch + command.drop(1))
+            val tree = ProcessTree(process.pid(), process::isAlive, platform)
             synchronized(runLock) {
                 currentTree = tree
                 if (paused) tree.pause()
