@@ -1,6 +1,6 @@
 # 48 — macOS support
 
-Status: spec-approved
+Status: in-progress
 Depends on: [05](../docs/specs/process-runner.md) (done), [16](../docs/specs/nix-flake-package.md) (done), [45](../docs/specs/device-selection.md) (done; macOS GPU surface must not conflict), [51](../docs/specs/ci-verification.md) (done; the macOS CI runners that verify this item), [50](../docs/specs/electron-desktop-app.md) (done; the Linux desktop app and its packaged specs, which the macOS packaged-app item extends)
 Blocks: — [49](49-windows-support.md)
 
