@@ -58,23 +58,24 @@ Filed 2026-10-13 from a portability pass over `main` (verified reads, nothing ex
 
 - **Metal device surface** (open question 1 answered): faithful to the probe. whisper-cli 1.8.4's
   darwin Metal log is `device N: MTL0 (type: 2)` / `GPU name: MTL0`; the human device name is not
-  logged. A Metal machine offers `gpu:0` with `gpuNames` `{"gpu:0": "Metal (MTL0)"}` (page: `GPU 0 —
-  Metal (MTL0)`); `gpu:0` → `--device 0`, `cpu` → `--no-gpu`, `auto` → no flag, per item 45.
+  logged. On a Metal-capable build, Settings offers `gpu:0` with `gpuNames` `{"gpu:0":
+  "Metal (MTL0)"}` (page: `GPU 0 — Metal (MTL0)`); `gpu:0` → `--device 0`, `cpu` → `--no-gpu`,
+  `auto` → no flag, per item 45.
 - **Which binary has Metal**: the pinned darwin prebuilds have no ggml GPU backend — arm64 ships
   `libwhisper.coreml.dylib` (encoder-only) but no `libggml-metal.dylib`, x64 has neither — so the
   Gradle/bootstrap path honestly reports cpu/auto only. Metal is the Nix-built whisper-cpp:
   `nix/whisper-cpp.nix` becomes Vulkan on Linux and Metal on darwin (`metalSupport = true` also on
-  x86_64-darwin, where nixpkgs defaults it off). The electron-builder macOS artifact stages the
-  prebuild, so Metal in a packaged desktop app needs the flake `.#desktop` darwin build or a
-  Metal-capable staged whisper-cli; the packaged-app item settles it rather than assumes it.
-- **Metal verification**: the positive half is pinned by the 1.8.4 darwin lines in a unit test and
-  user-verified on a real Mac (nobody on the team owns one); CI verifies the no-Metal half. GitHub
-  macOS runners are VMs; GPU passthrough was unavailable in 2020 and is unconfirmed since.
+  x86_64-darwin, where nixpkgs defaults it off). The desktop artifact is electron-builder only (two
+  per-architecture DMGs); the flake's `.#desktop` stays Linux-only, so the packaged desktop app has
+  the prebuild's CPU/CoreML path and Metal is the Nix server package and devenv.
+- **Metal verification (CI only)**: the positive half is pinned by the 1.8.4 darwin lines in a unit
+  test that runs in CI; the no-Metal half runs on the macOS CI leg. GitHub macOS runners are VMs;
+  GPU passthrough was unavailable in 2020 and is unconfirmed since, so a real Metal run is not
+  claimed (nobody on the team owns a Mac).
 - **CI legs** (open question 2 answered): both architectures, full tree — `macos-15` (ARM) and
   `macos-15-intel` (the last x86_64 image, through August 2027; `macos-13` is retired) — nightly and
   on this item's PRs.
-- **Tick rule**: macOS-CI items tick only on a reported real run (the user's CI or a real Mac),
-  never on a local proxy.
+- **Tick rule**: macOS-CI items tick only on a reported CI run, never on a local proxy.
 
 ## Proposal
 
@@ -102,33 +103,50 @@ To be settled at the first test-list item, starting from the decisions above:
 
 ## Test list (approved 2026-10-19; behaviors only)
 
-(Each macOS-CI item ticks only on a reported real run — the user's CI or a real Mac — never on a local proxy.)
+(Each macOS-CI item ticks only on a reported CI run, never on a local proxy.)
 
-- [ ] (CI, macOS ARM) `gradle check` + `gradle integrationTest` are green on a macOS runner
+Portability audit (2026-10-19): the macOS legs exercise every host-specific path — signals (item 2),
+`setsid` and process groups (items 1, 4), `/proc` (items 4, 7), Nix (item 8), devenv (item 8),
+desktop staging and per-user paths (item 10).
+
+- [ ] (CI, macOS) The human Gradle bootstrap works: `./gradlew check` + `./gradlew integrationTest`
+      are green on a macOS runner, downloading the darwin whisper-cli, ffmpeg and models (the
+      Linux-only system-deps tasks no-op)
 - [ ] (CI, macOS) Pausing a running task actually pauses its process and resume continues it: the
       process tree sends the platform's numbers (darwin SIGSTOP 17/SIGCONT 19; Linux 19/18), pinned
       host-independently and run through the real process runner on the macOS leg; ticks only on that run
 - [ ] (CI, macOS) A full upload → transcribe → diarize run completes on macOS for a fixed fixture and
       its output matches the Linux run
-- [ ] (CI, macOS) Cancel and delete stop the whole run (no orphan whisper-cli/ffmpeg processes)
-- [ ] (CI, macOS + user) On a Metal-capable build (the Nix package on darwin), Settings shows
-      `gpu:0` named `Metal (MTL0)` per item 45; on the pinned prebuild (no ggml GPU backend) and a
-      machine without Metal, cpu/auto only and no crash or phantom GPU. The positive half is pinned
-      by the recorded 1.8.4 darwin lines in a unit test and user-verified on a real Mac; the
-      cpu/auto half runs on CI
+- [ ] (CI, macOS) Cancel and delete stop the whole run on the no-`setsid` direct-child path (no
+      orphan whisper-cli/ffmpeg processes); the Linux process-group scenarios stay green
+- [ ] (CI, macOS, added 2026-10-19) The e2e harness finds and stops the backend without `/proc`
+      (portable `ps` where `/proc` is absent), leaving no JVM/whisper-cli/ffmpeg; the Linux container
+      path keeps `/proc`
+- [ ] (CI, macOS) On a Metal-capable build (the Nix package on darwin), Settings shows `gpu:0` named
+      `Metal (MTL0)` per item 45; on the pinned prebuild (no ggml GPU backend) and a machine without
+      Metal, cpu/auto only and no crash or phantom GPU. The positive half is pinned by the recorded
+      1.8.4 darwin lines in a unit test; the cpu/auto half runs on the macOS leg
 - [ ] (CI, macOS) DeviceArgs flags verified against the bundled whisper-cli version (the shipped
       binary, not 1.9.x assumptions)
-- [ ] (CI, macOS) The e2e journey (queue, history, settings, reorder, pause/cancel) is green on macOS
-- [ ] (CI or user-verified) `nix build`/`nix run` and the devenv shell work on darwin
+- [ ] (CI, macOS) `./gradlew e2e` (the journey: queue, history, settings, reorder, pause/cancel) is
+      green on macOS
+- [ ] (CI, macOS) The flake declares `aarch64-darwin` and `x86_64-darwin`; `nix build`/`nix run` and
+      the devenv shell (Linux-only packages gated) work on darwin, with the Metal whisper-cpp and a
+      darwin ffmpeg; `nix flake check` passes
 - [ ] (CI, inherited from 51 on 2026-10-14) This item adds its macOS legs — `macos-15` (ARM) and
       `macos-15-intel` — to `.github/workflows/ci.yml`; they run the full tree on the nightly
       schedule and on this item's PRs, and include the darwin Nix build above
-- [ ] (e2e, CI macOS, moved from item 50 on 2026-10-15) The packaged desktop app runs on macOS with
-      its per-user paths: item 50's packaged specs (journey, quit without orphan processes, first
-      run with the model download and its persistence, download failure with Retry) pass against
-      the installed macOS build
-- [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and the
-      Linux e2e stay green
+- [ ] (docs, added 2026-10-19) README documents macOS without the `brew install util-linux`
+      workaround: the Nix and `./gradlew` paths, the per-user paths, and Metal's actual source (the
+      Nix whisper-cpp; the pinned prebuild is CPU/CoreML)
+- [ ] (e2e, CI macOS, moved from item 50 on 2026-10-15) electron-builder builds an unsigned `.dmg`
+      per architecture (`aarch64`, `x86_64`) with a darwin jlink JRE and the darwin whisper-cli/ffmpeg;
+      the installed app runs with its per-user paths (`~/Library/Application Support/stt-app`,
+      `~/Library/Caches/stt-app/models`), and item 50's packaged specs (journey, quit without orphan
+      processes, first run with the model download and its persistence, download failure with Retry)
+      pass against the installed DMG
+- [ ] (must not break) `./gradlew check`, `./gradlew integrationTest`, `pnpm test`, `pnpm build` and
+      the Linux e2e stay green
 
 ## Acceptance criteria
 
@@ -152,6 +170,15 @@ To be settled at the first test-list item, starting from the decisions above:
   so Metal is the Nix-built whisper-cpp and the prebuild path reports cpu/auto only. Answers: Metal
   surface faithful (`gpu:0` = `Metal (MTL0)`; `gpu:0` → `--device 0`, `cpu` → `--no-gpu`, `auto` →
   no flag); both CI architectures (`macos-15`, `macos-15-intel`), full tree nightly and on this
-  item's PRs; Metal's positive half pinned by the 1.8.4 darwin lines and user-verified, the no-Metal
-  half on CI; first cycle = test item 2, ticking only on the user's macOS run. Status: in-progress
+  item's PRs; Metal's positive half pinned by the 1.8.4 darwin lines (no real-Mac run), the no-Metal
+  half on CI; first cycle = test item 2, ticking only on the macOS CI run. Status: in-progress
   (test list approved).
+- 2026-10-19: test list amended after the user's coverage check (13 items): item 1 names the human
+  `./gradlew` bootstrap and its darwin downloads; item 4 names the no-`setsid` direct-child path;
+  item 5 and the Decided bullet drop the "user-verified on a real Mac" half — everything is verified
+  in CI, the positive Metal half by the recorded-line unit test; item 8 makes the darwin Nix work
+  (both systems, Metal whisper-cpp, darwin ffmpeg) CI-only; item 10 names two unsigned DMGs from
+  electron-builder with darwin staging and `~/Library` paths (the flake `.#desktop` stays Linux-only);
+  added the portable e2e `/proc` replacement and the README macOS section. Known portability fixes
+  the macOS `integrationTest` run forces: `ProcessRunnerSpec`'s `seq`/`/proc`/`setsid` assumptions and
+  `ProcessTreeSpec`'s hardcoded Linux `[18, 15, 9]` (the latter is cycle 1's test-list item 2).
