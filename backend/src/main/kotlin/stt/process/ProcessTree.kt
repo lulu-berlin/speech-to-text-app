@@ -9,7 +9,7 @@ import kotlin.time.Duration
 /**
  * The process tree of one run: the direct child and its process group. The pid of a `setsid`-spawned
  * child is its group id, and kill(2) with the negated id reaches every process in the group
- * (ADR 0020). Linux signal numbers.
+ * (ADR 0020). Signal numbers come from [ProcessSignals] (Linux and Darwin differ for stop/continue).
  *
  * start() returns before setsid has created the group, so every signal goes to the direct child
  * first, then to the group: until setsid() runs, the child is the whole run, and a child that is
@@ -19,6 +19,8 @@ internal class ProcessTree(
     private val id: Long,
     /** Whether the direct child is still unreaped; its pid is signalled only then, never a reused one. */
     private val childAlive: () -> Boolean,
+    /** The host platform's SIGSTOP/SIGCONT numbers; production uses the JVM's `os.name`. */
+    private val signals: ProcessSignals = ProcessSignals.current(),
     /** kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). */
     private val kill: (pid: Int, signal: Int) -> Int = LibC.INSTANCE::kill,
 ) {
@@ -31,7 +33,7 @@ internal class ProcessTree(
      * (zombies without a reaping init, uninterruptible sleep) must not hang the caller (ADR 0020).
      */
     suspend fun terminate(gracePeriod: Duration) {
-        signal(SIGCONT)
+        signal(signals.cont)
         signal(SIGTERM)
         if (awaitEmpty(gracePeriod)) return
         signal(SIGKILL)
@@ -46,12 +48,12 @@ internal class ProcessTree(
 
     /** SIGSTOP the whole tree: a running transcription freezes its output (ADR 0004). */
     internal fun pause() {
-        signal(SIGSTOP)
+        signal(signals.stop)
     }
 
     /** SIGCONT the whole tree; harmless when the group is not stopped. */
     internal fun resume() {
-        signal(SIGCONT)
+        signal(signals.cont)
     }
 
     private suspend fun awaitEmpty(timeout: Duration): Boolean =
@@ -74,7 +76,5 @@ internal class ProcessTree(
 
         const val SIGKILL = 9
         const val SIGTERM = 15
-        const val SIGCONT = 18
-        const val SIGSTOP = 19
     }
 }
