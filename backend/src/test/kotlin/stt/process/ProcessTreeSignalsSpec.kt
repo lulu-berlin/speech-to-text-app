@@ -10,7 +10,7 @@ class ProcessTreeSignalsSpec :
                 then("pause sends SIGSTOP 17 and resume sends SIGCONT 19") {
                     val sent = mutableListOf<Int>()
                     val tree =
-                        ProcessTree(4242, childAlive = { false }, signals = ProcessSignals.DARWIN) { _, signal ->
+                        ProcessTree(4242, childAlive = { false }, platform = ProcessPlatform.DARWIN) { _, signal ->
                             sent += signal
                             0
                         }
@@ -19,7 +19,7 @@ class ProcessTreeSignalsSpec :
                     tree.resume()
 
                     sent.shouldBe(listOf(17, 19))
-                    ProcessSignals.forOsName("Mac OS X").shouldBe(ProcessSignals.DARWIN)
+                    ProcessPlatform.forOsName("Mac OS X").shouldBe(ProcessPlatform.DARWIN)
                 }
             }
         }
@@ -29,7 +29,7 @@ class ProcessTreeSignalsSpec :
                 then("pause sends SIGSTOP 19 and resume sends SIGCONT 18, unchanged") {
                     val sent = mutableListOf<Int>()
                     val tree =
-                        ProcessTree(4242, childAlive = { false }, signals = ProcessSignals.LINUX) { _, signal ->
+                        ProcessTree(4242, childAlive = { false }, platform = ProcessPlatform.LINUX) { _, signal ->
                             sent += signal
                             0
                         }
@@ -38,7 +38,7 @@ class ProcessTreeSignalsSpec :
                     tree.resume()
 
                     sent.shouldBe(listOf(19, 18))
-                    ProcessSignals.forOsName("Linux").shouldBe(ProcessSignals.LINUX)
+                    ProcessPlatform.forOsName("Linux").shouldBe(ProcessPlatform.LINUX)
                 }
             }
         }

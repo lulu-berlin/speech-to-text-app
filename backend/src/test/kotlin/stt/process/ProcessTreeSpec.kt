@@ -21,7 +21,7 @@ class ProcessTreeSpec :
                 then("terminate gives up one grace period after SIGKILL and logs a warning naming the group") {
                     val sent = mutableListOf<Int>()
                     val group =
-                        ProcessTree(4242, childAlive = { false }, signals = ProcessSignals.LINUX) { _, signal ->
+                        ProcessTree(4242, childAlive = { false }, platform = ProcessPlatform.LINUX) { _, signal ->
                             if (signal != 0) sent += signal
                             0
                         }
