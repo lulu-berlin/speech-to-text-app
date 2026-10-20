@@ -1,0 +1,590 @@
+openapi: 3.0.3
+info:
+  title: Speech-to-Text backend API
+  version: "1.0"
+  description: |
+    The current backend contract. The JSON examples in `docs/api/` are the authoritative
+    shapes (the frontend mocks and the backend shape checks use them); this OpenAPI document
+    mirrors them for tooling. Errors are `{ "error", "message" }` unless stated otherwise.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: tasks
+  - name: queue
+  - name: transcript
+  - name: speakers
+  - name: settings
+  - name: events
+paths:
+  /api/tasks:
+    get:
+      tags: [tasks]
+      summary: List tasks (pending in queue order, then finished newest first)
+      responses:
+        "200":
+          description: Tasks without audio bytes
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TaskList"}
+    post:
+      tags: [tasks]
+      summary: Upload one audio/video file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                language:
+                  type: string
+                  default: auto
+                speakers:
+                  type: string
+                  default: auto
+                  pattern: "^(auto|off|([1-9]|1[0-9]|20))$"
+                maxSpeakers:
+                  type: string
+                  default: "8"
+                  pattern: "^(?:[1-9]|1[0-9]|20)$"
+      responses:
+        "201":
+          description: The queued task
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Task"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "409":
+          description: The same bytes are already a task
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/DuplicateAudioError"}
+        "413":
+          description: Upload above STT_MAX_UPLOAD_BYTES
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "500": {$ref: "#/components/responses/Internal"}
+  /api/tasks/{id}:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    get:
+      tags: [tasks]
+      summary: One task
+      responses:
+        "200":
+          description: The task
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Task"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [tasks]
+      summary: Delete a task (a pending one is cancelled first)
+      responses:
+        "204": {description: Deleted}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/tasks/{id}/pause:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    post:
+      tags: [tasks]
+      summary: Pause the running task (SIGSTOP or the pause gate)
+      responses:
+        "200":
+          description: The updated task
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Task"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/resume:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    post:
+      tags: [tasks]
+      summary: Resume a paused task (a mid-run task continues its run; otherwise it is queued again)
+      responses:
+        "200":
+          description: The updated task
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Task"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/cancel:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    post:
+      tags: [tasks]
+      summary: Cancel a task (awaits the process death; keeps stored chunks/segments)
+      responses:
+        "200":
+          description: The updated task
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Task"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/retry:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    post:
+      tags: [tasks]
+      summary: Retry a FAILED/CANCELED task (queued at the end, resumes from stored chunks)
+      responses:
+        "200":
+          description: The updated task
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Task"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/queue:
+    get:
+      tags: [queue]
+      summary: The queue state and pending task ids in order
+      responses:
+        "200":
+          description: Queue
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Queue"}
+  /api/queue/pause:
+    post:
+      tags: [queue]
+      summary: Pause the queue (freezes the running process, starts nothing)
+      responses:
+        "200":
+          description: Queue
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Queue"}
+  /api/queue/resume:
+    post:
+      tags: [queue]
+      summary: Resume the queue
+      responses:
+        "200":
+          description: Queue
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Queue"}
+  /api/queue/order:
+    put:
+      tags: [queue]
+      summary: Reorder the queue (exactly the non-terminal ids, each once)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskIds]
+              properties:
+                taskIds:
+                  type: array
+                  items: {type: integer, format: int64}
+      responses:
+        "200":
+          description: Queue
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Queue"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/turns:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    get:
+      tags: [transcript]
+      summary: Speakers and speaker turns for a COMPLETED task
+      responses:
+        "200":
+          description: Turns
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Turns"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/transcript:
+    parameters:
+      - {$ref: "#/components/parameters/TaskId"}
+      - name: format
+        in: query
+        required: true
+        schema: {type: string, enum: [txt, srt, vtt]}
+    get:
+      tags: [transcript]
+      summary: Download the rendered transcript (COMPLETED only)
+      responses:
+        "200":
+          description: The rendered file
+          headers:
+            Content-Disposition:
+              schema: {type: string}
+          content:
+            text/plain: {schema: {type: string}}
+            application/x-subrip: {schema: {type: string}}
+            text/vtt: {schema: {type: string}}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/audio:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    get:
+      tags: [transcript]
+      summary: The stored canonical clip (FLAC), with Range support
+      parameters:
+        - name: Range
+          in: header
+          required: false
+          schema: {type: string}
+      responses:
+        "200":
+          description: The whole FLAC
+          headers:
+            Content-Length: {schema: {type: integer}}
+            Accept-Ranges: {schema: {type: string}}
+          content:
+            audio/flac: {schema: {type: string, format: binary}}
+        "206":
+          description: A byte range of the FLAC
+          headers:
+            Content-Length: {schema: {type: integer}}
+            Content-Range: {schema: {type: string}}
+            Accept-Ranges: {schema: {type: string}}
+          content:
+            audio/flac: {schema: {type: string, format: binary}}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/tasks/{id}/speakers/{speakerId}:
+    parameters:
+      - {$ref: "#/components/parameters/TaskId"}
+      - {$ref: "#/components/parameters/SpeakerId"}
+    put:
+      tags: [speakers]
+      summary: Rename a speaker (null resets to "Speaker N")
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [speaker]
+              properties:
+                speaker: {type: string, nullable: true}
+      responses:
+        "200":
+          description: The task's effective speakers
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Speakers"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/speakers/merge:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    post:
+      tags: [speakers]
+      summary: Merge speakers into one (resolved at read time, undoable)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group, into]
+              properties:
+                group:
+                  type: array
+                  minItems: 2
+                  items: {type: integer}
+                into: {type: integer}
+      responses:
+        "200":
+          description: The task's effective speakers
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Speakers"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/speakers/merges:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    delete:
+      tags: [speakers]
+      summary: Reset all merges of the task
+      responses:
+        "200":
+          description: All the task's speakers again
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Speakers"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/settings:
+    get:
+      tags: [settings]
+      summary: The stored settings, the available devices and their names
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Settings"}
+    put:
+      tags: [settings]
+      summary: Store the settings (validated in order; clears the fallback notice)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SettingsUpdate"}
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Settings"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+  /api/settings/device-fallback:
+    delete:
+      tags: [settings]
+      summary: Clear the CPU-fallback notice (also when there is none)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Settings"}
+  /api/health:
+    get:
+      tags: [tasks]
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, enum: [ok]}
+  /api/events:
+    get:
+      tags: [events]
+      summary: Live Server-Sent Events stream
+      description: |
+        `text/event-stream`. On connect the first frame is `snapshot`; then `task-updated`
+        (full Task), `task-progress`, `queue-updated`, `task-deleted`, `speakers-renamed`,
+        `speakers-merged`, `settings-updated`; `heartbeat` after 5 s of silence. A subscriber
+        that falls behind the buffer is disconnected (the client reconnects and re-snapshots).
+      responses:
+        "200":
+          description: The event stream
+          content:
+            text/event-stream:
+              schema: {type: string}
+      x-event-frames:
+        snapshot: {$ref: "#/components/schemas/SnapshotEvent"}
+        task-updated: {$ref: "#/components/schemas/Task"}
+        task-progress: {$ref: "#/components/schemas/TaskProgressEvent"}
+        queue-updated: {$ref: "#/components/schemas/Queue"}
+        task-deleted: {$ref: "#/components/schemas/TaskDeletedEvent"}
+        speakers-renamed: {$ref: "#/components/schemas/SpeakersChangedEvent"}
+        speakers-merged: {$ref: "#/components/schemas/SpeakersChangedEvent"}
+        settings-updated: {$ref: "#/components/schemas/SettingsChanged"}
+        heartbeat:
+          type: object
+          properties: {}
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema: {type: integer, format: int64}
+    SpeakerId:
+      name: speakerId
+      in: path
+      required: true
+      schema: {type: integer, minimum: 0}
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    NotFound:
+      description: Unknown task or resource
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    Conflict:
+      description: Illegal transition, not completed, or reorder mismatch
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    Internal:
+      description: Internal failure
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+  schemas:
+    Task:
+      type: object
+      required: [id, filename, status, language, speakersMode, maxSpeakers, sizeBytes, hasAudio, transcriptionProgress, createdAt]
+      properties:
+        id: {type: integer, format: int64}
+        filename: {type: string}
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, PAUSED, COMPLETED, FAILED, CANCELED]
+        phase:
+          type: string
+          nullable: true
+          enum: [CHUNKING, TRANSCRIBING, DIARIZING, null]
+        language: {type: string}
+        speakersMode: {type: string, enum: [auto, off, fixed]}
+        speakersCount: {type: integer, nullable: true}
+        maxSpeakers: {type: integer}
+        durationMs: {type: integer, format: int64, nullable: true}
+        sizeBytes: {type: integer, format: int64}
+        hasAudio: {type: boolean}
+        transcriptionProgress: {type: number, minimum: 0, maximum: 1}
+        diarizationStage:
+          type: string
+          nullable: true
+          enum: [EMBEDDING, CLUSTERING, null]
+        diarizationProgress: {type: number, nullable: true, minimum: 0, maximum: 1}
+        error: {type: string, nullable: true}
+        transcribedUntilMs: {type: integer, format: int64, nullable: true}
+        createdAt: {type: integer, format: int64}
+        startedAt: {type: integer, format: int64, nullable: true}
+        finishedAt: {type: integer, format: int64, nullable: true}
+    TaskList:
+      type: object
+      required: [tasks]
+      properties:
+        tasks:
+          type: array
+          items: {$ref: "#/components/schemas/Task"}
+    Queue:
+      type: object
+      required: [paused, taskIds]
+      properties:
+        paused: {type: boolean}
+        taskIds:
+          type: array
+          items: {type: integer, format: int64}
+    Speaker:
+      type: object
+      required: [speakerId, speaker]
+      properties:
+        speakerId: {type: integer, minimum: 0}
+        speaker: {type: string}
+    Speakers:
+      type: object
+      required: [speakers]
+      properties:
+        speakers:
+          type: array
+          items: {$ref: "#/components/schemas/Speaker"}
+    TurnSegment:
+      type: object
+      required: [startMs, endMs, text]
+      properties:
+        startMs: {type: integer, format: int64}
+        endMs: {type: integer, format: int64}
+        text: {type: string}
+    Turn:
+      type: object
+      required: [speakerId, startMs, endMs, text, segments]
+      properties:
+        speakerId: {type: integer, nullable: true}
+        startMs: {type: integer, format: int64}
+        endMs: {type: integer, format: int64}
+        text: {type: string}
+        segments:
+          type: array
+          items: {$ref: "#/components/schemas/TurnSegment"}
+    Turns:
+      type: object
+      required: [speakers, hasMerges, turns]
+      properties:
+        speakers:
+          type: array
+          items: {$ref: "#/components/schemas/Speaker"}
+        hasMerges: {type: boolean}
+        turns:
+          type: array
+          items: {$ref: "#/components/schemas/Turn"}
+    SettingsUpdate:
+      type: object
+      required: [device, threads, defaultLanguage, speakersMode, speakersCount, maxSpeakers]
+      properties:
+        device: {type: string, pattern: "^(auto|cpu|gpu:[0-9]+)$"}
+        threads: {type: integer, nullable: true, minimum: 1}
+        defaultLanguage: {type: string}
+        speakersMode: {type: string, enum: [auto, off, fixed]}
+        speakersCount: {type: integer, nullable: true, minimum: 1, maximum: 20}
+        maxSpeakers: {type: integer, minimum: 1, maximum: 20}
+    Settings:
+      allOf:
+        - {$ref: "#/components/schemas/SettingsUpdate"}
+        - type: object
+          required: [deviceFallback, availableDevices, gpuNames, deviceProbeError]
+          properties:
+            deviceFallback: {type: string, nullable: true, pattern: "^(gpu:[0-9]+)?$"}
+            availableDevices:
+              type: array
+              items: {type: string}
+            gpuNames:
+              type: object
+              additionalProperties: {type: string}
+            deviceProbeError: {type: string, nullable: true}
+    SettingsChanged:
+      allOf:
+        - {$ref: "#/components/schemas/SettingsUpdate"}
+        - type: object
+          properties:
+            deviceFallback: {type: string, nullable: true, pattern: "^(gpu:[0-9]+)?$"}
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: {type: string}
+        message: {type: string}
+    DuplicateAudioError:
+      allOf:
+        - {$ref: "#/components/schemas/Error"}
+        - type: object
+          required: [taskId]
+          properties:
+            taskId: {type: integer, format: int64}
+    SnapshotEvent:
+      type: object
+      required: [tasks, queue]
+      properties:
+        tasks:
+          type: array
+          items: {$ref: "#/components/schemas/Task"}
+        queue: {$ref: "#/components/schemas/Queue"}
+    TaskProgressEvent:
+      type: object
+      required: [id, transcriptionProgress, diarizationStage, diarizationProgress]
+      properties:
+        id: {type: integer, format: int64}
+        transcriptionProgress: {type: number}
+        diarizationStage: {type: string, nullable: true, enum: [EMBEDDING, CLUSTERING, null]}
+        diarizationProgress: {type: number, nullable: true}
+    TaskDeletedEvent:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer, format: int64}
+    SpeakersChangedEvent:
+      type: object
+      required: [id, speakers]
+      properties:
+        id: {type: integer, format: int64}
+        speakers:
+          type: array
+          items: {$ref: "#/components/schemas/Speaker"}
