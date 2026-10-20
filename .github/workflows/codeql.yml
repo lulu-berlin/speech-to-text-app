@@ -61,7 +61,10 @@ jobs:
         name: Compile the backend for extraction
         # --no-daemon: CodeQL's tracer cannot see a build delegated to an existing Gradle
         # daemon (CodeQL CLI docs, "Java project built using Gradle").
-        run: ./gradlew -p backend testClasses --no-daemon
+        # Gradle's default 512 MiB heap thrashed under the tracer (run 39344040356: "Gradle build
+        # daemon has been stopped: since the JVM garbage collector is thrashing"); the single-use
+        # daemon gets room. The other jobs keep the project's defaults.
+        run: ./gradlew -p backend testClasses --no-daemon -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=768m"
       - uses: github/codeql-action/analyze@v4
         with:
           category: '/language:${{ matrix.language }}'

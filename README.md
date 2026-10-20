@@ -125,6 +125,8 @@ Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/ge
 
 The shell's `ffmpeg` is the app's audio-only static build from the pinned `desktop-ffmpeg-v2` asset (roadmap item 62), so it has neither `ffplay` nor `ffprobe`; use another player to listen to a file and another tool to probe media.
 
+The shell's `whisper-cli` is the same pinned 1.8.4 Vulkan build `nix build .` and `.#desktop` ship, from the `desktop-whisper-cpp-v1` asset (roadmap item 63). Every system the flake declares must pin a whisper-cpp artifact — a flake check enforces it — so no machine compiles it.
+
 The end-to-end fixture generator (`e2e/global-setup.mjs`) needs a full `ffmpeg` on `PATH` — the `wav` muxer, the `pcm_s16le` encoder and the `concat` filter; the shell's ffmpeg is the app's slim build, not a general-purpose one. Use `./gradlew e2e` (its managed tools) or prepend a Nix `ffmpeg_8-full` from the flake's pin when running `pnpm --dir e2e test` directly.
 
 ```sh

@@ -22,25 +22,46 @@
 # sdl3 -> zenity -> libadwaita -> gtk4 -> gstreamer -> gst-plugins-bad -> flite, freepats,
 # chromaprint, python3 and pipewire into the package — ~330 MiB for an example nothing runs.
 # Only whisper-cli is used (ADR 0047), and it is not the SDL one.
-{ pkgs }:
+#
+# On x86_64-linux the shipped output is the pinned prebuilt release asset
+# (nix/desktop-artifacts.nix `whisperCpp`, roadmap item 63), fetched and re-linked by
+# nix/prebuilt-artifact.nix; a system without a pin ships the source build (items 48/49 add
+# their systems' artifacts with them). `source` is the derivation the asset is made from,
+# `whisperCpp` the one the package, Docker and the devenv run.
+{ pkgs, artifacts ? import ./desktop-artifacts.nix }:
 let
   tag = (import ./versions.nix).whisperCppTag;
-in
-(pkgs.whisper-cpp.override {
-  vulkanSupport = true;
-  withSDL = false;
-  withFFmpegSupport = false;
-}).overrideAttrs {
-  version = tag;
-  src = pkgs.fetchFromGitHub {
-    owner = "ggml-org";
-    repo = "whisper.cpp";
-    tag = "v${tag}";
-    hash = "sha256-YCuWKDKlrhbx+t3t2kDpAwuKt4rkipDsOXO6uqIU/W0=";
+  system = pkgs.stdenv.hostPlatform.system;
+
+  source = (pkgs.whisper-cpp.override {
+    vulkanSupport = true;
+    withSDL = false;
+    withFFmpegSupport = false;
+  }).overrideAttrs {
+    version = tag;
+    src = pkgs.fetchFromGitHub {
+      owner = "ggml-org";
+      repo = "whisper.cpp";
+      tag = "v${tag}";
+      hash = "sha256-YCuWKDKlrhbx+t3t2kDpAwuKt4rkipDsOXO6uqIU/W0=";
+    };
+    installCheckPhase = ''
+      runHook preInstallCheck
+      "$out/bin/whisper-cli" --help >/dev/null
+      runHook postInstallCheck
+    '';
   };
-  installCheckPhase = ''
-    runHook preInstallCheck
-    "$out/bin/whisper-cli" --help >/dev/null
-    runHook postInstallCheck
-  '';
+
+  # The pinned release asset for this system, if any: the shared helper fetches, re-links and
+  # scans it; a system without a pin gets the source build.
+  prebuiltArtifact = import ./prebuilt-artifact.nix {
+    inherit pkgs source;
+    artifact = artifacts.whisperCpp.${system} or null;
+    label = "whisperCpp";
+    subject = "whisper-cpp";
+  };
+in {
+  inherit source;
+  inherit (prebuiltArtifact) pinError;
+  whisperCpp = prebuiltArtifact.result;
 }

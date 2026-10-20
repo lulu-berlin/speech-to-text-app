@@ -1,7 +1,8 @@
-# Prebuilt artifacts of the desktop bundle and the app (roadmap items 56 and 62): GitHub Release
+# Prebuilt artifacts of the desktop bundle and the app (roadmap items 56, 62 and 63): GitHub Release
 # assets of this repository, uploaded by the user, each pinned by url and sha256. Keyed by artifact,
 # then by Nix system (`pkgs.stdenv.hostPlatform.system`); a system without an entry builds the
-# artifact from source. Pure data, read by nix/desktop-mesa.nix and nix/ffmpeg.nix.
+# artifact from source. Pure data, read by nix/desktop-mesa.nix, nix/ffmpeg.nix and
+# nix/whisper-cpp.nix.
 {
   # The bundle's Vulkan-only Mesa, per system: { url; sha256; storePath; references; } — storePath
   # is the out path of the source build the asset was made from, references that output's direct
@@ -35,5 +36,21 @@
     sha256 = "945db2902395cfc3a5c002de35fbddc4b3ea14de76ee50d5b3bbfbce98fc184c";
     storePath = "/nix/store/2pqr6g1ll2dzj7p87cz5a6w8amv2pp22-ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2";
     references = [];
+  };
+
+  # The pinned whisper-cpp (roadmap item 63): the 1.8.4 Vulkan build (no SDL, no nixpkgs ffmpeg)
+  # whisper-cli ships. Its files name the libraries below and its own build path, which the re-link
+  # rewrites.
+  whisperCpp.x86_64-linux = {
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-x86_64-linux.tar.zst";
+    sha256 = "33329560d092342ebdf61437413410f6e1f4ab769f6b91164f1f06038a79f1cf";
+    storePath = "/nix/store/n2vf0kiskxmm9mfrs5mcla5q1k7zqpmi-whisper-cpp-1.8.4";
+    references = [
+      "/nix/store/10dxp0qxqxxsyiljrh2kp0xqhz6arhcx-bash-5.3p15"
+      "/nix/store/h4wfwic161kxrr74jlzla5lsm28hgary-glibc-2.44-25"
+      "/nix/store/j7qx4s4mr17j1wqgvqdzj33lmrnzb387-gcc-16.2.0-lib"
+      "/nix/store/l60xx259knfbgfr7wzwsw7zg9ajmv3sn-wget-1.25.0"
+      "/nix/store/vjdqsn0bz2llabfqa746zfgk4kmswba5-vulkan-loader-1.4.357.0"
+    ];
   };
 }

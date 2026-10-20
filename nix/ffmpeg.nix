@@ -14,9 +14,9 @@
 # in every bit depth/endianness the containers map — the encoder each output muxer needs (FLAC; PCM
 # for `f32le` and the null muxer's `-f null -`), the `silencedetect`/`atrim`/`aresample`/`aformat`
 # filters, and the `file`/`pipe` protocols. No video codecs, hwaccels, capture devices, network
-# protocols or external libraries (the `lib*` decoders stay off). Check
-# `checks.ffmpeg-audio-only` compares this exact surface; the format and app-use checks prove the
-# behavior.
+# protocols or external libraries (the `lib*` decoders stay off). The `ffmpeg-audio-only` app
+# (`nix run .#ffmpeg-audio-only`) compares this exact surface; the format and app-use checks prove
+# the behavior.
 {
   pkgs,
   artifacts ? import ./desktop-artifacts.nix,
@@ -28,9 +28,9 @@
   lib = pkgs.lib;
   system = pkgs.stdenv.hostPlatform.system;
 
-  # The component lists the build's `--enable-<kind>=…` flags come from, and the same lists
-  # `checks.ffmpeg-audio-only` compares the built configuration against: one source, so the check
-  # cannot drift from the recipe.
+  # The component lists the build's `--enable-<kind>=…` flags come from, and the same lists the
+  # `ffmpeg-audio-only` app compares the built configuration against: one source, so the check cannot
+  # drift from the recipe.
   enable = [
     {
       kind = "demuxer";
