@@ -9,7 +9,7 @@
 // arguments (lib/processes.mjs), not by the group alone.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -20,6 +20,7 @@ export const e2eRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const repoRoot = join(e2eRoot, '..');
 export const backendDir = join(repoRoot, 'backend');
 export const frontendDist = join(repoRoot, 'frontend', 'dist');
+export const BACKEND_LOG_FILE = join(e2eRoot, '.e2e-backend.log');
 
 const STATE_FILE = join(e2eRoot, '.e2e-state.json');
 const healthUrl = (port) => `http://127.0.0.1:${port}/api/health`;
@@ -82,6 +83,7 @@ export const FIXTURE_CLIPS = [
   'jfk-ah.wav', // the sample looped 5x, ~55s, item 59's phase-color row clip
   'broken-59-status.wav', // item 59's status-page delete fixture
   'jfk-ai.wav', // the sample looped 17x, ~187s, item 59's header-typing clip
+  'jfk-metal.wav', // the sample looped once (~22s), item 48's Metal app e2e
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -189,6 +191,10 @@ export const STATUS_BROKEN_CLIP = FIXTURE_CLIPS[43];
 // Item 59's header-typing journey: a long clip that keeps a task RUNNING while the header
 // icon is watched, then cancelled so it does not hold up the later specs.
 export const HEADER_TYPING_CLIP = FIXTURE_CLIPS[44];
+
+// Item 48's app-level Metal e2e: a unique clip (the sample looped once) whose transcript must
+// carry the JFK quote while the task runs through MTL0 on the macOS runner.
+export const METAL_CLIP = FIXTURE_CLIPS[45];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
@@ -330,6 +336,23 @@ export function killGroup(pid) {
 // `env` overrides the child's environment before the fixed data dir, port and models — item 60's
 // probe-failure spec strips whisper-cli from PATH for its own backend (a second one on a free port;
 // the shared backend is untouched).
+/**
+ * Mirrors the backend's stdout/stderr to the console and appends them to [BACKEND_LOG_FILE], so a
+ * CI step can assert which whisper backend a task used (roadmap item 48).
+ */
+function captureBackendOutput(child) {
+  const log = createWriteStream(BACKEND_LOG_FILE, { flags: 'a' });
+  child.stdout?.on('data', (chunk) => {
+    process.stdout.write(chunk);
+    log.write(chunk);
+  });
+  child.stderr?.on('data', (chunk) => {
+    process.stderr.write(chunk);
+    log.write(chunk);
+  });
+  child.once('exit', () => log.end());
+}
+
 export async function startBackend({ port, dataDir, env = {} }) {
   checkPreconditions();
   const backendCmd = process.env.E2E_BACKEND_CMD;
@@ -350,8 +373,9 @@ export async function startBackend({ port, dataDir, env = {} }) {
         // backend (`java -cp …`, `./gradlew run`), which serves 404 at `/` without this.
         STT_STATIC_DIR: process.env.STT_STATIC_DIR ?? frontendDist,
       },
-      stdio: ['ignore', 'inherit', 'inherit'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
+    captureBackendOutput(child);
     try {
       await waitForHealth(port);
     } catch (error) {
@@ -371,8 +395,9 @@ export async function startBackend({ port, dataDir, env = {} }) {
       STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,
       STT_PORT: String(port),
     },
-    stdio: ['ignore', 'inherit', 'inherit'],
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  captureBackendOutput(child);
   try {
     await waitForHealth(port);
   } catch (error) {

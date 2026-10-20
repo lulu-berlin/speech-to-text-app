@@ -99,10 +99,10 @@ internal fun parseVulkanDeviceLines(stderr: List<String>): List<GpuDevice> =
 /**
  * whisper.cpp 1.8.4's Metal enumeration: `whisper_backend_init_gpu: found GPU device <ggml index>: MTL0
  * (type: 2, cnt: <gpu ordinal>)`. The human Apple device name is not logged, so the name Settings shows is
- * `Metal (MTL0)`; `cnt` is the GPU ordinal `--device N` selects (0 with one Metal device). Only GPU/IGPU
- * devices get the line, and the Vulkan parser never matches it.
+ * `Metal (MTL0)`; `cnt` is the GPU ordinal `--device N` selects (0 with one Metal device). Only MTL names
+ * match, so libwhisper's Vulkan `found GPU device … Vulkan0` lines are ignored.
  */
-private val METAL_DEVICE_LINE = Regex("""found GPU device \d+: (\S+) \(type: \d+, cnt: (\d+)\)""")
+private val METAL_DEVICE_LINE = Regex("""found GPU device \d+: (MTL\d+) \(type: \d+, cnt: (\d+)\)""")
 
 /** Parses the GPUs of whisper-cli's darwin Metal stderr; other lines are ignored, as are garbled indices. */
 internal fun parseMetalDeviceLines(stderr: List<String>): List<GpuDevice> =

@@ -20,3 +20,6 @@ build/
 node_modules/
 dist/
 result
+
+# The e2e backend log (roadmap item 48: the macOS CI greps it for the whisper backend)
+/e2e/.e2e-backend.log
