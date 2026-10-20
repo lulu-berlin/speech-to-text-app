@@ -3,17 +3,18 @@
 // backend pid) lives in .e2e-state.json so global setup, the tests and the teardown all
 // see the same process.
 //
-// The backend runs as `gradle --no-daemon run`. Even so, gradle 8.14 forks a single-use
-// daemon JVM that actually launches the app's JVM, and that daemon is outside the group
-// of the gradle launcher pid the harness holds — so stops find and kill the app JVM by
-// its arguments (appJvmPid), not by the group alone.
+// The backend runs as `gradle --no-daemon run`. Even so, gradle forks a single-use daemon
+// JVM that actually launches the app's JVM, and that daemon is outside the group of the
+// gradle launcher pid the harness holds — so stops find and kill the app JVM by its
+// arguments (lib/processes.mjs), not by the group alone.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ancestors, findProcess, processes } from './processes.mjs';
 
 export const e2eRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const repoRoot = join(e2eRoot, '..');
@@ -281,53 +282,15 @@ export async function waitForHealth(port, { down = false, timeoutMs = 600_000 } 
   }
 }
 
-// The app JVM `gradle run` actually runs lives under the single-use daemon gradle forks
-// (its launcher process is already gone by the time a stop happens), so a group kill of
-// the launcher pid can miss it. The JVM is identifiable by its own args instead: every
-// run passes the same class name and the data directory.
-function appJvmPid(dataDir) {
-  // No `ps` binary in this environment (it is a bash builtin), so read /proc directly.
-  const needles = ['stt.MainKt', dataDir];
-  for (const entry of readdirSync('/proc')) {
-    if (!/^\d+$/.test(entry)) continue;
-    try {
-      const cmdline = readFileSync(`/proc/${entry}/cmdline`, 'utf8').replaceAll('\0', ' ');
-      if (needles.every((n) => cmdline.includes(n))) return Number(entry);
-    } catch {
-      // the process exited while we listed it
-    }
-  }
-  return null;
-}
-
-// The ancestors of the app JVM — its gradle daemon and the launcher JVM — started out
-// in this harness's process group but are long reparented by the time a stop happens,
-// so a group kill misses them. Walk the live ppid chain from the app JVM up to init.
-function jvmAncestors(appPid) {
-  const chain = [];
-  let pid = appPid;
-  for (let guard = 0; pid > 1 && guard < 16; guard++) {
-    chain.push(pid);
-    try {
-      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-      const rightmostParen = stat.lastIndexOf(')');
-      const fields = stat.slice(rightmostParen + 2).split(/\s+/);
-      pid = Number(fields[1]);
-    } catch {
-      break; // exited while walking
-    }
-  }
-  return chain;
-}
-
 // Stops a backend running on [port]. `gradle run` launches through two JVMs — a
 // launcher and a single-use daemon — that are outside this harness's process group by
 // now; find the app JVM by its args and SIGKILL the whole chain, so nothing survives to
 // hold the port or linger.
 export async function stopBackend(pid, port, dataDir) {
-  const jvm = appJvmPid(dataDir);
+  const rows = processes();
+  const jvm = findProcess(rows, ['stt.MainKt', dataDir]);
   if (jvm !== null) {
-    for (const chainPid of jvmAncestors(jvm)) {
+    for (const chainPid of ancestors(rows, jvm.pid)) {
       try {
         process.kill(chainPid, 'SIGTERM');
       } catch {
@@ -335,7 +298,7 @@ export async function stopBackend(pid, port, dataDir) {
       }
     }
     try {
-      process.kill(jvm, 'SIGKILL');
+      process.kill(jvm.pid, 'SIGKILL');
     } catch {
       // already gone
     }

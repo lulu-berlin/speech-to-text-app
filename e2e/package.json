@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node check-playwright.mjs && prettier --check . && tsc -p desktop/tsconfig.json && playwright test",
+    "test": "node --test lib/processes.test.mjs && node check-playwright.mjs && prettier --check . && tsc -p desktop/tsconfig.json && playwright test",
     "record:gifs": "playwright test --config=playwright.gifs.config.ts",
     "test:desktop": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts",
     "test:desktop:nix": "tsc -p desktop/tsconfig.json && node desktop/run-in-docker.ts --nix",
