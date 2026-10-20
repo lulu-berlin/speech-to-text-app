@@ -126,6 +126,9 @@ desktop staging and per-user paths (item 10).
       `Metal (MTL0)` per item 45; on the pinned prebuild (no ggml GPU backend) and a machine without
       Metal, cpu/auto only and no crash or phantom GPU. The positive half is pinned by the recorded
       1.8.4 darwin lines in a unit test; the cpu/auto half runs on the macOS leg
+- [ ] (CI, macOS, added 2026-10-19) On the Metal runner, choosing `gpu:0` makes the app transcribe
+      the JFK clip through MTL0 (the captured backend log shows `using MTL0 backend`) and the
+      transcript carries the known quote; the Settings option reads `GPU 0 — Metal (MTL0)`
 - [ ] (CI, macOS) DeviceArgs flags verified against the bundled whisper-cli version (the shipped
       binary, not 1.9.x assumptions)
 - [ ] (CI, macOS) `./gradlew e2e` (the journey: queue, history, settings, reorder, pause/cancel) is
@@ -182,3 +185,10 @@ desktop staging and per-user paths (item 10).
   added the portable e2e `/proc` replacement and the README macOS section. Known portability fixes
   the macOS `integrationTest` run forces: `ProcessRunnerSpec`'s `seq`/`/proc`/`setsid` assumptions and
   `ProcessTreeSpec`'s hardcoded Linux `[18, 15, 9]` (the latter is cycle 1's test-list item 2).
+- 2026-10-20: test list amended (14 items, replay checkpoint): the app-level Metal e2e added — on
+  the Metal runner, choosing `gpu:0` makes the app transcribe the JFK clip through MTL0 (captured
+  backend log shows `using MTL0 backend`) with the known quote and the Settings option reads
+  `GPU 0 — Metal (MTL0)`; it pins the positive Metal half end-to-end, making the separate
+  CLI/settings tests redundant. The Intel CI leg drops: the pinned nixpkgs has no x86_64-darwin,
+  so the flake declares `aarch64-darwin` only and the macOS leg is `macos-15` (ARM) — decided at
+  the CI-legs item.
