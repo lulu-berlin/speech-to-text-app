@@ -117,7 +117,7 @@ graph TD
   42 --> 60[60 exception-handling policy ✓]:::done
   61[61 headless ffmpeg ✓]:::done --> 62[62 audio-only ffmpeg ✓]:::done
   56 --> 62
-  63[63 whisper-cpp build time]
+  63[63 whisper-cpp build time ✓]:::done
   50 --> 64[64 evaluate Tauri]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
@@ -188,5 +188,5 @@ graph TD
 | [60 — Exception-handling policy: no catch-all swallows a throwable silently](../docs/specs/exception-handling-policy.md) | done | 42 |
 | [61 — Ship nixpkgs' cached headless ffmpeg](../docs/specs/headless-ffmpeg.md) | done | — |
 | [62 — An audio-only ffmpeg, shipped as a pinned prebuilt artifact](../docs/specs/audio-only-ffmpeg.md) | done | 56, 61 |
-| [63 — Stop compiling whisper-cpp on every uncached machine](63-whisper-cpp-build-time.md) | draft | — |
+| [63 — Stop compiling whisper-cpp on every uncached machine](../docs/specs/whisper-cpp-artifact.md) | done | — |
 | [64 — Evaluate Tauri as the desktop shell](64-tauri-evaluation.md) | spec-approved | 50 |

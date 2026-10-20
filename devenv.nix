@@ -14,8 +14,9 @@ in
   packages = [
     pkgs.git
 
-    # Transcribe CLI, the same pinned 1.8.4 Vulkan build the package ships (nix/whisper-cpp.nix)
-    (import ./nix/whisper-cpp.nix { inherit pkgs; })
+    # Transcribe CLI: the pinned 1.8.4 Vulkan build from the desktop-whisper-cpp-v1 asset
+    # (roadmap item 63), the same one `nix build .` and .#desktop ship.
+    (import ./nix/whisper-cpp.nix { inherit pkgs; }).whisperCpp
     
     # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks
     # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see

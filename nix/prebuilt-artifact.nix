@@ -45,6 +45,14 @@
     name = assetName;
     tools = pkgs.buildPackages;
     fetch = tools.writeShellScript "fetch-${name}" ''
+      # Structured attrs pass the derivation's attributes as JSON/shell files, not environment
+      # variables: in a build the output path comes from the shell file's `outputs` map ($out is
+      # unset otherwise — item 63's first fetch handed curl an empty --output). A direct invocation
+      # (the integrity checks) has no such file and keeps the caller's $out.
+      if [ -n "''${NIX_ATTRS_SH_FILE:-}" ]; then
+        source "$NIX_ATTRS_SH_FILE"
+        out=''${outputs[out]}
+      fi
       export PATH=${lib.makeBinPath [tools.curl tools.coreutils]}
       export SSL_CERT_FILE=${tools.cacert}/etc/ssl/certs/ca-bundle.crt
       name=${lib.escapeShellArg name}
@@ -67,8 +75,15 @@
     asset =
       derivation {
         inherit name;
+        # A flat fixed-output derivation's bytes are arbitrary (the tar names the build's own path
+        # and its libraries), so it has no meaningful references; newer Nix scans every built output
+        # and rejects references on a flat FOD unless they are discarded (item 63's first fetch:
+        # "fixed output derivation '…' is not allowed to refer to other store paths"). Structured
+        # attrs are how the option reaches the low-level `derivation` builtin.
+        __structuredAttrs = true;
+        unsafeDiscardReferences = {out = true;};
         system = pkgs.stdenv.buildPlatform.system;
-        builder = fetch;
+        builder = "${fetch}";
         outputHashMode = "flat";
         outputHashAlgo = "sha256";
         outputHash = pin.sha256;
