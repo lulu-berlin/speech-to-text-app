@@ -34,17 +34,23 @@ How it works inside — the components, the life of a task, the data model, the 
 
 | | Who it is for | Status |
 | --- | --- | --- |
-| [Packaged app with Nix](#packaged-app-with-nix) | Using the app | available |
+| [Packaged app with Nix](#packaged-app-with-nix) | Using the app | available on Linux and macOS Apple Silicon |
 | [Desktop app](#desktop-app) | Using the app in its own window, without a browser | available on Linux |
-| [Development environment (devenv)](#development-environment-devenv) | Working on the app | available |
-| [Docker](#docker) | Using the app without Nix | available |
-| [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | available |
+| [Development environment (devenv)](#development-environment-devenv) | Working on the app | available on Linux and macOS Apple Silicon |
+| [Docker](#docker) | Using the app without Nix | available on Linux |
+| [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | available on Linux and macOS Apple Silicon |
 
-All ways need **Linux on x86-64**; the Gradle path also has macOS builds, untested. A GPU is optional: whisper.cpp runs on any GPU with a **Vulkan** driver and falls back to the CPU otherwise. The first build of the package, the development shell or the Docker image downloads about 600 MB of models; the desktop app downloads them on its first start.
+All ways run on **Linux on x86-64**. The Nix package and the development shell also run on **macOS
+Apple Silicon** (`aarch64-darwin`), and the Gradle path runs on Apple Silicon too; **Intel macOS is
+not supported** (Apple discontinued Intel Macs and the pinned nixpkgs dropped `x86_64-darwin`). A GPU
+is optional: whisper.cpp uses **Vulkan** on Linux and **Metal** on Apple Silicon — the Nix-built
+whisper-cpp on the Nix paths, a pinned static Metal build on the Gradle path — and falls back to the
+CPU without a usable GPU. The first build of the package, the development shell or the Docker image
+downloads about 600 MB of models; the desktop app downloads them on its first start.
 
 ### Packaged app with Nix
 
-Prerequisites: [Nix](https://nixos.org/download/) with flakes enabled (`experimental-features = nix-command flakes` in `nix.conf`). Everything else — Java, whisper.cpp, ffmpeg, the models and the built frontend — comes with the package.
+Prerequisites: [Nix](https://nixos.org/download/) with flakes enabled (`experimental-features = nix-command flakes` in `nix.conf`), on Linux x86-64 or macOS Apple Silicon. Everything else — Java, whisper.cpp, ffmpeg, the models and the built frontend — comes with the package.
 
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git
@@ -53,6 +59,8 @@ nix run .
 ```
 
 Then open <http://localhost:8080>. `nix build .` builds the same app into `./result/bin/stt-app` without starting it. Details: [docs/specs/nix-flake-package.md](docs/specs/nix-flake-package.md).
+
+On macOS the app keeps its data in `~/Library/Application Support/stt-app`; on Linux in `${XDG_DATA_HOME:-~/.local/share}/stt-app`. Intel Macs are not supported by the flake (the pinned nixpkgs has no `x86_64-darwin`).
 
 ### Desktop app
 
@@ -121,13 +129,13 @@ Each form has its packaged end-to-end suite, run in a clean container from the d
 
 ### Development environment (devenv)
 
-Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell). The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
+Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell), on Linux x86-64 or macOS Apple Silicon. The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
 
-The shell's `ffmpeg` is the app's audio-only static build from the pinned `desktop-ffmpeg-v2` asset (roadmap item 62), so it has neither `ffplay` nor `ffprobe`; use another player to listen to a file and another tool to probe media.
+On Linux the shell's `ffmpeg` is the app's audio-only static build from the pinned `desktop-ffmpeg-v2` asset (roadmap item 62), so it has neither `ffplay` nor `ffprobe`; on macOS it is nixpkgs' `ffmpeg_8-headless`. Use another player to listen to a file and another tool to probe media.
 
-The shell's `whisper-cli` is the same pinned 1.8.4 Vulkan build `nix build .` and `.#desktop` ship, from the `desktop-whisper-cpp-v1` asset (roadmap item 63). Every system the flake declares must pin a whisper-cpp artifact — a flake check enforces it — so no machine compiles it.
+The shell's `whisper-cli` is the same pinned 1.8.4 build (Vulkan on Linux, Metal on darwin) that `nix build .` and `.#desktop` ship, from the `desktop-whisper-cpp-v1` asset on x86_64-linux (roadmap item 63). Every system the flake declares must pin a whisper-cpp artifact — a flake check enforces it — so no machine compiles it.
 
-The end-to-end fixture generator (`e2e/global-setup.mjs`) needs a full `ffmpeg` on `PATH` — the `wav` muxer, the `pcm_s16le` encoder and the `concat` filter; the shell's ffmpeg is the app's slim build, not a general-purpose one. Use `./gradlew e2e` (its managed tools) or prepend a Nix `ffmpeg_8-full` from the flake's pin when running `pnpm --dir e2e test` directly.
+The end-to-end fixture generator (`e2e/global-setup.mjs`) needs a full `ffmpeg` on `PATH` — the `wav` muxer, the `pcm_s16le` encoder and the `concat` filter; on Linux the shell's ffmpeg is the app's slim build, not a general-purpose one (the macOS shell's is full). Use `./gradlew e2e` (its managed tools) or prepend a Nix `ffmpeg_8-full` from the flake's pin when running `pnpm --dir e2e test` directly.
 
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git
@@ -183,7 +191,7 @@ The container runs as an unprivileged user (uid 1000) and writes only to its dat
 
 ### Gradle without Nix
 
-For working on the app without Nix: the repository's `./gradlew` downloads everything else itself — Gradle 9.8, JDK 21, Node.js, pnpm, whisper-cli 1.8.4, ffmpeg 8.1 and the models — at the versions the Nix flake pins (the committed [`versions.json`](versions.json), which the flake checks), and verifies every file's SHA-256. Linux x86-64 is tested; the macOS builds (Intel and Apple Silicon) are best-effort and untested. This path is for people; AI agents working on the repository keep to Nix and devenv ([AGENTS.md](AGENTS.md)).
+For working on the app without Nix: the repository's `./gradlew` downloads everything else itself — Gradle 9.8, JDK 21, Node.js, pnpm, whisper-cli 1.8.4, ffmpeg 8.1 and the models — at the versions the Nix flake pins (the committed [`versions.json`](versions.json), which the flake checks), and verifies every file's SHA-256. Linux x86-64 and macOS Apple Silicon are tested; Intel macOS is unsupported (the pinned darwin-x64 prebuild is broken and nixpkgs has no `x86_64-darwin`). This path is for people; AI agents working on the repository keep to Nix and devenv ([AGENTS.md](AGENTS.md)).
 
 Prerequisites:
 
@@ -202,12 +210,7 @@ Prerequisites:
   ./gradlew runtimeSystemDeps
   ```
 
-- **macOS**: `setsid` (the app starts whisper-cli and ffmpeg through it), from Homebrew's `util-linux`, which does not put it on `PATH` by itself:
-
-  ```sh
-  brew install util-linux
-  export PATH="$(brew --prefix util-linux)/bin:$PATH"
-  ```
+- **macOS Apple Silicon**: no extra tools. The bootstrap downloads the pinned static 1.8.4 Metal whisper-cli from the `desktop-whisper-cpp-v1` release; the app signals its direct child, so it needs no `setsid` and no system libraries. Data lives in `~/Library/Application Support/stt-app`. The older upstream darwin prebuilts (no GPU backend) are not used.
 
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git
