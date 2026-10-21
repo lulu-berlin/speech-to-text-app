@@ -60,34 +60,38 @@ tasks.register("checkVersions") {
         //    downloads, plus the desktop's JDK, has a pinned windows-x64 artifact. The download,
         //    sha256 check and .exe resolution run on Windows; this keeps the manifest honest on
         //    any host, since the bootstrap reads the committed versions.json without Nix.
-        val windowsPlatform = "windows-x64"
-        if (windowsPlatform !in supportedPlatforms) {
-            throw GradleException(
-                "supportedPlatforms has no $windowsPlatform, so versions.json has no Windows tool pins " +
-                    "(supported: ${supportedPlatforms.joinToString()}).",
-            )
-        }
-        val downloads = manifest["downloads"] as Map<*, *>
-        val windowsAssets =
-            mapOf(
-                "whisper-cli" to "whisper-1.8.4-windows-x64.tar.gz",
-                "ffmpeg" to "windows-x86_64-gpl.jar",
-                "temurin-jdk" to "windows_hotspot",
-            )
-        for ((tool, asset) in windowsAssets) {
-            val table = downloads[tool] as Map<*, *>?
-            val entry =
-                (table?.get(windowsPlatform) as Map<*, *>?)
-                    ?: throw GradleException("versions.json has no $tool download for $windowsPlatform")
-            val url = entry["url"] as String?
-            if (url == null || !url.contains(asset)) {
-                throw GradleException("versions.json's $tool pin for $windowsPlatform must point at $asset, got $url")
+        fun verifyWindowsPins() {
+            val windowsPlatform = "windows-x64"
+            if (windowsPlatform !in supportedPlatforms) {
+                throw GradleException(
+                    "supportedPlatforms has no $windowsPlatform, so versions.json has no Windows tool pins " +
+                        "(supported: ${supportedPlatforms.joinToString()}).",
+                )
             }
-            val sha = entry["sha256"] as String?
-            if (sha == null || !Regex("[0-9a-f]{64}").matches(sha)) {
-                throw GradleException("versions.json's $tool pin for $windowsPlatform needs a 64-hex sha256, got $sha")
+            val downloads = manifest["downloads"] as Map<*, *>
+            val windowsAssets =
+                mapOf(
+                    "whisper-cli" to "whisper-1.8.4-windows-x64.tar.gz",
+                    "ffmpeg" to "windows-x86_64-gpl.jar",
+                    "temurin-jdk" to "windows_hotspot",
+                )
+            for ((tool, asset) in windowsAssets) {
+                val table = downloads[tool] as Map<*, *>?
+                val entry =
+                    (table?.get(windowsPlatform) as Map<*, *>?)
+                        ?: throw GradleException("versions.json has no $tool download for $windowsPlatform")
+                val url = entry["url"] as String?
+                if (url == null || !url.contains(asset)) {
+                    throw GradleException("versions.json's $tool pin for $windowsPlatform must point at $asset, got $url")
+                }
+                val sha = entry["sha256"] as String?
+                if (sha == null || !Regex("[0-9a-f]{64}").matches(sha)) {
+                    throw GradleException("versions.json's $tool pin for $windowsPlatform needs a 64-hex sha256, got $sha")
+                }
             }
         }
+
+        verifyWindowsPins()
 
         logger.lifecycle(
             "checkVersions: versions.json is in sync (Gradle $manifestGradle, nixpkgs ${lockRev.take(12)}, " +
