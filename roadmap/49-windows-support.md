@@ -101,7 +101,7 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 (Windows-CI items tick only on a reported CI run, never on a local proxy; a run the user performs
 on a Windows VM or host is recorded in the Approval log as user-verified.)
 
-- [ ] (split from item 1, 2026-10-21) On Windows a command is spawned without `setsid`, a bare tool
+- [x] (split from item 1, 2026-10-21) On Windows a command is spawned without `setsid`, a bare tool
       name resolves through the `;`-separated PATH to `<name>.exe`, stdin is `NUL`, and
       pause/resume send no signals (pause happens at the chunk gate)
 - [ ] (split from item 1, 2026-10-21) `windows-x64` whisper-cli (Vulkan), ffmpeg and Temurin JDK
@@ -170,3 +170,11 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   PR and nightly, with the first measured wall time compared to the macOS e2e band (13–16 min) and
   the cadence returned to the user if slower. First cycle: the Windows spawn seam. Status:
   in-progress (test list approved).
+- 2026-10-21: user-verification path: QEMU with the NVIDIA GPU passed through to a Windows
+  guest, so the VM run can cover both the CPU/queue semantics and the real Vulkan GPU path
+  (driver permitting; a dual boot remains the fallback if passthrough is refused). Recorded as
+  user-verified when run.
+- 2026-10-21: cycle 1 (Windows spawn seam) green and ticked: `ProcessRunnerWindowsSpec` red first
+  on the missing `WINDOWS`/`env`/`signals` API, then green; full `gradle -p backend check` green.
+  Commits: `920973e0` (test + code), `c760137a` (approved refactor: absent signal numbers),
+  `9876ea76` (approved refactor: platform facts moved to `ProcessRunnerPlatformSpec`).
