@@ -1,7 +1,7 @@
 # Frontend foundation
 
 Status: done (roadmap item 13, merged 2026-10-09)
-Depends on: [02 — Repo skeleton and conventions](repo-skeleton-and-conventions.md), [12 — HTTP API and SSE](../../roadmap/12-http-api-and-sse.md) (spec-approved only)
+Depends on: [02 — Repo skeleton and conventions](repo-skeleton-and-conventions.md), [12 — HTTP API and SSE](http-api-and-sse.md) (spec-approved only)
 
 ## Goal
 Provide the shared frontend building blocks that the Queue (item 14) and History (item 15) views build on:
@@ -17,7 +17,7 @@ Provide the shared frontend building blocks that the Queue (item 14) and History
 - [ADR 0001 — Stack and monorepo](../decisions/0001-stack-and-monorepo.md): React + TypeScript + styled-components, served by the backend.
 - [ADR 0007 — SSE live updates](../decisions/0007-sse-live-updates.md): live state via `GET /api/events`, all commands via REST.
 - [ADR 0009 — Approval-gated Canon TDD workflow](../decisions/0009-approval-gated-canon-tdd-workflow.md).
-- [ADR 0029 — Contract-first frontend](../decisions/0029-contract-first-frontend-shared-api-examples.md): the frontend builds against item 12's approved contract with MSW mocks, in parallel with items 09–12. The files in [`docs/api/`](../api/) are the only source of mock data. The check against the running backend is item [21](../../roadmap/21-frontend-backend-end-to-end.md).
+- [ADR 0029 — Contract-first frontend](../decisions/0029-contract-first-frontend-shared-api-examples.md): the frontend builds against item 12's approved contract with MSW mocks, in parallel with items 09–12. The files in [`docs/api/`](../api/) are the only source of mock data. The check against the running backend is item [21](frontend-backend-end-to-end.md).
 - [ADR 0031 — Frontend routing with react-router, state with XState](../decisions/0031-frontend-routing-react-router-state-xstate.md): react-router URLs; XState v5 + `@xstate/react` machines for client actions, with server state applied as received; one transition table, `docs/api/task-transitions.json`.
 - [Frontend conventions](../conventions/frontend.md): `app/`, `features/<feature>/`, `shared/`; design values only as theme tokens; named exports; colocated tests; typed API client in `src/shared/api/`.
 

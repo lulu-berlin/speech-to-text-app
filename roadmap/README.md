@@ -40,10 +40,10 @@ graph TD
   12 -. spec only .-> 13
   13 --> 14[14 frontend queue UI ✓]:::done
   13 --> 15[15 frontend history UI ✓]:::done
-  02 --> 16[16 Nix flake package]
+  02 --> 16[16 Nix flake package ✓]:::done
   14 --> 16
   15 --> 16
-  17 --> 16
+  17[17 Branding: stenographer typing animation ✓]:::done --> 16
   20[20 cleanup refactors ✓]:::done
   12 --> 21[21 frontend-backend end-to-end ✓]:::done
   14 --> 21
@@ -80,8 +80,8 @@ graph TD
   34[34 dev mode ✓]:::done
   21 --> 35[35 README and architecture overview ✓]:::done
   36[36 follow-mode hold-off race ✓]:::done --> 35[35 README and architecture overview ✓]:::done
-  37 --> 35[35 README and architecture overview]
-  38 --> 35[35 README and architecture overview]
+  37[37 Audio request 500: the joiner shares the engine's single-flight runner ✓]:::done --> 35[35 README and architecture overview ✓]:::done
+  38[38 Joined playback stalls at ~90 s of a long clip ✓]:::done --> 35[35 README and architecture overview ✓]:::done
   39[39 devenv/doc drift: playwright comment ✓]:::done
   11 --> 40[40 atomic task transitions ✓]:::done
   12 --> 41[41 upload hardening ✓]:::done

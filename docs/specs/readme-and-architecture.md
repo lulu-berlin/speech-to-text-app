@@ -22,7 +22,7 @@ To be settled in the consultation. Starting points:
 - **`README.md`** at the repository root:
   - what the app does (upload many files, a pausable and reorderable queue, transcription with speaker diarization, history, playback, speaker rename/merge, the output formats) with item 21's screenshots and a few animated GIFs of the main flows;
   - the ways to run it, each with its prerequisites: devenv (now), dev mode (item 34), and sections that items 16 (Nix), 19 (Docker) and 33 (Gradle without Nix) add as part of their acceptance;
-  - configuration (`STT_*`), where data lives and how to back it up, licenses and attributions ([docs/attributions.md](../docs/attributions.md)), links to `AGENTS.md` and the architecture overview.
+  - configuration (`STT_*`), where data lives and how to back it up, licenses and attributions ([docs/attributions.md](../attributions.md)), links to `AGENTS.md` and the architecture overview.
 - **Animated GIFs**: recorded by a Playwright spec in `e2e/` (video recording of the real app) and converted with ffmpeg (from devenv) by the user; proposed flows: uploading files and watching the queue progress, transcript playback with follow mode, renaming and merging speakers; each GIF kept small (a few MB at most), committed next to the screenshots.
 - **`docs/architecture.md`**:
   - one component diagram: browser UI ⇄ Ktor HTTP/SSE ⇄ queue and engine ⇄ SQLite; the engine driving ffmpeg, whisper-cli and the CAM++ model;
