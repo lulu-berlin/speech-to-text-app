@@ -24,10 +24,8 @@
     ...
   }: let
     # The systems the flake declares: the per-system outputs are built for each (roadmap
-    # item 48 adds aarch64-darwin). The artifact-policy checks cover declaredSystems, the
-    # systems with pinned prebuilt artifacts; darwin ships the source Metal build (its
-    # pinned whisper-cpp asset lands with the packaged-artifact work).
-    declaredSystems = ["x86_64-linux"];
+    # item 48 adds aarch64-darwin). Every one of them pins a prebuilt whisper-cpp artifact
+    # (the policy check checks), so adding a platform cannot land without its asset.
     systems = ["x86_64-linux" "aarch64-darwin"];
     mkSystem = system: let
       pkgs = nixpkgs.legacyPackages.${system};
@@ -889,14 +887,16 @@
         key = "whisperCpp";
         subject = "whisper-cpp";
         tool = "whisper-cli";
-        desktop = self.packages.${system}.desktop;
+        desktop = if isLinux then self.packages.${system}.desktop else null;
         server = self.packages.${system}.default;
-        roots = {
-          server = self.packages.${system}.default;
-          docker-root = self.packages.${system}.docker-root;
-          desktop = self.packages.${system}.desktop;
-          desktop-bundle = self.packages.${system}.desktop-bundle;
-        };
+        # darwin ships no desktop, bundle or docker-root: the server package is the root there.
+        roots =
+          {server = self.packages.${system}.default;}
+          // pkgs.lib.optionalAttrs isLinux {
+            docker-root = self.packages.${system}.docker-root;
+            desktop = self.packages.${system}.desktop;
+            desktop-bundle = self.packages.${system}.desktop-bundle;
+          };
         name = "whisper-cpp-everywhere";
       };
 
@@ -917,12 +917,11 @@
     };
 
     # Roadmap item 63 (test-list item 6): every system the flake declares has a pinned whisper-cpp
-    # artifact, so adding a platform (items 48, 49) cannot land without its asset. darwin (roadmap
-    # item 48) ships the source Metal build until its own asset pin lands, so it is not in
-    # declaredSystems yet and the check is excluded there.
+    # artifact, so adding a platform (items 48, 49) cannot land without its asset. darwin's pin
+    # (roadmap item 48's follow-up) is the static Metal build the Gradle bootstrap downloads.
     whisper-cpp-artifact-policy = let
       artifacts = import ./nix/desktop-artifacts.nix;
-      missing = builtins.filter (s: (artifacts.whisperCpp.${s} or null) == null) declaredSystems;
+      missing = builtins.filter (s: (artifacts.whisperCpp.${s} or null) == null) systems;
     in
       assert pkgs.lib.assertMsg (missing == [])
       "whisper-cpp-artifact-policy: no pinned whisper-cpp artifact for ${pkgs.lib.concatStringsSep ", " missing} (nix/desktop-artifacts.nix whisperCpp)";
@@ -1078,7 +1077,7 @@
         echo ok > $out
       '';
 
-    } (if isLinux then [] else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-audio-only-everywhere" "ffmpeg-upload-formats" "ffmpeg-app-uses" "ffmpeg-artifact-integrity" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-everywhere" "whisper-cpp-artifact-integrity" "whisper-cpp-artifact-policy" "whisper-cpp-closure-size" "whisper-cpp-asset-fetch"]);
+    } (if isLinux then [] else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-audio-only-everywhere" "ffmpeg-upload-formats" "ffmpeg-app-uses" "ffmpeg-artifact-integrity" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-closure-size"]);
   };
   in {
     packages = nixpkgs.lib.genAttrs systems (system: (mkSystem system).packages);

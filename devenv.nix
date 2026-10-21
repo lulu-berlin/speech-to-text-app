@@ -15,9 +15,9 @@ in
     [
       pkgs.git
 
-      # Transcribe CLI: the pinned 1.8.4 build (Vulkan on Linux, Metal on darwin) from the
-      # desktop-whisper-cpp-v1 asset on x86_64-linux (roadmap item 63), the same one
-      # `nix build .` and .#desktop ship.
+      # Transcribe CLI: the pinned 1.8.4 build (Vulkan on Linux, static Metal on darwin) from the
+      # desktop-whisper-cpp-v1 asset on x86_64-linux and aarch64-darwin (roadmap items 63 and 48),
+      # the same one `nix build .` and .#desktop ship.
       (import ./nix/whisper-cpp.nix { inherit pkgs; }).whisperCpp
 
       # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks

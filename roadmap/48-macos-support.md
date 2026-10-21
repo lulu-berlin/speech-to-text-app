@@ -152,6 +152,11 @@ desktop staging and per-user paths (item 10).
       `~/Library/Caches/stt-app/models`), and item 50's packaged specs (journey, quit without orphan
       processes, first run with the model download and its persistence, download failure with Retry)
       pass against the installed DMG
+- [ ] (CI, macOS, added 2026-10-21) The darwin whisper-cpp the Nix package and the devenv ship is
+      the pinned static prebuilt artifact from `desktop-whisper-cpp-v1` (the same tar the Gradle
+      bootstrap downloads); `nix/desktop-artifacts.nix` records `whisperCpp.aarch64-darwin`, the flake
+      has no separate `declaredSystems` list, and the asset-fetch, policy, everywhere and integrity
+      checks run on darwin (no `docker-root` there); `nix flake check --system aarch64-darwin` passes
 - [x] (must not break) `./gradlew check`, `./gradlew integrationTest`, `pnpm test`, `pnpm build` and
       the Linux e2e stay green
 
@@ -280,3 +285,16 @@ desktop staging and per-user paths (item 10).
 - 2026-10-20: all test-list items green on CI run 39357501229 (commit `73677550`): every macOS leg
   (gradle check, integrationTest, e2e with `using MTL0 backend`, DMG + packaged e2e, Nix build +
   devenv) and every Linux leg passed. Status: in-review.
+- 2026-10-21: test item added (replay checkpoint, user-approved): the darwin whisper-cpp the Nix
+  package and the devenv ship is the pinned static prebuilt artifact from
+  `desktop-whisper-cpp-v1` (`whisper-cpp-1.8.4-aarch64-darwin.tar.gz`, sha256
+  `58ff90b3b693c58c28a3cf50c8dc9fcc6ad355101e9535f234d187bd9651078a`), the same tar the Gradle
+  bootstrap downloads; `nix/desktop-artifacts.nix` records `whisperCpp.aarch64-darwin` with
+  `storePath = null` and no references (the binary is static: system frameworks only, no store
+  paths, so there is nothing to re-link and no stale pin to catch), the separate `declaredSystems`
+  list is deleted (the policy check now covers every declared system), and the asset-fetch, policy,
+  everywhere and integrity checks run on darwin (the everywhere check checks the server wrapper
+  only — darwin has no desktop, bundle or `docker-root`). The producer `whisper-cpp-asset-pin`
+  check stays Linux-only: the darwin asset is compiled by the manual cmake job, not by the flake's
+  Nix source build, so there is no source derivation to reproduce it from; the fetch gate still
+  verifies its sha256. The Gradle bootstrap's static darwin tar stays as is.

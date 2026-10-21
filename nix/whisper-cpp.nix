@@ -27,9 +27,10 @@
 #
 # On x86_64-linux the shipped output is the pinned prebuilt release asset
 # (nix/desktop-artifacts.nix `whisperCpp`, roadmap item 63), fetched and re-linked by
-# nix/prebuilt-artifact.nix; a system without a pin ships the source build (items 48/49 add
-# their systems' artifacts with them). `source` is the derivation the asset is made from,
-# `whisperCpp` the one the package, Docker and the devenv run.
+# nix/prebuilt-artifact.nix; aarch64-darwin ships the pinned static Metal build (roadmap item 48's
+# follow-up, the same asset the Gradle bootstrap downloads). A system without a pin ships the
+# source build (item 49 adds its system's artifact with it). `source` is the derivation the Linux
+# asset is made from, `whisperCpp` the one the package, Docker and the devenv run.
 { pkgs, artifacts ? import ./desktop-artifacts.nix }:
 let
   tag = (import ./versions.nix).whisperCppTag;
