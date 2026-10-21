@@ -9,9 +9,10 @@ Blocks: —
 The app runs on Windows 10/11 x64 without WSL: built and launched through the Gradle wrapper
 (`gradlew.bat`, item 33's bootstrap path) and a `.cmd` launcher, speaking to pinned Windows binaries
 of whisper-cli and ffmpeg, with working queue semantics (pause at the next chunk boundary, cancel,
-resume, reorder, retry) and a green e2e journey. Windows is a supported platform in the docs; the
-POSIX-only pieces are replaced or cleanly abstracted, not papered over. GPU-accelerated
-transcription works with a GPU-enabled whisper-cli build.
+resume, reorder, retry) and a green e2e journey. It is delivered as a portable zip and an unsigned
+per-user MSI. Windows is a supported platform in the docs; the POSIX-only pieces are replaced or
+cleanly abstracted, not papered over. GPU-accelerated transcription works with a GPU-enabled
+whisper-cli build (Vulkan, the pinned upstream Windows tarball).
 
 ## Evidence
 
@@ -48,6 +49,33 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 - **Delivery**: `gradlew.bat` bootstrap + a `.cmd` launcher, zip layout, pinned sha-verified Windows
   artifacts in versions.nix.
 
+### Decided (checkpoint 1, 2026-10-21)
+
+- **GPU backend: Vulkan.** The pinned upstream `whisper-1.8.4-windows-x64.tar.gz` (sha256
+  `cfc2a9f82e6db9c5fe11e3637d6be8660ae169a527febfbc5d35a5e0d96ca85b`) is a static PE32+ build with
+  ggml-vulkan; `vulkan-1.dll` is `LoadLibrary`-loaded, so a host without an ICD falls back to CPU.
+  The existing Vulkan probe parser and `gpu:N` → `--device N` path carry over unchanged. CUDA is a
+  possible later item (a second pinned asset, CUDA DLL staging, a CUDA parser and selector); on the
+  benchmarked RTX 4070 Mobile (whisper.cpp issue #89) Vulkan's encoder was ~18% slower on
+  large-v3-turbo and the one end-to-end run (medium.en, 75 min) was ~4% slower — a throughput
+  tradeoff, not a capability one, and Vulkan is what makes AMD/Intel GPUs usable at all.
+- **CPU-first CI.** Standard GitHub-hosted Windows runners have no GPU; GPU runners are larger
+  runners for organization plans. The Windows leg verifies startup, the CPU path, the zero-GPU probe
+  and the `gpu:N` fallback; a real-GPU observation is user-verified on a Windows VM/host if
+  available, and the docs state the Vulkan driver requirement.
+- **Process control:** the backend terminates the direct child (`Process.destroyForcibly`;
+  whisper-cli/ffmpeg do not fork), pause is the existing chunk-boundary `PauseGate` with no
+  signals, and the exit-143 detection becomes a known-stopped-by-us flag. The desktop app quits
+  with `taskkill /T /F` on the live backend pid (Node cannot send a catchable SIGTERM on Windows)
+  and spawns it with `windowsHide: true`; an abrupt quit is crash-safe (SQLite) and RUNNING tasks
+  recover (ADR 0004).
+- **Test list:** approved as 13 items, with item 1 split into the spawn seam and the Windows pins,
+  and a new MSI item. Windows-CI items tick only on a reported run; user runs are recorded.
+- **Windows CI cadence:** every pull request and the nightly schedule, unless the first run's
+  measured wall time says otherwise; the decision is recorded with that measurement.
+- **Packaging:** the portable zip plus an unsigned per-user MSI (WiX, `perMachine: false`); data in
+  `%APPDATA%\stt-app`, models in `%LOCALAPPDATA%\stt-app\models`.
+
 ## Proposal
 
 1. Consume item 48's process-control seam: a Windows implementation replacing setsid/signals —
@@ -59,32 +87,50 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
    `nix/versions.nix`/`versions.json`; `.cmd` launcher; e2e process cleanup without POSIX group kill.
 4. Docs: Windows platform section; AGENTS/README updates.
 
-## Open questions
+## Open questions (answered 2026-10-21)
 
-- GPU compute backend on Windows (CUDA / DirectML / Vulkan) — decided during implementation against
-  runner availability; GPU device enumeration reconciles with items 45/48.
-- Whether the Windows CI runner includes a GPU (device-selection tests) or runs CPU-only with the
-  flag path verified separately.
+- GPU compute backend on Windows? → **Vulkan**: the pinned upstream Windows tarball is
+  Vulkan-enabled, reuses item 45's parser and `--device N`, and covers NVIDIA/AMD/Intel; CUDA is a
+  possible later item. See the Decided section for the benchmark evidence.
+- Does the Windows CI runner include a GPU? → **No** on the standard free runners (GPU runners are
+  larger runners for organization plans), so CI is CPU-first and the flag/fallback path is what it
+  verifies; a real-GPU run is user-verified if a Windows VM or host exposes the GPU.
 
-## Test list (proposed; behaviors only)
+## Test list (approved 2026-10-21; behaviors only)
 
-- [ ] Backend starts on Windows via `gradlew.bat` + the `.cmd` launcher with a Windows-idiomatic
+(Windows-CI items tick only on a reported CI run, never on a local proxy; a run the user performs
+on a Windows VM or host is recorded in the Approval log as user-verified.)
+
+- [ ] (split from item 1, 2026-10-21) On Windows a command is spawned without `setsid`, a bare tool
+      name resolves through the `;`-separated PATH to `<name>.exe`, stdin is `NUL`, and
+      pause/resume send no signals (pause happens at the chunk gate)
+- [ ] (split from item 1, 2026-10-21) `windows-x64` whisper-cli (Vulkan), ffmpeg and Temurin JDK
+      pins exist in `nix/versions.nix` and `versions.json`; the bootstrap downloads, sha-verifies
+      and resolves `whisper-cli.exe`/`ffmpeg.exe` on Windows
+- [ ] Backend starts on Windows via `gradlew.bat` + `stt.cmd` with a Windows-idiomatic
       STT_DATA_DIR and serves the UI; required-env-var errors are the same as on Linux
 - [ ] A full upload → transcribe → diarize run completes on Windows and its output matches Linux
 - [ ] Pausing a running task on Windows stops progress and resume continues from the next chunk
       without corrupting the transcript (per the decided checkpoint design)
 - [ ] Cancel and delete leave no orphan processes (whisper-cli/ffmpeg all gone) on Windows
 - [ ] Queue pause, reorder, retry and history behave as on Linux
-- [ ] Device selection works with the GPU-enabled build (or, on CPU-only CI, the flag path is
-      verified and documented as CPU-first)
-- [ ] README documents Windows support and the bootstrap path
-- [ ] (CI, inherited from 51 on 2026-10-14) This item adds its Windows leg to
-      `.github/workflows/ci.yml`; it runs on the nightly schedule and on this item's PRs; no Nix job
-      exists on Windows
-- [ ] (e2e, CI Windows, moved from item 50 on 2026-10-15) The packaged desktop app runs on Windows
+- [ ] Device selection works with the GPU-enabled Vulkan build (or, on CPU-only CI, the flag path
+      is verified and documented as CPU-first); a real-GPU run is user-verified if available
+- [ ] README documents Windows support and the bootstrap path, including the Vulkan driver
+      requirement and the CPU fallback
+- [ ] (CI, inherited from 51 on 2026-10-14; amended 2026-10-21) This item adds its Windows leg to
+      `.github/workflows/ci.yml`; it runs on every pull request and the nightly schedule, and no Nix
+      job exists on Windows. Matched to the macOS cadence only if the first run's measured wall time
+      is comparable (macOS e2e observed at 13–16 min on 2026-10-21): the measurement is recorded in
+      the Approval log, and a slower run returns the cadence decision to the user before ticking
+- [ ] (e2e, CI Windows, moved from item 50 on 2026-10-15) The packaged portable zip runs on Windows
       with its per-user paths: item 50's packaged specs (journey, quit without orphan processes,
       first run with the model download and its persistence, download failure with Retry) pass
-      against the installed Windows build
+      against the unpacked build
+- [ ] (e2e, CI Windows, added 2026-10-21) The unsigned per-user MSI installs the same app: silent
+      `msiexec /i … /quiet` installs under the per-user programs directory, item 50's packaged
+      specs pass against the installed app, and `msiexec /x {ProductCode} /quiet` removes the
+      program files while the data directory and model cache remain
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green
 
@@ -92,7 +138,10 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 
 - Windows x64 is a documented, tested platform for the runtime and queue semantics; the POSIX-only
   assumptions (setsid, signals, /dev/null, PATH, exit-143) are gone or cleanly abstracted; every
-  spawned tool is a pinned Windows artifact (GPU build included); the e2e journey passes on Windows.
+  spawned tool is a pinned Windows artifact (the Vulkan GPU build included); the e2e journey passes
+  on Windows.
+- The app ships as a portable zip and an unsigned per-user MSI, both carrying the bundled JRE,
+  backend, UI and pinned tools.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
@@ -104,3 +153,20 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 - 2026-10-15: item 50's test item "The packaged app runs on macOS and Windows with their per-user
   paths" moved here (Windows half) by the user's decision, so item 50 could ship Linux first;
   dependency on 50 added, 50 removed from "Blocks".
+- 2026-10-21: checkpoint 1 — the GPU backend is **Vulkan**, not CUDA: the pinned upstream
+  `whisper-1.8.4-windows-x64.tar.gz` is Vulkan-enabled and `vulkan-1.dll` is loaded dynamically, so
+  a driver-less host falls back to CPU; item 45's parser and `gpu:N` contract are reused. Benchmark
+  evidence discussed: whisper.cpp issue #89's RTX 4070 Mobile (Win11) encoder timings, CUDA vs
+  Vulkan — large-v3-turbo 249 vs 294 ms (+18%), medium 154 vs 166 ms (+8%), and one 75-minute
+  medium.en transcription 295.6 vs 308.7 s (+4.4%) — so the CUDA gap is throughput, not capability,
+  and CUDA is deferred as a possible later item. Standard GitHub-hosted Windows runners have no GPU
+  (GPU runners are larger runners for organization plans), so CI verifies the CPU path, the zero-GPU
+  probe and the `gpu:N` fallback; the user will record a Windows VM run and, if a host or VM exposes
+  the GPU, a real-GPU run.
+- 2026-10-21: checkpoint 1 — stop design: direct-child `destroyForcibly` in the backend, chunk-gate
+  pause with no signals, a known-stopped-by-us flag instead of exit 143, and `taskkill /T /F` with
+  `windowsHide: true` for the desktop quit (no tray/console window). Test list approved as 13 items:
+  item 1 split into the spawn seam and the Windows pins; a new MSI item added; Windows CI on every
+  PR and nightly, with the first measured wall time compared to the macOS e2e band (13–16 min) and
+  the cadence returned to the user if slower. First cycle: the Windows spawn seam. Status:
+  in-progress (test list approved).
