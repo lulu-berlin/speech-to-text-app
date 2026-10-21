@@ -178,3 +178,10 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   on the missing `WINDOWS`/`env`/`signals` API, then green; full `gradle -p backend check` green.
   Commits: `920973e0` (test + code), `c760137a` (approved refactor: absent signal numbers),
   `9876ea76` (approved refactor: platform facts moved to `ProcessRunnerPlatformSpec`).
+- 2026-10-21: cycle 2 (Windows pins) green locally: `checkVersions` failed first on the missing
+  `windows-x64` platform, then passed with the three pins; `ktlintCheck` green. The artifacts were
+  downloaded and their sha256 values match; contents confirmed `whisper-cli.exe` (Vulkan),
+  `ffmpeg.exe` + DLLs and the JDK's jmods. `nix` was not on the workspace's PATH, so `versions.json`
+  was regenerated with `jq -S` in the flake's shape; `versions-sync` awaits a Nix run. Commits:
+  `aa12eb5c` (test + pins), `27d8cb32` (approved refactor: `platformExecutable`), `7964a134`
+  (approved refactor: `verifyWindowsPins`). Item 2 ticks with the Windows run in item 3.
