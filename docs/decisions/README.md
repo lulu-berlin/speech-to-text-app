@@ -69,3 +69,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0056 | [Which shell a script starts with: `env` only where Nix is absent, pinned store interpreters otherwise](0056-shebang-env-only-outside-nix.md) | accepted | 2026-10-15 |
 | 0057 | [A RUNNING task whose process is gone goes back to QUEUED](0057-running-task-without-process-is-queued.md) | accepted | 2026-10-17 |
 | 0058 | [A QUEUED task whose start write fails is FAILED](0058-queued-task-whose-start-fails-is-failed.md) | accepted | 2026-10-18 |
+| 0059 | [The Linux desktop app keeps Electron: Tauri 2's 24–32% saving is a cross-date comparison, the comparable unpacked saving is inferred at ~36%, and ADR 0055 cannot be kept](0059-os-shell-stays-electron.md) | accepted | 2026-10-20 |

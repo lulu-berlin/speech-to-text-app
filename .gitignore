@@ -13,6 +13,9 @@ devenv.local.yaml
 /workspaces/*
 !/workspaces/README.md
 
+# Agent working files (per-session state, never committed)
+handoff.md
+
 # Build outputs (roadmap item 02)
 build/
 .gradle/
