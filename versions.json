@@ -16,8 +16,8 @@
     },
     "whisper-cli": {
       "darwin-arm64": {
-        "sha256": "44eca18e0cfa74e856d589fe6da70ce251aa18b04417766828b3f89ad7934921",
-        "url": "https://github.com/jiang1997/whisper.cpp-release/releases/download/v1.8.4/whisper-1.8.4-macos-arm64.tar.gz"
+        "sha256": "58ff90b3b693c58c28a3cf50c8dc9fcc6ad355101e9535f234d187bd9651078a",
+        "url": "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-aarch64-darwin.tar.gz"
       },
       "darwin-x64": {
         "sha256": "a5f41b14a6e4cb3e0c045b7954f0a4050bc0d44a9b2ce2e5826ee2a5fef8577c",
@@ -29,6 +29,10 @@
       }
     },
     "temurin-jdk": {
+      "darwin-arm64": {
+        "sha256": "3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.12.1_1.tar.gz"
+      },
       "linux-x64": {
         "sha256": "ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
         "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz"

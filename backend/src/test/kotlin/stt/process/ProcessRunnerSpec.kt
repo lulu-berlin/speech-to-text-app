@@ -295,7 +295,7 @@ class ProcessRunnerSpec :
                     val result =
                         withTimeout(10.seconds) {
                             ProcessRunner().run(
-                                listOf("seq", "1", "100000"),
+                                listOf("awk", "BEGIN { for (i = 1; i <= 100000; i++) print i }"),
                                 onStdoutLine = { delivered += it },
                             )
                         }
@@ -322,7 +322,7 @@ class ProcessRunnerSpec :
                         launch {
                             try {
                                 ProcessRunner(gracePeriod = 300.milliseconds).run(
-                                    listOf("sh", "-c", "seq 1 100000; sleep 100"),
+                                    listOf("sh", "-c", "awk 'BEGIN { for (i = 1; i <= 100000; i++) print i }'; sleep 100"),
                                     onStdoutLine = { line ->
                                         delivered.add(line)
                                         firstLine.complete(Unit)
@@ -634,15 +634,30 @@ private fun runTree(): List<Long> =
         .map(ProcessHandle::pid)
         .toList()
 
-/** The state letter in `/proc/<pid>/stat` (R running, S sleeping, T stopped, Z zombie, …); null once it is gone. */
+/** The state letter (R running, S sleeping, T stopped, Z zombie, …); /proc on Linux, `ps` on darwin. */
 private fun processState(pid: Long): Char? =
-    runCatching {
-        Files
-            .readString(Path.of("/proc/$pid/stat"))
-            .substringAfterLast(')')
-            .trim()
-            .first()
-    }.getOrNull()
+    if (ProcessPlatform.current().processGroups) {
+        runCatching {
+            Files
+                .readString(Path.of("/proc/$pid/stat"))
+                .substringAfterLast(')')
+                .trim()
+                .first()
+        }.getOrNull()
+    } else {
+        runCatching {
+            val process = ProcessBuilder("ps", "-o", "stat=", "-p", pid.toString()).start()
+            try {
+                process.inputStream
+                    .bufferedReader()
+                    .use { it.readText() }
+                    .trim()
+                    .firstOrNull()
+            } finally {
+                process.waitFor()
+            }
+        }.getOrNull()
+    }
 
 /**
  * Runs [runner] against [command], waits for the first line (the pid line) to arrive, invokes
