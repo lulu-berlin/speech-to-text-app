@@ -298,3 +298,17 @@ desktop staging and per-user paths (item 10).
   check stays Linux-only: the darwin asset is compiled by the manual cmake job, not by the flake's
   Nix source build, so there is no source derivation to reproduce it from; the fetch gate still
   verifies its sha256. The Gradle bootstrap's static darwin tar stays as is.
+- 2026-10-21: closure-size approval (item 63's decision) — the user approved growth of the two
+  bounds by item 48's measured 4,462-byte platform layer: `default` 1,771,160,066 → 1,771,164,528
+  and `docker-root` 2,805,345,088 → 2,805,349,550; `desktop-bundle` stays at 1,564,784,978 (its
+  payload stayed within the item-62 bound). Local main→branch jar comparison: 1,039,419 →
+  1,043,881 bytes (+4,462) — the platform class and companion, the Metal parser, the
+  backend-selection log and the wiring, plus zip overhead.
+- 2026-10-21: replay acceptance — the user accepted the reconstructed history (13 `Test:` cycles,
+  the `Refactor: rename ProcessSignals to ProcessPlatform` commit, the Metal-e2e test-list
+  amendment and the darwin pinned-asset item) as the Canon-compliant reconstruction of the item;
+  the recorded reds are the original CI failures logged above, not new per-cycle runs.
+- 2026-10-21: red handling for the darwin pinned-asset item — dated waiver: its red (the
+  `whisper-cpp-artifact-policy` check failing on aarch64-darwin before the pin lands) can only run
+  on a darwin host, and the workspace agent has none (its host is x86_64-linux); the item's green
+  is the macOS Nix job of CI run 39540019816.
