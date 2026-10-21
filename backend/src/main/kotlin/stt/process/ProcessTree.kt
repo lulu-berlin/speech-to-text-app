@@ -33,6 +33,8 @@ internal class ProcessTree(
      * (zombies without a reaping init, uninterruptible sleep) must not hang the caller (ADR 0020).
      */
     suspend fun terminate(gracePeriod: Duration) {
+        // A platform without signals never builds a tree (Windows kills its direct child instead).
+        if (!platform.signals) return
         signal(platform.cont)
         signal(SIGTERM)
         if (awaitEmpty(gracePeriod)) return
@@ -63,7 +65,8 @@ internal class ProcessTree(
         } ?: false
 
     /** The child first (Linux: then the group): once it is stopped or dead it cannot add processes. */
-    private fun signal(signal: Int) {
+    private fun signal(signal: Int?) {
+        if (signal == null) return
         if (childAlive()) kill(id.toInt(), signal)
         if (platform.processGroups) kill(target, signal)
     }

@@ -10,15 +10,19 @@ package stt.process
  * An unknown platform falls back to Linux, today's behavior.
  */
 internal data class ProcessPlatform(
-    val stop: Int,
-    val cont: Int,
+    /** SIGSTOP's number, or null where the host has no signals (Windows). */
+    val stop: Int?,
+    /** SIGCONT's number, or null where the host has no signals (Windows). */
+    val cont: Int?,
     /** Whether commands are spawned through `setsid` and signalled as a process group. */
     val processGroups: Boolean,
-    /** Whether the host has POSIX signals; false on Windows, where pause never freezes a process. */
-    val signals: Boolean = true,
     /** Whether this is Windows: the `;` PATH, `.exe` names and the `NUL` null device. */
     val windows: Boolean = false,
 ) {
+    /** Whether the host has POSIX signals; false on Windows, where pause never freezes a process. */
+    val signals: Boolean
+        get() = stop != null && cont != null
+
     companion object {
         val LINUX = ProcessPlatform(stop = 19, cont = 18, processGroups = true)
 
@@ -26,7 +30,7 @@ internal data class ProcessPlatform(
         val DARWIN = ProcessPlatform(stop = 17, cont = 19, processGroups = false)
 
         /** Windows: no signals, no `setsid`; the run is the direct child and is terminated directly. */
-        val WINDOWS = ProcessPlatform(stop = 0, cont = 0, processGroups = false, signals = false, windows = true)
+        val WINDOWS = ProcessPlatform(stop = null, cont = null, processGroups = false, windows = true)
 
         /** The JVM's `os.name`: "Mac OS X" on macOS, "Linux" on Linux, "Windows 11" on Windows. */
         fun forOsName(osName: String): ProcessPlatform =
