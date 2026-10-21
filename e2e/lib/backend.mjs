@@ -12,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ancestors, findProcess, processes } from './processes.mjs';
 
@@ -336,6 +336,20 @@ export function killGroup(pid) {
 // `env` overrides the child's environment before the fixed data dir, port and models — item 60's
 // probe-failure spec strips whisper-cli from PATH for its own backend (a second one on a free port;
 // the shared backend is untouched).
+/** The Gradle to run the backend with: PATH's gradle when present, else the repository wrapper. */
+function backendGradle() {
+  const hasGradle = (process.env.PATH ?? '')
+    .split(delimiter)
+    .some((dir) => existsSync(join(dir, 'gradle')));
+  return hasGradle
+    ? { command: 'gradle', args: ['--no-daemon', 'run', '--console=plain'], cwd: backendDir }
+    : {
+        command: join(repoRoot, 'gradlew'),
+        args: ['-p', backendDir, '--no-daemon', 'run', '--console=plain'],
+        cwd: repoRoot,
+      };
+}
+
 /**
  * Mirrors the backend's stdout/stderr to the console and appends them to [BACKEND_LOG_FILE], so a
  * CI step can assert which whisper backend a task used (roadmap item 48).
@@ -384,8 +398,9 @@ export async function startBackend({ port, dataDir, env = {} }) {
     }
     return { pid: child.pid };
   }
-  const child = spawn('gradle', ['--no-daemon', 'run', '--console=plain'], {
-    cwd: backendDir,
+  const gradle = backendGradle();
+  const child = spawn(gradle.command, gradle.args, {
+    cwd: gradle.cwd,
     detached: true, // own session + process group: a group kill reaches gradle and the app JVM
     env: {
       ...process.env,
