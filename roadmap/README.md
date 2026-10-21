@@ -89,7 +89,7 @@ graph TD
   11 --> 47[47 atomic-transitions spec flaky ✓]:::done
   51[51 CI verification ✓]:::done
   51 --> 53[53 Nix store cache: one writer, keyed v2 ✓]:::done
-  51 --> 48[48 macOS support]
+  51 --> 48[48 macOS support ✓]:::done
   05 --> 48
   16 --> 48
   45 --> 48
@@ -178,7 +178,7 @@ graph TD
 | [45 — Make both GPUs selectable: enumerate physical Vulkan devices](../docs/specs/device-selection.md)                                                               | done          | 11, 32                      |
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md)                                           | done          | 11                          |
 | [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](../docs/specs/atomic-transitions-spec-flaky.md)                                           | done          | 11                          |
-| [48 — macOS support](48-macos-support.md)                                                                                                                            | spec-approved | 05, 16, 45, 50, 51          |
+| [48 — macOS support](../docs/specs/macos-support.md) | done | 05, 16, 45, 50, 51 |
 | [49 — Windows support](49-windows-support.md)                                                                                                                        | spec-approved | 33, 48, 50, 51              |
 | [50 — Electron desktop app](../docs/specs/electron-desktop-app.md)                                                                                                   | done          | 16                          |
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md)                                                                              | done          | —                           |

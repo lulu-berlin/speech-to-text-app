@@ -106,7 +106,7 @@ The task becomes `COMPLETED` and its scratch directory is removed. The transcrip
 
 ### Pause, cancel, retry, reorder, delete
 
-- **Pause** a task: the running whisper-cli or ffmpeg process is frozen with a signal (`SIGSTOP`, `SIGCONT` to resume), and diarization stops at its next checkpoint ([ADR 0020](decisions/0020-process-runner-jna-signals-process-groups.md)). **Pause the queue**: the same, and the worker takes no new task until it is resumed.
+- **Pause** a task: the running whisper-cli or ffmpeg process is frozen with the platform's stop signal and continued with its continue signal (macOS sends 17/19 where Linux sends 19/18), and diarization stops at its next checkpoint ([ADR 0020](decisions/0020-process-runner-jna-signals-process-groups.md)). **Pause the queue**: the same, and the worker takes no new task until it is resumed.
 - **Cancel** stops the work and keeps what is stored; **retry** puts a failed or canceled task back at the end of the queue, and it continues from its last finished chunk.
 - **Reorder** rewrites the queue positions of the waiting tasks in one transaction.
 - **Delete** cancels the task if it is still pending, then removes it with everything it owns.

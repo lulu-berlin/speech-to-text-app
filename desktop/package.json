@@ -14,6 +14,7 @@
     "fetch:jdk": "node fetch-jdk.ts",
     "check:model-hosts": "node check-model-hosts.ts",
     "dist": "pnpm run build && node stage.ts && electron-builder --config electron-builder.yml --linux deb --x64",
+    "dist:mac": "pnpm run build && node stage.ts && electron-builder --config electron-builder.yml --mac dmg --arm64",
     "test": "prettier --check . && pnpm run typecheck",
     "format": "prettier --write ."
   },

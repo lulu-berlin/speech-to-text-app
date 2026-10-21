@@ -6,7 +6,8 @@
 #
 # `key` is the pin's entry in nix/desktop-artifacts.nix, `subject` the artifact's name in messages,
 # `tool` the program under the desktop's resources/tools/bin and the wrapper's PATH, and `name` the
-# check's derivation name (also the message prefix).
+# check's derivation name (also the message prefix). `desktop` may be null where the desktop package
+# is Linux-only (aarch64-darwin, roadmap item 48): then only the server wrapper is checked.
 {
   pkgs,
   artifact,
@@ -37,9 +38,11 @@ in
         echo "${name}: $1" >&2
         exit 1
       }
-      desktopTool=$(readlink -f ${desktop}/share/stt-app/resources/tools/bin/${tool})
-      [ "$desktopTool" = ${artifact}/bin/${tool} ] ||
-        fail "the desktop's tools ${tool} is $desktopTool, not ${artifact}/bin/${tool}"
+      ${lib.optionalString (desktop != null) ''
+        desktopTool=$(readlink -f ${desktop}/share/stt-app/resources/tools/bin/${tool})
+        [ "$desktopTool" = ${artifact}/bin/${tool} ] ||
+          fail "the desktop's tools ${tool} is $desktopTool, not ${artifact}/bin/${tool}"
+      ''}
       grep -qF ${artifact}/bin ${server}/bin/stt-app ||
         fail "the server package's wrapper does not name ${artifact}/bin"
       ${lib.concatStrings (lib.mapAttrsToList (rootName: closure: ''

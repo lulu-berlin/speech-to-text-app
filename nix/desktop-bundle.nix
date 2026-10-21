@@ -154,7 +154,7 @@
 
     store=$cache/nix/store
     loader=${inBundle "${lib.getLib pkgs.glibc}/lib/ld-linux-x86-64.so.2"}
-    libs=${lib.replaceStrings ["/nix/store/"] ["$store/"] (lib.removeSuffix ":" (lib.fileContents bwrapLibs))}
+    libs=@libs@
     bwrap=${inBundle "${bwrap}/bin/bwrap"}
     app=${inBundle "${desktop}/bin/stt-app"}
 
@@ -236,7 +236,12 @@ in
 
     # Bake the payload's size and identity into the launcher, then append the payload: the launcher
     # reads its own tail, so the two must be written in this order.
+    # The launcher's library path is read here, at build time: `lib.fileContents` would force this
+    # build during evaluation, which makes `nix flake check` fail on a cold store (2026-10-19).
+    libs=$(sed 's|/nix/store/|$store/|g' ${bwrapLibs})
+    libs=''${libs%:}
     sed -i \
+      -e "s|@libs@|$libs|" \
       -e "s|@id@|$(sha256sum ${payload} | cut -c1-16)|" \
       -e "s|@payload_bytes@|$(stat -c%s ${payload})|" \
       $out/bin/stt-app-bundle

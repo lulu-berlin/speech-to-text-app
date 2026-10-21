@@ -2,17 +2,17 @@
 
 Status: done (roadmap item 51, merged 2026-10-14)
 Depends on: — (infrastructure; nothing to build on)
-Blocks: — [48](../../roadmap/48-macos-support.md) and [49](../../roadmap/49-windows-support.md) (their CI-runner verification)
+Blocks: — [48](macos-support.md) and [49](../../roadmap/49-windows-support.md) (their CI-runner verification)
 
 ## Goal
 
 The repository gets its first continuous-verification workflow. It runs the whole check stack
 (`gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build`, the e2e journey) with
-dependency caching so runs stay fast and deterministic. Linux runs on every push; macOS and Windows
-legs run at a lower cadence (nightly) once their platform items land. macOS verification includes
-the Nix flake build; Windows has no Nix (Nix does not support Windows). Filed because the macOS and
-Windows items were approved with CI as their verification path: nobody on the team owns a Mac or a
-Windows machine, and the repo has no CI today.
+dependency caching so runs stay fast and deterministic. Linux and macOS run on every push and pull
+request; the Windows legs keep a lower cadence (nightly) until item 49 lands. macOS verification
+includes the Nix flake build; Windows has no Nix (Nix does not support Windows). Filed because the
+macOS and Windows items were approved with CI as their verification path: nobody on the team owns
+a Mac or a Windows machine, and the repo has no CI today.
 
 ## Evidence
 
@@ -30,9 +30,9 @@ Windows machine, and the repo has no CI today.
 
 - **Matrix order**: a Linux-first workflow now; the macOS (ARM; Intel per item 48) and Windows matrix
   legs are added as 48/49 land.
-- **Cadence**: every push (to `main` and PRs): Linux unit + format + pnpm + integration + e2e.
-  Lower cadence (nightly scheduled runs) for the macOS and Windows legs; their 48/49 PRs can trigger
-  their own leg on demand.
+- **Cadence**: every push (to `main` and PRs): Linux unit + format + pnpm + integration + e2e, and
+  (amended 2026-10-21, item 48) the full macOS legs on every push and pull request. Lower cadence
+  (nightly scheduled runs) for the Windows legs; item 49's PRs can trigger their own leg on demand.
 - **Nix**: macOS CI legs run the flake build (`nix build`/`nix run` and the devenv shell) — that is
   item 48's Nix-darwin verification. No Nix job on Windows (Nix has no Windows support). Linux CI is
   not required to use Nix (the Gradle/pnpm/bootstrap path is sufficient and matches ADR 0010's
@@ -42,11 +42,12 @@ Windows machine, and the repo has no CI today.
 
 - **Triggers**: push to `main` and `pull_request`, plus `workflow_dispatch`. A pushed branch
   without a PR gets no run; every triggered run runs the whole Linux tree (fast gate, then
-  integration and e2e).
-- **Nightly**: `schedule` at 03:00 Europe/Berlin (the `timezone:` field). Until 48/49 land it runs the
-  Linux tree, so the trigger itself is exercised.
-- **macOS/Windows legs belong to 48/49**: each platform item adds its own legs to the workflow (nightly
-  and on its own PRs) as part of its work. The former test items "nightly macOS/Windows legs pass"
+  integration and e2e) and, since item 48, the macOS tree.
+- **Nightly**: `schedule` at 03:00 Europe/Berlin (the `timezone:` field). It runs the Linux and
+  macOS trees (the Windows legs follow with item 49), so the trigger itself is exercised.
+- **macOS/Windows legs belong to 48/49**: each platform item adds its own legs to the workflow as
+  part of its work — item 48 runs macOS on every push and pull request (amended 2026-10-21), item 49
+  keeps the nightly cadence and its own PRs. The former test items "nightly macOS/Windows legs pass"
   and "Nix on the macOS runner, none on Windows" moved to items 48 and 49.
 - **Linux Nix job** (user decision, over the earlier "Linux CI is not required to use Nix"): CI runs
   the devenv shell, `nix flake check` and `nix build` on Linux, with a Nix store cache so it stays
@@ -184,3 +185,6 @@ Windows machine, and the repo has no CI today.
   confirmed by the first 03:00 Europe/Berlin scheduled run from `main`; branch protection requires
   the single `CI (all checks)` job. Spec and final test list moved here from
   `roadmap/51-ci-verification.md`.
+- 2026-10-21 (amended by the user's decision in item 48): the six macOS legs run on every pull
+  request and every push to main, not only nightly and item 48's PRs; the workflow's `roadmap/48-`
+  gate is removed and item 48's spec records the decision. The Windows cadence is unchanged.

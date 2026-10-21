@@ -2,6 +2,8 @@ package stt.transcribe
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import stt.config.Device
 import stt.process.ProcessRunner
 import java.nio.file.Files
@@ -14,6 +16,8 @@ class ChunkTranscriber internal constructor(
     private val executable: String,
 ) : Transcriber {
     constructor(runner: ProcessRunner) : this(runner, "whisper-cli")
+
+    private val logger: Logger = LoggerFactory.getLogger(ChunkTranscriber::class.java)
 
     /**
      * Runs whisper-cli over [audio] and returns its segments, offsets relative to [audio].
@@ -32,7 +36,18 @@ class ChunkTranscriber internal constructor(
         onGpuUnavailable: suspend () -> Unit,
     ): List<WhisperSegment> {
         val command = whisperCommand(settings, audio, outputPrefix, prompt, executable)
-        val result = runner.run(command, onStderrLine = { line -> parseProgress(line)?.let(onProgress) })
+        val result =
+            runner.run(
+                command,
+                onStderrLine = { line ->
+                    parseProgress(line)?.let(onProgress)
+                    // The backend whisper-cli actually selected (e.g. "using MTL0 backend"); the app log
+                    // is how the macOS CI proves a task ran on Metal (roadmap item 48).
+                    if (line.contains(": using ") && line.endsWith(" backend")) {
+                        logger.info("whisper-cli: {}", line.substringAfter(": ").trim())
+                    }
+                },
+            )
         val stderr = result.stderr.joinToString("\n")
         if (result.exitCode != 0) {
             throw TranscriptionException("whisper-cli failed on $audio (exit ${result.exitCode}):\n$stderr")
