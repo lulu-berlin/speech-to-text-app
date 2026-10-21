@@ -56,20 +56,57 @@ tasks.register("checkVersions") {
             )
         }
 
-        logger.lifecycle("checkVersions: versions.json is in sync (Gradle $manifestGradle, nixpkgs ${lockRev.take(12)})")
+        // 3. Windows (roadmap item 49): the platform is supported and every tool the bootstrap
+        //    downloads, plus the desktop's JDK, has a pinned windows-x64 artifact. The download,
+        //    sha256 check and .exe resolution run on Windows; this keeps the manifest honest on
+        //    any host, since the bootstrap reads the committed versions.json without Nix.
+        val windowsPlatform = "windows-x64"
+        if (windowsPlatform !in supportedPlatforms) {
+            throw GradleException(
+                "supportedPlatforms has no $windowsPlatform, so versions.json has no Windows tool pins " +
+                    "(supported: ${supportedPlatforms.joinToString()}).",
+            )
+        }
+        val downloads = manifest["downloads"] as Map<*, *>
+        val windowsAssets =
+            mapOf(
+                "whisper-cli" to "whisper-1.8.4-windows-x64.tar.gz",
+                "ffmpeg" to "windows-x86_64-gpl.jar",
+                "temurin-jdk" to "windows_hotspot",
+            )
+        for ((tool, asset) in windowsAssets) {
+            val table = downloads[tool] as Map<*, *>?
+            val entry =
+                (table?.get(windowsPlatform) as Map<*, *>?)
+                    ?: throw GradleException("versions.json has no $tool download for $windowsPlatform")
+            val url = entry["url"] as String?
+            if (url == null || !url.contains(asset)) {
+                throw GradleException("versions.json's $tool pin for $windowsPlatform must point at $asset, got $url")
+            }
+            val sha = entry["sha256"] as String?
+            if (sha == null || !Regex("[0-9a-f]{64}").matches(sha)) {
+                throw GradleException("versions.json's $tool pin for $windowsPlatform needs a 64-hex sha256, got $sha")
+            }
+        }
+
+        logger.lifecycle(
+            "checkVersions: versions.json is in sync (Gradle $manifestGradle, nixpkgs ${lockRev.take(12)}, " +
+                "Windows pins present)",
+        )
     }
 }
 
-// ---- platform: Linux x64 supported, macOS best-effort (no testing) ----
+// ---- platform: Linux x64 and Windows x64 supported, macOS best-effort (no testing) ----
 // Null on any other OS/architecture. Tasks that need no downloaded tool (checkVersions)
 // still run there; a build that would download or start one fails before any task runs.
 val osName = System.getProperty("os.name").lowercase(Locale.ROOT)
 val osArch = System.getProperty("os.arch").lowercase(Locale.ROOT)
-val supportedPlatforms = listOf("linux-x64", "darwin-x64", "darwin-arm64")
+val supportedPlatforms = listOf("linux-x64", "darwin-x64", "darwin-arm64", "windows-x64")
 val platform: String? =
     when {
         osName.contains("mac") && osArch == "aarch64" -> "darwin-arm64"
         osName.contains("mac") -> "darwin-x64"
+        osName.contains("windows") && (osArch == "amd64" || osArch == "x86_64") -> "windows-x64"
         osName.contains("linux") && (osArch == "amd64" || osArch == "x86_64") -> "linux-x64"
         else -> null
     }
@@ -77,7 +114,7 @@ val platform: String? =
 fun requirePlatform(): String =
     platform ?: throw GradleException(
         "The Gradle bootstrap does not support this platform: $osName/$osArch. " +
-            "Supported: ${supportedPlatforms.joinToString()} (Linux x64 tested, macOS best-effort).",
+            "Supported: ${supportedPlatforms.joinToString()} (Linux x64 and Windows x64 tested, macOS best-effort).",
     )
 
 // Every task that downloads or runs a managed tool: prepareRuntime (whisper-cli, ffmpeg,
@@ -270,9 +307,14 @@ tasks.register("prepareRuntime") {
     doLast {
         for ((label, entry) in listOf("whisper-cli" to whisperCliEntry, "ffmpeg" to ffmpegEntry)) {
             if (entry == null) {
-                throw GradleException("versions.json has no $label download for $platform (supported: linux-x64, darwin-x64, darwin-arm64)")
+                throw GradleException(
+                    "versions.json has no $label download for $platform " +
+                        "(supported: ${supportedPlatforms.joinToString()})",
+                )
             }
-            val exe = prepareTool(label, entry, label)
+            // Windows executables carry .exe; the archive's file name is the only name it knows.
+            val exeName = if (requirePlatform().startsWith("windows")) "$label.exe" else label
+            val exe = prepareTool(label, entry, exeName)
             // An archive can ship more than one executable: Linux's bytedeco ffmpeg jar carries
             // ffmpeg and ffprobe. Nothing runs ffprobe (the shipped ffmpeg does not have it), so
             // only ffmpeg is resolved. Gradle's zip copy drops the executable bit, so
