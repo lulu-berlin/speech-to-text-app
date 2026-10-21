@@ -65,43 +65,80 @@ function stageBackendAndUi(): void {
   cpSync(ui, join(stage, 'ui'), { recursive: true });
 }
 
+function findFile(root: string, name: string): string | undefined {
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) {
+      const found = findFile(path, name);
+      if (found !== undefined) return found;
+    } else if (entry.name === name) {
+      return path;
+    }
+  }
+  return undefined;
+}
+
 function stageTools(): void {
   rmSync(join(stage, 'tools'), { recursive: true, force: true });
   const toolsBin = join(stage, 'tools', 'bin');
   mkdirSync(toolsBin, { recursive: true });
 
-  // whisper-cli: the jiang1997 prebuild (glibc >= 2.38, Vulkan), a tar.gz of one directory.
-  // Its shared libraries (libwhisper.so.*, libggml*.so) resolve through RUNPATH $ORIGIN, so
-  // everything must sit flat in tools/bin.
+  // whisper-cli: Linux ships the jiang1997 prebuild (Vulkan), a tar.gz of one directory whose
+  // libraries resolve through RUNPATH $ORIGIN and whose relative symlinks (libwhisper.so.1 ->
+  // libwhisper.so.1.8.4) must stay relative — tar preserves them; cpSync would make them absolute
+  // into a temp dir. macOS ships our static Metal build, a tar.gz with bin/whisper-cli (roadmap
+  // item 48), which is extracted and flattened here.
   const whisper = artifact('whisper-cli');
-  spawnSync('tar', ['-xzf', whisper, '-C', toolsBin, '--strip-components=1'], { stdio: 'inherit' });
-  if (!existsSync(join(toolsBin, 'whisper-cli'))) fail('whisper-cli not in the extracted tarball');
+  if (process.platform === 'linux') {
+    spawnSync('tar', ['-xzf', whisper, '-C', toolsBin, '--strip-components=1'], {
+      stdio: 'inherit',
+    });
+    if (!existsSync(join(toolsBin, 'whisper-cli')))
+      fail('whisper-cli not in the extracted tarball');
+  } else {
+    const whisperTmp = join(toolsBin, 'whisper-tmp');
+    mkdirSync(whisperTmp, { recursive: true });
+    spawnSync('tar', ['-xzf', whisper, '-C', whisperTmp], { stdio: 'inherit' });
+    const whisperExe = findFile(whisperTmp, 'whisper-cli');
+    const whisperDir =
+      whisperExe === undefined
+        ? fail('whisper-cli not in the extracted tarball')
+        : dirname(whisperExe);
+    for (const entry of readdirSync(whisperDir)) {
+      copyTo(join(whisperDir, entry), join(toolsBin, entry));
+    }
+    rmSync(whisperTmp, { recursive: true, force: true });
+  }
 
-  // ffmpeg: bytedeco's jar is a zip carrying the executable and its libav*/libva/drm
-  // libraries under one directory, whose flat contents belong next to the binary. The
-  // libraries carry no RUNPATH, so backend.ts sets LD_LIBRARY_PATH to tools/bin itself.
+  // ffmpeg: bytedeco's jar is a zip carrying the executable and its libav* libraries under one
+  // directory, whose flat contents belong next to the binary. On Linux the libraries carry no
+  // RUNPATH (backend.ts sets LD_LIBRARY_PATH); on macOS @loader_path finds them.
+  const ffmpegClassifier =
+    process.platform === 'darwin'
+      ? process.arch === 'arm64'
+        ? 'macosx-arm64-gpl'
+        : 'macosx-x86_64-gpl'
+      : 'linux-x86_64-gpl';
   const ffmpeg = artifact('ffmpeg');
   const ffmpegTmp = join(toolsBin, 'ffmpeg-tmp');
   mkdirSync(ffmpegTmp, { recursive: true });
   // `jar` (the JDK's) rather than unzip: no unzip on a Nix shell.
   spawnSync('jar', ['xf', ffmpeg], { cwd: ffmpegTmp, stdio: 'inherit' });
-  const libs = readdirSync(join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', 'linux-x86_64-gpl'), {
+  const libs = readdirSync(join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier), {
     withFileTypes: true,
   });
   for (const entry of libs) {
     copyTo(
-      join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', 'linux-x86_64-gpl', entry.name),
+      join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier, entry.name),
       join(toolsBin, entry.name),
     );
   }
   rmSync(ffmpegTmp, { recursive: true, force: true });
   if (!existsSync(join(toolsBin, 'ffmpeg'))) fail('ffmpeg not in the extracted jar');
-  // A zip stores no file modes, so `jar xf` left the executable non-executable. The backend
-  // runs ffmpeg (and ffprobe) by name from PATH (backend.ts prepends tools/bin), so the bit has
-  // to be restored here — otherwise the packaged app fails every task with EACCES. The
-  // tar-extracted whisper-cli keeps its 0755 from the archive; the jlink JRE keeps its own.
+  // A zip stores no file modes, so `jar xf` left the executables non-executable. The backend
+  // runs ffmpeg from PATH (backend.ts prepends tools/bin), so the bit has to be restored here.
   for (const executable of ['ffmpeg', 'ffprobe']) {
-    chmodSync(join(toolsBin, executable), 0o755);
+    if (existsSync(join(toolsBin, executable))) chmodSync(join(toolsBin, executable), 0o755);
   }
 }
 

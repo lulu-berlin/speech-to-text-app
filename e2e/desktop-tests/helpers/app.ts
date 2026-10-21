@@ -4,7 +4,8 @@ import {
   type ElectronApplication,
   type Page,
 } from '@playwright/test';
-import { copyFileSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { JFK_QUOTE, turnTextOf } from '../../tests/helpers/ui';
@@ -116,10 +117,15 @@ export function jfkClip(): string {
 
 /** The per-user directories a fresh HOME gets (the paths the app decided on, 2026-10-14). */
 export function userPaths(home: string) {
-  return {
-    data: join(home, '.local', 'share', 'stt-app'),
-    models: join(home, '.cache', 'stt-app', 'models'),
-  };
+  return process.platform === 'darwin'
+    ? {
+        data: join(home, 'Library', 'Application Support', 'stt-app'),
+        models: join(home, 'Library', 'Caches', 'stt-app', 'models'),
+      }
+    : {
+        data: join(home, '.local', 'share', 'stt-app'),
+        models: join(home, '.cache', 'stt-app', 'models'),
+      };
 }
 
 /** An environment variable the container harness passes; without it the test cannot run. */
@@ -146,20 +152,32 @@ export interface RunningProcess {
 }
 
 /**
- * The running processes whose command line matches `pattern`. Read from /proc rather than `ps`: a
- * stock ubuntu container has no procps, and nothing test-only is installed there.
+ * The running processes whose command line matches `pattern`. Read from /proc on Linux (a stock
+ * ubuntu container has no procps); on macOS, which has no /proc, from `ps`.
  */
 export function processes(pattern: RegExp): RunningProcess[] {
   const found: RunningProcess[] = [];
-  for (const pid of readdirSync('/proc')) {
-    if (!/^\d+$/.test(pid)) continue;
-    let cmdline: string;
-    try {
-      cmdline = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
-    } catch {
-      continue; // the process ended between the readdir and the read
+  if (existsSync('/proc')) {
+    for (const pid of readdirSync('/proc')) {
+      if (!/^\d+$/.test(pid)) continue;
+      let cmdline: string;
+      try {
+        cmdline = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+      } catch {
+        continue; // the process ended between the readdir and the read
+      }
+      const command = cmdline.replaceAll('\0', ' ').trim();
+      if (pattern.test(command)) found.push({ pid, command });
     }
-    const command = cmdline.replaceAll('\0', ' ').trim();
+    return found;
+  }
+  const rows = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
+  for (const line of rows.split('\n')) {
+    const match = /^\s*(\d+)\s+(.*)$/.exec(line);
+    if (match === null) continue;
+    const pid = match[1];
+    const command = match[2];
+    if (pid === undefined || command === undefined) continue;
     if (pattern.test(command)) found.push({ pid, command });
   }
   return found;
