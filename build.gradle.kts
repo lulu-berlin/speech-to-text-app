@@ -213,6 +213,17 @@ fun findExecutable(
 }
 
 fun defaultDataDir(): String {
+    if (platform == "windows-x64") {
+        // %APPDATA%\stt-app (roadmap item 49), the directory the desktop app also uses.
+        val appData = System.getenv("APPDATA")
+        val base =
+            if (!appData.isNullOrEmpty()) {
+                appData
+            } else {
+                File(System.getenv("USERPROFILE") ?: "", "AppData\\Roaming").absolutePath
+            }
+        return "$base\\stt-app"
+    }
     if (platform?.startsWith("darwin") == true) {
         return (System.getenv("HOME") ?: "") + "/Library/Application Support/stt-app"
     }
@@ -339,7 +350,14 @@ tasks.register("prepareRuntime") {
 }
 
 val backendInstallDist = gradle.includedBuild("backend").task(":installDist")
-val backendMain = rootProject.file("backend/build/install/stt-backend/bin/stt-backend")
+val backendMain =
+    rootProject.file(
+        if (platform == "windows-x64") {
+            "backend/build/install/stt-backend/bin/stt-backend.bat"
+        } else {
+            "backend/build/install/stt-backend/bin/stt-backend"
+        },
+    )
 val jdkMajor = (manifest["jdk"] as String).substringBefore('.')
 // Resolved lazily at execution: the current JVM when it is the pinned JDK, else
 // foojay downloads it (the resolver is root-only, from settings.gradle.kts).
@@ -362,10 +380,11 @@ fun appEnv(): Map<String, String> =
                     nodeInstallDir().let { n ->
                         listOf(
                             File(n, "pnpm/pnpm-v${manifest["pnpm"]}/bin").absolutePath,
-                            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}/bin").absolutePath,
+                            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}")
+                                .let { if (platform == "windows-x64") it.absolutePath else File(it, "bin").absolutePath },
                         )
                     } + System.getenv("PATH")
-            ).joinToString(":"),
+            ).joinToString(File.pathSeparator),
         "JAVA_HOME" to runtimeJavaHome.get(),
         // Gradle 9's HTML test report writes one directory per test name, and names like "0°, 20°"
         // or "O(n³)" fail to encode under a POSIX locale: devenv.nix and flake.nix set the same for
@@ -385,6 +404,7 @@ fun appEnv(): Map<String, String> =
 fun nodePlatform(): String =
     when {
         platform == "linux-x64" -> "linux-x64"
+        platform == "windows-x64" -> "win-x64"
         platform == "darwin-arm64" -> "darwin-arm64"
         else -> "darwin-x64"
     }
@@ -411,7 +431,14 @@ tasks.register<Exec>("run") {
     dependsOn("prepareRuntime", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
         applyAppEnv(this as Exec)
-        setCommandLine(backendMain.absolutePath)
+        // A .bat is not a Win32 executable; cmd runs it, as the installDist launcher expects.
+        setCommandLine(
+            if (platform == "windows-x64") {
+                listOf("cmd", "/c", backendMain.absolutePath)
+            } else {
+                listOf(backendMain.absolutePath)
+            },
+        )
     }
 }
 
@@ -424,7 +451,11 @@ fun applyAppEnv(task: Exec) = appEnv().forEach { (k, v) -> task.environment(k, r
 // Gradle provides what the devenv otherwise sets: the pinned fixtures, the managed
 // tools on PATH, the browsers and the backend command. A user-set variable wins.
 val e2eDir = rootProject.file("e2e")
-val pnpmExe = File(nodeInstallDir(), "pnpm/pnpm-v${manifest["pnpm"]}/bin/pnpm")
+val pnpmExe =
+    File(
+        nodeInstallDir(),
+        "pnpm/pnpm-v${manifest["pnpm"]}/bin/" + if (platform == "windows-x64") "pnpm.cmd" else "pnpm",
+    )
 val fixtures = manifest["fixtures"] as Map<*, *>
 
 val jfkWavFile = assetCacheFile("fixtures", fixtures["jfkWav"] as Map<*, *>)
