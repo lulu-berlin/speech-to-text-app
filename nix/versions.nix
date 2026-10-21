@@ -17,8 +17,8 @@ in {
 
   # Prebuilt tools for machines without Nix (user decisions 2026-10-11/12), each pinned
   # by URL and sha256:
-  # - whisper-cli: the jiang1997 prebuild of the Nix build's tag (Vulkan on Linux,
-  #   CoreML on macOS); hashes computed over the GitHub release assets.
+  # - whisper-cli: the jiang1997 prebuild of the Nix build's tag (Vulkan on Linux and
+  #   Windows, CoreML on macOS); hashes computed over the GitHub release assets.
   # - ffmpeg: bytedeco's builds on Maven Central (user decision 2026-10-12), which
   #   never deletes or changes a published artifact - the BtbN daily build first pinned
   #   here was deleted after 14 days. 8.1.2 is the flake's ffmpeg_8. Each jar holds a
@@ -42,6 +42,11 @@ in {
         url = "https://github.com/jiang1997/whisper.cpp-release/releases/download/v${wcTag}/whisper-${wcTag}-macos-x64.tar.gz";
         sha256 = "a5f41b14a6e4cb3e0c045b7954f0a4050bc0d44a9b2ce2e5826ee2a5fef8577c";
       };
+      # Windows x64: static whisper-cli.exe with ggml-vulkan (roadmap item 49); no DLLs beside it.
+      "windows-x64" = {
+        url = "https://github.com/jiang1997/whisper.cpp-release/releases/download/v${wcTag}/whisper-${wcTag}-windows-x64.tar.gz";
+        sha256 = "cfc2a9f82e6db9c5fe11e3637d6be8660ae169a527febfbc5d35a5e0d96ca85b";
+      };
     };
     ffmpeg = {
       "linux-x64" = {
@@ -55,6 +60,11 @@ in {
       "darwin-x64" = {
         url = ffmpegUrl "macosx-x86_64";
         sha256 = "917327cd6178e7ecddd4fb9dd5981cb4c5f04631a06dc0bd81cfe0377b1f3705";
+      };
+      # Windows x64: the same bytedeco jar shape as Linux, with ffmpeg.exe and its DLLs (item 49).
+      "windows-x64" = {
+        url = ffmpegUrl "windows-x86_64";
+        sha256 = "9c4bbdecba752fb2d0a8e537e69d330c6db6b02087f5035f88decad0050e5550";
       };
     };
 
@@ -70,6 +80,11 @@ in {
       "darwin-arm64" = {
         url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.12.1_1.tar.gz";
         sha256 = "3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998";
+      };
+      # Windows x64: a zip (Adoptium publishes no tar.gz for Windows), unpacked by the desktop staging.
+      "windows-x64" = {
+        url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip";
+        sha256 = "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e";
       };
     };
   };
