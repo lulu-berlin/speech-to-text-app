@@ -56,6 +56,17 @@ class ProcessRunnerPlatformSpec :
                 }
             }
         }
+
+        given("Windows, where the host has no signals") {
+            `when`("the platform is asked for its process-control facts") {
+                then("it owns no process group and sends no signals") {
+                    val platform = ProcessPlatform.forOsName("Windows 11")
+
+                    platform.processGroups shouldBe false
+                    platform.signals shouldBe false
+                }
+            }
+        }
     })
 
 /** A process that has already exited: its streams are empty and its exit code is 0. */

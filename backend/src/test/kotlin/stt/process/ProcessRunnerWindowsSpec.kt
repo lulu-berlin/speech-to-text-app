@@ -40,15 +40,6 @@ class ProcessRunnerWindowsSpec :
                     spawned.redirectInput().file() shouldBe File("NUL")
                 }
             }
-
-            `when`("the platform is asked for its process-control facts") {
-                then("it owns no process group and sends no signals") {
-                    val platform = ProcessPlatform.forOsName("Windows 11")
-
-                    platform.processGroups shouldBe false
-                    platform.signals shouldBe false
-                }
-            }
         }
     })
 
