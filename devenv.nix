@@ -11,67 +11,74 @@ let
 in
 {
   # https://devenv.sh/packages/
-  packages = [
-    pkgs.git
+  packages =
+    [
+      pkgs.git
 
-    # Transcribe CLI: the pinned 1.8.4 Vulkan build from the desktop-whisper-cpp-v1 asset
-    # (roadmap item 63), the same one `nix build .` and .#desktop ship.
-    (import ./nix/whisper-cpp.nix { inherit pkgs; }).whisperCpp
-    
-    # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks
-    # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see
-    # nix/whisper-cpp.nix); standalone ffmpeg is handy for trimming/merging audio
-    # before transcription. The shell ships the app's audio-only static ffmpeg from the
-    # pinned desktop-ffmpeg-v2 asset (roadmap item 62; item 33's Gradle bootstrap syncs 8.1
-    # too): only `ffmpeg`, no `ffplay` or `ffprobe`.
-    ffmpeg
-    
-    # Diagnostics: `vulkaninfo --summary` verifies the GPU is visible to Vulkan
-    pkgs.vulkan-tools
+      # Transcribe CLI: the pinned 1.8.4 build (Vulkan on Linux, Metal on darwin) from the
+      # desktop-whisper-cpp-v1 asset on x86_64-linux (roadmap item 63), the same one
+      # `nix build .` and .#desktop ship.
+      (import ./nix/whisper-cpp.nix { inherit pkgs; }).whisperCpp
 
-    pkgs.sqlite
+      # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks
+      # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see
+      # nix/whisper-cpp.nix); standalone ffmpeg is handy for trimming/merging audio
+      # before transcription. The shell ships the app's audio-only ffmpeg from the
+      # pinned desktop-ffmpeg-v2 asset on x86_64-linux (roadmap item 62; item 33's Gradle
+      # bootstrap syncs 8.1 too), or the same audio-only recipe's source build on darwin
+      # (roadmap item 48): only `ffmpeg`, no `ffplay` or `ffprobe`.
+      ffmpeg
 
-    # Manual API/SSE smoke checks against the backend (`curl -N` for SSE)
-    pkgs.curl
-    pkgs.jq
+      pkgs.sqlite
 
-    # Frontend package manager (ADR 0012): same major as the flake's pnpm_11,
-    # because the lockfile format is tied to the pnpm major.
-    pkgs.pnpm_11
+      # Manual API/SSE smoke checks against the backend (`curl -N` for SSE)
+      pkgs.curl
+      pkgs.jq
 
-    # Process runner (roadmap item 05, ADR 0020): `setsid` puts every spawned
-    # command in its own process group so SIGSTOP/SIGCONT/TERM/KILL reach the
-    # whole tree (negative pid), not just the direct child.
-    pkgs.util-linux
+      # Frontend package manager (ADR 0012): same major as the flake's pnpm_11,
+      # because the lockfile format is tied to the pnpm major.
+      pkgs.pnpm_11
 
-    # E2E browser runtime (roadmap item 21): Chromium for `pnpm --dir e2e test`,
-    # found through PLAYWRIGHT_BROWSERS_PATH below. e2e/'s @playwright/test stays
-    # pinned to the playwright version THIS devenv provides (devenv's pkgs come from
-    # the flake's shared nixpkgs pin — ADR 0036 — currently
-    # playwright 1.63.0, browser revisions 1243;
-    # e2e/check-playwright.mjs verifies comment, package.json and the realized store
-    # agree): the npm package and the farm
-    # must agree on the browser revisions. Bump both together. Dev only — the flake's
-    # build is untouched (ADR 0010).
-    pkgs.playwright-driver
+      # E2E browser runtime (roadmap item 21): Chromium for `pnpm --dir e2e test`,
+      # found through PLAYWRIGHT_BROWSERS_PATH below. e2e/'s @playwright/test stays
+      # pinned to the playwright version THIS devenv provides (devenv's pkgs come from
+      # the flake's shared nixpkgs pin — ADR 0036 — currently
+      # playwright 1.63.0, browser revisions 1243;
+      # e2e/check-playwright.mjs verifies comment, package.json and the realized store
+      # agree): the npm package and the farm
+      # must agree on the browser revisions. Bump both together. Dev only — the flake's
+      # build is untouched (ADR 0010).
+      pkgs.playwright-driver
 
-    # Kotlin CLI + language server, as languages.kotlin provided them before item 33
-    # replaced it (it hard-codes nixpkgs' default gradle, 8.14.4).
-    pkgs.kotlin
-    pkgs.kotlin-language-server
+      # Kotlin CLI + language server, as languages.kotlin provided them before item 33
+      # replaced it (it hard-codes nixpkgs' default gradle, 8.14.4).
+      pkgs.kotlin
+      pkgs.kotlin-language-server
 
-    # Workflow linting (roadmap item 51): `actionlint .github/workflows/*.yml` checks the
-    # workflow and the local composite actions in .github/actions/ before a push (GitHub only
-    # reports YAML errors once a run starts). Nix-level result is user-verified (ADR 0010).
-    pkgs.actionlint
-    # Desktop app (roadmap item 50): electron-builder builds the Linux .deb with fpm. Its
-    # own fpm download is a generic Linux build that cannot run in a Nix shell, so the
-    # store's fpm is used instead (USE_SYSTEM_FPM below). xvfb-run gives the packaged-app
-    # e2e its X display inside the stock ubuntu container, which reaches it through the
-    # read-only /nix/store mount — nothing test-only is installed into that machine.
-    pkgs.fpm
-    pkgs.xvfb-run
-  ];
+      # Workflow linting (roadmap item 51): `actionlint .github/workflows/*.yml` checks the
+      # workflow and the local composite actions in .github/actions/ before a push (GitHub only
+      # reports YAML errors once a run starts). Nix-level result is user-verified (ADR 0010).
+      pkgs.actionlint
+    ]
+    ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+      # Diagnostics: `vulkaninfo --summary` verifies the GPU is visible to Vulkan (Linux only;
+      # macOS has Metal, which whisper-cli reports itself — roadmap item 48).
+      pkgs.vulkan-tools
+
+      # Process runner (roadmap item 05, ADR 0020; darwin amended in item 48): `setsid` puts
+      # every spawned command in its own process group so SIGSTOP/SIGCONT/TERM/KILL reach the
+      # whole tree (negative pid), not just the direct child. macOS has no setsid; the runner
+      # signals the direct child there.
+      pkgs.util-linux
+
+      # Desktop app (roadmap item 50): electron-builder builds the Linux .deb with fpm. Its
+      # own fpm download is a generic Linux build that cannot run in a Nix shell, so the
+      # store's fpm is used instead (USE_SYSTEM_FPM below). xvfb-run gives the packaged-app
+      # e2e its X display inside the stock ubuntu container, which reaches it through the
+      # read-only /nix/store mount — nothing test-only is installed into that machine.
+      pkgs.fpm
+      pkgs.xvfb-run
+    ];
 
   # https://devenv.sh/languages/
   # JDK 21 (pkgs.jdk, the flake's runtime JDK) as JAVA_HOME, and Gradle 9.8 on it — the
@@ -93,7 +100,7 @@ in
   # directory per test name, and names like "0°, 20°" or "O(n³)" fail to encode when the
   # locale is POSIX (an unset LANG, as in agent shells). LC_CTYPE only sets the charset;
   # the user's LANG (messages, sorting) is left alone.
-  env.LC_CTYPE = "C.UTF-8";
+  env.LC_CTYPE = if pkgs.stdenv.isDarwin then "UTF-8" else "C.UTF-8";
 
   # Models for the app and integration tests (pinned in nix/models.nix)
   env.STT_WHISPER_MODEL = "${models.whisper}";
@@ -161,10 +168,10 @@ in
     { whisper-cli --help && ffmpeg -version && sqlite3 --version && curl --version && jq --version; } >/dev/null 2>&1 \
       && ok "whisper-cli, ffmpeg, sqlite3, curl, jq" || fail "whisper-cli, ffmpeg, sqlite3, curl, jq"
 
-    echo "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2  $STT_WHISPER_MODEL" | sha256sum -c --status - \
+    echo "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2  $STT_WHISPER_MODEL" | ${pkgs.coreutils}/bin/sha256sum -c --status - \
       && ok "whisper model sha256 (ADR 0008)" || fail "whisper model sha256 (ADR 0008)"
 
-    echo "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b  $STT_SPEAKER_MODEL" | sha256sum -c --status - \
+    echo "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b  $STT_SPEAKER_MODEL" | ${pkgs.coreutils}/bin/sha256sum -c --status - \
       && ok "speaker model sha256 (ADR 0003)" || fail "speaker model sha256 (ADR 0003)"
   '';
 }

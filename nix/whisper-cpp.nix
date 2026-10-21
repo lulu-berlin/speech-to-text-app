@@ -17,11 +17,13 @@
 # neither. With it off, the only ffmpeg in every shipped closure is the app's pinned
 # audio-only artifact.
 #
-# `withSDL = false` (found 2026-10-15 by `nix why-depends` on the desktop closure): the
-# default builds whisper.cpp's SDL example too, which alone dragged SDL2 -> sdl2-compat ->
-# sdl3 -> zenity -> libadwaita -> gtk4 -> gstreamer -> gst-plugins-bad -> flite, freepats,
-# chromaprint, python3 and pipewire into the package — ~330 MiB for an example nothing runs.
-# Only whisper-cli is used (ADR 0047), and it is not the SDL one.
+# `vulkanSupport` on Linux and `metalSupport` on darwin (roadmap item 48): nixpkgs turns Metal on
+# by default only for aarch64-darwin, so x86_64-darwin needs it explicitly. `withSDL = false` (found
+# 2026-10-15 by `nix why-depends` on the desktop closure): the default builds whisper.cpp's SDL
+# example too, which alone dragged SDL2 -> sdl2-compat -> sdl3 -> zenity -> libadwaita -> gtk4 ->
+# gstreamer -> gst-plugins-bad -> flite, freepats, chromaprint, python3 and pipewire into the
+# package — ~330 MiB for an example nothing runs. Only whisper-cli is used (ADR 0047), and it is
+# not the SDL one.
 #
 # On x86_64-linux the shipped output is the pinned prebuilt release asset
 # (nix/desktop-artifacts.nix `whisperCpp`, roadmap item 63), fetched and re-linked by
@@ -34,7 +36,8 @@ let
   system = pkgs.stdenv.hostPlatform.system;
 
   source = (pkgs.whisper-cpp.override {
-    vulkanSupport = true;
+    vulkanSupport = pkgs.stdenv.hostPlatform.isLinux;
+    metalSupport = pkgs.stdenv.hostPlatform.isDarwin;
     withSDL = false;
     withFFmpegSupport = false;
   }).overrideAttrs {

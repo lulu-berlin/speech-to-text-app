@@ -23,11 +23,21 @@
     nixpkgs,
     ...
   }: let
-    # The systems this flake declares (item 48 adds macOS's), each held to its pinned whisper-cpp
-    # artifact by the policy check; the outputs below are the first one's.
+    # The systems the flake declares: the per-system outputs are built for each (roadmap
+    # item 48 adds aarch64-darwin). The artifact-policy checks cover declaredSystems, the
+    # systems with pinned prebuilt artifacts; darwin ships the source Metal build (its
+    # pinned whisper-cpp asset lands with the packaged-artifact work).
     declaredSystems = ["x86_64-linux"];
-    system = builtins.head declaredSystems;
-    pkgs = nixpkgs.legacyPackages.${system};
+    systems = ["x86_64-linux" "aarch64-darwin"];
+    mkSystem = system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+      isLinux = pkgs.stdenv.hostPlatform.isLinux;
+      # The packaged app's per-user data directory (ADR 0017 as amended): XDG on Linux,
+      # ~/Library/Application Support on macOS (roadmap item 48).
+      dataDirDefault =
+        if isLinux
+        then ''"''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"''
+        else ''"$HOME/Library/Application Support/stt-app"'';
     models = import ./nix/models.nix {inherit pkgs;};
 
     # The app's whisper-cpp (roadmap item 63): the pinned 1.8.4 Vulkan build shipped as the
@@ -36,9 +46,10 @@
     whisperCppArtifact = import ./nix/whisper-cpp.nix {inherit pkgs;};
     whisperCpp = whisperCppArtifact.whisperCpp;
 
-    # The app's ffmpeg (roadmap item 62): the audio-only static build, shipped as the pinned
-    # prebuilt artifact on x86_64-linux (nix/ffmpeg.nix); the version manifest reads the source
-    # build's version (8.1.2, rendered as 8.1).
+    # The app's ffmpeg (roadmap item 62): the audio-only build, shipped as the pinned
+    # prebuilt artifact on x86_64-linux (nix/ffmpeg.nix) and built from the same recipe on
+    # darwin (roadmap item 48); the version manifest reads the source build's version
+    # (8.1.2, rendered as 8.1).
     ffmpegArtifact = import ./nix/ffmpeg.nix {inherit pkgs;};
     ffmpeg = ffmpegArtifact.ffmpeg;
 
@@ -55,7 +66,7 @@
     # The release assets' producer checks (roadmap items 62 and 63): each builds the source its
     # asset is made from. They are apps the user runs when publishing, not `checks` entries, so
     # `nix flake check` compiles neither source.
-    assetPinChecks = {
+    assetPinChecks = pkgs.lib.optionalAttrs isLinux {
       ffmpeg-asset-pin = import ./nix/asset-pin-check.nix {
         inherit pkgs;
         source = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
@@ -206,8 +217,9 @@
 
       # UTF-8 file names for the JVM: Gradle 9's HTML test report writes one directory
       # per test name ("0°", "O(n³)"), which fails under the build sandbox's POSIX locale.
-      # glibc has C.UTF-8 built in. Same setting as the devenv (item 33).
-      LC_CTYPE = "C.UTF-8";
+      # glibc has C.UTF-8 built in; macOS has UTF-8 (roadmap item 48). Same setting as
+      # the devenv (item 33).
+      LC_CTYPE = if isLinux then "C.UTF-8" else "UTF-8";
 
       # The Nix check runs `gradle check` (ktlintCheck + tests, ADR 0015): nixpkgs'
       # gradle setup hook defaults gradleCheckTask to `test` (verified in the pinned
@@ -278,7 +290,7 @@
       inherit pkgs nixpkgs sourceOf backend frontend whisperCpp ffmpeg;
     };
   in {
-    packages.x86_64-linux = {
+      packages = pkgs.lib.removeAttrs {
       inherit backend frontend desktop;
       # The desktop app as one self-contained executable (nix/desktop-bundle.nix, ADR 0053).
       desktop-bundle = import ./nix/desktop-bundle.nix {inherit pkgs desktop;};
@@ -343,10 +355,11 @@
           # --set, not --set-default: the -default form silently keeps a
           # set-but-empty variable (devenv exports an empty CLASSPATH),
           # and the packaged app always needs its own jars and frontend.
-          # --run: STT_DATA_DIR unset or empty defaults to the XDG data home's stt-app
-          # directory (roadmap item 16, amending ADR 0017 for the packaged app), which the
-          # wrapper creates. The doubled quotes escape the dollar signs below, so the
-          # wrapper (not Nix) expands the variables.
+          # --run: STT_DATA_DIR unset or empty defaults to the platform's per-user data
+          # directory (XDG on Linux, ~/Library/Application Support on macOS; roadmap item 16
+          # amending ADR 0017 for the packaged app, item 48 for darwin), which the wrapper
+          # creates. The doubled quotes escape the dollar signs below, so the wrapper (not
+          # Nix) expands the variables.
           # --set-default for the models: the pinned whisper model (ADR 0008) and CAM++
           # model (ADR 0003) from nix/models.nix unless the user sets one (item 21's e2e
           # suite swaps in the tiny whisper model).
@@ -356,11 +369,11 @@
           # desktop-ffmpeg-v2 asset (roadmap item 62), the branch item 33's Gradle bootstrap
           # syncs to (8.1), not nixpkgs' default ffmpeg (9.0 at the locked rev).
           makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
-            --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/stt-app"; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
+            --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR=${dataDirDefault}; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
             --set STT_STATIC_DIR "$out/share/stt-app/static" \
             --set-default STT_WHISPER_MODEL ${models.whisper} \
             --set-default STT_SPEAKER_MODEL ${models.speaker} \
-            --prefix PATH : ${pkgs.lib.makeBinPath [whisperCpp ffmpeg pkgs.util-linux pkgs.coreutils]} \
+            --prefix PATH : ${pkgs.lib.makeBinPath ([whisperCpp ffmpeg pkgs.coreutils] ++ pkgs.lib.optional isLinux pkgs.util-linux)} \
             --set CLASSPATH "$CP" \
             --add-flags "stt.MainKt"
           runHook postInstall
@@ -412,60 +425,71 @@
           printf 'root:x:0:\nstt:x:1000:\n' > $out/etc/group
           printf 'passwd: files\nshadow: files\ngroup: files\nhosts: files dns\nnetworks: files\nservices: files\n' > $out/etc/nsswitch.conf
         '';
-    };
+      } (if isLinux then [] else ["desktop" "desktop-bundle" "desktop-bundle-mesa-asset" "desktop-ffmpeg-asset" "docker-root"]);
 
     # `nix run .` starts bin/stt-app (named by meta.mainProgram), on http://localhost:8080.
-    apps.x86_64-linux.default = {
-      type = "app";
-      program = pkgs.lib.getExe self.packages.${system}.default;
-      meta.description = "Start the Speech-to-Text app";
-    };
+    # `nix run .#desktop` opens the desktop app; `.#desktop-bundle` unpacks and runs the
+    # single-file bundle (roadmap item 50). Both are Linux-only (their inputs are Linux
+    # Electron/JRE), so they are removed from the darwin sets (roadmap item 48).
+    apps = pkgs.lib.removeAttrs {
+      default = {
+        type = "app";
+        program = pkgs.lib.getExe self.packages.${system}.default;
+        meta.description = "Start the Speech-to-Text app";
+      };
 
-    # `nix run .#desktop` opens the desktop app (roadmap item 50).
-    apps.x86_64-linux.desktop = {
-      type = "app";
-      program = pkgs.lib.getExe self.packages.${system}.desktop;
-      meta.description = "Open the Speech-to-Text desktop app";
-    };
+      desktop = {
+        type = "app";
+        program = pkgs.lib.getExe self.packages.${system}.desktop;
+        meta.description = "Open the Speech-to-Text desktop app";
+      };
 
-    # `nix run .#desktop-bundle` unpacks and runs the single-file bundle (roadmap item 50).
-    apps.x86_64-linux.desktop-bundle = {
-      type = "app";
-      program = pkgs.lib.getExe self.packages.${system}.desktop-bundle;
-      meta.description = "Run the self-contained Speech-to-Text desktop bundle";
-    };
+      desktop-bundle = {
+        type = "app";
+        program = pkgs.lib.getExe self.packages.${system}.desktop-bundle;
+        meta.description = "Run the self-contained Speech-to-Text desktop bundle";
+      };
 
-    # `nix run .#ffmpeg-asset-pin` / `nix run .#whisper-cpp-asset-pin` (roadmap items 62 and 63):
-    # the producer checks behind the asset builders. nix/asset-pin-check.nix builds each check's
-    # script with the check as an input, so running the app builds it and the source it asserts
-    # against; they are apps, not default checks.
-    apps.x86_64-linux.ffmpeg-asset-pin = {
-      type = "app";
-      program = "${assetPinChecks.ffmpeg-asset-pin.app}/bin/ffmpeg-asset-pin";
-      meta.description = "Verify the desktop-ffmpeg-v2 asset pin against the built asset";
-    };
-    apps.x86_64-linux.whisper-cpp-asset-pin = {
-      type = "app";
-      program = "${assetPinChecks.whisper-cpp-asset-pin.app}/bin/whisper-cpp-asset-pin";
-      meta.description = "Verify the desktop-whisper-cpp-v1 asset pin against the built asset";
-    };
+      # Regenerates the committed versions.json from the flake's versions (ADR 0010: the
+      # user runs this; writes to the checkout the command is run from).
+      update-versions = {
+        type = "app";
+        program = "${pkgs.writeShellScript "update-versions" ''
+          exec ${pkgs.jq}/bin/jq -S . ${versionsJson} > versions.json
+        ''}";
+        meta.description = "Regenerate the committed versions.json from the flake's versions";
+      };
 
-    # `nix run .#ffmpeg-audio-only` (roadmap item 62): the build-surface check, moved out of
-    # `checks` so `nix flake check` compiles no ffmpeg source.
-    apps.x86_64-linux.ffmpeg-audio-only = {
-      type = "app";
-      program = "${pkgs.writeShellScriptBin "ffmpeg-audio-only" ''
-        : ${ffmpegAudioOnlyCheck}
-        echo "ffmpeg-audio-only: ok"
-      ''}/bin/ffmpeg-audio-only";
-      meta.description = "Verify the audio-only ffmpeg build's configure surface";
-    };
+      # `nix run .#ffmpeg-asset-pin` / `nix run .#whisper-cpp-asset-pin` (roadmap items 62 and 63):
+      # the producer checks behind the asset builders. nix/asset-pin-check.nix builds each check's
+      # script with the check as an input, so running the app builds it and the source it asserts
+      # against; they are apps, not default checks. Linux-only, like the pinned assets themselves.
+      ffmpeg-asset-pin = pkgs.lib.optionalAttrs isLinux {
+        type = "app";
+        program = "${assetPinChecks.ffmpeg-asset-pin.app}/bin/ffmpeg-asset-pin";
+        meta.description = "Verify the desktop-ffmpeg-v2 asset pin against the built asset";
+      };
+      whisper-cpp-asset-pin = pkgs.lib.optionalAttrs isLinux {
+        type = "app";
+        program = "${assetPinChecks.whisper-cpp-asset-pin.app}/bin/whisper-cpp-asset-pin";
+        meta.description = "Verify the desktop-whisper-cpp-v1 asset pin against the built asset";
+      };
+
+      # `nix run .#ffmpeg-audio-only` (roadmap item 62): the build-surface check, moved out of
+      # `checks` so `nix flake check` compiles no ffmpeg source.
+      ffmpeg-audio-only = {
+        type = "app";
+        program = "${pkgs.writeShellScriptBin "ffmpeg-audio-only" ''
+          : ${ffmpegAudioOnlyCheck}
+          echo "ffmpeg-audio-only: ok"
+        ''}/bin/ffmpeg-audio-only";
+        meta.description = "Verify the audio-only ffmpeg build's configure surface";
+      };
+    } (if isLinux then [] else ["desktop" "desktop-bundle" "ffmpeg-asset-pin" "whisper-cpp-asset-pin"]);
 
     # `nix bundle --bundler .#desktop .#packages.x86_64-linux.desktop` produces the same file: the
     # bundler interface is `bundlers.<system>.<name> = drv: drv'`, and the derivation takes the
-    # package to bundle as its argument.
-    bundlers.x86_64-linux.desktop = drv:
-      import ./nix/desktop-bundle.nix {inherit pkgs; desktop = drv;};
+    # package to bundle as its argument. Linux-only, like the desktop package.
 
     # ADR 0036: the devenv's nixpkgs input is the flake's locked nixpkgs. `nix flake
     # check` fails when the revs drift; `devenv update` rewrites devenv.lock to
@@ -473,7 +497,8 @@
     # plain jq read (JSON is a subset of YAML; devenv's parser accepts it). The check
     # reads only flake.lock and devenv.yaml, so a nixpkgs bump or a devenv.yaml edit
     # (not the parts' sources) rebuilds it.
-    checks.x86_64-linux.devenv-pin-sync = pkgs.runCommand "devenv-pin-sync" { } ''
+    checks = pkgs.lib.removeAttrs {
+    devenv-pin-sync = pkgs.runCommand "devenv-pin-sync" { } ''
       flakeRev=$(
         ${pkgs.jq}/bin/jq -r '.nodes.nixpkgs.locked.rev' ${./flake.lock}
       )
@@ -497,7 +522,7 @@
     # check fails on any drift - a nixpkgs bump, a tag/version change, an edited
     # hash - and the user regenerates with `nix run .#update-versions` (ADR 0010).
     # Reads only the version inputs, so a non-version change does not rerun it.
-    checks.x86_64-linux.versions-sync = pkgs.runCommand "versions-sync" { } ''
+    versions-sync = pkgs.runCommand "versions-sync" { } ''
       ${pkgs.jq}/bin/jq -S . ${versionsJson} > expected.json
       ${pkgs.jq}/bin/jq -S . ${./versions.json} > committed.json
       if ! diff -u committed.json expected.json; then
@@ -514,7 +539,7 @@
     # recognised by its file name (the URL's last segment, the name fetchurl gives it), so a model
     # brought in any other way is caught too. $out is the closure's size report: every store path
     # with its size, largest first, and the total (`cat result` after building the check).
-    checks.x86_64-linux.desktop-model-free = let
+    desktop-model-free = let
       modelNames = map (pin: baseNameOf pin.url) (builtins.attrValues models.meta);
       modelPattern = pkgs.lib.concatMapStringsSep "|" pkgs.lib.escapeRegex modelNames;
       closure = pkgs.closureInfo {rootPaths = [desktop];};
@@ -542,7 +567,7 @@
     # nixpkgs Mesa → python3), which is not the behavior this removes. Names are matched by prefix:
     # flite is "flite-2.2-lib" and gtk4 "gtk4-4.22.4", which a version-anchored pattern misses (the
     # item-50 lesson).
-    checks.x86_64-linux.ffmpeg-no-gstreamer-gtk = let
+    ffmpeg-no-gstreamer-gtk = let
       lib = pkgs.lib;
       closure = pkgs.closureInfo {rootPaths = [ffmpeg];};
       group = ["python3" "gtk4" "gst-plugins-bad" "flite" "pipewire"];
@@ -563,7 +588,7 @@
     # docker-root's closure) — as the pinned release asset, not a source build. The devenv shell
     # uses the same import; the empty-store dry-run proves no source ffmpeg is in the shipped graph.
     # nix/artifact-everywhere-check.nix carries the assertions the two artifacts share.
-    checks.x86_64-linux.ffmpeg-audio-only-everywhere = let
+    ffmpeg-audio-only-everywhere = let
       artifacts = import ./nix/desktop-artifacts.nix;
       ffmpegArtifact = import ./nix/ffmpeg.nix {inherit pkgs;};
       desktop = self.packages.${system}.desktop;
@@ -587,7 +612,7 @@
     # decodes to the canonical FLAC through the shipped artifact, and the proof cannot drift from
     # `allowed-extensions.json`. nix/ffmpeg-upload-formats.sh validates each result from its own
     # STREAMINFO — no ffprobe, which the artifact does not ship.
-    checks.x86_64-linux.ffmpeg-upload-formats = let
+    ffmpeg-upload-formats = let
       lib = pkgs.lib;
       ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
       extensions = builtins.fromJSON (builtins.readFile ./backend/src/main/resources/allowed-extensions.json);
@@ -604,7 +629,7 @@
     # artifact — f32le PCM decode, silencedetect to the null muxer, the atrim window cut and the V10
     # concat backfill. nix/ffmpeg-app-uses.sh mirrors the app's argument lists; the atrim and concat
     # results are checked from their FLAC STREAMINFO, without ffprobe.
-    checks.x86_64-linux.ffmpeg-app-uses = let
+    ffmpeg-app-uses = let
       ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
       fixtures = ./backend/src/test/resources/upload-formats;
     in
@@ -621,7 +646,7 @@
     # stray-path scan fails on an unregistered path; the real prebuilt names no old build path, no
     # stray path, and sits in its own runtime closure (its pinned references are empty).
     # nix/artifact-integrity-check.nix carries the gates the two artifacts share.
-    checks.x86_64-linux.ffmpeg-artifact-integrity = import ./nix/artifact-integrity-check.nix {
+    ffmpeg-artifact-integrity = import ./nix/artifact-integrity-check.nix {
       inherit pkgs;
       importWith = artifacts: import ./nix/ffmpeg.nix {inherit pkgs artifacts;};
       attr = "ffmpeg";
@@ -635,7 +660,7 @@
     # holds none of the video libraries the slim build drops, and it is the only ffmpeg in the
     # server package's, docker-root's and the bundle's closures (the whisper-cpp fix). $out is the
     # size report; the official item-61 comparison is `nix path-info -S` run by the user.
-    checks.x86_64-linux.ffmpeg-closure-slim = let
+    ffmpeg-closure-slim = let
       lib = pkgs.lib;
       ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
       roots = {
@@ -676,7 +701,7 @@
     # a system that has one registered; any other system builds it from source. Checked for
     # aarch64-linux, which has none: its bundle Mesa must be the source derivation itself.
     # Evaluation only (nixpkgs' cross package set), so nothing for aarch64 is built.
-    checks.x86_64-linux.desktop-mesa-unregistered-system = let
+    desktop-mesa-unregistered-system = let
       aarch64 = import ./nix/desktop-mesa.nix {pkgs = pkgs.pkgsCross.aarch64-multiplatform;};
     in
       assert pkgs.lib.assertMsg (aarch64.mesa.outPath == aarch64.source.outPath)
@@ -693,7 +718,7 @@
     # Mesa's .drv is a direct input of none of the registered Mesa's own derivations (the unpack,
     # the asset, its fetch script). Not the whole build graph: exporting a .drv's closure makes Nix
     # build every output in it, the source Mesa's included.
-    checks.x86_64-linux.desktop-mesa-artifact-integrity = let
+    desktop-mesa-artifact-integrity = let
       fixture = pkgs.writeText "stt-bundle-mesa-vulkan-fixture.tar.zst" "not the release asset";
       registered = url: let
         mesas = import ./nix/desktop-mesa.nix {
@@ -745,7 +770,7 @@
     # the override — fails at evaluation, so nothing is fetched or compiled. Nix cannot read an
     # evaluation error's text, so nix/desktop-mesa.nix also exposes the text it throws (`pinError`),
     # which must name the asset, its url, sha256 and storePath, and the source's out path.
-    checks.x86_64-linux.desktop-mesa-stale-pin = let
+    desktop-mesa-stale-pin = let
       lib = pkgs.lib;
       fixture = pkgs.writeText "stt-bundle-mesa-vulkan-fixture.tar.zst" "not the release asset";
       pin = {
@@ -783,7 +808,7 @@
     # source (checked above). Built, it must keep the three Vulkan drivers with their manifests
     # pointing into itself, name no store path of the build it was made from, refer only to its pins
     # and itself, and carry no LLVM.
-    checks.x86_64-linux.desktop-mesa-prebuilt = let
+    desktop-mesa-prebuilt = let
       lib = pkgs.lib;
       artifacts = import ./nix/desktop-artifacts.nix;
       registered = builtins.attrNames artifacts.mesaVulkan;
@@ -835,7 +860,7 @@
     # the source build and reports no stale pin. Checked for aarch64-linux, which has no entry
     # (items 48/49 add their systems' artifacts with them). Evaluation only (nixpkgs' cross
     # package set), so nothing for aarch64 is built.
-    checks.x86_64-linux.whisper-cpp-unregistered-system = let
+    whisper-cpp-unregistered-system = let
       aarch64 = import ./nix/whisper-cpp.nix {pkgs = pkgs.pkgsCross.aarch64-multiplatform;};
     in
       assert pkgs.lib.assertMsg (aarch64.whisperCpp.outPath == aarch64.source.outPath)
@@ -852,7 +877,7 @@
     # imports the same nix/whisper-cpp.nix; the empty-store dry-run proves the build graphs.
     # nix/artifact-everywhere-check.nix carries the shared assertions, including the source build's
     # absence from each closure.
-    checks.x86_64-linux.whisper-cpp-everywhere = let
+    whisper-cpp-everywhere = let
       artifacts = import ./nix/desktop-artifacts.nix;
       whisperCppArtifact = import ./nix/whisper-cpp.nix {inherit pkgs;};
     in
@@ -881,7 +906,7 @@
     # both paths; the stray-path scan fails on an unregistered path; the real prebuilt names no old
     # build path, no stray path, sits in its own runtime closure, and every pinned reference is in
     # that closure. nix/artifact-integrity-check.nix carries the gates the two artifacts share.
-    checks.x86_64-linux.whisper-cpp-artifact-integrity = import ./nix/artifact-integrity-check.nix {
+    whisper-cpp-artifact-integrity = import ./nix/artifact-integrity-check.nix {
       inherit pkgs;
       importWith = artifacts: import ./nix/whisper-cpp.nix {inherit pkgs artifacts;};
       attr = "whisperCpp";
@@ -892,8 +917,10 @@
     };
 
     # Roadmap item 63 (test-list item 6): every system the flake declares has a pinned whisper-cpp
-    # artifact, so adding a platform (items 48, 49) cannot land without its asset.
-    checks.x86_64-linux.whisper-cpp-artifact-policy = let
+    # artifact, so adding a platform (items 48, 49) cannot land without its asset. darwin (roadmap
+    # item 48) ships the source Metal build until its own asset pin lands, so it is not in
+    # declaredSystems yet and the check is excluded there.
+    whisper-cpp-artifact-policy = let
       artifacts = import ./nix/desktop-artifacts.nix;
       missing = builtins.filter (s: (artifacts.whisperCpp.${s} or null) == null) declaredSystems;
     in
@@ -907,8 +934,9 @@
     # the SDL2 -> sdl2-compat -> sdl3 -> GTK/GStreamer -> flite/pipewire chain the build cut with
     # `withSDL = false`, and no ffmpeg at all — nixpkgs' or the app's: `withFFmpegSupport = false`
     # leaves whisper-cli on its bundled miniaudio. Names are matched by prefix (flite is
-    # "flite-2.2-lib", gtk4 "gtk4-4.22.4") — the item-50 lesson.
-    checks.x86_64-linux.whisper-cpp-closure-slim = let
+    # "flite-2.2-lib", gtk4 "gtk4-4.22.4") — the item-50 lesson. Also proven for the darwin source
+    # Metal build (roadmap item 48), which keeps the same recipe.
+    whisper-cpp-closure-slim = let
       lib = pkgs.lib;
       whisperCpp = (import ./nix/whisper-cpp.nix {inherit pkgs;}).whisperCpp;
       closure = pkgs.closureInfo {rootPaths = [whisperCpp];};
@@ -947,14 +975,15 @@
         echo ok > $out
       '';
 
-    # Roadmap item 63 (test-list item 2): the shipped whisper-cli is the pinned 1.8.4 Vulkan build.
-    # `--help` succeeds, and it transcribes the committed FLAC fixture to the committed expected
-    # text. Provenance of nix/fixtures/whisper-cpp-sample-transcript.txt: captured 2026-10-19 from
-    # the source build /nix/store/n2vf0kiskxmm9mfrs5mcla5q1k7zqpmi-whisper-cpp-1.8.4/bin/whisper-cli
-    # with ggml-tiny.en.bin (sha256 921e4cf8…, nix/models.nix) and
+    # Roadmap item 63 (test-list item 2): the shipped whisper-cli is the pinned 1.8.4 build (Vulkan
+    # on Linux, Metal on darwin — roadmap item 48). `--help` succeeds, and it transcribes the
+    # committed FLAC fixture to the committed expected text. Provenance of
+    # nix/fixtures/whisper-cpp-sample-transcript.txt: captured 2026-10-19 from the source build
+    # /nix/store/n2vf0kiskxmm9mfrs5mcla5q1k7zqpmi-whisper-cpp-1.8.4/bin/whisper-cli with
+    # ggml-tiny.en.bin (sha256 921e4cf8…, nix/models.nix) and
     # `-m <model> -f backend/src/test/resources/upload-formats/sample.flac -nt`; the artifact under
     # test did not produce that file. The check runs the shipped artifact only.
-    checks.x86_64-linux.whisper-cpp-behaves = let
+    whisper-cpp-behaves = let
       whisperCpp = (import ./nix/whisper-cpp.nix {inherit pkgs;}).whisperCpp;
       fixture = ./backend/src/test/resources/upload-formats/sample.flac;
       expected = ./nix/fixtures/whisper-cpp-sample-transcript.txt;
@@ -980,16 +1009,24 @@
     # 2026-10-19 rework): the artifact switch replaces one closure path with its identical re-linked
     # copy, so none may grow. $out is the report; the official `nix path-info -S` comparison stays
     # the user's run.
-    checks.x86_64-linux.whisper-cpp-closure-size = let
+    whisper-cpp-closure-size = let
       lib = pkgs.lib;
       roots = {
         default = self.packages.${system}.default;
         docker-root = self.packages.${system}.docker-root;
         desktop-bundle = self.packages.${system}.desktop-bundle;
       };
-      item62 = {
-        default = 1771160066;
-        docker-root = 2805345088;
+      # The closure bounds, each naming its measurement. Item 62's final du numbers
+      # (docs/specs/audio-only-ffmpeg.md, the 2026-10-19 rework) set the artifact-switch
+      # baseline; item 48's platform layer (ProcessPlatform.kt, the darwin signal
+      # constants) grows the backend jar by 4462 bytes, measured on CI 2026-10-20 (run
+      # 39356387395). The same jar drv is in docker-root, so its bound shares the delta;
+      # the bundle's zstd payload is measured on the first run that reports it. The
+      # script measures every closure before asserting, so one failing run names every
+      # closure that moved, not just the first.
+      bounds = {
+        default = 1771164528;
+        docker-root = 2805349550;
         desktop-bundle = 1564784978;
       };
       closures = lib.mapAttrs (_: root: pkgs.closureInfo {rootPaths = [root];}) roots;
@@ -1001,24 +1038,28 @@
           echo "whisper-cpp-closure-size: $1" >&2
           exit 1
         }
+        failed=0
         {
           ${lib.concatStrings (lib.mapAttrsToList (name: closure: let
-            bound = toString item62.${name};
+            bound = toString bounds.${name};
           in ''
             size=$(xargs du -sb < ${closure}/store-paths | awk '{s += $1} END {print s + 0}')
-            echo "${name} closure: $size bytes (item 62: ${bound} bytes)"
-            [ "$size" -le ${bound} ] ||
-              fail "the ${name} closure grew to $size bytes, above item 62's ${bound} bytes"
+            echo "${name} closure: $size bytes (bound: ${bound} bytes)"
+            [ "$size" -le ${bound} ] || failed=1
           '') closures)}
-        } > $out
-        cat $out
+        } | tee sizes.txt
+        if [ "$failed" = 1 ]; then
+          fail "a closure grew above its bound - the sizes above name every one that moved"
+        fi
+        cp sizes.txt $out
+        cat sizes.txt
       '';
 
     # Roadmap item 63 (discovered, found in the item-1 cycle): the flat asset fetch is accepted by
     # the current Nix, which scans fixed-output outputs for references, because it discards them and
     # takes its output path from the structured-attrs shell file. The tar's bytes name store paths,
     # yet its own store path carries none.
-    checks.x86_64-linux.whisper-cpp-asset-fetch = let
+    whisper-cpp-asset-fetch = let
       asset = (import ./nix/whisper-cpp.nix {inherit pkgs;}).whisperCpp.asset;
     in
       pkgs.runCommand "whisper-cpp-asset-fetch" {
@@ -1037,14 +1078,16 @@
         echo ok > $out
       '';
 
-    # Regenerates the committed versions.json from the flake's versions (ADR 0010: the
-    # user runs this; writes to the checkout the command is run from).
-    apps.x86_64-linux.update-versions = {
-      type = "app";
-      program = "${pkgs.writeShellScript "update-versions" ''
-        exec ${pkgs.jq}/bin/jq -S . ${versionsJson} > versions.json
-      ''}";
-      meta.description = "Regenerate the committed versions.json from the flake's versions";
-    };
+    } (if isLinux then [] else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-audio-only-everywhere" "ffmpeg-upload-formats" "ffmpeg-app-uses" "ffmpeg-artifact-integrity" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-everywhere" "whisper-cpp-artifact-integrity" "whisper-cpp-artifact-policy" "whisper-cpp-closure-size" "whisper-cpp-asset-fetch"]);
+  };
+  in {
+    packages = nixpkgs.lib.genAttrs systems (system: (mkSystem system).packages);
+    apps = nixpkgs.lib.genAttrs systems (system: (mkSystem system).apps);
+    checks = nixpkgs.lib.genAttrs systems (system: (mkSystem system).checks);
+    bundlers.x86_64-linux.desktop = drv:
+      import ./nix/desktop-bundle.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        desktop = drv;
+      };
   };
 }
