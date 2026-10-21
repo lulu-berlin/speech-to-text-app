@@ -25,8 +25,8 @@ runs:
       run: |
         set -euo pipefail
         pins=$(jq -Sec '{downloads, models, fixtures, whisperCpp, ffmpeg}' versions.json)
-        key=$( { cat flake.lock devenv.lock devenv.yaml devenv.nix $(find nix -type f | sort); printf '%s' "$pins"; } | sha256sum | cut -d' ' -f1)
-        echo "key=nix-${{ runner.os }}-v2-$key" >> "$GITHUB_OUTPUT"
+        if command -v sha256sum >/dev/null; then hash=$( { cat flake.lock devenv.lock devenv.yaml devenv.nix $(find nix -type f | sort); printf '%s' "$pins"; } | sha256sum); else hash=$( { cat flake.lock devenv.lock devenv.yaml devenv.nix $(find nix -type f | sort); printf '%s' "$pins"; } | shasum -a 256); fi
+        echo "key=nix-${{ runner.os }}-v2-$(cut -d' ' -f1 <<<"$hash")" >> "$GITHUB_OUTPUT"
     - uses: nix-community/cache-nix-action@v7
       with:
         primary-key: ${{ steps.nix-cache-key.outputs.key }}
@@ -37,3 +37,4 @@ runs:
         # 4 GB, not 6: a key change transiently leaves the previous store entry alive next to the
         # Gradle, pnpm and downloads caches, and evicting those is what costs a cold run its models.
         gc-max-store-size-linux: 4G
+        gc-max-store-size-macos: 4G
