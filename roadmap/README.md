@@ -118,7 +118,7 @@ graph TD
   61[61 headless ffmpeg ✓]:::done --> 62[62 audio-only ffmpeg ✓]:::done
   56 --> 62
   63[63 whisper-cpp build time ✓]:::done
-  50 --> 64[64 evaluate Tauri]
+  50 --> 64[64 evaluate Tauri ✓]:::done
   65[65 fix the row-color phase observation]
   64 --> 66[66 local service and frontend flavors]
   48 --> 66
@@ -194,7 +194,7 @@ graph TD
 | [61 — Ship nixpkgs' cached headless ffmpeg](../docs/specs/headless-ffmpeg.md)                                                                                        | done          | —                           |
 | [62 — An audio-only ffmpeg, shipped as a pinned prebuilt artifact](../docs/specs/audio-only-ffmpeg.md)                                                               | done          | 56, 61                      |
 | [63 — Stop compiling whisper-cpp on every uncached machine](../docs/specs/whisper-cpp-artifact.md)                                                                   | done          | —                           |
-| [64 — Evaluate Tauri as the desktop shell](64-tauri-evaluation.md)                                                                                                   | spec-approved | 50                          |
+| [64 — Evaluate Tauri as the desktop shell](../docs/specs/tauri-evaluation.md) | done | 50 |
 | [65 — `59-row-color`'s chunking-phase observation is flaky](65-row-color-chunking-observation.md)                                                                    | spec-approved | —                           |
 | [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](66-local-service-and-frontends.md)                                   | draft         | 48, 49, 64                  |
 | [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | draft         | 66                          |
