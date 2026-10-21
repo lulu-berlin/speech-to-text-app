@@ -117,6 +117,9 @@ fun requirePlatform(): String =
             "Supported: ${supportedPlatforms.joinToString()} (Linux x64 and Windows x64 tested, macOS best-effort).",
     )
 
+/** A managed tool's file name on this platform: Windows executables carry `.exe` (roadmap item 49). */
+fun platformExecutable(name: String): String = if (requirePlatform().startsWith("windows")) "$name.exe" else name
+
 // Every task that downloads or runs a managed tool: prepareRuntime (whisper-cli, ffmpeg,
 // models; run, dev and e2e depend on it) and e2eInstall (node/pnpm; e2eBrowsers,
 // e2eSystemDeps and e2e depend on it). Checked once the task graph is known, so the
@@ -310,9 +313,7 @@ tasks.register("prepareRuntime") {
                         "(supported: ${supportedPlatforms.joinToString()})",
                 )
             }
-            // Windows executables carry .exe; the archive's file name is the only name it knows.
-            val exeName = if (requirePlatform().startsWith("windows")) "$label.exe" else label
-            val exe = prepareTool(label, entry, exeName)
+            val exe = prepareTool(label, entry, platformExecutable(label))
             // An archive can ship more than one executable: the bytedeco ffmpeg jar carries ffmpeg
             // and ffprobe. Nothing runs ffprobe (the shipped ffmpeg does not have it), so only
             // ffmpeg is resolved. Gradle's zip copy drops the executable bit, so findExecutable
