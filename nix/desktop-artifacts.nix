@@ -1,8 +1,9 @@
-# Prebuilt artifacts of the desktop bundle and the app (roadmap items 56, 62 and 63): GitHub Release
-# assets of this repository, uploaded by the user, each pinned by url and sha256. Keyed by artifact,
-# then by Nix system (`pkgs.stdenv.hostPlatform.system`); a system without an entry builds the
-# artifact from source. Pure data, read by nix/desktop-mesa.nix, nix/ffmpeg.nix and
-# nix/whisper-cpp.nix.
+# Prebuilt artifacts of the desktop bundle and the app (roadmap items 56, 62, 63 and 48): GitHub
+# Release assets of this repository, uploaded by the user, each pinned by url and sha256. Keyed by
+# artifact, then by Nix system (`pkgs.stdenv.hostPlatform.system`); a system without an entry builds
+# the artifact from source. Pure data, read by nix/desktop-mesa.nix, nix/ffmpeg.nix and
+# nix/whisper-cpp.nix. A static asset that names no store path (the darwin whisper-cli) records
+# `storePath = null` and no references: there is no build path to rewrite and no stale-pin to catch.
 {
   # The bundle's Vulkan-only Mesa, per system: { url; sha256; storePath; references; } — storePath
   # is the out path of the source build the asset was made from, references that output's direct
@@ -52,5 +53,16 @@
       "/nix/store/l60xx259knfbgfr7wzwsw7zg9ajmv3sn-wget-1.25.0"
       "/nix/store/vjdqsn0bz2llabfqa746zfgk4kmswba5-vulkan-loader-1.4.357.0"
     ];
+  };
+
+  # Apple Silicon (roadmap item 48's follow-up): the static Metal/BLAS 1.8.4 build the manual
+  # `macos-whisper-asset` CI job compiles and the Gradle bootstrap downloads (nix/versions.nix
+  # darwin-arm64) — one binary, system frameworks only, no store paths. The Nix package and the
+  # devenv run it too, so all three paths ship the same tool.
+  whisperCpp.aarch64-darwin = {
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-aarch64-darwin.tar.gz";
+    sha256 = "58ff90b3b693c58c28a3cf50c8dc9fcc6ad355101e9535f234d187bd9651078a";
+    storePath = null;
+    references = [];
   };
 }

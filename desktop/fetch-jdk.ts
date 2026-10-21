@@ -26,7 +26,8 @@ const tarball = downloadVerified({
 
 rmSync(targetDir, { recursive: true, force: true });
 mkdirSync(targetDir, { recursive: true });
-const result = spawnSync('tar', ['-xzf', tarball, '-C', targetDir, '--strip-components=1'], {
+const strip = process.platform === 'darwin' ? 3 : 1;
+const result = spawnSync('tar', ['-xzf', tarball, '-C', targetDir, `--strip-components=${strip}`], {
   stdio: 'inherit',
 });
 if (result.status !== 0) fail('extraction failed');

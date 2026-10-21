@@ -68,6 +68,7 @@ export default async function globalSetup() {
     { args: ['-stream_loop', '12'], file: FIXTURE_CLIPS[41] }, // ~143s, item 59's elapsed-time row clip
     { args: ['-stream_loop', '4'], file: FIXTURE_CLIPS[42] }, // ~55s, item 59's phase-color row clip
     { args: ['-stream_loop', '16'], file: FIXTURE_CLIPS[44] }, // ~187s, item 59's header-typing clip
+    { args: ['-stream_loop', '1'], file: FIXTURE_CLIPS[45] }, // ~22s, item 48's Metal app e2e
   ];
   for (const { args, file } of recipes) {
     const target = join(fixturesDir, file);

@@ -31,9 +31,13 @@ interface ModelPin {
 
 type OnProgress = (progress: ModelProgress) => void;
 
-// ${XDG_CACHE_HOME:-~/.cache}/stt-app/models (decided 2026-10-14): re-downloadable, so backups
-// skip it, while the data directory beside it holds the transcripts.
+// ${XDG_CACHE_HOME:-~/.cache}/stt-app/models on Linux, ~/Library/Caches/stt-app/models on macOS
+// (decided 2026-10-14, extended by roadmap item 48): re-downloadable, so backups skip it, while
+// the data directory beside it holds the transcripts.
 export function modelsDir(): string {
+  if (process.platform === 'darwin') {
+    return join(homedir(), 'Library', 'Caches', 'stt-app', 'models');
+  }
   const base = process.env.XDG_CACHE_HOME || join(homedir(), '.cache');
   return join(base, 'stt-app', 'models');
 }

@@ -2,7 +2,9 @@
 # asset that is missing or does not match its sha256 fails naming the asset, url and sha256; an asset
 # pinned to another source build fails at evaluation naming both paths; the stray-path scan fails on
 # an unregistered path; the real prebuilt names no old build path, no stray path, sits in its own
-# runtime closure, and holds every pinned reference.
+# runtime closure, and holds every pinned reference. A static pin (`storePath = null`, roadmap
+# item 48's darwin whisper-cli) has no build path to look for; the closure, stray-path and reference
+# gates still run.
 #
 # `importWith` imports the artifact's module with an overridden `artifacts` argument, `attr` is the
 # module's result attribute, `name` the check's derivation name (also the message prefix),
@@ -90,9 +92,11 @@ in
       ref=/nix/store/11111111111111111111111111111111-reference
       printf '%s\n' "$ref" > allowed/x
       bash ${./store-path-scan.sh} allowed "$ref" || fail "the scan rejected a declared reference"
-      if grep -rlaF ${lib.escapeShellArg pin.storePath} ${artifact}; then
-        fail "the prebuilt still names ${pin.storePath}, the build it was made from"
-      fi
+      ${lib.optionalString (pin.storePath != null) ''
+        if grep -rlaF ${lib.escapeShellArg pin.storePath} ${artifact}; then
+          fail "the prebuilt still names ${pin.storePath}, the build it was made from"
+        fi
+      ''}
       bash ${./store-path-scan.sh} ${artifact} ${lib.escapeShellArgs pin.references} ||
         fail "the prebuilt names a stray store path"
       closure=${pkgs.closureInfo {rootPaths = [artifact];}}/store-paths

@@ -25,13 +25,20 @@ const fail = (label: string, message: string): never => {
   process.exit(1);
 };
 
-/** The `{ url, sha256 }` pin of `key` in versions.json for `platform`. */
-export function pin(key: string, label: string, platform = 'linux-x64'): Pin {
+/** The `{ url, sha256 }` pin of `key` in versions.json for this build host's platform. */
+export function pin(
+  key: string,
+  label: string,
+  platform = process.platform === 'darwin'
+    ? process.arch === 'arm64'
+      ? 'darwin-arm64'
+      : 'darwin-x64'
+    : 'linux-x64',
+): Pin {
   return (
     manifest.downloads[key]?.[platform] ?? fail(label, `versions.json has no ${platform} ${key}`)
   );
 }
-
 /**
  * Downloads `key`'s pinned artifact into dist/downloads as `cacheName`, once: an existing
  * file is reused (and re-verified), a missing one is fetched with curl. A sha256 that differs

@@ -79,3 +79,12 @@ deb:
     - libxcb1
     - libxcb-shm0
     - libudev1
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.productivity
+  # Unsigned v1 (item 50's decision): no signing identity, no hardened runtime, no notarization.
+  identity: null
+  hardenedRuntime: false

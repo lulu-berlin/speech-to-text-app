@@ -169,6 +169,9 @@ fun findExecutable(
 }
 
 fun defaultDataDir(): String {
+    if (platform?.startsWith("darwin") == true) {
+        return (System.getenv("HOME") ?: "") + "/Library/Application Support/stt-app"
+    }
     val xdg = System.getenv("XDG_DATA_HOME")
     val home = System.getenv("HOME")
     val base = if (!xdg.isNullOrEmpty()) xdg else (home ?: "") + "/.local/share"
@@ -318,7 +321,7 @@ fun appEnv(): Map<String, String> =
         // Gradle 9's HTML test report writes one directory per test name, and names like "0°, 20°"
         // or "O(n³)" fail to encode under a POSIX locale: devenv.nix and flake.nix set the same for
         // the same reason, and this no-Nix path needs it too. LC_CTYPE sets the charset only.
-        "LC_CTYPE" to (System.getenv("LC_CTYPE") ?: "C.UTF-8"),
+        "LC_CTYPE" to (System.getenv("LC_CTYPE") ?: if (platform?.startsWith("darwin") == true) "UTF-8" else "C.UTF-8"),
         // The model defaults are the paths the cache *will* hold after prepareRuntime
         // (which both tasks depend on), not a value only set during its execution.
         "STT_WHISPER_MODEL" to (System.getenv("STT_WHISPER_MODEL") ?: modelCacheFile("whisper").absolutePath),

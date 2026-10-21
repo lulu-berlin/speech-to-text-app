@@ -21,12 +21,17 @@
   pkgs,
   artifacts ? import ./desktop-artifacts.nix,
 }: let
-  # pkgsStatic is a musl cross package set (nixpkgs stage.nix: crossSystem), so the generic recipe's
-  # cross flags are needed; the build itself is one output with the `ffmpeg` program only (no
-  # ffprobe: the app never runs it, and it would duplicate the code).
-  static = pkgs.pkgsStatic;
+  # `pkgsStatic` is the musl cross package set and exists only on Linux; darwin has no static
+  # libc, so the same audio-only recipe is built with the native package set there (roadmap item
+  # 48). The pinned release asset exists only for x86_64-linux; a system without a pin builds
+  # from source.
+  base = if pkgs.stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs;
   lib = pkgs.lib;
   system = pkgs.stdenv.hostPlatform.system;
+  # ffmpeg's configure target: Linux keeps the pinned asset's exact flags; darwin needs its own
+  # target, or configure cross-compiles for linux/x86_64 with the wrong compiler (roadmap item 48).
+  targetOS = if pkgs.stdenv.hostPlatform.isDarwin then "darwin" else "linux";
+  targetArch = if pkgs.stdenv.hostPlatform.isAarch64 then "aarch64" else "x86_64";
 
   # The component lists the build's `--enable-<kind>=…` flags come from, and the same lists the
   # `ffmpeg-audio-only` app compares the built configuration against: one source, so the check cannot
@@ -120,8 +125,8 @@
       components = ["file" "pipe"];
     }
   ];
-  source =
-    (static.ffmpeg_8-headless.override {
+  linuxSource =
+    (base.ffmpeg_8-headless.override {
       # The external libraries and GUI/network features all default on with the headless variant.
       withHeadlessDeps = false;
       withSmallDeps = false;
@@ -158,13 +163,13 @@
       # cross build's host compiler instead — it is a build input, and Nix would record it in the
       # binary's references (nixpkgs' own postConfigure does this too).
       postConfigure = ''
-        remove-references-to -t ${static.buildPackages.stdenv.cc} config.h
+        remove-references-to -t ${base.buildPackages.stdenv.cc} config.h
       '';
       # nixpkgs' postFixup patches the shared libraries' RUNPATH; this build has none.
       postFixup = "";
       configureFlags = [
-        "--target_os=linux"
-        "--arch=x86_64"
+        "--target_os=${targetOS}"
+        "--arch=${targetArch}"
         "--prefix=${placeholder "out"}"
         "--disable-everything"
         "--disable-autodetect"
@@ -183,12 +188,19 @@
         "--disable-avdevice"
       ]
       ++ map ({kind, components}: "--enable-${kind}=${lib.concatStringsSep "," components}") enable
-      ++ lib.optionals (static.stdenv.hostPlatform != static.stdenv.buildPlatform) [
-        "--cross-prefix=${static.stdenv.cc.targetPrefix}"
+      ++ lib.optionals (base.stdenv.hostPlatform != base.stdenv.buildPlatform) [
+        "--cross-prefix=${base.stdenv.cc.targetPrefix}"
         "--enable-cross-compile"
-        "--host-cc=${static.buildPackages.stdenv.cc}/bin/cc"
+        "--host-cc=${base.buildPackages.stdenv.cc}/bin/cc"
       ];
     });
+
+  # On darwin the app uses nixpkgs' cached ffmpeg_8-headless: the audio-only static recipe is
+  # Linux-shaped (static libc) and its darwin configure is not maintained (roadmap item 48).
+  source =
+    if pkgs.stdenv.hostPlatform.isDarwin
+    then pkgs.ffmpeg_8-headless
+    else linuxSource;
   # The pinned release asset for this system, if any: the shared helper fetches, re-links and
   # scans it; a system without a pin gets the source build.
   prebuiltArtifact = import ./prebuilt-artifact.nix {

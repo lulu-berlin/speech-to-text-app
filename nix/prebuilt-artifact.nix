@@ -40,7 +40,9 @@
   # A registered artifact: the release asset, then its unpack and re-link. The asset was built at
   # another store path, and the output may name that path, so every occurrence of it becomes this
   # output's own path (same length). Each pinned direct reference is made an input, so the output's
-  # closure is complete, and the build fails if any other store path survives.
+  # closure is complete, and the build fails if any other store path survives. A static asset
+  # (storePath = null, the darwin whisper-cli) names no store path at all: there is nothing to
+  # rewrite, and the stray-path scan below still proves it.
   prebuilt = let
     name = assetName;
     tools = pkgs.buildPackages;
@@ -96,22 +98,31 @@
       };
   in
     pkgs.runCommand source.name ({
-      nativeBuildInputs = [tools.zstd tools.perl tools.coreutils tools.gnugrep];
+      nativeBuildInputs = [tools.zstd tools.gzip tools.perl tools.coreutils tools.gnugrep];
       passthru = {inherit asset;};
     } // extraAttrs) ''
       mkdir $out
-      tar -x --zstd -f ${asset} -C $out
-      # The files that name the asset's build path get this output's path instead; the scan below
-      # proves none was missed.
-      old=${lib.escapeShellArg pin.storePath}
-      files=$(grep -rlF -- "$old" $out || true)
-      # `old` must reach perl's environment (a shell variable is not visible in %ENV); without it
-      # the empty pattern rewrites every position.
-      if [ -n "$files" ]; then old="$old" out="$out" perl -pi -e 's/\Q$ENV{old}\E/$ENV{out}/g' $files; fi
-      if [ -n "$files" ] && grep -qF -- "$old" $files; then
-        echo "desktop artifact ${name}: these files still name ${pin.storePath}" >&2
-        exit 1
-      fi
+      case ${lib.escapeShellArg assetName} in
+        *.tar.zst) tar -x --zstd -f ${asset} -C $out ;;
+        *.tar.gz) tar -x --gzip -f ${asset} -C $out ;;
+        *)
+          echo "desktop artifact ${name}: unsupported asset name ${assetName}" >&2
+          exit 1
+          ;;
+      esac
+      ${lib.optionalString (pin.storePath != null) ''
+        # The files that name the asset's build path get this output's path instead; the scan below
+        # proves none was missed.
+        old=${lib.escapeShellArg pin.storePath}
+        files=$(grep -rlF -- "$old" $out || true)
+        # `old` must reach perl's environment (a shell variable is not visible in %ENV); without it
+        # the empty pattern rewrites every position.
+        if [ -n "$files" ]; then old="$old" out="$out" perl -pi -e 's/\Q$ENV{old}\E/$ENV{out}/g' $files; fi
+        if [ -n "$files" ] && grep -qF -- "$old" $files; then
+          echo "desktop artifact ${name}: these files still name ${pin.storePath}" >&2
+          exit 1
+        fi
+      ''}
       if ! stray=$(bash ${./store-path-scan.sh} $out ${lib.escapeShellArgs referenced}); then
         echo "desktop artifact ${name}: names store paths that are neither itself nor a pinned reference:" >&2
         echo "$stray" >&2
@@ -125,7 +136,7 @@
   # flake's check, which cannot read an evaluation error.
   sourcePath = builtins.unsafeDiscardStringContext source.outPath;
   pinError =
-    if pin == null || pin.storePath == sourcePath
+    if pin == null || pin.storePath == null || pin.storePath == sourcePath
     then null
     else ''
       desktop artifact ${assetName} (${label}.${system} in nix/desktop-artifacts.nix) was made from another ${subject} build than this flake's; rebuild the asset from this flake's ${subject} and pin the new release.

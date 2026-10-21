@@ -1,6 +1,6 @@
-# Continuous verification (roadmap item 51). Linux runs on pushes to main and on pull requests;
-# the pinned tool versions come from the committed versions.json (the flake's pins, item 33)
-# through the shared toolchain actions in .github/actions/. No secrets.
+# Continuous verification (roadmap item 51). Linux and macOS run on pushes to main and on pull
+# requests; the pinned tool versions come from the committed versions.json (the flake's pins,
+# item 33) through the shared toolchain actions in .github/actions/. No secrets.
 name: CI
 
 on:
@@ -9,8 +9,8 @@ on:
   pull_request:
   workflow_dispatch:
   # Nightly at 03:00 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry.
-  # Until items 48/49 add their platform legs, the nightly runs the Linux tree, so the trigger
-  # itself is exercised. GitHub runs a scheduled workflow only from the default branch.
+  # The nightly runs the whole tree, including the macOS legs; the Windows legs follow with item
+  # 49. GitHub runs a scheduled workflow only from the default branch.
   schedule:
     - cron: '0 3 * * *'
       timezone: 'Europe/Berlin'
@@ -117,6 +117,235 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" "$gradle_home" "$GITHUB_WORKSPACE"
       - name: gradle e2e
         run: ./gradlew e2e
+
+  # macOS (roadmap item 48): Apple Silicon only — Apple and nixpkgs dropped Intel Macs. These jobs
+  # run on every push to main, every pull request, workflow dispatch and the nightly schedule.
+  # The Gradle tree is the human path (./gradlew); the Nix job is the flake/devenv verification.
+  macos-backend-check:
+    name: macOS (gradle check)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+      - name: gradle check
+        run: ./gradlew -p backend check
+
+  macos-frontend-check:
+    name: macOS (pnpm test, pnpm build)
+    runs-on: macos-15
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+      - name: pnpm test
+        run: pnpm test
+      - name: pnpm build
+        run: pnpm build
+
+  macos-backend-integration:
+    name: macOS (gradle integrationTest)
+    needs: [macos-backend-check, macos-frontend-check]
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+      - name: gradle integrationTest
+        run: ./gradlew integrationTest
+
+  macos-e2e:
+    name: macOS (e2e)
+    needs: [macos-backend-check, macos-frontend-check]
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+      - name: gradle e2e
+        run: |
+          rm -f e2e/.e2e-backend.log
+          ./gradlew e2e
+      - name: Assert a task ran through Metal
+        run: |
+          set -euo pipefail
+          grep -q 'using MTL0 backend' e2e/.e2e-backend.log || {
+            echo 'no whisper-cli MTL0 backend line in the app log' >&2
+            tail -100 e2e/.e2e-backend.log
+            exit 1
+          }
+
+  macos-nix:
+    name: macOS (Nix build + devenv)
+    needs: [macos-backend-check, macos-frontend-check]
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/nix-toolchain
+        with:
+          save-cache: 'true'
+      - name: Install the devenv CLI
+        run: nix profile install nixpkgs#devenv
+      - name: actionlint the workflows
+        run: devenv shell -- actionlint .github/workflows/*.yml
+      - name: devenv test
+        run: devenv test
+      - name: nix flake check
+        run: nix flake check --print-build-logs
+      - name: nix build
+        run: nix build --print-build-logs
+
+  # macOS desktop artifact (roadmap item 48): electron-builder builds the unsigned Apple Silicon
+  # DMG from the staged darwin JRE, backend, UI and tools, and item 50's four packaged specs run
+  # against the app installed from that DMG. No Docker/Xvfb: macOS runs the window itself.
+  macos-dmg:
+    name: macOS (DMG + packaged e2e)
+    needs: [macos-backend-check, macos-frontend-check]
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: |
+            desktop/pnpm-lock.yaml
+            e2e/pnpm-lock.yaml
+      - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron)
+        uses: actions/cache@v6
+        with:
+          path: |
+            desktop/dist/downloads
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
+          restore-keys: desktop-downloads-${{ runner.os }}-
+      - name: Build the backend, the UI, the tools and the fixtures
+        run: |
+          set -euo pipefail
+          ./gradlew -p backend installDist
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend build
+          ./gradlew prepareRuntime prepareE2eFixtures
+      - name: Install the desktop and e2e packages
+        run: |
+          set -euo pipefail
+          pnpm --dir desktop install --frozen-lockfile
+          pnpm --dir e2e install --frozen-lockfile
+      - name: Check the desktop package and specs (format, types)
+        run: |
+          set -euo pipefail
+          pnpm --dir desktop test
+          pnpm --dir e2e exec tsc -p desktop/tsconfig.json
+      - name: Build the DMG
+        run: |
+          set -euo pipefail
+          pnpm --dir desktop fetch:jdk
+          pnpm --dir desktop dist:mac
+      # The same pinned fixtures and models the Linux desktop job exports; the sha256 values the
+      # first-run spec asserts against come from versions.json.
+      - name: Export the fixture and model environment
+        run: |
+          set -euo pipefail
+          cache="${GRADLE_USER_HOME:-$HOME/.gradle}/stt-app"
+          tiny=$(find "$cache/models" -maxdepth 1 -name '*ggml-tiny.en.bin' | head -n 1)
+          speaker=$(find "$cache/models" -maxdepth 1 -name '*campplus*voxceleb_16k.onnx' | head -n 1)
+          jfk=$(find "$cache/fixtures" -maxdepth 1 -name '*jfk.wav' | head -n 1)
+          for file in "$tiny" "$speaker" "$jfk"; do
+            [ -n "$file" ] || { echo "a pinned fixture or model is missing from $cache" >&2; exit 1; }
+          done
+          {
+            echo "TEST_WHISPER_TINY_EN_MODEL=$tiny"
+            echo "STT_SPEAKER_MODEL=$speaker"
+            echo "TEST_JFK_WAV=$jfk"
+            echo "TEST_WHISPER_TINY_EN_SHA256=$(jq -er '.models.whisperTinyEn.sha256' versions.json)"
+            echo "TEST_SPEAKER_SHA256=$(jq -er '.models.speaker.sha256' versions.json)"
+          } >> "$GITHUB_ENV"
+      - name: Mount the DMG and install the app
+        run: |
+          set -euo pipefail
+          dmg=$(find desktop/dist -maxdepth 1 -name '*.dmg' | head -n 1)
+          [ -n "$dmg" ] || { echo 'no DMG was built' >&2; exit 1; }
+          mount=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$dmg"
+          app=$(find "$mount" -maxdepth 1 -name '*.app' | head -n 1)
+          [ -n "$app" ] || { echo 'no .app in the DMG' >&2; exit 1; }
+          appdir=$(mktemp -d)
+          cp -R "$app" "$appdir/"
+          hdiutil detach "$mount"
+          name=$(basename "$app" .app)
+          echo "STT_DESKTOP_APP=$appdir/$name.app/Contents/MacOS/$name" >> "$GITHUB_ENV"
+      - name: Upload the DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Speech-to-Text-macos-arm64-dmg
+          path: desktop/dist/*.dmg
+          retention-days: 30
+      - name: Run the packaged desktop e2e
+        working-directory: e2e
+        run: >-
+          pnpm exec playwright test -c playwright.desktop.config.ts
+          01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
+
+  # Manual tool (roadmap item 48, aligned with item 63's `desktop-whisper-cpp-v1` release): the
+  # pinned jiang1997 darwin prebuild's binaries load libggml-metal/libggml-blas dylibs the tarball
+  # does not ship, so whisper-cli cannot start on macOS. This builds a static 1.8.4 Metal binary
+  # on the runner, checks it has no @rpath dependency, and uploads the tar as a workflow artifact.
+  # The user publishes it as the macOS asset of `desktop-whisper-cpp-v1`
+  # (`whisper-cpp-1.8.4-aarch64-darwin.tar.gz`; .tar.gz because the Gradle bootstrap extracts it
+  # without a zstd dependency, unlike item 63's Nix artifact); the bootstrap pin is then updated
+  # (agents never publish to GitHub).
+  macos-whisper-asset:
+    name: macOS whisper-cli asset (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build whisper.cpp 1.8.4 (static, Metal + Accelerate)
+        run: |
+          set -euo pipefail
+          cmake --version >/dev/null || brew install cmake
+          curl -fsSL https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.4.tar.gz -o whisper.tar.gz
+          tar xzf whisper.tar.gz
+          cmake -S whisper.cpp-1.8.4 -B build -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF -DGGML_METAL=ON -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple \
+            -DWHISPER_COREML=OFF -DWHISPER_SDL2=OFF -DWHISPER_BUILD_TESTS=OFF
+          cmake --build build --config Release -j
+          build/bin/whisper-cli --help >/dev/null
+          if otool -L build/bin/whisper-cli | grep -q '@rpath'; then
+            echo "the binary still loads an @rpath library:" >&2
+            otool -L build/bin/whisper-cli
+            exit 1
+          fi
+      - name: Package and print the sha256
+        run: |
+          set -euo pipefail
+          mkdir -p stage/bin
+          cp build/bin/whisper-cli stage/bin/
+          tar -czf whisper-cpp-1.8.4-aarch64-darwin.tar.gz -C stage .
+          shasum -a 256 whisper-cpp-1.8.4-aarch64-darwin.tar.gz | tee sha256.txt
+          echo "### whisper-cpp asset" >> "$GITHUB_STEP_SUMMARY"
+          cat sha256.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-cpp-1.8.4-aarch64-darwin
+          path: whisper-cpp-1.8.4-aarch64-darwin.tar.gz
+          retention-days: 90
 
   # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds
   # the .deb, apt installs it as a user would (its declared Depends pull the runtime libraries the
@@ -360,7 +589,7 @@ jobs:
   # (its own comment says why); a job absent from this list cannot gate merges.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build]
+    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
