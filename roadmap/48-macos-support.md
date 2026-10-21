@@ -152,7 +152,7 @@ desktop staging and per-user paths (item 10).
       `~/Library/Caches/stt-app/models`), and item 50's packaged specs (journey, quit without orphan
       processes, first run with the model download and its persistence, download failure with Retry)
       pass against the installed DMG
-- [ ] (CI, macOS, added 2026-10-21) The darwin whisper-cpp the Nix package and the devenv ship is
+- [x] (CI, macOS, added 2026-10-21) The darwin whisper-cpp the Nix package and the devenv ship is
       the pinned static prebuilt artifact from `desktop-whisper-cpp-v1` (the same tar the Gradle
       bootstrap downloads); `nix/desktop-artifacts.nix` records `whisperCpp.aarch64-darwin`, the flake
       has no separate `declaredSystems` list, and the asset-fetch, policy, everywhere and integrity
@@ -312,3 +312,13 @@ desktop staging and per-user paths (item 10).
   `whisper-cpp-artifact-policy` check failing on aarch64-darwin before the pin lands) can only run
   on a darwin host, and the workspace agent has none (its host is x86_64-linux); the item's green
   is the macOS Nix job of CI run 39540019816.
+- 2026-10-21: the darwin whisper-cpp prebuilt-asset item is green on CI run
+  [39540019816](https://github.com/lulu-berlin/speech-to-text-app/actions/runs/39540019816)
+  (attempt 2) at `30550168`: all 20 jobs passed — macOS (Nix build + devenv) 9:30, Nix (flake
+  check) 7:31, macOS (e2e, including the `using MTL0 backend` assert) 14:19, macOS (DMG + packaged
+  e2e) 5:25, macOS (gradle check) and macOS (gradle integrationTest), Desktop (packaged .deb e2e)
+  7:35 after the re-run, Desktop (flake package e2e) and Desktop (bundle e2e), E2E, Backend
+  check/integration, Frontend, Docs, Nix (build) and Nix (devenv shell); the two skipped jobs are
+  the manual asset build and the weekly model-host check. The first attempt's packaged `.deb` job
+  failed on the quit spec's cleanup guard (`TypeError: … reading '_object'`), logged in
+  docs/known-issues.md; the re-run passed.
