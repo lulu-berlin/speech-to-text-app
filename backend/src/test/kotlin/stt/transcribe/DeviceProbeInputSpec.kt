@@ -20,8 +20,8 @@ class DeviceProbeInputSpec :
                     var command: List<String>? = null
                     val probe =
                         DeviceProbe(
-                            run = { run ->
-                                command = run
+                            run = { argv ->
+                                command = argv
                                 ProcessResult(exitCode = 0, stdout = emptyList(), stderr = emptyList())
                             },
                             model = Path.of("model.bin"),
