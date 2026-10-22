@@ -38,12 +38,13 @@ How it works inside — the components, the life of a task, the data model, the 
 | [Desktop app](#desktop-app) | Using the app in its own window, without a browser | available on Linux |
 | [Development environment (devenv)](#development-environment-devenv) | Working on the app | available on Linux and macOS Apple Silicon |
 | [Docker](#docker) | Using the app without Nix | available on Linux |
-| [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | available on Linux and macOS Apple Silicon |
+| [Gradle without Nix](#gradle-without-nix) | Working on the app without Nix | available on Linux x86-64, macOS Apple Silicon and Windows x64 |
 
 All ways run on **Linux on x86-64**. The Nix package and the development shell also run on **macOS
-Apple Silicon** (`aarch64-darwin`), and the Gradle path runs on Apple Silicon too; **Intel macOS is
-not supported** (Apple discontinued Intel Macs and the pinned nixpkgs dropped `x86_64-darwin`). A GPU
-is optional: whisper.cpp uses **Vulkan** on Linux and **Metal** on Apple Silicon — the Nix-built
+Apple Silicon** (`aarch64-darwin`), and the Gradle path runs on Apple Silicon and on **Windows 10/11
+on x64** too (Windows on ARM64 is not supported); **Intel macOS is not supported** (Apple
+discontinued Intel Macs and the pinned nixpkgs dropped `x86_64-darwin`). A GPU is optional:
+whisper.cpp uses **Vulkan** on Linux and Windows and **Metal** on Apple Silicon — the Nix-built
 whisper-cpp on the Nix paths, a pinned static Metal build on the Gradle path — and falls back to the
 CPU without a usable GPU. The first build of the package, the development shell or the Docker image
 downloads about 600 MB of models; the desktop app downloads them on its first start.
@@ -191,7 +192,7 @@ The container runs as an unprivileged user (uid 1000) and writes only to its dat
 
 ### Gradle without Nix
 
-For working on the app without Nix: the repository's `./gradlew` downloads everything else itself — Gradle 9.8, JDK 21, Node.js, pnpm, whisper-cli 1.8.4, ffmpeg 8.1 and the models — at the versions the Nix flake pins (the committed [`versions.json`](versions.json), which the flake checks), and verifies every file's SHA-256. Linux x86-64 and macOS Apple Silicon are tested; Intel macOS is unsupported (the pinned darwin-x64 prebuild is broken and nixpkgs has no `x86_64-darwin`). This path is for people; AI agents working on the repository keep to Nix and devenv ([AGENTS.md](AGENTS.md)).
+For working on the app without Nix: the repository's `./gradlew` downloads everything else itself — Gradle 9.8, JDK 21, Node.js, pnpm, whisper-cli 1.8.4, ffmpeg 8.1 and the models — at the versions the Nix flake pins (the committed [`versions.json`](versions.json), which the flake checks), and verifies every file's SHA-256. Linux x86-64, macOS Apple Silicon and Windows x64 are tested; Intel macOS is unsupported (the pinned darwin-x64 prebuild is broken and nixpkgs has no `x86_64-darwin`). This path is for people; AI agents working on the repository keep to Nix and devenv ([AGENTS.md](AGENTS.md)).
 
 Prerequisites:
 
@@ -233,9 +234,35 @@ Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads abo
 
 Where things live:
 
-- The downloads: `~/.gradle/stt-app/` (`dl/`, `tools/`, `models/`, `fixtures/`, `node/`, `ms-playwright/`), shared by every clone; `GRADLE_USER_HOME` moves it with the rest of Gradle's files. Deleting it is safe: the next run downloads again.
+- The downloads: `~/.gradle/stt-app/` (`dl/`, `tools/`, `models/`, `fixtures/`, `node/`, `ms-playwright/`), shared by every clone; `GRADLE_USER_HOME` moves it with the rest of Gradle's files. On Windows it is `%USERPROFILE%\.gradle\stt-app\`. Deleting it is safe: the next run downloads again.
 - The data: `${XDG_DATA_HOME:-~/.local/share}/stt-app`, the same directory as the Nix package's ([Where your data lives](#where-your-data-lives)).
 - Every [`STT_*` variable](#configuration) you set yourself wins over Gradle's default, for example `STT_DATA_DIR` or `STT_PORT`.
+
+#### Windows x64
+
+Windows 10/11 on x64 uses the same Gradle bootstrap; Windows on ARM64 is not supported (the pinned
+tools have no ARM64 build). In a new `cmd` console in the checkout — PowerShell needs `.\` before
+`stt.cmd` — run:
+
+```bat
+gradlew.bat checkVersions
+gradlew.bat prepareRuntime
+stt.cmd
+```
+
+Java 21 or newer runs `gradlew.bat` itself, and the app runs on the JDK 21 that Gradle downloads.
+The first run downloads the tools and models and builds the frontend and the backend (about 850 MB,
+in `%USERPROFILE%\.gradle\stt-app\`). `stt.cmd` calls `gradlew.bat run`, so extra arguments reach
+Gradle. The app keeps its data in `%APPDATA%\stt-app`; Ctrl-C stops it, and a running task stops at
+its next chunk boundary (there are no signals on Windows).
+
+A GPU is optional. whisper.cpp uses **Vulkan**: a driver from NVIDIA, AMD or Intel that exposes
+Vulkan is enough, and the pinned `whisper-cli.exe` carries its Vulkan loader and the MSVC runtime
+beside it, so no separate Vulkan runtime or Visual C++ redistributable is needed. Without a
+Vulkan-capable driver the startup probe finds no GPU and transcription runs on the CPU; the
+**Settings** page lists the GPUs it found (automatic, CPU or a specific GPU).
+
+`gradlew.bat dev` (dev mode) is not available on Windows yet; `stt.cmd` runs the built app.
 
 ## Configuration
 
@@ -266,6 +293,7 @@ Everything the app keeps — the queue, the transcripts, the speaker names and t
 | `devenv up` and the devenv shell | `.devenv/state/stt` inside the repository (git-ignored, survives restarts) |
 | `gradle run` | `$STT_DATA_DIR`, which you choose |
 | `./gradlew run` and `./gradlew dev` | `$STT_DATA_DIR` if set, else `${XDG_DATA_HOME:-~/.local/share}/stt-app` |
+| `stt.cmd` (Windows) | `%APPDATA%\stt-app` |
 | Docker | the named volume `stt-data`, mounted at `/data` in the container |
 
 Inside it:
