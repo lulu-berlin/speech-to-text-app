@@ -36,9 +36,18 @@ export interface LaunchOptions {
  */
 export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronApplication> {
   const { home = temporaryDir('home'), models = 'override', env = {} } = options;
+  // A fresh per-user area per launch. Windows apps read %APPDATA%/%LOCALAPPDATA%, not HOME.
+  const homeEnv =
+    process.platform === 'win32'
+      ? {
+          USERPROFILE: home,
+          APPDATA: join(home, 'AppData', 'Roaming'),
+          LOCALAPPDATA: join(home, 'AppData', 'Local'),
+        }
+      : { HOME: home };
   // Only variables that are set: an unset one has no value to pass to the app.
   const appEnv: Record<string, string> = Object.fromEntries(
-    Object.entries({ ...process.env, ...env, HOME: home }).filter(
+    Object.entries({ ...process.env, ...env, ...homeEnv }).filter(
       (entry): entry is [string, string] => entry[1] !== undefined,
     ),
   );
@@ -115,17 +124,24 @@ export function jfkClip(): string {
   return clip;
 }
 
-/** The per-user directories a fresh HOME gets (the paths the app decided on, 2026-10-14). */
+/** The per-user directories a fresh HOME gets (the paths the app decided on, 2026-10-14/22). */
 export function userPaths(home: string) {
-  return process.platform === 'darwin'
-    ? {
-        data: join(home, 'Library', 'Application Support', 'stt-app'),
-        models: join(home, 'Library', 'Caches', 'stt-app', 'models'),
-      }
-    : {
-        data: join(home, '.local', 'share', 'stt-app'),
-        models: join(home, '.cache', 'stt-app', 'models'),
-      };
+  if (process.platform === 'darwin') {
+    return {
+      data: join(home, 'Library', 'Application Support', 'stt-app'),
+      models: join(home, 'Library', 'Caches', 'stt-app', 'models'),
+    };
+  }
+  if (process.platform === 'win32') {
+    return {
+      data: join(home, 'AppData', 'Roaming', 'stt-app'),
+      models: join(home, 'AppData', 'Local', 'stt-app', 'models'),
+    };
+  }
+  return {
+    data: join(home, '.local', 'share', 'stt-app'),
+    models: join(home, '.cache', 'stt-app', 'models'),
+  };
 }
 
 /** An environment variable the container harness passes; without it the test cannot run. */
@@ -142,8 +158,8 @@ export function required(name: string): string {
 /** The backend JVM the app spawns, by its main class. */
 export const BACKEND = /stt\.MainKt/;
 
-/** The processes the app owns: the backend JVM, whisper-cli and ffmpeg. */
-export const APP_PROCESSES = /stt\.MainKt|whisper-cli|(^|\/)ffmpeg(gui)?\b/;
+/** The processes the app owns: the backend JVM, whisper-cli and ffmpeg (Windows paths use `\`). */
+export const APP_PROCESSES = /stt\.MainKt|whisper-cli(\.exe)?\b|[\\/]ffmpeg(gui)?(\.exe)?\b/;
 
 /** A running process: its pid and its command line, arguments joined by spaces. */
 export interface RunningProcess {
@@ -153,10 +169,33 @@ export interface RunningProcess {
 
 /**
  * The running processes whose command line matches `pattern`. Read from /proc on Linux (a stock
- * ubuntu container has no procps); on macOS, which has no /proc, from `ps`.
+ * ubuntu container has no procps); on macOS, which has no /proc, from `ps`; on Windows from
+ * CIM's `Win32_Process`.
  */
 export function processes(pattern: RegExp): RunningProcess[] {
   const found: RunningProcess[] = [];
+  if (process.platform === 'win32') {
+    const output = execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress',
+      ],
+      { encoding: 'utf8' },
+    );
+    const parsed = JSON.parse(output) as
+      | Array<{ ProcessId: number; CommandLine: string | null }>
+      | { ProcessId: number; CommandLine: string | null }
+      | null;
+    if (parsed === null) return found;
+    for (const row of Array.isArray(parsed) ? parsed : [parsed]) {
+      const command = row.CommandLine ?? '';
+      if (pattern.test(command)) found.push({ pid: String(row.ProcessId), command });
+    }
+    return found;
+  }
   if (existsSync('/proc')) {
     for (const pid of readdirSync('/proc')) {
       if (!/^\d+$/.test(pid)) continue;

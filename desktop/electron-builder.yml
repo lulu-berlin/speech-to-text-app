@@ -88,3 +88,11 @@ mac:
   # Unsigned v1 (item 50's decision): no signing identity, no hardened runtime, no notarization.
   identity: null
   hardenedRuntime: false
+
+# Roadmap item 49: a portable zip (unsigned), unpacked anywhere and run as a user; the per-user
+# data and model directories are the app's (backend.ts, models.ts), not the package's.
+win:
+  target:
+    - target: zip
+      arch: [x64]
+  artifactName: Speech-to-Text-${version}-win-${arch}.${ext}

@@ -6,7 +6,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createServer, type AddressInfo } from 'node:net';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { ModelPaths } from './models.js';
 
@@ -29,13 +29,16 @@ function resources(resourcesDir: string) {
 
 /**
  * The per-user data directory: on Linux the same ${XDG_DATA_HOME:-~/.local/share}/stt-app the Nix
- * package and ./gradlew use; on macOS ~/Library/Application Support/stt-app (roadmap item 48).
- * A user-set STT_DATA_DIR wins, like everywhere else.
+ * package and ./gradlew use; on macOS ~/Library/Application Support/stt-app (roadmap item 48);
+ * on Windows %APPDATA%\stt-app (roadmap item 49). A user-set STT_DATA_DIR wins, like everywhere else.
  */
 export function dataDir(): string {
   if (process.env.STT_DATA_DIR) return process.env.STT_DATA_DIR;
   if (process.platform === 'darwin') {
     return join(process.env.HOME ?? homedir(), 'Library', 'Application Support', 'stt-app');
+  }
+  if (process.platform === 'win32') {
+    return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'stt-app');
   }
   const base = process.env.XDG_DATA_HOME || join(process.env.HOME ?? homedir(), '.local', 'share');
   return join(base, 'stt-app');
@@ -81,7 +84,8 @@ export function readyUrl(port: number): string {
 /**
  * Spawns the backend and returns { child, stop }. `stop` asks the backend to shut down
  * (its own lifecycle, item 26, stops whisper and ffmpeg after it) and waits for the JVM to
- * exit, SIGKILL after 10 s — no orphan JVM may survive the app.
+ * exit, SIGKILL after 10 s — no orphan JVM may survive the app. On Windows it ends the whole
+ * tree with `taskkill /T /F`, since there are no signals.
  * `resourcesDir` is the packaged resources directory — see `resources()` above.
  * `models` holds the resolved model file paths — a user override, a Nix store file or the
  * verified file in the per-user cache (models.ts); they are the same `STT_*_MODEL` variables
@@ -92,7 +96,7 @@ export async function startBackend(
   { resourcesDir, models }: { resourcesDir: string; models: ModelPaths },
 ): Promise<{ child: ChildProcess; stop: () => Promise<void> }> {
   const { jre, backendLib, toolsBin, staticDir } = resources(resourcesDir);
-  const java = join(jre, 'bin', 'java');
+  const java = join(jre, 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
   const backendJar = join(backendLib, 'stt-backend-0.1.0-SNAPSHOT.jar');
   if (!existsSync(java)) throw new Error(`no bundled JRE at ${jre}`);
   if (!existsSync(backendJar)) throw new Error(`no bundled backend at ${backendLib}`);
@@ -111,8 +115,9 @@ export async function startBackend(
       STT_SPEAKER_MODEL: models.speaker,
       // The bundled whisper-cli and ffmpeg come first; a user's PATH still works for the
       // rest. On Linux LD_LIBRARY_PATH makes bytedeco's ffmpeg find its bundled libav*
-      // libraries (they carry no RUNPATH); on macOS they resolve through @loader_path.
-      PATH: `${toolsBin}${process.env.PATH ? `:${process.env.PATH}` : ''}`,
+      // libraries (they carry no RUNPATH); on macOS they resolve through @loader_path and on
+      // Windows the DLLs sit beside the exe.
+      PATH: `${toolsBin}${process.env.PATH ? `${delimiter}${process.env.PATH}` : ''}`,
       ...(process.platform === 'linux'
         ? {
             LD_LIBRARY_PATH: `${toolsBin}${process.env.LD_LIBRARY_PATH ? `:${process.env.LD_LIBRARY_PATH}` : ''}`,
@@ -120,6 +125,8 @@ export async function startBackend(
         : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Windows would otherwise flash a console window for the backend.
+    windowsHide: true,
   });
   child.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[backend] ${chunk}`));
   child.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[backend] ${chunk}`));
@@ -130,6 +137,15 @@ export async function startBackend(
       return promise;
     }
     child.once('exit', () => resolve());
+    if (process.platform === 'win32') {
+      // Windows has no signals: taskkill ends the backend and every tool it spawned, the tree
+      // the graceful SIGTERM path would otherwise stop (roadmap item 49's decision).
+      spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      return promise;
+    }
     child.kill('SIGTERM');
     setTimeout(() => {
       if (child.exitCode === null) child.kill('SIGKILL');

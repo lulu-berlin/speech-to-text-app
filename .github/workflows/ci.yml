@@ -501,6 +501,112 @@ jobs:
       - name: pnpm build
         run: pnpm build
 
+  # The portable Windows zip, built and tested the way item 49 ships it (roadmap item 49's
+  # packaged-zip item): electron-builder packs the staged app, the zip is unpacked like a user's
+  # download, and items 50's packaged specs 01-04 run against it in the unpacked directory. No
+  # Xvfb and no Nix: Windows runs the window itself, and everything comes from the package.
+  windows-desktop-zip:
+    name: Windows (packaged zip e2e)
+    runs-on: windows-2025
+    needs: [backend-check, frontend-check]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: |
+            desktop/pnpm-lock.yaml
+            e2e/pnpm-lock.yaml
+      - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron)
+        uses: actions/cache@v6
+        with:
+          path: |
+            desktop/dist/downloads
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
+          restore-keys: desktop-downloads-${{ runner.os }}-
+      - name: Build the backend and the UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat -p backend installDist
+          if ($LASTEXITCODE -ne 0) { throw 'backend installDist failed' }
+          pnpm --dir frontend install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'frontend install failed' }
+          pnpm --dir frontend build
+          if ($LASTEXITCODE -ne 0) { throw 'frontend build failed' }
+      - name: Fetch the runtime tools, models and fixtures
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat prepareRuntime prepareE2eFixtures
+          if ($LASTEXITCODE -ne 0) { throw 'prepareRuntime failed' }
+      - name: Install the desktop and e2e packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm --dir desktop install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'desktop install failed' }
+          pnpm --dir e2e install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'e2e install failed' }
+      - name: Check the desktop package and specs (format, types)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm --dir desktop test
+          if ($LASTEXITCODE -ne 0) { throw 'desktop checks failed' }
+          pnpm --dir e2e exec tsc -p desktop/tsconfig.json
+          if ($LASTEXITCODE -ne 0) { throw 'spec type check failed' }
+      - name: Build the portable zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm --dir desktop fetch:jdk
+          if ($LASTEXITCODE -ne 0) { throw 'fetch:jdk failed' }
+          pnpm --dir desktop dist:win
+          if ($LASTEXITCODE -ne 0) { throw 'electron-builder failed' }
+      - name: Unpack the zip like a user's download
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Get-ChildItem desktop\dist\Speech-to-Text-*-win-x64.zip | Select-Object -First 1
+          if (-not $zip) { throw 'no portable zip was produced' }
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath desktop\dist\portable -Force
+          $app = Get-ChildItem desktop\dist\portable -Recurse -Filter 'Speech-to-Text.exe' |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $app) { throw 'no Speech-to-Text.exe in the unpacked zip' }
+          "STT_DESKTOP_APP=$app" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      # The specs read the same pinned fixtures and models the other jobs use, from the Gradle
+      # cache; the sha256 values the first-run spec asserts against come from versions.json.
+      - name: Export the fixture and model environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cache = Join-Path $env:GRADLE_USER_HOME 'stt-app'
+          $tiny = Get-ChildItem (Join-Path $cache 'models') -Filter '*ggml-tiny.en.bin' | Select-Object -First 1
+          $speaker = Get-ChildItem (Join-Path $cache 'models') -Filter '*campplus*voxceleb_16k.onnx' | Select-Object -First 1
+          $jfk = Get-ChildItem (Join-Path $cache 'fixtures') -Filter '*jfk.wav' | Select-Object -First 1
+          if (-not $tiny -or -not $speaker -or -not $jfk) { throw "a pinned fixture or model is missing from $cache" }
+          $versions = Get-Content versions.json | ConvertFrom-Json
+          @(
+            "TEST_WHISPER_TINY_EN_MODEL=$($tiny.FullName)",
+            "STT_SPEAKER_MODEL=$($speaker.FullName)",
+            "TEST_JFK_WAV=$($jfk.FullName)",
+            "TEST_WHISPER_TINY_EN_SHA256=$($versions.models.whisperTinyEn.sha256)",
+            "TEST_SPEAKER_SHA256=$($versions.models.speaker.sha256)"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run the packaged desktop e2e
+        shell: pwsh
+        working-directory: e2e
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm exec playwright test -c playwright.desktop.config.ts 01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
+          if ($LASTEXITCODE -ne 0) { throw 'the packaged specs failed' }
+
   # The Windows whisper-cli asset (manual, roadmap item 49). The published prebuilts are not
   # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC
   # runtime (MSVCP140/VCRUNTIME140/VCOMP140, the last from OpenMP) and the pinned Vulkan build also
@@ -896,7 +1002,7 @@ jobs:
   # (its own comment says why); a job absent from this list cannot gate merges.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check]
+    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
