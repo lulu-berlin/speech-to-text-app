@@ -155,9 +155,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       program files while the data directory and model cache remain
 - [x] (discovered, 2026-10-22, user-approved) On Windows the device probe passes the platform null
       device (`NUL`) as whisper-cli's `-f` input, not `/dev/null`
-- [ ] (discovered, 2026-10-22, user-approved) A whisper-cli that cannot load (missing DLL/shared
+- [x] (discovered, 2026-10-22, user-approved) A whisper-cli that cannot load (missing DLL/shared
       library) is a `LaunchFailed` probe outcome, not `0 GPU(s)`; the app must not start offering
-      cpu/auto as if the probe had succeeded
+      cpu/auto as if the probe had succeeded (Windows loader codes, 2026-10-22)
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green
 
@@ -302,3 +302,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   GPU"}`, `"deviceProbeError":null`. The running whisper-cli came from the pinned 9e467fcb asset and
   carried `--device 0`; `nvidia-smi` sampled 638 → 900 MiB used during the run, then a 100%
   utilization sample. The task was deleted before the transcript was captured. Item 8 ticked.
+- 2026-10-22: discovered cycle (whisper-cli cannot load) green. New `DeviceProbeLoadFailureSpec`
+  (red: `Probed(gpus=[]) … expected LaunchFailed`; green: `STATUS_DLL_NOT_FOUND` 0xC0000135 and
+  `STATUS_INVALID_IMAGE_FORMAT` 0xC000007B map to `LaunchFailed` with a message naming the
+  missing/invalid DLL, logged and surfaced as `deviceProbeError`). `gradle -p backend check` green
+  after the hex-constant refactor. Commits `5b30e440`, `751f9289`. Item ticked; the POSIX
+  loader-failure case (exit 127) is appended as a discovered item.
