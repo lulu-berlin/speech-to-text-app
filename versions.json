@@ -46,8 +46,8 @@
         "url": "https://github.com/jiang1997/whisper.cpp-release/releases/download/v1.8.4/whisper-1.8.4-linux-x64.tar.gz"
       },
       "windows-x64": {
-        "sha256": "cfc2a9f82e6db9c5fe11e3637d6be8660ae169a527febfbc5d35a5e0d96ca85b",
-        "url": "https://github.com/jiang1997/whisper.cpp-release/releases/download/v1.8.4/whisper-1.8.4-windows-x64.tar.gz"
+        "sha256": "fdc7eb9e98b5c28c98897da9cf6786230d3870c75f09e6f29aadae7a8166ea7e",
+        "url": "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-windows-x64.tar.gz"
       }
     }
   },

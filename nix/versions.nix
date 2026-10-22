@@ -31,6 +31,10 @@ in {
     # linux-x64 and darwin-x64 come from the upstream jiang1997 tag. darwin-arm64 is our own
     # `desktop-whisper-cpp-v1` static build: the upstream darwin tarballs omit the libggml-metal/
     # libggml-blas dylibs their binaries load, so whisper-cli cannot start there (roadmap item 48).
+    # windows-x64 is our own `desktop-whisper-cpp-v1` build too (roadmap item 49): the upstream
+    # tarball imports the MSVC runtime and vulkan-1.dll, which a stock Windows install lacks. The
+    # asset is built with the static CRT, no OpenMP and the pinned Vulkan loader beside the exes
+    # (the loader enumerates no devices without an ICD, which is the CPU fallback).
     "whisper-cli" = {
       "linux-x64" = {
         url = "https://github.com/jiang1997/whisper.cpp-release/releases/download/v${wcTag}/whisper-${wcTag}-linux-x64.tar.gz";
@@ -44,10 +48,12 @@ in {
         url = "https://github.com/jiang1997/whisper.cpp-release/releases/download/v${wcTag}/whisper-${wcTag}-macos-x64.tar.gz";
         sha256 = "a5f41b14a6e4cb3e0c045b7954f0a4050bc0d44a9b2ce2e5826ee2a5fef8577c";
       };
-      # Windows x64: static whisper-cli.exe with ggml-vulkan (roadmap item 49); no DLLs beside it.
+      # Windows x64: our self-contained build (roadmap item 49), whisper-cli.exe + whisper-server.exe
+      # with the pinned Vulkan loader (vulkan-1.dll) beside them; built by the manual
+      # `windows-whisper-asset` CI job and published under desktop-whisper-cpp-v1.
       "windows-x64" = {
-        url = "https://github.com/jiang1997/whisper.cpp-release/releases/download/v${wcTag}/whisper-${wcTag}-windows-x64.tar.gz";
-        sha256 = "cfc2a9f82e6db9c5fe11e3637d6be8660ae169a527febfbc5d35a5e0d96ca85b";
+        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-windows-x64.tar.gz";
+        sha256 = "fdc7eb9e98b5c28c98897da9cf6786230d3870c75f09e6f29aadae7a8166ea7e";
       };
     };
     ffmpeg = {

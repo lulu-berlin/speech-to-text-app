@@ -71,7 +71,7 @@ tasks.register("checkVersions") {
             val downloads = manifest["downloads"] as Map<*, *>
             val windowsAssets =
                 mapOf(
-                    "whisper-cli" to "whisper-1.8.4-windows-x64.tar.gz",
+                    "whisper-cli" to "whisper-cpp-1.8.4-windows-x64.tar.gz",
                     "ffmpeg" to "windows-x86_64-gpl.jar",
                     "temurin-jdk" to "windows_hotspot",
                 )
