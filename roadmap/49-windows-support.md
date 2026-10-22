@@ -135,8 +135,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       (user-verified on the Windows 11 guest, 2026-10-22)
 - [x] Queue pause, reorder, retry and history behave as on Linux (user-verified on the Windows 11
       guest, 2026-10-22)
-- [ ] Device selection works with the GPU-enabled Vulkan build (or, on CPU-only CI, the flag path
+- [x] Device selection works with the GPU-enabled Vulkan build (or, on CPU-only CI, the flag path
       is verified and documented as CPU-first); a real-GPU run is user-verified if available
+      (Windows 11 guest, 2026-10-22)
 - [ ] README documents Windows support and the bootstrap path, including the Vulkan driver
       requirement and the CPU fallback
 - [ ] (CI, inherited from 51 on 2026-10-14; amended 2026-10-21) This item adds its Windows leg to
@@ -294,3 +295,10 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   devices: 0 = NVIDIA GeForce RTX 3050 Laptop GPU`. Commits `eb3cc903`, `e87e5b9f`, `dfb1d8d0`.
   Item ticked; the app-level GPU evidence (probe line, `gpuNames`, a `--device 0` run) belongs to
   item 8's user-verified run and is pending.
+- 2026-10-22: item 8 user-verified on the Windows 11 guest with the RTX 3050 passed through.
+  Startup: `Device probe: 1 GPU(s) [GpuDevice(index=0, name=NVIDIA GeForce RTX 3050 Laptop GPU)]`.
+  After saving the choice, `GET /api/settings` answered `"device":"gpu:0"`,
+  `"availableDevices":["cpu","auto","gpu:0"]`, `"gpuNames":{"gpu:0":"NVIDIA GeForce RTX 3050 Laptop
+  GPU"}`, `"deviceProbeError":null`. The running whisper-cli came from the pinned 9e467fcb asset and
+  carried `--device 0`; `nvidia-smi` sampled 638 → 900 MiB used during the run, then a 100%
+  utilization sample. The task was deleted before the transcript was captured. Item 8 ticked.
