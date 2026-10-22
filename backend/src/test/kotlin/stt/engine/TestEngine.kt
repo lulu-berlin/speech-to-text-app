@@ -44,8 +44,10 @@ import stt.db.TaskRepository
 import stt.db.TestDataDir
 import stt.db.insertTaskRow
 import stt.db.queuedTask
+import stt.process.ProcessPlatform
 import stt.queue.TaskStatus
 import java.io.IOException
+import java.nio.file.AccessDeniedException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
@@ -352,16 +354,26 @@ internal fun filesUnder(root: Path): List<Path> {
             override fun visitFileFailed(
                 file: Path,
                 exc: IOException,
-            ): FileVisitResult = if (exc is NoSuchFileException) FileVisitResult.CONTINUE else throw exc
+            ): FileVisitResult = if (gone(file, exc)) FileVisitResult.CONTINUE else throw exc
 
             override fun postVisitDirectory(
                 dir: Path,
                 exc: IOException?,
-            ): FileVisitResult = if (exc == null || exc is NoSuchFileException) FileVisitResult.CONTINUE else throw exc
+            ): FileVisitResult = if (exc == null || gone(dir, exc)) FileVisitResult.CONTINUE else throw exc
         },
     )
     return files
 }
+
+/**
+ * A path the concurrent deletion already removed. POSIX reports [NoSuchFileException]; Windows reports an
+ * [AccessDeniedException] for a path in its delete-pending state, and any exception for a path that no longer
+ * exists counts as gone.
+ */
+private fun gone(
+    path: Path,
+    exc: IOException,
+): Boolean = exc is NoSuchFileException || !Files.exists(path) || (ProcessPlatform.current().windows && exc is AccessDeniedException)
 
 /**
  * Stores [task]'s plan of [chunkCount] chunks together with the fake chunker's canonical clip, in one transaction:

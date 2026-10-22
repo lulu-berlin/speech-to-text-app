@@ -15,7 +15,7 @@ class ProcessRunnerPlatformSpec :
     BehaviorSpec({
         given("darwin, where there is no setsid") {
             `when`("a command is run") {
-                then("it is spawned directly, without setsid") {
+                then("it is spawned directly, without setsid").config(enabled = !ProcessPlatform.current().windows) {
                     var spawned: List<String>? = null
                     val runner =
                         ProcessRunner(

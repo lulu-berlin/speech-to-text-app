@@ -21,6 +21,7 @@ import stt.db.Database
 import stt.db.SettingsTable
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
+import stt.process.ProcessPlatform
 import stt.queue.TaskStatus
 import stt.transcribe.TranscriptionException
 import stt.transcribe.WhisperSegment
@@ -346,43 +347,44 @@ class ProcessingEngineFailureSpec :
                 }
             }
         }
-        given("a task whose scratch directory cannot be removed") {
-            `when`("the task completes") {
-                then("the cleanup failure is logged with its throwable and the task still completes") {
-                    withEngineDatabase { dataDir, db ->
-                        val fixture = engineUnderTest(dataDir, db)
-                        val secondChunk = holdSecondChunk(fixture)
-                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
-                        val dir = fixture.scratchDir.taskDirPath(task)
+        given("a task whose scratch directory cannot be removed")
+            .config(enabled = !ProcessPlatform.current().windows) {
+                `when`("the task completes") {
+                    then("the cleanup failure is logged with its throwable and the task still completes") {
+                        withEngineDatabase { dataDir, db ->
+                            val fixture = engineUnderTest(dataDir, db)
+                            val secondChunk = holdSecondChunk(fixture)
+                            val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+                            val dir = fixture.scratchDir.taskDirPath(task)
 
-                        val events =
-                            withCapturedLogs(ProcessingEngine::class.java.name, Level.WARN) { logs ->
-                                fixture.engine.start()
-                                nextChunkEntered(fixture.transcriber) shouldBe "chunk-0.flac"
-                                nextChunkEntered(fixture.transcriber) shouldBe "chunk-1.flac"
-                                // A file in a directory the run may read but not write: deletion is refused.
-                                Files.createDirectories(dir)
-                                Files.writeString(dir.resolve("kept.txt"), "kept")
-                                Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"))
-                                secondChunk.complete(Unit)
+                            val events =
+                                withCapturedLogs(ProcessingEngine::class.java.name, Level.WARN) { logs ->
+                                    fixture.engine.start()
+                                    nextChunkEntered(fixture.transcriber) shouldBe "chunk-0.flac"
+                                    nextChunkEntered(fixture.transcriber) shouldBe "chunk-1.flac"
+                                    // A file in a directory the run may read but not write: deletion is refused.
+                                    Files.createDirectories(dir)
+                                    Files.writeString(dir.resolve("kept.txt"), "kept")
+                                    Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"))
+                                    secondChunk.complete(Unit)
 
-                                fixture.completed.receive() shouldBe task
-                                logs
-                            }
-                        // Restore the directory so the fixture's own cleanup can remove it.
-                        Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"))
+                                    fixture.completed.receive() shouldBe task
+                                    logs
+                                }
+                            // Restore the directory so the fixture's own cleanup can remove it.
+                            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"))
 
-                        events shouldHaveSize 1
-                        val logged = events.single()
-                        logged.formattedMessage shouldContain "Could not remove task $task's scratch directory"
-                        val failure = logged.throwableProxy.shouldNotBeNull()
-                        failure.className shouldContain "AccessDeniedException"
-                        storedTaskOf(fixture, task).status shouldBe TaskStatus.COMPLETED
-                        Files.exists(dir.resolve("kept.txt")).shouldBeTrue()
+                            events shouldHaveSize 1
+                            val logged = events.single()
+                            logged.formattedMessage shouldContain "Could not remove task $task's scratch directory"
+                            val failure = logged.throwableProxy.shouldNotBeNull()
+                            failure.className shouldContain "AccessDeniedException"
+                            storedTaskOf(fixture, task).status shouldBe TaskStatus.COMPLETED
+                            Files.exists(dir.resolve("kept.txt")).shouldBeTrue()
+                        }
                     }
                 }
             }
-        }
     })
 
 /**
