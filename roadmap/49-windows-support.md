@@ -152,7 +152,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       `msiexec /i … /quiet` installs under the per-user programs directory, item 50's packaged
       specs pass against the installed app, and `msiexec /x {ProductCode} /quiet` removes the
       program files while the data directory and model cache remain
-- [ ] (discovered, 2026-10-22, user-approved) On Windows the device probe passes the platform null
+- [x] (discovered, 2026-10-22, user-approved) On Windows the device probe passes the platform null
       device (`NUL`) as whisper-cli's `-f` input, not `/dev/null`
 - [ ] (discovered, 2026-10-22, user-approved) A whisper-cli that cannot load (missing DLL/shared
       library) is a `LaunchFailed` probe outcome, not `0 GPU(s)`; the app must not start offering
@@ -286,3 +286,11 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   real-app harness (`Config`, CPU device, Ktor's 60 s-free `runTestWithRealTime` +
   `runTestApplication`, upload) is now `RealEngineApp.kt` (`realEngineApp` + `TaskRepository.upload`).
   Commit `aad9fb06`; both specs green (1 + 2 tests).
+- 2026-10-22: discovered cycle (Windows probe input) green. New `DeviceProbeInputSpec` (red:
+  `No parameter with name 'platform' found`; green: `ProcessPlatform.nullDevice`, derived from
+  `windows`, feeds both the probe's `whisper-cli -f` and `ProcessRunner`'s stdin).
+  `gradle -p backend check integrationTest` green (3m 2s). Guest runs: `-f /dev/null` →
+  `error: input file not found` before any backend init; `-f NUL` → `ggml_vulkan: Found 1 Vulkan
+  devices: 0 = NVIDIA GeForce RTX 3050 Laptop GPU`. Commits `eb3cc903`, `e87e5b9f`, `dfb1d8d0`.
+  Item ticked; the app-level GPU evidence (probe line, `gpuNames`, a `--device 0` run) belongs to
+  item 8's user-verified run and is pending.
