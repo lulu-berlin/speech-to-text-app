@@ -520,12 +520,25 @@ jobs:
           $stage = 'stage\whisper-1.8.4-windows-x64'
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item 'build\bin\Release\whisper-cli.exe', 'build\bin\Release\whisper-server.exe' $stage
-          Copy-Item (Join-Path $env:VULKAN_SDK 'Bin\vulkan-1.dll') $stage
+
+          # The SDK action unpacks the installer payload, whose layout differs from an installed SDK
+          # (no fixed Bin\vulkan-1.dll): locate the 64-bit loader instead of guessing the directory.
+          $loaders = @(Get-ChildItem $env:VULKAN_SDK -Recurse -Filter vulkan-1.dll | Where-Object { $_.FullName -notmatch '\\Bin32\\' })
+          if ($loaders.Count -eq 0) {
+            Get-ChildItem $env:VULKAN_SDK -Recurse -Filter '*.dll' | Select-Object -First 40 -ExpandProperty FullName
+            throw "no 64-bit vulkan-1.dll under $env:VULKAN_SDK"
+          }
+          $loader = ($loaders | Where-Object { $_.FullName -match '\\Bin\\' } | Select-Object -First 1) ?? $loaders[0]
+          Copy-Item $loader.FullName $stage
+          "Staged loader: $($loader.FullName)"
 
           # dumpbin is not on PATH in a plain runner shell: it comes from the VS installation.
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           $dumpbin = (Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -Last 1).FullName
+          if (-not ((& $dumpbin /nologo /headers "$stage\vulkan-1.dll") | Select-String 'machine \(x64\)')) {
+            throw "the staged vulkan-1.dll is not x64"
+          }
           function Imports([string] $path) {
             (& $dumpbin /nologo /dependents $path) |
               Select-String -Pattern '^\s+\S+\.dll\s*$' |
