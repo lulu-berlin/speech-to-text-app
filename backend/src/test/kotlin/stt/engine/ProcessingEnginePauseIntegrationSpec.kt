@@ -135,7 +135,7 @@ private suspend fun settledProgress(
 }
 
 /** The fixture WAV with its data chunk repeated [loops] times, as a minimal RIFF/WAVE header and payload. */
-private fun loopWav(
+internal fun loopWav(
     source: Path,
     loops: Int,
 ): ByteArray {
