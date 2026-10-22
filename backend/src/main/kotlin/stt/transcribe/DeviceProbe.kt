@@ -90,10 +90,13 @@ class DeviceProbe internal constructor(
  * (0xC0000135) and `STATUS_INVALID_IMAGE_FORMAT` (0xC000007B). A process with one of these printed no
  * backend lines, so reading its empty stderr as "no GPU" would start the app on cpu/auto by mistake.
  */
+private val STATUS_DLL_NOT_FOUND = 0xC0000135u
+private val STATUS_INVALID_IMAGE_FORMAT = 0xC000007Bu
+
 private fun loadFailureMessage(exitCode: Int): String? =
-    when (exitCode) {
-        -1073741515 -> "whisper-cli cannot load: a required DLL is missing (0xC0000135)"
-        -1073741701 -> "whisper-cli cannot load: a DLL is not a valid image (0xC000007B)"
+    when (exitCode.toUInt()) {
+        STATUS_DLL_NOT_FOUND -> "whisper-cli cannot load: a required DLL is missing (0xC0000135)"
+        STATUS_INVALID_IMAGE_FORMAT -> "whisper-cli cannot load: a DLL is not a valid image (0xC000007B)"
         else -> null
     }
 
