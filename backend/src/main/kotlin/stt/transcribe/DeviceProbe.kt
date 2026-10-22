@@ -72,7 +72,7 @@ class DeviceProbe internal constructor(
                 logger.warn("Device probe failed; {}", e.message ?: e.toString(), e)
                 return DeviceProbeOutcome.LaunchFailed(e.message ?: e.toString())
             }
-        val loadFailure = loadFailureMessage(result.exitCode)
+        val loadFailure = loadFailureMessage(result)
         if (loadFailure != null) {
             logger.warn("Device probe failed; {}", loadFailure)
             return DeviceProbeOutcome.LaunchFailed(loadFailure)
@@ -86,18 +86,33 @@ class DeviceProbe internal constructor(
 }
 
 /**
- * The Windows loader exit codes that mean whisper-cli started but never loaded: `STATUS_DLL_NOT_FOUND`
- * (0xC0000135) and `STATUS_INVALID_IMAGE_FORMAT` (0xC000007B). A process with one of these printed no
- * backend lines, so reading its empty stderr as "no GPU" would start the app on cpu/auto by mistake.
+ * The loader failures that mean whisper-cli started but never initialized: Windows exits the process with
+ * `STATUS_DLL_NOT_FOUND` (0xC0000135) or `STATUS_INVALID_IMAGE_FORMAT` (0xC000007B); the POSIX loaders print
+ * their own line (`ld.so`: "error while loading shared libraries", `dyld`: "Library not loaded"). A process
+ * with one of these printed no backend lines, so reading it as "no GPU" would start the app on cpu/auto by
+ * mistake.
  */
 private val STATUS_DLL_NOT_FOUND = 0xC0000135u
 private val STATUS_INVALID_IMAGE_FORMAT = 0xC000007Bu
+private val LOADER_FAILURE_LINES = listOf("error while loading shared libraries", "Library not loaded")
 
-private fun loadFailureMessage(exitCode: Int): String? =
-    when (exitCode.toUInt()) {
-        STATUS_DLL_NOT_FOUND -> "whisper-cli cannot load: a required DLL is missing (0xC0000135)"
-        STATUS_INVALID_IMAGE_FORMAT -> "whisper-cli cannot load: a DLL is not a valid image (0xC000007B)"
-        else -> null
+private fun loadFailureMessage(result: ProcessResult): String? =
+    when {
+        result.exitCode.toUInt() == STATUS_DLL_NOT_FOUND -> {
+            "whisper-cli cannot load: a required DLL is missing (0xC0000135)"
+        }
+
+        result.exitCode.toUInt() == STATUS_INVALID_IMAGE_FORMAT -> {
+            "whisper-cli cannot load: a DLL is not a valid image (0xC000007B)"
+        }
+
+        LOADER_FAILURE_LINES.any { line -> result.stderr.any { it.contains(line) } } -> {
+            "whisper-cli cannot load: a required shared library is missing"
+        }
+
+        else -> {
+            null
+        }
     }
 
 /**
