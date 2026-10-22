@@ -9,11 +9,11 @@ on:
   pull_request:
   workflow_dispatch:
     # A dispatch is how a branch runs the checks before a PR exists; the manual asset jobs (the
-    # whisper-cli assets and the audio-only ffmpeg asset) are opt-in, so a check-only dispatch
-    # does not rebuild them (roadmap items 49 and 69).
+    # whisper-cli and audio-only ffmpeg assets, macOS and Windows) are opt-in, so a check-only
+    # dispatch does not rebuild them (roadmap items 49 and 69).
     inputs:
       assets:
-        description: 'Also build the manual macOS whisper-cli and ffmpeg assets'
+        description: 'Also build the manual macOS/Windows whisper-cli and ffmpeg assets'
         type: boolean
         default: false
   # Nightly at 03:00 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry.
@@ -518,7 +518,7 @@ jobs:
   # the same staged DLLs.
   windows-whisper-asset:
     name: Windows whisper-cli asset (manual)
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.assets
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
