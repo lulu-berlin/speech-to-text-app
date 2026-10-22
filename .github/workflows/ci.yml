@@ -1,5 +1,5 @@
-# Continuous verification (roadmap item 51). Linux and macOS run on pushes to main and on pull
-# requests; the pinned tool versions come from the committed versions.json (the flake's pins,
+# Continuous verification (roadmap item 51). Linux, macOS and Windows run on pushes to main and on
+# pull requests; the pinned tool versions come from the committed versions.json (the flake's pins,
 # item 33) through the shared toolchain actions in .github/actions/. No secrets.
 name: CI
 
@@ -17,8 +17,8 @@ on:
         type: boolean
         default: false
   # Nightly at 03:00 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry.
-  # The nightly runs the whole tree, including the macOS legs; the Windows legs follow with item
-  # 49. GitHub runs a scheduled workflow only from the default branch.
+  # The nightly runs the whole tree, including the macOS and Windows legs. GitHub runs a scheduled
+  # workflow only from the default branch.
   schedule:
     - cron: '0 3 * * *'
       timezone: 'Europe/Berlin'
@@ -397,7 +397,6 @@ jobs:
           path: whisper-cpp-1.8.4-aarch64-darwin.tar.gz
           retention-days: 90
 
-<<<<<<< HEAD
   # Manual tool (roadmap item 69, the macOS counterpart of `macos-whisper-asset`; opt-in like it,
   # via the `assets` dispatch input): builds the shared audio-only recipe for aarch64-darwin,
   # proves its surface with `ffmpeg-audio-only` (one binary, no ffprobe/ffplay, `otool -L` names
@@ -464,6 +463,43 @@ jobs:
         with:
           name: ffmpeg-audio-only-aarch64-darwin
           path: '*.tar.gz'
+
+  # The Gradle tree on Windows (roadmap item 49). No Nix job: Windows has no Nix path, so these are
+  # the automated runs of the spawn seam, the probe parsing, the queue and the frontend on a Windows
+  # host. The runner has no GPU; the startup probe therefore reports zero GPUs (the CPU fallback is
+  # the tested path), and a real-GPU run stays user-verified (item 49's approval log).
+  windows-backend-check:
+    name: Windows (gradle check)
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+      - name: gradlew.bat checkVersions
+        shell: cmd
+        run: gradlew.bat checkVersions
+      - name: gradlew.bat -p backend check
+        shell: cmd
+        run: gradlew.bat -p backend check
+
+  windows-frontend-check:
+    name: Windows (pnpm test, pnpm build)
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+      - name: pnpm test
+        run: pnpm test
+      - name: pnpm build
+        run: pnpm build
 
   # The Windows whisper-cli asset (manual, roadmap item 49). The published prebuilts are not
   # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC
@@ -860,7 +896,7 @@ jobs:
   # (its own comment says why); a job absent from this list cannot gate merges.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg]
+    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
