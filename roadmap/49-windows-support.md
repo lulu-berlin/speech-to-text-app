@@ -128,8 +128,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       (user-verified on a Windows 11 guest, 2026-10-22)
 - [x] A full upload → transcribe → diarize run completes on Windows and its output matches Linux
       (user-verified on the Windows 11 guest, 2026-10-22)
-- [ ] Pausing a running task on Windows stops progress and resume continues from the next chunk
-      without corrupting the transcript (per the decided checkpoint design)
+- [x] Pausing a running task on Windows stops progress and resume continues from the next chunk
+      without corrupting the transcript (per the decided checkpoint design) (user-verified on the
+      Windows 11 guest, 2026-10-22)
 - [ ] Cancel and delete leave no orphan processes (whisper-cli/ffmpeg all gone) on Windows
 - [ ] Queue pause, reorder, retry and history behave as on Linux
 - [ ] Device selection works with the GPU-enabled Vulkan build (or, on CPU-only CI, the flag path
@@ -258,3 +259,12 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   test list: (a) on Windows the device probe passes `/dev/null` as whisper-cli's input instead of
   `NUL`; (b) a whisper-cli that cannot load is reported as `0 GPU(s)` instead of a `LaunchFailed`
   probe outcome (entry in `docs/known-issues.md`).
+- 2026-10-22: cycle 5 (item 5) green, user-verified on the Windows 11 guest. New
+  `ProcessingEnginePauseIntegrationSpec` (Integration): the 11 s jfk fixture looped 30× (330 s) chunks
+  into 300 s + 30 s, is paused while TRANSCRIBING, must stop moving below 1.0 with status PAUSED, then
+  resumes to COMPLETED with the JFK quote and strictly increasing segment starts. The test was green
+  on arrival on Linux (the signal path freezes the in-flight chunk); on Windows no signal freezes it,
+  so the in-flight chunk finishes and the chunk gate stops the run. First guest run hit Ktor's
+  `testApplication` 60 s real-time cap (`UncompletedCoroutinesError`); the spec now uses
+  `runTestWithRealTime(timeout = 10.minutes) { runTestApplication { … } }`. Guest rerun: `EXIT=0`,
+  `tests=1 failures=0`, 83.1 s. No production change. Commit `a3877016`. Item 5 ticked.
