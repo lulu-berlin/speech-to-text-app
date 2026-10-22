@@ -579,6 +579,12 @@ jobs:
           $app = Get-ChildItem desktop\dist\portable -Recurse -Filter 'Speech-to-Text.exe' |
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $app) { throw 'no Speech-to-Text.exe in the unpacked zip' }
+          # Chromium's sandboxed child processes run with a restricted token that must read and
+          # execute the app's files. An install directory's ACL grants that (ALL RESTRICTED
+          # APPLICATION PACKAGES, S-1-15-2-2); the runner workspace's inherited ACL does not, and
+          # without it the GPU process dies at startup (0x80000003) and the browser aborts.
+          icacls desktop\dist\portable /grant "*S-1-15-2-2:(OI)(CI)(RX)" /T /C /Q | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'granting the sandbox read/execute ACL failed' }
           "STT_DESKTOP_APP=$app" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       # The specs read the same pinned fixtures and models the other jobs use, from the Gradle
       # cache; the sha256 values the first-run spec asserts against come from versions.json.
@@ -602,6 +608,10 @@ jobs:
       - name: Run the packaged desktop e2e
         shell: pwsh
         working-directory: e2e
+        env:
+          # Chromium's own log (captured from the app's stderr) names a sandbox/GPU abort that
+          # otherwise only shows up as the 0x80000003 exit code.
+          ELECTRON_ENABLE_LOGGING: '1'
         run: |
           $ErrorActionPreference = 'Stop'
           pnpm exec playwright test -c playwright.desktop.config.ts 01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
