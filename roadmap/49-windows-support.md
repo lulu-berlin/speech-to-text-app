@@ -138,7 +138,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] Device selection works with the GPU-enabled Vulkan build (or, on CPU-only CI, the flag path
       is verified and documented as CPU-first); a real-GPU run is user-verified if available
       (Windows 11 guest, 2026-10-22)
-- [ ] README documents Windows support and the bootstrap path, including the Vulkan driver
+- [x] README documents Windows support and the bootstrap path, including the Vulkan driver
       requirement and the CPU fallback
 - [ ] (CI, inherited from 51 on 2026-10-14; amended 2026-10-21) This item adds its Windows leg to
       `.github/workflows/ci.yml`; it runs on every pull request and the nightly schedule, and no Nix
@@ -320,3 +320,10 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   integrationTest` green on the behavior (2m55s); the approved test-only refactor `69e694c1` shares
   the probe setup and keeps `gradle -p backend check` green. Commits `f2b4e445`, `69e694c1`. Item
   ticked.
+- 2026-10-22: item 9 cycle green. New `docs/check-readme-windows.mjs` pins the README's Windows
+  facts (red: the ways-to-run row, the section, `gradlew.bat`, `stt.cmd`, `%APPDATA%\stt-app` and
+  the ARM64 scope were missing; the Vulkan/CPU facts already existed). The README gains the
+  Windows x64 section (bootstrap commands, prerequisites, downloads, data directory, Ctrl-C/chunk
+  boundary, Vulkan driver and CPU fallback, no `dev` mode), the table row, the platform summaries,
+  the download path and the `stt.cmd` data row; AGENTS lists the new check. The three existing doc
+  checks stay green. Commit `41490a3e`. Item ticked.
