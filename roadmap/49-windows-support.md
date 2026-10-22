@@ -133,7 +133,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       Windows 11 guest, 2026-10-22)
 - [x] Cancel and delete leave no orphan processes (whisper-cli/ffmpeg all gone) on Windows
       (user-verified on the Windows 11 guest, 2026-10-22)
-- [ ] Queue pause, reorder, retry and history behave as on Linux
+- [x] Queue pause, reorder, retry and history behave as on Linux (user-verified on the Windows 11
+      guest, 2026-10-22)
 - [ ] Device selection works with the GPU-enabled Vulkan build (or, on CPU-only CI, the flag path
       is verified and documented as CPU-first); a real-GPU run is user-verified if available
 - [ ] README documents Windows support and the bootstrap path, including the Vulkan driver
@@ -276,3 +277,12 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   delete of a running task → `Accepted`, row gone, no tool descendants either (delete cancels
   through the engine first). Green on Linux first (2 tests, 0 failures); guest rerun: `EXIT=0`,
   `tests=2 failures=0`, 9.8 s. No production change. Commit `57e8c01d`. Item 6 ticked.
+- 2026-10-22: cycle 7 (item 7) green, user-verified on the Windows 11 guest. Ran the existing suites
+  that own the four behaviors through `gradlew.bat -p backend test`: `TaskQueueSpec` (16),
+  `ProcessingEngineQueuePauseSpec` (2), `ProcessingEngineRetrySpec` (3), `QueuePauseResumeSpec` (1),
+  `QueueReorderSpec` (1), `QueueReorderMismatchSpec` (1), `TaskListSpec` (1) — `EXIT=0`, every suite
+  `failures=0`. No production change. Item 7 ticked.
+- 2026-10-22: approved test-only refactor after item 6: the pause and cancel specs' duplicated
+  real-app harness (`Config`, CPU device, Ktor's 60 s-free `runTestWithRealTime` +
+  `runTestApplication`, upload) is now `RealEngineApp.kt` (`realEngineApp` + `TaskRepository.upload`).
+  Commit `aad9fb06`; both specs green (1 + 2 tests).
