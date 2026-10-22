@@ -154,8 +154,7 @@ class ProcessRunner internal constructor(
      * tool that reads stdin to EOF (ffmpeg without -nostdin) would otherwise wait forever.
      */
     private suspend fun spawn(command: List<String>): Process {
-        val nullDevice = if (platform.windows) File("NUL") else File("/dev/null")
-        val builder = ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.from(nullDevice))
+        val builder = ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.from(File(platform.nullDevice)))
         return withContext(NonCancellable) {
             withContext(Dispatchers.IO) { startProcess(builder) }
         }

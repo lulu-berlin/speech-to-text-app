@@ -18,19 +18,21 @@ internal data class ProcessPlatform(
     val processGroups: Boolean,
     /** Whether this is Windows: the `;` PATH, `.exe` names and the `NUL` null device. */
     val windows: Boolean = false,
+    /** The null input device: `/dev/null` on POSIX, `NUL` on Windows (a run's stdin and whisper-cli's probe input). */
+    val nullDevice: String,
 ) {
     /** Whether the host has POSIX signals; false on Windows, where pause never freezes a process. */
     val signals: Boolean
         get() = stop != null && cont != null
 
     companion object {
-        val LINUX = ProcessPlatform(stop = 19, cont = 18, processGroups = true)
+        val LINUX = ProcessPlatform(stop = 19, cont = 18, processGroups = true, nullDevice = "/dev/null")
 
         /** macOS/BSD: SIGSTOP is 17 and SIGCONT is 19 (swapped against Linux); no `setsid`. */
-        val DARWIN = ProcessPlatform(stop = 17, cont = 19, processGroups = false)
+        val DARWIN = ProcessPlatform(stop = 17, cont = 19, processGroups = false, nullDevice = "/dev/null")
 
         /** Windows: no signals, no `setsid`; the run is the direct child and is terminated directly. */
-        val WINDOWS = ProcessPlatform(stop = null, cont = null, processGroups = false, windows = true)
+        val WINDOWS = ProcessPlatform(stop = null, cont = null, processGroups = false, windows = true, nullDevice = "NUL")
 
         /** The JVM's `os.name`: "Mac OS X" on macOS, "Linux" on Linux, "Windows 11" on Windows. */
         fun forOsName(osName: String): ProcessPlatform =

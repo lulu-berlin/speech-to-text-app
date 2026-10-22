@@ -3,6 +3,7 @@ package stt.transcribe
 import kotlinx.coroutines.CancellationException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import stt.process.ProcessPlatform
 import stt.process.ProcessResult
 import stt.process.ProcessRunner
 import java.io.IOException
@@ -31,10 +32,11 @@ sealed interface DeviceProbeOutcome {
 
 /**
  * The startup device probe (roadmap items 32, 45, 48): runs whisper-cli once and parses the physical GPUs
- * its ggml backend enumerates on stderr — Vulkan devices on Linux, the Metal device on macOS. whisper-cli
- * prints them while initializing, before it reads the audio — the input only has to exist (`/dev/null`
- * decodes to nothing), so the probe costs one model load and any exit code still carries the lines. A launch
- * failure (`IOException`: whisper-cli missing or not executable) is logged with its throwable and reported
+ * its ggml backend enumerates on stderr — Vulkan devices on Linux and Windows, the Metal device on macOS.
+ * whisper-cli prints them while initializing, before it reads the audio — the input only has to exist (the
+ * platform's null device, `/dev/null` or `NUL`, decodes to nothing), so the probe costs one model load and any
+ * exit code still carries the lines. A launch failure (`IOException`: whisper-cli missing or not executable)
+ * is logged with its throwable and reported
  * as [DeviceProbeOutcome.LaunchFailed], so the app still starts and the Settings page offers CPU and auto;
  * any other throwable propagates and fails startup (item 60), and cancellation is rethrown.
  */
@@ -44,6 +46,8 @@ class DeviceProbe internal constructor(
     private val model: Path,
     /** The whisper-cli executable. A seam so tests can stand in a script for whisper-cli (like [ChunkTranscriber]). */
     private val executable: String,
+    /** The host platform: its null device is whisper-cli's input, since `/dev/null` does not exist on Windows. */
+    private val platform: ProcessPlatform = ProcessPlatform.current(),
 ) {
     constructor(
         runner: ProcessRunner,
@@ -60,7 +64,7 @@ class DeviceProbe internal constructor(
     suspend fun probe(): DeviceProbeOutcome {
         val result =
             try {
-                run(listOf(executable, "-m", model.toString(), "-f", "/dev/null"))
+                run(listOf(executable, "-m", model.toString(), "-f", platform.nullDevice))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
