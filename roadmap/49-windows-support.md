@@ -49,6 +49,21 @@ Filed 2026-10-13 from the portability pass (verified reads, nothing executed):
 - **Delivery**: `gradlew.bat` bootstrap + a `.cmd` launcher, zip layout, pinned sha-verified Windows
   artifacts in versions.nix.
 
+### Decided (checkpoint 2, 2026-10-22)
+
+- **The upstream Windows tarball is not runnable on stock Windows.** The pinned
+  `jiang1997` `whisper-1.8.4-windows-x64.tar.gz` (and ggml-org's own Windows zip) imports the MSVC
+  runtime (`MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1`, `VCOMP140`) and `vulkan-1.dll`, and the
+  app's ONNX Runtime native imports the same MSVC runtime. A fresh Windows 11 guest fails with
+  `0xC0000135` (whisper) and `Can't find dependent libraries` (ONNX, diarization). Checkpoint 1's
+  "static build; `vulkan-1.dll` is loaded dynamically" was wrong.
+- **We build and pin our own Windows asset** (`desktop-whisper-cpp-v1`,
+  `whisper-cpp-1.8.4-windows-x64.tar.gz`): whisper.cpp 1.8.4 with `/MT`, `GGML_OPENMP=OFF` and
+  `GGML_VULKAN=ON`; the Vulkan loader built from the pinned `vulkan-sdk-1.4.309.0` sources; and
+  Microsoft's four redistributable CRT DLLs for ONNX Runtime — all extracted into the tool directory
+  the bootstrap puts on PATH. The manual `windows-whisper-asset` CI job builds it and gates it on
+  `dumpbin` imports plus a real CPU transcription.
+
 ### Decided (checkpoint 1, 2026-10-21)
 
 - **GPU backend: Vulkan.** The pinned upstream `whisper-1.8.4-windows-x64.tar.gz` (sha256
@@ -111,7 +126,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] Backend starts on Windows via `gradlew.bat` + `stt.cmd` with a Windows-idiomatic
       STT_DATA_DIR and serves the UI; required-env-var errors are the same as on Linux
       (user-verified on a Windows 11 guest, 2026-10-22)
-- [ ] A full upload → transcribe → diarize run completes on Windows and its output matches Linux
+- [x] A full upload → transcribe → diarize run completes on Windows and its output matches Linux
+      (user-verified on the Windows 11 guest, 2026-10-22)
 - [ ] Pausing a running task on Windows stops progress and resume continues from the next chunk
       without corrupting the transcript (per the decided checkpoint design)
 - [ ] Cancel and delete leave no orphan processes (whisper-cli/ffmpeg all gone) on Windows
@@ -219,3 +235,21 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
     CPU and auto` and failed an uploaded task — the designed behavior for a PATH without the
     managed tools, not a Windows defect.
   Items 2 and 3 tick as user-verified (no CI run yet; the Windows leg is item 10).
+- 2026-10-22: cycle 4 (item 4) green, user-verified on the Windows 11 guest. Red first: the managed
+  `gradlew.bat integrationTest` could not start because the root task launched the POSIX `gradlew`;
+  after `cmd /c gradlew.bat` + `-PtestFilter`, the spec failed with `whisper-cli … exit -1073741515`
+  (STATUS_DLL_NOT_FOUND), then with ONNX Runtime's `Can't find dependent libraries` once whisper
+  ran. Fixes, each verified by the same run: a self-contained Windows asset built by the manual
+  `windows-whisper-asset` job (`/MT`, `GGML_OPENMP=OFF`, pinned `vulkan-sdk-1.4.309.0` loader built
+  from source, the four MSVC redistributable CRT DLLs for ONNX Runtime), published under
+  `desktop-whisper-cpp-v1` and pinned (`9e467fcbe0de807c9e41ae9116bf76c5bedbe0b6551209b719571bc75257436c`);
+  `checkVersions` now expects that asset name. Final run:
+  `gradlew.bat checkVersions` in sync; `gradlew.bat prepareRuntime` downloaded and extracted the
+  asset; `gradlew.bat integrationTest -PtestFilter=stt.engine.ProcessingEngineIntegrationSpec`
+  `EXIT=0` (`BUILD SUCCESSFUL`) with the spec's JFK quote and one-speaker assertions green. Commits:
+  `a3950f3e` (launcher + filter + quote assertions), `ef97a6ca`/`cc52c59a`/`da98092b`/`eca0f748`/
+  `9bd18c2c` (asset job), `d03c215d`/`48b9c7e9` (pins). Item 4 ticked.
+- 2026-10-22: discovered at the same checkpoint, awaiting the user's confirmation to append to the
+  test list: (a) on Windows the device probe passes `/dev/null` as whisper-cli's input instead of
+  `NUL`; (b) a whisper-cli that cannot load is reported as `0 GPU(s)` instead of a `LaunchFailed`
+  probe outcome (entry in `docs/known-issues.md`).
