@@ -140,7 +140,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       (Windows 11 guest, 2026-10-22)
 - [x] README documents Windows support and the bootstrap path, including the Vulkan driver
       requirement and the CPU fallback
-- [ ] (CI, inherited from 51 on 2026-10-14; amended 2026-10-21) This item adds its Windows leg to
+- [x] (CI, inherited from 51 on 2026-10-14; amended 2026-10-21) This item adds its Windows leg to
       `.github/workflows/ci.yml`; it runs on every pull request and the nightly schedule, and no Nix
       job exists on Windows. Matched to the macOS cadence only if the first run's measured wall time
       is comparable (macOS e2e observed at 13–16 min on 2026-10-21): the measurement is recorded in
@@ -325,5 +325,18 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   the ARM64 scope were missing; the Vulkan/CPU facts already existed). The README gains the
   Windows x64 section (bootstrap commands, prerequisites, downloads, data directory, Ctrl-C/chunk
   boundary, Vulkan driver and CPU fallback, no `dev` mode), the table row, the platform summaries,
-  the download path and the `stt.cmd` data row; AGENTS lists the new check. The three existing doc
+  download path and the `stt.cmd` data row; AGENTS lists the new check. The three existing doc
   checks stay green. Commit `41490a3e`. Item ticked.
+- 2026-10-22: item 10 green on CI, run #147 `39850684668` (branch `43551d8`, `workflow_dispatch`):
+  `Windows (gradle check)` 5:00 and `Windows (pnpm test, pnpm build)` 1:44, both success; the two
+  whisper asset jobs skipped (the new `assets` dispatch input defaults off); the run 32:24 overall
+  (Linux e2e 27:52, unchanged). The first run (#145, `bd4d9457`) was the red: five backend tests
+  failed on POSIX assumptions (`Files.setPosixFilePermissions` in `DatabaseSpec` and
+  `ProcessingEngineFailureSpec`, `sleep` in `ProcessRunnerPlatformSpec`, `/`-paths in
+  `WhisperCommandSpec`) and `filesUnder` threw on Windows' deletion-pending errors; Prettier failed
+  on all 136 frontend files because the checkout was CRLF. Fixed by gating the four POSIX-only
+  scenarios, deriving the expected paths, tolerating delete-pending paths in the test helper, and
+  `.gitattributes` (`* text=auto eol=lf`, `.bat`/`.cmd` CRLF). Commits `bd4d9457` (jobs +
+  aggregator), `3613515a` (asset jobs behind the dispatch input), `43551d81` (portability).
+  Measured 5:00 against the macOS e2e band 13–16 min → no cadence change: every PR and nightly.
+  Item ticked.
