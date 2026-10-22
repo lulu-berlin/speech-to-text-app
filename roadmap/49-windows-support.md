@@ -131,7 +131,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] Pausing a running task on Windows stops progress and resume continues from the next chunk
       without corrupting the transcript (per the decided checkpoint design) (user-verified on the
       Windows 11 guest, 2026-10-22)
-- [ ] Cancel and delete leave no orphan processes (whisper-cli/ffmpeg all gone) on Windows
+- [x] Cancel and delete leave no orphan processes (whisper-cli/ffmpeg all gone) on Windows
+      (user-verified on the Windows 11 guest, 2026-10-22)
 - [ ] Queue pause, reorder, retry and history behave as on Linux
 - [ ] Device selection works with the GPU-enabled Vulkan build (or, on CPU-only CI, the flag path
       is verified and documented as CPU-first); a real-GPU run is user-verified if available
@@ -268,3 +269,10 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   `testApplication` 60 s real-time cap (`UncompletedCoroutinesError`); the spec now uses
   `runTestWithRealTime(timeout = 10.minutes) { runTestApplication { … } }`. Guest rerun: `EXIT=0`,
   `tests=1 failures=0`, 83.1 s. No production change. Commit `a3877016`. Item 5 ticked.
+- 2026-10-22: cycle 6 (item 6) green, user-verified on the Windows 11 guest. New
+  `ProcessingEngineCancelIntegrationSpec` (Integration, two scenarios) on the 330 s looped clip:
+  cancel while a real whisper-cli is running → `Accepted`, status CANCELED, and the test JVM has no
+  descendant executable named whisper-cli/ffmpeg (`ProcessHandle.descendants`, polled up to 10 s);
+  delete of a running task → `Accepted`, row gone, no tool descendants either (delete cancels
+  through the engine first). Green on Linux first (2 tests, 0 failures); guest rerun: `EXIT=0`,
+  `tests=2 failures=0`, 9.8 s. No production change. Commit `57e8c01d`. Item 6 ticked.
