@@ -158,6 +158,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-22, user-approved) A whisper-cli that cannot load (missing DLL/shared
       library) is a `LaunchFailed` probe outcome, not `0 GPU(s)`; the app must not start offering
       cpu/auto as if the probe had succeeded (Windows loader codes, 2026-10-22)
+- [ ] (discovered, 2026-10-22, user-approved) A whisper-cli whose shared library is missing on
+      Linux/macOS (the dynamic loader exits 127) is a `LaunchFailed` probe outcome, not `0 GPU(s)`
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green
 
