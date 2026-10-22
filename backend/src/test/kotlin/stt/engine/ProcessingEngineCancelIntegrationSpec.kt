@@ -1,25 +1,16 @@
 package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
-import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.testing.runTestApplication
-import io.ktor.test.dispatcher.runTestWithRealTime
 import stt.Integration
-import stt.config.Config
-import stt.config.realSpeakerModelPath
-import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.TaskPhase
 import stt.db.TaskRepository
-import stt.db.queuedTask
-import stt.http.sttApp
 import stt.queue.TaskStatus
 import stt.transcribe.transcriptFixtures
-import java.io.ByteArrayInputStream
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -40,70 +31,46 @@ class ProcessingEngineCancelIntegrationSpec :
         given("the application with the real ffmpeg, whisper-cli (ggml-tiny.en) and CAM++ model") {
             `when`("a task transcribing a long clip is canceled") {
                 then("the run stops as CANCELED and no whisper-cli or ffmpeg process survives") {
-                    val (whisperModel, jfk) = transcriptFixtures()
-                    val dataDir = tempdir("stt-cancel").toPath()
-                    val config = Config(dataDir, realSpeakerModelPath(), whisperModel)
-                    storeCpuDevice(dataDir)
+                    val (_, jfk) = transcriptFixtures()
                     val clip = loopWav(jfk, loops = 30)
+                    realEngineApp {
+                        val db = application.dependencies.resolve<Database>()
+                        val tasks = TaskRepository(db)
+                        val id = tasks.upload("cancel.wav", clip)
+                        val engine = application.dependencies.resolve<ProcessingEngine>()
+                        engine.wake()
 
-                    runTestWithRealTime(timeout = 10.minutes) {
-                        runTestApplication {
-                            application { sttApp(config) }
-                            startApplication()
-                            val db = application.dependencies.resolve<Database>()
-                            val tasks = TaskRepository(db)
-                            val id =
-                                tasks.createFromUpload(
-                                    queuedTask("cancel.wav", createdAt = 0).copy(queuePosition = 0),
-                                    ByteArrayInputStream(clip),
-                                )
-                            val engine = application.dependencies.resolve<ProcessingEngine>()
-                            engine.wake()
-
-                            awaitUntil(timeout = 2.minutes, every = 100.milliseconds) {
-                                tasks.find(id)?.task?.phase == TaskPhase.TRANSCRIBING && runningTools().isNotEmpty()
-                            }
-
-                            engine.cancelTask(id) shouldBe TaskCommandOutcome.Accepted
-                            tasks.find(id)?.task?.status shouldBe TaskStatus.CANCELED
-                            awaitUntil(timeout = 10.seconds, every = 100.milliseconds) { runningTools().isEmpty() }
-                            runningTools().shouldBeEmpty()
+                        awaitUntil(timeout = 2.minutes, every = 100.milliseconds) {
+                            tasks.find(id)?.task?.phase == TaskPhase.TRANSCRIBING && runningTools().isNotEmpty()
                         }
+
+                        engine.cancelTask(id) shouldBe TaskCommandOutcome.Accepted
+                        tasks.find(id)?.task?.status shouldBe TaskStatus.CANCELED
+                        awaitUntil(timeout = 10.seconds, every = 100.milliseconds) { runningTools().isEmpty() }
+                        runningTools().shouldBeEmpty()
                     }
                 }
             }
 
             `when`("a task transcribing a long clip is deleted") {
                 then("its row is gone and no whisper-cli or ffmpeg process survives") {
-                    val (whisperModel, jfk) = transcriptFixtures()
-                    val dataDir = tempdir("stt-delete").toPath()
-                    val config = Config(dataDir, realSpeakerModelPath(), whisperModel)
-                    storeCpuDevice(dataDir)
+                    val (_, jfk) = transcriptFixtures()
                     val clip = loopWav(jfk, loops = 30)
+                    realEngineApp {
+                        val db = application.dependencies.resolve<Database>()
+                        val tasks = TaskRepository(db)
+                        val id = tasks.upload("delete.wav", clip)
+                        val engine = application.dependencies.resolve<ProcessingEngine>()
+                        engine.wake()
 
-                    runTestWithRealTime(timeout = 10.minutes) {
-                        runTestApplication {
-                            application { sttApp(config) }
-                            startApplication()
-                            val db = application.dependencies.resolve<Database>()
-                            val tasks = TaskRepository(db)
-                            val id =
-                                tasks.createFromUpload(
-                                    queuedTask("delete.wav", createdAt = 0).copy(queuePosition = 0),
-                                    ByteArrayInputStream(clip),
-                                )
-                            val engine = application.dependencies.resolve<ProcessingEngine>()
-                            engine.wake()
-
-                            awaitUntil(timeout = 2.minutes, every = 100.milliseconds) {
-                                tasks.find(id)?.task?.phase == TaskPhase.TRANSCRIBING && runningTools().isNotEmpty()
-                            }
-
-                            engine.deleteTask(id) shouldBe TaskCommandOutcome.Accepted
-                            tasks.find(id).shouldBeNull()
-                            awaitUntil(timeout = 10.seconds, every = 100.milliseconds) { runningTools().isEmpty() }
-                            runningTools().shouldBeEmpty()
+                        awaitUntil(timeout = 2.minutes, every = 100.milliseconds) {
+                            tasks.find(id)?.task?.phase == TaskPhase.TRANSCRIBING && runningTools().isNotEmpty()
                         }
+
+                        engine.deleteTask(id) shouldBe TaskCommandOutcome.Accepted
+                        tasks.find(id).shouldBeNull()
+                        awaitUntil(timeout = 10.seconds, every = 100.milliseconds) { runningTools().isEmpty() }
+                        runningTools().shouldBeEmpty()
                     }
                 }
             }

@@ -1,27 +1,18 @@
 package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
-import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.testing.runTestApplication
-import io.ktor.test.dispatcher.runTestWithRealTime
 import kotlinx.coroutines.delay
 import stt.Integration
-import stt.config.Config
-import stt.config.realSpeakerModelPath
-import stt.config.storeCpuDevice
 import stt.db.Database
 import stt.db.SegmentRepository
 import stt.db.TaskPhase
 import stt.db.TaskRepository
-import stt.db.queuedTask
-import stt.http.sttApp
 import stt.queue.TaskStatus
 import stt.transcribe.transcriptFixtures
-import java.io.ByteArrayInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.file.Files
@@ -49,59 +40,46 @@ class ProcessingEnginePauseIntegrationSpec :
         given("the application with the real ffmpeg, whisper-cli (ggml-tiny.en) and CAM++ model") {
             `when`("a task transcribing a two-chunk clip is paused and then resumed") {
                 then("progress stops while PAUSED and the resumed run completes the transcript intact") {
-                    val (whisperModel, jfk) = transcriptFixtures()
-                    val dataDir = tempdir("stt-pause").toPath()
-                    val config = Config(dataDir, realSpeakerModelPath(), whisperModel)
-                    storeCpuDevice(dataDir)
+                    val (_, jfk) = transcriptFixtures()
                     val clip = loopWav(jfk, loops = 30)
+                    realEngineApp {
+                        val db = application.dependencies.resolve<Database>()
+                        val tasks = TaskRepository(db)
+                        val segments = SegmentRepository(db)
+                        val id = tasks.upload("long.wav", clip)
+                        val engine = application.dependencies.resolve<ProcessingEngine>()
+                        engine.wake()
 
-                    // testApplication hardcodes a 60 s real-time timeout; this run takes longer.
-                    runTestWithRealTime(timeout = 10.minutes) {
-                        runTestApplication {
-                            application { sttApp(config) }
-                            startApplication()
-                            val db = application.dependencies.resolve<Database>()
-                            val tasks = TaskRepository(db)
-                            val segments = SegmentRepository(db)
-                            val id =
-                                tasks.createFromUpload(
-                                    queuedTask("long.wav", createdAt = 0).copy(queuePosition = 0),
-                                    ByteArrayInputStream(clip),
-                                )
-                            val engine = application.dependencies.resolve<ProcessingEngine>()
-                            engine.wake()
-
-                            awaitUntil(timeout = 2.minutes, every = 100.milliseconds) {
-                                val task = tasks.find(id)?.task
-                                task?.phase == TaskPhase.TRANSCRIBING && task.progress > 0.0
-                            }
-                            engine.pauseTask(id) shouldBe TaskCommandOutcome.Accepted
-                            tasks.find(id)?.task?.status shouldBe TaskStatus.PAUSED
-
-                            // The in-flight chunk finishes (or is frozen where signals exist), then the gate holds
-                            // the run: progress must stop moving below completion.
-                            val pausedAt = settledProgress(progress = { tasks.find(id)?.task?.progress ?: 1.0 })
-                            (pausedAt > 0.0) shouldBe true
-                            (pausedAt < 1.0) shouldBe true
-                            tasks.find(id)?.task?.status shouldBe TaskStatus.PAUSED
-                            tasks.find(id)?.task?.progress shouldBe pausedAt
-
-                            engine.resumeTask(id) shouldBe TaskCommandOutcome.Accepted
-                            awaitUntil(timeout = 5.minutes, every = 200.milliseconds) {
-                                tasks.find(id)?.task?.status == TaskStatus.COMPLETED
-                            }
-
-                            val task = tasks.find(id)!!.task
-                            (task.status to task.error) shouldBe (TaskStatus.COMPLETED to null)
-                            task.progress shouldBe 1.0
-                            val stored = segments.findByTask(id)
-                            stored.shouldNotBeEmpty()
-                            val transcript = stored.joinToString("") { it.text }.lowercase()
-                            transcript shouldContain "ask not what your country can do for you"
-                            // Chunks are stitched contiguously from the clip's start: no repeated or rewritten
-                            // segment positions after the pause.
-                            stored.map { it.startMs }.zipWithNext().forEach { (a, b) -> (a < b) shouldBe true }
+                        awaitUntil(timeout = 2.minutes, every = 100.milliseconds) {
+                            val task = tasks.find(id)?.task
+                            task?.phase == TaskPhase.TRANSCRIBING && task.progress > 0.0
                         }
+                        engine.pauseTask(id) shouldBe TaskCommandOutcome.Accepted
+                        tasks.find(id)?.task?.status shouldBe TaskStatus.PAUSED
+
+                        // The in-flight chunk finishes (or is frozen where signals exist), then the gate holds
+                        // the run: progress must stop moving below completion.
+                        val pausedAt = settledProgress(progress = { tasks.find(id)?.task?.progress ?: 1.0 })
+                        (pausedAt > 0.0) shouldBe true
+                        (pausedAt < 1.0) shouldBe true
+                        tasks.find(id)?.task?.status shouldBe TaskStatus.PAUSED
+                        tasks.find(id)?.task?.progress shouldBe pausedAt
+
+                        engine.resumeTask(id) shouldBe TaskCommandOutcome.Accepted
+                        awaitUntil(timeout = 5.minutes, every = 200.milliseconds) {
+                            tasks.find(id)?.task?.status == TaskStatus.COMPLETED
+                        }
+
+                        val task = tasks.find(id)!!.task
+                        (task.status to task.error) shouldBe (TaskStatus.COMPLETED to null)
+                        task.progress shouldBe 1.0
+                        val stored = segments.findByTask(id)
+                        stored.shouldNotBeEmpty()
+                        val transcript = stored.joinToString("") { it.text }.lowercase()
+                        transcript shouldContain "ask not what your country can do for you"
+                        // Chunks are stitched contiguously from the clip's start: no repeated or rewritten
+                        // segment positions after the pause.
+                        stored.map { it.startMs }.zipWithNext().forEach { (a, b) -> (a < b) shouldBe true }
                     }
                 }
             }
