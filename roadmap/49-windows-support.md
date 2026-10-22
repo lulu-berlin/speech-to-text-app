@@ -158,7 +158,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-22, user-approved) A whisper-cli that cannot load (missing DLL/shared
       library) is a `LaunchFailed` probe outcome, not `0 GPU(s)`; the app must not start offering
       cpu/auto as if the probe had succeeded (Windows loader codes, 2026-10-22)
-- [ ] (discovered, 2026-10-22, user-approved) A whisper-cli whose shared library is missing is a
+- [x] (discovered, 2026-10-22, user-approved) A whisper-cli whose shared library is missing is a
       `LaunchFailed` probe outcome, not `0 GPU(s)`: Linux `ld.so` prints `error while loading shared
       libraries` and exits 127; macOS `dyld` prints `Library not loaded` and aborts (SIGABRT)
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
@@ -314,3 +314,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - 2026-10-22: the POSIX loader-failure scenario's wording corrected before its cycle: macOS `dyld`
   aborts with SIGABRT (it does not exit 127), so the loader's stderr line, not the exit code, is
   the cross-platform signal. Behavior unchanged; the user had approved the scenario.
+- 2026-10-22: POSIX loader-failure cycle green. `DeviceProbeLoadFailureSpec`'s Linux scenario (red:
+  `Probed(gpus=[]) … expected LaunchFailed`; green: `loadFailureMessage` matches `ld.so`'s and
+  `dyld`'s stderr lines as well as the Windows status codes). `gradle -p backend check
+  integrationTest` green on the behavior (2m55s); the approved test-only refactor `69e694c1` shares
+  the probe setup and keeps `gradle -p backend check` green. Commits `f2b4e445`, `69e694c1`. Item
+  ticked.
