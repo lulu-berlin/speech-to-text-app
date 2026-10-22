@@ -149,6 +149,11 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       `msiexec /i … /quiet` installs under the per-user programs directory, item 50's packaged
       specs pass against the installed app, and `msiexec /x {ProductCode} /quiet` removes the
       program files while the data directory and model cache remain
+- [ ] (discovered, 2026-10-22, user-approved) On Windows the device probe passes the platform null
+      device (`NUL`) as whisper-cli's `-f` input, not `/dev/null`
+- [ ] (discovered, 2026-10-22, user-approved) A whisper-cli that cannot load (missing DLL/shared
+      library) is a `LaunchFailed` probe outcome, not `0 GPU(s)`; the app must not start offering
+      cpu/auto as if the probe had succeeded
 - [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green
 
