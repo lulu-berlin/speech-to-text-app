@@ -521,24 +521,32 @@ jobs:
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item 'build\bin\Release\whisper-cli.exe', 'build\bin\Release\whisper-server.exe' $stage
 
-          # The SDK action unpacks the installer payload, whose layout differs from an installed SDK
-          # (no fixed Bin\vulkan-1.dll): locate the 64-bit loader instead of guessing the directory.
-          $loaders = @(Get-ChildItem $env:VULKAN_SDK -Recurse -Filter vulkan-1.dll | Where-Object { $_.FullName -notmatch '\\Bin32\\' })
-          if ($loaders.Count -eq 0) {
-            Get-ChildItem $env:VULKAN_SDK -Recurse -Filter '*.dll' | Select-Object -First 40 -ExpandProperty FullName
-            throw "no 64-bit vulkan-1.dll under $env:VULKAN_SDK"
-          }
-          $loader = ($loaders | Where-Object { $_.FullName -match '\\Bin\\' } | Select-Object -First 1) ?? $loaders[0]
-          Copy-Item $loader.FullName $stage
-          "Staged loader: $($loader.FullName)"
+          # The SDK payload ships only the loader's import library (Lib\vulkan-1.lib); the runtime
+          # loader lives in the separate, pinned Vulkan runtime installer. Extract it and pick the
+          # x64 copy — the installer carries the 32-bit one for SysWOW64 too.
+          $rtUrl = 'https://sdk.lunarg.com/sdk/download/1.4.309.0/windows/VulkanRT-1.4.309.0-Installer.exe'
+          $rtSha = '9cbb7461f49b5fe489fc1c59b9cff49924671fa31fa06e2b119c29ecd141c622'
+          Invoke-WebRequest $rtUrl -OutFile vulkanrt.exe
+          $got = (Get-FileHash vulkanrt.exe -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $rtSha) { throw "Vulkan runtime installer sha256 $got, expected $rtSha" }
+          $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
+          if (-not $sevenZip) { $sevenZip = "$env:ProgramFiles\7-Zip\7z.exe" }
+          & $sevenZip x vulkanrt.exe -aoa -oVULKAN_RT | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "extracting the Vulkan runtime failed" }
+          $loaders = @(Get-ChildItem VULKAN_RT -Recurse -Filter vulkan-1.dll)
+          if ($loaders.Count -eq 0) { throw "no vulkan-1.dll in the Vulkan runtime payload" }
 
           # dumpbin is not on PATH in a plain runner shell: it comes from the VS installation.
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           $dumpbin = (Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -Last 1).FullName
-          if (-not ((& $dumpbin /nologo /headers "$stage\vulkan-1.dll") | Select-String 'machine \(x64\)')) {
-            throw "the staged vulkan-1.dll is not x64"
+          $loader = $loaders | Where-Object { (& $dumpbin /nologo /headers $_.FullName) -match 'machine \(x64\)' } | Select-Object -First 1
+          if (-not $loader) {
+            $loaders | ForEach-Object { $_.FullName }
+            throw "the Vulkan runtime payload has no 64-bit vulkan-1.dll"
           }
+          Copy-Item $loader.FullName $stage
+          "Staged loader: $($loader.FullName)"
           function Imports([string] $path) {
             (& $dumpbin /nologo /dependents $path) |
               Select-String -Pattern '^\s+\S+\.dll\s*$' |
