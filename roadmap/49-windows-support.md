@@ -104,11 +104,13 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (split from item 1, 2026-10-21) On Windows a command is spawned without `setsid`, a bare tool
       name resolves through the `;`-separated PATH to `<name>.exe`, stdin is `NUL`, and
       pause/resume send no signals (pause happens at the chunk gate)
-- [ ] (split from item 1, 2026-10-21) `windows-x64` whisper-cli (Vulkan), ffmpeg and Temurin JDK
+- [x] (split from item 1, 2026-10-21) `windows-x64` whisper-cli (Vulkan), ffmpeg and Temurin JDK
       pins exist in `nix/versions.nix` and `versions.json`; the bootstrap downloads, sha-verifies
-      and resolves `whisper-cli.exe`/`ffmpeg.exe` on Windows
-- [ ] Backend starts on Windows via `gradlew.bat` + `stt.cmd` with a Windows-idiomatic
+      and resolves `whisper-cli.exe`/`ffmpeg.exe` on Windows (user-verified on a Windows 11 guest,
+      2026-10-22)
+- [x] Backend starts on Windows via `gradlew.bat` + `stt.cmd` with a Windows-idiomatic
       STT_DATA_DIR and serves the UI; required-env-var errors are the same as on Linux
+      (user-verified on a Windows 11 guest, 2026-10-22)
 - [ ] A full upload → transcribe → diarize run completes on Windows and its output matches Linux
 - [ ] Pausing a running task on Windows stops progress and resume continues from the next chunk
       without corrupting the transcript (per the decided checkpoint design)
@@ -185,3 +187,35 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   was regenerated with `jq -S` in the flake's shape; `versions-sync` awaits a Nix run. Commits:
   `aa12eb5c` (test + pins), `27d8cb32` (approved refactor: `platformExecutable`), `7964a134`
   (approved refactor: `verifyWindowsPins`). Item 2 ticks with the Windows run in item 3.
+- 2026-10-22: user-verified on a Windows 11 x64 guest (`C:\stt-49`, source copy of `88850329`,
+  JDK 21 Temurin, git-ignored `handoff.md` only). Run 1, after the crash interrupted the earlier
+  attempt (cache in `%USERPROFILE%\.gradle\stt-app` reused):
+  - `gradlew.bat checkVersions` → `checkVersions: versions.json is in sync (Gradle 9.8.0, nixpkgs
+    494ce7fd23ff, Windows pins present)`.
+  - `gradlew.bat prepareRuntime` → BUILD SUCCESSFUL, no download: the cached whisper tarball,
+    ffmpeg jar, whisper model and CAM++ model were re-hashed against `versions.json` (the cache
+    check runs on every invocation). `whisper-cli.exe`, `whisper-server.exe` and `ffmpeg.exe`
+    (with `avcodec-62.dll` and the bytedeco sibling DLLs) present under
+    `%USERPROFILE%\.gradle\stt-app\tools\…`; the whisper tree was unpacked by Windows' own
+    `tar.exe` in the earlier guest run and reused here, so the extraction path is observed and
+    the extraction itself is not re-run in this recorded run.
+  - `stt.cmd` → frontend `tsc --noEmit && vite build` (2169 modules), migrations 1→12 on a fresh
+    database, `Device probe: 0 GPU(s) []` (no GPU passed through to the guest, no probe error),
+    `Application started in 3.839 seconds`, `Responding at http://127.0.0.1:8080` via
+    `gradlew.bat run` + `cmd /c …\stt-backend.bat` (exit 0 of the launcher path).
+  - `GET /api/health` → `{"status":"ok"}`; `GET /` → `<title>Speech-to-Text</title>`; `stt.db`
+    (114,688 bytes) plus `-wal`/`-shm` in `%APPDATA%\stt-app`.
+  - Required env: unset → `STT_DATA_DIR must be set to the data directory (it holds stt.db)` and
+    `EXIT=1`; with only the speaker model set → `STT_WHISPER_MODEL must be set to the whisper.cpp
+    model file`.
+  - Stop: Ctrl-C on `stt.cmd` leaves `:8080` closed (`netstat -ano | findstr :8080` empty) and no
+    `whisper-cli`/`ffmpeg`; the only surviving `java.exe` is the Gradle 9.8 daemon (command line
+    `org.gradle.launcher.daemon.bootstrap.GradleDaemon 9.8.0`), which is expected and exits on
+    `gradlew.bat --stop` or after the daemon idle timeout.
+  - The item-3 checklist step 5 originally read "no java in `tasklist`"; corrected here: the daemon
+    is expected, the backend must be gone.
+  - Incidental: a hand-started `stt-backend.bat` (outside the Gradle `run` task, so without the
+    managed-tools PATH) logged `Device probe failed; Executable not found: whisper-cli … offering
+    CPU and auto` and failed an uploaded task — the designed behavior for a PATH without the
+    managed tools, not a Windows defect.
+  Items 2 and 3 tick as user-verified (no CI run yet; the Windows leg is item 10).
