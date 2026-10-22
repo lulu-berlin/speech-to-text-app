@@ -17,8 +17,8 @@ in {
 
   # Prebuilt tools for machines without Nix (user decisions 2026-10-11/12), each pinned
   # by URL and sha256:
-  # - whisper-cli: the jiang1997 prebuild of the Nix build's tag (Vulkan on Linux,
-  #   CoreML on macOS); hashes computed over the GitHub release assets.
+  # - whisper-cli: the jiang1997 prebuild of the Nix build's tag (Vulkan on Linux and
+  #   Windows, CoreML on macOS); hashes computed over the GitHub release assets.
   # - ffmpeg: bytedeco's builds on Maven Central (user decision 2026-10-12), which
   #   never deletes or changes a published artifact - the BtbN daily build first pinned
   #   here was deleted after 14 days. 8.1.2 is the flake's ffmpeg_8. Each jar holds a
@@ -29,6 +29,10 @@ in {
     # linux-x64 and darwin-x64 come from the upstream jiang1997 tag. darwin-arm64 is our own
     # `desktop-whisper-cpp-v1` static build: the upstream darwin tarballs omit the libggml-metal/
     # libggml-blas dylibs their binaries load, so whisper-cli cannot start there (roadmap item 48).
+    # windows-x64 is our own `desktop-whisper-cpp-v1` build too (roadmap item 49): the upstream
+    # tarball imports the MSVC runtime and vulkan-1.dll, which a stock Windows install lacks. The
+    # asset is built with the static CRT, no OpenMP and the pinned Vulkan loader beside the exes
+    # (the loader enumerates no devices without an ICD, which is the CPU fallback).
     "whisper-cli" = {
       "linux-x64" = {
         url = "https://github.com/jiang1997/whisper.cpp-release/releases/download/v${wcTag}/whisper-${wcTag}-linux-x64.tar.gz";
@@ -41,6 +45,13 @@ in {
       "darwin-x64" = {
         url = "https://github.com/jiang1997/whisper.cpp-release/releases/download/v${wcTag}/whisper-${wcTag}-macos-x64.tar.gz";
         sha256 = "a5f41b14a6e4cb3e0c045b7954f0a4050bc0d44a9b2ce2e5826ee2a5fef8577c";
+      };
+      # Windows x64: our self-contained build (roadmap item 49), whisper-cli.exe + whisper-server.exe
+      # with the pinned Vulkan loader (vulkan-1.dll) beside them; built by the manual
+      # `windows-whisper-asset` CI job and published under desktop-whisper-cpp-v1.
+      "windows-x64" = {
+        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-windows-x64.tar.gz";
+        sha256 = "fdc7eb9e98b5c28c98897da9cf6786230d3870c75f09e6f29aadae7a8166ea7e";
       };
     };
     ffmpeg = {
@@ -56,6 +67,11 @@ in {
         url = ffmpegUrl "macosx-x86_64";
         sha256 = "917327cd6178e7ecddd4fb9dd5981cb4c5f04631a06dc0bd81cfe0377b1f3705";
       };
+      # Windows x64: the same bytedeco jar shape as Linux, with ffmpeg.exe and its DLLs (item 49).
+      "windows-x64" = {
+        url = ffmpegUrl "windows-x86_64";
+        sha256 = "9c4bbdecba752fb2d0a8e537e69d330c6db6b02087f5035f88decad0050e5550";
+      };
     };
 
     # The JDK 21 tarball whose jmods the desktop staging links with jlink (roadmap item 50):
@@ -70,6 +86,11 @@ in {
       "darwin-arm64" = {
         url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.12.1_1.tar.gz";
         sha256 = "3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998";
+      };
+      # Windows x64: a zip (Adoptium publishes no tar.gz for Windows), unpacked by the desktop staging.
+      "windows-x64" = {
+        url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip";
+        sha256 = "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e";
       };
     };
   };

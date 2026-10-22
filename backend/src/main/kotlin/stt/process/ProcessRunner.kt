@@ -18,6 +18,8 @@ import kotlin.time.Duration.Companion.seconds
 
 class ProcessRunner internal constructor(
     private val gracePeriod: Duration,
+    /** The process environment; a seam so a test can exercise Windows PATH resolution on any host. */
+    private val env: Map<String, String> = System.getenv(),
     /** The host platform's signals and process-group support; production uses the JVM's `os.name`. */
     private val platform: ProcessPlatform = ProcessPlatform.current(),
     /** Starts the built process. A seam so tests can act inside the spawn window (ADR 0020). */
@@ -73,13 +75,14 @@ class ProcessRunner internal constructor(
         val executable = withContext(Dispatchers.IO) { resolveInPath(command[0]) }
         return coroutineScope {
             // Linux owns a process group through setsid; Darwin has no setsid, so the run is the
-            // direct child alone and its signals target that pid.
+            // direct child alone and its signals target that pid. Windows has neither: the direct
+            // child is the whole run and is destroyed directly.
             val launch = if (platform.processGroups) listOf("setsid", executable) else listOf(executable)
             val process = spawn(launch + command.drop(1))
-            val tree = ProcessTree(process.pid(), process::isAlive, platform)
+            val tree = if (platform.signals) ProcessTree(process.pid(), process::isAlive, platform) else null
             synchronized(runLock) {
                 currentTree = tree
-                if (paused) tree.pause()
+                if (paused) tree?.pause()
             }
             val stdout = async(Dispatchers.IO) { readLines(process.inputStream, process, onStdoutLine) }
             val stderr = async(Dispatchers.IO) { readLines(process.errorStream, process, onStderrLine) }
@@ -91,8 +94,9 @@ class ProcessRunner internal constructor(
                 // the tree while the caller waited (roadmap item 34, discovered). Surface it as a
                 // cancellation so the engine never records FAILED: it puts the task back to QUEUED and runs it
                 // again (item 42), or, when the app is quitting, leaves it to the next start's recovery
-                // (ADR 0004) — this covers whisper-cli and ffmpeg alike.
-                if (exitCode == SIGTERM_EXIT_CODE) {
+                // (ADR 0004) — this covers whisper-cli and ffmpeg alike. Windows has no SIGTERM; there the
+                // desktop app kills the tree on quit (item 49) and recovery covers the rest.
+                if (platform.signals && exitCode == SIGTERM_EXIT_CODE) {
                     throw CancellationException("process was terminated by SIGTERM (exit $SIGTERM_EXIT_CODE)")
                 }
                 ProcessResult(exitCode, stdout.await(), stderr.await())
@@ -102,7 +106,7 @@ class ProcessRunner internal constructor(
                 stdout.cancel()
                 stderr.cancel()
                 withContext(NonCancellable) {
-                    tree.terminate(gracePeriod)
+                    if (tree != null) tree.terminate(gracePeriod) else terminateDirectly(process)
                     stdout.cancelAndJoin()
                     stderr.cancelAndJoin()
                 }
@@ -115,6 +119,8 @@ class ProcessRunner internal constructor(
 
     /** Freezes the current run (SIGSTOP the whole tree), also when it is still spawning. No-op while no run is in flight. */
     override fun pause() {
+        // Windows has no signal that freezes a process: the pause gate stops the run before its next chunk.
+        if (!platform.signals) return
         synchronized(runLock) {
             if (!inFlight) return
             paused = true
@@ -124,9 +130,18 @@ class ProcessRunner internal constructor(
 
     /** Unfreezes the current run (SIGCONT the whole tree). No-op while no run is in flight. */
     override fun resume() {
+        if (!platform.signals) return
         synchronized(runLock) {
             paused = false
             currentTree?.resume()
+        }
+    }
+
+    /** Windows: there is no signal to send, so the run's direct child is terminated and waited for, bounded. */
+    private suspend fun terminateDirectly(process: Process) {
+        process.destroyForcibly()
+        withContext(Dispatchers.IO) {
+            process.waitFor(gracePeriod.inWholeMilliseconds, TimeUnit.MILLISECONDS)
         }
     }
 
@@ -135,11 +150,12 @@ class ProcessRunner internal constructor(
      * when the caller is cancelled while start() runs (prompt cancellation on the way back); the outer
      * NonCancellable context returns it regardless, so the caller can register and kill it (ADR 0020).
      *
-     * stdin is /dev/null, not a pipe nobody writes or closes: a tool that reads stdin to EOF (ffmpeg
-     * without -nostdin) would otherwise wait forever.
+     * stdin is the null device (/dev/null, NUL on Windows), not a pipe nobody writes or closes: a
+     * tool that reads stdin to EOF (ffmpeg without -nostdin) would otherwise wait forever.
      */
     private suspend fun spawn(command: List<String>): Process {
-        val builder = ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.from(File("/dev/null")))
+        val nullDevice = if (platform.windows) File("NUL") else File("/dev/null")
+        val builder = ProcessBuilder(command).redirectInput(ProcessBuilder.Redirect.from(nullDevice))
         return withContext(NonCancellable) {
             withContext(Dispatchers.IO) { startProcess(builder) }
         }
@@ -150,20 +166,27 @@ class ProcessRunner internal constructor(
         pathCandidates(name).firstOrNull { isExecutable(it) }
             ?: throw ExecutableNotFoundException("Executable not found: $name")
 
-    private fun pathCandidates(name: String): List<String> =
-        if (name.contains('/')) {
-            listOf(name)
-        } else {
-            (System.getenv("PATH") ?: "")
-                .split(":")
-                .filter { it.startsWith("/") }
-                .map { dir -> "$dir/$name" }
-                .toList()
-        }
+    /**
+     * The candidate paths for [name]: the name itself when it is a path, otherwise every absolute
+     * directory of [env]'s PATH joined with the name. On Windows PATH is `;`-separated and a bare
+     * tool name is tried as given and with `.exe` (whisper-cli, ffmpeg), the way CreateProcess does.
+     */
+    private fun pathCandidates(name: String): List<String> {
+        if (name.contains('/') || name.contains('\\')) return listOf(name)
+        val separator = if (platform.windows) ';' else ':'
+        val suffixes =
+            if (platform.windows && !name.endsWith(".exe", ignoreCase = true)) listOf("", ".exe") else listOf("")
+        return (env["PATH"] ?: "")
+            .split(separator)
+            .map { it.trim().trim('"') }
+            .filter { it.isNotEmpty() && Path.of(it).isAbsolute }
+            .flatMap { dir -> suffixes.map { suffix -> Path.of(dir, name + suffix).toString() } }
+    }
 
     private fun isExecutable(path: String): Boolean {
         val file = Path.of(path)
-        return Files.isRegularFile(file) && Files.isExecutable(file)
+        // Windows has no executable bit on a regular file: existence is what CreateProcess needs.
+        return Files.isRegularFile(file) && (platform.windows || Files.isExecutable(file))
     }
 
     /** A blocking waitFor cannot be cancelled, so the wait is sliced to observe cancellation. */

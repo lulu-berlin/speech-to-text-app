@@ -56,20 +56,61 @@ tasks.register("checkVersions") {
             )
         }
 
-        logger.lifecycle("checkVersions: versions.json is in sync (Gradle $manifestGradle, nixpkgs ${lockRev.take(12)})")
+        // 3. Windows (roadmap item 49): the platform is supported and every tool the bootstrap
+        //    downloads, plus the desktop's JDK, has a pinned windows-x64 artifact. The download,
+        //    sha256 check and .exe resolution run on Windows; this keeps the manifest honest on
+        //    any host, since the bootstrap reads the committed versions.json without Nix.
+        fun verifyWindowsPins() {
+            val windowsPlatform = "windows-x64"
+            if (windowsPlatform !in supportedPlatforms) {
+                throw GradleException(
+                    "supportedPlatforms has no $windowsPlatform, so versions.json has no Windows tool pins " +
+                        "(supported: ${supportedPlatforms.joinToString()}).",
+                )
+            }
+            val downloads = manifest["downloads"] as Map<*, *>
+            val windowsAssets =
+                mapOf(
+                    "whisper-cli" to "whisper-cpp-1.8.4-windows-x64.tar.gz",
+                    "ffmpeg" to "windows-x86_64-gpl.jar",
+                    "temurin-jdk" to "windows_hotspot",
+                )
+            for ((tool, asset) in windowsAssets) {
+                val table = downloads[tool] as Map<*, *>?
+                val entry =
+                    (table?.get(windowsPlatform) as Map<*, *>?)
+                        ?: throw GradleException("versions.json has no $tool download for $windowsPlatform")
+                val url = entry["url"] as String?
+                if (url == null || !url.contains(asset)) {
+                    throw GradleException("versions.json's $tool pin for $windowsPlatform must point at $asset, got $url")
+                }
+                val sha = entry["sha256"] as String?
+                if (sha == null || !Regex("[0-9a-f]{64}").matches(sha)) {
+                    throw GradleException("versions.json's $tool pin for $windowsPlatform needs a 64-hex sha256, got $sha")
+                }
+            }
+        }
+
+        verifyWindowsPins()
+
+        logger.lifecycle(
+            "checkVersions: versions.json is in sync (Gradle $manifestGradle, nixpkgs ${lockRev.take(12)}, " +
+                "Windows pins present)",
+        )
     }
 }
 
-// ---- platform: Linux x64 supported, macOS best-effort (no testing) ----
+// ---- platform: Linux x64 and Windows x64 supported, macOS best-effort (no testing) ----
 // Null on any other OS/architecture. Tasks that need no downloaded tool (checkVersions)
 // still run there; a build that would download or start one fails before any task runs.
 val osName = System.getProperty("os.name").lowercase(Locale.ROOT)
 val osArch = System.getProperty("os.arch").lowercase(Locale.ROOT)
-val supportedPlatforms = listOf("linux-x64", "darwin-x64", "darwin-arm64")
+val supportedPlatforms = listOf("linux-x64", "darwin-x64", "darwin-arm64", "windows-x64")
 val platform: String? =
     when {
         osName.contains("mac") && osArch == "aarch64" -> "darwin-arm64"
         osName.contains("mac") -> "darwin-x64"
+        osName.contains("windows") && (osArch == "amd64" || osArch == "x86_64") -> "windows-x64"
         osName.contains("linux") && (osArch == "amd64" || osArch == "x86_64") -> "linux-x64"
         else -> null
     }
@@ -77,8 +118,11 @@ val platform: String? =
 fun requirePlatform(): String =
     platform ?: throw GradleException(
         "The Gradle bootstrap does not support this platform: $osName/$osArch. " +
-            "Supported: ${supportedPlatforms.joinToString()} (Linux x64 tested, macOS best-effort).",
+            "Supported: ${supportedPlatforms.joinToString()} (Linux x64 and Windows x64 tested, macOS best-effort).",
     )
+
+/** A managed tool's file name on this platform: Windows executables carry `.exe` (roadmap item 49). */
+fun platformExecutable(name: String): String = if (requirePlatform().startsWith("windows")) "$name.exe" else name
 
 // Every task that downloads or runs a managed tool: prepareRuntime (whisper-cli, ffmpeg,
 // models; run, dev and e2e depend on it) and e2eInstall (node/pnpm; e2eBrowsers,
@@ -169,6 +213,17 @@ fun findExecutable(
 }
 
 fun defaultDataDir(): String {
+    if (platform == "windows-x64") {
+        // %APPDATA%\stt-app (roadmap item 49), the directory the desktop app also uses.
+        val appData = System.getenv("APPDATA")
+        val base =
+            if (!appData.isNullOrEmpty()) {
+                appData
+            } else {
+                File(System.getenv("USERPROFILE") ?: "", "AppData\\Roaming").absolutePath
+            }
+        return "$base\\stt-app"
+    }
     if (platform?.startsWith("darwin") == true) {
         return (System.getenv("HOME") ?: "") + "/Library/Application Support/stt-app"
     }
@@ -268,9 +323,12 @@ tasks.register("prepareRuntime") {
     doLast {
         for ((label, entry) in listOf("whisper-cli" to whisperCliEntry, "ffmpeg" to ffmpegEntry)) {
             if (entry == null) {
-                throw GradleException("versions.json has no $label download for $platform (supported: linux-x64, darwin-x64, darwin-arm64)")
+                throw GradleException(
+                    "versions.json has no $label download for $platform " +
+                        "(supported: ${supportedPlatforms.joinToString()})",
+                )
             }
-            val exe = prepareTool(label, entry, label)
+            val exe = prepareTool(label, entry, platformExecutable(label))
             // An archive can ship more than one executable: the bytedeco ffmpeg jar carries ffmpeg
             // and ffprobe. Nothing runs ffprobe (the shipped ffmpeg does not have it), so only
             // ffmpeg is resolved. Gradle's zip copy drops the executable bit, so findExecutable
@@ -290,7 +348,14 @@ tasks.register("prepareRuntime") {
 }
 
 val backendInstallDist = gradle.includedBuild("backend").task(":installDist")
-val backendMain = rootProject.file("backend/build/install/stt-backend/bin/stt-backend")
+val backendMain =
+    rootProject.file(
+        if (platform == "windows-x64") {
+            "backend/build/install/stt-backend/bin/stt-backend.bat"
+        } else {
+            "backend/build/install/stt-backend/bin/stt-backend"
+        },
+    )
 val jdkMajor = (manifest["jdk"] as String).substringBefore('.')
 // Resolved lazily at execution: the current JVM when it is the pinned JDK, else
 // foojay downloads it (the resolver is root-only, from settings.gradle.kts).
@@ -313,10 +378,11 @@ fun appEnv(): Map<String, String> =
                     nodeInstallDir().let { n ->
                         listOf(
                             File(n, "pnpm/pnpm-v${manifest["pnpm"]}/bin").absolutePath,
-                            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}/bin").absolutePath,
+                            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}")
+                                .let { if (platform == "windows-x64") it.absolutePath else File(it, "bin").absolutePath },
                         )
                     } + System.getenv("PATH")
-            ).joinToString(":"),
+            ).joinToString(File.pathSeparator),
         "JAVA_HOME" to runtimeJavaHome.get(),
         // Gradle 9's HTML test report writes one directory per test name, and names like "0°, 20°"
         // or "O(n³)" fail to encode under a POSIX locale: devenv.nix and flake.nix set the same for
@@ -336,6 +402,7 @@ fun appEnv(): Map<String, String> =
 fun nodePlatform(): String =
     when {
         platform == "linux-x64" -> "linux-x64"
+        platform == "windows-x64" -> "win-x64"
         platform == "darwin-arm64" -> "darwin-arm64"
         else -> "darwin-x64"
     }
@@ -362,7 +429,14 @@ tasks.register<Exec>("run") {
     dependsOn("prepareRuntime", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
         applyAppEnv(this as Exec)
-        setCommandLine(backendMain.absolutePath)
+        // A .bat is not a Win32 executable; cmd runs it, as the installDist launcher expects.
+        setCommandLine(
+            if (platform == "windows-x64") {
+                listOf("cmd", "/c", backendMain.absolutePath)
+            } else {
+                listOf(backendMain.absolutePath)
+            },
+        )
     }
 }
 
@@ -375,7 +449,11 @@ fun applyAppEnv(task: Exec) = appEnv().forEach { (k, v) -> task.environment(k, r
 // Gradle provides what the devenv otherwise sets: the pinned fixtures, the managed
 // tools on PATH, the browsers and the backend command. A user-set variable wins.
 val e2eDir = rootProject.file("e2e")
-val pnpmExe = File(nodeInstallDir(), "pnpm/pnpm-v${manifest["pnpm"]}/bin/pnpm")
+val pnpmExe =
+    File(
+        nodeInstallDir(),
+        "pnpm/pnpm-v${manifest["pnpm"]}/bin/" + if (platform == "windows-x64") "pnpm.cmd" else "pnpm",
+    )
 val fixtures = manifest["fixtures"] as Map<*, *>
 
 val jfkWavFile = assetCacheFile("fixtures", fixtures["jfkWav"] as Map<*, *>)
@@ -516,6 +594,8 @@ tasks.register<Exec>("e2e") {
 // fixtures from the environment, which the devenv exports. This wraps it so a clean checkout can
 // run `./gradlew integrationTest`, exactly like `e2e`. The nested wrapper invocation is the same
 // pattern `dev` uses (DEV_RUN_GRADLE) and keeps the backend a standalone build (ADR 0014).
+// `-PtestFilter=<pattern>` narrows the run to matching test classes, the same Gradle `--tests`
+// filter the backend task takes (roadmap item 49: one spec on a platform leg, the full suite elsewhere).
 tasks.register<Exec>("integrationTest") {
     group = "verification"
     description =
@@ -527,7 +607,17 @@ tasks.register<Exec>("integrationTest") {
         applyAppEnv(this as Exec)
         applyFixtureEnv(this as Exec)
         workingDir = rootProject.projectDir
-        setCommandLine(rootProject.file("gradlew").absolutePath, "-p", "backend", "integrationTest")
+        // Windows has no POSIX shell to run `gradlew`: it runs `gradlew.bat`, and a .bat needs cmd
+        // (roadmap item 49). The backend launcher follows the same rule in the `run` task.
+        val wrapper = rootProject.file(if (platform == "windows-x64") "gradlew.bat" else "gradlew")
+        setCommandLine(
+            if (platform == "windows-x64") {
+                listOf("cmd", "/c", wrapper.absolutePath, "-p", "backend", "integrationTest")
+            } else {
+                listOf(wrapper.absolutePath, "-p", "backend", "integrationTest")
+            },
+        )
+        providers.gradleProperty("testFilter").orNull?.let { args("--tests", it) }
     }
 }
 
