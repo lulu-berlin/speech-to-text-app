@@ -541,7 +541,7 @@ jobs:
           if (-not (Test-Path 'loader-build\loader\Release\vulkan-1.dll')) {
             throw "the Vulkan loader build produced no vulkan-1.dll"
           }
-      - name: Stage and verify the self-contained imports
+      - name: Stage the tools
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -549,6 +549,28 @@ jobs:
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item 'build\bin\Release\whisper-cli.exe', 'build\bin\Release\whisper-server.exe' $stage
           Copy-Item 'loader-build\loader\Release\vulkan-1.dll' $stage
+
+          # The app's ONNX Runtime native (diarization) is built against the dynamic MSVC CRT:
+          # onnxruntime.dll imports MSVCP140/MSVCP140_1/VCRUNTIME140/VCRUNTIME140_1, which stock
+          # Windows lacks. Ship Microsoft's redistributable runtime DLLs from the runner's VS
+          # redist beside the tools; the extracted directory is on the app's PATH, and the
+          # packaged-app items stage the same tarball.
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $crtDir =
+            (Get-ChildItem "$vs\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT\msvcp140.dll" |
+              Sort-Object FullName | Select-Object -Last 1).DirectoryName
+          if (-not $crtDir) { throw "no MSVC runtime redist under $vs" }
+          foreach ($dll in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            if (-not (Test-Path (Join-Path $crtDir $dll))) { throw "missing $dll in $crtDir" }
+            Copy-Item (Join-Path $crtDir $dll) $stage
+          }
+          "Staged MSVC runtime from $crtDir"
+      - name: Verify the imports
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = 'stage\whisper-1.8.4-windows-x64'
 
           # dumpbin is not on PATH in a plain runner shell: it comes from the VS installation.
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -568,21 +590,6 @@ jobs:
             $runtime = $imports | Where-Object { $_ -match '^(msvcp|vcruntime|vcomp)' }
             if ($runtime) { throw "$(Split-Path $binary -Leaf) imports the VC runtime: $runtime" }
           }
-
-          # The app's ONNX Runtime native (diarization) is built against the dynamic MSVC CRT:
-          # onnxruntime.dll imports MSVCP140/MSVCP140_1/VCRUNTIME140/VCRUNTIME140_1, which stock
-          # Windows lacks. Ship Microsoft's redistributable runtime DLLs from the runner's VS
-          # redist beside the tools; the extracted directory is on the app's PATH, and the
-          # packaged-app items stage the same tarball.
-          $crtDir =
-            (Get-ChildItem "$vs\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT\msvcp140.dll" |
-              Sort-Object FullName | Select-Object -Last 1).DirectoryName
-          if (-not $crtDir) { throw "no MSVC runtime redist under $vs" }
-          foreach ($dll in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
-            if (-not (Test-Path (Join-Path $crtDir $dll))) { throw "missing $dll in $crtDir" }
-            Copy-Item (Join-Path $crtDir $dll) $stage
-          }
-          "Staged MSVC runtime from $crtDir"
       - name: Transcribe the JFK clip on CPU through the bundled loader
         shell: pwsh
         run: |
