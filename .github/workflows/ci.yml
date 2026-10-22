@@ -397,6 +397,7 @@ jobs:
           path: whisper-cpp-1.8.4-aarch64-darwin.tar.gz
           retention-days: 90
 
+<<<<<<< HEAD
   # Manual tool (roadmap item 69, the macOS counterpart of `macos-whisper-asset`; opt-in like it,
   # via the `assets` dispatch input): builds the shared audio-only recipe for aarch64-darwin,
   # proves its surface with `ffmpeg-audio-only` (one binary, no ffprobe/ffplay, `otool -L` names
@@ -463,6 +464,105 @@ jobs:
         with:
           name: ffmpeg-audio-only-aarch64-darwin
           path: '*.tar.gz'
+
+  # The Windows whisper-cli asset (manual, roadmap item 49). The published prebuilts are not
+  # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC
+  # runtime (MSVCP140/VCRUNTIME140/VCOMP140, the last from OpenMP) and the pinned Vulkan build also
+  # imports vulkan-1.dll, so a stock Windows install fails with 0xC0000135 before a single word is
+  # transcribed. The prebuilts cannot be fixed without rebuilding, so this job builds whisper.cpp
+  # 1.8.4 with the static MSVC CRT (the top-level project pins CMake 3.5, so the runtime variable is
+  # ignored and the Release flags carry /MT), ggml's own Win32 thread pool instead of OpenMP
+  # (GGML_OPENMP=OFF removes vcomp140.dll; ggml-cpu's threadpool still uses every core), and the
+  # pinned LunarG SDK's vulkan-1.dll beside the exes: the loader picks up a driver's ICD when one
+  # exists and enumerates zero devices otherwise, which is the CPU fallback. The loader is
+  # Apache-2.0 and built with the static CRT. The job fails unless the exes import no VC runtime and
+  # the JFK clip transcribes on CPU through the bundled loader — the packaged-app items extend this
+  # asset with the same staged DLL.
+  windows-whisper-asset:
+    name: Windows whisper-cli asset (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      # Pin the loader/header version the release repo builds against (1.4.309.0), so a later SDK
+      # cannot silently change what ships beside whisper-cli.exe.
+      - name: Install the Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Build whisper.cpp 1.8.4 (static CRT, no OpenMP, Vulkan)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          curl.exe -fsSL https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.4.tar.gz -o whisper.tar.gz
+          if ($LASTEXITCODE -ne 0) { throw "downloading whisper.cpp failed" }
+          tar xzf whisper.tar.gz
+          if ($LASTEXITCODE -ne 0) { throw "extracting whisper.cpp failed" }
+          cmake -S whisper.cpp-1.8.4 -B build -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_SHARED_LIBS=OFF `
+            -DGGML_VULKAN=1 `
+            -DGGML_NATIVE=OFF `
+            -DGGML_OPENMP=OFF `
+            -DWHISPER_SDL2=OFF `
+            -DWHISPER_BUILD_TESTS=OFF `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+            -DCMAKE_C_FLAGS_RELEASE='/MT /O2 /Ob2 /DNDEBUG' `
+            -DCMAKE_CXX_FLAGS_RELEASE='/MT /O2 /Ob2 /DNDEBUG'
+          if ($LASTEXITCODE -ne 0) { throw "configuring whisper.cpp failed" }
+          cmake --build build --config Release -j 4
+          if ($LASTEXITCODE -ne 0) { throw "building whisper.cpp failed" }
+      - name: Stage and verify the self-contained imports
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = 'stage\whisper-1.8.4-windows-x64'
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item 'build\bin\Release\whisper-cli.exe', 'build\bin\Release\whisper-server.exe' $stage
+          Copy-Item (Join-Path $env:VULKAN_SDK 'Bin\vulkan-1.dll') $stage
+
+          # dumpbin is not on PATH in a plain runner shell: it comes from the VS installation.
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = (Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -Last 1).FullName
+          function Imports([string] $path) {
+            (& $dumpbin /nologo /dependents $path) |
+              Select-String -Pattern '^\s+\S+\.dll\s*$' |
+              ForEach-Object { ($_.Line -split '\s+')[1] }
+          }
+          foreach ($binary in @("$stage\whisper-cli.exe", "$stage\whisper-server.exe", "$stage\vulkan-1.dll")) {
+            $imports = Imports $binary
+            "Imports of $(Split-Path $binary -Leaf): $($imports -join ', ')"
+            $runtime = $imports | Where-Object { $_ -match '^(msvcp|vcruntime|vcomp)' }
+            if ($runtime) { throw "$(Split-Path $binary -Leaf) imports the VC runtime: $runtime" }
+          }
+      - name: Transcribe the JFK clip on CPU through the bundled loader
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = 'stage\whisper-1.8.4-windows-x64'
+          $v = Get-Content versions.json | ConvertFrom-Json
+          Invoke-WebRequest $v.models.whisperTinyEn.url -OutFile tiny.bin
+          Invoke-WebRequest $v.fixtures.jfkWav.url -OutFile jfk.wav
+          $output = & "$stage\whisper-cli.exe" -m tiny.bin -f jfk.wav -nt 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "whisper-cli failed on the JFK clip: $output" }
+          $output | Select-Object -Last 5
+          if (-not ($output -match 'ask not what your country can do for you')) { throw "the JFK clip did not transcribe" }
+      - name: Package and print the sha256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          tar -czf whisper-cpp-1.8.4-windows-x64.tar.gz -C stage whisper-1.8.4-windows-x64
+          if ($LASTEXITCODE -ne 0) { throw "packaging failed" }
+          $sha = (Get-FileHash whisper-cpp-1.8.4-windows-x64.tar.gz -Algorithm SHA256).Hash.ToLower()
+          "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz"
+          "### whisper-cpp Windows asset" >> $env:GITHUB_STEP_SUMMARY
+          "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz" >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-cpp-1.8.4-windows-x64
+          path: whisper-cpp-1.8.4-windows-x64.tar.gz
           retention-days: 90
 
   # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds
