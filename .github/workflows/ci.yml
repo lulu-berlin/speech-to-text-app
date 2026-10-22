@@ -513,6 +513,32 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "configuring whisper.cpp failed" }
           cmake --build build --config Release -j 4
           if ($LASTEXITCODE -ne 0) { throw "building whisper.cpp failed" }
+      - name: Build the pinned Vulkan loader
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The SDK ships only the loader's import library (Lib\vulkan-1.lib); the runtime DLL is not
+          # in its payload, and the separate VulkanRT installer wraps it in a nested archive. Build
+          # the loader from source at the same pinned SDK tag instead: its CMake selects the static
+          # MSVC CRT on Windows unless asked otherwise, so the result imports no VC runtime.
+          $tag = 'vulkan-sdk-1.4.309.0'
+          foreach ($repo in @('Vulkan-Headers', 'Vulkan-Loader')) {
+            curl.exe -fsSL "https://github.com/KhronosGroup/$repo/archive/refs/tags/$tag.tar.gz" -o "$repo.tar.gz"
+            if ($LASTEXITCODE -ne 0) { throw "downloading $repo failed" }
+            tar xzf "$repo.tar.gz"
+            if ($LASTEXITCODE -ne 0) { throw "extracting $repo failed" }
+          }
+          cmake -S "Vulkan-Headers-$tag" -B headers-build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$PWD\vk-headers"
+          if ($LASTEXITCODE -ne 0) { throw "configuring Vulkan-Headers failed" }
+          cmake --install headers-build --config Release
+          if ($LASTEXITCODE -ne 0) { throw "installing Vulkan-Headers failed" }
+          cmake -S "Vulkan-Loader-$tag" -B loader-build "-DVULKAN_HEADERS_INSTALL_DIR=$PWD\vk-headers" -DBUILD_TESTS=OFF
+          if ($LASTEXITCODE -ne 0) { throw "configuring Vulkan-Loader failed" }
+          cmake --build loader-build --config Release --target vulkan
+          if ($LASTEXITCODE -ne 0) { throw "building the Vulkan loader failed" }
+          if (-not (Test-Path 'loader-build\loader\Release\vulkan-1.dll')) {
+            throw "the Vulkan loader build produced no vulkan-1.dll"
+          }
       - name: Stage and verify the self-contained imports
         shell: pwsh
         run: |
@@ -520,33 +546,15 @@ jobs:
           $stage = 'stage\whisper-1.8.4-windows-x64'
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item 'build\bin\Release\whisper-cli.exe', 'build\bin\Release\whisper-server.exe' $stage
-
-          # The SDK payload ships only the loader's import library (Lib\vulkan-1.lib); the runtime
-          # loader lives in the separate, pinned Vulkan runtime installer. Extract it and pick the
-          # x64 copy — the installer carries the 32-bit one for SysWOW64 too.
-          $rtUrl = 'https://sdk.lunarg.com/sdk/download/1.4.309.0/windows/VulkanRT-1.4.309.0-Installer.exe'
-          $rtSha = '9cbb7461f49b5fe489fc1c59b9cff49924671fa31fa06e2b119c29ecd141c622'
-          Invoke-WebRequest $rtUrl -OutFile vulkanrt.exe
-          $got = (Get-FileHash vulkanrt.exe -Algorithm SHA256).Hash.ToLower()
-          if ($got -ne $rtSha) { throw "Vulkan runtime installer sha256 $got, expected $rtSha" }
-          $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
-          if (-not $sevenZip) { $sevenZip = "$env:ProgramFiles\7-Zip\7z.exe" }
-          & $sevenZip x vulkanrt.exe -aoa -oVULKAN_RT | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "extracting the Vulkan runtime failed" }
-          $loaders = @(Get-ChildItem VULKAN_RT -Recurse -Filter vulkan-1.dll)
-          if ($loaders.Count -eq 0) { throw "no vulkan-1.dll in the Vulkan runtime payload" }
+          Copy-Item 'loader-build\loader\Release\vulkan-1.dll' $stage
 
           # dumpbin is not on PATH in a plain runner shell: it comes from the VS installation.
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           $dumpbin = (Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -Last 1).FullName
-          $loader = $loaders | Where-Object { (& $dumpbin /nologo /headers $_.FullName) -match 'machine \(x64\)' } | Select-Object -First 1
-          if (-not $loader) {
-            $loaders | ForEach-Object { $_.FullName }
-            throw "the Vulkan runtime payload has no 64-bit vulkan-1.dll"
+          if (-not ((& $dumpbin /nologo /headers "$stage\vulkan-1.dll") | Select-String 'machine \(x64\)')) {
+            throw "the built vulkan-1.dll is not x64"
           }
-          Copy-Item $loader.FullName $stage
-          "Staged loader: $($loader.FullName)"
           function Imports([string] $path) {
             (& $dumpbin /nologo /dependents $path) |
               Select-String -Pattern '^\s+\S+\.dll\s*$' |
