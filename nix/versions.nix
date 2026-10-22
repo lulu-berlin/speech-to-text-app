@@ -53,7 +53,7 @@ in {
       # `windows-whisper-asset` CI job and published under desktop-whisper-cpp-v1.
       "windows-x64" = {
         url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-windows-x64.tar.gz";
-        sha256 = "fdc7eb9e98b5c28c98897da9cf6786230d3870c75f09e6f29aadae7a8166ea7e";
+        sha256 = "9e467fcbe0de807c9e41ae9116bf76c5bedbe0b6551209b719571bc75257436c";
       };
     };
     ffmpeg = {
