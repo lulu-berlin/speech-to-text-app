@@ -475,9 +475,11 @@ jobs:
   # (GGML_OPENMP=OFF removes vcomp140.dll; ggml-cpu's threadpool still uses every core), and the
   # pinned LunarG SDK's vulkan-1.dll beside the exes: the loader picks up a driver's ICD when one
   # exists and enumerates zero devices otherwise, which is the CPU fallback. The loader is
-  # Apache-2.0 and built with the static CRT. The job fails unless the exes import no VC runtime and
-  # the JFK clip transcribes on CPU through the bundled loader — the packaged-app items extend this
-  # asset with the same staged DLL.
+  # Apache-2.0 and built with the static CRT. The tarball also carries the four MSVC redistributable
+  # runtime DLLs: ONNX Runtime's Windows native (diarization) imports them, and stock Windows has no
+  # VC++ runtime. The job fails unless the exes and the loader import no VC runtime and the JFK clip
+  # transcribes on CPU through the bundled loader — the packaged-app items extend this asset with
+  # the same staged DLLs.
   windows-whisper-asset:
     name: Windows whisper-cli asset (manual)
     if: github.event_name == 'workflow_dispatch'
@@ -566,6 +568,21 @@ jobs:
             $runtime = $imports | Where-Object { $_ -match '^(msvcp|vcruntime|vcomp)' }
             if ($runtime) { throw "$(Split-Path $binary -Leaf) imports the VC runtime: $runtime" }
           }
+
+          # The app's ONNX Runtime native (diarization) is built against the dynamic MSVC CRT:
+          # onnxruntime.dll imports MSVCP140/MSVCP140_1/VCRUNTIME140/VCRUNTIME140_1, which stock
+          # Windows lacks. Ship Microsoft's redistributable runtime DLLs from the runner's VS
+          # redist beside the tools; the extracted directory is on the app's PATH, and the
+          # packaged-app items stage the same tarball.
+          $crtDir =
+            (Get-ChildItem "$vs\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT\msvcp140.dll" |
+              Sort-Object FullName | Select-Object -Last 1).DirectoryName
+          if (-not $crtDir) { throw "no MSVC runtime redist under $vs" }
+          foreach ($dll in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            if (-not (Test-Path (Join-Path $crtDir $dll))) { throw "missing $dll in $crtDir" }
+            Copy-Item (Join-Path $crtDir $dll) $stage
+          }
+          "Staged MSVC runtime from $crtDir"
       - name: Transcribe the JFK clip on CPU through the bundled loader
         shell: pwsh
         run: |
