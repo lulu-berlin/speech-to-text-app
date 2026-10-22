@@ -594,6 +594,8 @@ tasks.register<Exec>("e2e") {
 // fixtures from the environment, which the devenv exports. This wraps it so a clean checkout can
 // run `./gradlew integrationTest`, exactly like `e2e`. The nested wrapper invocation is the same
 // pattern `dev` uses (DEV_RUN_GRADLE) and keeps the backend a standalone build (ADR 0014).
+// `-PtestFilter=<pattern>` narrows the run to matching test classes, the same Gradle `--tests`
+// filter the backend task takes (roadmap item 49: one spec on a platform leg, the full suite elsewhere).
 tasks.register<Exec>("integrationTest") {
     group = "verification"
     description =
@@ -605,7 +607,17 @@ tasks.register<Exec>("integrationTest") {
         applyAppEnv(this as Exec)
         applyFixtureEnv(this as Exec)
         workingDir = rootProject.projectDir
-        setCommandLine(rootProject.file("gradlew").absolutePath, "-p", "backend", "integrationTest")
+        // Windows has no POSIX shell to run `gradlew`: it runs `gradlew.bat`, and a .bat needs cmd
+        // (roadmap item 49). The backend launcher follows the same rule in the `run` task.
+        val wrapper = rootProject.file(if (platform == "windows-x64") "gradlew.bat" else "gradlew")
+        setCommandLine(
+            if (platform == "windows-x64") {
+                listOf("cmd", "/c", wrapper.absolutePath, "-p", "backend", "integrationTest")
+            } else {
+                listOf(wrapper.absolutePath, "-p", "backend", "integrationTest")
+            },
+        )
+        providers.gradleProperty("testFilter").orNull?.let { args("--tests", it) }
     }
 }
 
