@@ -504,11 +504,13 @@ jobs:
   # The portable Windows zip, built and tested the way item 49 ships it (roadmap item 49's
   # packaged-zip item): electron-builder packs the staged app, the zip is unpacked like a user's
   # download, and items 50's packaged specs 01-04 run against it in the unpacked directory. No
-  # Xvfb and no Nix: Windows runs the window itself, and everything comes from the package.
+  # Xvfb and no Nix: Windows runs the window itself, and everything comes from the package. It is
+  # gated on the Windows checks, as the macOS jobs are on theirs: the package is built from the
+  # Windows build, so a Windows check failure must not start it.
   windows-desktop-zip:
     name: Windows (packaged zip e2e)
     runs-on: windows-2025
-    needs: [backend-check, frontend-check]
+    needs: [windows-backend-check, windows-frontend-check]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
