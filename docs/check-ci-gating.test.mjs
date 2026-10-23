@@ -5,14 +5,16 @@
 // `node --test docs/check-ci-gating.test.mjs` from the repository root.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const workflowPath = join(repoRoot, '.github/workflows/ci.yml');
 const classifierPath = join(repoRoot, '.github/classify-change.sh');
+const decidePath = join(repoRoot, '.github/decide-code-change.sh');
 
 // Jobs that must run on every event. `changes` decides, `docs-check` is the cheap always-on
 // check, and `ci` is the required aggregator that reports the run's result.
@@ -77,6 +79,45 @@ function classify(paths) {
     '.github/classify-change.sh exists: the changes job classifies its diff instead of guessing',
   );
   return execFileSync('bash', [classifierPath], { input: `${paths.join('\n')}\n`, encoding: 'utf8' }).trim();
+}
+
+// A throwaway git repository: [commit] writes [files] (relative path -> content) on top of the
+// previous commit and returns the new commit id, so a test can hand the decision script a real
+// base/head pair.
+function tempRepo() {
+  const dir = mkdtempSync(join(tmpdir(), 'stt-ci-gating-'));
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim();
+  git('init', '-q');
+  git('config', 'user.email', 'ci-gating@example.invalid');
+  git('config', 'user.name', 'CI gating test');
+  return {
+    dir,
+    commit(files, message) {
+      for (const [path, content] of Object.entries(files)) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true });
+        writeFileSync(join(dir, path), content);
+      }
+      git('add', '-A');
+      git('commit', '-qm', message);
+      return git('rev-parse', 'HEAD');
+    },
+  };
+}
+
+// The `changes` job's decision for [event] on the base/head range, from .github/decide-code-change.sh
+// — the script the workflow step pipes into $GITHUB_OUTPUT.
+function decide(dir, event, range = {}, forceFull = false) {
+  return execFileSync('bash', [decidePath], {
+    cwd: dir,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      EVENT: event,
+      FORCE_FULL: String(forceFull),
+      BASE_SHA: range.base ?? '',
+      HEAD_SHA: range.head ?? '',
+    },
+  }).trim();
 }
 
 test('a documentation-only pull request skips every heavy job and still reports the required check', () => {
@@ -181,4 +222,17 @@ test('a non-Markdown file under docs/ counts as code, and so does every .txt', (
   );
 
   assert.equal(classify(['docs/specs/ci-verification.md', 'LICENSE']), 'code=false', 'Markdown and LICENSE stay documentation');
+});
+
+test('a push to main and the nightly schedule run every heavy job', (t) => {
+  const repo = tempRepo();
+  t.after(() => rmSync(repo.dir, { recursive: true, force: true }));
+  const base = repo.commit({ 'README.md': '# base\n' }, 'base');
+  const head = repo.commit({ 'docs/specs/ci-verification.md': '# contract\n' }, 'docs only');
+  const range = { base, head };
+
+  assert.equal(decide(repo.dir, 'pull_request', range), 'code=false', 'the range really is documentation only');
+  assert.equal(decide(repo.dir, 'push', range), 'code=true', 'a push runs everything, whatever the range holds');
+  assert.equal(decide(repo.dir, 'schedule', range), 'code=true', 'the nightly schedule runs everything');
+  assert.equal(decide(repo.dir, 'workflow_dispatch', range), 'code=true', 'a dispatch runs everything');
 });

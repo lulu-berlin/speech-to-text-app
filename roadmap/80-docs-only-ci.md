@@ -77,7 +77,7 @@ dispatch runs always run everything.
       `build.gradle.kts` count as code, not documentation
 - [x] (discovered) A non-Markdown file under `docs/` (a contract example the tests read, an image,
       the schema) counts as code, and so does every `.txt` (they are build inputs)
-- [ ] (CI) A push to `main` and the nightly schedule run every heavy job
+- [x] (CI) A push to `main` and the nightly schedule run every heavy job
 - [ ] (CI) With the `ci:full` label, a documentation-only PR runs every heavy job
 - [ ] (must not break) The required check keeps the name `CI (all checks)`; the aggregator's `needs`
       covers every heavy job; the manual asset jobs and the macOS-only jobs keep their conditions
@@ -135,3 +135,7 @@ e2e (the reason is recorded here, as in item 65).
   `classify-change.sh` dropped its `docs/`, `roadmap/` and `.txt` exceptions: 4 tests pass,
   `actionlint` clean, AGENTS links resolve. The Decided and Open-questions sections record the
   revision.
+- 2026-10-23 (cycle 5, test-list item 4): passed on its first run — the decision script already
+  runs everything outside a pull request, so the test executes it on a temp repo whose range is
+  documentation only (`pull_request` → `code=false`, the control) and gets `code=true` for `push`,
+  `schedule` and `workflow_dispatch`. 5 tests pass. GitHub half: the `main` push run after merge.
