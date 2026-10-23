@@ -5,12 +5,7 @@ import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -35,7 +30,7 @@ class ProcessRunnerStoppingSpec :
                                 env = mapOf("PATH" to bin.absolutePath),
                                 platform = platform,
                                 stopping = { true },
-                                startProcess = { FinishedTool(exitCode = 1) },
+                                startProcess = { ExitedProcess(exitCode = 1) },
                             )
 
                         runTest {
@@ -46,29 +41,3 @@ class ProcessRunnerStoppingSpec :
             }
         }
     })
-
-/** A process that has already exited with [exitCode]; its streams are empty. */
-private class FinishedTool(
-    private val exitCode: Int,
-) : Process() {
-    override fun getOutputStream(): OutputStream = ByteArrayOutputStream()
-
-    override fun getInputStream(): InputStream = ByteArrayInputStream(ByteArray(0))
-
-    override fun getErrorStream(): InputStream = ByteArrayInputStream(ByteArray(0))
-
-    override fun waitFor(): Int = exitCode
-
-    override fun waitFor(
-        timeout: Long,
-        unit: TimeUnit,
-    ): Boolean = true
-
-    override fun exitValue(): Int = exitCode
-
-    override fun destroy() = Unit
-
-    override fun pid(): Long = 4244
-
-    override fun isAlive(): Boolean = false
-}
