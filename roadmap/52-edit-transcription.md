@@ -64,6 +64,17 @@ inline in the transcript; beside it a play control that plays just that segment'
   the existing per-segment keys, so it is not triggered — but the item should keep the in-place
   update (no refetch) so it stays that way.
 
+## Decided (2026-10-23, user)
+
+- **The inline editor's direction is the segment's own, and only in edit mode**: while the textarea
+  is open, its direction and alignment follow the segment's first alphabetic character (Unicode
+  first-strong, `dir="auto"`), independent of the turn paragraph's direction. Numbers and
+  punctuation before the first letter do not decide, and a segment with no letter falls back to the
+  paragraph's direction. Closing the editor restores the transcript paragraph rule (item 76). The
+  editor's Save/Cancel controls stay in the turn's layout; only the textarea's text direction and
+  alignment follow the segment, and the direction can change while typing as the first strong
+  character changes.
+
 ## Open questions (answered 2026-10-14)
 
 - Which tasks are editable? → **COMPLETED only** (item 22's rule); others `409 not-completed`.
@@ -86,6 +97,10 @@ inline in the transcript; beside it a play control that plays just that segment'
 - [ ] The downloads (txt, srt, vtt) contain the edited text after the edit
 - [ ] (view) An Edit control opens an inline textarea pre-filled with the segment's text; Save (button or Ctrl+Enter) commits, Escape discards; a rejected save keeps the old text and shows the error
 - [ ] (view) The per-segment play control plays exactly the segment's window once — starts at its startMs and stops at its endMs; the normal player behavior (click-to-seek, full-clip playback) is unchanged
+- [ ] (view) The inline editor's direction and alignment follow the segment's first alphabetic
+      character (Arabic-first → RTL, Latin-first → LTR), independent of the turn's paragraph
+      direction; closing the editor restores the paragraph rule, and a letterless segment falls
+      back to the paragraph direction
 - [ ] (e2e, ADR 0046) Against the real backend, editing a segment updates the view and the downloaded txt
 - [ ] (must not break) The suites, the contract-shape checks (`turns*.json` gains the segment id) and the e2e journey stay green
 
@@ -105,3 +120,7 @@ inline in the transcript; beside it a play control that plays just that segment'
   (Ctrl+Enter saves, Escape discards); a separate per-segment play control playing the window
   once (click-to-seek unchanged); in-place update from the `200`/`segment-edited` event without a
   `/turns` refetch; downloads reflect edits. Test list approved; status `spec-approved`.
+- 2026-10-23: the user added the editor-direction rule: in edit mode the inline textarea takes the
+  segment's own first-alphabetic direction (independent of the paragraph); outside edit mode the
+  paragraph rule applies. Test list amended with that scenario; the interaction is recorded in item
+  76 as the one sub-paragraph exception.
