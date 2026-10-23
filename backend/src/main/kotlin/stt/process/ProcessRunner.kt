@@ -96,31 +96,10 @@ class ProcessRunner internal constructor(
                 // A cancel that landed during spawn surfaces here, where the failure path kills the tree.
                 ensureActive()
                 val exitCode = awaitExit(process)
-                // A SIGTERM death is an interruption, not a failure: shutdown or an external TERM killed
-                // the tree while the caller waited (roadmap item 34, discovered). Surface it as a
-                // cancellation so the engine never records FAILED: it puts the task back to QUEUED and runs it
-                // again (item 42), or, when the app is quitting, leaves it to the next start's recovery
-                // (ADR 0004) — this covers whisper-cli and ffmpeg alike.
-                if (platform.signals && exitCode == SIGTERM_EXIT_CODE) {
-                    throw CancellationException("process was terminated by SIGTERM (exit $SIGTERM_EXIT_CODE)")
-                }
-                // A console Ctrl-C (stt.cmd) reaches the tool and the JVM at once, so the tool can end with
-                // STATUS_CONTROL_C_EXIT before the shutdown has set [stopping]: Windows' counterpart of exit 143.
-                if (platform.windows && exitCode == STATUS_CONTROL_C_EXIT) {
-                    throw CancellationException("process was ended by a console Ctrl-C (STATUS_CONTROL_C_EXIT)")
-                }
-                // Darwin has no setsid, so a tool shares the terminal's process group and a Ctrl-C on the
-                // terminal SIGINTs it together with the JVM, again before [stopping] is set. Linux tools have
-                // their own session, so a SIGINT there was sent on purpose and stays a failure.
-                if (platform.signals && !platform.processGroups && exitCode == SIGINT_EXIT_CODE) {
-                    throw CancellationException("process was ended by a terminal Ctrl-C (exit $SIGINT_EXIT_CODE)")
-                }
-                // The known-stopped-by-us flag (item 49): a tool that dies while the backend is stopping was
-                // stopped by the shutdown — on Windows there is no SIGTERM to recognise it by — so it is an
-                // interruption on every platform, never a failure.
-                if (exitCode != 0 && stopping()) {
-                    throw CancellationException("process exited with $exitCode while the backend was stopping")
-                }
+                // An interrupted tool is a cancellation, never a failure: the engine never records FAILED, it
+                // puts the task back to QUEUED and runs it again (item 42), or, when the app is quitting, leaves
+                // it to the next start's recovery (ADR 0004) — this covers whisper-cli and ffmpeg alike.
+                interruption(exitCode)?.let { throw CancellationException(it) }
                 ProcessResult(exitCode, stdout.await(), stderr.await())
             } catch (e: Throwable) {
                 // Any failure, not only cancellation: a callback that throws after the direct child
@@ -228,6 +207,39 @@ class ProcessRunner internal constructor(
                 ensureActive()
             }
             process.exitValue()
+        }
+
+    /** Why a tool that ended with [exitCode] was interrupted rather than failed, or null when it was not. */
+    private fun interruption(exitCode: Int): String? =
+        when {
+            // A SIGTERM death: shutdown or an external TERM killed the tree while the caller waited
+            // (roadmap item 34, discovered).
+            platform.signals && exitCode == SIGTERM_EXIT_CODE -> {
+                "process was terminated by SIGTERM (exit $SIGTERM_EXIT_CODE)"
+            }
+
+            // A console Ctrl-C (stt.cmd) reaches the tool and the JVM at once, so the tool can end with
+            // STATUS_CONTROL_C_EXIT before the shutdown has set [stopping]: Windows' counterpart of exit 143.
+            platform.windows && exitCode == STATUS_CONTROL_C_EXIT -> {
+                "process was ended by a console Ctrl-C (STATUS_CONTROL_C_EXIT)"
+            }
+
+            // Darwin has no setsid, so a tool shares the terminal's process group and a Ctrl-C on the
+            // terminal SIGINTs it together with the JVM, again before [stopping] is set. Linux tools have
+            // their own session, so a SIGINT there was sent on purpose and stays a failure.
+            platform.signals && !platform.processGroups && exitCode == SIGINT_EXIT_CODE -> {
+                "process was ended by a terminal Ctrl-C (exit $SIGINT_EXIT_CODE)"
+            }
+
+            // The known-stopped-by-us flag (item 49): a tool that dies while the backend is stopping was
+            // stopped by the shutdown — on Windows there is no SIGTERM to recognise it by.
+            exitCode != 0 && stopping() -> {
+                "process exited with $exitCode while the backend was stopping"
+            }
+
+            else -> {
+                null
+            }
         }
 
     private companion object {
