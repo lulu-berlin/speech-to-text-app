@@ -1,6 +1,6 @@
 # 80 — Documentation-only pull requests skip the heavy CI jobs
 
-Status: spec-approved
+Status: in-progress
 Depends on: [49](../docs/specs/windows-support.md) (adds the Windows jobs this must cover too),
 [51](../docs/specs/ci-verification.md) (done; the workflow and the `CI (all checks)` aggregator)
 Blocks: —
