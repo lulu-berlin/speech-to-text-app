@@ -45,7 +45,10 @@ Filed 2026-10-13 during the review/portability work (verified reads):
 - **Bundled JRE**: per-OS `jlink` runtime image included — the "no manual tool installation"
   promise.
 - **Unsigned v1**: no code signing, no auto-update; the macOS Gatekeeper "unidentified developer"
-  notice is accepted until asked otherwise.
+  notice is accepted until asked otherwise. **Distribution superseded by
+  [ADR 0060](../decisions/0060-windows-store-and-unsigned-macos.md)** (2026-10-23): Windows releases
+  through the Microsoft Store as an MSIX (Microsoft signs it); the macOS DMG stays unsigned with a
+  documented Gatekeeper bypass; auto-update stays out.
 - **Tooling**: `electron-builder` for packaging (cross-platform, standard).
 
 ## Decided (first test item, 2026-10-14)

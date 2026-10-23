@@ -139,6 +139,16 @@ graph TD
   75[75 retire the Python oracle]
   76[76 RTL transcription]
   77[77 upload spec shared temp dir]
+  78[78 stable release]
+  49 --> 78
+  52 --> 78
+  65 --> 78
+  68 --> 78
+  69 --> 78
+  72 --> 78
+  74 --> 78
+  76 --> 78
+  77 --> 78
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -223,3 +233,4 @@ graph TD
 | [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | draft         | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | draft         | —                           |
 | [77 — `UploadStoredInDatabaseSpec` fails when another process writes to the shared temp dir](77-upload-spec-shared-temp-dir.md)                                     | spec-approved | —                           |
+| [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77 |
