@@ -578,3 +578,11 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   "Library not loaded" line (backup restored in the same cycle): both cases failed with
   `Probed(gpus=[]) is of type … but expected … LaunchFailed`. `gradle check`, `gradle integrationTest`,
   frontend and docs checks green. Commit `9878c70a`. Item ticked.
+- 2026-10-23: review cycle 12 (MSI install location) done; Windows-only, unticked. The tautological
+  check is gone: the spec now scans `%ProgramFiles%` and `%ProgramFiles(x86)%` for
+  `Speech-to-Text.exe` (`installedUnderProgramFiles`) and requires none, so a per-machine install
+  fails on the install location itself instead of only timing out the 180 s search under
+  `%LOCALAPPDATA%\Programs`. Type check (`tsc -p desktop/tsconfig.json`) and Prettier green; the
+  spec skips on Linux, so no local red or green. Planned red: the same scan pointed at the per-user
+  directory, where the exe exists, on the Windows guest or in a CI run. Commit `056afab1`.
+  Ticks with a reported Windows run.
