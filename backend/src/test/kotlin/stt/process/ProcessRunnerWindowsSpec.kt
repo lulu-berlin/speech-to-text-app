@@ -72,7 +72,6 @@ class ProcessRunnerWindowsSpec :
 
                     child.destroyed shouldBe true
                     child.waitedForMs shouldBe 300L
-                    child.signals shouldBe emptyList()
                 }
             }
 
@@ -120,7 +119,6 @@ private fun spawnedOnWindows(
 private class RecordingProcess : Process() {
     var destroyed = false
     var waitedForMs: Long? = null
-    val signals = mutableListOf<Int>()
 
     override fun getOutputStream(): OutputStream = ByteArrayOutputStream()
 
