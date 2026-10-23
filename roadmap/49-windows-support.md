@@ -179,7 +179,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       10 s
 - [x] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
       within a bound even when `taskkill` fails, and the failure is logged
-- [ ] (discovered, 2026-10-23, from the root review) On Windows a cancelled run destroys its direct
+- [x] (discovered, 2026-10-23, from the root review) On Windows a cancelled run destroys its direct
       child and waits for it, bounded, without signals
 - [ ] (discovered, 2026-10-23, from the root review) A whisper-cli with an invalid image
       (`0xC000007B`) and a macOS `dyld` `Library not loaded` are both a `LaunchFailed` probe outcome
@@ -562,4 +562,12 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   and call `kill()` with no signal; the three earlier cases' stubs now return `true`. Red:
   `one line names the failure, got []`. `node --test` 3 tests, the three `tsc` projects, Prettier,
   `gradle check`, `gradle integrationTest`, frontend and docs checks green. Commit `50e49b1f`.
+  Item ticked.
+- 2026-10-23: review cycle 10 (cancelled Windows run) green. New case in
+  `ProcessRunnerWindowsSpec`: the run's coroutine is cancelled from inside the spawn seam, so the
+  failure path takes `terminateDirectly`; a `RecordingProcess` fake records `destroyForcibly`, the
+  bounded `waitFor` (300 ms grace) and any signal. Green on arrival — the code already did this —
+  so the red was recorded by temporarily removing the `destroyForcibly()` call (reverted in the same
+  cycle): `expected:<true> but was:<false>` on `child.destroyed`. `gradle check` (355 tests),
+  `gradle integrationTest` (402, 82 executed), frontend and docs checks green. Commit `f6fc4a78`.
   Item ticked.
