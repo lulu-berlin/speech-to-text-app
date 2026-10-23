@@ -161,8 +161,23 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-22, user-approved) A whisper-cli whose shared library is missing is a
       `LaunchFailed` probe outcome, not `0 GPU(s)`: Linux `ld.so` prints `error while loading shared
       libraries` and exits 127; macOS `dyld` prints `Library not loaded` and aborts (SIGABRT)
-- [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
-      e2e stay green
+- [ ] (discovered, 2026-10-23, from the root review) On Windows a bare tool name resolves through the
+      PATH variable whatever its spelling (`Path`, `PATH`)
+- [ ] (discovered, 2026-10-23, from the root review) A tool that exits while the backend is stopping
+      leaves its task RUNNING for restart recovery, not FAILED, on every platform; on Windows a console
+      Ctrl-C exit (`0xC000013A`) counts as stopped
+- [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit stops the backend
+      gracefully first and force-kills the tree only after a bounded wait
+- [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
+      within a bound even when `taskkill` fails, and the failure is logged
+- [ ] (discovered, 2026-10-23, from the root review) On Windows a cancelled run destroys its direct
+      child and waits for it, bounded, without signals
+- [ ] (discovered, 2026-10-23, from the root review) A whisper-cli with an invalid image
+      (`0xC000007B`) and a macOS `dyld` `Library not loaded` are both a `LaunchFailed` probe outcome
+- [ ] (discovered, 2026-10-23, from the root review) The MSI spec fails when an installed
+      `Speech-to-Text.exe` exists under `%ProgramFiles%` or `%ProgramFiles(x86)%`
+- [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
+      e2e stay green (re-run after the review findings)
 
 ## Acceptance criteria
 
@@ -402,3 +417,19 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   untested Windows branches and dead guards; a tautological MSI assertion and an unbounded README
   section check; an unpinned Vulkan SDK action and a wrong `versions.nix` comment). Status:
   in-progress.
+- 2026-10-23: review decisions (user). Finding 2: **implement the decided known-stopped-by-us
+  flag** — the backend marks itself stopping when the application starts to stop, and a tool exit
+  after that is a cancellation on every platform (the task stays RUNNING for recovery); on Windows
+  `0xC000013A` (console Ctrl-C) counts as stopped; the Windows desktop quit closes the backend's
+  stdin (honoured only when the desktop sets a switch variable), waits up to 10 s, then
+  `taskkill /T /F`. A tool killed from outside (Task Manager, exit 1) still ends FAILED on Windows.
+  Finding 4: **remove** the Windows branch — `e2e`/`e2eInstall`/`e2eBrowsers` fail fast on Windows
+  with a pointer to the packaged-app e2e; `appEnv()`'s pnpm PATH entry is corrected. Seven
+  discovered items appended to the test list (a proposed "Gradle e2e finds pnpm on Windows" item
+  dropped with the removal); the must-not-break item is unticked until the final re-run. The MSI
+  item's red is recorded by pointing the new check at the per-user directory, where the exe does
+  exist. Order: CI action pin and `versions.nix` comment; PATH case; stopping flag → graceful
+  desktop stop → `taskkill` failure; the e2e removal; the cancel-kill and loader-code coverage; the
+  MSI check; the refactors (dead `pause()`/`resume()` returns, `require(platform.signals)` in
+  `ProcessTree`, `TestEngine`'s Windows-only `!Files.exists`, the bounded README section, the pause
+  spec's wait for whisper-cli to be gone), each offered at a checkpoint.
