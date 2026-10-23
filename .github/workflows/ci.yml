@@ -668,9 +668,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # Pin the loader/header version the release repo builds against (1.4.309.0), so a later SDK
-      # cannot silently change what ships beside whisper-cli.exe.
+      # cannot silently change what ships beside whisper-cli.exe. The action itself is pinned to a
+      # commit, not its movable tag: it runs in the job that builds the published Windows asset.
       - name: Install the Vulkan SDK
-        uses: humbletim/install-vulkan-sdk@v1.2
+        uses: humbletim/install-vulkan-sdk@30ba978f977e81b72d091fc8888feb1fb26f9aff # v1.2
         with:
           version: 1.4.309.0
           cache: true
