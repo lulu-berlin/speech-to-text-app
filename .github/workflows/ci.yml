@@ -610,16 +610,29 @@ jobs:
           $ErrorActionPreference = 'Stop'
           pnpm exec playwright test -c playwright.desktop.config.ts 01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
           if ($LASTEXITCODE -ne 0) { throw 'the packaged specs failed' }
-      # The installer the same staged tree produces (roadmap item 49, test item 12). The spec
-      # installs it silently, runs the app's journey, and uninstalls by its ProductCode, asserting
-      # that the per-user data and the model cache survive.
-      - name: Find the MSI the packaged build produced
+      # The installer the same staged tree produces (roadmap item 49, test item 12): installed
+      # silently, the packaged specs run against the installed app, not the unpacked zip.
+      - name: Install the MSI and run the packaged specs against the installed app
         shell: pwsh
+        working-directory: e2e
+        env:
+          ELECTRON_ENABLE_LOGGING: '1'
         run: |
           $ErrorActionPreference = 'Stop'
-          $msi = Get-ChildItem desktop\dist\Speech-to-Text-*-win-x64.msi | Select-Object -First 1
+          $msi = Get-ChildItem ..\desktop\dist\Speech-to-Text-*-win-x64.msi | Select-Object -First 1
           if (-not $msi) { throw 'no MSI was produced: the win target builds only the zip' }
+          $install = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /quiet /norestart" -Wait -PassThru
+          if ($install.ExitCode -ne 0 -and $install.ExitCode -ne 3010) { throw "msiexec /i failed: $($install.ExitCode)" }
+          $app = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Filter 'Speech-to-Text.exe' -File |
+            Select-Object -First 1
+          if (-not $app) { throw 'the MSI installed no Speech-to-Text.exe under %LOCALAPPDATA%\Programs' }
+          "STT_DESKTOP_APP=$($app.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "STT_DESKTOP_MSI=$($msi.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $env:STT_DESKTOP_APP = $app.FullName
+          pnpm exec playwright test -c playwright.desktop.config.ts 01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
+          if ($LASTEXITCODE -ne 0) { throw 'the packaged specs failed against the installed app' }
+      # And the installer's own lifecycle: a silent install, the app's journey, a silent uninstall
+      # by ProductCode, and the per-user data and model cache surviving it.
       - name: Run the MSI installer spec
         shell: pwsh
         working-directory: e2e

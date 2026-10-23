@@ -89,10 +89,21 @@ mac:
   identity: null
   hardenedRuntime: false
 
-# Roadmap item 49: a portable zip (unsigned), unpacked anywhere and run as a user; the per-user
-# data and model directories are the app's (backend.ts, models.ts), not the package's.
+# Roadmap item 49: a portable zip (unsigned), unpacked anywhere and run as a user, and the
+# per-user MSI (unsigned, no elevation) that installs the same staged tree under
+# %LOCALAPPDATA%\Programs. The per-user data and model directories are the app's (backend.ts,
+# models.ts), not the package's, so an uninstall keeps them.
 win:
   target:
     - target: zip
       arch: [x64]
+    - target: msi
+      arch: [x64]
   artifactName: Speech-to-Text-${version}-win-${arch}.${ext}
+# Per-user and one-click: no admin, no wizard, `msiexec /i … /quiet` is the same install. The
+# app does not start by itself after an install (`runAfterFinish: false`): silent installs are
+# what the Windows job runs, and a launched app would hold the install directory.
+msi:
+  oneClick: true
+  perMachine: false
+  runAfterFinish: false
