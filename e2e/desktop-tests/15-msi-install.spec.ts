@@ -91,28 +91,18 @@ function expectUserDataKept(paths: { data: string; models: string }, models: str
   for (const model of models) expect(existsSync(join(paths.models, model))).toBe(true);
 }
 
-/** Every `Speech-to-Text.exe` under the machine-wide Program Files directories, which a per-user install must not touch. */
+/**
+ * The machine-wide install locations a per-machine MSI would use, which a per-user install must leave
+ * untouched. The paths are checked directly: recursing through Program Files outlived the spec's
+ * timeout on the Windows runner (2026-10-23), and electron-builder installs under
+ * `<Program Files>\<app directory>`, not somewhere arbitrary.
+ */
 function installedUnderProgramFiles(): string[] {
-  const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(
-    (root): root is string => typeof root === 'string' && root !== '' && existsSync(root),
-  );
-  return roots.flatMap((root) => {
-    const output = execFileSync(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `Get-ChildItem -LiteralPath '${root}' -Recurse -Filter 'Speech-to-Text.exe' -File ` +
-          '-ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName',
-      ],
-      { encoding: 'utf8', timeout: 120_000 },
-    );
-    return output
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line !== '');
-  });
+  const directories = ['stt-app', 'Speech-to-Text'];
+  return [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]
+    .filter((root): root is string => typeof root === 'string' && root !== '')
+    .flatMap((root) => directories.map((directory) => join(root, directory, 'Speech-to-Text.exe')))
+    .filter((exe) => existsSync(exe));
 }
 
 /** Runs `msiexec` and fails on anything but success (3010 is "success, reboot required"). */
