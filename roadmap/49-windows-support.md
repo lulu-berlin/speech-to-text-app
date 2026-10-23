@@ -470,3 +470,14 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   inference from the code, not reproduced. Approved refactor: one shared exited-process test fake
   for the `stt.process` specs. Deferred: merging the exit-interruption checks into one function,
   to be offered again after the exit-code cycles.
+- 2026-10-23: approved refactor `af638842`: `ExitedProcess(exitCode, pid)` in its own test file
+  replaces the three private fakes of `ProcessRunnerPlatformSpec`, `ProcessRunnerWindowsSpec` and
+  `ProcessRunnerStoppingSpec`; all gates green (351 unit tests).
+- 2026-10-23: review cycle 3 (Windows console Ctrl-C) green locally. New case in
+  `ProcessRunnerWindowsSpec`: with the backend not (yet) stopping, a tool exiting
+  `0xC000013A` must make the run a cancellation. Red: `Expected exception
+  java.util.concurrent.CancellationException but no exception was thrown`. Green: `ProcessRunner`
+  maps `STATUS_CONTROL_C_EXIT` on Windows to a cancellation, next to the SIGTERM-143 check.
+  `gradle check` (352 tests), `gradle integrationTest`, frontend and docs checks green. Commit
+  `6e2a1905`. Ticks with the next CI run's `Windows (gradle check)`, which runs this spec on
+  Windows.
