@@ -579,38 +579,7 @@ jobs:
           $app = Get-ChildItem desktop\dist\portable -Recurse -Filter 'Speech-to-Text.exe' |
             Select-Object -First 1 -ExpandProperty FullName
           if (-not $app) { throw 'no Speech-to-Text.exe in the unpacked zip' }
-          # Chromium's sandboxed child processes run with a restricted token that must read and
-          # execute the app's files. An install directory's ACL grants that (ALL RESTRICTED
-          # APPLICATION PACKAGES, S-1-15-2-2); the runner workspace's inherited ACL does not, and
-          # without it the GPU process dies at startup (0x80000003) and the browser aborts.
-          icacls desktop\dist\portable /grant "*S-1-15-2-2:(OI)(CI)(RX)" /T /C /Q | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw 'granting the sandbox read/execute ACL failed' }
           "STT_DESKTOP_APP=$app" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-      # A direct launch tells apart an app/Electron startup crash from a Playwright-inspector one:
-      # plain, then with the inspector Playwright uses, then with the V8 optimizer disabled.
-      - name: Smoke-launch the unpacked app
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $exe = $env:STT_DESKTOP_APP
-          $variants = @(
-            @{ name = 'plain'; args = @() },
-            @{ name = 'inspect'; args = @('--inspect=0', '--remote-debugging-port=0') },
-            @{ name = 'inspect-no-opt'; args = @('--inspect=0', '--remote-debugging-port=0', '--js-flags=--no-opt') },
-            @{ name = 'inspect-jitless'; args = @('--inspect=0', '--remote-debugging-port=0', '--js-flags=--jitless') }
-          )
-          foreach ($variant in $variants) {
-            $err = Join-Path $PWD "smoke-$($variant.name).err.log"
-            $p = Start-Process -FilePath $exe -ArgumentList $variant.args -PassThru -RedirectStandardError $err
-            Start-Sleep -Seconds 6
-            if ($p.HasExited) {
-              Write-Host "$($variant.name): exited $($p.ExitCode)"
-              Get-Content $err -ErrorAction SilentlyContinue | Write-Host
-            } else {
-              Write-Host "$($variant.name): alive"
-              Stop-Process -Id $p.Id -Force
-            }
-          }
       # The specs read the same pinned fixtures and models the other jobs use, from the Gradle
       # cache; the sha256 values the first-run spec asserts against come from versions.json.
       - name: Export the fixture and model environment

@@ -4,7 +4,14 @@ import {
   type ElectronApplication,
   type Page,
 } from '@playwright/test';
-import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+} from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,14 +44,7 @@ export interface LaunchOptions {
 export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronApplication> {
   const { home = temporaryDir('home'), models = 'override', env = {} } = options;
   // A fresh per-user area per launch. Windows apps read %APPDATA%/%LOCALAPPDATA%, not HOME.
-  const homeEnv =
-    process.platform === 'win32'
-      ? {
-          USERPROFILE: home,
-          APPDATA: join(home, 'AppData', 'Roaming'),
-          LOCALAPPDATA: join(home, 'AppData', 'Local'),
-        }
-      : { HOME: home };
+  const homeEnv = process.platform === 'win32' ? windowsHomeEnv(home) : { HOME: home };
   // Only variables that are set: an unset one has no value to pass to the app.
   const appEnv: Record<string, string> = Object.fromEntries(
     Object.entries({ ...process.env, ...env, ...homeEnv }).filter(
@@ -243,4 +243,17 @@ export function delay(ms: number): Promise<void> {
 
 function temporaryDir(kind: string): string {
   return mkdtempSync(join(tmpdir(), `stt-desktop-${kind}-`));
+}
+
+/**
+ * The fresh Windows per-user environment. The two AppData directories must exist before Electron
+ * starts: with %USERPROFILE%, %APPDATA% and %LOCALAPPDATA% all pointing into a fresh tree whose
+ * AppData children are missing, Chromium aborts at startup with 0x80000003 (roadmap item 49).
+ */
+function windowsHomeEnv(home: string): Record<string, string> {
+  const roaming = join(home, 'AppData', 'Roaming');
+  const local = join(home, 'AppData', 'Local');
+  mkdirSync(roaming, { recursive: true });
+  mkdirSync(local, { recursive: true });
+  return { USERPROFILE: home, APPDATA: roaming, LOCALAPPDATA: local };
 }
