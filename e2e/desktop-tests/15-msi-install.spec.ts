@@ -39,13 +39,13 @@ test('the per-user MSI installs the app, transcribes, and the uninstall keeps th
   }
 
   install(msi);
+  // msiexec is synchronous: what it installed is on disk now, so a per-machine install is caught here,
+  // naming the Program Files path, instead of as a timeout of the per-user search below.
+  expect(installedUnderProgramFiles()).toEqual([]);
   const exe = await waitFor(installedExe, 180_000, 'the MSI to install Speech-to-Text.exe');
   // Per-user: under %LOCALAPPDATA%\Programs, never under Program Files (the user is not asked
   // for an elevated install).
   expect(exe.startsWith(programs + '\\')).toBe(true);
-  // A per-machine install would put the exe under Program Files, not merely outside the per-user
-  // directory; both roots must stay untouched by a per-user install.
-  expect(installedUnderProgramFiles()).toEqual([]);
 
   // The installed app is the packaged app: the first run provisions the per-user data directory
   // and downloads the models into the cache (the same loopback server item 50's first-run spec
