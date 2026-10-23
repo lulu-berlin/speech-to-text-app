@@ -6,7 +6,7 @@ import { stopBackend, type StoppableChild } from './backend.ts';
 class FakeBackend implements StoppableChild {
   exitCode: number | null = null;
   readonly pid = 4242;
-  readonly signals: NodeJS.Signals[] = [];
+  readonly signals: Array<NodeJS.Signals | 'default'> = [];
   readonly stdin = {
     ended: false,
     end(): void {
@@ -15,8 +15,8 @@ class FakeBackend implements StoppableChild {
   };
   readonly #exitListeners: Array<() => void> = [];
 
-  kill(signal: NodeJS.Signals): boolean {
-    this.signals.push(signal);
+  kill(signal?: NodeJS.Signals): boolean {
+    this.signals.push(signal ?? 'default');
     return true;
   }
 
@@ -41,7 +41,10 @@ test('on Windows the quit closes the backend stdin and force-kills only after th
     const stopping = stopBackend(backend, {
       platform: 'win32',
       timeoutMs: 10_000,
-      forceKill: (pid) => forced.push(pid),
+      forceKill: async (pid) => {
+        forced.push(pid);
+        return true;
+      },
     });
 
     assert.equal(backend.stdin.ended, true, 'the graceful ask is the closed stdin');
@@ -67,7 +70,10 @@ test('on Windows the quit never force-kills a backend that is already gone', asy
     const stopping = stopBackend(exiting, {
       platform: 'win32',
       timeoutMs: 10_000,
-      forceKill: (pid) => forcedAfterExit.push(pid),
+      forceKill: async (pid) => {
+        forcedAfterExit.push(pid);
+        return true;
+      },
     });
     exiting.exit();
     await stopping;
@@ -81,11 +87,41 @@ test('on Windows the quit never force-kills a backend that is already gone', asy
     await stopBackend(exited, {
       platform: 'win32',
       timeoutMs: 10_000,
-      forceKill: (pid) => forcedBefore.push(pid),
+      forceKill: async (pid) => {
+        forcedBefore.push(pid);
+        return true;
+      },
     });
     assert.equal(exited.stdin.ended, false, 'nothing is asked of a gone backend');
     mock.timers.tick(10_000);
     assert.deepEqual(forcedBefore, [], 'nothing is forced either');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('on Windows a quit whose taskkill fails logs it and still ends the backend', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const backend = new FakeBackend();
+    const logged: string[] = [];
+
+    const stopping = stopBackend(backend, {
+      platform: 'win32',
+      timeoutMs: 10_000,
+      forceKill: async () => false,
+      log: (message) => logged.push(message),
+    });
+
+    mock.timers.tick(10_000);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.equal(logged.length, 1, `one line names the failure, got ${JSON.stringify(logged)}`);
+    assert.match(logged[0] ?? '', /taskkill/);
+    assert.deepEqual(backend.signals, ['default'], 'the JVM is then ended directly');
+    backend.exit();
+    await stopping;
   } finally {
     mock.timers.reset();
   }

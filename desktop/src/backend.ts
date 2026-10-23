@@ -147,7 +147,7 @@ export interface StoppableChild {
   readonly pid?: number;
   readonly exitCode: number | null;
   readonly stdin: { end(): void } | null;
-  kill(signal: NodeJS.Signals): boolean;
+  kill(signal?: NodeJS.Signals): boolean;
   once(event: 'exit', listener: () => void): unknown;
 }
 
@@ -156,8 +156,10 @@ export interface StopOptions {
   platform?: NodeJS.Platform;
   /** How long to wait for the exit after the ask before forcing it. */
   timeoutMs?: number;
-  /** Windows' force-kill of the tree; a seam so a test can watch it without running `taskkill`. */
-  forceKill?: (pid: number) => void;
+  /** Windows' force-kill of the tree: true when the backend was ended. A seam for `node --test`. */
+  forceKill?: (pid: number) => Promise<boolean>;
+  /** Where a failed force-kill is reported; the console by default. */
+  log?: (message: string) => void;
 }
 
 /**
@@ -172,9 +174,8 @@ export function stopBackend(
   {
     platform = process.platform,
     timeoutMs = STOP_TIMEOUT_MS,
-    // Windows' force-kill: taskkill ends the backend and every process it spawned; no signals, no groups.
-    forceKill = (pid: number) =>
-      spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }),
+    forceKill = taskkill,
+    log = console.warn,
   }: StopOptions = {},
 ): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
@@ -187,8 +188,24 @@ export function stopBackend(
     // The backend stops when its stdin closes (STT_STOP_ON_STDIN_CLOSE=1, which startBackend sets there);
     // only a backend that outlives the wait is force-killed with its whole tree.
     child.stdin?.end();
+    const forceEnd = async (): Promise<void> => {
+      const pid = child.pid ?? 0;
+      let ended = false;
+      try {
+        ended = await forceKill(pid);
+      } catch (error) {
+        log(`taskkill failed for the backend (pid ${pid}): ${String(error)}`);
+      }
+      if (ended || child.exitCode !== null) return;
+      // taskkill is the only way to reach the tools it spawned; failing that, end the JVM at least.
+      log(`taskkill failed for the backend (pid ${pid}); ending the JVM directly`);
+      if (!child.kill()) {
+        log(`the backend (pid ${pid}) survived taskkill and kill(); not waiting longer`);
+        resolve();
+      }
+    };
     setTimeout(() => {
-      if (child.exitCode === null) forceKill(child.pid ?? 0);
+      if (child.exitCode === null) void forceEnd();
     }, timeoutMs);
     return promise;
   }
@@ -196,5 +213,17 @@ export function stopBackend(
   setTimeout(() => {
     if (child.exitCode === null) child.kill('SIGKILL');
   }, timeoutMs);
+  return promise;
+}
+
+/** Windows' force-kill: `taskkill /T /F` ends the backend and every process it spawned; false when it could not. */
+async function taskkill(pid: number): Promise<boolean> {
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const killer = spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  killer.once('error', () => resolve(false));
+  killer.once('exit', (code) => resolve(code === 0));
   return promise;
 }
