@@ -84,8 +84,9 @@ export function readyUrl(port: number): string {
 /**
  * Spawns the backend and returns { child, stop }. `stop` asks the backend to shut down
  * (its own lifecycle, item 26, stops whisper and ffmpeg after it) and waits for the JVM to
- * exit, SIGKILL after 10 s — no orphan JVM may survive the app. On Windows it ends the whole
- * tree with `taskkill /T /F`, since there are no signals.
+ * exit, SIGKILL after 10 s — no orphan JVM may survive the app. On Windows it closes the backend's
+ * stdin to ask, and ends the whole tree with `taskkill /T /F` only if the JVM outlives the wait,
+ * since there are no signals (see [stopBackend]).
  * `resourcesDir` is the packaged resources directory — see `resources()` above.
  * `models` holds the resolved model file paths — a user override, a Nix store file or the
  * verified file in the per-user cache (models.ts); they are the same `STT_*_MODEL` variables
@@ -123,34 +124,77 @@ export async function startBackend(
             LD_LIBRARY_PATH: `${toolsBin}${process.env.LD_LIBRARY_PATH ? `:${process.env.LD_LIBRARY_PATH}` : ''}`,
           }
         : {}),
+      // The graceful quit on Windows: [stopBackend] closes this pipe, and the backend stops when it ends.
+      ...(process.platform === 'win32' ? { STT_STOP_ON_STDIN_CLOSE: '1' } : {}),
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    // stdin is the graceful quit channel on Windows (closed by [stopBackend]); elsewhere nothing writes
+    // or reads it, so the pipe stays idle. A literal keeps `spawn`'s non-null stdout/stderr typing.
+    stdio: ['pipe', 'pipe', 'pipe'],
     // Windows would otherwise flash a console window for the backend.
     windowsHide: true,
   });
   child.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[backend] ${chunk}`));
   child.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[backend] ${chunk}`));
-  const stop = (): Promise<void> => {
-    const { promise, resolve } = Promise.withResolvers<void>();
-    if (child.exitCode !== null) {
-      resolve();
-      return promise;
-    }
-    child.once('exit', () => resolve());
-    if (process.platform === 'win32') {
-      // Windows has no signals: taskkill ends the backend and every tool it spawned, the tree
-      // the graceful SIGTERM path would otherwise stop (roadmap item 49's decision).
-      spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-      return promise;
-    }
-    child.kill('SIGTERM');
-    setTimeout(() => {
-      if (child.exitCode === null) child.kill('SIGKILL');
-    }, 10_000);
-    return promise;
-  };
+  const stop = (): Promise<void> => stopBackend(child);
   return { child, stop };
+}
+
+/** How long a quit waits after asking the backend to stop before it forces it. */
+const STOP_TIMEOUT_MS = 10_000;
+
+/** The parts of a spawned backend [stopBackend] needs; a seam so `node --test` can watch a stop without a process. */
+export interface StoppableChild {
+  readonly pid?: number;
+  readonly exitCode: number | null;
+  readonly stdin: { end(): void } | null;
+  kill(signal: NodeJS.Signals): boolean;
+  once(event: 'exit', listener: () => void): unknown;
+}
+
+export interface StopOptions {
+  /** Windows asks for the graceful stop by closing stdin; elsewhere SIGTERM is the ask. */
+  platform?: NodeJS.Platform;
+  /** How long to wait for the exit after the ask before forcing it. */
+  timeoutMs?: number;
+  /** Windows' force-kill of the tree; a seam so a test can watch it without running `taskkill`. */
+  forceKill?: (pid: number) => void;
+}
+
+/**
+ * Asks the backend to stop and waits for its exit, so no orphan JVM outlives the app (item 26's
+ * lifecycle stops whisper and ffmpeg inside it). On Windows there is no signal to send, so it closes
+ * the backend's stdin instead — the backend honours that only under `STT_STOP_ON_STDIN_CLOSE=1`, which
+ * [startBackend] sets there — and only force-kills the tree (`taskkill /T /F`) if the JVM outlives the
+ * wait. Elsewhere SIGTERM is the ask, SIGKILL the force.
+ */
+export function stopBackend(
+  child: StoppableChild,
+  {
+    platform = process.platform,
+    timeoutMs = STOP_TIMEOUT_MS,
+    // Windows' force-kill: taskkill ends the backend and every process it spawned; no signals, no groups.
+    forceKill = (pid: number) =>
+      spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }),
+  }: StopOptions = {},
+): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  if (child.exitCode !== null) {
+    resolve();
+    return promise;
+  }
+  child.once('exit', () => resolve());
+  if (platform === 'win32') {
+    // The backend stops when its stdin closes (STT_STOP_ON_STDIN_CLOSE=1, which startBackend sets there);
+    // only a backend that outlives the wait is force-killed with its whole tree.
+    child.stdin?.end();
+    setTimeout(() => {
+      forceKill(child.pid ?? 0);
+    }, timeoutMs);
+    return promise;
+  }
+  child.kill('SIGTERM');
+  setTimeout(() => {
+    if (child.exitCode === null) child.kill('SIGKILL');
+  }, timeoutMs);
+  return promise;
 }

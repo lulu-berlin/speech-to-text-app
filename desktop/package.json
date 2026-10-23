@@ -16,7 +16,7 @@
     "dist": "pnpm run build && node stage.ts && electron-builder --config electron-builder.yml --linux deb --x64",
     "dist:mac": "pnpm run build && node stage.ts && electron-builder --config electron-builder.yml --mac dmg --arm64",
     "dist:win": "pnpm run build && node stage.ts && electron-builder --config electron-builder.yml --win zip msi --x64",
-    "test": "prettier --check . && pnpm run typecheck",
+    "test": "prettier --check . && pnpm run typecheck && tsc -p tsconfig.test.json && node --test src/backend.test.ts",
     "format": "prettier --write ."
   },
   "devDependencies": {
