@@ -1,6 +1,13 @@
 # Continuous verification (roadmap item 51). Linux, macOS and Windows run on pushes to main and on
 # pull requests; the pinned tool versions come from the committed versions.json (the flake's pins,
 # item 33) through the shared toolchain actions in .github/actions/. No secrets.
+#
+# A pull request that changes only documentation still runs this workflow, so the required
+# `CI (all checks)` reports, but it skips every job that builds, tests or packages code: the
+# `changes` job decides once from the PR's diff (roadmap item 80). Documenting, feeding the queue
+# or editing the roadmap costs minutes instead of the full matrix. Every push, schedule and
+# dispatch run, a PR carrying the `ci:full` label, and a diff the comparison cannot read run
+# everything.
 name: CI
 
 on:
@@ -36,9 +43,46 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Whether this run builds code at all (roadmap item 80). A pull request whose diff is
+  # documentation only still runs this job, the docs check and the required aggregator,
+  # but skips every job that builds, tests or packages code. Everything else runs the whole matrix:
+  # every push, schedule and dispatch run, a PR carrying the `ci:full` label, and a diff this job
+  # cannot read (an empty or failed comparison must never be the reason a job is skipped).
+  changes:
+    name: Changes (code vs documentation)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.code.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # A pull request's base commit is not in a shallow clone, and the diff needs it.
+          fetch-depth: 0
+      - name: Decide whether code changed
+        id: code
+        env:
+          EVENT: ${{ github.event_name }}
+          FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ] || [ "$FORCE_FULL" = true ]; then
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! diff=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA"); then
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s\n' "$diff" | bash .github/classify-change.sh >> "$GITHUB_OUTPUT"
+
   backend-check:
     name: Linux (gradle check)
     runs-on: ubuntu-24.04
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -51,6 +95,8 @@ jobs:
   frontend-check:
     name: Linux (pnpm test, pnpm build)
     runs-on: ubuntu-24.04
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 20
     defaults:
       run:
@@ -80,11 +126,18 @@ jobs:
         run: node docs/check-exceptions.ts
       - name: node --test docs/check-exceptions.test.ts
         run: node --test docs/check-exceptions.test.ts
+      # The change filter's shape is pinned here because this job runs on every event, including
+      # the documentation-only pull requests the filter skips (roadmap item 80): a gate that
+      # dropped a heavy job or skipped itself would otherwise only show up as a silently unrun
+      # check on GitHub.
+      - name: node --test docs/check-ci-gating.test.mjs
+        run: node --test docs/check-ci-gating.test.mjs
 
   backend-integration:
     name: Linux (gradle integrationTest)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -102,7 +155,8 @@ jobs:
   e2e:
     name: Linux (e2e)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -127,11 +181,14 @@ jobs:
         run: ./gradlew e2e
 
   # macOS (roadmap item 48): Apple Silicon only — Apple and nixpkgs dropped Intel Macs. These jobs
-  # run on every push to main, every pull request, workflow dispatch and the nightly schedule.
+  # run on every push to main, every pull request that touches code, workflow dispatch and the
+  # nightly schedule; the `changes` gate skips them on a documentation-only pull request (item 80).
   # The Gradle tree is the human path (./gradlew); the Nix job is the flake/devenv verification.
   macos-backend-check:
     name: macOS (gradle check)
     runs-on: macos-15
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -142,6 +199,8 @@ jobs:
   macos-frontend-check:
     name: macOS (pnpm test, pnpm build)
     runs-on: macos-15
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 20
     defaults:
       run:
@@ -160,7 +219,8 @@ jobs:
 
   macos-backend-integration:
     name: macOS (gradle integrationTest)
-    needs: [macos-backend-check, macos-frontend-check]
+    needs: [changes, macos-backend-check, macos-frontend-check]
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -173,7 +233,8 @@ jobs:
 
   macos-e2e:
     name: macOS (e2e)
-    needs: [macos-backend-check, macos-frontend-check]
+    needs: [changes, macos-backend-check, macos-frontend-check]
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -196,7 +257,8 @@ jobs:
 
   macos-nix:
     name: macOS (Nix build + devenv)
-    needs: [macos-backend-check, macos-frontend-check]
+    needs: [changes, macos-backend-check, macos-frontend-check]
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -231,7 +293,8 @@ jobs:
   # against the app installed from that DMG. No Docker/Xvfb: macOS runs the window itself.
   macos-dmg:
     name: macOS (DMG + packaged e2e)
-    needs: [macos-backend-check, macos-frontend-check]
+    needs: [changes, macos-backend-check, macos-frontend-check]
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -471,6 +534,8 @@ jobs:
   windows-backend-check:
     name: Windows (gradle check)
     runs-on: windows-2025
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -485,6 +550,8 @@ jobs:
   windows-frontend-check:
     name: Windows (pnpm test, pnpm build)
     runs-on: windows-2025
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 20
     defaults:
       run:
@@ -510,7 +577,8 @@ jobs:
   windows-desktop-zip:
     name: Windows (packaged zip e2e)
     runs-on: windows-2025
-    needs: [windows-backend-check, windows-frontend-check]
+    needs: [changes, windows-backend-check, windows-frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -808,7 +876,8 @@ jobs:
   desktop-e2e:
     name: Linux (packaged .deb e2e)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -910,7 +979,8 @@ jobs:
   desktop-nix-e2e:
     name: Linux (flake package e2e)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -940,7 +1010,8 @@ jobs:
   desktop-bundle-e2e:
     name: Linux (bundle e2e)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
@@ -968,7 +1039,8 @@ jobs:
   nix-devenv:
     name: Linux (Nix devenv shell)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -992,7 +1064,8 @@ jobs:
   nix-flake-check:
     name: Linux (Nix flake check)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -1003,7 +1076,8 @@ jobs:
   nix-build:
     name: Linux (Nix build)
     runs-on: ubuntu-24.04
-    needs: [backend-check, frontend-check]
+    needs: [changes, backend-check, frontend-check]
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
       # The sources are required twice over: the toolchain's key step hashes flake.lock,
@@ -1037,13 +1111,15 @@ jobs:
 
   # The one required check for branch protection: it waits for every other job and fails when any of
   # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
-  # renaming a job cannot silently un-gate merges. `model-hosts` is the one deliberate exception
-  # (its own comment says why); a job absent from this list cannot gate merges. Every other job's
-  # name starts with the platform it targets (Linux, macOS, Windows); this one covers all of them,
-  # and branch protection requires it by this exact name, so it keeps it.
+  # renaming a job cannot silently un-gate merges. `changes` is in `needs` so the decision itself is
+  # reported; a documentation-only pull request reaches this job with every heavy job skipped and
+  # still goes green (roadmap item 80). `model-hosts` is the one deliberate exception (its own
+  # comment says why); a job absent from this list cannot gate merges. Every other job's name starts
+  # with the platform it targets (Linux, macOS, Windows); this one covers all of them, and branch
+  # protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
+    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

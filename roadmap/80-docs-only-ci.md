@@ -64,7 +64,7 @@ dispatch runs always run everything.
 
 ## Test list (approved 2026-10-23; behaviors only)
 
-- [ ] (CI) A pull request whose diff is documentation only skips every heavy job, runs
+- [x] (CI) A pull request whose diff is documentation only skips every heavy job, runs
       `Docs (exception policy)`, and `CI (all checks)` is green
 - [ ] (CI) A pull request touching one code path runs every heavy job (no skip)
 - [ ] (CI) Changes to `.github/`, `devenv.nix`, `flake.nix`, `versions.json` or
@@ -99,3 +99,9 @@ e2e (the reason is recorded here, as in item 65).
   `docs/`, `roadmap/`, `*.md` and `LICENSE` (build-affecting dotfiles are code); `codeql.yml` stays
   unchanged; empty/unknown diffs run everything. Test list approved as worded. Status:
   spec-approved.
+- 2026-10-23 (cycle 1, test-list item 1): red — `node --test docs/check-ci-gating.test.mjs`
+  failed at "`.github/classify-change.sh` exists: the changes job classifies its diff instead of
+  guessing" (no classifier, no `changes` job, no gate). Green after adding `.github/classify-change.sh`,
+  the `changes` job and `needs`/`if` on all 16 code jobs: 1 test passes, `actionlint` clean,
+  `node docs/check-links.mjs AGENTS.md` clean. The GitHub job list for a documentation-only PR is
+  pending the user's push.

@@ -1,0 +1,132 @@
+// The CI gating check (roadmap item 80): a documentation-only pull request must skip every job
+// that builds, tests or packages code, while the docs check and the required
+// `CI (all checks)` still run. The workflow's own runs are the proof on GitHub; this test pins the
+// shape locally and runs the classifier the `changes` job runs on real diffs. Run with
+// `node --test docs/check-ci-gating.test.mjs` from the repository root.
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+const workflowPath = join(repoRoot, '.github/workflows/ci.yml');
+const classifierPath = join(repoRoot, '.github/classify-change.sh');
+
+// Jobs that must run on every event. `changes` decides, `docs-check` is the cheap always-on
+// check, and `ci` is the required aggregator that reports the run's result.
+const UNGATED = new Set(['changes', 'docs-check', 'ci']);
+// Jobs that are gated by their own event instead: the manual assets (a dispatch with `assets`)
+// and the weekly model-host probe (a cron string); none of them is in the aggregator.
+const EVENT_GATED = new Set(['macos-whisper-asset', 'macos-ffmpeg-asset', 'windows-whisper-asset', 'model-hosts']);
+
+// The job ids of `.github/workflows/ci.yml`, with the job-level keys this check reads. The file is
+// parsed rather than loaded with a YAML library because the repository has none and this check
+// must run with only the Node the devenv pins.
+function parseJobs(text) {
+  const jobs = new Map();
+  let inJobs = false;
+  let current = null;
+  let pendingNeeds = false;
+  let blockIndent = -1;
+  for (const line of text.split('\n')) {
+    const indent = line.length - line.trimStart().length;
+    if (blockIndent >= 0) {
+      if (line.trim() === '' || indent > blockIndent) continue;
+      blockIndent = -1;
+    }
+    if (/^jobs:\s*$/.test(line)) {
+      inJobs = true;
+      continue;
+    }
+    if (!inJobs) continue;
+    const job = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if (job) {
+      current = { id: job[1], name: null, needs: [], if: null, raw: [] };
+      jobs.set(current.id, current);
+      pendingNeeds = false;
+      continue;
+    }
+    if (current === null) continue;
+    current.raw.push(line);
+    if (pendingNeeds && /^ {6}- \S/.test(line)) {
+      current.needs.push(line.replace(/^ {6}- /, '').trim());
+      continue;
+    }
+    if (indent !== 4) continue;
+    const key = /^ {4}([A-Za-z0-9_-]+):(.*)$/.exec(line);
+    if (key === null) continue;
+    const [, name, rest] = key;
+    const value = rest.trim().replace(/^(['"])(.*)\1$/, '$2');
+    pendingNeeds = false;
+    if (/^[|>]/.test(value)) {
+      blockIndent = 4;
+      continue;
+    }
+    if (name === 'name') current.name = value;
+    if (name === 'if') current.if = value;
+    if (name === 'needs') {
+      if (value.startsWith('[')) {
+        current.needs = value
+          .slice(1, -1)
+          .split(',')
+          .map((need) => need.trim())
+          .filter(Boolean);
+      } else if (value === '') {
+        pendingNeeds = true;
+      }
+    }
+  }
+  return jobs;
+}
+
+// The `code` value the `changes` job reads, from the classifier the job pipes its diff into.
+function classify(paths) {
+  assert.ok(
+    existsSync(classifierPath),
+    '.github/classify-change.sh exists: the changes job classifies its diff instead of guessing',
+  );
+  return execFileSync('bash', [classifierPath], { input: `${paths.join('\n')}\n`, encoding: 'utf8' }).trim();
+}
+
+test('a documentation-only pull request skips every heavy job and still reports the required check', () => {
+  assert.equal(
+    classify(['docs/decisions/0050-pr-merge-on-github.md', 'roadmap/80-docs-only-ci.md', 'README.md', 'LICENSE']),
+    'code=false',
+    'a diff of docs/, roadmap/, *.md and LICENSE is documentation only',
+  );
+
+  const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
+  assert.ok(jobs.has('changes'), 'the workflow decides code-vs-documentation once, in a changes job');
+  const changes = jobs.get('changes');
+  assert.match(changes.raw.join('\n'), /fetch-depth: 0/, 'the changes job fetches the base commit');
+  assert.match(
+    changes.raw.join('\n'),
+    /classify-change\.sh/,
+    'the changes job classifies the real diff with .github/classify-change.sh',
+  );
+
+  // The docs job is the always-on cheap check; item 49 renamed its display name to the platform
+  // prefix, so the job id is what the gate promises to leave alone.
+  assert.equal(jobs.get('docs-check')?.needs.length, 0, 'docs-check waits for nothing');
+  assert.equal(jobs.get('docs-check')?.if, null, 'docs-check runs even when no code changed');
+
+  for (const job of jobs.values()) {
+    if (UNGATED.has(job.id) || EVENT_GATED.has(job.id)) continue;
+    assert.ok(
+      job.needs.includes('changes'),
+      `${job.id} needs changes, so a documentation-only pull request can skip it`,
+    );
+    assert.equal(
+      job.if,
+      "needs.changes.outputs.code == 'true'",
+      `${job.id} runs only when the diff touches code`,
+    );
+  }
+
+  const ci = jobs.get('ci');
+  assert.equal(ci?.name, 'CI (all checks)', 'the required check keeps its name');
+  assert.ok(ci?.needs.includes('changes'), 'the aggregator waits for the decision');
+  assert.equal(ci?.if, 'always()', 'the aggregator reports even when the heavy jobs did not run');
+});
