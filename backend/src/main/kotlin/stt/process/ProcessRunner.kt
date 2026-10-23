@@ -120,8 +120,6 @@ class ProcessRunner internal constructor(
 
     /** Freezes the current run (SIGSTOP the whole tree), also when it is still spawning. No-op while no run is in flight. */
     override fun pause() {
-        // Windows has no signal that freezes a process: the pause gate stops the run before its next chunk.
-        if (!platform.signals) return
         synchronized(runLock) {
             if (!inFlight) return
             paused = true
@@ -131,7 +129,6 @@ class ProcessRunner internal constructor(
 
     /** Unfreezes the current run (SIGCONT the whole tree). No-op while no run is in flight. */
     override fun resume() {
-        if (!platform.signals) return
         synchronized(runLock) {
             paused = false
             currentTree?.resume()
