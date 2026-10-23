@@ -639,7 +639,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   `Linux (bundle e2e)` and the Nix jobs shared the 4-core runner); attempt 2 (re-run failed jobs) is
   green — `Linux (e2e)` passed all 41, and every other job of the run (including `Windows (gradle
   check)` and `Windows (packaged zip e2e)` with the MSI spec and the installed-app specs 01–04)
-  succeeded. Recorded as a LOW known issue (contention cascade, not a code defect). The Ctrl-C item,
+  succeeded, and the run finished `success`. Recorded as a LOW known issue (contention cascade,
+  not a code defect). The Ctrl-C item,
   the per-machine MSI item and "(must not break)" are ticked on that run; status: in-review.
   Still to file by the root agent: a new roadmap item for a full e2e journey on Windows (CI runs only
   the packaged specs; the 41-test journey is Linux/macOS today); see the draft in the session log.
