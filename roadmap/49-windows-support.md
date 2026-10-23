@@ -586,3 +586,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   spec skips on Linux, so no local red or green. Planned red: the same scan pointed at the per-user
   directory, where the exe exists, on the Windows guest or in a CI run. Commit `056afab1`.
   Ticks with a reported Windows run.
+- 2026-10-23: finding 4 implemented as decided (remove): `pnpmExe` and `appEnv()`'s pnpm PATH entry
+  now use npm's global layout (`pnpm/pnpm-v<version>` on Windows, its `bin/` elsewhere), and
+  `e2e`/`e2eInstall`/`e2eBrowsers` throw at execution time on Windows with a pointer to the packaged
+  app's e2e. The README's Windows section states that boundary. `gradle help`, `e2eInstall --dry-run`,
+  `gradle check`, frontend and docs checks green; the Windows message itself can only be observed on
+  the guest. Commit `6709af2d`.
