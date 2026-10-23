@@ -161,7 +161,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-22, user-approved) A whisper-cli whose shared library is missing is a
       `LaunchFailed` probe outcome, not `0 GPU(s)`: Linux `ld.so` prints `error while loading shared
       libraries` and exits 127; macOS `dyld` prints `Library not loaded` and aborts (SIGABRT)
-- [ ] (discovered, 2026-10-23, from the root review) On Windows a bare tool name resolves through the
+- [x] (discovered, 2026-10-23, from the root review) On Windows a bare tool name resolves through the
       PATH variable whatever its spelling (`Path`, `PATH`)
 - [ ] (discovered, 2026-10-23, from the root review) A tool that exits while the backend is stopping
       leaves its task RUNNING for restart recovery, not FAILED, on every platform; on Windows a console
@@ -433,3 +433,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   MSI check; the refactors (dead `pause()`/`resume()` returns, `require(platform.signals)` in
   `ProcessTree`, `TestEngine`'s Windows-only `!Files.exists`, the bounded README section, the pause
   spec's wait for whisper-cli to be gone), each offered at a checkpoint.
+- 2026-10-23: review cycle 1 (PATH spelling) green. Red: `ProcessRunnerWindowsSpec`'s new case, a
+  Windows env of `mapOf("Path" to …)`, failed with `ExecutableNotFoundException: Executable not
+  found: ffmpeg` (`ProcessRunner.kt:166`). Green: `searchPath()` matches the variable's name
+  ignoring case on Windows and keeps the exact `PATH` lookup elsewhere; `gradle check` and
+  `gradle integrationTest` (80 Integration tests) green. Ticked; the Windows-only observation
+  follows with the next CI run or the guest. Commit `9165c8c5`.
