@@ -171,8 +171,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-23, user-approved) On macOS, a tool's SIGINT exit (130, a terminal Ctrl-C
       that reaches the tool's process group) counts as a stopped tool, so its task is left for recovery
 - [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) Started with
-      `STT_STOP_ON_STDIN_CLOSE=1`, the backend stops once its stdin closes; without the variable it
-      ignores stdin
+      `STT_STOP_ON_STDIN_CLOSE=1`, the backend stops once its stdin closes
+- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) Without
+      `STT_STOP_ON_STDIN_CLOSE`, closing the backend's stdin leaves it running and serving
 - [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows the desktop quit
       closes the backend's stdin and force-kills the tree only if the backend has not exited within
       10 s
@@ -513,3 +514,12 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   treated as a close). `gradle check` (354 tests), `gradle integrationTest` (401, 80 executed),
   frontend and docs checks green. Commit `0e1a3cb1`. Not ticked: the item's "without the variable it
   ignores stdin" half is untested — proposed as its own test at the checkpoint.
+- 2026-10-23: checkpoint after review cycle 5 (user: refactor, split, confirm the next test).
+  Approved refactor `a815aa5c`: `stt/BackendProcess.kt` (`startBackend`, `awaitServing`, `freePort`)
+  replaces the duplicated JVM spawn in `StopOnStdinCloseIntegrationSpec` and the private helpers in
+  `UpgradeCrashScratchIntegrationSpec`; both specs pass (1 test each), `gradle check` (354) and
+  `gradle integrationTest` green, frontend and docs checks green (a first frontend run flaked with
+  three 5 s timeouts while the Gradle run held the machine; the re-run passed 177/177). The
+  stdin-close item is split: the test-list line for the flag remains, and a new line pins the
+  negative — without the variable, closing stdin leaves the backend running and serving. Next test:
+  the negative.
