@@ -92,8 +92,8 @@ test('a documentation-only pull request skips every heavy job and still reports 
   assert.match(changes.raw.join('\n'), /fetch-depth: 0/, 'the changes job fetches the base commit');
   assert.match(
     changes.raw.join('\n'),
-    /classify-change\.sh/,
-    'the changes job classifies the real diff with .github/classify-change.sh',
+    /decide-code-change\.sh/,
+    'the changes job decides from the real diff with .github/decide-code-change.sh',
   );
 
   // The docs job is the always-on cheap check; item 49 renamed its display name to the platform

@@ -110,3 +110,8 @@ e2e (the reason is recorded here, as in item 65).
   documentation; the test pins that one Kotlin path (alone and among docs) reports `code=true` and
   that every heavy job's only `if` is the `changes` output. 2 tests pass, `actionlint` clean.
   GitHub proof: this branch's own PR (its diff touches `.github/`) must show every heavy job run.
+- 2026-10-23 (refactor, approved): the `changes` step's shell moved to
+  `.github/decide-code-change.sh` (event, `ci:full`, diff, unreadable-diff fallback), so items 4
+  and 5 can execute the decision instead of pinning YAML text; the workflow step is now one call.
+  Smoke on temp repos: docs-only PR `code=false`; code PR, docs + `ci:full`, push, schedule, empty
+  diff and unknown base all `code=true`. 2 tests pass, `actionlint` clean, AGENTS links resolve.
