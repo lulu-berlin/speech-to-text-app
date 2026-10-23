@@ -32,6 +32,14 @@ class FakeBackend implements StoppableChild {
   }
 }
 
+/** A Windows force-kill that records the pids it was asked for and reports that it ended them. */
+function forceKills(forced: number[]): (pid: number) => Promise<boolean> {
+  return async (pid) => {
+    forced.push(pid);
+    return true;
+  };
+}
+
 test('on Windows the quit closes the backend stdin and force-kills only after the wait', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
@@ -41,10 +49,7 @@ test('on Windows the quit closes the backend stdin and force-kills only after th
     const stopping = stopBackend(backend, {
       platform: 'win32',
       timeoutMs: 10_000,
-      forceKill: async (pid) => {
-        forced.push(pid);
-        return true;
-      },
+      forceKill: forceKills(forced),
     });
 
     assert.equal(backend.stdin.ended, true, 'the graceful ask is the closed stdin');
@@ -70,10 +75,7 @@ test('on Windows the quit never force-kills a backend that is already gone', asy
     const stopping = stopBackend(exiting, {
       platform: 'win32',
       timeoutMs: 10_000,
-      forceKill: async (pid) => {
-        forcedAfterExit.push(pid);
-        return true;
-      },
+      forceKill: forceKills(forcedAfterExit),
     });
     exiting.exit();
     await stopping;
@@ -87,10 +89,7 @@ test('on Windows the quit never force-kills a backend that is already gone', asy
     await stopBackend(exited, {
       platform: 'win32',
       timeoutMs: 10_000,
-      forceKill: async (pid) => {
-        forcedBefore.push(pid);
-        return true;
-      },
+      forceKill: forceKills(forcedBefore),
     });
     assert.equal(exited.stdin.ended, false, 'nothing is asked of a gone backend');
     mock.timers.tick(10_000);
