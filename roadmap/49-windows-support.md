@@ -163,10 +163,13 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       libraries` and exits 127; macOS `dyld` prints `Library not loaded` and aborts (SIGABRT)
 - [x] (discovered, 2026-10-23, from the root review) On Windows a bare tool name resolves through the
       PATH variable whatever its spelling (`Path`, `PATH`)
-- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) A tool that exits while the
-      backend is stopping leaves its task RUNNING for restart recovery, not FAILED, on every platform
+- [x] (discovered, 2026-10-23, from the root review; split and reworded 2026-10-23) A tool that exits
+      while the backend is stopping never fails its task: the task goes back to the queue or stays
+      RUNNING for restart recovery, on every platform
 - [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows, a tool's console
       Ctrl-C exit (`0xC000013A`) counts as a stopped tool, so its task is left for recovery
+- [ ] (discovered, 2026-10-23, user-approved) On macOS, a tool's SIGINT exit (130, a terminal Ctrl-C
+      that reaches the tool's process group) counts as a stopped tool, so its task is left for recovery
 - [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit stops the backend
       gracefully first and force-kills the tree only after a bounded wait
 - [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
@@ -459,3 +462,11 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   that cancellation into QUEUED while its coroutine is still active (item 42's requeue) and leaves
   RUNNING only once the engine itself is cancelled, so the item's "leaves its task RUNNING" is
   narrower than the behaviour; a rewording is proposed at the checkpoint.
+- 2026-10-23: checkpoint after review cycle 2 (user: refactor 1, defer 2, add the discovered
+  scenario, go on). The stopping-flag item is reworded to the behaviour — never FAILED; back to the
+  queue, or RUNNING for restart recovery — and ticked on cycle 2's evidence. Discovered and
+  appended: on macOS (no `setsid`, so tools share the terminal's process group) a terminal Ctrl-C
+  can kill whisper-cli with SIGINT (exit 130) before the JVM's shutdown hook sets the flag; an
+  inference from the code, not reproduced. Approved refactor: one shared exited-process test fake
+  for the `stt.process` specs. Deferred: merging the exit-interruption checks into one function,
+  to be offered again after the exit-code cycles.
