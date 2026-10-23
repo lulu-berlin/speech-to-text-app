@@ -602,3 +602,33 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   is left before its stability window (shared `runningTools()` in `AwaitUntil.kt`, also used by the
   cancel spec), which needs a guest `integrationTest` run to observe on Windows. Gates after each:
   `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build`, the docs checks, `actionlint`.
+- 2026-10-23: root review round 3 on the rebased branch (HEAD `b2cca36b`): the rebase kept both
+  items' work (`stage.ts`, `nix/versions.nix`, `ci.yml`, `build.gradle.kts`, `docs/known-issues.md`);
+  four findings, all handled. Root's gate runs on `b2cca36b`: `gradle test --rerun-tasks`,
+  `gradle integrationTest --rerun-tasks`, vitest 177, desktop `node --test` 3, `actionlint`,
+  `check-readme-windows` and `check-exceptions` — all green. CI run #220 (`1c1c312a`) was cancelled
+  and superseded.
+  - Finding 1 (MED): the per-machine assertion ran after the 180 s per-user wait, so a per-machine
+    regression surfaced only as a timeout. It now runs straight after `install(msi)` (msiexec is
+    synchronous), before the wait; `installedUnderProgramFiles` checks electron-builder's per-machine
+    layout directly (`<Program Files>\stt-app` and `<Program Files>\Speech-to-Text`), which also fixes
+    the earlier recursive PowerShell scan that timed out on the runner. Commit `7b7e4676` (the scan
+    fix is `b2cca36b`). Red evidence for the per-machine failure itself is still pending a guest run
+    with the assertion pointed at the per-user directory, as planned.
+  - Finding 2 (MED): the Windows graceful-quit wiring had no test. `backendStopEnv(platform)` and
+    `backendStdio(platform)` now name the decision, `startBackend` uses both, and
+    `desktop/src/backend.test.ts` asserts win32 vs linux/darwin. Red: the test failed on the missing
+    export. Commit `32692b15` (5 tests, then 6 with the verdict test).
+  - Finding 3 (MED): the pause spec's "no whisper-cli left" wait could never hold where signals exist
+    (the tool is SIGSTOPped, still a live descendant), so Linux/macOS paid its 2-minute deadline. It
+    is gated on `!ProcessPlatform.current().signals`. Commit `5cb3b0cf`. With
+    `gradle check integrationTest --rerun-tasks`, the pair took 4m25s (goal: drop from the root's
+    4m57s integration run) and is green.
+  - Finding 4 (LOW): `EngineModule`'s subscription has `markStopping` and `StoppingFlagSpec` raises
+    `ApplicationStopPreparing` on a test application (`3ba49bd9`); the fake's never-written signal list
+    is gone (`3b2820a7`); the stdin-close negative case passes no override and `ConfigSpec` pins the
+    default (`eeda8dbf`); the `taskkill` verdict is `taskkillEnded(code)` with a test, the `/pid /T /F`
+    arguments stay in the spawner (`af4dfdaf`).
+  Gates after the round: `gradle check` (359 tests) and `gradle integrationTest` (406, 324 skipped,
+  82 executed) with `--rerun-tasks`, all green; desktop `tsc` ×3, Prettier and `node --test` 6; e2e
+  `tsc`/Prettier; frontend vitest 177, build; docs checks and `actionlint`.
