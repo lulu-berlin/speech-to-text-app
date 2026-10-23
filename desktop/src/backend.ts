@@ -2,7 +2,12 @@
 // the bundled JRE + installDist lib/ with the app's environment, wait for /api/health, and
 // stop cleanly (SIGTERM, then SIGKILL after 10 s). Separated from main.ts so the app wiring
 // and the process orchestration stay reviewable on their own.
-import { type ChildProcess, spawn } from 'node:child_process';
+import {
+  type ChildProcess,
+  type ChildProcessWithoutNullStreams,
+  type StdioOptions,
+  spawn,
+} from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createServer, type AddressInfo } from 'node:net';
 import { homedir } from 'node:os';
@@ -125,14 +130,14 @@ export async function startBackend(
           }
         : {}),
       // The graceful quit on Windows: [stopBackend] closes this pipe, and the backend stops when it ends.
-      ...(process.platform === 'win32' ? { STT_STOP_ON_STDIN_CLOSE: '1' } : {}),
+      ...backendStopEnv(),
     },
     // stdin is the graceful quit channel on Windows (closed by [stopBackend]); elsewhere nothing writes
     // or reads it, so the pipe stays idle. A literal keeps `spawn`'s non-null stdout/stderr typing.
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: backendStdio(),
     // Windows would otherwise flash a console window for the backend.
     windowsHide: true,
-  });
+  }) as ChildProcessWithoutNullStreams;
   child.stdout.on('data', (chunk: Buffer) => process.stdout.write(`[backend] ${chunk}`));
   child.stderr.on('data', (chunk: Buffer) => process.stderr.write(`[backend] ${chunk}`));
   const stop = (): Promise<void> => stopBackend(child);
@@ -226,4 +231,22 @@ async function taskkill(pid: number): Promise<boolean> {
   killer.once('error', () => resolve(false));
   killer.once('exit', (code) => resolve(code === 0));
   return promise;
+}
+
+/**
+ * The backend's environment on [platform]: Windows has no signal to stop it with, so the desktop quits it
+ * by closing its stdin, which the backend honours only under this switch (roadmap item 49).
+ */
+export function backendStopEnv(
+  platform: NodeJS.Platform = process.platform,
+): Record<string, string> {
+  return platform === 'win32' ? { STT_STOP_ON_STDIN_CLOSE: '1' } : {};
+}
+
+/**
+ * The stdio of a spawned backend on [platform]: Windows' stdin is the quit pipe [stopBackend] closes; elsewhere
+ * nothing writes or reads it. Both pipe stdout and stderr, so the child's streams are never null.
+ */
+export function backendStdio(platform: NodeJS.Platform = process.platform): StdioOptions {
+  return platform === 'win32' ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'];
 }
