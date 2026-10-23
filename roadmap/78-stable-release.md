@@ -5,8 +5,9 @@ Depends on: [49](49-windows-support.md), [52](52-edit-transcription.md),
 [65](65-row-color-chunking-observation.md), [68](68-windows-audio-only-ffmpeg.md),
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](72-frontend-state-and-errors.md),
 [74](74-desktop-presentation.md), [76](76-right-to-left-transcription.md),
-[77](77-upload-spec-shared-temp-dir.md) — the gates proposed below — and the six MED known issues
-listed under Evidence, which no roadmap item handles today
+[77](77-upload-spec-shared-temp-dir.md), [79](79-full-e2e-journey-on-windows.md) — the gates
+proposed below — and the six MED known issues listed under Evidence, which no roadmap item handles
+today
 Blocks: —
 
 ## Goal
@@ -65,6 +66,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 75 Retire the Python oracle | draft | after 1.0 | docs-only |
 | 76 Right-to-left transcription | draft | **yes** | correctness for scripts the app already accepts |
 | 77 Upload spec shared temp dir | in progress | **yes** | a `macOS (gradle check)` flake undermines release verification |
+| 79 Full e2e journey on Windows | draft | **yes** | 1.0 claims Windows support; the journey is the only suite not run there (item 49 covers the packaged specs only) |
 
 ### Known issues a stable release must close (MED; planned by this item)
 
@@ -128,7 +130,7 @@ the e2e ffmpeg WAV-muxer issue (recorded on branch 52). Both must be closed befo
 ## Decided (consultation, 2026-10-23)
 
 - **Gates**: the in/after split proposed above is approved as written: in 1.0 are 49, 52, 65, 68,
-  69, 72, 74, 76, 77 and the six MED known issues; after 1.0 are 54, 66, 67, 70, 71, 73, 75.
+  69, 72, 74, 76, 77, 79 and the six MED known issues; after 1.0 are 54, 66, 67, 70, 71, 73, 75.
 - **Signing**: Windows ships through the **Microsoft Store** as an MSIX (Microsoft signs it; the zip
   and MSI stay unsigned direct downloads), per ADR 0060. No subscription; the one-time Store
   registration fee is accepted. The **macOS DMG stays unsigned** — Developer ID and notarization
@@ -199,3 +201,6 @@ the e2e ffmpeg WAV-muxer issue (recorded on branch 52). Both must be closed befo
   never prompts (no quarantine attribute). There are no signing secrets. ADR 0060 retitled and
   rewritten; the notarization scenarios replaced by the bypass-documentation check. Test list: 11
   items.
+- 2026-10-23 (the user): roadmap item 79 — the full e2e journey on Windows — is added as a 1.0 gate
+  and to this item's dependencies, since 1.0 claims Windows support and the journey is the only
+  suite not run there.

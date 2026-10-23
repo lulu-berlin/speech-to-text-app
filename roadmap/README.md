@@ -149,6 +149,11 @@ graph TD
   74 --> 78
   76 --> 78
   77 --> 78
+  79[79 full e2e journey on Windows]
+  21 --> 79
+  49 --> 79
+  51 --> 79
+  79 --> 78
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -233,4 +238,5 @@ graph TD
 | [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | draft         | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | draft         | —                           |
 | [77 — `UploadStoredInDatabaseSpec` fails when another process writes to the shared temp dir](77-upload-spec-shared-temp-dir.md)                                     | spec-approved | —                           |
-| [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77 |
+| [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |
+| [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | draft         | 21, 49, 51                  |
