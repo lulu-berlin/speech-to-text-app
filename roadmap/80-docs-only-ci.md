@@ -153,11 +153,22 @@ e2e (the reason is recorded here, as in item 65).
   `success` + `skipped` stays green, `failure` and `cancelled` redden it, and the job-level
   `if: always()` keeps it scheduled. 8 tests pass; `actionlint`, the links check and the whole test
   file were re-run before this line. All test-list items ticked; Status: in-review.
-- 2026-10-23 (GitHub evidence — pending, no run observed): the branch is not pushed. Needed before
-  the item is complete: (1) this branch's PR — a code diff, so `changes` must report `code=true` and
-  every heavy job must run; (2) a documentation-only PR — `Changes`, `Docs (exception policy)` and
-  `CI (all checks)` only, every heavy job skipped, aggregator green; (3) the same PR with the
-  `ci:full` label — the full matrix. Run ids and job names go here once the user supplies them.
+- 2026-10-23 (GitHub evidence 1 — documentation-only PR): run
+  [40040260117](https://github.com/lulu-berlin/speech-to-text-app/actions/runs/40040260117),
+  PR #58 `docs/80-proof` → base `roadmap/80-docs-only-ci` (`32af1224`), head `00fe1c0f`
+  (`docs/ci-gating-proof.md` only). The run finished `success` in 40 s with 26 jobs: scheduled and
+  green were `Changes (code vs documentation)`, `Linux (docs exception policy)` and
+  `CI (all checks)`. Twenty-three jobs were skipped: `Linux (gradle check)`, `Linux (pnpm test,
+  pnpm build)`, `Linux (gradle integrationTest)`, `Linux (e2e)`, `Linux (packaged .deb e2e)`,
+  `Linux (flake package e2e)`, `Linux (bundle e2e)`, `Linux (Nix devenv shell)`,
+  `Linux (Nix flake check)`, `Linux (Nix build)`, `macOS (gradle check)`, `macOS (pnpm test, pnpm
+  build)`, `macOS (gradle integrationTest)`, `macOS (e2e)`, `macOS (Nix build + devenv)`,
+  `macOS (DMG + packaged e2e)`, `Windows (gradle check)`, `Windows (pnpm test, pnpm build)`,
+  `Windows (packaged zip e2e)`, the three manual assets and `Linux (pinned model hosts resolve)`.
+  Skipped needs left `CI (all checks)` green (test-list items 1 and 7 observed on GitHub). A
+  superseded run on the code PR, [40039773631](https://github.com/lulu-berlin/speech-to-text-app/actions/runs/40039773631),
+  was cancelled mid-flight and its aggregator correctly failed on `cancelled` — the other half of
+  item 7. The code PR's full-matrix run and the `ci:full` run are recorded separately.
 - 2026-10-23 (rebase onto `main` after item 49): resolved `ci.yml` keeping both changes — the three
   Windows jobs (`windows-backend-check`, `windows-frontend-check`, `windows-desktop-zip`) carry
   `needs: [changes]` and the gate, `windows-desktop-zip` keeps its two Windows dependencies, the
