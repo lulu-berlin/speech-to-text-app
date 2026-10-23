@@ -1,6 +1,6 @@
 # 49 — Windows support
 
-Status: in-review
+Status: in-progress
 Depends on: [33](../docs/specs/gradle-bootstrap.md) (done; the no-Nix path), [48](../docs/specs/macos-support.md) (done; its portable process-control seam is the foundation), [51](../docs/specs/ci-verification.md) (done; a Windows CI runner verifies — local virtualization is the fallback), [50](../docs/specs/electron-desktop-app.md) (done; the Linux desktop app and its packaged specs, which the Windows packaged-app item extends)
 Blocks: —
 
@@ -396,3 +396,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   after the start). The Windows path ends before the Linux bundle job (13:55) and macOS e2e, so the
   gate change does not lengthen the run. Item ticked; every test-list item is ticked. Status:
   in-review.
+- 2026-10-23: returned from the root agent's review with seven findings (case-sensitive `Path`
+  lookup on Windows; the decided known-stopped-by-us flag not implemented; the Windows desktop
+  `stop()` neither observes nor escalates `taskkill`; the Windows pnpm path in `build.gradle.kts`;
+  untested Windows branches and dead guards; a tautological MSI assertion and an unbounded README
+  section check; an unpinned Vulkan SDK action and a wrong `versions.nix` comment). Status:
+  in-progress.
