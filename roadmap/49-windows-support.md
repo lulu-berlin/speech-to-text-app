@@ -181,7 +181,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       within a bound even when `taskkill` fails, and the failure is logged
 - [x] (discovered, 2026-10-23, from the root review) On Windows a cancelled run destroys its direct
       child and waits for it, bounded, without signals
-- [ ] (discovered, 2026-10-23, from the root review) A whisper-cli with an invalid image
+- [x] (discovered, 2026-10-23, from the root review) A whisper-cli with an invalid image
       (`0xC000007B`) and a macOS `dyld` `Library not loaded` are both a `LaunchFailed` probe outcome
 - [ ] (discovered, 2026-10-23, from the root review) The MSI spec fails when an installed
       `Speech-to-Text.exe` exists under `%ProgramFiles%` or `%ProgramFiles(x86)%`
@@ -571,3 +571,10 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   cycle): `expected:<true> but was:<false>` on `child.destroyed`. `gradle check` (355 tests),
   `gradle integrationTest` (402, 82 executed), frontend and docs checks green. Commit `f6fc4a78`.
   Item ticked.
+- 2026-10-23: review cycle 11 (loader codes) green. Two cases added to
+  `DeviceProbeLoadFailureSpec`: `STATUS_INVALID_IMAGE_FORMAT` (`0xC000007B`) on Windows, and a macOS
+  `dyld` "Library not loaded" (exit 134). Green on arrival — the mapping already existed — so the red
+  was recorded by temporarily removing the `STATUS_INVALID_IMAGE_FORMAT` branch and the
+  "Library not loaded" line (backup restored in the same cycle): both cases failed with
+  `Probed(gpus=[]) is of type … but expected … LaunchFailed`. `gradle check`, `gradle integrationTest`,
+  frontend and docs checks green. Commit `9878c70a`. Item ticked.
