@@ -189,6 +189,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       e2e stay green (re-run after the review findings)
 - [x] (discovered, 2026-10-23, from PR #46's CI) The paused-time check binds to the audio element's
       playback position, not to a display read taken before the last update.
+- [x] (discovered, 2026-10-23, from CI #223/#239) The first pause after a backend start answers as
+      fast as later ones: libc is not loaded inside the request.
 
 ## Acceptance criteria
 
@@ -660,3 +662,21 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   Green: the spec alone against the real backend (`gradle run`, devenv whisper-cli/ffmpeg) 5 of 5
   runs, 34.1-35.1 s each. The MED known-issues row is narrowed to the remaining fixed-sleep finding
   (LOW); the paused-time race leaves the backlog with this item.
+- 2026-10-23: discovered cycle (first pause loads libc) green, user-approved. Run #239 (`5f58bb60`):
+  `macOS (e2e)` green (confirms the paused-time fix), every job green except `Linux (e2e)`, which failed
+  first at `40-atomic-transitions.spec.ts:46` and then 13 specs on a queue that never drained — the same
+  signature as #223 attempt 1. Not load: specs 1-19 ran at normal speed, each GitHub-hosted job has its
+  own VM, and the backend logged no completion after the spec started. Cause, reproduced locally: the
+  backend publishes PAUSED before `pauseTask` freezes the run and answers, and the row action machine
+  drops an `ACTIVATE` while a command is in flight, so a Resume clicked before the pause request answers
+  is lost and the task stays PAUSED (a resume sent to the API then answered 200 in 18-70 ms and the task
+  ran on). `1c1c312a` made libc load on the first signal, i.e. inside the first pause request after a
+  backend start (`17-settings` restarts it right before this spec): first `POST /pause` 106-141 ms on
+  the branch vs 20-25 ms on the base `d47e5149`. Red: CI #239 `Linux (e2e)`, #223 attempt 1, and 4 of 6
+  local subset runs. Green: `ProcessTree` binds `LibC.INSTANCE::kill` when the tree is built (at spawn,
+  as on `main`; Windows never builds a tree since `ac755b72`): first pause 29-32 ms, `40-atomic-transitions`
+  alone 10 of 10, the 40/41/42 subset 3 of 3, the full local e2e 40 passed + 1 skipped (8.0 m),
+  `gradle check integrationTest` (359 unit, 406 integration / 324 skipped, 0 failures), e2e `tsc` and
+  Prettier, docs checks and `actionlint`. Known issues: the LOW "contention" row from round 3 named the
+  wrong cause and is removed; the pre-existing dropped-click race (~20 ms window on `main`) is a new MED
+  Frontend row for its own roadmap item.
