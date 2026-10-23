@@ -191,6 +191,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       playback position, not to a display read taken before the last update.
 - [x] (discovered, 2026-10-23, from CI #223/#239) The first pause after a backend start answers as
       fast as later ones: libc is not loaded inside the request.
+- [x] (discovered, 2026-10-23, from #47's Windows job) A runner built for a platform that is not the
+      host's never loads libc, and a runner on a host with signals loads it once, outside any request.
 
 ## Acceptance criteria
 
@@ -680,3 +682,19 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   Prettier, docs checks and `actionlint`. Known issues: the LOW "contention" row from round 3 named the
   wrong cause and is removed; the pre-existing dropped-click race (~20 ms window on `main`) is a new MED
   Frontend row for its own roadmap item.
+- 2026-10-23: discovered cycle (libc only where the host has signals), user-approved; it fixes my own
+  regression. Red: PR #47's run #249, job `Windows (gradle check)` 120651073659 —
+  `ProcessRunnerPlatformSpec.kt:114` `UnsatisfiedLinkError` at `:67-68`, `ProcessRunnerStoppingSpec.kt:68`
+  `NoClassDefFoundError` -> `ExceptionInInitializerError` at `NativeLibrary.java:325`; locally the new spec
+  did not compile (`No parameter with name 'loadLibc' found`). Cause: `a438153a` made `ProcessTree`'s
+  default `kill` a method reference (`LibC.INSTANCE::kill`), evaluated when the tree is built; the Windows
+  job builds a tree from a Darwin platform on a Windows host, where libc does not exist. Before that, the
+  lambda deferred the load to the first signal and those specs never signal. Green: the lazy lambda is
+  restored, and `ProcessRunner` takes a `loadLibc` seam and calls it in `init` only when
+  `ProcessPlatform.current().signals` — the host, not the injected platform. New `ProcessRunnerLibcSpec`
+  (a foreign platform loads 0 times on a host without signals and once where the host has them; a host
+  with signals loads once at construction, and pausing loads nothing more), 2 of 2; platform spec 4 of 4,
+  stopping spec 2 of 2; `gradle check integrationTest --rerun-tasks` 361 unit and 408 integration
+  (326 skipped), 0 failures; the first `POST /pause` after a backend start 29.8-30.7 ms (three fresh
+  backends), so the #223/#239 wiring stays fixed; docs checks and `actionlint`. Windows is the proof:
+  PR #47's `Windows (gradle check)` on the next run.

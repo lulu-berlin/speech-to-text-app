@@ -24,6 +24,8 @@ class ProcessRunner internal constructor(
     private val platform: ProcessPlatform = ProcessPlatform.current(),
     /** Whether the backend is stopping (the known-stopped-by-us flag, item 49). */
     private val stopping: () -> Boolean = { false },
+    /** Loads libc, the `kill(2)` library; a seam so a test can count the loads. */
+    private val loadLibc: () -> Unit = { LibC.INSTANCE },
     /** Starts the built process. A seam so tests can act inside the spawn window (ADR 0020). */
     private val startProcess: (ProcessBuilder) -> Process,
 ) : ProcessControl {
@@ -32,6 +34,13 @@ class ProcessRunner internal constructor(
         gracePeriod: Duration = 2.seconds,
         stopping: () -> Boolean = { false },
     ) : this(gracePeriod, stopping = stopping, startProcess = ProcessBuilder::start)
+
+    init {
+        // Roadmap item 49 (PR #47's Windows job): libc exists only where the host has signals, and the host decides,
+        // not [platform] — a runner built for Darwin on Windows is still a Windows process. Loading it here, at
+        // construction, keeps the JNA load out of the first pause request (CI #223/#239).
+        if (ProcessPlatform.current().signals) loadLibc()
+    }
 
     /**
      * Guards the per-run state ([inFlight], [currentTree], [paused]). Registering a tree and applying
