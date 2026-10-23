@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-import { backendStdio, backendStopEnv, stopBackend, type StoppableChild } from './backend.ts';
+import {
+  backendStdio,
+  backendStopEnv,
+  stopBackend,
+  taskkillEnded,
+  type StoppableChild,
+} from './backend.ts';
 
 /** A backend process double: records what a stop does to it, and [exit] ends it as a real exit would. */
 class FakeBackend implements StoppableChild {
@@ -136,4 +142,11 @@ test('on Windows the backend stdin is the quit pipe, elsewhere it is ignored', (
   assert.equal(backendStdio('win32')[0], 'pipe');
   assert.equal(backendStdio('linux')[0], 'ignore');
   assert.equal(backendStdio('darwin')[0], 'ignore');
+});
+
+test('a taskkill exit code says whether the tree was ended', () => {
+  assert.equal(taskkillEnded(0), true);
+  assert.equal(taskkillEnded(1), false);
+  assert.equal(taskkillEnded(128), false);
+  assert.equal(taskkillEnded(null), false);
 });

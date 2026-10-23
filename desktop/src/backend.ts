@@ -222,6 +222,11 @@ export function stopBackend(
 }
 
 /** Windows' force-kill: `taskkill /T /F` ends the backend and every process it spawned; false when it could not. */
+/** Whether a `taskkill` run ended the backend: only exit code 0 is success. A test pins the verdict. */
+export function taskkillEnded(code: number | null): boolean {
+  return code === 0;
+}
+
 async function taskkill(pid: number): Promise<boolean> {
   const { promise, resolve } = Promise.withResolvers<boolean>();
   const killer = spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {
@@ -229,7 +234,7 @@ async function taskkill(pid: number): Promise<boolean> {
     windowsHide: true,
   });
   killer.once('error', () => resolve(false));
-  killer.once('exit', (code) => resolve(code === 0));
+  killer.once('exit', (code) => resolve(taskkillEnded(code)));
   return promise;
 }
 
