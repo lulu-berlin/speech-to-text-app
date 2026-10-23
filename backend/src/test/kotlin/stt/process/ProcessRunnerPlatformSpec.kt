@@ -1,28 +1,25 @@
 package stt.process
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
-import java.io.OutputStream
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 class ProcessRunnerPlatformSpec :
     BehaviorSpec({
         given("darwin, where there is no setsid") {
             `when`("a command is run") {
-                then("it is spawned directly, without setsid") {
+                then("it is spawned directly, without setsid").config(enabled = !ProcessPlatform.current().windows) {
                     var spawned: List<String>? = null
                     val runner =
                         ProcessRunner(
                             gracePeriod = 1.seconds,
                             startProcess = { builder ->
                                 spawned = builder.command()
-                                ExitedProcess(4242)
+                                ExitedProcess()
                             },
                             platform = ProcessPlatform.DARWIN,
                         )
@@ -55,31 +52,41 @@ class ProcessRunnerPlatformSpec :
                     sent.map { it.second } shouldBe listOf(17, 19, 19, 15, 9)
                 }
             }
+
+            `when`("a terminal Ctrl-C reaches the tool, which shares the terminal's process group") {
+                then("its SIGINT exit (130) is a cancellation, not a failed result") {
+                    val runner =
+                        ProcessRunner(
+                            gracePeriod = 1.seconds,
+                            platform = ProcessPlatform.DARWIN,
+                            startProcess = { ExitedProcess(exitCode = 130) },
+                        )
+
+                    // Resolution runs before the spawn seam, so the command must exist on the host: the JVM's own
+                    // binary does everywhere (and Darwin appends no suffix, so an absolute path is used as given).
+                    runTest {
+                        shouldThrow<CancellationException> { runner.run(listOf(hostExecutable())) }
+                    }
+                }
+            }
+        }
+
+        given("Windows, where the host has no signals") {
+            `when`("the platform is asked for its process-control facts") {
+                then("it owns no process group and sends no signals") {
+                    val platform = ProcessPlatform.forOsName("Windows 11")
+
+                    platform.processGroups shouldBe false
+                    platform.signals shouldBe false
+                }
+            }
         }
     })
 
-/** A process that has already exited: its streams are empty and its exit code is 0. */
-private class ExitedProcess(
-    private val pid: Long,
-) : Process() {
-    override fun getOutputStream(): OutputStream = ByteArrayOutputStream()
-
-    override fun getInputStream(): InputStream = ByteArrayInputStream(ByteArray(0))
-
-    override fun getErrorStream(): InputStream = ByteArrayInputStream(ByteArray(0))
-
-    override fun waitFor(): Int = 0
-
-    override fun waitFor(
-        timeout: Long,
-        unit: TimeUnit,
-    ): Boolean = true
-
-    override fun exitValue(): Int = 0
-
-    override fun destroy() = Unit
-
-    override fun pid(): Long = pid
-
-    override fun isAlive(): Boolean = false
-}
+/** A command that resolves on every host: the running JVM's own executable (resolution runs before the seam). */
+private fun hostExecutable(): String =
+    ProcessHandle
+        .current()
+        .info()
+        .command()
+        .orElseThrow()

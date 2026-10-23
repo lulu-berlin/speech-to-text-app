@@ -1,7 +1,7 @@
 # 66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)
 
 Status: spec-approved
-Depends on: [48](../docs/specs/macos-support.md), [49](49-windows-support.md), [64](../docs/specs/tauri-evaluation.md) —
+Depends on: [48](../docs/specs/macos-support.md), [49](../docs/specs/windows-support.md), [64](../docs/specs/tauri-evaluation.md) —
 all **done** before this item starts (the user 2026-10-19): they bring macOS/Windows support and
 packaging/CI and the shell choice, so the login/tray/terminal mechanics this item adds become
 testable on all three OSes.

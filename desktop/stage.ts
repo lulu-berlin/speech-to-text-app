@@ -31,6 +31,7 @@ import { downloadVerified, pin } from './verified-download.ts';
 const desktopRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(desktopRoot, '..');
 const stage = join(desktopRoot, 'dist', 'stage');
+const windows = process.platform === 'win32';
 
 const fail = (message: string): never => {
   console.error(`stage: ${message}`);
@@ -101,7 +102,7 @@ function stageTools(): void {
     const whisperTmp = join(toolsBin, 'whisper-tmp');
     mkdirSync(whisperTmp, { recursive: true });
     spawnSync('tar', ['-xzf', whisper, '-C', whisperTmp], { stdio: 'inherit' });
-    const whisperExe = findFile(whisperTmp, 'whisper-cli');
+    const whisperExe = findFile(whisperTmp, windows ? 'whisper-cli.exe' : 'whisper-cli');
     const whisperDir =
       whisperExe === undefined
         ? fail('whisper-cli not in the extracted tarball')
@@ -112,15 +113,24 @@ function stageTools(): void {
     rmSync(whisperTmp, { recursive: true, force: true });
   }
 
-  // ffmpeg: on Linux bytedeco's jar is a zip carrying the executable and its libav* libraries
-  // under one directory, whose flat contents belong next to the binary (the libraries carry no
-  // RUNPATH; backend.ts sets LD_LIBRARY_PATH). Apple Silicon ships the pinned audio-only build
-  // (roadmap item 69), a .tar.gz with one `bin/ffmpeg`: no libraries and no ffprobe.
+  // ffmpeg: on Linux and Windows bytedeco's jar is a zip carrying the executable and its libav*
+  // libraries under one directory, whose flat contents belong next to the binary (the libraries
+  // carry no RUNPATH; backend.ts sets LD_LIBRARY_PATH on Linux, and the DLLs sit beside the exe on
+  // Windows). Apple Silicon ships the pinned audio-only build (roadmap item 69), a .tar.gz with one
+  // `bin/ffmpeg`: no libraries and no ffprobe.
   const ffmpeg = artifact('ffmpeg');
   const ffmpegTmp = join(toolsBin, 'ffmpeg-tmp');
   mkdirSync(ffmpegTmp, { recursive: true });
-  if (process.platform === 'linux') {
-    const ffmpegClassifier = 'linux-x86_64-gpl';
+  if (process.platform === 'darwin' && process.arch === 'arm64') {
+    spawnSync('tar', ['-xzf', ffmpeg, '-C', ffmpegTmp], { stdio: 'inherit' });
+    const exe = findFile(ffmpegTmp, 'ffmpeg') ?? fail('ffmpeg not in the extracted tarball');
+    // tar keeps the executable bit; the app runs ffmpeg from PATH (backend.ts prepends
+    // tools/bin), so the staged copy must stay executable.
+    copyTo(exe, join(toolsBin, 'ffmpeg'));
+    chmodSync(join(toolsBin, 'ffmpeg'), 0o755);
+    rmSync(ffmpegTmp, { recursive: true, force: true });
+  } else {
+    const ffmpegClassifier = windows ? 'windows-x86_64-gpl' : 'linux-x86_64-gpl';
     // `jar` (the JDK's) rather than unzip: no unzip on a Nix shell.
     spawnSync('jar', ['xf', ffmpeg], { cwd: ffmpegTmp, stdio: 'inherit' });
     const libs = readdirSync(join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier), {
@@ -133,20 +143,15 @@ function stageTools(): void {
       );
     }
     rmSync(ffmpegTmp, { recursive: true, force: true });
-    if (!existsSync(join(toolsBin, 'ffmpeg'))) fail('ffmpeg not in the extracted jar');
+    if (!existsSync(join(toolsBin, windows ? 'ffmpeg.exe' : 'ffmpeg')))
+      fail('ffmpeg not in the extracted jar');
     // A zip stores no file modes, so `jar xf` left the executables non-executable. The backend
     // runs ffmpeg from PATH (backend.ts prepends tools/bin), so the bit has to be restored here.
-    for (const executable of ['ffmpeg', 'ffprobe']) {
-      if (existsSync(join(toolsBin, executable))) chmodSync(join(toolsBin, executable), 0o755);
+    if (!windows) {
+      for (const executable of ['ffmpeg', 'ffprobe']) {
+        if (existsSync(join(toolsBin, executable))) chmodSync(join(toolsBin, executable), 0o755);
+      }
     }
-  } else {
-    spawnSync('tar', ['-xzf', ffmpeg, '-C', ffmpegTmp], { stdio: 'inherit' });
-    const exe = findFile(ffmpegTmp, 'ffmpeg') ?? fail('ffmpeg not in the extracted tarball');
-    // tar keeps the executable bit; the app runs ffmpeg from PATH (backend.ts prepends
-    // tools/bin), so the staged copy must stay executable.
-    copyTo(exe, join(toolsBin, 'ffmpeg'));
-    chmodSync(join(toolsBin, 'ffmpeg'), 0o755);
-    rmSync(ffmpegTmp, { recursive: true, force: true });
   }
 }
 
@@ -189,7 +194,8 @@ function stageJre(): void {
   const result = spawnSync('jlink', args, { stdio: 'inherit', env: process.env });
   if (result.error) fail(`jlink could not be spawned: ${result.error.message}`);
   if (result.status !== 0) fail(`jlink failed (exit ${result.status})`);
-  if (!existsSync(join(stage, 'jre', 'bin', 'java'))) fail('jlink produced no bin/java');
+  if (!existsSync(join(stage, 'jre', 'bin', windows ? 'java.exe' : 'java')))
+    fail('jlink produced no bin/java');
   console.log(`stage: jlink image at dist/stage/jre (${JLINK_MODULES.join(', ')})`);
 }
 

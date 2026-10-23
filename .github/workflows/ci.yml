@@ -1,5 +1,5 @@
-# Continuous verification (roadmap item 51). Linux and macOS run on pushes to main and on pull
-# requests; the pinned tool versions come from the committed versions.json (the flake's pins,
+# Continuous verification (roadmap item 51). Linux, macOS and Windows run on pushes to main and on
+# pull requests; the pinned tool versions come from the committed versions.json (the flake's pins,
 # item 33) through the shared toolchain actions in .github/actions/. No secrets.
 name: CI
 
@@ -9,16 +9,16 @@ on:
   pull_request:
   workflow_dispatch:
     # A dispatch is how a branch runs the checks before a PR exists; the manual asset jobs (the
-    # whisper-cli assets and the audio-only ffmpeg asset) are opt-in, so a check-only dispatch
-    # does not rebuild them (roadmap items 49 and 69).
+    # whisper-cli and audio-only ffmpeg assets, macOS and Windows) are opt-in, so a check-only
+    # dispatch does not rebuild them (roadmap items 49 and 69).
     inputs:
       assets:
-        description: 'Also build the manual macOS whisper-cli and ffmpeg assets'
+        description: 'Also build the manual macOS/Windows whisper-cli and ffmpeg assets'
         type: boolean
         default: false
   # Nightly at 03:00 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry.
-  # The nightly runs the whole tree, including the macOS legs; the Windows legs follow with item
-  # 49. GitHub runs a scheduled workflow only from the default branch.
+  # The nightly runs the whole tree, including the macOS and Windows legs. GitHub runs a scheduled
+  # workflow only from the default branch.
   schedule:
     - cron: '0 3 * * *'
       timezone: 'Europe/Berlin'
@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   backend-check:
-    name: Backend (gradle check)
+    name: Linux (gradle check)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -49,7 +49,7 @@ jobs:
         run: ./gradlew -p backend check
 
   frontend-check:
-    name: Frontend (pnpm test, pnpm build)
+    name: Linux (pnpm test, pnpm build)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
@@ -68,7 +68,7 @@ jobs:
         run: pnpm build
 
   docs-check:
-    name: Docs (exception policy)
+    name: Linux (docs exception policy)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -82,7 +82,7 @@ jobs:
         run: node --test docs/check-exceptions.test.ts
 
   backend-integration:
-    name: Backend (gradle integrationTest)
+    name: Linux (gradle integrationTest)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -100,7 +100,7 @@ jobs:
         run: ./gradlew integrationTest
 
   e2e:
-    name: E2E (Playwright)
+    name: Linux (e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -463,6 +463,340 @@ jobs:
         with:
           name: ffmpeg-audio-only-aarch64-darwin
           path: '*.tar.gz'
+
+  # The Gradle tree on Windows (roadmap item 49). No Nix job: Windows has no Nix path, so these are
+  # the automated runs of the spawn seam, the probe parsing, the queue and the frontend on a Windows
+  # host. The runner has no GPU; the startup probe therefore reports zero GPUs (the CPU fallback is
+  # the tested path), and a real-GPU run stays user-verified (item 49's approval log).
+  windows-backend-check:
+    name: Windows (gradle check)
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+      - name: gradlew.bat checkVersions
+        shell: cmd
+        run: gradlew.bat checkVersions
+      - name: gradlew.bat -p backend check
+        shell: cmd
+        run: gradlew.bat -p backend check
+
+  windows-frontend-check:
+    name: Windows (pnpm test, pnpm build)
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+      - name: pnpm test
+        run: pnpm test
+      - name: pnpm build
+        run: pnpm build
+
+  # The portable Windows zip, built and tested the way item 49 ships it (roadmap item 49's
+  # packaged-zip item): electron-builder packs the staged app, the zip is unpacked like a user's
+  # download, and items 50's packaged specs 01-04 run against it in the unpacked directory. No
+  # Xvfb and no Nix: Windows runs the window itself, and everything comes from the package. It is
+  # gated on the Windows checks, as the macOS jobs are on theirs: the package is built from the
+  # Windows build, so a Windows check failure must not start it.
+  windows-desktop-zip:
+    name: Windows (packaged zip e2e)
+    runs-on: windows-2025
+    needs: [windows-backend-check, windows-frontend-check]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+      - uses: ./.github/actions/node-toolchain
+        with:
+          cache-dependency-path: |
+            desktop/pnpm-lock.yaml
+            e2e/pnpm-lock.yaml
+      - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron)
+        uses: actions/cache@v6
+        with:
+          path: |
+            desktop/dist/downloads
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
+          restore-keys: desktop-downloads-${{ runner.os }}-
+      - name: Build the backend and the UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat -p backend installDist
+          if ($LASTEXITCODE -ne 0) { throw 'backend installDist failed' }
+          pnpm --dir frontend install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'frontend install failed' }
+          pnpm --dir frontend build
+          if ($LASTEXITCODE -ne 0) { throw 'frontend build failed' }
+      - name: Fetch the runtime tools, models and fixtures
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\gradlew.bat prepareRuntime prepareE2eFixtures
+          if ($LASTEXITCODE -ne 0) { throw 'prepareRuntime failed' }
+      - name: Install the desktop and e2e packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm --dir desktop install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'desktop install failed' }
+          pnpm --dir e2e install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'e2e install failed' }
+      - name: Check the desktop package and specs (format, types)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm --dir desktop test
+          if ($LASTEXITCODE -ne 0) { throw 'desktop checks failed' }
+          pnpm --dir e2e exec tsc -p desktop/tsconfig.json
+          if ($LASTEXITCODE -ne 0) { throw 'spec type check failed' }
+      - name: Build the portable zip
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm --dir desktop fetch:jdk
+          if ($LASTEXITCODE -ne 0) { throw 'fetch:jdk failed' }
+          pnpm --dir desktop dist:win
+          if ($LASTEXITCODE -ne 0) { throw 'electron-builder failed' }
+      - name: Unpack the zip like a user's download
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Get-ChildItem desktop\dist\Speech-to-Text-*-win-x64.zip | Select-Object -First 1
+          if (-not $zip) { throw 'no portable zip was produced' }
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath desktop\dist\portable -Force
+          $app = Get-ChildItem desktop\dist\portable -Recurse -Filter 'Speech-to-Text.exe' |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $app) { throw 'no Speech-to-Text.exe in the unpacked zip' }
+          "STT_DESKTOP_APP=$app" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      # The specs read the same pinned fixtures and models the other jobs use, from the Gradle
+      # cache; the sha256 values the first-run spec asserts against come from versions.json.
+      - name: Export the fixture and model environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cache = Join-Path $env:GRADLE_USER_HOME 'stt-app'
+          $tiny = Get-ChildItem (Join-Path $cache 'models') -Filter '*ggml-tiny.en.bin' | Select-Object -First 1
+          $speaker = Get-ChildItem (Join-Path $cache 'models') -Filter '*campplus*voxceleb_16k.onnx' | Select-Object -First 1
+          $jfk = Get-ChildItem (Join-Path $cache 'fixtures') -Filter '*jfk.wav' | Select-Object -First 1
+          if (-not $tiny -or -not $speaker -or -not $jfk) { throw "a pinned fixture or model is missing from $cache" }
+          $versions = Get-Content versions.json | ConvertFrom-Json
+          @(
+            "TEST_WHISPER_TINY_EN_MODEL=$($tiny.FullName)",
+            "STT_SPEAKER_MODEL=$($speaker.FullName)",
+            "TEST_JFK_WAV=$($jfk.FullName)",
+            "TEST_WHISPER_TINY_EN_SHA256=$($versions.models.whisperTinyEn.sha256)",
+            "TEST_SPEAKER_SHA256=$($versions.models.speaker.sha256)"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run the packaged desktop e2e
+        shell: pwsh
+        working-directory: e2e
+        env:
+          # Chromium's own log (captured from the app's stderr) names a sandbox/GPU abort that
+          # otherwise only shows up as the 0x80000003 exit code.
+          ELECTRON_ENABLE_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm exec playwright test -c playwright.desktop.config.ts 01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
+          if ($LASTEXITCODE -ne 0) { throw 'the packaged specs failed' }
+      # The installer the same staged tree produces (roadmap item 49, test item 12): installed
+      # silently, the packaged specs run against the installed app, not the unpacked zip.
+      - name: Install the MSI and run the packaged specs against the installed app
+        shell: pwsh
+        working-directory: e2e
+        env:
+          ELECTRON_ENABLE_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = Get-ChildItem ..\desktop\dist\Speech-to-Text-*-win-x64.msi | Select-Object -First 1
+          if (-not $msi) { throw 'no MSI was produced: the win target builds only the zip' }
+          $install = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /quiet /norestart" -Wait -PassThru
+          if ($install.ExitCode -ne 0 -and $install.ExitCode -ne 3010) { throw "msiexec /i failed: $($install.ExitCode)" }
+          $app = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Filter 'Speech-to-Text.exe' -File |
+            Select-Object -First 1
+          if (-not $app) { throw 'the MSI installed no Speech-to-Text.exe under %LOCALAPPDATA%\Programs' }
+          "STT_DESKTOP_APP=$($app.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "STT_DESKTOP_MSI=$($msi.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $env:STT_DESKTOP_APP = $app.FullName
+          pnpm exec playwright test -c playwright.desktop.config.ts 01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
+          if ($LASTEXITCODE -ne 0) { throw 'the packaged specs failed against the installed app' }
+      # And the installer's own lifecycle: a silent install, the app's journey, a silent uninstall
+      # by ProductCode, and the per-user data and model cache surviving it.
+      - name: Run the MSI installer spec
+        shell: pwsh
+        working-directory: e2e
+        env:
+          ELECTRON_ENABLE_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm exec playwright test -c playwright.desktop.config.ts 15-msi-install.spec.ts
+          if ($LASTEXITCODE -ne 0) { throw 'the MSI spec failed' }
+
+  # The Windows whisper-cli asset (manual, roadmap item 49). The published prebuilts are not
+  # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC
+  # runtime (MSVCP140/VCRUNTIME140/VCOMP140, the last from OpenMP) and the pinned Vulkan build also
+  # imports vulkan-1.dll, so a stock Windows install fails with 0xC0000135 before a single word is
+  # transcribed. The prebuilts cannot be fixed without rebuilding, so this job builds whisper.cpp
+  # 1.8.4 with the static MSVC CRT (the top-level project pins CMake 3.5, so the runtime variable is
+  # ignored and the Release flags carry /MT), ggml's own Win32 thread pool instead of OpenMP
+  # (GGML_OPENMP=OFF removes vcomp140.dll; ggml-cpu's threadpool still uses every core), and the
+  # pinned LunarG SDK's vulkan-1.dll beside the exes: the loader picks up a driver's ICD when one
+  # exists and enumerates zero devices otherwise, which is the CPU fallback. The loader is
+  # Apache-2.0 and built with the static CRT. The tarball also carries the four MSVC redistributable
+  # runtime DLLs: ONNX Runtime's Windows native (diarization) imports them, and stock Windows has no
+  # VC++ runtime. The job fails unless the exes and the loader import no VC runtime and the JFK clip
+  # transcribes on CPU through the bundled loader — the packaged-app items extend this asset with
+  # the same staged DLLs.
+  windows-whisper-asset:
+    name: Windows whisper-cli asset (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.assets
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      # Pin the loader/header version the release repo builds against (1.4.309.0), so a later SDK
+      # cannot silently change what ships beside whisper-cli.exe. The action itself is pinned to a
+      # commit, not its movable tag: it runs in the job that builds the published Windows asset.
+      - name: Install the Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@30ba978f977e81b72d091fc8888feb1fb26f9aff # v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Build whisper.cpp 1.8.4 (static CRT, no OpenMP, Vulkan)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          curl.exe -fsSL https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.4.tar.gz -o whisper.tar.gz
+          if ($LASTEXITCODE -ne 0) { throw "downloading whisper.cpp failed" }
+          tar xzf whisper.tar.gz
+          if ($LASTEXITCODE -ne 0) { throw "extracting whisper.cpp failed" }
+          cmake -S whisper.cpp-1.8.4 -B build -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_SHARED_LIBS=OFF `
+            -DGGML_VULKAN=1 `
+            -DGGML_NATIVE=OFF `
+            -DGGML_OPENMP=OFF `
+            -DWHISPER_SDL2=OFF `
+            -DWHISPER_BUILD_TESTS=OFF `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+            -DCMAKE_C_FLAGS_RELEASE='/MT /O2 /Ob2 /DNDEBUG' `
+            -DCMAKE_CXX_FLAGS_RELEASE='/MT /O2 /Ob2 /DNDEBUG'
+          if ($LASTEXITCODE -ne 0) { throw "configuring whisper.cpp failed" }
+          cmake --build build --config Release -j 4
+          if ($LASTEXITCODE -ne 0) { throw "building whisper.cpp failed" }
+      - name: Build the pinned Vulkan loader
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The SDK ships only the loader's import library (Lib\vulkan-1.lib); the runtime DLL is not
+          # in its payload, and the separate VulkanRT installer wraps it in a nested archive. Build
+          # the loader from source at the same pinned SDK tag instead: its CMake selects the static
+          # MSVC CRT on Windows unless asked otherwise, so the result imports no VC runtime.
+          $tag = 'vulkan-sdk-1.4.309.0'
+          foreach ($repo in @('Vulkan-Headers', 'Vulkan-Loader')) {
+            curl.exe -fsSL "https://github.com/KhronosGroup/$repo/archive/refs/tags/$tag.tar.gz" -o "$repo.tar.gz"
+            if ($LASTEXITCODE -ne 0) { throw "downloading $repo failed" }
+            tar xzf "$repo.tar.gz"
+            if ($LASTEXITCODE -ne 0) { throw "extracting $repo failed" }
+          }
+          cmake -S "Vulkan-Headers-$tag" -B headers-build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$PWD\vk-headers"
+          if ($LASTEXITCODE -ne 0) { throw "configuring Vulkan-Headers failed" }
+          cmake --install headers-build --config Release
+          if ($LASTEXITCODE -ne 0) { throw "installing Vulkan-Headers failed" }
+          cmake -S "Vulkan-Loader-$tag" -B loader-build "-DVULKAN_HEADERS_INSTALL_DIR=$PWD\vk-headers" -DBUILD_TESTS=OFF
+          if ($LASTEXITCODE -ne 0) { throw "configuring Vulkan-Loader failed" }
+          cmake --build loader-build --config Release --target vulkan
+          if ($LASTEXITCODE -ne 0) { throw "building the Vulkan loader failed" }
+          if (-not (Test-Path 'loader-build\loader\Release\vulkan-1.dll')) {
+            throw "the Vulkan loader build produced no vulkan-1.dll"
+          }
+      - name: Stage the tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = 'stage\whisper-1.8.4-windows-x64'
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item 'build\bin\Release\whisper-cli.exe', 'build\bin\Release\whisper-server.exe' $stage
+          Copy-Item 'loader-build\loader\Release\vulkan-1.dll' $stage
+
+          # The app's ONNX Runtime native (diarization) is built against the dynamic MSVC CRT:
+          # onnxruntime.dll imports MSVCP140/MSVCP140_1/VCRUNTIME140/VCRUNTIME140_1, which stock
+          # Windows lacks. Ship Microsoft's redistributable runtime DLLs from the runner's VS
+          # redist beside the tools; the extracted directory is on the app's PATH, and the
+          # packaged-app items stage the same tarball.
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $crtDir =
+            (Get-ChildItem "$vs\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT\msvcp140.dll" |
+              Sort-Object FullName | Select-Object -Last 1).DirectoryName
+          if (-not $crtDir) { throw "no MSVC runtime redist under $vs" }
+          foreach ($dll in @('msvcp140.dll', 'msvcp140_1.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            if (-not (Test-Path (Join-Path $crtDir $dll))) { throw "missing $dll in $crtDir" }
+            Copy-Item (Join-Path $crtDir $dll) $stage
+          }
+          "Staged MSVC runtime from $crtDir"
+      - name: Verify the imports
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = 'stage\whisper-1.8.4-windows-x64'
+
+          # dumpbin is not on PATH in a plain runner shell: it comes from the VS installation.
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $dumpbin = (Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -Last 1).FullName
+          if (-not ((& $dumpbin /nologo /headers "$stage\vulkan-1.dll") | Select-String 'machine \(x64\)')) {
+            throw "the built vulkan-1.dll is not x64"
+          }
+          function Imports([string] $path) {
+            (& $dumpbin /nologo /dependents $path) |
+              Select-String -Pattern '^\s+\S+\.dll\s*$' |
+              ForEach-Object { ($_.Line -split '\s+')[1] }
+          }
+          foreach ($binary in @("$stage\whisper-cli.exe", "$stage\whisper-server.exe", "$stage\vulkan-1.dll")) {
+            $imports = Imports $binary
+            "Imports of $(Split-Path $binary -Leaf): $($imports -join ', ')"
+            $runtime = $imports | Where-Object { $_ -match '^(msvcp|vcruntime|vcomp)' }
+            if ($runtime) { throw "$(Split-Path $binary -Leaf) imports the VC runtime: $runtime" }
+          }
+      - name: Transcribe the JFK clip on CPU through the bundled loader
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = 'stage\whisper-1.8.4-windows-x64'
+          $v = Get-Content versions.json | ConvertFrom-Json
+          Invoke-WebRequest $v.models.whisperTinyEn.url -OutFile tiny.bin
+          Invoke-WebRequest $v.fixtures.jfkWav.url -OutFile jfk.wav
+          $output = & "$stage\whisper-cli.exe" -m tiny.bin -f jfk.wav -nt 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "whisper-cli failed on the JFK clip: $output" }
+          $output | Select-Object -Last 5
+          if (-not ($output -match 'ask not what your country can do for you')) { throw "the JFK clip did not transcribe" }
+      - name: Package and print the sha256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          tar -czf whisper-cpp-1.8.4-windows-x64.tar.gz -C stage whisper-1.8.4-windows-x64
+          if ($LASTEXITCODE -ne 0) { throw "packaging failed" }
+          $sha = (Get-FileHash whisper-cpp-1.8.4-windows-x64.tar.gz -Algorithm SHA256).Hash.ToLower()
+          "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz"
+          "### whisper-cpp Windows asset" >> $env:GITHUB_STEP_SUMMARY
+          "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz" >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-cpp-1.8.4-windows-x64
+          path: whisper-cpp-1.8.4-windows-x64.tar.gz
           retention-days: 90
 
   # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds
@@ -472,7 +806,7 @@ jobs:
   # e2e/desktop/run-in-docker.ts (the dev entry point) exists for hosts whose /nix/store supplies
   # the node, Xvfb and fixtures it insists on, which is why CI does not go through the container.
   desktop-e2e:
-    name: Desktop (packaged .deb e2e)
+    name: Linux (packaged .deb e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -574,7 +908,7 @@ jobs:
   # with AppArmor, so this job is also where Chromium's sandbox meets the user-namespace
   # restriction that store-installed Electron (no setuid helper) has to live with.
   desktop-nix-e2e:
-    name: Desktop (flake package e2e)
+    name: Linux (flake package e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 90
@@ -604,7 +938,7 @@ jobs:
   # Nix build here runs the backend's `gradle check`, so item 58's real-time completion waits can
   # still fail it — as they can the already-required `desktop-nix-e2e` and `nix-build`.
   desktop-bundle-e2e:
-    name: Desktop (bundle e2e)
+    name: Linux (bundle e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 120
@@ -632,7 +966,7 @@ jobs:
   # Each of the three Nix jobs checks out the sources and restores the same store cache; only
   # `nix-build` may write it (cache-nix-action saves in a post step that runs on `success()`).
   nix-devenv:
-    name: Nix (devenv shell)
+    name: Linux (Nix devenv shell)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -656,7 +990,7 @@ jobs:
         run: devenv test
 
   nix-flake-check:
-    name: Nix (flake check)
+    name: Linux (Nix flake check)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -667,7 +1001,7 @@ jobs:
         run: nix flake check --print-build-logs
 
   nix-build:
-    name: Nix (build)
+    name: Linux (Nix build)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -689,7 +1023,7 @@ jobs:
   # versions.json and needs no build, so it is a two-second job. Deliberately not in the `ci`
   # aggregator: a weekly network check must not gate a pull request.
   model-hosts:
-    name: Pinned model hosts resolve
+    name: Linux (pinned model hosts resolve)
     if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -704,10 +1038,12 @@ jobs:
   # The one required check for branch protection: it waits for every other job and fails when any of
   # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
   # renaming a job cannot silently un-gate merges. `model-hosts` is the one deliberate exception
-  # (its own comment says why); a job absent from this list cannot gate merges.
+  # (its own comment says why); a job absent from this list cannot gate merges. Every other job's
+  # name starts with the platform it targets (Linux, macOS, Windows); this one covers all of them,
+  # and branch protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
-    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg]
+    needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

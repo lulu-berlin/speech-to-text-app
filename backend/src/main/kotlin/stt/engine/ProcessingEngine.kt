@@ -188,8 +188,9 @@ class ProcessingEngine internal constructor(
     }
 
     /**
-     * Pauses the queue: no further task starts until [resumeQueue], and the process of a task already
-     * running is frozen (SIGSTOP; a no-op when no process is in flight).
+     * Pauses the queue: no further task starts until [resumeQueue]. A task already running is frozen
+     * where the host can freeze a process (SIGSTOP on POSIX); on Windows it stops at its next chunk
+     * (roadmap item 49). A no-op when no process is in flight.
      */
     suspend fun pauseQueue() {
         queueState.setPaused(true)
@@ -410,7 +411,7 @@ class ProcessingEngine internal constructor(
             ?.let { TaskCommandOutcome.Illegal(it, to) }
             ?: TaskCommandOutcome.Unknown
 
-    /** Freezes the current run: its process (SIGSTOP; a no-op when none is in flight) and its pause gate. */
+    /** Freezes the current run: its process (SIGSTOP where signals exist) and its pause gate (always the stop on Windows). */
     private fun freezeCurrentRun() {
         processControl.pause()
         pauseGate.pause()

@@ -38,6 +38,10 @@ export function modelsDir(): string {
   if (process.platform === 'darwin') {
     return join(homedir(), 'Library', 'Caches', 'stt-app', 'models');
   }
+  if (process.platform === 'win32') {
+    const base = process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local');
+    return join(base, 'stt-app', 'models');
+  }
   const base = process.env.XDG_CACHE_HOME || join(homedir(), '.cache');
   return join(base, 'stt-app', 'models');
 }

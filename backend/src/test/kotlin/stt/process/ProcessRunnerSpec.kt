@@ -717,10 +717,10 @@ private suspend fun pausedFromSpawn(
         lateinit var runner: ProcessRunner
         val spawned = CompletableDeferred<Unit>()
         runner =
-            ProcessRunner(2.seconds) { builder ->
+            ProcessRunner(2.seconds, startProcess = { builder ->
                 runner.pause()
                 start(builder).also { spawned.complete(Unit) }
-            }
+            })
         val delivered = mutableListOf<String>()
         val firstLine = CompletableDeferred<String>()
         val job =
@@ -758,12 +758,12 @@ private suspend fun cancelledFromSpawn(start: (ProcessBuilder) -> Process): Canc
     lateinit var job: Job
     val spawned = CompletableDeferred<Process>()
     val runner =
-        ProcessRunner(300.milliseconds) { builder ->
+        ProcessRunner(300.milliseconds, startProcess = { builder ->
             start(builder).also { process ->
                 spawned.complete(process)
                 job.cancel()
             }
-        }
+        })
     var thrown: Throwable? = null
     var aliveWhenRunThrew: Boolean? = null
     try {

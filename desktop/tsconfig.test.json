@@ -1,0 +1,16 @@
+{
+  "//": "The desktop's `node --test` specs (ADR 0054): type-checked against the same globals as src, never compiled.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src/main.ts",
+    "src/backend.ts",
+    "src/backend.test.ts",
+    "src/models.ts",
+    "src/preload.cts",
+    "src/bridge.d.ts"
+  ]
+}

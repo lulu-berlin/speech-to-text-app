@@ -12,6 +12,24 @@
       "linux-x64": {
         "sha256": "3c56835c2675ed4fae638268588896a00e1dd109ccdea5aacc3056d6330a669e",
         "url": "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/8.1.2-1.5.14/ffmpeg-8.1.2-1.5.14-linux-x86_64-gpl.jar"
+      },
+      "windows-x64": {
+        "sha256": "9c4bbdecba752fb2d0a8e537e69d330c6db6b02087f5035f88decad0050e5550",
+        "url": "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/8.1.2-1.5.14/ffmpeg-8.1.2-1.5.14-windows-x86_64-gpl.jar"
+      }
+    },
+    "temurin-jdk": {
+      "darwin-arm64": {
+        "sha256": "3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.12.1_1.tar.gz"
+      },
+      "linux-x64": {
+        "sha256": "ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz"
+      },
+      "windows-x64": {
+        "sha256": "f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip"
       }
     },
     "whisper-cli": {
@@ -26,16 +44,10 @@
       "linux-x64": {
         "sha256": "d89e59ee9a0acd4bcadaadd31edcb60a079a6929a3e06293c1cca7751d3563ed",
         "url": "https://github.com/jiang1997/whisper.cpp-release/releases/download/v1.8.4/whisper-1.8.4-linux-x64.tar.gz"
-      }
-    },
-    "temurin-jdk": {
-      "darwin-arm64": {
-        "sha256": "3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998",
-        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.12.1_1.tar.gz"
       },
-      "linux-x64": {
-        "sha256": "ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
-        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz"
+      "windows-x64": {
+        "sha256": "9e467fcbe0de807c9e41ae9116bf76c5bedbe0b6551209b719571bc75257436c",
+        "url": "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-windows-x64.tar.gz"
       }
     }
   },
