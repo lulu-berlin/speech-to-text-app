@@ -15,6 +15,9 @@ import java.nio.file.Path
  * so `STT_DEVICE` and `STT_THREADS` are not read.
  * `STT_MAX_UPLOAD_BYTES` caps one upload's size (roadmap item 41); it defaults to 1 GiB, and any value that is
  * not a positive integer fails fast.
+ * `STT_STOP_ON_STDIN_CLOSE=1` makes the backend stop once its stdin closes: the desktop app's graceful quit on
+ * Windows, which has no signal to send (roadmap item 49). Any other value, or none, leaves stdin unread, so
+ * `gradle run` (whose stdin is empty) and a console start keep running.
  */
 data class Config(
     val dataDir: Path,
@@ -24,6 +27,7 @@ data class Config(
     val host: String = "0.0.0.0",
     val staticDir: Path? = null,
     val maxUploadBytes: Long = DEFAULT_MAX_UPLOAD_BYTES,
+    val stopOnStdinClose: Boolean = false,
 ) {
     companion object {
         private const val PORT_LIMIT_ERROR =
@@ -55,6 +59,7 @@ data class Config(
                 host = env["STT_HOST"]?.takeIf { it.isNotEmpty() } ?: "0.0.0.0",
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
                 maxUploadBytes = maxUploadBytes,
+                stopOnStdinClose = env["STT_STOP_ON_STDIN_CLOSE"] == "1",
             )
         }
 
