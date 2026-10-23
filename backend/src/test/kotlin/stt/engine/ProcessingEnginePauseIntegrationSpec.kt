@@ -11,6 +11,7 @@ import stt.db.Database
 import stt.db.SegmentRepository
 import stt.db.TaskPhase
 import stt.db.TaskRepository
+import stt.process.ProcessPlatform
 import stt.queue.TaskStatus
 import stt.transcribe.transcriptFixtures
 import java.nio.ByteBuffer
@@ -59,8 +60,11 @@ class ProcessingEnginePauseIntegrationSpec :
 
                         // The in-flight chunk finishes (or is frozen where signals exist), then the gate holds
                         // the run: progress must stop moving below completion. On Windows nothing freezes it, so
-                        // wait until its whisper-cli has exited before reading a stable progress.
-                        awaitUntil(timeout = 2.minutes, every = 100.milliseconds) { runningTools().isEmpty() }
+                        // wait until its whisper-cli has exited before reading a stable progress; where signals
+                        // exist the tool is SIGSTOPped and stays a live descendant, so that wait could never hold.
+                        if (!ProcessPlatform.current().signals) {
+                            awaitUntil(timeout = 2.minutes, every = 100.milliseconds) { runningTools().isEmpty() }
+                        }
                         val pausedAt = settledProgress(progress = { tasks.find(id)?.task?.progress ?: 1.0 })
                         (pausedAt > 0.0) shouldBe true
                         (pausedAt < 1.0) shouldBe true
