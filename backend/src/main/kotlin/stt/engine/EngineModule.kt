@@ -1,6 +1,7 @@
 package stt.engine
 
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopPreparing
 import io.ktor.server.plugins.di.dependencies
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ import stt.db.TaskRepository
 import stt.diarization.SpeakerDiarizer
 import stt.process.ProcessRunner
 import stt.transcribe.ChunkTranscriber
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The processing engine's feature module (ADR 0013): registers the [ProcessingEngine] with Ktor DI over the real
@@ -38,9 +40,13 @@ fun Application.processingEngine(config: Config) {
     // child never takes the engine down.
     val engineJob = SupervisorJob(coroutineContext[Job])
     val engineScope = CoroutineScope(coroutineContext + engineJob + Dispatchers.Default)
+    // The known-stopped-by-us flag (item 49): set when the server starts to stop, before the engine is cancelled,
+    // so a tool that dies in between (a console Ctrl-C reaches it too) is an interruption, not a failure.
+    val stopping = AtomicBoolean(false)
+    markStopping(stopping)
     dependencies {
         // One runner for every external process: it is single-flight (ADR 0020) and is the engine's pause control.
-        provide<ProcessRunner> { ProcessRunner() }
+        provide<ProcessRunner> { ProcessRunner(stopping = stopping::get) }
         provide<SpeakerDiarizer> { SpeakerDiarizer(config.speakerModel, SegmentRepository(resolve())) }
         provide<ProcessingEngine> {
             val db: Database = resolve()
@@ -77,4 +83,12 @@ fun Application.processingEngine(config: Config) {
     val engine: ProcessingEngine = runBlocking { dependencies.resolve<ProcessingEngine>() }
     // The worker starts on that same engine: it recovers what a crash left RUNNING, then takes the queue.
     launch { engine.start() }
+}
+
+/**
+ * Subscribes [stopping] to the server's stop, before the engine is cancelled (roadmap item 49). A test application
+ * and the running server raise the same event, so [StoppingFlagSpec] covers exactly this wiring.
+ */
+internal fun Application.markStopping(stopping: AtomicBoolean) {
+    monitor.subscribe(ApplicationStopPreparing) { stopping.set(true) }
 }

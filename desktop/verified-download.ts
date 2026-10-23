@@ -33,7 +33,9 @@ export function pin(
     ? process.arch === 'arm64'
       ? 'darwin-arm64'
       : 'darwin-x64'
-    : 'linux-x64',
+    : process.platform === 'win32'
+      ? 'windows-x64'
+      : 'linux-x64',
 ): Pin {
   return (
     manifest.downloads[key]?.[platform] ?? fail(label, `versions.json has no ${platform} ${key}`)

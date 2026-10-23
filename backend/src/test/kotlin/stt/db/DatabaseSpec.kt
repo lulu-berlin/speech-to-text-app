@@ -15,6 +15,7 @@ import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import org.flywaydb.core.Flyway
+import stt.process.ProcessPlatform
 import stt.queue.TaskStatus
 import java.nio.file.Files
 import java.nio.file.Path
@@ -152,22 +153,23 @@ class DatabaseSpec :
             }
         }
 
-        given("an existing stt.db in rollback-journal mode that is write-protected, so WAL cannot be enabled") {
-            `when`("opening the database") {
-                then("it fails with an error naming STT_DATA_DIR and the path") {
-                    runTest {
-                        val dataDir = tempdir("stt-db").toPath()
-                        val dbFile = dataDir.resolve("stt.db")
-                        DriverManager.getConnection("jdbc:sqlite:$dbFile").use { connection ->
-                            connection.createStatement().use { st -> st.execute("CREATE TABLE existing (x INTEGER)") }
-                        }
-                        Files.setPosixFilePermissions(dbFile, PosixFilePermissions.fromString("r--r--r--"))
+        given("an existing stt.db in rollback-journal mode that is write-protected, so WAL cannot be enabled")
+            .config(enabled = !ProcessPlatform.current().windows) {
+                `when`("opening the database") {
+                    then("it fails with an error naming STT_DATA_DIR and the path") {
+                        runTest {
+                            val dataDir = tempdir("stt-db").toPath()
+                            val dbFile = dataDir.resolve("stt.db")
+                            DriverManager.getConnection("jdbc:sqlite:$dbFile").use { connection ->
+                                connection.createStatement().use { st -> st.execute("CREATE TABLE existing (x INTEGER)") }
+                            }
+                            Files.setPosixFilePermissions(dbFile, PosixFilePermissions.fromString("r--r--r--"))
 
-                        shouldFailOpeningNaming(dataDir)
+                            shouldFailOpeningNaming(dataDir)
+                        }
                     }
                 }
             }
-        }
 
         given("an existing stt.db whose recorded V1 checksum no longer matches V1__init.sql") {
             `when`("opening the database") {

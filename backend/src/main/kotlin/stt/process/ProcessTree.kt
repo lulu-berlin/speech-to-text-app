@@ -21,9 +21,19 @@ internal class ProcessTree(
     private val childAlive: () -> Boolean,
     /** The host platform's signals and process-group support; production uses the JVM's `os.name`. */
     private val platform: ProcessPlatform = ProcessPlatform.current(),
-    /** kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). */
-    private val kill: (pid: Int, signal: Int) -> Int = LibC.INSTANCE::kill,
+    /**
+     * kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). Resolved on the first signal,
+     * not here: a tree can be built on a host without libc when a spec injects a foreign platform (roadmap item 49,
+     * PR #47's Windows job). A runner for this host loads libc at construction instead ([ProcessRunner]).
+     */
+    private val kill: (pid: Int, signal: Int) -> Int = { pid, signal -> LibC.INSTANCE.kill(pid, signal) },
 ) {
+    init {
+        // A platform without signals never builds a tree (Windows destroys its direct child instead), so
+        // this is a programming error rather than a no-op terminate().
+        require(platform.signals) { "a process tree needs signals; this platform has none" }
+    }
+
     /** kill(2) addresses a whole group through the negated group id (Linux only). */
     private val target = -id.toInt()
 
@@ -63,7 +73,8 @@ internal class ProcessTree(
         } ?: false
 
     /** The child first (Linux: then the group): once it is stopped or dead it cannot add processes. */
-    private fun signal(signal: Int) {
+    private fun signal(signal: Int?) {
+        if (signal == null) return
         if (childAlive()) kill(id.toInt(), signal)
         if (platform.processGroups) kill(target, signal)
     }

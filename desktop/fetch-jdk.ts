@@ -16,20 +16,24 @@ const fail = (message: string): never => {
 };
 
 // The cache name is the one this script has always used, so an existing entry in
-// dist/downloads is reused instead of re-downloading the ~200 MB tarball.
+// dist/downloads is reused instead of re-downloading the ~200 MB archive. Windows is a zip
+// (Adoptium publishes no tar.gz there); the runner's bsdtar extracts it.
+const windows = process.platform === 'win32';
 const { sha256 } = pin('temurin-jdk', 'fetch:jdk');
-const tarball = downloadVerified({
+const archive = downloadVerified({
   key: 'temurin-jdk',
   label: 'fetch:jdk',
-  cacheName: `temurin-${sha256.slice(0, 12)}.tar.gz`,
+  cacheName: `temurin-${sha256.slice(0, 12)}.${windows ? 'zip' : 'tar.gz'}`,
 });
 
 rmSync(targetDir, { recursive: true, force: true });
 mkdirSync(targetDir, { recursive: true });
 const strip = process.platform === 'darwin' ? 3 : 1;
-const result = spawnSync('tar', ['-xzf', tarball, '-C', targetDir, `--strip-components=${strip}`], {
-  stdio: 'inherit',
-});
+const result = spawnSync(
+  'tar',
+  [windows ? '-xf' : '-xzf', archive, '-C', targetDir, `--strip-components=${strip}`],
+  { stdio: 'inherit' },
+);
 if (result.status !== 0) fail('extraction failed');
 if (!existsSync(join(targetDir, 'jmods'))) fail('extracted JDK has no jmods');
 console.log('fetch:jdk: Temurin JDK ready at desktop/dist/jdk');

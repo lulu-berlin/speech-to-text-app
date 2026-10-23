@@ -4,7 +4,14 @@ import {
   type ElectronApplication,
   type Page,
 } from '@playwright/test';
-import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+} from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,6 +28,11 @@ export interface LaunchOptions {
   /** Reuse a HOME across launches (item 3's restart); a fresh one by default. */
   home?: string;
   /**
+   * The executable to start instead of `STT_DESKTOP_APP`: the installed MSI's app (item 49's
+   * installer spec), which a step before the launch put on the machine.
+   */
+  executable?: string;
+  /**
    * `override` (the default) passes the two models the harness mounts, so the app skips the
    * download; `download` leaves STT_WHISPER_MODEL/STT_SPEAKER_MODEL unset, so the app provisions
    * the models itself (item 3).
@@ -35,10 +47,17 @@ export interface LaunchOptions {
  * starts empty) and Chromium's sandbox on.
  */
 export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronApplication> {
-  const { home = temporaryDir('home'), models = 'override', env = {} } = options;
+  const {
+    home = temporaryDir('home'),
+    executable = DESKTOP_APP,
+    models = 'override',
+    env = {},
+  } = options;
+  // A fresh per-user area per launch. Windows apps read %APPDATA%/%LOCALAPPDATA%, not HOME.
+  const homeEnv = process.platform === 'win32' ? windowsHomeEnv(home) : { HOME: home };
   // Only variables that are set: an unset one has no value to pass to the app.
   const appEnv: Record<string, string> = Object.fromEntries(
-    Object.entries({ ...process.env, ...env, HOME: home }).filter(
+    Object.entries({ ...process.env, ...env, ...homeEnv }).filter(
       (entry): entry is [string, string] => entry[1] !== undefined,
     ),
   );
@@ -52,7 +71,7 @@ export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronA
     delete appEnv.STT_SPEAKER_MODEL;
   }
   return electron.launch({
-    executablePath: DESKTOP_APP,
+    executablePath: executable,
     // Playwright adds --no-sandbox on Linux by default; the app runs as shipped, sandboxed.
     chromiumSandbox: true,
     env: appEnv,
@@ -115,17 +134,24 @@ export function jfkClip(): string {
   return clip;
 }
 
-/** The per-user directories a fresh HOME gets (the paths the app decided on, 2026-10-14). */
+/** The per-user directories a fresh HOME gets (the paths the app decided on, 2026-10-14/22). */
 export function userPaths(home: string) {
-  return process.platform === 'darwin'
-    ? {
-        data: join(home, 'Library', 'Application Support', 'stt-app'),
-        models: join(home, 'Library', 'Caches', 'stt-app', 'models'),
-      }
-    : {
-        data: join(home, '.local', 'share', 'stt-app'),
-        models: join(home, '.cache', 'stt-app', 'models'),
-      };
+  if (process.platform === 'darwin') {
+    return {
+      data: join(home, 'Library', 'Application Support', 'stt-app'),
+      models: join(home, 'Library', 'Caches', 'stt-app', 'models'),
+    };
+  }
+  if (process.platform === 'win32') {
+    return {
+      data: join(home, 'AppData', 'Roaming', 'stt-app'),
+      models: join(home, 'AppData', 'Local', 'stt-app', 'models'),
+    };
+  }
+  return {
+    data: join(home, '.local', 'share', 'stt-app'),
+    models: join(home, '.cache', 'stt-app', 'models'),
+  };
 }
 
 /** An environment variable the container harness passes; without it the test cannot run. */
@@ -142,8 +168,8 @@ export function required(name: string): string {
 /** The backend JVM the app spawns, by its main class. */
 export const BACKEND = /stt\.MainKt/;
 
-/** The processes the app owns: the backend JVM, whisper-cli and ffmpeg. */
-export const APP_PROCESSES = /stt\.MainKt|whisper-cli|(^|\/)ffmpeg(gui)?\b/;
+/** The processes the app owns: the backend JVM, whisper-cli and ffmpeg (Windows paths use `\`). */
+export const APP_PROCESSES = /stt\.MainKt|whisper-cli(\.exe)?\b|[\\/]ffmpeg(gui)?(\.exe)?\b/;
 
 /** A running process: its pid and its command line, arguments joined by spaces. */
 export interface RunningProcess {
@@ -153,10 +179,33 @@ export interface RunningProcess {
 
 /**
  * The running processes whose command line matches `pattern`. Read from /proc on Linux (a stock
- * ubuntu container has no procps); on macOS, which has no /proc, from `ps`.
+ * ubuntu container has no procps); on macOS, which has no /proc, from `ps`; on Windows from
+ * CIM's `Win32_Process`.
  */
 export function processes(pattern: RegExp): RunningProcess[] {
   const found: RunningProcess[] = [];
+  if (process.platform === 'win32') {
+    const output = execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress',
+      ],
+      { encoding: 'utf8' },
+    );
+    const parsed = JSON.parse(output) as
+      | Array<{ ProcessId: number; CommandLine: string | null }>
+      | { ProcessId: number; CommandLine: string | null }
+      | null;
+    if (parsed === null) return found;
+    for (const row of Array.isArray(parsed) ? parsed : [parsed]) {
+      const command = row.CommandLine ?? '';
+      if (pattern.test(command)) found.push({ pid: String(row.ProcessId), command });
+    }
+    return found;
+  }
   if (existsSync('/proc')) {
     for (const pid of readdirSync('/proc')) {
       if (!/^\d+$/.test(pid)) continue;
@@ -204,4 +253,17 @@ export function delay(ms: number): Promise<void> {
 
 function temporaryDir(kind: string): string {
   return mkdtempSync(join(tmpdir(), `stt-desktop-${kind}-`));
+}
+
+/**
+ * The fresh Windows per-user environment. The two AppData directories must exist before Electron
+ * starts: with %USERPROFILE%, %APPDATA% and %LOCALAPPDATA% all pointing into a fresh tree whose
+ * AppData children are missing, Chromium aborts at startup with 0x80000003 (roadmap item 49).
+ */
+function windowsHomeEnv(home: string): Record<string, string> {
+  const roaming = join(home, 'AppData', 'Roaming');
+  const local = join(home, 'AppData', 'Local');
+  mkdirSync(roaming, { recursive: true });
+  mkdirSync(local, { recursive: true });
+  return { USERPROFILE: home, APPDATA: roaming, LOCALAPPDATA: local };
 }

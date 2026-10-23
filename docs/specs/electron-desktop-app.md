@@ -3,8 +3,8 @@
 Status: done (roadmap item 50)
 Depends on: [16](nix-flake-package.md) (done; tool/artifact gathering). The item ships
 Linux only; the macOS and Windows packaged apps are part of [48](macos-support.md) and
-[49](../../roadmap/49-windows-support.md) (moved there 2026-10-15), so it does not wait for them.
-Blocks: [48](macos-support.md), [49](../../roadmap/49-windows-support.md) (their packaged-app test items build
+[49](windows-support.md) (moved there 2026-10-15), so it does not wait for them.
+Blocks: [48](macos-support.md), [49](windows-support.md) (their packaged-app test items build
 on this item's desktop app and specs)
 
 ## Goal
@@ -197,7 +197,7 @@ Filed 2026-10-13 during the review/portability work (verified reads):
 - [x] Quitting the app stops the backend and its processes (no orphan JVM/whisper/ffmpeg)
 - [x] First run on a clean machine works: data dir + models are provisioned per the decided design,
       and data persists across restarts
-- (moved 2026-10-15 to [48](macos-support.md) and [49](../../roadmap/49-windows-support.md), not an item here)
+- (moved 2026-10-15 to [48](macos-support.md) and [49](windows-support.md), not an item here)
   The packaged app runs on macOS and Windows with their per-user paths
 - [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build`, backend
       suites and the Linux e2e stay green (see the cycle-4 log line: only the documented item-47

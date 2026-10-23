@@ -2,7 +2,7 @@
 
 Status: spec-approved
 Depends on: [62 — An audio-only ffmpeg](../docs/specs/audio-only-ffmpeg.md) (done; its enable list,
-exact-set check and format fixtures), [49 — Windows support](49-windows-support.md) (the Windows
+exact-set check and format fixtures), [49 — Windows support](../docs/specs/windows-support.md) (the Windows
 tool pins, bootstrap, packaging and its e2e leg)
 Blocks: —
 

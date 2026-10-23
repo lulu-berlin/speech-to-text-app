@@ -1,7 +1,7 @@
 # 79 — The full e2e journey on Windows
 
 Status: draft
-Depends on: [49](49-windows-support.md) (in progress; the Windows CI legs, packaged e2e and the
+Depends on: [49](../docs/specs/windows-support.md) (in progress; the Windows CI legs, packaged e2e and the
 process-control seam), [21](../docs/specs/frontend-backend-end-to-end.md) (done; the journey and its
 harness), [51](../docs/specs/ci-verification.md) (done; the CI legs)
 Blocks: [78](78-stable-release.md) (a 1.0 gate: Windows is a supported platform)

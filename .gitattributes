@@ -1,0 +1,6 @@
+# Check out text files with LF on every OS (roadmap item 49): Prettier checks LF, while Git on Windows
+# would otherwise rewrite the whole working tree to CRLF and fail the frontend's `prettier --check`.
+# Batch files keep CRLF for cmd.exe.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

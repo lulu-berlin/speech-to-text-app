@@ -3,6 +3,7 @@ package stt.transcribe
 import kotlinx.coroutines.CancellationException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import stt.process.ProcessPlatform
 import stt.process.ProcessResult
 import stt.process.ProcessRunner
 import java.io.IOException
@@ -23,7 +24,7 @@ sealed interface DeviceProbeOutcome {
         val gpus: List<GpuDevice>,
     ) : DeviceProbeOutcome
 
-    /** whisper-cli could not be launched; [message] is the JVM's reason (missing, not executable, …). */
+    /** whisper-cli could not be started or could not load its libraries; [message] says why. */
     data class LaunchFailed(
         val message: String,
     ) : DeviceProbeOutcome
@@ -31,12 +32,14 @@ sealed interface DeviceProbeOutcome {
 
 /**
  * The startup device probe (roadmap items 32, 45, 48): runs whisper-cli once and parses the physical GPUs
- * its ggml backend enumerates on stderr — Vulkan devices on Linux, the Metal device on macOS. whisper-cli
- * prints them while initializing, before it reads the audio — the input only has to exist (`/dev/null`
- * decodes to nothing), so the probe costs one model load and any exit code still carries the lines. A launch
- * failure (`IOException`: whisper-cli missing or not executable) is logged with its throwable and reported
- * as [DeviceProbeOutcome.LaunchFailed], so the app still starts and the Settings page offers CPU and auto;
- * any other throwable propagates and fails startup (item 60), and cancellation is rethrown.
+ * its ggml backend enumerates on stderr — Vulkan devices on Linux and Windows, the Metal device on macOS.
+ * whisper-cli prints them while initializing, before it reads the audio — the input only has to exist (the
+ * platform's null device, `/dev/null` or `NUL`, decodes to nothing), so the probe costs one model load and any
+ * exit code still carries the lines. A process that cannot start (`IOException`: whisper-cli missing or not
+ * executable) or cannot load its libraries (on Windows the loader exits it with `STATUS_DLL_NOT_FOUND` or
+ * `STATUS_INVALID_IMAGE_FORMAT`, printing nothing) is logged and reported as
+ * [DeviceProbeOutcome.LaunchFailed], so the app still starts and the Settings page offers CPU and auto while
+ * naming the failure; any other throwable propagates and fails startup (item 60), and cancellation is rethrown.
  */
 class DeviceProbe internal constructor(
     /** The runner seam: production passes [ProcessRunner.run]; a test throws or answers directly. */
@@ -44,6 +47,8 @@ class DeviceProbe internal constructor(
     private val model: Path,
     /** The whisper-cli executable. A seam so tests can stand in a script for whisper-cli (like [ChunkTranscriber]). */
     private val executable: String,
+    /** The host platform: its null device is whisper-cli's input, since `/dev/null` does not exist on Windows. */
+    private val platform: ProcessPlatform = ProcessPlatform.current(),
 ) {
     constructor(
         runner: ProcessRunner,
@@ -60,13 +65,18 @@ class DeviceProbe internal constructor(
     suspend fun probe(): DeviceProbeOutcome {
         val result =
             try {
-                run(listOf(executable, "-m", model.toString(), "-f", "/dev/null"))
+                run(listOf(executable, "-m", model.toString(), "-f", platform.nullDevice))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
                 logger.warn("Device probe failed; {}", e.message ?: e.toString(), e)
                 return DeviceProbeOutcome.LaunchFailed(e.message ?: e.toString())
             }
+        val loadFailure = loadFailureMessage(result)
+        if (loadFailure != null) {
+            logger.warn("Device probe failed; {}", loadFailure)
+            return DeviceProbeOutcome.LaunchFailed(loadFailure)
+        }
         return DeviceProbeOutcome.Probed(parseVulkanDeviceLines(result.stderr) + parseMetalDeviceLines(result.stderr))
     }
 
@@ -74,6 +84,36 @@ class DeviceProbe internal constructor(
         val logger: Logger = LoggerFactory.getLogger(DeviceProbe::class.java)
     }
 }
+
+/**
+ * The loader failures that mean whisper-cli started but never initialized: Windows exits the process with
+ * `STATUS_DLL_NOT_FOUND` (0xC0000135) or `STATUS_INVALID_IMAGE_FORMAT` (0xC000007B); the POSIX loaders print
+ * their own line (`ld.so`: "error while loading shared libraries", `dyld`: "Library not loaded"). A process
+ * with one of these printed no backend lines, so reading it as "no GPU" would start the app on cpu/auto by
+ * mistake.
+ */
+private val STATUS_DLL_NOT_FOUND = 0xC0000135u
+private val STATUS_INVALID_IMAGE_FORMAT = 0xC000007Bu
+private val LOADER_FAILURE_LINES = listOf("error while loading shared libraries", "Library not loaded")
+
+private fun loadFailureMessage(result: ProcessResult): String? =
+    when {
+        result.exitCode.toUInt() == STATUS_DLL_NOT_FOUND -> {
+            "whisper-cli cannot load: a required DLL is missing (0xC0000135)"
+        }
+
+        result.exitCode.toUInt() == STATUS_INVALID_IMAGE_FORMAT -> {
+            "whisper-cli cannot load: a DLL is not a valid image (0xC000007B)"
+        }
+
+        LOADER_FAILURE_LINES.any { line -> result.stderr.any { it.contains(line) } } -> {
+            "whisper-cli cannot load: a required shared library is missing"
+        }
+
+        else -> {
+            null
+        }
+    }
 
 /**
  * ggml-vulkan's per-device line, `ggml_vulkan: %zu = %s (%s) | uma: %d | …` (index, device name, driver name;

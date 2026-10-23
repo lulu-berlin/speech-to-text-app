@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { PLAYBACK_CLIP } from '../lib/backend.mjs';
 import { uploadAndOpen } from './helpers/ui';
 
@@ -9,6 +9,12 @@ async function activeIndex(region: Locator): Promise<number> {
       segment.hasAttribute('data-active'),
     ),
   );
+}
+
+// The audio element's playback position in seconds: the pause signal, independent of when the display
+// renders the last timeupdate (see the paused-time check below).
+async function audioPosition(page: Page): Promise<number> {
+  return page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime);
 }
 
 // Whether the highlighted segment lies inside the transcript region's visible box.
@@ -80,15 +86,21 @@ test('playback: the highlight follows seeking and pausing, a click seeks and pla
   await page.waitForTimeout(500);
   await expect(back).toBeHidden();
 
-  // The highlight follows pausing: once playing has moved the time, pausing freezes both the
-  // time and the highlight.
+  // The highlight follows pausing: the audio element's position is frozen (0.05 s tolerates one
+  // stalled sample, not the one-second advance a still-playing element makes), and once the display
+  // has caught up it stops changing together with the highlight. The display can render one more
+  // timeupdate after the click, so binding the freeze to the element — not to a text read taken right
+  // after Pause — is what makes the check race-free (PR #46).
   await page.getByRole('button', { name: 'Play' }).click();
   const started = await times.textContent();
   await expect.poll(() => times.textContent(), { timeout: 10_000 }).not.toBe(started);
   await page.getByRole('button', { name: 'Pause' }).click();
+  const pausedPosition = await audioPosition(page);
+  await page.waitForTimeout(1_500);
+  expect(Math.abs((await audioPosition(page)) - pausedPosition)).toBeLessThanOrEqual(0.05);
   const pausedTime = await times.textContent();
   const pausedIndex = await activeIndex(region);
-  await page.waitForTimeout(1_500);
+  await page.waitForTimeout(500);
   expect(await times.textContent()).toBe(pausedTime);
   expect(await activeIndex(region)).toBe(pausedIndex);
   await expect(back).toBeHidden();

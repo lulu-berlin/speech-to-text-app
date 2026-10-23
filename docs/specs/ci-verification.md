@@ -2,7 +2,7 @@
 
 Status: done (roadmap item 51, merged 2026-10-14)
 Depends on: — (infrastructure; nothing to build on)
-Blocks: — [48](macos-support.md) and [49](../../roadmap/49-windows-support.md) (their CI-runner verification)
+Blocks: — [48](macos-support.md) and [49](windows-support.md) (their CI-runner verification)
 
 ## Goal
 

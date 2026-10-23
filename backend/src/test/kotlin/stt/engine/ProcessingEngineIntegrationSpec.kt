@@ -7,6 +7,7 @@ import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
 import stt.Integration
@@ -73,7 +74,13 @@ class ProcessingEngineIntegrationSpec :
 
                                 val stored = segments.findByTask(id)
                                 stored.shouldNotBeEmpty()
-                                stored.joinToString("") { it.text }.isNotBlank() shouldBe true
+                                // The clip is whisper.cpp's jfk.wav, so the transcript is the sample's known
+                                // quote (the two phrases e2e/05-transcript checks on the app's journey) and
+                                // its one voice is one speaker: the same expected output on every host.
+                                val transcript = stored.joinToString("") { it.text }.lowercase()
+                                transcript shouldContain "ask not what your country can do for you"
+                                transcript shouldContain "ask what you can do for your country"
+                                segments.findSpeakers(id).size shouldBe 1
                                 val speakerIds = stored.map { it.speakerId.shouldNotBeNull() }
                                 segments.findSpeakers(id).map { it.speakerId } shouldBe speakerIds.distinct().sorted()
                                 Files.exists(config.dataDir.resolve("work")).shouldBeFalse()

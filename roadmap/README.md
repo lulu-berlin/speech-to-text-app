@@ -93,7 +93,7 @@ graph TD
   05 --> 48
   16 --> 48
   45 --> 48
-  33 --> 49[49 Windows support]
+  33 --> 49[49 Windows support ✓]:::done
   48 --> 49
   51 --> 49
   16 --> 50[50 Electron desktop app ✓]:::done
@@ -212,7 +212,7 @@ graph TD
 | [46 — Contextual logging: the task's id in every log line (MDC) and named coroutines](../docs/specs/contextual-logging.md)                                           | done          | 11                          |
 | [47 — ProcessingEngineAtomicTransitionsSpec is schedule-dependent (flaky)](../docs/specs/atomic-transitions-spec-flaky.md)                                           | done          | 11                          |
 | [48 — macOS support](../docs/specs/macos-support.md) | done | 05, 16, 45, 50, 51 |
-| [49 — Windows support](49-windows-support.md)                                                                                                                        | spec-approved | 33, 48, 50, 51              |
+| [49 — Windows support](../docs/specs/windows-support.md)                                                                                                                        | done          | 33, 48, 50, 51              |
 | [50 — Electron desktop app](../docs/specs/electron-desktop-app.md)                                                                                                   | done          | 16                          |
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md)                                                                              | done          | —                           |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md)                                                    | spec-approved | 12, 22                      |

@@ -137,4 +137,12 @@ class ConfigSpec :
                 }
             }
         }
+
+        given("STT_STOP_ON_STDIN_CLOSE unset, as the console launcher and gradle run leave it") {
+            `when`("configuration is loaded") {
+                then("the backend does not watch stdin; the switch is the desktop app's (item 49)") {
+                    Config.fromEnv(TEST_REQUIRED_ENV).stopOnStdinClose shouldBe false
+                }
+            }
+        }
     })
