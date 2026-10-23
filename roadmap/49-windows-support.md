@@ -187,6 +187,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       `Speech-to-Text.exe` exists under `%ProgramFiles%` or `%ProgramFiles(x86)%`
 - [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green (re-run after the review findings)
+- [x] (discovered, 2026-10-23, from PR #46's CI) The paused-time check binds to the audio element's
+      playback position, not to a display read taken before the last update.
 
 ## Acceptance criteria
 
@@ -644,3 +646,17 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   the per-machine MSI item and "(must not break)" are ticked on that run; status: in-review.
   Still to file by the root agent: a new roadmap item for a full e2e journey on Windows (CI runs only
   the packaged specs; the 41-test journey is Linux/macOS today); see the draft in the session log.
+- 2026-10-23: discovered cycle (paused-time check) green. `06-playback`'s paused-time check read the
+  displayed time right after clicking Pause, slept 1.5 s and demanded the same text; the player's last
+  `timeupdate` can render after that read, so a correctly paused player failed. Recorded red: CI run
+  #179 (`57f5211a`, https://github.com/lulu-berlin/speech-to-text-app/actions/runs/39884473983), job
+  `macOS (e2e)` (https://github.com/lulu-berlin/speech-to-text-app/actions/runs/39884473983/job/120192895326):
+  `06-playback.spec.ts:92` `Expected: "00:01 / 02:12"`, `Received: "00:02 / 02:12"`, 40 of 41 passed with
+  no frontend or `e2e/tests` change; the same failure was reported on the PR's macOS (e2e). The fix binds
+  the freeze to the element: `audio.currentTime` read right after Pause, again after 1.5 s, within
+  0.05 s; then the display and the highlight are read and must not change over a further 500 ms.
+  Follow mode and click-to-seek are unchanged. The new assertion can fail: with the Pause click
+  removed it failed at `:100` (`Expected: <= 0.05`, `Received: 1.521736`), then the click was restored.
+  Green: the spec alone against the real backend (`gradle run`, devenv whisper-cli/ffmpeg) 5 of 5
+  runs, 34.1-35.1 s each. The MED known-issues row is narrowed to the remaining fixed-sleep finding
+  (LOW); the paused-time race leaves the backlog with this item.
