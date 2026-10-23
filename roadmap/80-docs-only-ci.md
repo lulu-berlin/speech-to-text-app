@@ -79,7 +79,7 @@ dispatch runs always run everything.
       the schema) counts as code, and so does every `.txt` (they are build inputs)
 - [x] (CI) A push to `main` and the nightly schedule run every heavy job
 - [x] (CI) With the `ci:full` label, a documentation-only PR runs every heavy job
-- [ ] (must not break) The required check keeps the name `CI (all checks)`; the aggregator's `needs`
+- [x] (must not break) The required check keeps the name `CI (all checks)`; the aggregator's `needs`
       covers every heavy job; the manual asset jobs and the macOS-only jobs keep their conditions
 - [ ] (must not break) A skipped job does not make `CI (all checks)` red, and a failing job still
       does
@@ -143,3 +143,8 @@ e2e (the reason is recorded here, as in item 65).
   honours `FORCE_FULL`; the test flips a documentation-only temp-repo range from `code=false` to
   `code=true` and pins the `changes` job's `FORCE_FULL: contains(github.event.pull_request.labels.*.name, 'ci:full')`
   wiring. 6 tests pass. GitHub half: a documentation-only PR carrying the label.
+- 2026-10-23 (cycle 7, test-list item 6): passed on its first run — a pin over the post-change
+  workflow: the aggregator keeps the name, lists every heavy job (and every `needs` entry names a
+  real job), the two manual asset jobs keep `workflow_dispatch && inputs.assets` and no `needs`,
+  the macOS jobs keep their `macos-backend-check`/`macos-frontend-check` dependencies alongside the
+  gate, and `model-hosts` keeps its cron and stays out of the aggregator. 7 tests pass.

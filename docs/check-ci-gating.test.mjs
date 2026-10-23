@@ -251,3 +251,40 @@ test('the ci:full label runs every heavy job on a documentation-only pull reques
   const changes = parseJobs(readFileSync(workflowPath, 'utf8')).get('changes');
   assert.match(changes.raw.join('\n'), /FORCE_FULL: \$\{\{ contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci:full'\) \}\}/);
 });
+
+test('the required check and the jobs it gates keep their names and conditions', () => {
+  const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
+  const ci = jobs.get('ci');
+  assert.equal(ci.name, 'CI (all checks)', 'the required check keeps the name branch protection requires');
+
+  // Every heavy job reports through the aggregator, so the gate cannot hide a job from the required
+  // check; and a typo in a `needs` entry names nothing and would silently un-gate.
+  for (const job of jobs.values()) {
+    if (UNGATED.has(job.id) || EVENT_GATED.has(job.id)) continue;
+    assert.ok(ci.needs.includes(job.id), `${job.id} is in CI (all checks)`);
+  }
+  for (const need of ci.needs) {
+    assert.ok(jobs.has(need), `ci needs ${need}, which is a job`);
+  }
+  assert.ok(ci.needs.includes('docs-check'), 'the always-on docs job reports through the aggregator');
+
+  // The manual assets stay dispatch-only and outside the change filter.
+  for (const id of ['macos-whisper-asset', 'macos-ffmpeg-asset']) {
+    const job = jobs.get(id);
+    assert.equal(job.if, "github.event_name == 'workflow_dispatch' && inputs.assets", `${id} keeps its dispatch condition`);
+    assert.deepEqual(job.needs, [], `${id} does not wait for the change filter`);
+  }
+
+  // The macOS jobs keep their own dependencies: the change gate is added, not swapped in.
+  for (const id of ['macos-backend-integration', 'macos-e2e', 'macos-nix', 'macos-dmg']) {
+    const job = jobs.get(id);
+    assert.ok(job.needs.includes('changes'), `${id} carries the change gate`);
+    assert.ok(job.needs.includes('macos-backend-check'), `${id} still waits for macOS (gradle check)`);
+    assert.ok(job.needs.includes('macos-frontend-check'), `${id} still waits for macOS (pnpm test, pnpm build)`);
+  }
+
+  // The weekly model-host probe stays outside the aggregator on its own cron.
+  const modelHosts = jobs.get('model-hosts');
+  assert.equal(modelHosts.if, "github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'");
+  assert.ok(!ci.needs.includes('model-hosts'), 'a weekly network probe does not gate pull requests');
+});
