@@ -149,7 +149,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       with its per-user paths: item 50's packaged specs (journey, quit without orphan processes,
       first run with the model download and its persistence, download failure with Retry) pass
       against the unpacked build
-- [ ] (e2e, CI Windows, added 2026-10-21) The unsigned per-user MSI installs the same app: silent
+- [x] (e2e, CI Windows, added 2026-10-21) The unsigned per-user MSI installs the same app: silent
       `msiexec /i … /quiet` installs under the per-user programs directory, item 50's packaged
       specs pass against the installed app, and `msiexec /x {ProductCode} /quiet` removes the
       program files while the data directory and model cache remain
@@ -354,3 +354,22 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   02 16.1 s, 03 1.2 m, 04 17.1 s, all pass. The job's 7:30 stays inside the macOS e2e band
   13–16 min → no cadence change. Commits `02ee7ce5` (helper + launch env), `8a72fa4e` (packaging).
   Item ticked; run recorded as user-verified.
+- 2026-10-23: item 12 (per-user MSI) green on CI. New `e2e/desktop-tests/15-msi-install.spec.ts`
+  (Windows-only): a silent `msiexec /i … /quiet /norestart` must put `Speech-to-Text.exe` under
+  `%LOCALAPPDATA%\Programs` and never under Program Files; the installed app's first run downloads
+  both models from the loopback server and transcribes the JFK clip; `msiexec /x {ProductCode}
+  /quiet` (the code read from the per-user uninstall entry) must remove the program files while
+  `stt.db` and both cached models remain. The Windows job also installs the MSI and runs item 50's
+  packaged specs 01–04 against the installed app. Red 1: run #174 `39882646124` (`cb507d45`) —
+  the zip specs passed, then `no MSI was produced: the win target builds only the zip`. Red 2: run
+  #179 `39884473983` (`57f5211a`, `msi` target with `perMachine: false`, `oneClick`,
+  `runAfterFinish: false`) — the zip built, the WiX link failed with `LGHT0094 : The identifier
+  'Icon:SpeechtoTextIcon.exe' could not be found` (electron-builder emits the `<Icon>` element only
+  when an application icon is configured). Green: run #183 `39886849354` (`b884993f`, `icon:
+  icon.png`), job `Windows (packaged zip e2e)` success in 7:00 — zip specs 0:29, MSI install +
+  installed-app specs 01–04 0:38, MSI installer spec 0:27. The run failed only on `macOS (gradle
+  check)`, the temp-dir watch flake recorded in `docs/known-issues.md` (`7b52120b`); #179's
+  `macOS (e2e)` red was `06-playback.spec.ts:92` (`00:01` expected, `00:02` received after pause),
+  code this branch does not touch, recorded in the known-issues row for that spec. Not run on the
+  Windows 11 guest: CI-verified only. Commits `cb507d45` (spec + CI step), `57f5211a` (MSI target +
+  installed-app specs), `b884993f` (icon). Item ticked.
