@@ -530,3 +530,18 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   reverted in the same cycle): `expected:<true> but was:<false>` at `:63` (`app.isAlive`). Green on
   the restored conditional. `gradle check` (354 tests), `gradle integrationTest` (402, 82 executed),
   frontend and docs checks green. Commit `658e8615`. Both stdin-close items ticked.
+- 2026-10-23: review cycle 7 (Windows desktop quit, graceful first) green. The stop logic moved out of
+  `startBackend`'s closure into `stopBackend(child, {platform, timeoutMs, forceKill})` (`desktop/src/backend.ts`),
+  and the desktop package got its first test runner: `node --test src/backend.test.ts`, added to
+  `pnpm --dir desktop test` (which the three desktop CI jobs already run), with
+  `desktop/tsconfig.test.json` type-checking the spec against the same globals as `src`.
+  The spec's fake process records stdin ends, signals and force-kills; `node:test` mock timers
+  drive the 10 s wait deterministically. Red (after the extraction, before the fix): "the graceful
+  ask is the closed stdin" (`false !== true`). Green: on Windows `stopBackend` ends the child's
+  stdin, force-kills with `taskkill /T /F` only after the wait, and sends no signal; `startBackend`
+  pipes stdin and sets `STT_STOP_ON_STDIN_CLOSE=1` there. `stdio` is one literal
+  `['pipe', 'pipe', 'pipe']` so the type of `child.stdout`/`stderr` stays non-null; on POSIX the
+  stdin pipe is never written or read. Gates: `node --test` 1 test, `tsc` for the app, the test
+  project and the scripts, Prettier, `gradle check`, `gradle integrationTest`, frontend and docs
+  checks. Commit `8401caf6`. Not ticked: "only if the backend has not exited within 10 s" — the
+  branch where the backend exits in time — is untested; proposed as its own test.
