@@ -112,6 +112,10 @@ tasks.named("check") {
     dependsOn("ktlintCheck")
 }
 
+// Full exception format for failing tests in the console (roadmap item 77). A separate script so
+// TestLoggingIntegrationSpec can apply the same file to its fixture build.
+apply(from = "gradle/test-logging.gradle.kts")
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform {
         includeEngines("kotest")
@@ -126,6 +130,24 @@ tasks.withType<Test>().configureEach {
             .get()
             .runtimeClasspath.asPath,
     )
+    // The Gradle distribution running this build, so TestLoggingIntegrationSpec starts its fixture
+    // build with the same Gradle (the devenv's locally, the wrapper's in CI). Not Gradle TestKit:
+    // its jars carry Gradle's own SLF4J provider, which displaces logback in every test (item 77).
+    gradle.gradleHomeDir?.let { systemProperty("stt.test.gradleHome", it.absolutePath) }
+    // Each test JVM gets its own java.io.tmpdir under build/, recreated empty before the run. The
+    // JDK default is the temp dir every process of the user shares (the Gradle daemon included), so
+    // a spec that watches the app's temp dir for spool files (UploadStoredInDatabaseSpec) would
+    // record files other processes write there (roadmap item 77).
+    val privateTmpDir =
+        layout.buildDirectory
+            .dir("test-tmp/$name")
+            .get()
+            .asFile
+    systemProperty("java.io.tmpdir", privateTmpDir.absolutePath)
+    doFirst {
+        privateTmpDir.deleteRecursively()
+        privateTmpDir.mkdirs()
+    }
 }
 
 // Unit default: `gradle test`/`gradle check` run no Integration-tagged tests

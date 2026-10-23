@@ -138,7 +138,7 @@ graph TD
   74[74 desktop presentation]
   75[75 retire the Python oracle]
   76[76 RTL transcription]
-  77[77 upload spec shared temp dir]
+  77[77 private test temp dirs ✓]:::done
   78[78 stable release]
   49 --> 78
   52 --> 78
@@ -240,7 +240,7 @@ graph TD
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | draft         | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | draft         | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | draft         | —                           |
-| [77 — `UploadStoredInDatabaseSpec` fails when another process writes to the shared temp dir](77-upload-spec-shared-temp-dir.md)                                     | spec-approved | —                           |
+| [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |
 | [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | draft         | 21, 49, 51                  |
 | [80 — Documentation-only pull requests skip the heavy CI jobs](80-docs-only-ci.md)                                                                                | spec-approved | 49, 51                      |

@@ -5,7 +5,7 @@ Depends on: [49](49-windows-support.md), [52](52-edit-transcription.md),
 [65](65-row-color-chunking-observation.md), [68](68-windows-audio-only-ffmpeg.md),
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](72-frontend-state-and-errors.md),
 [74](74-desktop-presentation.md), [76](76-right-to-left-transcription.md),
-[77](77-upload-spec-shared-temp-dir.md), [79](79-full-e2e-journey-on-windows.md) — the gates
+[77](../docs/specs/test-harness-temp-dirs.md), [79](79-full-e2e-journey-on-windows.md) — the gates
 proposed below — and the six MED known issues listed under Evidence, which no roadmap item handles
 today
 Blocks: —
