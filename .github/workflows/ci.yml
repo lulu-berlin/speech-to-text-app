@@ -37,7 +37,7 @@ concurrency:
 
 jobs:
   backend-check:
-    name: Backend (gradle check)
+    name: Linux (gradle check)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -49,7 +49,7 @@ jobs:
         run: ./gradlew -p backend check
 
   frontend-check:
-    name: Frontend (pnpm test, pnpm build)
+    name: Linux (pnpm test, pnpm build)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
@@ -68,7 +68,7 @@ jobs:
         run: pnpm build
 
   docs-check:
-    name: Docs (exception policy)
+    name: Linux (docs exception policy)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -82,7 +82,7 @@ jobs:
         run: node --test docs/check-exceptions.test.ts
 
   backend-integration:
-    name: Backend (gradle integrationTest)
+    name: Linux (gradle integrationTest)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -100,7 +100,7 @@ jobs:
         run: ./gradlew integrationTest
 
   e2e:
-    name: E2E (Playwright)
+    name: Linux (e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -805,7 +805,7 @@ jobs:
   # e2e/desktop/run-in-docker.ts (the dev entry point) exists for hosts whose /nix/store supplies
   # the node, Xvfb and fixtures it insists on, which is why CI does not go through the container.
   desktop-e2e:
-    name: Desktop (packaged .deb e2e)
+    name: Linux (packaged .deb e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -907,7 +907,7 @@ jobs:
   # with AppArmor, so this job is also where Chromium's sandbox meets the user-namespace
   # restriction that store-installed Electron (no setuid helper) has to live with.
   desktop-nix-e2e:
-    name: Desktop (flake package e2e)
+    name: Linux (flake package e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 90
@@ -937,7 +937,7 @@ jobs:
   # Nix build here runs the backend's `gradle check`, so item 58's real-time completion waits can
   # still fail it — as they can the already-required `desktop-nix-e2e` and `nix-build`.
   desktop-bundle-e2e:
-    name: Desktop (bundle e2e)
+    name: Linux (bundle e2e)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 120
@@ -965,7 +965,7 @@ jobs:
   # Each of the three Nix jobs checks out the sources and restores the same store cache; only
   # `nix-build` may write it (cache-nix-action saves in a post step that runs on `success()`).
   nix-devenv:
-    name: Nix (devenv shell)
+    name: Linux (Nix devenv shell)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -989,7 +989,7 @@ jobs:
         run: devenv test
 
   nix-flake-check:
-    name: Nix (flake check)
+    name: Linux (Nix flake check)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -1000,7 +1000,7 @@ jobs:
         run: nix flake check --print-build-logs
 
   nix-build:
-    name: Nix (build)
+    name: Linux (Nix build)
     runs-on: ubuntu-24.04
     needs: [backend-check, frontend-check]
     timeout-minutes: 60
@@ -1022,7 +1022,7 @@ jobs:
   # versions.json and needs no build, so it is a two-second job. Deliberately not in the `ci`
   # aggregator: a weekly network check must not gate a pull request.
   model-hosts:
-    name: Pinned model hosts resolve
+    name: Linux (pinned model hosts resolve)
     if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -1037,7 +1037,9 @@ jobs:
   # The one required check for branch protection: it waits for every other job and fails when any of
   # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
   # renaming a job cannot silently un-gate merges. `model-hosts` is the one deliberate exception
-  # (its own comment says why); a job absent from this list cannot gate merges.
+  # (its own comment says why); a job absent from this list cannot gate merges. Every other job's
+  # name starts with the platform it targets (Linux, macOS, Windows); this one covers all of them,
+  # and branch protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
     needs: [backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
