@@ -290,7 +290,7 @@ class ProcessingEngineSpec :
                                 // no process starts) runs in a coroutine of the engine's scope.
                                 val probe =
                                     DeviceProbe(
-                                        ProcessRunner(2.seconds) { throw IOException("no whisper-cli") },
+                                        ProcessRunner(2.seconds, startProcess = { throw IOException("no whisper-cli") }),
                                         Path.of("/m.bin"),
                                         "/whisper-cli",
                                     )

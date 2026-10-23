@@ -22,10 +22,16 @@ class ProcessRunner internal constructor(
     private val env: Map<String, String> = System.getenv(),
     /** The host platform's signals and process-group support; production uses the JVM's `os.name`. */
     private val platform: ProcessPlatform = ProcessPlatform.current(),
+    /** Whether the backend is stopping (the known-stopped-by-us flag, item 49). */
+    private val stopping: () -> Boolean = { false },
     /** Starts the built process. A seam so tests can act inside the spawn window (ADR 0020). */
     private val startProcess: (ProcessBuilder) -> Process,
 ) : ProcessControl {
-    constructor(gracePeriod: Duration = 2.seconds) : this(gracePeriod, startProcess = ProcessBuilder::start)
+    /** [stopping] tells the runner the backend is shutting down; production wires it to the application's stop. */
+    constructor(
+        gracePeriod: Duration = 2.seconds,
+        stopping: () -> Boolean = { false },
+    ) : this(gracePeriod, stopping = stopping, startProcess = ProcessBuilder::start)
 
     /**
      * Guards the per-run state ([inFlight], [currentTree], [paused]). Registering a tree and applying
@@ -94,10 +100,15 @@ class ProcessRunner internal constructor(
                 // the tree while the caller waited (roadmap item 34, discovered). Surface it as a
                 // cancellation so the engine never records FAILED: it puts the task back to QUEUED and runs it
                 // again (item 42), or, when the app is quitting, leaves it to the next start's recovery
-                // (ADR 0004) — this covers whisper-cli and ffmpeg alike. Windows has no SIGTERM; there the
-                // desktop app kills the tree on quit (item 49) and recovery covers the rest.
+                // (ADR 0004) — this covers whisper-cli and ffmpeg alike.
                 if (platform.signals && exitCode == SIGTERM_EXIT_CODE) {
                     throw CancellationException("process was terminated by SIGTERM (exit $SIGTERM_EXIT_CODE)")
+                }
+                // The known-stopped-by-us flag (item 49): a tool that dies while the backend is stopping was
+                // stopped by the shutdown — on Windows there is no SIGTERM to recognise it by — so it is an
+                // interruption on every platform, never a failure.
+                if (exitCode != 0 && stopping()) {
+                    throw CancellationException("process exited with $exitCode while the backend was stopping")
                 }
                 ProcessResult(exitCode, stdout.await(), stderr.await())
             } catch (e: Throwable) {
