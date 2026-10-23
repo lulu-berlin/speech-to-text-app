@@ -138,6 +138,7 @@ graph TD
   74[74 desktop presentation]
   75[75 retire the Python oracle]
   76[76 RTL transcription]
+  77[77 upload spec shared temp dir]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -221,3 +222,4 @@ graph TD
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | draft         | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | draft         | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | draft         | —                           |
+| [77 — `UploadStoredInDatabaseSpec` fails when another process writes to the shared temp dir](77-upload-spec-shared-temp-dir.md)                                     | spec-approved | —                           |
