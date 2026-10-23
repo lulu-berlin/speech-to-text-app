@@ -28,7 +28,6 @@ function parseJobs(text) {
   const jobs = new Map();
   let inJobs = false;
   let current = null;
-  let pendingNeeds = false;
   let blockIndent = -1;
   for (const line of text.split('\n')) {
     const indent = line.length - line.trimStart().length;
@@ -45,37 +44,27 @@ function parseJobs(text) {
     if (job) {
       current = { id: job[1], name: null, needs: [], if: null, raw: [] };
       jobs.set(current.id, current);
-      pendingNeeds = false;
       continue;
     }
     if (current === null) continue;
     current.raw.push(line);
-    if (pendingNeeds && /^ {6}- \S/.test(line)) {
-      current.needs.push(line.replace(/^ {6}- /, '').trim());
-      continue;
-    }
     if (indent !== 4) continue;
     const key = /^ {4}([A-Za-z0-9_-]+):(.*)$/.exec(line);
     if (key === null) continue;
     const [, name, rest] = key;
     const value = rest.trim().replace(/^(['"])(.*)\1$/, '$2');
-    pendingNeeds = false;
     if (/^[|>]/.test(value)) {
       blockIndent = 4;
       continue;
     }
     if (name === 'name') current.name = value;
     if (name === 'if') current.if = value;
-    if (name === 'needs') {
-      if (value.startsWith('[')) {
-        current.needs = value
-          .slice(1, -1)
-          .split(',')
-          .map((need) => need.trim())
-          .filter(Boolean);
-      } else if (value === '') {
-        pendingNeeds = true;
-      }
+    if (name === 'needs' && value.startsWith('[')) {
+      current.needs = value
+        .slice(1, -1)
+        .split(',')
+        .map((need) => need.trim())
+        .filter(Boolean);
     }
   }
   return jobs;
