@@ -2,12 +2,10 @@ package stt.process
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
-import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
-import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 class ProcessRunnerPlatformSpec :
@@ -57,23 +55,17 @@ class ProcessRunnerPlatformSpec :
 
             `when`("a terminal Ctrl-C reaches the tool, which shares the terminal's process group") {
                 then("its SIGINT exit (130) is a cancellation, not a failed result") {
-                    val bin = tempdir("stt-darwin-sigint")
-                    // `.exe` because the host may be Windows, where Files.isExecutable needs the extension even
-                    // though the simulated platform is Darwin (which appends no suffix).
-                    File(bin, "whisper-cli.exe").apply {
-                        createNewFile()
-                        setExecutable(true)
-                    }
                     val runner =
                         ProcessRunner(
                             gracePeriod = 1.seconds,
-                            env = mapOf("PATH" to bin.absolutePath),
                             platform = ProcessPlatform.DARWIN,
                             startProcess = { ExitedProcess(exitCode = 130) },
                         )
 
+                    // Resolution runs before the spawn seam, so the command must exist on the host: the JVM's own
+                    // binary does everywhere (and Darwin appends no suffix, so an absolute path is used as given).
                     runTest {
-                        shouldThrow<CancellationException> { runner.run(listOf("whisper-cli.exe")) }
+                        shouldThrow<CancellationException> { runner.run(listOf(hostExecutable())) }
                     }
                 }
             }
@@ -90,3 +82,11 @@ class ProcessRunnerPlatformSpec :
             }
         }
     })
+
+/** A command that resolves on every host: the running JVM's own executable (resolution runs before the seam). */
+private fun hostExecutable(): String =
+    ProcessHandle
+        .current()
+        .info()
+        .command()
+        .orElseThrow()

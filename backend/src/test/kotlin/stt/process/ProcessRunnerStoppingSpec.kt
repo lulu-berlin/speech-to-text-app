@@ -2,10 +2,8 @@ package stt.process
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
-import io.kotest.engine.spec.tempdir
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
-import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -20,26 +18,29 @@ class ProcessRunnerStoppingSpec :
             given("$name, with the backend stopping") {
                 `when`("a tool exits with a non-zero code") {
                     then("the run is a cancellation, not a failed result") {
-                        val bin = tempdir("stt-stopping")
-                        // `.exe` because the host may be Windows, where Files.isExecutable needs the extension
-                        // even though the simulated platform may be Darwin (which appends no suffix).
-                        val tool = File(bin, "whisper-cli.exe")
-                        tool.createNewFile()
-                        tool.setExecutable(true)
                         val runner =
                             ProcessRunner(
                                 gracePeriod = 1.seconds,
-                                env = mapOf("PATH" to bin.absolutePath),
                                 platform = platform,
                                 stopping = { true },
                                 startProcess = { ExitedProcess(exitCode = 1) },
                             )
 
+                        // Resolution runs before the spawn seam, so the command must exist on the host: the JVM's
+                        // own binary does everywhere (an absolute path is used as given, no PATH lookup).
                         runTest {
-                            shouldThrow<CancellationException> { runner.run(listOf("whisper-cli.exe")) }
+                            shouldThrow<CancellationException> { runner.run(listOf(hostExecutable())) }
                         }
                     }
                 }
             }
         }
     })
+
+/** A command that resolves on every host: the running JVM's own executable (resolution runs before the seam). */
+private fun hostExecutable(): String =
+    ProcessHandle
+        .current()
+        .info()
+        .command()
+        .orElseThrow()
