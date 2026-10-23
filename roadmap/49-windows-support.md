@@ -592,3 +592,13 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   app's e2e. The README's Windows section states that boundary. `gradle help`, `e2eInstall --dry-run`,
   `gradle check`, frontend and docs checks green; the Windows message itself can only be observed on
   the guest. Commit `6709af2d`.
+- 2026-10-23: the five approved refactors, each its own commit with every gate green:
+  `dfd5010b` `ProcessTree` requires signals in its constructor instead of two silent no-op guards;
+  `68b6d15c` the unreachable `!platform.signals` early returns are gone from `pause()`/`resume()`
+  (Windows has no tree, so the body was already a no-op); `2df19716` `TestEngine`'s
+  `!Files.exists` fallback counts as gone only on Windows, so a POSIX access error is no longer
+  swallowed; `e5568092` `docs/check-readme-windows.mjs` bounds its section at the next heading, so
+  the Vulkan/CPU facts can only match inside it; `eaf6fe19` the pause spec waits until no whisper-cli
+  is left before its stability window (shared `runningTools()` in `AwaitUntil.kt`, also used by the
+  cancel spec), which needs a guest `integrationTest` run to observe on Windows. Gates after each:
+  `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build`, the docs checks, `actionlint`.
