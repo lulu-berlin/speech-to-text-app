@@ -7,9 +7,8 @@
 # gates still run.
 #
 # `importWith` imports the artifact's module with an overridden `artifacts` argument, `attr` is the
-# module's result attribute, `name` the check's derivation name (also the message prefix),
-# `fixtureName` the bogus asset's file name and `staleStorePath` a store path of this artifact's name
-# that is not this flake's source build.
+# module's result attribute, `name` the check's derivation name (also the message prefix) and
+# `fixtureName` the bogus asset's file name.
 {
   pkgs,
   importWith,
@@ -17,7 +16,6 @@
   pin,
   name,
   fixtureName,
-  staleStorePath,
 }:
 let
   lib = pkgs.lib;
@@ -25,6 +23,8 @@ let
   zeros = "0000000000000000000000000000000000000000000000000000000000000000";
   real = importWith (import ./desktop-artifacts.nix);
   source = real.source;
+  # A store path of this artifact's name that is not this flake's source build (the all-zero hash).
+  staleStorePath = "/nix/store/${builtins.substring 0 32 zeros}-${source.name}";
   artifact = real.${attr};
   fixture = pkgs.writeText fixtureName "not the release asset";
   registered = url:

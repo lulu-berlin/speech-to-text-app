@@ -187,7 +187,8 @@ val models = manifest["models"] as Map<*, *>
 val runtimeBinDirs = mutableListOf<File>()
 
 // Downloads, verifies and unpacks one tool and returns its executable. Archives are
-// .tar.gz (whisper-cli) or .jar (ffmpeg from Maven Central, a zip).
+// .tar.gz (whisper-cli; ffmpeg on Apple Silicon) or .jar (ffmpeg on Linux and Intel macOS, from
+// Maven Central, a zip).
 fun prepareTool(
     label: String,
     entry: Map<*, *>,
@@ -228,7 +229,8 @@ fun prepareTool(
 // (libva, libdrm, also bundled) are found only through LD_LIBRARY_PATH. The generated wrappers,
 // first on PATH, set it for one tool and exec the real binary. The extract directory is never on
 // PATH itself, so every executable an archive ships needs its own wrapper.
-// (macOS needs no wrapper: the dylibs resolve through @rpath = @loader_path.)
+// (macOS needs no wrapper: Apple Silicon's ffmpeg is one binary linking only system libraries, and
+// Intel's bytedeco dylibs resolve through @rpath = @loader_path.)
 fun linuxLibraryPathWrapper(tools: List<File>): File {
     val wrapperDir = File(tools.first().parentFile, "stt-bin")
     wrapperDir.mkdirs()
@@ -271,10 +273,10 @@ tasks.register("prepareRuntime") {
                 throw GradleException("versions.json has no $label download for $platform (supported: linux-x64, darwin-x64, darwin-arm64)")
             }
             val exe = prepareTool(label, entry, label)
-            // An archive can ship more than one executable: the bytedeco ffmpeg jar carries ffmpeg
-            // and ffprobe. Nothing runs ffprobe (the shipped ffmpeg does not have it), so only
-            // ffmpeg is resolved. Gradle's zip copy drops the executable bit, so findExecutable
-            // restores it.
+            // An archive can ship more than one executable: Linux's bytedeco ffmpeg jar carries
+            // ffmpeg and ffprobe. Nothing runs ffprobe (the shipped ffmpeg does not have it), so
+            // only ffmpeg is resolved. Gradle's zip copy drops the executable bit, so
+            // findExecutable restores it; the darwin tar.gz keeps its mode.
             val executables = listOf(findExecutable(exe.parentFile, exe.name))
             val binDir =
                 if (label == "ffmpeg" && requirePlatform().startsWith("linux")) {

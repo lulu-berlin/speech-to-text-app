@@ -54,16 +54,16 @@ export const FIXTURE_CLIPS = [
   'jfk-i.wav', // 0-7s
   'jfk-j.wav', // 4-11s
   'broken-2.wav',
-  'jfk-k.wav', // the sample looped 7x, ~77s
+  'jfk-k.wav', // the sample 8 times, ~88s
   'jfk-l.wav', // 0-4s
   'jfk-m.wav', // 0-5s
-  'jfk-n.wav', // the sample looped 8x, ~88s
+  'jfk-n.wav', // the sample 9 times, ~99s
   'jfk-o.wav', // 5-7s, the contract check (item 16)
   'jfk-p.wav', // 1-8s, item 32's settings e2e
   'jfk-follow.wav', // the sample looped 14x, ~154s (item 36)
   'jfk-q.wav', // 3-5s, item 37's completed player clip
-  'jfk-r.wav', // the sample looped 5x, ~55s, item 37's background transcription
-  'jfk-s.wav', // the sample looped 9x, ~110s, item 40's atomic-transitions race clip
+  'jfk-r.wav', // the sample 6 times, ~66s, item 37's background transcription
+  'jfk-s.wav', // the sample 10 times, ~110s, item 40's atomic-transitions race clip
   'jfk-u.wav', // 6-9s, item 40's queue-is-live follow-up
   'jfk-v.wav', // the sample looped 11x, ~121s, item 40's pause-queued running clip
   'jfk-w.wav', // 2-6s, item 40's pause-queued clip
@@ -83,7 +83,7 @@ export const FIXTURE_CLIPS = [
   'jfk-ah.wav', // the sample looped 5x, ~55s, item 59's phase-color row clip
   'broken-59-status.wav', // item 59's status-page delete fixture
   'jfk-ai.wav', // the sample looped 17x, ~187s, item 59's header-typing clip
-  'jfk-metal.wav', // the sample looped once (~22s), item 48's Metal app e2e
+  'jfk-metal.wav', // the sample twice (~22s), item 48's Metal app e2e
 ];
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -122,13 +122,13 @@ export const FOLLOW_CLIP = FIXTURE_CLIPS[22];
 // player is checked. Unique bytes: FOLLOW_CLIP is item 36's loop, and the other trims
 // are other tests' clips, so these cannot answer 409.
 export const COMPLETED_PLAYER_CLIP = FIXTURE_CLIPS[23]; // 3-5s
-export const TRANSCRIBING_BACKGROUND_CLIP = FIXTURE_CLIPS[24]; // the sample looped 5x, ~55s
+export const TRANSCRIBING_BACKGROUND_CLIP = FIXTURE_CLIPS[24]; // the sample 6 times, ~66s
 
 // Item 40's atomic-transition journey (ADR 0046): a long clip for the rapid
 // pause/resume/cancel race, and a short trim whose completion proves the queue kept
-// working. Unique bytes: jfk-r (5x), jfk-k (7x), jfk-n (8x), jfk-long (12x) and
+// working. Unique bytes: jfk-r (6x), jfk-k (8x), jfk-n (9x), jfk-long (12x) and
 // jfk-follow (14x) are other tests' loops, and 6-9s is no existing trim.
-export const ATOMIC_RACE_CLIP = FIXTURE_CLIPS[25]; // the sample looped 9x, ~110s
+export const ATOMIC_RACE_CLIP = FIXTURE_CLIPS[25]; // the sample 10 times, ~110s
 export const ATOMIC_NEXT_CLIP = FIXTURE_CLIPS[26]; // 6-9s
 // Item 40's pause-a-queued-upload journey (the review): a long clip that keeps the engine
 // transcribing, and a short trim queued behind it that the test pauses. Unique bytes: no
@@ -192,7 +192,7 @@ export const STATUS_BROKEN_CLIP = FIXTURE_CLIPS[43];
 // icon is watched, then cancelled so it does not hold up the later specs.
 export const HEADER_TYPING_CLIP = FIXTURE_CLIPS[44];
 
-// Item 48's app-level Metal e2e: a unique clip (the sample looped once) whose transcript must
+// Item 48's app-level Metal e2e: a unique clip (the sample twice) whose transcript must
 // carry the JFK quote while the task runs through MTL0 on the macOS runner.
 export const METAL_CLIP = FIXTURE_CLIPS[45];
 

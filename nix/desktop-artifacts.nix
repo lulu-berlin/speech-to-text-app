@@ -39,6 +39,18 @@
     references = [];
   };
 
+  # The same build for Apple Silicon (roadmap item 69), made by the manual `macos-ffmpeg-asset`
+  # job: one binary whose only dependencies are the OS's libraries, no ffprobe. The asset is a
+  # `.tar.gz` (a stock macOS host has no zstd), and it is the one the flake, `./gradlew
+  # prepareRuntime` and the DMG ship. Its build path is the only store path in the binary, which
+  # the re-link rewrites, so the references list is empty.
+  ffmpeg.aarch64-darwin = {
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-aarch64-darwin.tar.gz";
+    sha256 = "9f0c576d370ed47da5a541f7021e21a8a6916c2949a5546cbab7d08528a2b313";
+    storePath = "/nix/store/2y34dvlvmkxrbiq0kqq3wdx1m5mvkkjk-ffmpeg-audio-only-8.1.2";
+    references = [];
+  };
+
   # The pinned whisper-cpp (roadmap item 63): the 1.8.4 Vulkan build (no SDL, no nixpkgs ffmpeg)
   # whisper-cli ships. Its files name the libraries below and its own build path, which the re-link
   # rewrites.

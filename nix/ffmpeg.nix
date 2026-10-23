@@ -1,11 +1,16 @@
-# The app's audio-only ffmpeg (roadmap item 62): one static binary built for exactly the
+# The app's audio-only ffmpeg (roadmap items 62 and 69): one binary built for exactly the
 # backend's ffmpeg surface, so `nix/desktop-artifacts.nix` can pin a release asset of it and the
 # desktop, the server package, Docker and the devenv ship the same bytes without compiling ffmpeg.
 #
-# `source` is the static build the asset is made from. Its name is the final, re-linked output's name
-# too (`source.name`; pkgsStatic adds `-static-<host>`: `ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2`).
-# The asset is built at another store path, which the binary's own `configuration:` line names, and
-# the re-link rewrites it in place — same-length paths, so both derivations use this exact name.
+# `source` is the build the asset is made from, on both systems. Its name is the final, re-linked
+# output's name too (`source.name`; on Linux pkgsStatic adds `-static-<host>`:
+# `ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2`). The asset is built at another store
+# path, which the binary's own `configuration:` line names, and the re-link rewrites it in place —
+# same-length paths, so both derivations use this exact name.
+#
+# On Linux the build is static (pkgsStatic's musl); darwin has no static libc, so the same recipe
+# runs on the native package set there and the binary links its av* code in, naming only the OS's
+# own libraries (roadmap item 69).
 #
 # The feature list is the app's, not nixpkgs': `--disable-everything` and then the demuxers of the 19
 # accepted extensions' containers plus `concat` and `loas` (LATM), every native audio decoder those
@@ -23,13 +28,12 @@
 }: let
   # `pkgsStatic` is the musl cross package set and exists only on Linux; darwin has no static
   # libc, so the same audio-only recipe is built with the native package set there (roadmap item
-  # 48). The pinned release asset exists only for x86_64-linux; a system without a pin builds
-  # from source.
+  # 69). A system with a pinned release asset fetches it; one without builds from source.
   base = if pkgs.stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs;
   lib = pkgs.lib;
   system = pkgs.stdenv.hostPlatform.system;
   # ffmpeg's configure target: Linux keeps the pinned asset's exact flags; darwin needs its own
-  # target, or configure cross-compiles for linux/x86_64 with the wrong compiler (roadmap item 48).
+  # target, or configure cross-compiles for linux/x86_64 with the wrong compiler (roadmap item 69).
   targetOS = if pkgs.stdenv.hostPlatform.isDarwin then "darwin" else "linux";
   targetArch = if pkgs.stdenv.hostPlatform.isAarch64 then "aarch64" else "x86_64";
 
@@ -125,7 +129,10 @@
       components = ["file" "pipe"];
     }
   ];
-  linuxSource =
+  # One recipe for both systems (roadmap item 69): the same enable list and configure flags; only
+  # `base` differs (a static musl package set on Linux, the native set on darwin, which has no
+  # static libc). The darwin build links its av* code in and names only the OS's libraries.
+  source =
     (base.ffmpeg_8-headless.override {
       # The external libraries and GUI/network features all default on with the headless variant.
       withHeadlessDeps = false;
@@ -188,6 +195,14 @@
         "--disable-avdevice"
       ]
       ++ map ({kind, components}: "--enable-${kind}=${lib.concatStringsSep "," components}") enable
+      # This list replaces nixpkgs', which is where a clang stdenv's compiler flags live. Without
+      # them configure falls back to its `gcc` default, which a darwin stdenv does not provide
+      # ("gcc is unable to create an executable file"). Linux's static build uses gcc and is
+      # unaffected, so its flags and out path stay as they are.
+      ++ lib.optionals base.stdenv.cc.isClang [
+        "--cc=${base.stdenv.cc.targetPrefix}clang"
+        "--cxx=${base.stdenv.cc.targetPrefix}clang++"
+      ]
       ++ lib.optionals (base.stdenv.hostPlatform != base.stdenv.buildPlatform) [
         "--cross-prefix=${base.stdenv.cc.targetPrefix}"
         "--enable-cross-compile"
@@ -195,12 +210,6 @@
       ];
     });
 
-  # On darwin the app uses nixpkgs' cached ffmpeg_8-headless: the audio-only static recipe is
-  # Linux-shaped (static libc) and its darwin configure is not maintained (roadmap item 48).
-  source =
-    if pkgs.stdenv.hostPlatform.isDarwin
-    then pkgs.ffmpeg_8-headless
-    else linuxSource;
   # The pinned release asset for this system, if any: the shared helper fetches, re-links and
   # scans it; a system without a pin gets the source build.
   prebuiltArtifact = import ./prebuilt-artifact.nix {

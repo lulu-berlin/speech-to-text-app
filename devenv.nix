@@ -24,9 +24,8 @@ in
       # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see
       # nix/whisper-cpp.nix); standalone ffmpeg is handy for trimming/merging audio
       # before transcription. The shell ships the app's audio-only ffmpeg from the
-      # pinned desktop-ffmpeg-v2 asset on x86_64-linux (roadmap item 62; item 33's Gradle
-      # bootstrap syncs 8.1 too), or the same audio-only recipe's source build on darwin
-      # (roadmap item 48): only `ffmpeg`, no `ffplay` or `ffprobe`.
+      # pinned desktop-ffmpeg-v2 asset on both systems (roadmap items 62 and 69; item 33's
+      # Gradle bootstrap syncs 8.1 too): only `ffmpeg`, no `ffplay` or `ffprobe`.
       ffmpeg
 
       pkgs.sqlite

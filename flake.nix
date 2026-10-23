@@ -61,36 +61,51 @@
     # the first build).
     whisperCppAssetTag = "desktop-whisper-cpp-v1";
 
-    # The release assets' producer checks (roadmap items 62 and 63): each builds the source its
+    # The release assets' producer checks (roadmap items 62, 63 and 69): each builds the source its
     # asset is made from. They are apps the user runs when publishing, not `checks` entries, so
-    # `nix flake check` compiles neither source.
-    assetPinChecks = pkgs.lib.optionalAttrs isLinux {
-      ffmpeg-asset-pin = import ./nix/asset-pin-check.nix {
-        inherit pkgs;
-        source = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
-        asset = self.packages.${system}.desktop-ffmpeg-asset;
-        pin = (import ./nix/desktop-artifacts.nix).ffmpeg.${system};
-        name = "ffmpeg-asset-pin";
-        tag = ffmpegAssetTag;
-        key = "ffmpeg";
+    # `nix flake check` compiles neither source. The ffmpeg one exists on both systems (darwin's
+    # asset is a `.tar.gz`); the whisper-cpp one stays Linux-only.
+    assetPinChecks =
+      {
+        ffmpeg-asset-pin = import ./nix/asset-pin-check.nix {
+          inherit pkgs;
+          source = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
+          asset = self.packages.${system}.desktop-ffmpeg-asset;
+          pin = (import ./nix/desktop-artifacts.nix).ffmpeg.${system} or null;
+          name = "ffmpeg-asset-pin";
+          tag = ffmpegAssetTag;
+          key = "ffmpeg";
+        };
+      }
+      // pkgs.lib.optionalAttrs isLinux {
+        whisper-cpp-asset-pin = import ./nix/asset-pin-check.nix {
+          inherit pkgs;
+          source = (import ./nix/whisper-cpp.nix {inherit pkgs;}).source;
+          asset = self.packages.${system}.desktop-whisper-cpp-asset;
+          pin = (import ./nix/desktop-artifacts.nix).whisperCpp.${system};
+          name = "whisper-cpp-asset-pin";
+          tag = whisperCppAssetTag;
+          key = "whisperCpp";
+        };
       };
-      whisper-cpp-asset-pin = import ./nix/asset-pin-check.nix {
-        inherit pkgs;
-        source = (import ./nix/whisper-cpp.nix {inherit pkgs;}).source;
-        asset = self.packages.${system}.desktop-whisper-cpp-asset;
-        pin = (import ./nix/desktop-artifacts.nix).whisperCpp.${system};
-        name = "whisper-cpp-asset-pin";
-        tag = whisperCppAssetTag;
-        key = "whisperCpp";
-      };
-    };
 
-    # The audio-only build's configure surface (roadmap item 62, test-list item 2): one static
-    # binary, no ffprobe or ffplay, and a configure line that names exactly the app's ffmpeg surface.
+    # The audio-only build's configure surface (roadmap items 62 and 69, test-list item 2 / item
+    # 1): one binary, no ffprobe or ffplay, and a configure line that names exactly the app's
+    # ffmpeg surface. On Linux the binary is static (readelf: no NEEDED, no INTERP); on darwin it
+    # is a Mach-O that links libSystem dynamically, so `otool -L` must name only the OS's own
+    # libraries (roadmap item 69).
     # It builds the source, so it is an app the user runs (`nix run .#ffmpeg-audio-only`), not a
     # `checks` entry — `nix flake check` then compiles no ffmpeg source.
+    # The app-surface proofs (roadmap item 62), run against whichever binary the caller names: each
+    # accepted extension decodes to the canonical FLAC, and the app's own ffmpeg commands work.
+    ffmpegUploadFormats = ffmpeg: ''
+      bash ${./nix/ffmpeg-upload-formats.sh} ${ffmpeg}/bin/ffmpeg ${./backend/src/test/resources/upload-formats} ${pkgs.lib.escapeShellArgs (builtins.fromJSON (builtins.readFile ./backend/src/main/resources/allowed-extensions.json))}'';
+    ffmpegAppUses = ffmpeg: ''
+      bash ${./nix/ffmpeg-app-uses.sh} ${ffmpeg}/bin/ffmpeg ${./backend/src/test/resources/upload-formats}'';
+
     ffmpegAudioOnlyCheck = let
       lib = pkgs.lib;
+      isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
       config = import ./nix/ffmpeg.nix {inherit pkgs;};
       audioOnly = config.source;
       ffmpeg = "${audioOnly}/bin/ffmpeg";
@@ -112,7 +127,10 @@
       '';
     in
       pkgs.runCommand "ffmpeg-audio-only" {
-        nativeBuildInputs = [pkgs.binutils pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.gnused];
+        nativeBuildInputs =
+          lib.optionals (!isDarwin) [pkgs.binutils]
+          ++ [pkgs.bash pkgs.coreutils pkgs.gnugrep pkgs.gnused]
+          ++ lib.optionals isDarwin [pkgs.darwin.binutils-unwrapped];
       } ''
         fail() {
           echo "ffmpeg-audio-only: $1" >&2
@@ -122,13 +140,26 @@
         [ "$(ls ${audioOnly}/bin)" = ffmpeg ] || fail "bin/ holds more than ffmpeg: $(ls ${audioOnly}/bin)"
         [ ! -e ${audioOnly}/bin/ffprobe ] || fail "the build ships bin/ffprobe"
         [ ! -e ${audioOnly}/bin/ffplay ] || fail "the build ships bin/ffplay"
-        # Static: no library dependency and no program interpreter.
-        if ${pkgs.binutils}/bin/readelf -d ${ffmpeg} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q NEEDED; then
-          fail "the binary has dynamic library dependencies"
-        fi
-        if ${pkgs.binutils}/bin/readelf -l ${ffmpeg} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q INTERP; then
-          fail "the binary has a program interpreter"
-        fi
+        ${lib.optionalString isDarwin ''
+          # Darwin has no static libc: the av* code is linked into the binary, and the only
+          # libraries it loads are the OS's own. `otool -L` prints the file's line, then one
+          # dependency per line; the first field is the install path.
+          deps=$(otool -L ${ffmpeg} | sed -n '2,$s/^[[:space:]]*\([^[:space:]]*\).*/\1/p')
+          [ -n "$deps" ] || fail "otool -L lists no library dependency"
+          grep -qxF /usr/lib/libSystem.B.dylib <<<"$deps" ||
+            fail "otool -L does not name /usr/lib/libSystem.B.dylib"
+          offenders=$(grep -vE '^(/usr/lib/|/System/Library/)' <<<"$deps" || true)
+          [ -z "$offenders" ] || fail "the binary loads a non-system library: $(echo $offenders)"
+        ''}
+        ${lib.optionalString (!isDarwin) ''
+          # Static: no library dependency and no program interpreter.
+          if ${pkgs.binutils}/bin/readelf -d ${ffmpeg} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q NEEDED; then
+            fail "the binary has dynamic library dependencies"
+          fi
+          if ${pkgs.binutils}/bin/readelf -l ${ffmpeg} 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q INTERP; then
+            fail "the binary has a program interpreter"
+          fi
+        ''}
         bash ${./nix/ffmpeg-audio-only.sh} ${ffmpeg} ${expected}
         echo ok > $out
       '';
@@ -310,12 +341,15 @@
       # paste into nix/desktop-artifacts.nix. The user builds it and uploads the tar to a
       # `ffmpegAssetTag` release of this repository; agents never publish. `pin.nix` carries the
       # sha256, the source's out path and its direct references, printed with `cat result/pin.nix`.
+      # The darwin asset is a `.tar.gz`: the Gradle bootstrap and the DMG extract it on a stock
+      # macOS host, which has no zstd (roadmap item 69); Linux keeps `.tar.zst` and its pin.
       desktop-ffmpeg-asset = import ./nix/release-asset.nix {
         inherit pkgs;
         source = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
         name = "stt-ffmpeg-asset";
         tag = ffmpegAssetTag;
         key = "ffmpeg";
+        compression = if isLinux then "zst" else "gz";
       };
 
       # Roadmap item 63: the release asset for the pinned whisper-cpp on this system, with the pin
@@ -423,7 +457,9 @@
           printf 'root:x:0:\nstt:x:1000:\n' > $out/etc/group
           printf 'passwd: files\nshadow: files\ngroup: files\nhosts: files dns\nnetworks: files\nservices: files\n' > $out/etc/nsswitch.conf
         '';
-      } (if isLinux then [] else ["desktop" "desktop-bundle" "desktop-bundle-mesa-asset" "desktop-ffmpeg-asset" "docker-root"]);
+      # `desktop-ffmpeg-asset` is not removed on darwin: the manual `macos-ffmpeg-asset` job builds
+      # the aarch64-darwin asset with it (roadmap item 69), like `desktop-whisper-cpp-asset`.
+      } (if isLinux then [] else ["desktop" "desktop-bundle" "desktop-bundle-mesa-asset" "docker-root"]);
 
     # `nix run .` starts bin/stt-app (named by meta.mainProgram), on http://localhost:8080.
     # `nix run .#desktop` opens the desktop app; `.#desktop-bundle` unpacks and runs the
@@ -458,11 +494,12 @@
         meta.description = "Regenerate the committed versions.json from the flake's versions";
       };
 
-      # `nix run .#ffmpeg-asset-pin` / `nix run .#whisper-cpp-asset-pin` (roadmap items 62 and 63):
-      # the producer checks behind the asset builders. nix/asset-pin-check.nix builds each check's
-      # script with the check as an input, so running the app builds it and the source it asserts
-      # against; they are apps, not default checks. Linux-only, like the pinned assets themselves.
-      ffmpeg-asset-pin = pkgs.lib.optionalAttrs isLinux {
+      # `nix run .#ffmpeg-asset-pin` / `nix run .#whisper-cpp-asset-pin` (roadmap items 62, 63 and
+      # 69): the producer checks behind the asset builders. nix/asset-pin-check.nix builds each
+      # check's script with the check as an input, so running the app builds it and the source it
+      # asserts against; they are apps, not default checks. The ffmpeg one runs on both systems;
+      # the whisper-cpp one is Linux-only.
+      ffmpeg-asset-pin = {
         type = "app";
         program = "${assetPinChecks.ffmpeg-asset-pin.app}/bin/ffmpeg-asset-pin";
         meta.description = "Verify the desktop-ffmpeg-v2 asset pin against the built asset";
@@ -471,6 +508,26 @@
         type = "app";
         program = "${assetPinChecks.whisper-cpp-asset-pin.app}/bin/whisper-cpp-asset-pin";
         meta.description = "Verify the desktop-whisper-cpp-v1 asset pin against the built asset";
+      };
+
+      # Roadmap item 69 (the root review's finding 1): the manual `macos-ffmpeg-asset` job's
+      # fixture and app-command proofs, run on the binary that job built instead of the pinned
+      # prebuilt, so a stale pin cannot stop the job before it packages and prints its asset. Same
+      # scripts as the `ffmpeg-upload-formats` and `ffmpeg-app-uses` checks.
+      ffmpeg-source-surface = let
+        ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).source;
+      in {
+        type = "app";
+        program = "${pkgs.writeShellApplication {
+          name = "ffmpeg-source-surface";
+          runtimeInputs = [pkgs.bash pkgs.coreutils];
+          text = ''
+            ${ffmpegUploadFormats ffmpeg}
+            ${ffmpegAppUses ffmpeg}
+            echo "ffmpeg-source-surface: ok"
+          '';
+        }}/bin/ffmpeg-source-surface";
+        meta.description = "Prove the upload-format and app-command fixtures on the audio-only ffmpeg source build";
       };
 
       # `nix run .#ffmpeg-audio-only` (roadmap item 62): the build-surface check, moved out of
@@ -483,7 +540,7 @@
         ''}/bin/ffmpeg-audio-only";
         meta.description = "Verify the audio-only ffmpeg build's configure surface";
       };
-    } (if isLinux then [] else ["desktop" "desktop-bundle" "ffmpeg-asset-pin" "whisper-cpp-asset-pin"]);
+    } (if isLinux then [] else ["desktop" "desktop-bundle" "whisper-cpp-asset-pin"]);
 
     # `nix bundle --bundler .#desktop .#packages.x86_64-linux.desktop` produces the same file: the
     # bundler interface is `bundlers.<system>.<name> = drv: drv'`, and the derivation takes the
@@ -581,60 +638,60 @@
         echo ok > $out
       '';
 
-    # Roadmap item 62 (test-list item 1): every x86_64-linux build ships the same audio-only ffmpeg —
-    # the desktop's tools (and so the bundle's), the server package's wrapper PATH (and so
-    # docker-root's closure) — as the pinned release asset, not a source build. The devenv shell
-    # uses the same import; the empty-store dry-run proves no source ffmpeg is in the shipped graph.
+    # Roadmap item 62 (test-list item 1) and item 69 (test-list item 3): every build ships the same
+    # audio-only ffmpeg as the pinned release asset, not a source build — on Linux the desktop's
+    # tools (and so the bundle's) and the server package's wrapper PATH (and so docker-root's
+    # closure); on darwin the server package alone, since the desktop package is Linux-only and the
+    # macOS app is the DMG. The devenv shell uses the same import.
     # nix/artifact-everywhere-check.nix carries the assertions the two artifacts share.
     ffmpeg-audio-only-everywhere = let
+      lib = pkgs.lib;
       artifacts = import ./nix/desktop-artifacts.nix;
       ffmpegArtifact = import ./nix/ffmpeg.nix {inherit pkgs;};
-      desktop = self.packages.${system}.desktop;
+      desktop = self.packages.${system}.desktop or null;
+      server = self.packages.${system}.default;
     in
-      assert pkgs.lib.assertMsg (desktop.ffmpeg.outPath == ffmpegArtifact.ffmpeg.outPath)
+      assert lib.assertMsg (desktop == null || desktop.ffmpeg.outPath == ffmpegArtifact.ffmpeg.outPath)
       "ffmpeg-audio-only-everywhere: the desktop ships ${desktop.ffmpeg.outPath}, not the prebuilt ${ffmpegArtifact.ffmpeg.outPath}";
         import ./nix/artifact-everywhere-check.nix {
-          inherit pkgs desktop;
+          inherit pkgs desktop server;
           artifact = ffmpegArtifact.ffmpeg;
           source = ffmpegArtifact.source;
           pinned = artifacts.ffmpeg.${system} or null;
           key = "ffmpeg";
           subject = "ffmpeg";
           tool = "ffmpeg";
-          server = self.packages.${system}.default;
-          roots.docker-root = self.packages.${system}.docker-root;
+          roots = {default = server;} // lib.optionalAttrs isLinux {docker-root = self.packages.${system}.docker-root;};
           name = "ffmpeg-audio-only-everywhere";
         };
 
     # Roadmap item 62 (test-list item 3; the review's two additions): every extension the app accepts
     # decodes to the canonical FLAC through the shipped artifact, and the proof cannot drift from
     # `allowed-extensions.json`. nix/ffmpeg-upload-formats.sh validates each result from its own
-    # STREAMINFO — no ffprobe, which the artifact does not ship.
+    # STREAMINFO — no ffprobe, which the artifact does not ship. Runs on darwin too (roadmap item
+    # 69): the manual `macos-ffmpeg-asset` job builds it against the binary it packages.
     ffmpeg-upload-formats = let
-      lib = pkgs.lib;
       ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
-      extensions = builtins.fromJSON (builtins.readFile ./backend/src/main/resources/allowed-extensions.json);
-      fixtures = ./backend/src/test/resources/upload-formats;
     in
       pkgs.runCommand "ffmpeg-upload-formats" {
         nativeBuildInputs = [pkgs.bash pkgs.coreutils];
       } ''
-        bash ${./nix/ffmpeg-upload-formats.sh} ${ffmpeg}/bin/ffmpeg ${fixtures} ${lib.escapeShellArgs extensions}
+        ${ffmpegUploadFormats ffmpeg}
         echo ok > $out
       '';
 
     # Roadmap item 62 (test-list item 4): the app's other ffmpeg commands still work with the shipped
     # artifact — f32le PCM decode, silencedetect to the null muxer, the atrim window cut and the V10
     # concat backfill. nix/ffmpeg-app-uses.sh mirrors the app's argument lists; the atrim and concat
-    # results are checked from their FLAC STREAMINFO, without ffprobe.
+    # results are checked from their FLAC STREAMINFO, without ffprobe. Runs on darwin too (roadmap
+    # item 69).
     ffmpeg-app-uses = let
       ffmpeg = (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg;
-      fixtures = ./backend/src/test/resources/upload-formats;
     in
       pkgs.runCommand "ffmpeg-app-uses" {
         nativeBuildInputs = [pkgs.bash pkgs.coreutils];
       } ''
-        bash ${./nix/ffmpeg-app-uses.sh} ${ffmpeg}/bin/ffmpeg ${fixtures}
+        ${ffmpegAppUses ffmpeg}
         echo ok > $out
       '';
 
@@ -643,16 +700,73 @@
     # sha256; an asset pinned to another source build fails at evaluation naming both paths; the
     # stray-path scan fails on an unregistered path; the real prebuilt names no old build path, no
     # stray path, and sits in its own runtime closure (its pinned references are empty).
-    # nix/artifact-integrity-check.nix carries the gates the two artifacts share.
+    # nix/artifact-integrity-check.nix carries the gates the two artifacts share. Runs on both
+    # systems (roadmap item 69): the fixture mirrors the pinned asset's archive type.
     ffmpeg-artifact-integrity = import ./nix/artifact-integrity-check.nix {
       inherit pkgs;
       importWith = artifacts: import ./nix/ffmpeg.nix {inherit pkgs artifacts;};
       attr = "ffmpeg";
       pin = (import ./nix/desktop-artifacts.nix).ffmpeg.${system};
-      fixtureName = "ffmpeg-asset-fixture.tar.zst";
-      staleStorePath = "/nix/store/00000000000000000000000000000000-ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2";
+      fixtureName =
+        if isLinux
+        then "ffmpeg-asset-fixture.tar.zst"
+        else "ffmpeg-asset-fixture.tar.gz";
       name = "ffmpeg-artifact-integrity";
     };
+
+    # Roadmap item 69 (test-list item 8): a mismatched pin — wrong storePath, the old tag, or a
+    # sha256 that is not the asset's — fails the asset-pin check naming the asset file and the
+    # pin's url. Fixtures stand in for the source build and the asset, so nothing is compiled; the
+    # two pin gates are read at evaluation, the sha256 gate runs the check's own verification.
+    ffmpeg-asset-pin-mismatch = let
+      lib = pkgs.lib;
+      source = pkgs.writeText "ffmpeg-asset-pin-fixture-source" "";
+      # The name nix/release-asset.nix gives this build's asset, spelled out independently: the
+      # source's name, the system, and the compression (zst on Linux, gz on darwin).
+      expectedFile = "${source.name}-${system}.tar.${if isLinux then "zst" else "gz"}";
+      asset = pkgs.writeTextDir expectedFile "not the release asset" // {file = expectedFile;};
+      checkWith = pin:
+        import ./nix/asset-pin-check.nix {
+          inherit pkgs source asset pin;
+          tag = ffmpegAssetTag;
+          key = "ffmpeg";
+          name = "ffmpeg-asset-pin";
+        };
+      url = file: "https://github.com/lulu-berlin/speech-to-text-app/releases/download/${ffmpegAssetTag}/${file}";
+      # Names the fixture build's own asset under the current tag; its sha256 is not the asset's.
+      pin = {
+        url = url expectedFile;
+        sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+        storePath = builtins.unsafeDiscardStringContext source.outPath;
+        references = [];
+      };
+      rejects = label: bad: let
+        error = (checkWith bad).pinError;
+      in
+        assert lib.assertMsg (error != null) "ffmpeg-asset-pin-mismatch: ${label} was accepted";
+        assert lib.assertMsg (lib.hasInfix expectedFile error && lib.hasInfix bad.url error)
+        "ffmpeg-asset-pin-mismatch: the error for ${label} does not name ${expectedFile} and ${bad.url}; it reads: ${error}"; true;
+      wrongSha256 = checkWith pin;
+    in
+      assert rejects "a wrong storePath" (pin // {storePath = "/nix/store/00000000000000000000000000000000-ffmpeg-audio-only-8.1.2";});
+      assert rejects "the old tag" (pin // {url = lib.replaceStrings ["/${ffmpegAssetTag}/"] ["/desktop-ffmpeg-v1/"] (url expectedFile);});
+      assert rejects "another file's url" (pin // {url = url (lib.replaceStrings [".tar.zst" ".tar.gz"] [".tar.gz" ".tar.zst"] expectedFile);});
+      # A url whose basename merely starts with the asset's name (a sidecar) named another file.
+      assert rejects "a sidecar url" (pin // {url = url "${expectedFile}.sha256";});
+      assert lib.assertMsg (wrongSha256.pinError == null) "ffmpeg-asset-pin-mismatch: the sha256 case failed at evaluation: ${toString wrongSha256.pinError}";
+        pkgs.runCommand "ffmpeg-asset-pin-mismatch" {nativeBuildInputs = [pkgs.gnugrep];} ''
+          if ${lib.getExe wrongSha256.verifyAsset} ${asset}/${expectedFile} 2> err; then
+            echo "ffmpeg-asset-pin-mismatch: a sha256 that is not the asset's was accepted" >&2
+            exit 1
+          fi
+          for expected in ${lib.escapeShellArgs [expectedFile pin.url]}; do
+            grep -qF -- "$expected" err || {
+              echo "ffmpeg-asset-pin-mismatch: the sha256 error does not name $expected; it reads: $(cat err)" >&2
+              exit 1
+            }
+          done
+          echo ok > $out
+        '';
 
     # Roadmap item 62 (test-list item 6): the artifact's runtime closure is the static binary alone,
     # holds none of the video libraries the slim build drops, and it is the only ffmpeg in the
@@ -912,7 +1026,6 @@
       attr = "whisperCpp";
       pin = (import ./nix/desktop-artifacts.nix).whisperCpp.${system};
       fixtureName = "whisper-cpp-asset-fixture.tar.zst";
-      staleStorePath = "/nix/store/00000000000000000000000000000000-whisper-cpp-1.8.4";
       name = "whisper-cpp-artifact-integrity";
     };
 
@@ -1077,7 +1190,10 @@
         echo ok > $out
       '';
 
-    } (if isLinux then [] else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-audio-only-everywhere" "ffmpeg-upload-formats" "ffmpeg-app-uses" "ffmpeg-artifact-integrity" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-closure-size"]);
+    # `ffmpeg-upload-formats` and `ffmpeg-app-uses` are not removed on darwin: they prove the
+    # darwin binary's behavior on every accepted fixture and on the app's commands (roadmap item
+    # 69), on the same binary the desktop ships.
+    } (if isLinux then [] else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-closure-size"]);
   };
   in {
     packages = nixpkgs.lib.genAttrs systems (system: (mkSystem system).packages);
