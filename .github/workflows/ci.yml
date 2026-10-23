@@ -610,6 +610,25 @@ jobs:
           $ErrorActionPreference = 'Stop'
           pnpm exec playwright test -c playwright.desktop.config.ts 01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
           if ($LASTEXITCODE -ne 0) { throw 'the packaged specs failed' }
+      # The installer the same staged tree produces (roadmap item 49, test item 12). The spec
+      # installs it silently, runs the app's journey, and uninstalls by its ProductCode, asserting
+      # that the per-user data and the model cache survive.
+      - name: Find the MSI the packaged build produced
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = Get-ChildItem desktop\dist\Speech-to-Text-*-win-x64.msi | Select-Object -First 1
+          if (-not $msi) { throw 'no MSI was produced: the win target builds only the zip' }
+          "STT_DESKTOP_MSI=$($msi.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run the MSI installer spec
+        shell: pwsh
+        working-directory: e2e
+        env:
+          ELECTRON_ENABLE_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pnpm exec playwright test -c playwright.desktop.config.ts 15-msi-install.spec.ts
+          if ($LASTEXITCODE -ne 0) { throw 'the MSI spec failed' }
 
   # The Windows whisper-cli asset (manual, roadmap item 49). The published prebuilts are not
   # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC

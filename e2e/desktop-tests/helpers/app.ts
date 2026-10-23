@@ -28,6 +28,11 @@ export interface LaunchOptions {
   /** Reuse a HOME across launches (item 3's restart); a fresh one by default. */
   home?: string;
   /**
+   * The executable to start instead of `STT_DESKTOP_APP`: the installed MSI's app (item 49's
+   * installer spec), which a step before the launch put on the machine.
+   */
+  executable?: string;
+  /**
    * `override` (the default) passes the two models the harness mounts, so the app skips the
    * download; `download` leaves STT_WHISPER_MODEL/STT_SPEAKER_MODEL unset, so the app provisions
    * the models itself (item 3).
@@ -42,7 +47,12 @@ export interface LaunchOptions {
  * starts empty) and Chromium's sandbox on.
  */
 export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronApplication> {
-  const { home = temporaryDir('home'), models = 'override', env = {} } = options;
+  const {
+    home = temporaryDir('home'),
+    executable = DESKTOP_APP,
+    models = 'override',
+    env = {},
+  } = options;
   // A fresh per-user area per launch. Windows apps read %APPDATA%/%LOCALAPPDATA%, not HOME.
   const homeEnv = process.platform === 'win32' ? windowsHomeEnv(home) : { HOME: home };
   // Only variables that are set: an unset one has no value to pass to the app.
@@ -61,7 +71,7 @@ export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronA
     delete appEnv.STT_SPEAKER_MODEL;
   }
   return electron.launch({
-    executablePath: DESKTOP_APP,
+    executablePath: executable,
     // Playwright adds --no-sandbox on Linux by default; the app runs as shipped, sandboxed.
     chromiumSandbox: true,
     env: appEnv,
