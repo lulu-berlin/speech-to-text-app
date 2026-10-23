@@ -8,13 +8,10 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.delay
 import stt.Integration
 import stt.audio.sineFlac
+import stt.awaitServing
 import stt.engine.filesUnder
-import java.net.ServerSocket
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.nio.file.Path
+import stt.freePort
+import stt.startBackend
 import java.util.concurrent.TimeUnit
 
 /**
@@ -49,7 +46,8 @@ class UpgradeCrashScratchIntegrationSpec :
                     )
 
                     // The first run: killed as soon as the backfill has written its first temporary file.
-                    val killed = startApp(dataDir, appTemp, nativeTemp, fixtures.resolve("killed.log"))
+                    val killed =
+                        startBackend(dataDir, freePort(), fixtures.resolve("killed.log"), appTemp, nativeTemp)
                     try {
                         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
                         while (filesUnder(appTemp).isEmpty() && killed.isAlive && System.nanoTime() < deadline) delay(5)
@@ -61,7 +59,8 @@ class UpgradeCrashScratchIntegrationSpec :
 
                     // The next start finishes the upgrade and serves.
                     val port = freePort()
-                    val restarted = startApp(dataDir, appTemp, nativeTemp, fixtures.resolve("restarted.log"), port)
+                    val restarted =
+                        startBackend(dataDir, port, fixtures.resolve("restarted.log"), appTemp, nativeTemp)
                     try {
                         awaitServing(port) shouldBe true
                         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
@@ -76,52 +75,3 @@ class UpgradeCrashScratchIntegrationSpec :
             }
         }
     })
-
-/**
- * Starts the app (`stt.MainKt`) as a separate JVM on [dataDir] with [appTemp] as its `java.io.tmpdir`, the native
- * libraries SQLite and Netty unpack sent to [nativeTemp], and its output in [log].
- */
-private fun startApp(
-    dataDir: Path,
-    appTemp: Path,
-    nativeTemp: Path,
-    log: Path,
-    port: Int = freePort(),
-): Process {
-    val java =
-        ProcessHandle
-            .current()
-            .info()
-            .command()
-            .orElseThrow()
-    val builder =
-        ProcessBuilder(
-            java,
-            "-Djava.io.tmpdir=$appTemp",
-            "-Dorg.sqlite.tmpdir=$nativeTemp",
-            "-Dio.netty.native.workdir=$nativeTemp",
-            "-cp",
-            System.getProperty("java.class.path"),
-            "stt.MainKt",
-        ).redirectErrorStream(true)
-            .redirectOutput(log.toFile())
-    builder.environment()["STT_DATA_DIR"] = dataDir.toString()
-    builder.environment()["STT_PORT"] = port.toString()
-    builder.environment().remove("STT_STATIC_DIR")
-    return builder.start()
-}
-
-/** Whether the app on [port] answers `GET /api/tasks` with 200 within a minute. */
-private suspend fun awaitServing(port: Int): Boolean {
-    val client = HttpClient.newHttpClient()
-    val request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:$port/api/tasks")).build()
-    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
-    while (System.nanoTime() < deadline) {
-        val status = runCatching { client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode() }.getOrNull()
-        if (status == 200) return true
-        delay(100)
-    }
-    return false
-}
-
-private fun freePort(): Int = ServerSocket(0).use { it.localPort }
