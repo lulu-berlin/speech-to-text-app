@@ -21,7 +21,9 @@ class ProcessRunnerStoppingSpec :
                 `when`("a tool exits with a non-zero code") {
                     then("the run is a cancellation, not a failed result") {
                         val bin = tempdir("stt-stopping")
-                        val tool = File(bin, if (platform.windows) "whisper-cli.exe" else "whisper-cli")
+                        // `.exe` because the host may be Windows, where Files.isExecutable needs the extension
+                        // even though the simulated platform may be Darwin (which appends no suffix).
+                        val tool = File(bin, "whisper-cli.exe")
                         tool.createNewFile()
                         tool.setExecutable(true)
                         val runner =
@@ -34,7 +36,7 @@ class ProcessRunnerStoppingSpec :
                             )
 
                         runTest {
-                            shouldThrow<CancellationException> { runner.run(listOf("whisper-cli")) }
+                            shouldThrow<CancellationException> { runner.run(listOf("whisper-cli.exe")) }
                         }
                     }
                 }

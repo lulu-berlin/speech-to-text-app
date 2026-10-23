@@ -58,7 +58,9 @@ class ProcessRunnerPlatformSpec :
             `when`("a terminal Ctrl-C reaches the tool, which shares the terminal's process group") {
                 then("its SIGINT exit (130) is a cancellation, not a failed result") {
                     val bin = tempdir("stt-darwin-sigint")
-                    File(bin, "whisper-cli").apply {
+                    // `.exe` because the host may be Windows, where Files.isExecutable needs the extension even
+                    // though the simulated platform is Darwin (which appends no suffix).
+                    File(bin, "whisper-cli.exe").apply {
                         createNewFile()
                         setExecutable(true)
                     }
@@ -71,7 +73,7 @@ class ProcessRunnerPlatformSpec :
                         )
 
                     runTest {
-                        shouldThrow<CancellationException> { runner.run(listOf("whisper-cli")) }
+                        shouldThrow<CancellationException> { runner.run(listOf("whisper-cli.exe")) }
                     }
                 }
             }
