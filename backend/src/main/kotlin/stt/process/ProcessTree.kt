@@ -21,8 +21,8 @@ internal class ProcessTree(
     private val childAlive: () -> Boolean,
     /** The host platform's signals and process-group support; production uses the JVM's `os.name`. */
     private val platform: ProcessPlatform = ProcessPlatform.current(),
-    /** kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). */
-    private val kill: (pid: Int, signal: Int) -> Int = LibC.INSTANCE::kill,
+    /** kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). Loaded on the first call. */
+    private val kill: (pid: Int, signal: Int) -> Int = { pid, signal -> LibC.INSTANCE.kill(pid, signal) },
 ) {
     init {
         // A platform without signals never builds a tree (Windows destroys its direct child instead), so
