@@ -288,3 +288,24 @@ test('the required check and the jobs it gates keep their names and conditions',
   assert.equal(modelHosts.if, "github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'");
   assert.ok(!ci.needs.includes('model-hosts'), 'a weekly network probe does not gate pull requests');
 });
+
+// GitHub's `contains(needs.*.result, 'x')` terms of the aggregator's failure step, evaluated against
+// a set of job results.
+function aggregatorFails(condition, results) {
+  const terms = [...condition.matchAll(/contains\(\s*needs\.\*\.result\s*,\s*'([a-z]+)'\s*\)/g)].map((match) => match[1]);
+  assert.ok(terms.length > 0, `the aggregator's condition is contains(needs.*.result, …) terms: ${condition}`);
+  return terms.some((term) => results.includes(term));
+}
+
+test('a skipped job does not make CI (all checks) red, and a failing job still does', () => {
+  const ci = parseJobs(readFileSync(workflowPath, 'utf8')).get('ci');
+  assert.equal(ci.if, 'always()', 'the aggregator is scheduled even when every heavy job skipped');
+
+  const stepConditions = [...ci.raw.join('\n').matchAll(/^ {8}if: (.+)$/gm)].map((match) => match[1].trim());
+  assert.equal(stepConditions.length, 1, 'the aggregator has one conditional step: the failure report');
+  const [failureCondition] = stepConditions;
+
+  assert.equal(aggregatorFails(failureCondition, ['success', 'skipped', 'skipped', 'success']), false, 'skips and successes keep it green');
+  assert.equal(aggregatorFails(failureCondition, ['success', 'failure', 'skipped']), true, 'one failure reddens it');
+  assert.equal(aggregatorFails(failureCondition, ['cancelled', 'skipped']), true, 'a cancelled job reddens it');
+});

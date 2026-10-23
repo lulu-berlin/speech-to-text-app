@@ -1,6 +1,6 @@
 # 80 — Documentation-only pull requests skip the heavy CI jobs
 
-Status: in-progress
+Status: in-review
 Depends on: [49](../docs/specs/windows-support.md) (adds the Windows jobs this must cover too),
 [51](../docs/specs/ci-verification.md) (done; the workflow and the `CI (all checks)` aggregator)
 Blocks: —
@@ -81,7 +81,7 @@ dispatch runs always run everything.
 - [x] (CI) With the `ci:full` label, a documentation-only PR runs every heavy job
 - [x] (must not break) The required check keeps the name `CI (all checks)`; the aggregator's `needs`
       covers every heavy job; the manual asset jobs and the macOS-only jobs keep their conditions
-- [ ] (must not break) A skipped job does not make `CI (all checks)` red, and a failing job still
+- [x] (must not break) A skipped job does not make `CI (all checks)` red, and a failing job still
       does
 
 ## e2e stance
@@ -148,3 +148,13 @@ e2e (the reason is recorded here, as in item 65).
   real job), the two manual asset jobs keep `workflow_dispatch && inputs.assets` and no `needs`,
   the macOS jobs keep their `macos-backend-check`/`macos-frontend-check` dependencies alongside the
   gate, and `model-hosts` keeps its cron and stays out of the aggregator. 7 tests pass.
+- 2026-10-23 (cycle 8, test-list item 7): passed on its first run — the aggregator's condition is
+  unchanged, so the test evaluates its `contains(needs.*.result, …)` terms out of `ci.yml`:
+  `success` + `skipped` stays green, `failure` and `cancelled` redden it, and the job-level
+  `if: always()` keeps it scheduled. 8 tests pass; `actionlint`, the links check and the whole test
+  file were re-run before this line. All test-list items ticked; Status: in-review.
+- 2026-10-23 (GitHub evidence — pending, no run observed): the branch is not pushed. Needed before
+  the item is complete: (1) this branch's PR — a code diff, so `changes` must report `code=true` and
+  every heavy job must run; (2) a documentation-only PR — `Changes`, `Docs (exception policy)` and
+  `CI (all checks)` only, every heavy job skipped, aggregator green; (3) the same PR with the
+  `ci:full` label — the full matrix. Run ids and job names go here once the user supplies them.
