@@ -503,4 +503,13 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   Recorded in `docs/known-issues.md`; the gate now checks vitest's exit code itself. The desktop
   graceful-stop item is split in two: the backend stops on stdin close when
   `STT_STOP_ON_STDIN_CLOSE=1` is set, and the Windows desktop `stop()` closes stdin before a bounded
-  force-kill. Next test: the backend half.
+  force-kill. Next test: the backend half.- 2026-10-23: review cycle 5 (backend stops on stdin close) green. New Integration spec
+  `StopOnStdinCloseIntegrationSpec`: the app runs as a real JVM with `STT_STOP_ON_STDIN_CLOSE=1`,
+  serves, then its stdin is closed and it must exit within 30 s. Red:
+  `expected:<true> but was:<false>` at `:49` (the app kept running; the first `shouldBe true` at
+  `:45` passed, so the red is the stop, not the startup). Green: `Config.stopOnStdinClose` and
+  `stopWhenClosed` in `Main.kt` (a daemon-scoped blocking read on the IO dispatcher that calls
+  `server.stop()`, the same stop a SIGTERM's shutdown hook performs; an `IOException` is logged and
+  treated as a close). `gradle check` (354 tests), `gradle integrationTest` (401, 80 executed),
+  frontend and docs checks green. Commit `0e1a3cb1`. Not ticked: the item's "without the variable it
+  ignores stdin" half is untested — proposed as its own test at the checkpoint.
