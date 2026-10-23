@@ -188,7 +188,7 @@ export function stopBackend(
     // only a backend that outlives the wait is force-killed with its whole tree.
     child.stdin?.end();
     setTimeout(() => {
-      forceKill(child.pid ?? 0);
+      if (child.exitCode === null) forceKill(child.pid ?? 0);
     }, timeoutMs);
     return promise;
   }

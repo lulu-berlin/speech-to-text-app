@@ -57,3 +57,36 @@ test('on Windows the quit closes the backend stdin and force-kills only after th
     mock.timers.reset();
   }
 });
+
+test('on Windows the quit never force-kills a backend that is already gone', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    // It ends within the wait: the deferred force-kill must find nothing to do.
+    const exiting = new FakeBackend();
+    const forcedAfterExit: number[] = [];
+    const stopping = stopBackend(exiting, {
+      platform: 'win32',
+      timeoutMs: 10_000,
+      forceKill: (pid) => forcedAfterExit.push(pid),
+    });
+    exiting.exit();
+    await stopping;
+    mock.timers.tick(10_000);
+    assert.deepEqual(forcedAfterExit, [], 'an exited backend is not force-killed');
+
+    // It has already exited before the quit reaches it: the stop resolves at once.
+    const exited = new FakeBackend();
+    exited.exit();
+    const forcedBefore: number[] = [];
+    await stopBackend(exited, {
+      platform: 'win32',
+      timeoutMs: 10_000,
+      forceKill: (pid) => forcedBefore.push(pid),
+    });
+    assert.equal(exited.stdin.ended, false, 'nothing is asked of a gone backend');
+    mock.timers.tick(10_000);
+    assert.deepEqual(forcedBefore, [], 'nothing is forced either');
+  } finally {
+    mock.timers.reset();
+  }
+});
