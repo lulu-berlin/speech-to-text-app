@@ -145,7 +145,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       job exists on Windows. Matched to the macOS cadence only if the first run's measured wall time
       is comparable (macOS e2e observed at 13–16 min on 2026-10-21): the measurement is recorded in
       the Approval log, and a slower run returns the cadence decision to the user before ticking
-- [ ] (e2e, CI Windows, moved from item 50 on 2026-10-15) The packaged portable zip runs on Windows
+- [x] (e2e, CI Windows, moved from item 50 on 2026-10-15) The packaged portable zip runs on Windows
       with its per-user paths: item 50's packaged specs (journey, quit without orphan processes,
       first run with the model download and its persistence, download failure with Retry) pass
       against the unpacked build
@@ -340,3 +340,17 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   aggregator), `3613515a` (asset jobs behind the dispatch input), `43551d81` (portability).
   Measured 5:00 against the macOS e2e band 13–16 min → no cadence change: every PR and nightly.
   Item ticked.
+- 2026-10-23: item 11 green on CI and user-verified on the Windows 11 guest. Root cause of the four
+  earlier reds: the Playwright launch env repoints `USERPROFILE`/`APPDATA`/`LOCALAPPDATA` at a
+  fresh per-user tree, but the tree's `AppData\Roaming`/`AppData\Local` did not exist, so Chromium
+  aborted during init with `0x80000003`; the helper now creates both (`windowsHomeEnv`) and the app
+  is the only consumer of those variables it relies on. Also fixed on the way: `taskkill /T /F` for
+  the desktop quit (no orphan processes), `.gitattributes` (LF checkout, CRLF `.cmd`/`.bat`),
+  `java.exe` in the packaged backend launcher, the `%APPDATA%\stt-app` data directory in packaged
+  mode, and the `unchecked` asset-dispatch logging. CI run #162
+  `39878353214`, job `Windows (packaged zip e2e)`: all four specs pass (01 12.7 s, 02 5.9 s,
+  03 14.8 s, 04 16.0 s; 50.4 s total, job ~7:30 from 00:34:04 to 00:41:37) against the unpacked
+  `Speech-to-Text-0.1.0-win-x64.zip`; the run is green. Guest run of the same zip: 01 1.4 m,
+  02 16.1 s, 03 1.2 m, 04 17.1 s, all pass. The job's 7:30 stays inside the macOS e2e band
+  13–16 min → no cadence change. Commits `02ee7ce5` (helper + launch env), `8a72fa4e` (packaging).
+  Item ticked; run recorded as user-verified.
