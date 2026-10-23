@@ -1,6 +1,6 @@
 # 49 — Windows support
 
-Status: in-progress
+Status: in-review
 Depends on: [33](../docs/specs/gradle-bootstrap.md) (done; the no-Nix path), [48](../docs/specs/macos-support.md) (done; its portable process-control seam is the foundation), [51](../docs/specs/ci-verification.md) (done; a Windows CI runner verifies — local virtualization is the fallback), [50](../docs/specs/electron-desktop-app.md) (done; the Linux desktop app and its packaged specs, which the Windows packaged-app item extends)
 Blocks: —
 
@@ -166,7 +166,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-23, from the root review; split and reworded 2026-10-23) A tool that exits
       while the backend is stopping never fails its task: the task goes back to the queue or stays
       RUNNING for restart recovery, on every platform
-- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows, a tool's console
+- [x] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows, a tool's console
       Ctrl-C exit (`0xC000013A`) counts as a stopped tool, so its task is left for recovery
 - [x] (discovered, 2026-10-23, user-approved) On macOS, a tool's SIGINT exit (130, a terminal Ctrl-C
       that reaches the tool's process group) counts as a stopped tool, so its task is left for recovery
@@ -183,9 +183,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       child and waits for it, bounded, without signals
 - [x] (discovered, 2026-10-23, from the root review) A whisper-cli with an invalid image
       (`0xC000007B`) and a macOS `dyld` `Library not loaded` are both a `LaunchFailed` probe outcome
-- [ ] (discovered, 2026-10-23, from the root review) The MSI spec fails when an installed
+- [x] (discovered, 2026-10-23, from the root review) The MSI spec fails when an installed
       `Speech-to-Text.exe` exists under `%ProgramFiles%` or `%ProgramFiles(x86)%`
-- [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
+- [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green (re-run after the review findings)
 
 ## Acceptance criteria
@@ -632,3 +632,14 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   Gates after the round: `gradle check` (359 tests) and `gradle integrationTest` (406, 324 skipped,
   82 executed) with `--rerun-tasks`, all green; desktop `tsc` ×3, Prettier and `node --test` 6; e2e
   `tsc`/Prettier; frontend vitest 177, build; docs checks and `actionlint`.
+- 2026-10-23: review round 3 closed. CI run #223 (`58e8f766`, composed run): attempt 1 was green
+  everywhere except `Linux (e2e)` — `40-atomic-transitions.spec.ts:46`'s guarded cancel click timed
+  out under load, and because that spec runs serially and left its task in the queue, 13 later specs
+  failed their "queue idle" waits (26 passed, 14 failed, 32m19s against a usual 9–11 min while
+  `Linux (bundle e2e)` and the Nix jobs shared the 4-core runner); attempt 2 (re-run failed jobs) is
+  green — `Linux (e2e)` passed all 41, and every other job of the run (including `Windows (gradle
+  check)` and `Windows (packaged zip e2e)` with the MSI spec and the installed-app specs 01–04)
+  succeeded. Recorded as a LOW known issue (contention cascade, not a code defect). The Ctrl-C item,
+  the per-machine MSI item and "(must not break)" are ticked on that run; status: in-review.
+  Still to file by the root agent: a new roadmap item for a full e2e journey on Windows (CI runs only
+  the packaged specs; the 41-test journey is Linux/macOS today); see the draft in the session log.
