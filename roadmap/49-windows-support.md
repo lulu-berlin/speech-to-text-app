@@ -177,7 +177,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows the desktop quit
       closes the backend's stdin and force-kills the tree only if the backend has not exited within
       10 s
-- [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
+- [x] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
       within a bound even when `taskkill` fails, and the failure is logged
 - [ ] (discovered, 2026-10-23, from the root review) On Windows a cancelled run destroys its direct
       child and waits for it, bounded, without signals
@@ -553,3 +553,13 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   timer checks `exitCode === null` first. `node --test` 2 tests, the three `tsc` projects, Prettier,
   `gradle check`, `gradle integrationTest`, frontend and docs checks green. Commit `f27cc434`. The
   desktop-quit item is ticked.
+- 2026-10-23: review cycle 9 (failed taskkill) green. `stopBackend`'s Windows branch now asks
+  `forceKill` for a verdict (`Promise<boolean>`), logs a failure through an injected `log` (the
+  console by default), and ends the JVM with `child.kill()` when `taskkill` could not; if even that
+  fails it logs and settles the quit instead of hanging. The default spawner listens for `error`
+  and `exit`, so the Electron main process no longer sees an unhandled `error` event. New test in
+  `desktop/src/backend.test.ts`: a failing force-kill must log exactly one line naming `taskkill`
+  and call `kill()` with no signal; the three earlier cases' stubs now return `true`. Red:
+  `one line names the failure, got []`. `node --test` 3 tests, the three `tsc` projects, Prettier,
+  `gradle check`, `gradle integrationTest`, frontend and docs checks green. Commit `50e49b1f`.
+  Item ticked.
