@@ -174,7 +174,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       `STT_STOP_ON_STDIN_CLOSE=1`, the backend stops once its stdin closes
 - [x] (discovered, 2026-10-23, from the root review; split 2026-10-23) Without
       `STT_STOP_ON_STDIN_CLOSE`, closing the backend's stdin leaves it running and serving
-- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows the desktop quit
+- [x] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows the desktop quit
       closes the backend's stdin and force-kills the tree only if the backend has not exited within
       10 s
 - [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
@@ -545,3 +545,11 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   project and the scripts, Prettier, `gradle check`, `gradle integrationTest`, frontend and docs
   checks. Commit `8401caf6`. Not ticked: "only if the backend has not exited within 10 s" — the
   branch where the backend exits in time — is untested; proposed as its own test.
+- 2026-10-23: review cycle 8 (no force-kill of a gone backend) green. Second test in
+  `desktop/src/backend.test.ts`: a backend that exits within the wait, and one that had already
+  exited, are never force-killed (the first also asserts the stop resolves on its exit, the second
+  that stdin is not touched). Red: `AssertionError: an exited backend is not force-killed` — the
+  deferred `taskkill` fired regardless of the exit, a bug the extraction introduced. Green: the
+  timer checks `exitCode === null` first. `node --test` 2 tests, the three `tsc` projects, Prettier,
+  `gradle check`, `gradle integrationTest`, frontend and docs checks green. Commit `f27cc434`. The
+  desktop-quit item is ticked.
