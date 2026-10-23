@@ -19,12 +19,13 @@ in {
   # by URL and sha256:
   # - whisper-cli: the jiang1997 prebuild of the Nix build's tag (Vulkan on Linux,
   #   CoreML on macOS); hashes computed over the GitHub release assets.
-  # - ffmpeg: bytedeco's builds on Maven Central (user decision 2026-10-12), which
-  #   never deletes or changes a published artifact - the BtbN daily build first pinned
-  #   here was deleted after 14 days. 8.1.2 is the flake's ffmpeg_8. Each jar holds a
-  #   self-contained `ffmpeg` executable with its libav* libraries beside it (RUNPATH
-  #   $ORIGIN on Linux, @rpath = @loader_path on macOS). Central publishes SHA-1 only:
-  #   the sha256 below was computed over bytes that match Central's SHA-1.
+  # - ffmpeg: bytedeco's builds on Maven Central for Linux and Intel macOS (user decision
+  #   2026-10-12), which never deletes or changes a published artifact - the BtbN daily build
+  #   first pinned here was deleted after 14 days. 8.1.2 is the flake's ffmpeg_8. Each jar holds
+  #   a self-contained `ffmpeg` executable with its libav* libraries beside it (RUNPATH $ORIGIN
+  #   on Linux, @rpath = @loader_path on macOS). Central publishes SHA-1 only: the sha256 below
+  #   was computed over bytes that match Central's SHA-1. Apple Silicon gets our own audio-only
+  #   build instead (roadmap item 69), the same `.tar.gz` asset the flake and the DMG ship.
   downloads = {
     # linux-x64 and darwin-x64 come from the upstream jiang1997 tag. darwin-arm64 is our own
     # `desktop-whisper-cpp-v1` static build: the upstream darwin tarballs omit the libggml-metal/
@@ -49,8 +50,10 @@ in {
         sha256 = "3c56835c2675ed4fae638268588896a00e1dd109ccdea5aacc3056d6330a669e";
       };
       "darwin-arm64" = {
-        url = ffmpegUrl "macosx-arm64";
-        sha256 = "03abefca5abf608f040da235a83f22ad32518ed4780c8dac724f940015d653bd";
+        # Our own audio-only build (roadmap item 69): the same `.tar.gz` the flake pin, the DMG
+        # and this bootstrap ship — one binary, system libraries only, no ffprobe.
+        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-aarch64-darwin.tar.gz";
+        sha256 = "9f0c576d370ed47da5a541f7021e21a8a6916c2949a5546cbab7d08528a2b313";
       };
       "darwin-x64" = {
         url = ffmpegUrl "macosx-x86_64";

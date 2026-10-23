@@ -2,8 +2,8 @@
   "downloads": {
     "ffmpeg": {
       "darwin-arm64": {
-        "sha256": "03abefca5abf608f040da235a83f22ad32518ed4780c8dac724f940015d653bd",
-        "url": "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/8.1.2-1.5.14/ffmpeg-8.1.2-1.5.14-macosx-arm64-gpl.jar"
+        "sha256": "9f0c576d370ed47da5a541f7021e21a8a6916c2949a5546cbab7d08528a2b313",
+        "url": "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-aarch64-darwin.tar.gz"
       },
       "darwin-x64": {
         "sha256": "917327cd6178e7ecddd4fb9dd5981cb4c5f04631a06dc0bd81cfe0377b1f3705",

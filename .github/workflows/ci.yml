@@ -8,6 +8,14 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    # A dispatch is how a branch runs the checks before a PR exists; the manual asset jobs (the
+    # whisper-cli assets and the audio-only ffmpeg asset) are opt-in, so a check-only dispatch
+    # does not rebuild them (roadmap items 49 and 69).
+    inputs:
+      assets:
+        description: 'Also build the manual macOS whisper-cli and ffmpeg assets'
+        type: boolean
+        default: false
   # Nightly at 03:00 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry.
   # The nightly runs the whole tree, including the macOS legs; the Windows legs follow with item
   # 49. GitHub runs a scheduled workflow only from the default branch.
@@ -202,6 +210,17 @@ jobs:
         run: devenv shell -- actionlint .github/workflows/*.yml
       - name: devenv test
         run: devenv test
+      # Roadmap item 69 (test-list item 3): the shell's ffmpeg is the flake's ffmpeg, and that is
+      # not the source build — with no pin the source is what both resolve to, so this fails until
+      # nix/desktop-artifacts.nix records the darwin asset.
+      - name: The shell's ffmpeg is the pinned artifact
+        run: |
+          set -euo pipefail
+          shipped=$(nix eval --impure --raw --expr "let f = builtins.getFlake (toString ./.); pkgs = f.inputs.nixpkgs.legacyPackages.\${builtins.currentSystem}; in (import ./nix/ffmpeg.nix {inherit pkgs;}).ffmpeg.outPath")
+          source=$(nix eval --impure --raw --expr "let f = builtins.getFlake (toString ./.); pkgs = f.inputs.nixpkgs.legacyPackages.\${builtins.currentSystem}; in (import ./nix/ffmpeg.nix {inherit pkgs;}).source.outPath")
+          shell=$(devenv shell -- bash -c "readlink -f \"\$(command -v ffmpeg)\"")
+          test "$shell" = "$shipped/bin/ffmpeg"
+          test "$shipped" != "$source"
       - name: nix flake check
         run: nix flake check --print-build-logs
       - name: nix build
@@ -289,6 +308,37 @@ jobs:
           hdiutil detach "$mount"
           name=$(basename "$app" .app)
           echo "STT_DESKTOP_APP=$appdir/$name.app/Contents/MacOS/$name" >> "$GITHUB_ENV"
+      # Roadmap item 69 (test-list item 5): the packaged app's tools are the audio-only ffmpeg from
+      # the pinned asset — one binary, no ffprobe, the audio-only configure line — not bytedeco's
+      # full GPL build. The journey spec then transcribes an upload through it.
+      - name: Assert the packaged ffmpeg is the audio-only build
+        run: |
+          set -euo pipefail
+          resources="$(cd "$(dirname "$STT_DESKTOP_APP")/../Resources" && pwd)"
+          tools="$resources/tools/bin"
+          [ -x "$tools/ffmpeg" ] || {
+            echo "no executable ffmpeg in $tools" >&2
+            ls -l "$tools" >&2
+            exit 1
+          }
+          if [ -e "$tools/ffprobe" ]; then
+            echo 'the packaged tools still ship ffprobe' >&2
+            exit 1
+          fi
+          version=$("$tools/ffmpeg" -hide_banner -version)
+          configuration=$(sed -n 's/^configuration: //p' <<<"$version" | tr -d "'")
+          case $configuration in
+            *--disable-everything*) ;;
+            *)
+              echo "ffmpeg is not the audio-only build; configuration: $configuration" >&2
+              exit 1
+              ;;
+          esac
+          if [[ $configuration == *--enable-lib* ]]; then
+            echo "the audio-only build enables an external library: $configuration" >&2
+            exit 1
+          fi
+          echo "packaged ffmpeg: $(head -n 1 <<<"$version")"
       - name: Upload the DMG
         uses: actions/upload-artifact@v4
         with:
@@ -311,7 +361,7 @@ jobs:
   # (agents never publish to GitHub).
   macos-whisper-asset:
     name: macOS whisper-cli asset (manual)
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.assets
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -345,6 +395,74 @@ jobs:
         with:
           name: whisper-cpp-1.8.4-aarch64-darwin
           path: whisper-cpp-1.8.4-aarch64-darwin.tar.gz
+          retention-days: 90
+
+  # Manual tool (roadmap item 69, the macOS counterpart of `macos-whisper-asset`; opt-in like it,
+  # via the `assets` dispatch input): builds the shared audio-only recipe for aarch64-darwin,
+  # proves its surface with `ffmpeg-audio-only` (one binary, no ffprobe/ffplay, `otool -L` names
+  # only system libraries, the configure line's exact component sets) and packages it as the
+  # `.tar.gz` that the flake pin, `./gradlew prepareRuntime` and the DMG all consume. The user
+  # publishes the tar under the `desktop-ffmpeg-v2` release (a new tag only if the enable list or
+  # the nixpkgs pin changes) and pastes the printed pin into nix/desktop-artifacts.nix; agents
+  # never publish.
+  macos-ffmpeg-asset:
+    name: macOS ffmpeg asset (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.assets
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/nix-toolchain
+      - name: Build the audio-only ffmpeg and prove its surface
+        run: nix run --print-build-logs .#ffmpeg-audio-only
+      # Roadmap item 69 (the root review's finding 1): packaging comes before everything that
+      # reads the recorded pin. A stale pin fails at evaluation, and this job exists to rebuild the
+      # asset after exactly the change that makes a pin stale — so it must always produce and print
+      # the asset and its new pin, and only then report the stale pin.
+      - name: Package the asset, print the pin
+        run: |
+          set -euo pipefail
+          nix build --print-build-logs .#desktop-ffmpeg-asset
+          cat result/pin.nix
+          # `result` is a symlink into the store; `find -L` looks through it (plain `find` would
+          # stop at the link and report no asset).
+          asset=$(find -L result -maxdepth 1 -name '*.tar.gz' -print -quit)
+          if [ -z "$asset" ]; then
+            echo "no .tar.gz in the asset output:" >&2
+            ls -l result >&2
+            exit 1
+          fi
+          cp "$asset" .
+          name=$(basename "$asset")
+          shasum -a 256 "$name" | tee sha256.txt
+          {
+            echo "### ffmpeg asset"
+            echo '```'
+            cat result/pin.nix
+            echo '```'
+            cat sha256.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+      # Roadmap item 69 (test-list item 2): item 62's proofs, unchanged, on the binary this job
+      # built — all 19 accepted upload formats decoded to the canonical FLAC (validated from its
+      # STREAMINFO) and the app's f32le decode, silencedetect, atrim and concat commands
+      # (nix/ffmpeg-upload-formats.sh, nix/ffmpeg-app-uses.sh). The flake checks of the same name
+      # prove the pinned prebuilt; this app runs the scripts on the source build, so a stale pin
+      # cannot fail them.
+      - name: Prove the fixtures and the app's commands on this build
+        run: nix run --print-build-logs .#ffmpeg-source-surface
+      # Roadmap item 69 (test-list item 3): the recorded pin names this job's build (store path and
+      # references) and this asset (sha256 and url). It runs after packaging, so the asset and the
+      # new pin are printed even when the recorded pin is the reason the job fails. `nix flake
+      # check` proves the default package's closure ships the prebuilt output and not the source
+      # (`ffmpeg-audio-only-everywhere`, a darwin check).
+      - name: Prove the recorded pin matches the built asset
+        run: nix run --print-build-logs .#ffmpeg-asset-pin
+      # The tar is what the user publishes: upload it even when the pin proof failed above.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ffmpeg-audio-only-aarch64-darwin
+          path: '*.tar.gz'
           retention-days: 90
 
   # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds

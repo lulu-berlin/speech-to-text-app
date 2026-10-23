@@ -131,11 +131,11 @@ Each form has its packaged end-to-end suite, run in a clean container from the d
 
 Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell), on Linux x86-64 or macOS Apple Silicon. The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
 
-On Linux the shell's `ffmpeg` is the app's audio-only static build from the pinned `desktop-ffmpeg-v2` asset (roadmap item 62), so it has neither `ffplay` nor `ffprobe`; on macOS it is nixpkgs' `ffmpeg_8-headless`. Use another player to listen to a file and another tool to probe media.
+The shell's `ffmpeg` is the app's audio-only build from the pinned `desktop-ffmpeg-v2` asset on both systems (roadmap items 62 and 69): the static build on Linux, and on Apple Silicon the `.tar.gz` build whose only dependencies are the OS's libraries. It has neither `ffplay` nor `ffprobe`, so use another player to listen to a file and another tool to probe media.
 
 The shell's `whisper-cli` is the same pinned 1.8.4 build (Vulkan on Linux, Metal on darwin) that `nix build .` and `.#desktop` ship, from the `desktop-whisper-cpp-v1` asset on x86_64-linux (roadmap item 63). Every system the flake declares must pin a whisper-cpp artifact — a flake check enforces it — so no machine compiles it.
 
-The end-to-end fixture generator (`e2e/global-setup.mjs`) needs a full `ffmpeg` on `PATH` — the `wav` muxer, the `pcm_s16le` encoder and the `concat` filter; on Linux the shell's ffmpeg is the app's slim build, not a general-purpose one (the macOS shell's is full). Use `./gradlew e2e` (its managed tools) or prepend a Nix `ffmpeg_8-full` from the flake's pin when running `pnpm --dir e2e test` directly.
+The end-to-end fixture generator (`e2e/lib/fixtures.ts`, run by `e2e/global-setup.mjs`) decodes the pinned sample to `f32le` and cuts, loops and concatenates the clips as 16 kHz mono PCM WAV itself. It needs only a decoder and the `f32le` muxer, not the `wav` muxer or the `concat` filter, so `./gradlew e2e` needs no general-purpose ffmpeg: on macOS it runs with the pinned audio-only artifact, on Linux with the bytedeco build `./gradlew` manages. `e2e/lib/fixtures.test.ts` checks the generator with whichever `ffmpeg` is first on `PATH`; on macOS CI that is the pinned slim binary.
 
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git

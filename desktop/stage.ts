@@ -5,9 +5,11 @@
 //                       dependency jar, onnxruntime/sqlite natives included — decided
 //                       2026-10-14: no fat-jar plugin)
 //   dist/stage/ui       frontend/dist
-//   dist/stage/tools    the pinned whisper-cli and ffmpeg (versions.json), flat, with
-//                       their .so libraries; backend.ts adds the dir to PATH and
-//                       LD_LIBRARY_PATH when it spawns the backend
+//   dist/stage/tools    the pinned whisper-cli and ffmpeg (versions.json), flat — on Linux
+//                       with their .so libraries, on Apple Silicon as single binaries
+//                       (whisper-cli static, ffmpeg linking only system libraries);
+//                       backend.ts adds the dir to PATH and LD_LIBRARY_PATH when it spawns
+//                       the backend
 //
 // The tools and the Temurin JDK are fetched once from the versions.json pins into
 // dist/downloads and sha256-verified, like ./gradlew prepareRuntime does for the Gradle
@@ -110,35 +112,41 @@ function stageTools(): void {
     rmSync(whisperTmp, { recursive: true, force: true });
   }
 
-  // ffmpeg: bytedeco's jar is a zip carrying the executable and its libav* libraries under one
-  // directory, whose flat contents belong next to the binary. On Linux the libraries carry no
-  // RUNPATH (backend.ts sets LD_LIBRARY_PATH); on macOS @loader_path finds them.
-  const ffmpegClassifier =
-    process.platform === 'darwin'
-      ? process.arch === 'arm64'
-        ? 'macosx-arm64-gpl'
-        : 'macosx-x86_64-gpl'
-      : 'linux-x86_64-gpl';
+  // ffmpeg: on Linux bytedeco's jar is a zip carrying the executable and its libav* libraries
+  // under one directory, whose flat contents belong next to the binary (the libraries carry no
+  // RUNPATH; backend.ts sets LD_LIBRARY_PATH). Apple Silicon ships the pinned audio-only build
+  // (roadmap item 69), a .tar.gz with one `bin/ffmpeg`: no libraries and no ffprobe.
   const ffmpeg = artifact('ffmpeg');
   const ffmpegTmp = join(toolsBin, 'ffmpeg-tmp');
   mkdirSync(ffmpegTmp, { recursive: true });
-  // `jar` (the JDK's) rather than unzip: no unzip on a Nix shell.
-  spawnSync('jar', ['xf', ffmpeg], { cwd: ffmpegTmp, stdio: 'inherit' });
-  const libs = readdirSync(join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier), {
-    withFileTypes: true,
-  });
-  for (const entry of libs) {
-    copyTo(
-      join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier, entry.name),
-      join(toolsBin, entry.name),
-    );
-  }
-  rmSync(ffmpegTmp, { recursive: true, force: true });
-  if (!existsSync(join(toolsBin, 'ffmpeg'))) fail('ffmpeg not in the extracted jar');
-  // A zip stores no file modes, so `jar xf` left the executables non-executable. The backend
-  // runs ffmpeg from PATH (backend.ts prepends tools/bin), so the bit has to be restored here.
-  for (const executable of ['ffmpeg', 'ffprobe']) {
-    if (existsSync(join(toolsBin, executable))) chmodSync(join(toolsBin, executable), 0o755);
+  if (process.platform === 'linux') {
+    const ffmpegClassifier = 'linux-x86_64-gpl';
+    // `jar` (the JDK's) rather than unzip: no unzip on a Nix shell.
+    spawnSync('jar', ['xf', ffmpeg], { cwd: ffmpegTmp, stdio: 'inherit' });
+    const libs = readdirSync(join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier), {
+      withFileTypes: true,
+    });
+    for (const entry of libs) {
+      copyTo(
+        join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier, entry.name),
+        join(toolsBin, entry.name),
+      );
+    }
+    rmSync(ffmpegTmp, { recursive: true, force: true });
+    if (!existsSync(join(toolsBin, 'ffmpeg'))) fail('ffmpeg not in the extracted jar');
+    // A zip stores no file modes, so `jar xf` left the executables non-executable. The backend
+    // runs ffmpeg from PATH (backend.ts prepends tools/bin), so the bit has to be restored here.
+    for (const executable of ['ffmpeg', 'ffprobe']) {
+      if (existsSync(join(toolsBin, executable))) chmodSync(join(toolsBin, executable), 0o755);
+    }
+  } else {
+    spawnSync('tar', ['-xzf', ffmpeg, '-C', ffmpegTmp], { stdio: 'inherit' });
+    const exe = findFile(ffmpegTmp, 'ffmpeg') ?? fail('ffmpeg not in the extracted tarball');
+    // tar keeps the executable bit; the app runs ffmpeg from PATH (backend.ts prepends
+    // tools/bin), so the staged copy must stay executable.
+    copyTo(exe, join(toolsBin, 'ffmpeg'));
+    chmodSync(join(toolsBin, 'ffmpeg'), 0o755);
+    rmSync(ffmpegTmp, { recursive: true, force: true });
   }
 }
 

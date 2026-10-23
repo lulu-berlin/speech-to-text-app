@@ -2,122 +2,24 @@
 // STT_DATA_DIR for the whole run. globalSetup runs before the tests; the returned
 // function is the teardown, which Playwright calls after the run (it also runs when the
 // suite fails, so a stray backend cannot survive a broken run).
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  BROKEN2_CLIP,
-  BROKEN_CLIP,
-  FIXTURE_CLIPS,
-  MERGE_CLIP,
-  MERGE_SOURCE_IDS,
   checkPreconditions,
   choosePort,
-  librispeechDir,
   loadState,
   saveState,
   startBackend,
   stopBackend,
 } from './lib/backend.mjs';
+import { writeFixtures } from './lib/fixtures.ts';
 
 export default async function globalSetup() {
   checkPreconditions();
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-'));
   const fixturesDir = mkdtempSync(join(tmpdir(), 'stt-e2e-fixtures-'));
-  // The journey's clips: the committed LibriSpeech sample plus distinct trims of it —
-  // every fixture must have unique bytes (the backend deduplicates by content sha256 and
-  // the tests share one backend). Short trims still transcribe as real speech.
-  const recipes = [
-    { args: [], file: FIXTURE_CLIPS[0] }, // the full sample
-    { args: ['-t', '6'], file: FIXTURE_CLIPS[1] }, // 0-6s
-    { args: ['-ss', '3', '-t', '7'], file: FIXTURE_CLIPS[2] }, // 3-10s
-    { args: ['-t', '2'], file: FIXTURE_CLIPS[3] }, // 0-2s
-    { args: ['-ss', '2', '-t', '2'], file: FIXTURE_CLIPS[4] }, // 2-4s
-    { args: ['-ss', '4', '-t', '2'], file: FIXTURE_CLIPS[5] }, // 4-6s
-    { args: ['-stream_loop', '11'], file: FIXTURE_CLIPS[6] }, // the sample 12 times (~132 s)
-    { args: ['-stream_loop', '19'], file: FIXTURE_CLIPS[8] }, // the sample 20 times (~220 s)
-    { args: ['-ss', '6', '-t', '5'], file: FIXTURE_CLIPS[10] }, // 6-11s
-    { args: ['-t', '3'], file: FIXTURE_CLIPS[11] }, // 0-3s, item 12
-    { args: ['-ss', '7', '-t', '4'], file: FIXTURE_CLIPS[12] }, // 7-11s, item 12
-    { args: ['-t', '7'], file: FIXTURE_CLIPS[13] }, // 0-7s, item 13
-    { args: ['-ss', '4', '-t', '7'], file: FIXTURE_CLIPS[14] }, // 4-11s, item 13
-    { args: ['-stream_loop', '7'], file: FIXTURE_CLIPS[16] }, // ~77s, screenshots
-    { args: ['-t', '4'], file: FIXTURE_CLIPS[17] }, // 0-4s, screenshots' upload-in-flight
-    { args: ['-t', '5'], file: FIXTURE_CLIPS[18] }, // 0-5s, screenshots' second running seed
-    { args: ['-stream_loop', '8'], file: FIXTURE_CLIPS[19] }, // ~88s, the header/nav e2e (item 31)
-    { args: ['-ss', '5', '-t', '2'], file: FIXTURE_CLIPS[20] }, // 5-7s, item 14's contract check
-    { args: ['-ss', '1', '-t', '7'], file: FIXTURE_CLIPS[21] }, // 1-8s, the settings e2e (item 32)
-    { args: ['-stream_loop', '13'], file: FIXTURE_CLIPS[22] }, // ~154s, item 36's follow-mode e2e
-    { args: ['-ss', '3', '-t', '2'], file: FIXTURE_CLIPS[23] }, // 3-5s, item 37's completed player clip
-    { args: ['-stream_loop', '5'], file: FIXTURE_CLIPS[24] }, // ~55s, item 37's background transcription
-    { args: ['-stream_loop', '9'], file: FIXTURE_CLIPS[25] }, // ~110s, item 40's atomic-transitions race clip
-    { args: ['-ss', '6', '-t', '3'], file: FIXTURE_CLIPS[26] }, // 6-9s, item 40's queue-is-live follow-up
-    { args: ['-stream_loop', '10'], file: FIXTURE_CLIPS[27] }, // ~121s, item 40's pause-queued running clip
-    { args: ['-ss', '2', '-t', '4'], file: FIXTURE_CLIPS[28] }, // 2-6s, item 40's pause-queued clip
-    { args: ['-ss', '5', '-t', '6'], file: FIXTURE_CLIPS[29] }, // 5-11s, item 42's queue-survives-a-failure clip
-    { args: ['-ss', '8', '-t', '3'], file: FIXTURE_CLIPS[31] }, // 8-11s, item 41's concurrent-upload race
-    { args: ['-ss', '2', '-t', '6'], file: FIXTURE_CLIPS[32] }, // 2-8s, item 59's favicon typing clip
-    { args: ['-ss', '3', '-t', '3'], file: FIXTURE_CLIPS[33] }, // 3-6s, item 59's upload-options clip
-    { args: ['-stream_loop', '15'], file: FIXTURE_CLIPS[34] }, // ~176s, item 59's running-row clip
-    { args: ['-ss', '1', '-t', '2'], file: FIXTURE_CLIPS[35] }, // 1-3s, item 59's queued-row clip
-    { args: ['-ss', '9', '-t', '2'], file: FIXTURE_CLIPS[36] }, // 9-11s, item 59's history-row clip
-    { args: ['-stream_loop', '3'], file: FIXTURE_CLIPS[38] }, // ~44s, item 59's row-controls clip
-    { args: ['-ss', '7', '-t', '2'], file: FIXTURE_CLIPS[39] }, // 7-9s, item 59's row-controls second clip
-    { args: ['-stream_loop', '2'], file: FIXTURE_CLIPS[40] }, // ~33s, item 59's single-bar row clip
-    { args: ['-stream_loop', '12'], file: FIXTURE_CLIPS[41] }, // ~143s, item 59's elapsed-time row clip
-    { args: ['-stream_loop', '4'], file: FIXTURE_CLIPS[42] }, // ~55s, item 59's phase-color row clip
-    { args: ['-stream_loop', '16'], file: FIXTURE_CLIPS[44] }, // ~187s, item 59's header-typing clip
-    { args: ['-stream_loop', '1'], file: FIXTURE_CLIPS[45] }, // ~22s, item 48's Metal app e2e
-  ];
-  for (const { args, file } of recipes) {
-    const target = join(fixturesDir, file);
-    if (args.length === 0) {
-      copyFileSync(process.env.TEST_JFK_WAV, target);
-    } else {
-      execFileSync('ffmpeg', [
-        '-y',
-        '-loglevel',
-        'error',
-        ...args,
-        '-i',
-        process.env.TEST_JFK_WAV,
-        target,
-      ]);
-    }
-  }
-  // The two-speaker recording: the three committed LibriSpeech clips back to back.
-  execFileSync('ffmpeg', [
-    '-y',
-    '-loglevel',
-    'error',
-    ...MERGE_SOURCE_IDS.flatMap((id) => ['-i', join(librispeechDir, `${id}.flac`)]),
-    '-filter_complex',
-    '[0:a][1:a][2:a]concat=n=3:v=0:a=1',
-    join(fixturesDir, MERGE_CLIP),
-  ]);
-  // A .wav whose bytes are not audio: it passes the upload's extension check and fails
-  // when the engine decodes it (CHUNKING).
-  writeFileSync(
-    join(fixturesDir, BROKEN_CLIP),
-    "not audio — the e2e suite's undecodable fixture\n".repeat(256),
-  );
-  writeFileSync(
-    join(fixturesDir, BROKEN2_CLIP),
-    "also not audio — the history test's own undecodable fixture\n".repeat(256),
-  );
-  writeFileSync(
-    join(fixturesDir, FIXTURE_CLIPS[30]),
-    "not audio either — item 42's queue-survives-a-failure fixture\n".repeat(256),
-  );
-  writeFileSync(
-    join(fixturesDir, FIXTURE_CLIPS[37]),
-    "still not audio — item 59's history-row retry fixture\n".repeat(256),
-  );
-  writeFileSync(
-    join(fixturesDir, FIXTURE_CLIPS[43]),
-    "still not audio — item 59's status-page delete fixture\n".repeat(256),
-  );
+  writeFixtures(fixturesDir);
   const port = await choosePort();
   saveState({ port, dataDir, fixturesDir });
   const { pid } = await startBackend({ port, dataDir });
