@@ -43,7 +43,7 @@ fun Application.processingEngine(config: Config) {
     // The known-stopped-by-us flag (item 49): set when the server starts to stop, before the engine is cancelled,
     // so a tool that dies in between (a console Ctrl-C reaches it too) is an interruption, not a failure.
     val stopping = AtomicBoolean(false)
-    monitor.subscribe(ApplicationStopPreparing) { stopping.set(true) }
+    markStopping(stopping)
     dependencies {
         // One runner for every external process: it is single-flight (ADR 0020) and is the engine's pause control.
         provide<ProcessRunner> { ProcessRunner(stopping = stopping::get) }
@@ -83,4 +83,12 @@ fun Application.processingEngine(config: Config) {
     val engine: ProcessingEngine = runBlocking { dependencies.resolve<ProcessingEngine>() }
     // The worker starts on that same engine: it recovers what a crash left RUNNING, then takes the queue.
     launch { engine.start() }
+}
+
+/**
+ * Subscribes [stopping] to the server's stop, before the engine is cancelled (roadmap item 49). A test application
+ * and the running server raise the same event, so [StoppingFlagSpec] covers exactly this wiring.
+ */
+internal fun Application.markStopping(stopping: AtomicBoolean) {
+    monitor.subscribe(ApplicationStopPreparing) { stopping.set(true) }
 }
