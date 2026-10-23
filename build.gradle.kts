@@ -379,7 +379,7 @@ fun appEnv(): Map<String, String> =
                 runtimeBinDirs.map { it.absolutePath } +
                     nodeInstallDir().let { n ->
                         listOf(
-                            File(n, "pnpm/pnpm-v${manifest["pnpm"]}/bin").absolutePath,
+                            (if (platform == "windows-x64") pnpmHome else File(pnpmHome, "bin")).absolutePath,
                             File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}")
                                 .let { if (platform == "windows-x64") it.absolutePath else File(it, "bin").absolutePath },
                         )
@@ -451,12 +451,26 @@ fun applyAppEnv(task: Exec) = appEnv().forEach { (k, v) -> task.environment(k, r
 // Gradle provides what the devenv otherwise sets: the pinned fixtures, the managed
 // tools on PATH, the browsers and the backend command. A user-set variable wins.
 val e2eDir = rootProject.file("e2e")
+// npm's global bin on Windows is the prefix itself, so pnpm sits in the version directory there and
+// in its `bin/` on POSIX (the same layout node-gradle's own VariantComputer computes).
+val pnpmHome = File(nodeInstallDir(), "pnpm/pnpm-v${manifest["pnpm"]}")
 val pnpmExe =
     File(
-        nodeInstallDir(),
-        "pnpm/pnpm-v${manifest["pnpm"]}/bin/" + if (platform == "windows-x64") "pnpm.cmd" else "pnpm",
+        if (platform == "windows-x64") pnpmHome else File(pnpmHome, "bin"),
+        if (platform == "windows-x64") "pnpm.cmd" else "pnpm",
     )
 val fixtures = manifest["fixtures"] as Map<*, *>
+
+// The e2e tasks drive the frontend and Playwright through the POSIX toolchain layout. On Windows the
+// packaged app's own e2e (`e2e/desktop-tests`) is the supported path, so these tasks fail there when
+// they run — not at configuration time, which would break every other task on that host.
+fun requirePosixE2e(task: String) {
+    if (platform == "windows-x64") {
+        throw GradleException(
+            "$task is not supported on Windows: run the packaged app's e2e (e2e/desktop-tests) instead",
+        )
+    }
+}
 
 val jfkWavFile = assetCacheFile("fixtures", fixtures["jfkWav"] as Map<*, *>)
 val tinyModelFile = modelCacheFile("whisperTinyEn")
@@ -499,6 +513,7 @@ tasks.register<Exec>("e2eInstall") {
     description = "Install the e2e package's dependencies (frozen lockfile) with the managed pnpm"
     dependsOn(":frontend:pnpmSetup")
     doFirst {
+        requirePosixE2e("e2eInstall")
         applyE2eEnv(this as Exec)
         setCommandLine(pnpmExe.absolutePath, "install", "--frozen-lockfile")
     }
@@ -511,6 +526,7 @@ tasks.register<Exec>("e2eBrowsers") {
     // A user-set PLAYWRIGHT_BROWSERS_PATH (the devenv's read-only Nix browser farm) is used as is.
     onlyIf { System.getenv("PLAYWRIGHT_BROWSERS_PATH") == null }
     doFirst {
+        requirePosixE2e("e2eBrowsers")
         applyE2eEnv(this as Exec)
         setCommandLine(pnpmExe.absolutePath, "exec", "playwright", "install", "chromium")
     }
@@ -586,6 +602,7 @@ tasks.register<Exec>("e2e") {
         "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: ./gradlew e2eSystemDeps)"
     dependsOn("prepareRuntime", "prepareE2eFixtures", "e2eBrowsers", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
+        requirePosixE2e("e2e")
         applyE2eEnv(this as Exec)
         setCommandLine(pnpmExe.absolutePath, "test")
     }

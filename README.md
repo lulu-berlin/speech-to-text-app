@@ -264,6 +264,10 @@ Vulkan-capable driver the startup probe finds no GPU and transcription runs on t
 
 `gradlew.bat dev` (dev mode) is not available on Windows yet; `stt.cmd` runs the built app.
 
+The Gradle e2e tasks (`gradlew.bat e2e`, `e2eInstall`, `e2eBrowsers`) are POSIX-only and say so when
+run on Windows; the packaged app's own end-to-end suite ([`e2e/desktop-tests`](e2e/desktop-tests)) is
+the Windows path, and CI runs it for the zip and the MSI.
+
 ## Configuration
 
 The backend is configured with environment variables. The Nix package, the development shell, `./gradlew run`/`dev` and the desktop app set all of them; you only set them yourself to change something.
