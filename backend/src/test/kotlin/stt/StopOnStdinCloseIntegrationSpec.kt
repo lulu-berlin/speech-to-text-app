@@ -52,7 +52,7 @@ class StopOnStdinCloseIntegrationSpec :
                             dataDir,
                             port,
                             tempdir("stt-stdin-keep-log").toPath().resolve("app.log"),
-                            env = mapOf("STT_STOP_ON_STDIN_CLOSE" to "0"),
+                            env = emptyMap(),
                         )
                     try {
                         awaitServing(port) shouldBe true
