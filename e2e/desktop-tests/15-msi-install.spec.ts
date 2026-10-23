@@ -72,9 +72,8 @@ test('the per-user MSI installs the app, transcribes, and the uninstall keeps th
     await app.close();
     await server.close();
   }
-  expect(existsSync(join(paths.data, 'stt.db'))).toBe(true);
-  expect(existsSync(join(paths.models, whisperFile))).toBe(true);
-  expect(existsSync(join(paths.models, speakerFile))).toBe(true);
+  const models = [whisperFile, speakerFile];
+  expectUserDataKept(paths, models);
 
   // The uninstall by the ProductCode the installer registered: the program files go.
   const code = await productCode();
@@ -83,10 +82,14 @@ test('the per-user MSI installs the app, transcribes, and the uninstall keeps th
   await waitFor(() => installedExe() === null, 120_000, 'the uninstalled program files to go');
 
   // What the user keeps: the database with the transcript and the verified model cache.
-  expect(existsSync(join(paths.data, 'stt.db'))).toBe(true);
-  expect(existsSync(join(paths.models, whisperFile))).toBe(true);
-  expect(existsSync(join(paths.models, speakerFile))).toBe(true);
+  expectUserDataKept(paths, models);
 });
+
+/** The per-user database and every named model in the cache are on disk. */
+function expectUserDataKept(paths: { data: string; models: string }, models: string[]): void {
+  expect(existsSync(join(paths.data, 'stt.db'))).toBe(true);
+  for (const model of models) expect(existsSync(join(paths.models, model))).toBe(true);
+}
 
 /** Runs `msiexec` and fails on anything but success (3010 is "success, reboot required"). */
 function msiexec(args: string[]): void {

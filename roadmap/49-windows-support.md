@@ -373,3 +373,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   code this branch does not touch, recorded in the known-issues row for that spec. Not run on the
   Windows 11 guest: CI-verified only. Commits `cb507d45` (spec + CI step), `57f5211a` (MSI target +
   installed-app specs), `b884993f` (icon). Item ticked.
+- 2026-10-23: approved test-only refactor after item 12: `15-msi-install.spec.ts`'s two copies of
+  the kept-data assertions (after the app's run and after the uninstall) are now
+  `expectUserDataKept(paths, models)`. Type check (`tsc -p desktop/tsconfig.json`) and Prettier
+  green locally; the spec itself is Windows-only and runs in the next CI run.
