@@ -168,7 +168,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       RUNNING for restart recovery, on every platform
 - [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows, a tool's console
       Ctrl-C exit (`0xC000013A`) counts as a stopped tool, so its task is left for recovery
-- [ ] (discovered, 2026-10-23, user-approved) On macOS, a tool's SIGINT exit (130, a terminal Ctrl-C
+- [x] (discovered, 2026-10-23, user-approved) On macOS, a tool's SIGINT exit (130, a terminal Ctrl-C
       that reaches the tool's process group) counts as a stopped tool, so its task is left for recovery
 - [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit stops the backend
       gracefully first and force-kills the tree only after a bounded wait
@@ -481,3 +481,11 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   `gradle check` (352 tests), `gradle integrationTest`, frontend and docs checks green. Commit
   `6e2a1905`. Ticks with the next CI run's `Windows (gradle check)`, which runs this spec on
   Windows.
+- 2026-10-23: review cycle 4 (macOS terminal Ctrl-C) green. Scope confirmed by the user: macOS only;
+  on Linux, tools run in their own `setsid` session, so a 130 there is a deliberate SIGINT and stays
+  a failure. New case in `ProcessRunnerPlatformSpec` (Darwin platform): a tool exiting 130 must make
+  the run a cancellation. Red: `Expected exception java.util.concurrent.CancellationException but
+  no exception was thrown`. Green: `ProcessRunner` maps exit 130 to a cancellation where signals
+  exist but process groups do not (Darwin). `gradle check` (353 tests), `gradle integrationTest`,
+  frontend and docs checks green. Commit `e7fbe8cd`. Ticked: the seam test runs on every host and on
+  the macOS CI job; the Ctrl-C race itself stays an inference from the code, not reproduced.
