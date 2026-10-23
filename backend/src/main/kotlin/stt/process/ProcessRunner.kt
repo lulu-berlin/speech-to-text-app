@@ -104,6 +104,11 @@ class ProcessRunner internal constructor(
                 if (platform.signals && exitCode == SIGTERM_EXIT_CODE) {
                     throw CancellationException("process was terminated by SIGTERM (exit $SIGTERM_EXIT_CODE)")
                 }
+                // A console Ctrl-C (stt.cmd) reaches the tool and the JVM at once, so the tool can end with
+                // STATUS_CONTROL_C_EXIT before the shutdown has set [stopping]: Windows' counterpart of exit 143.
+                if (platform.windows && exitCode == STATUS_CONTROL_C_EXIT) {
+                    throw CancellationException("process was ended by a console Ctrl-C (STATUS_CONTROL_C_EXIT)")
+                }
                 // The known-stopped-by-us flag (item 49): a tool that dies while the backend is stopping was
                 // stopped by the shutdown — on Windows there is no SIGTERM to recognise it by — so it is an
                 // interruption on every platform, never a failure.
@@ -222,6 +227,9 @@ class ProcessRunner internal constructor(
     private companion object {
         /** The exit code of a process killed by SIGTERM: 128 + 15, Linux convention (as in ProcessTree). */
         const val SIGTERM_EXIT_CODE = 143
+
+        /** The exit code of a Windows process ended by a console Ctrl-C: NTSTATUS STATUS_CONTROL_C_EXIT. */
+        const val STATUS_CONTROL_C_EXIT = 0xC000013A.toInt()
     }
 }
 

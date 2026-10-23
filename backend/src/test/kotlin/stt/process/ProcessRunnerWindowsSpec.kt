@@ -1,9 +1,11 @@
 package stt.process
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
@@ -33,6 +35,24 @@ class ProcessRunnerWindowsSpec :
                     val spawned = spawnedOnWindows(mapOf("Path" to bin.absolutePath), listOf("ffmpeg", "-version"))
 
                     spawned.command() shouldBe listOf(ffmpeg.absolutePath, "-version")
+                }
+            }
+
+            `when`("a console Ctrl-C ends the tool before the backend knows it is stopping") {
+                then("its STATUS_CONTROL_C_EXIT is a cancellation, not a failed result") {
+                    val bin = tempdir("stt-win-ctrl-c")
+                    File(bin, "whisper-cli.exe").createNewFile()
+                    val runner =
+                        ProcessRunner(
+                            gracePeriod = 1.seconds,
+                            platform = ProcessPlatform.WINDOWS,
+                            env = mapOf("Path" to bin.absolutePath),
+                            startProcess = { ExitedProcess(exitCode = 0xC000013A.toInt()) },
+                        )
+
+                    runTest {
+                        shouldThrow<CancellationException> { runner.run(listOf("whisper-cli")) }
+                    }
                 }
             }
         }
