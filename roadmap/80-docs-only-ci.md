@@ -78,7 +78,7 @@ dispatch runs always run everything.
 - [x] (discovered) A non-Markdown file under `docs/` (a contract example the tests read, an image,
       the schema) counts as code, and so does every `.txt` (they are build inputs)
 - [x] (CI) A push to `main` and the nightly schedule run every heavy job
-- [ ] (CI) With the `ci:full` label, a documentation-only PR runs every heavy job
+- [x] (CI) With the `ci:full` label, a documentation-only PR runs every heavy job
 - [ ] (must not break) The required check keeps the name `CI (all checks)`; the aggregator's `needs`
       covers every heavy job; the manual asset jobs and the macOS-only jobs keep their conditions
 - [ ] (must not break) A skipped job does not make `CI (all checks)` red, and a failing job still
@@ -139,3 +139,7 @@ e2e (the reason is recorded here, as in item 65).
   runs everything outside a pull request, so the test executes it on a temp repo whose range is
   documentation only (`pull_request` → `code=false`, the control) and gets `code=true` for `push`,
   `schedule` and `workflow_dispatch`. 5 tests pass. GitHub half: the `main` push run after merge.
+- 2026-10-23 (cycle 6, test-list item 5): passed on its first run — the decision script already
+  honours `FORCE_FULL`; the test flips a documentation-only temp-repo range from `code=false` to
+  `code=true` and pins the `changes` job's `FORCE_FULL: contains(github.event.pull_request.labels.*.name, 'ci:full')`
+  wiring. 6 tests pass. GitHub half: a documentation-only PR carrying the label.

@@ -236,3 +236,18 @@ test('a push to main and the nightly schedule run every heavy job', (t) => {
   assert.equal(decide(repo.dir, 'schedule', range), 'code=true', 'the nightly schedule runs everything');
   assert.equal(decide(repo.dir, 'workflow_dispatch', range), 'code=true', 'a dispatch runs everything');
 });
+
+test('the ci:full label runs every heavy job on a documentation-only pull request', (t) => {
+  const repo = tempRepo();
+  t.after(() => rmSync(repo.dir, { recursive: true, force: true }));
+  const base = repo.commit({ 'README.md': '# base\n' }, 'base');
+  const head = repo.commit({ 'roadmap/80-docs-only-ci.md': '# item\n' }, 'docs only');
+  const range = { base, head };
+
+  assert.equal(decide(repo.dir, 'pull_request', range), 'code=false', 'without the label the docs-only PR skips the heavy jobs');
+  assert.equal(decide(repo.dir, 'pull_request', range, true), 'code=true', 'ci:full forces every heavy job');
+
+  // The label reaches the script only through the changes job's environment.
+  const changes = parseJobs(readFileSync(workflowPath, 'utf8')).get('changes');
+  assert.match(changes.raw.join('\n'), /FORCE_FULL: \$\{\{ contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci:full'\) \}\}/);
+});
