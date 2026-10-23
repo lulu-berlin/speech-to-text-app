@@ -40,6 +40,29 @@ class ProcessRunnerWindowsSpec :
                     spawned.redirectInput().file() shouldBe File("NUL")
                 }
             }
+
+            `when`("the environment spells the variable `Path`, as Windows itself does") {
+                then("the bare tool name still resolves through it") {
+                    val bin = tempdir("stt-win-path-case")
+                    val ffmpeg = File(bin, "ffmpeg.exe").apply { createNewFile() }
+                    var builder: ProcessBuilder? = null
+                    val runner =
+                        ProcessRunner(
+                            gracePeriod = 1.seconds,
+                            platform = ProcessPlatform.WINDOWS,
+                            env = mapOf("Path" to bin.absolutePath),
+                            startProcess = { spawned ->
+                                builder = spawned
+                                WindowsExitedProcess(4243)
+                            },
+                        )
+
+                    runTest { runner.run(listOf("ffmpeg", "-version")) }
+
+                    val spawned = builder ?: error("the process was never spawned")
+                    spawned.command() shouldBe listOf(ffmpeg.absolutePath, "-version")
+                }
+            }
         }
     })
 

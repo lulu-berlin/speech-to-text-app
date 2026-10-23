@@ -175,12 +175,23 @@ class ProcessRunner internal constructor(
         val separator = if (platform.windows) ';' else ':'
         val suffixes =
             if (platform.windows && !name.endsWith(".exe", ignoreCase = true)) listOf("", ".exe") else listOf("")
-        return (env["PATH"] ?: "")
+        return (searchPath() ?: "")
             .split(separator)
             .map { it.trim().trim('"') }
             .filter { it.isNotEmpty() && Path.of(it).isAbsolute }
             .flatMap { dir -> suffixes.map { suffix -> Path.of(dir, name + suffix).toString() } }
     }
+
+    /**
+     * The PATH variable. Windows names are case-insensitive and the system spells this one `Path`,
+     * but the map [System.getenv] returns there is case-sensitive, so the name is matched ignoring case.
+     */
+    private fun searchPath(): String? =
+        if (platform.windows) {
+            env.entries.firstOrNull { it.key.equals("PATH", ignoreCase = true) }?.value
+        } else {
+            env["PATH"]
+        }
 
     private fun isExecutable(path: String): Boolean {
         val file = Path.of(path)
