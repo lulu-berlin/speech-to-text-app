@@ -366,14 +366,17 @@ internal fun filesUnder(root: Path): List<Path> {
 }
 
 /**
- * A path the concurrent deletion already removed. POSIX reports [NoSuchFileException]; Windows reports an
- * [AccessDeniedException] for a path in its delete-pending state, and any exception for a path that no longer
- * exists counts as gone.
+ * A path the concurrent deletion already removed. POSIX reports [NoSuchFileException] and nothing else; Windows
+ * reports an [AccessDeniedException] for a path in its delete-pending state, and there any exception for a path
+ * that no longer exists counts as gone. An unreadable path is not a removed one, so the existence fallback stays
+ * on Windows: on POSIX it would hide a real access error.
  */
 private fun gone(
     path: Path,
     exc: IOException,
-): Boolean = exc is NoSuchFileException || !Files.exists(path) || (ProcessPlatform.current().windows && exc is AccessDeniedException)
+): Boolean =
+    exc is NoSuchFileException ||
+        (ProcessPlatform.current().windows && (exc is AccessDeniedException || !Files.exists(path)))
 
 /**
  * Stores [task]'s plan of [chunkCount] chunks together with the fake chunker's canonical clip, in one transaction:
