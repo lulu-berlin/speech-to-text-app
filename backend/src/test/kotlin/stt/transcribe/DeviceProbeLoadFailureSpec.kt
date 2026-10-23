@@ -46,6 +46,39 @@ class DeviceProbeLoadFailureSpec :
                 }
             }
         }
+
+        given("a whisper-cli whose DLL is not a valid image, so the loader exits with STATUS_INVALID_IMAGE_FORMAT") {
+            `when`("the startup probe runs it") {
+                then("the load failure is reported instead of an empty device list") {
+                    probeWith(
+                        ProcessResult(exitCode = 0xC000007B.toInt(), stdout = emptyList(), stderr = emptyList()),
+                        ProcessPlatform.WINDOWS,
+                    ).probe()
+                        .shouldBeInstanceOf<DeviceProbeOutcome.LaunchFailed>()
+                }
+            }
+        }
+
+        given("a whisper-cli whose dylib is missing on macOS, so dyld aborts before the backend runs") {
+            `when`("the startup probe runs it") {
+                then("the load failure is reported instead of an empty device list") {
+                    val result =
+                        ProcessResult(
+                            exitCode = 134,
+                            stdout = emptyList(),
+                            stderr =
+                                listOf(
+                                    "dyld[4242]: Library not loaded: @rpath/libggml.dylib",
+                                    "  Referenced from: /opt/stt/whisper-cli",
+                                ),
+                        )
+
+                    probeWith(result, ProcessPlatform.DARWIN)
+                        .probe()
+                        .shouldBeInstanceOf<DeviceProbeOutcome.LaunchFailed>()
+                }
+            }
+        }
     })
 
 /** The probe under test: the seam returns [result]; the platform only decides the input path, which the seam ignores. */
