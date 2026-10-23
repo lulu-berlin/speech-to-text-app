@@ -170,8 +170,12 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       Ctrl-C exit (`0xC000013A`) counts as a stopped tool, so its task is left for recovery
 - [x] (discovered, 2026-10-23, user-approved) On macOS, a tool's SIGINT exit (130, a terminal Ctrl-C
       that reaches the tool's process group) counts as a stopped tool, so its task is left for recovery
-- [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit stops the backend
-      gracefully first and force-kills the tree only after a bounded wait
+- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) Started with
+      `STT_STOP_ON_STDIN_CLOSE=1`, the backend stops once its stdin closes; without the variable it
+      ignores stdin
+- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows the desktop quit
+      closes the backend's stdin and force-kills the tree only if the backend has not exited within
+      10 s
 - [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
       within a bound even when `taskkill` fails, and the failure is logged
 - [ ] (discovered, 2026-10-23, from the root review) On Windows a cancelled run destroys its direct
@@ -489,3 +493,14 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   exist but process groups do not (Darwin). `gradle check` (353 tests), `gradle integrationTest`,
   frontend and docs checks green. Commit `e7fbe8cd`. Ticked: the seam test runs on every host and on
   the macOS CI job; the Ctrl-C race itself stays an inference from the code, not reproduced.
+- 2026-10-23: checkpoint after review cycle 4 (user: do the refactor, approve the split and the
+  next test). Approved refactor `170de287`: the four exit checks in `runExclusively` are one
+  `interruption(exitCode)` function (SIGTERM 143, Windows `STATUS_CONTROL_C_EXIT`, Darwin SIGINT 130,
+  the stopping flag); `gradle check` (353 tests) and `gradle integrationTest` green. Gate slip on
+  that commit: the frontend command's output filter hid vitest's exit code, and that full run had
+  failed 3 of 177 on 5 s timeouts under host load (11–14 on 8 cores); the commit changes only
+  `ProcessRunner.kt`, the failing files passed alone, and a re-run on the same tree passed 177/177.
+  Recorded in `docs/known-issues.md`; the gate now checks vitest's exit code itself. The desktop
+  graceful-stop item is split in two: the backend stops on stdin close when
+  `STT_STOP_ON_STDIN_CLOSE=1` is set, and the Windows desktop `stop()` closes stdin before a bounded
+  force-kill. Next test: the backend half.
