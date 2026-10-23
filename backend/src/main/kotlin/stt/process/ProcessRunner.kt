@@ -109,6 +109,12 @@ class ProcessRunner internal constructor(
                 if (platform.windows && exitCode == STATUS_CONTROL_C_EXIT) {
                     throw CancellationException("process was ended by a console Ctrl-C (STATUS_CONTROL_C_EXIT)")
                 }
+                // Darwin has no setsid, so a tool shares the terminal's process group and a Ctrl-C on the
+                // terminal SIGINTs it together with the JVM, again before [stopping] is set. Linux tools have
+                // their own session, so a SIGINT there was sent on purpose and stays a failure.
+                if (platform.signals && !platform.processGroups && exitCode == SIGINT_EXIT_CODE) {
+                    throw CancellationException("process was ended by a terminal Ctrl-C (exit $SIGINT_EXIT_CODE)")
+                }
                 // The known-stopped-by-us flag (item 49): a tool that dies while the backend is stopping was
                 // stopped by the shutdown — on Windows there is no SIGTERM to recognise it by — so it is an
                 // interruption on every platform, never a failure.
@@ -227,6 +233,9 @@ class ProcessRunner internal constructor(
     private companion object {
         /** The exit code of a process killed by SIGTERM: 128 + 15, Linux convention (as in ProcessTree). */
         const val SIGTERM_EXIT_CODE = 143
+
+        /** The exit code of a process killed by SIGINT: 128 + 2, the same convention. */
+        const val SIGINT_EXIT_CODE = 130
 
         /** The exit code of a Windows process ended by a console Ctrl-C: NTSTATUS STATUS_CONTROL_C_EXIT. */
         const val STATUS_CONTROL_C_EXIT = 0xC000013A.toInt()
