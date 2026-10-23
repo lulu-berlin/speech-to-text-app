@@ -20,21 +20,10 @@ class ProcessRunnerWindowsSpec :
                 then("it is spawned directly, resolved to its .exe through the ';' PATH, with NUL as stdin") {
                     val bin = tempdir("stt-win-path")
                     val whisper = File(bin, "whisper-cli.exe").apply { createNewFile() }
-                    var builder: ProcessBuilder? = null
-                    val runner =
-                        ProcessRunner(
-                            gracePeriod = 1.seconds,
-                            platform = ProcessPlatform.WINDOWS,
-                            env = mapOf("PATH" to bin.absolutePath),
-                            startProcess = { spawned ->
-                                builder = spawned
-                                WindowsExitedProcess(4242)
-                            },
-                        )
 
-                    runTest { runner.run(listOf("whisper-cli", "-m", "model.bin")) }
+                    val spawned =
+                        spawnedOnWindows(mapOf("PATH" to bin.absolutePath), listOf("whisper-cli", "-m", "model.bin"))
 
-                    val spawned = builder ?: error("the process was never spawned")
                     spawned.command() shouldBe listOf(whisper.absolutePath, "-m", "model.bin")
                     spawned.command().first() shouldNotBe "setsid"
                     spawned.redirectInput().file() shouldBe File("NUL")
@@ -45,26 +34,34 @@ class ProcessRunnerWindowsSpec :
                 then("the bare tool name still resolves through it") {
                     val bin = tempdir("stt-win-path-case")
                     val ffmpeg = File(bin, "ffmpeg.exe").apply { createNewFile() }
-                    var builder: ProcessBuilder? = null
-                    val runner =
-                        ProcessRunner(
-                            gracePeriod = 1.seconds,
-                            platform = ProcessPlatform.WINDOWS,
-                            env = mapOf("Path" to bin.absolutePath),
-                            startProcess = { spawned ->
-                                builder = spawned
-                                WindowsExitedProcess(4243)
-                            },
-                        )
 
-                    runTest { runner.run(listOf("ffmpeg", "-version")) }
+                    val spawned = spawnedOnWindows(mapOf("Path" to bin.absolutePath), listOf("ffmpeg", "-version"))
 
-                    val spawned = builder ?: error("the process was never spawned")
                     spawned.command() shouldBe listOf(ffmpeg.absolutePath, "-version")
                 }
             }
         }
     })
+
+/** The [ProcessBuilder] a Windows-platform runner spawns for [command] with [env] as its environment. */
+private fun spawnedOnWindows(
+    env: Map<String, String>,
+    command: List<String>,
+): ProcessBuilder {
+    var builder: ProcessBuilder? = null
+    val runner =
+        ProcessRunner(
+            gracePeriod = 1.seconds,
+            platform = ProcessPlatform.WINDOWS,
+            env = env,
+            startProcess = { spawned ->
+                builder = spawned
+                WindowsExitedProcess(4242)
+            },
+        )
+    runTest { runner.run(command) }
+    return builder ?: error("the process was never spawned")
+}
 
 /** A process that has already exited: its streams are empty and its exit code is 0. */
 private class WindowsExitedProcess(
