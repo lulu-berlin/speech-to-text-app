@@ -1,6 +1,6 @@
 # 49 — Windows support
 
-Status: in-progress
+Status: in-review
 Depends on: [33](../docs/specs/gradle-bootstrap.md) (done; the no-Nix path), [48](../docs/specs/macos-support.md) (done; its portable process-control seam is the foundation), [51](../docs/specs/ci-verification.md) (done; a Windows CI runner verifies — local virtualization is the fallback), [50](../docs/specs/electron-desktop-app.md) (done; the Linux desktop app and its packaged specs, which the Windows packaged-app item extends)
 Blocks: —
 
@@ -161,7 +161,7 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
 - [x] (discovered, 2026-10-22, user-approved) A whisper-cli whose shared library is missing is a
       `LaunchFailed` probe outcome, not `0 GPU(s)`: Linux `ld.so` prints `error while loading shared
       libraries` and exits 127; macOS `dyld` prints `Library not loaded` and aborts (SIGABRT)
-- [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
+- [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test`, `pnpm build` and Linux
       e2e stay green
 
 ## Acceptance criteria
@@ -377,3 +377,22 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   the kept-data assertions (after the app's run and after the uninstall) are now
   `expectUserDataKept(paths, models)`. Type check (`tsc -p desktop/tsconfig.json`) and Prettier
   green locally; the spec itself is Windows-only and runs in the next CI run.
+- 2026-10-23: CI layout changes, user-requested at the checkpoint: `Windows (packaged zip e2e)` now
+  needs the Windows checks instead of the Linux ones (`0449deb3`; it had shared the Linux jobs'
+  `needs` since `a51c05cf`), and every job's name starts with the platform it targets — the Linux
+  jobs were `Backend`/`Frontend`/`Docs`/`E2E`/`Desktop`/`Nix (…)`; `CI (all checks)` keeps its name,
+  the check branch protection requires (`775798d4`). `actionlint` clean. Known-issues evidence on
+  the way: the `06-playback` paused-time race (`91564cfc`), a second quit-spec cleanup failure in
+  run #185 (`95019157`); the temp-dir watch flake (two macOS `gradle check` failures, runs 183 and
+  187) moved to roadmap item 77 (`e4cad467`).
+- 2026-10-23: last item (must not break) green. Locally on `a4a150a2`: `gradle check` (ktlint, 348
+  tests, 0 failures, test outputs cleaned first), `gradle integrationTest` (80 Integration tests,
+  0 failures), `pnpm test` (177 vitest tests, Prettier clean) and `pnpm build` (`tsc --noEmit`,
+  `vite build`). On CI: run #190 `39893707847` (`ee715ea3`, `workflow_dispatch`, attempt 1) —
+  every job success, `CI (all checks)` included, 19:04 overall: `Linux (e2e)` 10:46, the
+  `.deb`/flake/bundle desktop jobs, `Linux (gradle integrationTest)`, the three Nix jobs, all
+  macOS jobs (`macOS (e2e)` 15:08, the first macOS e2e green since #174) and the Windows path
+  (checks 3:16, then `Windows (packaged zip e2e)` 9:18 with the refactored MSI spec, done 12:40
+  after the start). The Windows path ends before the Linux bundle job (13:55) and macOS e2e, so the
+  gate change does not lengthen the run. Item ticked; every test-list item is ticked. Status:
+  in-review.
