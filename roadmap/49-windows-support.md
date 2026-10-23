@@ -445,3 +445,17 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   `spawnedOnWindows(env, command)` (`71c6cee5`; `gradle check` and `gradle integrationTest` green).
   The stopping-flag item is split in two — the flag on every platform, and the Windows Ctrl-C exit
   code — so each is one test. Next cycle: the flag.
+- 2026-10-23: review cycle 2 (stopping flag) green. New `ProcessRunnerStoppingSpec`, Darwin and
+  Windows (Linux shares Darwin's path except the group it signals, so no real group is touched):
+  with the backend stopping, a tool that exits 1 must make the run a `CancellationException`. Red
+  first on the missing `stopping` seam (compile), then, with the seam unused, `Expected exception
+  java.util.concurrent.CancellationException but no exception was thrown` (both cases). Green:
+  `ProcessRunner` throws a cancellation for a non-zero exit while `stopping()` holds;
+  `processingEngine` sets the flag on Ktor's `ApplicationStopPreparing`. A throwaway spec (deleted)
+  confirmed the real Netty server raises `StopPreparing` before `Stopping`/`Stopped`. The public
+  constructor's new `stopping` lambda made three trailing-lambda test calls ambiguous; they now
+  name `startProcess`. `gradle check` (351 tests) and `gradle integrationTest` (80 Integration
+  tests) green, frontend and docs checks green. Commit `abb53e2a`. Not ticked yet: the engine turns
+  that cancellation into QUEUED while its coroutine is still active (item 42's requeue) and leaves
+  RUNNING only once the engine itself is cancelled, so the item's "leaves its task RUNNING" is
+  narrower than the behaviour; a rewording is proposed at the checkpoint.
