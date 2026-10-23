@@ -101,7 +101,7 @@ graph TD
   50 --> 49
   22 --> 52[52 edit transcription]
   12 --> 52
-  54[54 TypeScript for the remaining scripts]
+  49 --> 54[54 TypeScript for the remaining scripts]
   11 --> 43[43 diarization memory ✓]:::done
   38 --> 44[44 audio in database ✓]:::done
   11 --> 44
@@ -124,6 +124,19 @@ graph TD
   48 --> 66
   49 --> 66
   66 --> 67[67 TUI frontend]
+  66 --> 70[70 Rust GUI window]
+  67 --> 70
+  49 --> 70
+  62 --> 68[68 Windows audio-only ffmpeg]
+  49 --> 68
+  62 --> 69[69 macOS audio-only ffmpeg]
+  48 --> 69
+  70[70 Rust GUI window]
+  71[71 repository and chunking performance]
+  72[72 frontend state and errors]
+  73[73 diarization speaker separation]
+  74[74 desktop presentation]
+  75[75 retire the Python oracle]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -184,7 +197,7 @@ graph TD
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md)                                                                              | done          | —                           |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md)                                                    | spec-approved | 12, 22                      |
 | [53 — The Nix store cache: one writer per key, versioned past the stale entry](../docs/specs/nix-store-cache.md)                                                     | done          | 51                          |
-| [54 — TypeScript for the remaining hand-written JavaScript](54-typescript-for-the-remaining-scripts.md)                                                              | draft         | —                           |
+| [54 — TypeScript for the remaining hand-written JavaScript](54-typescript-for-the-remaining-scripts.md)                                                              | spec-approved | 49                          |
 | [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md)                                    | done          | —                           |
 | [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](../docs/specs/desktop-bundle-mesa-artifact.md)                                                | done          | 50                          |
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md)                                                     | done          | —                           |
@@ -196,5 +209,13 @@ graph TD
 | [63 — Stop compiling whisper-cpp on every uncached machine](../docs/specs/whisper-cpp-artifact.md)                                                                   | done          | —                           |
 | [64 — Evaluate Tauri as the desktop shell](../docs/specs/tauri-evaluation.md) | done | 50 |
 | [65 — `59-row-color`'s chunking-phase observation is flaky](65-row-color-chunking-observation.md)                                                                    | spec-approved | —                           |
-| [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](66-local-service-and-frontends.md)                                   | draft         | 48, 49, 64                  |
-| [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | draft         | 66                          |
+| [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](66-local-service-and-frontends.md)                                   | spec-approved | 48, 49, 64                  |
+| [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66                          |
+| [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](68-windows-audio-only-ffmpeg.md)                                                    | spec-approved | 62, 49                      |
+| [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](69-macos-audio-only-ffmpeg.md)                                         | spec-approved | 62, 48                      |
+| [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
+| [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](71-repository-and-chunking-performance.md)               | draft         | —                           |
+| [72 — Frontend state and error handling: visible errors, one settings owner, validated input](72-frontend-state-and-errors.md)                                      | draft         | —                           |
+| [73 — Diarization speaker separation: unseparated speakers, and a split remedy](73-diarization-speaker-separation.md)                                              | draft         | —                           |
+| [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | draft         | —                           |
+| [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | draft         | —                           |

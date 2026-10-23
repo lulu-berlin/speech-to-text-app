@@ -1,11 +1,11 @@
 # 66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)
 
-Status: draft
+Status: spec-approved
 Depends on: [48](../docs/specs/macos-support.md), [49](49-windows-support.md), [64](../docs/specs/tauri-evaluation.md) —
 all **done** before this item starts (the user 2026-10-19): they bring macOS/Windows support and
 packaging/CI and the shell choice, so the login/tray/terminal mechanics this item adds become
 testable on all three OSes.
-Blocks: —
+Blocks: [67](67-tui-frontend.md) (the TUI is one of this item's frontends)
 
 ## Goal
 
@@ -14,7 +14,8 @@ provisioning; frontends are clients of it. The app can be used from the browser,
 chosen in item 64) and a TUI; a tray is an optional launcher/supervisor. The user installs the
 frontends they want; each is registered with the service, the user sets a default, and the tray can
 open any installed one. It works on Linux, macOS and Windows with each OS's own login, tray and
-terminal mechanics.
+terminal mechanics. The tray and the service ship without any GUI frontend, and the tray is not
+tied to the GUI shell.
 
 ## Evidence
 
@@ -24,10 +25,19 @@ terminal mechanics.
   (`docs/specs/nix-flake-package.md:32`, `README.md:55`).
 - Today's Electron desktop starts a private backend on a free port and stops it with the window
   (`docs/specs/electron-desktop-app.md:53-57`; ADR 0055); it is a sidecar, not a service.
+  `desktop/src/main.ts:66` asks `freePort()` on every launch, so the URL changes each start.
 - `Config.kt:12-13,55`: `STT_HOST` defaults to `0.0.0.0`; only the desktop sets `127.0.0.1`.
-  The backend has no CORS/origin middleware and no authentication.
+  The backend has no CORS/origin middleware and no authentication (`grep` over
+  `backend/src/main/kotlin/stt/http`: no `Origin`, CORS or credential code).
+- The frontend uses relative URLs and `EventSource`: `frontend/src/shared/api/client.ts` fetches
+  `/api/…` and opens `new EventSource('/api/events')`. A custom header on every request is
+  impossible for `EventSource`; the browser credential must therefore be a cookie (or SSE must move
+  to a fetch-based reader).
 - The settings row holds device, threads, upload defaults and the device-fallback notice only
-  (`db/SettingsRepository.kt:37-43`) — there is no default-frontend setting.
+  (`db/SettingsRepository.kt:37-43`) — there is no default-frontend or terminal setting.
+- ADR [0059](../docs/decisions/0059-os-shell-stays-electron.md) keeps Electron for the window; the
+  user is considering another cross-platform GUI framework later, so the tray must not depend on
+  it.
 - No autostart, tray or service-manager code or decision exists in the repo; item 16 explicitly
   excluded a NixOS module/systemd service (`docs/specs/nix-flake-package.md:36,43`).
 - Items 48/49 bring macOS/Windows app support and packaging; neither has a service/tray model yet.
@@ -38,7 +48,7 @@ terminal mechanics.
 | Start at login (user-scoped) | XDG autostart `~/.config/autostart/*.desktop`; `systemd --user` optional and not universal | `~/Library/LaunchAgents` agent (`RunAtLoad`/`KeepAlive`), or the macOS 13+ login-item API | `HKCU\…\CurrentVersion\Run` or a Startup-folder shortcut (Task Scheduler for delay/restart) |
 | Background-process scope | per-user process, no root | per-user LaunchAgent, no root | per-user process — Windows services run in session 0 and cannot show UI |
 | Tray API | StatusNotifierItem/AppIndicator over D-Bus; GNOME shows it only with the AppIndicator extension; XEmbed is deprecated | `NSStatusItem` (menu bar); `LSUIElement` hides the Dock icon | `Shell_NotifyIcon`; tray-only means no taskbar entry |
-| Durable vs ephemeral state | durable port + per-install secret in the private config dir (`$XDG_CONFIG_HOME/stt-app`, 0600); ephemeral PID + actual endpoint in `$XDG_RUNTIME_DIR/stt-app` (cleared at logout/reboot) + lock | durable in `~/Library/Application Support/stt-app`; ephemeral PID/endpoint in the per-user temp dir | durable in `%LOCALAPPDATA%\stt-app` (user ACL); ephemeral in `%LOCALAPPDATA%\Temp\stt-app`; named mutex/pipe |
+| Durable vs ephemeral state | durable port + per-install secret in the private config dir (`$XDG_CONFIG_HOME/stt-app`, 0600); ephemeral PID + actual endpoint in `$XDG_RUNTIME_DIR/stt-app` (cleared at logout/reboot) + lock | durable in `~/Library/Application Support/stt-app`; ephemeral PID/endpoint in the per-user temp dir | durable in `%APPDATA%\stt-app` (config); ephemeral in `%LOCALAPPDATA%\Temp\stt-app`; named mutex/pipe |
 | Data / models / logs | XDG directories | `~/Library/{Application Support,Caches,Logs}` | `%APPDATA%` (config) / `%LOCALAPPDATA%` (data, DB, models) |
 | Browser launch | `xdg-open URL` (default browser) | `open URL` (default browser) | the shell's default-browser association |
 | Terminal launch | no standard default-terminal API: chain `$TERMINAL`, `xdg-terminal-exec`, `x-terminal-emulator`, common emulators | `open -a Terminal` launches Terminal.app explicitly (no OS default-terminal API; another terminal is a configured override) | spawn PowerShell (the user's choice) and let the configured console host — Windows Terminal when set, else ConHost — draw the window; `wt` is an override, not the default |
@@ -81,80 +91,122 @@ terminal mechanics.
 - **Item 64's scope is unchanged** (the user): its spike evaluates the embedded-shell role only;
   its ADR feeds the tray-host choice here (the chosen shell in tray-only mode, or a native helper).
 
+## Decided (consultation, 2026-10-22)
+
+- **Port conflict** (the user): the durable port is tried first; when a foreign program holds it,
+  the service takes a free port, **re-persists** it and advertises the actual endpoint in the
+  runtime file. The tray and `stt-app open` read the runtime file, so they always use the live URL;
+  only an old browser bookmark can go stale.
+- **Bootstrap state is files, not SQLite** (the user's question, settled): the durable
+  `config.json` in the private config dir (0600 / user ACL) holds the chosen port and the
+  per-install secret; the ephemeral `runtime.json` in the per-user runtime dir (0700) holds the PID
+  and the actual endpoint; an OS lock file next to it enforces one instance per user. The database
+  is the service's own state and holds app settings only (default frontend, terminal command,
+  device, threads, …). Rationale: clients must read the port and secret *before* they can talk to
+  the service; "a process is alive" is not durable DB state (stale rows survive crashes), and the
+  single-instance lock must be an OS lock anyway; keeping bootstrap data out of the DB means
+  `stt-app open` can start the service while it migrates the schema and the tray/TUI never open
+  SQLite.
+- **Browser credential: one-time token → HttpOnly cookie** (the user): `stt-app open` and the tray
+  open `http://127.0.0.1:<port>/open?t=<single-use token, seconds TTL>`; the service validates the
+  token, sets an `HttpOnly`, `SameSite=Strict` cookie and redirects to the app. The per-install
+  secret itself never appears in a URL, a log or browser history; the TUI and the tray send it as
+  an `Authorization` header. The frontend's relative fetches and `EventSource` are unchanged.
+  Supersedes the 2026-10-19 wording "the browser gets the credential in the tray's launch URL".
+- **Standalone Rust tray** (the user): a small Rust binary using the cross-platform tray backends
+  (`tray-icon`/`muda`: `Shell_NotifyIcon`, `NSStatusItem`, StatusNotifierItem). It ships without
+  any GUI flavor, lists/opens any registered frontend, and is unaffected by a later Electron
+  replacement. GNOME without AppIndicator degrades to no icon, with a notification and
+  `stt-app open` still working. This supersedes "the item-64 shell in tray-only mode": Electron is
+  the window flavor only.
+- **The Rust pin starts here**: the tray is the repo's first Rust artifact, so this item establishes
+  the pin (`versions.json` + `rust-toolchain.toml`, a committed `Cargo.lock`, a sync check like
+  `versions-sync`) and the non-Nix bootstrap/CI path for it; item 67's TUI reuses it.
+- **Default frontend lives in the service settings row** (the user): one user preference shared by
+  browser, window, TUI and tray, exposed by the settings API and editable on the Settings page
+  (schema migration); the registry stays install-time data.
+- **The terminal override is a settings field** (`terminalCommand`, empty = the OS chain), because
+  the tray/service — not the TUI — launches the terminal.
+- **The window attaches** (the user): the Electron window becomes a `gui` frontend that attaches to
+  the running service and **starts it if it is not running**; closing the window leaves the service
+  running, and quitting is explicit (tray or `stt-app quit`). The desktop packages install the
+  service alongside the window.
+- **Descriptor registry**: JSON files in the per-user config dir (`…/stt-app/frontends`), one per
+  frontend, `{version, id, kind: browser|gui|terminal, name, command?, url?, args?}`, 0600 / user
+  ACL, written by installers and removed on uninstall. A malformed or unknown-kind file is skipped
+  with a logged warning.
+- **Unsigned is accepted** (the user): no signing in this item; the first-run approvals (macOS
+  LaunchAgent/Gatekeeper, Windows SmartScreen) are documented.
+- **Items 48/49's packaged behavior is adapted here**: their specs stay historical; this item
+  updates the packaged e2e, README and `docs/architecture.md` to the service model.
+- **Test list** approved as worded in this file.
+
 ## Proposal
 
-1. Lifecycle: one service instance per user with a lock and an ephemeral runtime file (PID and the
-   actual endpoint); durable state — the chosen port, the per-install secret, the default frontend —
-   lives in the private config/data directory; autostart is an opt-in setting implemented per OS
-   with the user-scoped mechanisms above; on-demand start via the tray or `stt-app open` always
-   works.
-2. Endpoint: try the durable default/chosen port, fall back to a free one, persist the chosen port
-   durably, and publish the actual endpoint in the runtime file; print and expose the URL so
-   bookmarks, the tray and `stt-app open` agree.
-3. Frontend registry: descriptor files per installed frontend in a per-user directory, with kind,
-   name, command/URL and arguments; the service exposes the list and serves the default-frontend
-   setting; installers/packages write the descriptors.
-4. Tray: the item-64 shell in tray-only mode (or a native helper) as a service client — open default
-   frontend, open any registered one, pause/resume the queue, show status, quit the service, toggle
-   start at login.
-5. Security: loopback bind, `Host`/`Origin` validation, per-install credential in a durable `0600`
-   file (user ACL on Windows), user-only registry and runtime files; the browser gets the launch URL
-   from the tray/`stt-app open`, the TUI reads the durable credential file.
-6. Packaging per OS: Linux first (`.deb`, flake package, bundle + autostart entry), then the
-   macOS/Windows forms from items 48/49; the service binary is the same JVM app; frontends are
-   separate artifacts/packages.
-7. Record the service model, the trust boundary and the flavor/launch model as an ADR.
+1. Lifecycle: one service instance per user with an OS lock, a durable `config.json` (port, secret)
+   and an ephemeral `runtime.json` (PID, endpoint); autostart is an opt-in setting implemented per
+   OS with the user-scoped mechanisms above; on-demand start via the tray, a window or
+   `stt-app open` always works.
+2. Endpoint: try the durable port, fall back to a free port, re-persist it and publish the actual
+   endpoint; the tray, `stt-app open` and the window read the runtime file.
+3. Frontend registry: installed descriptors in the per-user config dir; the service exposes the
+   list and serves the default-frontend setting (a settings column, migration included).
+4. Tray: the standalone Rust tray builds/packages on Linux, macOS and Windows, reads descriptors,
+   opens any frontend, pauses/resumes the queue, shows status, quits the service and toggles
+   autostart; it works with no GUI flavor installed.
+5. Security: loopback bind, `Host`/`Origin` validation, the one-time-token → HttpOnly-cookie
+   handshake for the browser, the secret as an `Authorization` header for the TUI/tray, durable
+   files 0600 / user ACL, ephemeral files holding no secret.
+6. Packaging per OS: the service package includes the tray and the autostart entry; frontends are
+   separate artifacts (browser needs none, the window is the Electron app, the TUI is item 67).
+7. Record the service model, the trust boundary, the launch model and the tray choice as an ADR.
 
 ## Open questions
 
-- The exact default port (proposal 48763) and whether a taken persisted port is retried or a new
-  free one is adopted and re-persisted.
-- Descriptor schema, its per-user directory per OS, and whether the default frontend lives in the
-  service's settings row (shared by all clients) or in the registry's config.
-- Tray host: the item-64 shell in tray-only mode vs a small native helper per OS; GNOME without
-  AppIndicator degrades to no tray (notification + launcher) — confirm the degradation.
-- Terminal override: where the user sets the per-OS launcher (Linux terminal command, macOS terminal app, Windows shell/console host).
-- Whether the current sidecar desktop becomes one flavor (attaches to the service) or is retired.
-- What items 48/49's packaged-app sections need to change once this model exists; the ADR is the
-  input for that decision.
-- Unsigned macOS autostart and Windows SmartScreen acceptance for the service and its tray.
+None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 
-## Test list (proposed 2026-10-19; behaviors only; to be approved with the user)
+## Test list (approved; behaviors only)
 
 - [ ] (basic) One service per user: a second launch attaches to the running instance instead of
-      starting another; clients read the durable port and credential from the private file and the
-      running instance's actual endpoint from the ephemeral runtime file.
+      starting another; clients read the durable port and secret from `config.json` and the running
+      instance's actual endpoint from `runtime.json`
 - [ ] (basic) The browser frontend opens from the tray in the OS default browser; the TUI opens in
       a terminal (Windows: PowerShell default; macOS: Terminal; Linux: the terminal chain), each via
-      its registered descriptor.
+      its registered descriptor
 - [ ] (basic) The tray lists exactly the installed frontends' descriptors and opens each; "Open"
-      uses the user's default frontend; uninstalling a frontend removes it from the tray.
-- [ ] (basic) The window frontend attaches to the running service (no second backend); closing the
-      window leaves the service running; quitting the service is explicit and stops the engine
-      cleanly.
+      uses the user's default frontend; uninstalling a frontend removes it from the tray; the tray
+      works in an install with no GUI flavor (browser and/or TUI only)
+- [ ] (basic) The window frontend attaches to the running service (no second backend) and starts it
+      when it is not running; closing the window leaves the service running; quitting the service is
+      explicit and stops the engine cleanly
 - [ ] (basic) Autostart (opt in) starts the service at login on each OS with the user-scoped
-      mechanism (XDG autostart / LaunchAgent / HKCU Run) and produces no duplicate instance.
+      mechanism (XDG autostart / LaunchAgent / HKCU Run) and produces no duplicate instance
 - [ ] (edge) A taken default port falls back to a free one, the durable chosen port updates, and
-      bookmarks/`stt-app open`/the tray all use the new URL.
-- [ ] (edge) After a logout/reboot clears the ephemeral runtime directory, the service starts on
-      the durable port, the next runtime file advertises it, and no secret was stored ephemerally.
-- [ ] (security) The service refuses requests with a foreign `Host`/`Origin` or without the
-      per-install credential, while the browser (via the launch URL) and the TUI (via the durable
-      file) work; no credential appears in world-readable or ephemeral files.
+      the tray/`stt-app open` use the endpoint from the runtime file
+- [ ] (edge) After a logout/reboot clears the ephemeral runtime directory, the service starts on the
+      durable port, the next runtime file advertises it, and no secret was stored ephemerally
+- [ ] (edge) A malformed or unknown-kind descriptor is skipped with a logged warning while the
+      valid descriptors stay listed
+- [ ] (security) The service refuses requests with a foreign `Host`/`Origin` or without a
+      credential; the browser works through the one-time launch token's HttpOnly cookie (SSE
+      included) and the TUI through the durable secret as a header; the secret appears in no URL,
+      log, world-readable file or ephemeral file
 - [ ] (CI per OS) Each OS leg proves its mechanics: macOS LaunchAgent + menu bar, Windows autostart
-      + tray + PowerShell TUI, Linux autostart + AppIndicator (or the documented GNOME fallback).
+      + tray + PowerShell TUI, Linux autostart + AppIndicator (or the documented GNOME fallback)
 - [ ] (must not break) The existing server, Docker, desktop and e2e paths stay green on the platforms
-      they already cover; the three Linux desktop artifacts keep their packaged e2e.
+      they already cover; the three Linux desktop artifacts keep their packaged e2e
 
 ## Acceptance criteria
 
 - One per-user service owns state and processing on all three OSes; browser, window and TUI are
-  clients; the tray is optional; installed frontends are listed and the default is user-set.
+  clients; the tray is a standalone Rust binary that works without a GUI flavor; installed
+  frontends are listed and the default is user-set.
 - The port and the per-install secret persist across logout/reboot in the private directory, with a
-  default-port/free-port fallback; the ephemeral runtime file only advertises the running instance;
-  the service is loopback-only, `Host`/`Origin`-validated and credential-protected.
+  default-port/free-port fallback that re-persists; the runtime file only advertises the running
+  instance; the service is loopback-only, `Host`/`Origin`-validated and credential-protected (the
+  browser via the one-time-token cookie, other clients via the header).
 - Per-OS login, tray and terminal mechanics are implemented and verified by that OS's CI leg; the
-  service model is recorded as an ADR.
+  Rust pin and its sync check cover every path; the service model is recorded as an ADR.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
@@ -164,8 +216,15 @@ terminal mechanics.
   after 48/49/64; default port with free-port fallback persisted; browser/TUI launched from the tray
   (Windows PowerShell for the TUI); descriptors instead of PATH probing; loopback + Host/Origin +
   per-install credential. Test list proposed, not yet approved.
-
 - 2026-10-19 (review corrections): durable/ephemeral state split — the runtime directory is cleared
   at logout/reboot, so the port and secret live in the private directory and the runtime file only
   advertises the running instance; terminal launch recorded as a per-OS launcher plus a user
   override (no OS default-terminal API; PowerShell is a shell, not a terminal host).
+- 2026-10-22: consulted (main tree). The user settled the port-conflict fallback, the files-vs-DB
+  split (the question: why not SQLite), the browser credential (a one-time token exchanged for an
+  HttpOnly cookie — the secret itself only ever travels in headers or the 0600 file), the default
+  frontend's home, the terminal override and the sidecar's fate (the window attaches and starts the
+  service). The user replaced the tray host with a standalone, cross-platform **Rust** tray that
+  ships without a GUI flavor, so this item establishes the Rust pin that item 67 reuses. Test list
+  approved; item 3 now also states the no-GUI case and item 8 names the cookie/header split. Status:
+  spec-approved; work starts after item 49 is done.
