@@ -3,7 +3,9 @@ package stt
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Roadmap item 49's review finding (decided: a graceful desktop quit on Windows). Windows has no signal the desktop
@@ -33,6 +35,33 @@ class StopOnStdinCloseIntegrationSpec :
                         app.outputStream.close()
 
                         app.waitFor(30, TimeUnit.SECONDS) shouldBe true
+                    } finally {
+                        app.destroyForcibly().waitFor()
+                    }
+                }
+            }
+        }
+
+        given("a backend started without STT_STOP_ON_STDIN_CLOSE, as gradle run and stt.cmd start it") {
+            `when`("its stdin closes") {
+                then("it keeps running and serving") {
+                    val dataDir = tempdir("stt-stdin-keep").toPath()
+                    val port = freePort()
+                    val app =
+                        startBackend(
+                            dataDir,
+                            port,
+                            tempdir("stt-stdin-keep-log").toPath().resolve("app.log"),
+                            env = mapOf("STT_STOP_ON_STDIN_CLOSE" to "0"),
+                        )
+                    try {
+                        awaitServing(port) shouldBe true
+
+                        app.outputStream.close()
+                        delay(5.seconds)
+
+                        app.isAlive shouldBe true
+                        awaitServing(port) shouldBe true
                     } finally {
                         app.destroyForcibly().waitFor()
                     }
