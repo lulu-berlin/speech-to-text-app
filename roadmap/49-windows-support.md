@@ -163,9 +163,10 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       libraries` and exits 127; macOS `dyld` prints `Library not loaded` and aborts (SIGABRT)
 - [x] (discovered, 2026-10-23, from the root review) On Windows a bare tool name resolves through the
       PATH variable whatever its spelling (`Path`, `PATH`)
-- [ ] (discovered, 2026-10-23, from the root review) A tool that exits while the backend is stopping
-      leaves its task RUNNING for restart recovery, not FAILED, on every platform; on Windows a console
-      Ctrl-C exit (`0xC000013A`) counts as stopped
+- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) A tool that exits while the
+      backend is stopping leaves its task RUNNING for restart recovery, not FAILED, on every platform
+- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows, a tool's console
+      Ctrl-C exit (`0xC000013A`) counts as a stopped tool, so its task is left for recovery
 - [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit stops the backend
       gracefully first and force-kills the tree only after a bounded wait
 - [ ] (discovered, 2026-10-23, from the root review) On Windows the desktop quit ends the backend
@@ -439,3 +440,8 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   ignoring case on Windows and keeps the exact `PATH` lookup elsewhere; `gradle check` and
   `gradle integrationTest` (80 Integration tests) green. Ticked; the Windows-only observation
   follows with the next CI run or the guest. Commit `9165c8c5`.
+- 2026-10-23: checkpoint after review cycle 1 (user: proceed with the proposals). Approved
+  test-only refactor: the two Windows cases in `ProcessRunnerWindowsSpec` share
+  `spawnedOnWindows(env, command)` (`71c6cee5`; `gradle check` and `gradle integrationTest` green).
+  The stopping-flag item is split in two — the flag on every platform, and the Windows Ctrl-C exit
+  code — so each is one test. Next cycle: the flag.
