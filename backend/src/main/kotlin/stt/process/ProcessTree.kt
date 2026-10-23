@@ -24,6 +24,12 @@ internal class ProcessTree(
     /** kill(2); a seam so tests can simulate a group that outlives SIGKILL (ADR 0020). */
     private val kill: (pid: Int, signal: Int) -> Int = LibC.INSTANCE::kill,
 ) {
+    init {
+        // A platform without signals never builds a tree (Windows destroys its direct child instead), so
+        // this is a programming error rather than a no-op terminate().
+        require(platform.signals) { "a process tree needs signals; this platform has none" }
+    }
+
     /** kill(2) addresses a whole group through the negated group id (Linux only). */
     private val target = -id.toInt()
 
@@ -33,8 +39,6 @@ internal class ProcessTree(
      * (zombies without a reaping init, uninterruptible sleep) must not hang the caller (ADR 0020).
      */
     suspend fun terminate(gracePeriod: Duration) {
-        // A platform without signals never builds a tree (Windows kills its direct child instead).
-        if (!platform.signals) return
         signal(platform.cont)
         signal(SIGTERM)
         if (awaitEmpty(gracePeriod)) return
