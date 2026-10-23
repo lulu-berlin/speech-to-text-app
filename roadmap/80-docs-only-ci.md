@@ -66,7 +66,7 @@ dispatch runs always run everything.
 
 - [x] (CI) A pull request whose diff is documentation only skips every heavy job, runs
       `Docs (exception policy)`, and `CI (all checks)` is green
-- [ ] (CI) A pull request touching one code path runs every heavy job (no skip)
+- [x] (CI) A pull request touching one code path runs every heavy job (no skip)
 - [ ] (CI) Changes to `.github/`, `devenv.nix`, `flake.nix`, `versions.json` or
       `build.gradle.kts` count as code, not documentation
 - [ ] (CI) A push to `main` and the nightly schedule run every heavy job
@@ -105,3 +105,8 @@ e2e (the reason is recorded here, as in item 65).
   the `changes` job and `needs`/`if` on all 16 code jobs: 1 test passes, `actionlint` clean,
   `node docs/check-links.mjs AGENTS.md` clean. The GitHub job list for a documentation-only PR is
   pending the user's push.
+- 2026-10-23 (cycle 2, test-list item 2): the test passed on its first run — no red was available,
+  because cycle 1's classifier already defaults to `code=true` for anything that is not
+  documentation; the test pins that one Kotlin path (alone and among docs) reports `code=true` and
+  that every heavy job's only `if` is the `changes` output. 2 tests pass, `actionlint` clean.
+  GitHub proof: this branch's own PR (its diff touches `.github/`) must show every heavy job run.

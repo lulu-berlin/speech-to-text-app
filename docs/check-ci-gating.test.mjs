@@ -119,3 +119,25 @@ test('a documentation-only pull request skips every heavy job and still reports 
   assert.ok(ci?.needs.includes('changes'), 'the aggregator waits for the decision');
   assert.equal(ci?.if, 'always()', 'the aggregator reports even when the heavy jobs did not run');
 });
+
+test('a pull request touching one code path runs every heavy job', () => {
+  assert.equal(classify(['backend/src/main/kotlin/app/Main.kt']), 'code=true', 'one Kotlin source file is code');
+  assert.equal(
+    classify(['docs/specs/ci-verification.md', 'backend/src/main/kotlin/app/Main.kt', 'roadmap/80-docs-only-ci.md']),
+    'code=true',
+    'one code path among documentation is enough to run everything',
+  );
+
+  // `code=true` is the whole gate: every heavy job's only condition is that output, so none of them
+  // can skip a run that touches code.
+  const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
+  const heavy = [...jobs.values()].filter((job) => !UNGATED.has(job.id) && !EVENT_GATED.has(job.id));
+  assert.ok(heavy.length > 0, 'the workflow has heavy jobs to run');
+  for (const job of heavy) {
+    assert.equal(
+      job.if,
+      "needs.changes.outputs.code == 'true'",
+      `${job.id} runs whenever the diff touches code`,
+    );
+  }
+});
