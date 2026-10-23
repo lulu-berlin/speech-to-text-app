@@ -166,3 +166,8 @@ e2e (the reason is recorded here, as in item 65).
   (`Linux (docs exception policy)`, `Linux (pinned model hosts resolve)`), so the checks pin the
   documentable contract — the aggregator's name — and job ids elsewhere. 8 tests pass after the
   rebase; `actionlint` clean. GitHub run evidence still pending.
+- 2026-10-23 (discovered + approved, test-list item 5, after the rebase): the label alone started no
+  run — GitHub's `pull_request` defaults are `opened`/`synchronize`/`reopened` — so the trigger
+  gained `labeled` with the defaults restated. Red: the new assertion failed ("a labeled
+  pull_request triggers a run"); green after `types: [opened, synchronize, reopened, labeled]`.
+  8 tests pass, `actionlint` clean.

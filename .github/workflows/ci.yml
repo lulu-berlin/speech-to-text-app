@@ -13,7 +13,10 @@ name: CI
 on:
   push:
     branches: [main]
+  # `labeled` is how `ci:full` forces the full matrix on a documentation-only PR without a new
+  # commit; GitHub's default types are restated because `types` replaces them.
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
     # A dispatch is how a branch runs the checks before a PR exists; the manual asset jobs (the
     # whisper-cli and audio-only ffmpeg assets, macOS and Windows) are opt-in, so a check-only

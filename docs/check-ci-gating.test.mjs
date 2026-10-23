@@ -247,6 +247,14 @@ test('the ci:full label runs every heavy job on a documentation-only pull reques
   assert.equal(decide(repo.dir, 'pull_request', range), 'code=false', 'without the label the docs-only PR skips the heavy jobs');
   assert.equal(decide(repo.dir, 'pull_request', range, true), 'code=true', 'ci:full forces every heavy job');
 
+  // Adding the label must start a run by itself; `types` replaces GitHub's defaults, so they are
+  // restated.
+  assert.match(
+    readFileSync(workflowPath, 'utf8'),
+    /^ {2}pull_request:\n {4}types: \[opened, synchronize, reopened, labeled\]$/m,
+    'a labeled pull_request triggers a run, so ci:full works without a new commit',
+  );
+
   // The label reaches the script only through the changes job's environment.
   const changes = parseJobs(readFileSync(workflowPath, 'utf8')).get('changes');
   assert.match(changes.raw.join('\n'), /FORCE_FULL: \$\{\{ contains\(github\.event\.pull_request\.labels\.\*\.name, 'ci:full'\) \}\}/);
