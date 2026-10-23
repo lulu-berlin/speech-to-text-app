@@ -76,14 +76,3 @@ class ProcessingEngineCancelIntegrationSpec :
             }
         }
     })
-
-/** The executables of this JVM's live descendants that are one of the app's spawned tools. */
-private fun runningTools(): List<String> =
-    ProcessHandle
-        .current()
-        .descendants()
-        .map { handle -> handle.info().command().orElse("") }
-        .filter { command -> TOOLS.any { tool -> command.substringAfterLast('\\').substringAfterLast('/').startsWith(tool) } }
-        .toList()
-
-private val TOOLS = listOf("whisper-cli", "ffmpeg")

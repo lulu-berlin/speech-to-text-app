@@ -58,7 +58,9 @@ class ProcessingEnginePauseIntegrationSpec :
                         tasks.find(id)?.task?.status shouldBe TaskStatus.PAUSED
 
                         // The in-flight chunk finishes (or is frozen where signals exist), then the gate holds
-                        // the run: progress must stop moving below completion.
+                        // the run: progress must stop moving below completion. On Windows nothing freezes it, so
+                        // wait until its whisper-cli has exited before reading a stable progress.
+                        awaitUntil(timeout = 2.minutes, every = 100.milliseconds) { runningTools().isEmpty() }
                         val pausedAt = settledProgress(progress = { tasks.find(id)?.task?.progress ?: 1.0 })
                         (pausedAt > 0.0) shouldBe true
                         (pausedAt < 1.0) shouldBe true

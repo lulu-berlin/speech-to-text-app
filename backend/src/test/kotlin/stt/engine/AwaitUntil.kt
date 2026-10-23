@@ -18,3 +18,14 @@ internal suspend fun awaitUntil(
     val deadline = TimeSource.Monotonic.markNow() + timeout
     while (!done() && deadline.hasNotPassedNow()) delay(every)
 }
+
+/** The executables of this JVM's live descendants that are one of the app's spawned tools. */
+internal fun runningTools(): List<String> =
+    ProcessHandle
+        .current()
+        .descendants()
+        .map { handle -> handle.info().command().orElse("") }
+        .filter { command -> TOOLS.any { tool -> command.substringAfterLast('\\').substringAfterLast('/').startsWith(tool) } }
+        .toList()
+
+private val TOOLS = listOf("whisper-cli", "ffmpeg")
