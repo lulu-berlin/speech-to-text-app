@@ -17,9 +17,10 @@ in {
 
   # Prebuilt tools for machines without Nix (user decisions 2026-10-11/12), each pinned
   # by URL and sha256:
-  # - whisper-cli: linux-x64 and darwin-x64 are the jiang1997 prebuild of the Nix build's tag;
-  #   darwin-arm64 and windows-x64 are our own `desktop-whisper-cpp-v1` builds (roadmap items 48
-  #   and 49). Hashes computed over the GitHub release assets.
+  # - whisper-cli: linux-x64 and darwin-x64 are the jiang1997 prebuild of the Nix build's
+  #   tag; darwin-arm64 and windows-x64 are our own `desktop-whisper-cpp-v1` builds
+  #   (roadmap items 48 and 49; the table below says why); hashes computed over the
+  #   GitHub release assets.
   # - ffmpeg: bytedeco's builds on Maven Central for Linux and Intel macOS (user decision
   #   2026-10-12), which never deletes or changes a published artifact - the BtbN daily build
   #   first pinned here was deleted after 14 days. 8.1.2 is the flake's ffmpeg_8. Each jar holds
