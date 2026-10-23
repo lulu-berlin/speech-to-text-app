@@ -83,7 +83,7 @@ test('a documentation-only pull request skips every heavy job and still reports 
   assert.equal(
     classify(['docs/decisions/0050-pr-merge-on-github.md', 'roadmap/80-docs-only-ci.md', 'README.md', 'LICENSE']),
     'code=false',
-    'a diff of docs/, roadmap/, *.md and LICENSE is documentation only',
+    'a diff of Markdown files and LICENSE is documentation only',
   );
 
   const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
@@ -140,4 +140,45 @@ test('a pull request touching one code path runs every heavy job', () => {
       `${job.id} runs whenever the diff touches code`,
     );
   }
+});
+
+test('changes to .github/, the build files and the lockfiles count as code', () => {
+  const code = [
+    '.github/workflows/ci.yml',
+    '.github/actions/jvm-toolchain/action.yml',
+    'devenv.nix',
+    'devenv.lock',
+    'flake.nix',
+    'flake.lock',
+    'versions.json',
+    'build.gradle.kts',
+    'settings.gradle.kts',
+    'backend/build.gradle.kts',
+    'package.json',
+    'frontend/package.json',
+    'frontend/pnpm-lock.yaml',
+    'desktop/pnpm-lock.yaml',
+    'e2e/pnpm-lock.yaml',
+  ];
+  for (const path of code) {
+    assert.equal(classify([path]), 'code=true', `${path} builds or pins something, so it is code`);
+  }
+});
+
+// Discovered while checking item 3: `docs/api/*.json` are the API contract the backend tests read
+// and the `.txt` files are build inputs (`desktop/jlink-modules.txt` for the bundled JRE, the
+// whisper fixture for a flake check), so documentation cannot be decided by directory or by `.txt`.
+test('a non-Markdown file under docs/ counts as code, and so does every .txt', () => {
+  assert.equal(classify(['docs/api/languages.json']), 'code=true', 'the contract tests read docs/api/*.json');
+  assert.equal(classify(['docs/backend-schema.sql']), 'code=true', 'a schema is not prose');
+  assert.equal(classify(['docs/images/screenshot.png']), 'code=true', 'an image is not a Markdown file');
+
+  assert.equal(classify(['desktop/jlink-modules.txt']), 'code=true', 'the bundled JRE is built from it');
+  assert.equal(
+    classify(['nix/fixtures/whisper-cpp-sample-transcript.txt']),
+    'code=true',
+    'a flake check compares whisper output to it',
+  );
+
+  assert.equal(classify(['docs/specs/ci-verification.md', 'LICENSE']), 'code=false', 'Markdown and LICENSE stay documentation');
 });

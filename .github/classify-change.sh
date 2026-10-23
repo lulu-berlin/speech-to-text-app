@@ -4,9 +4,11 @@
 # they are documentation only (roadmap item 80). The `changes` job pipes the diff in and appends
 # the printed line to $GITHUB_OUTPUT.
 #
-# Documentation is `docs/`, `roadmap/`, any `*.md` file and `LICENSE`; everything else is code,
-# including `.github/`, `.editorconfig`, `.gitattributes`, `devenv.nix`, `flake.nix`,
-# `versions.json`, `build.gradle.kts` and `stt.cmd` (decided 2026-10-23). An empty diff is not
+# Documentation is any `*.md` file and `LICENSE`; everything else is code, including `docs/api/`
+# (its JSON is the API contract the backend tests read), `docs/backend-schema.sql`, images and every
+# `.txt` (`desktop/jlink-modules.txt` builds the bundled JRE, `nix/fixtures/*.txt` backs a flake
+# check), and also `.github/`, the dotfiles, `devenv.nix`, `flake.nix`, `versions.json` and
+# `build.gradle.kts` (decided 2026-10-23, revised the same day). An empty diff is not
 # "documentation only" — it is a comparison that told us nothing — so it runs everything.
 set -euo pipefail
 
@@ -16,7 +18,7 @@ while IFS= read -r path; do
   [ -n "$path" ] || continue
   paths=$((paths + 1))
   case $path in
-    docs/*|roadmap/*|LICENSE|*.md) ;;
+    LICENSE|*.md) ;;
     *)
       code=true
       break

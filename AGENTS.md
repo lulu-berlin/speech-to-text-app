@@ -68,7 +68,7 @@ Keep [docs/known-issues.md](docs/known-issues.md) current: add every real findin
 
 Run backend commands from `backend/`, frontend commands from `frontend/`.
 
-CI (`.github/workflows/ci.yml`) decides once per run whether code changed: a pull request whose diff is only `docs/`, `roadmap/`, `*.md` or `LICENSE` skips every job that builds, tests or packages code, while `docs-check` and the required `CI (all checks)` still run, so the PR stays mergeable in minutes. Every push, schedule and dispatch run, a PR labelled `ci:full`, and a diff the comparison cannot read run everything. A change to anything else — code, `.github/`, a dotfile, `devenv.nix`, `flake.nix`, `versions.json` — counts as code.
+CI (`.github/workflows/ci.yml`) decides once per run whether code changed: a pull request whose diff is only Markdown files (`*.md`, any directory) or `LICENSE` skips every job that builds, tests or packages code, while `docs-check` and the required `CI (all checks)` still run, so the PR stays mergeable in minutes. Every push, schedule and dispatch run, a PR labelled `ci:full`, and a diff the comparison cannot read run everything. Everything else is code — including `.github/`, a dotfile, a `.txt` (they are build inputs here), a `docs/api/*.json` contract example the tests read, `devenv.nix`, `flake.nix` and `versions.json`.
 
 Root (devenv):
 
@@ -95,7 +95,7 @@ Documentation (Node, run from the repository root; run them after changing `READ
 - `node docs/check-readme-windows.mjs` — `README.md` documents the Windows x64 path: the bootstrap commands, the Vulkan driver requirement, the CPU fallback, the per-user data directory and the ARM64 scope.
 - `node docs/check-architecture-names.mjs && node docs/check-architecture-diagram.mjs` — every code name in the architecture overview exists in the code, and its diagram's boxes and arrows are real components and calls.
 - `node docs/check-exceptions.ts` — every broad `catch` in `backend/src/main/kotlin` rethrows, logs its throwable, or carries `// exceptions: swallow-ok <reason>`, and no `runCatching` remains; `node --test docs/check-exceptions.test.ts` covers the check itself.
-- `node --test docs/check-ci-gating.test.mjs` — `.github/decide-code-change.sh` runs everything off a pull request and on the `ci:full` label, `.github/classify-change.sh` calls `docs/`, `roadmap/`, `*.md` and `LICENSE` documentation (and everything else code), every heavy job in `ci.yml` carries the `changes` gate, and `docs-check` and `CI (all checks)` stay ungated.
+- `node --test docs/check-ci-gating.test.mjs` — `.github/decide-code-change.sh` runs everything off a pull request and on the `ci:full` label, `.github/classify-change.sh` calls only `*.md` and `LICENSE` documentation (everything else code), every heavy job in `ci.yml` carries the `changes` gate, and `docs-check` and `CI (all checks)` stay ungated.
 
 ## Git
 

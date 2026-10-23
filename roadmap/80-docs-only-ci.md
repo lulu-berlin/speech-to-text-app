@@ -53,13 +53,19 @@ dispatch runs always run everything.
 - **The documentation set** is `docs/`, `roadmap/`, any `*.md`, and `LICENSE`. Everything else is
   code, including `.github/`, `.editorconfig`, `.gitattributes`, `devenv.nix`, `flake.nix`,
   `versions.json`, `build.gradle.kts` and `stt.cmd`.
+- **Revised the same day, before the filter shipped:** the documentation set is any `*.md` file and
+  `LICENSE`. A directory does not make documentation: `docs/api/*.json` is the API contract the
+  backend tests read, `docs/backend-schema.sql` and `docs/images/*` are not prose, and the `.txt`
+  files are build inputs (`desktop/jlink-modules.txt` builds the bundled JRE,
+  `nix/fixtures/whisper-cpp-sample-transcript.txt` backs a flake check). Everything else is code.
 - **`codeql.yml` stays unchanged**: it is a separate workflow and is not the required check.
 - **Empty or unknown diffs run everything** (`code=true`), so a missing base can never skip a job.
 
 ## Open questions (answered 2026-10-23)
 
 - Full run on a docs PR? → **the `ci:full` label**.
-- The filter's definition? → the set above; a build-affecting dotfile is code.
+- The filter's definition? → the set above; a build-affecting dotfile is code. (Revised the same
+  day: `*.md` and `LICENSE` only — a directory, a `.txt` or an image does not make documentation.)
 - `codeql.yml`? → unchanged.
 
 ## Test list (approved 2026-10-23; behaviors only)
@@ -67,8 +73,10 @@ dispatch runs always run everything.
 - [x] (CI) A pull request whose diff is documentation only skips every heavy job, runs
       `Docs (exception policy)`, and `CI (all checks)` is green
 - [x] (CI) A pull request touching one code path runs every heavy job (no skip)
-- [ ] (CI) Changes to `.github/`, `devenv.nix`, `flake.nix`, `versions.json` or
+- [x] (CI) Changes to `.github/`, `devenv.nix`, `flake.nix`, `versions.json` or
       `build.gradle.kts` count as code, not documentation
+- [x] (discovered) A non-Markdown file under `docs/` (a contract example the tests read, an image,
+      the schema) counts as code, and so does every `.txt` (they are build inputs)
 - [ ] (CI) A push to `main` and the nightly schedule run every heavy job
 - [ ] (CI) With the `ci:full` label, a documentation-only PR runs every heavy job
 - [ ] (must not break) The required check keeps the name `CI (all checks)`; the aggregator's `needs`
@@ -115,3 +123,15 @@ e2e (the reason is recorded here, as in item 65).
   and 5 can execute the decision instead of pinning YAML text; the workflow step is now one call.
   Smoke on temp repos: docs-only PR `code=false`; code PR, docs + `ci:full`, push, schedule, empty
   diff and unknown base all `code=true`. 2 tests pass, `actionlint` clean, AGENTS links resolve.
+- 2026-10-23 (cycle 3, test-list item 3): passed on its first run — the classifier's catch-all makes
+  every non-documentation path code, so there was no red to record; the pin covers `.github/`
+  (workflow and composite action), `devenv.nix`/`.lock`, `flake.nix`/`.lock`, `versions.json`,
+  `build.gradle.kts` (root and backend), `settings.gradle.kts` and the `package.json`/`pnpm-lock.yaml`
+  pairs (added at the user's request while confirming the item). 3 tests pass.
+- 2026-10-23 (discovered + approved, test-list item `(discovered)`): while checking item 3,
+  `docs/api/*.json` turned out to be the contract the backend tests read and all three `.txt` files
+  to be build inputs, so the user approved narrowing documentation to `*.md` + `LICENSE`. Red: the
+  new test failed at "the contract tests read docs/api/*.json" (`code=false`). Green after
+  `classify-change.sh` dropped its `docs/`, `roadmap/` and `.txt` exceptions: 4 tests pass,
+  `actionlint` clean, AGENTS links resolve. The Decided and Open-questions sections record the
+  revision.
