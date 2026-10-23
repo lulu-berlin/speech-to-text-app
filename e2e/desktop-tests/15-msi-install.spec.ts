@@ -43,9 +43,9 @@ test('the per-user MSI installs the app, transcribes, and the uninstall keeps th
   // Per-user: under %LOCALAPPDATA%\Programs, never under Program Files (the user is not asked
   // for an elevated install).
   expect(exe.startsWith(programs + '\\')).toBe(true);
-  for (const programFiles of [process.env.ProgramFiles, process.env['ProgramFiles(x86)']]) {
-    if (programFiles) expect(exe.startsWith(programFiles + '\\')).toBe(false);
-  }
+  // A per-machine install would put the exe under Program Files, not merely outside the per-user
+  // directory; both roots must stay untouched by a per-user install.
+  expect(installedUnderProgramFiles()).toEqual([]);
 
   // The installed app is the packaged app: the first run provisions the per-user data directory
   // and downloads the models into the cache (the same loopback server item 50's first-run spec
@@ -89,6 +89,30 @@ test('the per-user MSI installs the app, transcribes, and the uninstall keeps th
 function expectUserDataKept(paths: { data: string; models: string }, models: string[]): void {
   expect(existsSync(join(paths.data, 'stt.db'))).toBe(true);
   for (const model of models) expect(existsSync(join(paths.models, model))).toBe(true);
+}
+
+/** Every `Speech-to-Text.exe` under the machine-wide Program Files directories, which a per-user install must not touch. */
+function installedUnderProgramFiles(): string[] {
+  const roots = [process.env.ProgramFiles, process.env['ProgramFiles(x86)']].filter(
+    (root): root is string => typeof root === 'string' && root !== '' && existsSync(root),
+  );
+  return roots.flatMap((root) => {
+    const output = execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Get-ChildItem -LiteralPath '${root}' -Recurse -Filter 'Speech-to-Text.exe' -File ` +
+          '-ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName',
+      ],
+      { encoding: 'utf8', timeout: 120_000 },
+    );
+    return output
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line !== '');
+  });
 }
 
 /** Runs `msiexec` and fails on anything but success (3010 is "success, reboot required"). */
