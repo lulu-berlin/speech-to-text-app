@@ -170,9 +170,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
       Ctrl-C exit (`0xC000013A`) counts as a stopped tool, so its task is left for recovery
 - [x] (discovered, 2026-10-23, user-approved) On macOS, a tool's SIGINT exit (130, a terminal Ctrl-C
       that reaches the tool's process group) counts as a stopped tool, so its task is left for recovery
-- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) Started with
+- [x] (discovered, 2026-10-23, from the root review; split 2026-10-23) Started with
       `STT_STOP_ON_STDIN_CLOSE=1`, the backend stops once its stdin closes
-- [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) Without
+- [x] (discovered, 2026-10-23, from the root review; split 2026-10-23) Without
       `STT_STOP_ON_STDIN_CLOSE`, closing the backend's stdin leaves it running and serving
 - [ ] (discovered, 2026-10-23, from the root review; split 2026-10-23) On Windows the desktop quit
       closes the backend's stdin and force-kills the tree only if the backend has not exited within
@@ -523,3 +523,10 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   stdin-close item is split: the test-list line for the flag remains, and a new line pins the
   negative — without the variable, closing stdin leaves the backend running and serving. Next test:
   the negative.
+- 2026-10-23: review cycle 6 (stdin ignored without the switch) green. Second case in
+  `StopOnStdinCloseIntegrationSpec`: without `STT_STOP_ON_STDIN_CLOSE` (started as `gradle run` and
+  `stt.cmd` start it), closing stdin must leave the backend running and serving. Red recorded
+  honestly by temporarily making the watcher unconditional (`if (config.stopOnStdinClose || true)`,
+  reverted in the same cycle): `expected:<true> but was:<false>` at `:63` (`app.isAlive`). Green on
+  the restored conditional. `gradle check` (354 tests), `gradle integrationTest` (402, 82 executed),
+  frontend and docs checks green. Commit `658e8615`. Both stdin-close items ticked.
