@@ -269,7 +269,7 @@ test('the required check and the jobs it gates keep their names and conditions',
   assert.ok(ci.needs.includes('docs-check'), 'the always-on docs job reports through the aggregator');
 
   // The manual assets stay dispatch-only and outside the change filter.
-  for (const id of ['macos-whisper-asset', 'macos-ffmpeg-asset']) {
+  for (const id of ['macos-whisper-asset', 'macos-ffmpeg-asset', 'windows-whisper-asset']) {
     const job = jobs.get(id);
     assert.equal(job.if, "github.event_name == 'workflow_dispatch' && inputs.assets", `${id} keeps its dispatch condition`);
     assert.deepEqual(job.needs, [], `${id} does not wait for the change filter`);
@@ -282,6 +282,12 @@ test('the required check and the jobs it gates keep their names and conditions',
     assert.ok(job.needs.includes('macos-backend-check'), `${id} still waits for macOS (gradle check)`);
     assert.ok(job.needs.includes('macos-frontend-check'), `${id} still waits for macOS (pnpm test, pnpm build)`);
   }
+
+  // The Windows jobs keep their own dependencies too (item 49's package runs on its checks).
+  const zip = jobs.get('windows-desktop-zip');
+  assert.ok(zip.needs.includes('changes'), 'windows-desktop-zip carries the change gate');
+  assert.ok(zip.needs.includes('windows-backend-check'), 'windows-desktop-zip still waits for Windows (gradle check)');
+  assert.ok(zip.needs.includes('windows-frontend-check'), 'windows-desktop-zip still waits for Windows (pnpm test, pnpm build)');
 
   // The weekly model-host probe stays outside the aggregator on its own cron.
   const modelHosts = jobs.get('model-hosts');

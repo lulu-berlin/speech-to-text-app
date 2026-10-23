@@ -158,3 +158,11 @@ e2e (the reason is recorded here, as in item 65).
   every heavy job must run; (2) a documentation-only PR — `Changes`, `Docs (exception policy)` and
   `CI (all checks)` only, every heavy job skipped, aggregator green; (3) the same PR with the
   `ci:full` label — the full matrix. Run ids and job names go here once the user supplies them.
+- 2026-10-23 (rebase onto `main` after item 49): resolved `ci.yml` keeping both changes — the three
+  Windows jobs (`windows-backend-check`, `windows-frontend-check`, `windows-desktop-zip`) carry
+  `needs: [changes]` and the gate, `windows-desktop-zip` keeps its two Windows dependencies, the
+  dispatch-only `windows-whisper-asset` stays outside the filter, and `CI (all checks)` lists all
+  three Windows jobs plus `changes` and keeps its name. Item 49 also renamed display names
+  (`Linux (docs exception policy)`, `Linux (pinned model hosts resolve)`), so the checks pin the
+  documentable contract — the aggregator's name — and job ids elsewhere. 8 tests pass after the
+  rebase; `actionlint` clean. GitHub run evidence still pending.
