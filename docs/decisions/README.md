@@ -71,3 +71,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0058 | [A QUEUED task whose start write fails is FAILED](0058-queued-task-whose-start-fails-is-failed.md) | accepted | 2026-10-18 |
 | 0059 | [The Linux desktop app keeps Electron: Tauri 2's 24–32% saving is a cross-date comparison, the comparable unpacked saving is inferred at ~36%, and ADR 0055 cannot be kept](0059-os-shell-stays-electron.md) | accepted | 2026-10-20 |
 | 0060 | [Windows releases through the Microsoft Store (MSIX); the macOS DMG stays unsigned with a documented Gatekeeper bypass](0060-windows-store-and-unsigned-macos.md) | accepted | 2026-10-23 |
+| 0061 | [A segment keeps whisper's original text, and Revert restores it](0061-segment-keeps-original-text.md) | accepted, adds `edited` to the turns contract and `POST …/segments/{id}/revert` | 2026-10-23 |

@@ -9,9 +9,11 @@
       "text": "Remember to buy milk.",
       "segments": [
         {
+          "id": 1,
           "startMs": 0,
           "endMs": 3400,
-          "text": "Remember to buy milk."
+          "text": "Remember to buy milk.",
+          "edited": false
         }
       ]
     },
@@ -22,9 +24,11 @@
       "text": "And call the dentist on Monday.",
       "segments": [
         {
+          "id": 2,
           "startMs": 4100,
           "endMs": 7900,
-          "text": "And call the dentist on Monday."
+          "text": "And call the dentist on Monday.",
+          "edited": false
         }
       ]
     }

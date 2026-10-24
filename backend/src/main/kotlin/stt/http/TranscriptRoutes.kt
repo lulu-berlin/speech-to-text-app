@@ -18,6 +18,8 @@ import stt.db.Speaker
 import stt.db.SpeakersMode
 import stt.db.TaskDetails
 import stt.db.TaskRepository
+import stt.diarization.SpeakerTurn
+import stt.diarization.TurnSegment
 import stt.diarization.speakerTurns
 import stt.outputs.downloadFileName
 import stt.outputs.renderSrt
@@ -69,35 +71,47 @@ fun Application.transcriptRoutes() {
 
         get("/api/tasks/{id}/turns") {
             val details = call.completedTaskOrError(tasks, "turns") ?: return@get
-            val id = details.id
-            if (details.task.speakersMode == SpeakersMode.OFF) {
-                val turns = segments.findByTask(id).map { it.toNullSpeakerTurn() }
-                call.respond(TurnsJson(speakers = emptyList(), hasMerges = false, turns = turns))
-            } else {
-                // Item 22: the effective speakers and the segments as merged; speakerTurns itself is unchanged.
-                val diarized = segments.findDiarized(id)
-                call.respond(
-                    TurnsJson(
-                        speakers = diarized.speakers.map { it.toJson() },
-                        hasMerges = diarized.hasMerges,
-                        turns =
-                            speakerTurns(diarized.segments, diarized.speakers).map { turn ->
-                                TurnJson(
-                                    speakerId = turn.speakerId,
-                                    startMs = turn.startMs,
-                                    endMs = turn.endMs,
-                                    text = turn.text,
-                                    segments = turn.segments.map { TurnSegmentJson(it.startMs, it.endMs, it.text) },
-                                )
-                            },
-                    ),
-                )
-            }
+            call.respond(segments.turnsJson(details))
         }
     }
 }
 
+/**
+ * The body of `GET /api/tasks/{id}/turns` and of a segment edit's `200` (item 52, `docs/api/turns*.json`): with
+ * speakers off, one turn per segment with no speaker; otherwise the effective speakers (item 22) and item 09's
+ * turns, whose segments name their stored row by `id`.
+ */
+internal suspend fun SegmentRepository.turnsJson(details: TaskDetails): TurnsJson {
+    val id = details.id
+    if (details.task.speakersMode == SpeakersMode.OFF) {
+        val turns = findByTask(id).map { it.toNullSpeakerTurn() }
+        return TurnsJson(speakers = emptyList(), hasMerges = false, turns = turns)
+    }
+    // Item 22: the effective speakers and the segments as merged; speakerTurns itself is unchanged.
+    val diarized = findDiarized(id)
+    return TurnsJson(
+        speakers = diarized.speakers.map { it.toJson() },
+        hasMerges = diarized.hasMerges,
+        turns = speakerTurns(diarized.segments, diarized.speakers).map { it.toJson() },
+    )
+}
+
 private suspend fun RoutingCall.notFound() = respondError(HttpStatusCode.NotFound, "not-found", "Task ${parameters["id"]} does not exist")
+
+/** `409 not-completed`: the task is not COMPLETED (any more), so it has no [what] to give. */
+internal suspend fun RoutingCall.respondNotCompleted(
+    taskId: Long,
+    what: String,
+    status: TaskStatus? = null,
+) = respondError(
+    HttpStatusCode.Conflict,
+    "not-completed",
+    if (status == null) {
+        "Task $taskId left COMPLETED; only COMPLETED tasks have $what"
+    } else {
+        "Task $taskId is $status; only COMPLETED tasks have $what"
+    },
+)
 
 /**
  * The route's task when it exists and is COMPLETED; otherwise responds `404 not-found` (missing or non-numeric
@@ -113,11 +127,7 @@ internal suspend fun RoutingCall.completedTaskOrError(
         return null
     }
     if (details.task.status != TaskStatus.COMPLETED) {
-        respondError(
-            HttpStatusCode.Conflict,
-            "not-completed",
-            "Task ${details.id} is ${details.task.status}; only COMPLETED tasks have $what",
-        )
+        respondNotCompleted(details.id, what, details.task.status)
         return null
     }
     return details
@@ -125,9 +135,20 @@ internal suspend fun RoutingCall.completedTaskOrError(
 
 /** A speakers-off segment as its own turn (item 12's contract): no speaker, the trimmed text (ADR 0030). */
 private fun Segment.toNullSpeakerTurn(): TurnJson {
-    val trimmed = text.trim()
-    return TurnJson(null, startMs, endMs, trimmed, listOf(TurnSegmentJson(startMs, endMs, trimmed)))
+    val segment = toJson()
+    return TurnJson(null, startMs, endMs, segment.text, listOf(segment))
 }
+
+/** One stored segment as the contract names it (item 52), its text trimmed for every reader (ADR 0030). */
+internal fun Segment.toJson(): TurnSegmentJson =
+    TurnSegmentJson(
+        requireNotNull(id) { "Segment has no stored row id" },
+        startMs,
+        endMs,
+        text.trim(),
+        // ADR 0061: whether an edit moved the text away from whisper's line; both trimmed, as readers see them.
+        edited = text.trim() != (originalText ?: text).trim(),
+    )
 
 /** The body of `GET /api/tasks/{id}/turns` (item 12's contract, `docs/api/turns*.json`). */
 @Serializable
@@ -149,10 +170,28 @@ data class TurnJson(
 
 @Serializable
 data class TurnSegmentJson(
+    // Item 52: the stored segment row the edit endpoint addresses.
+    val id: Long,
     val startMs: Long,
     val endMs: Long,
     val text: String,
+    // ADR 0061: whether the stored text differs from whisper's original, so a client offers Revert.
+    val edited: Boolean,
 )
+
+/** One turn as the contract names it (item 12's contract); its segments carry their stored row ids (item 52). */
+internal fun SpeakerTurn.toJson(): TurnJson =
+    TurnJson(
+        speakerId = speakerId,
+        startMs = startMs,
+        endMs = endMs,
+        text = text,
+        segments = segments.map { it.toJson() },
+    )
+
+/** One turn segment as the contract names it; every segment read from the database carries its row id (item 52). */
+internal fun TurnSegment.toJson(): TurnSegmentJson =
+    TurnSegmentJson(requireNotNull(id) { "Turn segment has no stored row id" }, startMs, endMs, text, edited)
 
 /** One downloadable transcript format: its extension, its content type, and item 10's renderer. */
 private class TranscriptFormat(

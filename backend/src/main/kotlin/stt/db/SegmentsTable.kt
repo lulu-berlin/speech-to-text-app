@@ -11,6 +11,9 @@ internal object SegmentsTable : Table("segments") {
     val startMs = long("start_ms")
     val endMs = long("end_ms")
     val text = text("text")
+
+    // Item 52 / ADR 0061: whisper's text as first stored, so Revert can restore it (V13).
+    val originalText = text("original_text").nullable()
     val speakerId = integer("speaker_id").nullable()
 
     override val primaryKey = PrimaryKey(id)

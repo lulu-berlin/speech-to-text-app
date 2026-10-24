@@ -70,6 +70,7 @@ fun Application.sttApp(
     taskCommandRoutes()
     queueRoutes()
     transcriptRoutes()
+    segmentEditRoutes()
     speakerRoutes()
     audioRoutes()
     eventsRoutes()

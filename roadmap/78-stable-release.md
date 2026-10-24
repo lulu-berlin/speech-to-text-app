@@ -1,7 +1,7 @@
 # 78 — The first stable release: release gates, one version everywhere, and the release process
 
 Status: spec-approved
-Depends on: [49](../docs/specs/windows-support.md), [52](52-edit-transcription.md),
+Depends on: [49](../docs/specs/windows-support.md), [52](../docs/specs/edit-transcription.md),
 [65](65-row-color-chunking-observation.md), [68](68-windows-audio-only-ffmpeg.md),
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](72-frontend-state-and-errors.md),
 [74](74-desktop-presentation.md), [76](76-right-to-left-transcription.md),

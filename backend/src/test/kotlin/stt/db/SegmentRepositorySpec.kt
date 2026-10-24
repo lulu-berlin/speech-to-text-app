@@ -4,6 +4,7 @@ import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import stt.audio.PlannedChunk
+import stt.queue.TaskStatus
 
 class SegmentRepositorySpec :
     BehaviorSpec({
@@ -20,23 +21,97 @@ class SegmentRepositorySpec :
                         segments.insertAll(
                             taskId,
                             listOf(
-                                Segment(chunkIdx = 1, seq = 1, startMs = 45_000L, endMs = 59_000L, text = "Bye.", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 1,
+                                    startMs = 45_000L,
+                                    endMs = 59_000L,
+                                    text = "Bye.",
+                                    speakerId = null,
+                                    originalText = "Bye.",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 1,
+                                    startMs = 12_000L,
+                                    endMs = 29_000L,
+                                    text = "Hi.",
+                                    speakerId = null,
+                                    originalText = "Hi.",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 0,
+                                    startMs = 0L,
+                                    endMs = 11_500L,
+                                    text = "Hello.",
+                                    speakerId = null,
+                                    originalText = "Hello.",
+                                ),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 0,
+                                    startMs = 30_000L,
+                                    endMs = 44_000L,
+                                    text = "So.",
+                                    speakerId = null,
+                                    originalText = "So.",
+                                ),
                             ),
                         )
                         segments.insertAll(
                             otherTaskId,
-                            listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 4_000L, text = "Other.", speakerId = null)),
+                            listOf(
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 0,
+                                    startMs = 0L,
+                                    endMs = 4_000L,
+                                    text = "Other.",
+                                    speakerId = null,
+                                    originalText = "Other.",
+                                ),
+                            ),
                         )
 
-                        segments.findByTask(taskId).shouldBe(
+                        segments.findByTask(taskId).withoutIds().shouldBe(
                             listOf(
-                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 1, startMs = 45_000L, endMs = 59_000L, text = "Bye.", speakerId = null),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 0,
+                                    startMs = 0L,
+                                    endMs = 11_500L,
+                                    text = "Hello.",
+                                    speakerId = null,
+                                    originalText = "Hello.",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 1,
+                                    startMs = 12_000L,
+                                    endMs = 29_000L,
+                                    text = "Hi.",
+                                    speakerId = null,
+                                    originalText = "Hi.",
+                                ),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 0,
+                                    startMs = 30_000L,
+                                    endMs = 44_000L,
+                                    text = "So.",
+                                    speakerId = null,
+                                    originalText = "So.",
+                                ),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 1,
+                                    startMs = 45_000L,
+                                    endMs = 59_000L,
+                                    text = "Bye.",
+                                    speakerId = null,
+                                    originalText = "Bye.",
+                                ),
                             ),
                         )
                     }
@@ -55,21 +130,101 @@ class SegmentRepositorySpec :
                         segments.insertAll(
                             taskId,
                             listOf(
-                                Segment(chunkIdx = 1, seq = 1, startMs = 40_000L, endMs = 50_000L, text = "D", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 2, startMs = 20_000L, endMs = 29_000L, text = "C", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 39_000L, text = "B2", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 9_000L, text = "A", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 1, startMs = 10_000L, endMs = 19_000L, text = "B", speakerId = null),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 1,
+                                    startMs = 40_000L,
+                                    endMs = 50_000L,
+                                    text = "D",
+                                    speakerId = null,
+                                    originalText = "D",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 2,
+                                    startMs = 20_000L,
+                                    endMs = 29_000L,
+                                    text = "C",
+                                    speakerId = null,
+                                    originalText = "C",
+                                ),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 0,
+                                    startMs = 30_000L,
+                                    endMs = 39_000L,
+                                    text = "B2",
+                                    speakerId = null,
+                                    originalText = "B2",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 0,
+                                    startMs = 0L,
+                                    endMs = 9_000L,
+                                    text = "A",
+                                    speakerId = null,
+                                    originalText = "A",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 1,
+                                    startMs = 10_000L,
+                                    endMs = 19_000L,
+                                    text = "B",
+                                    speakerId = null,
+                                    originalText = "B",
+                                ),
                             ),
                         )
 
-                        segments.findByTask(taskId).shouldBe(
+                        segments.findByTask(taskId).withoutIds().shouldBe(
                             listOf(
-                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 9_000L, text = "A", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 1, startMs = 10_000L, endMs = 19_000L, text = "B", speakerId = null),
-                                Segment(chunkIdx = 0, seq = 2, startMs = 20_000L, endMs = 29_000L, text = "C", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 39_000L, text = "B2", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 1, startMs = 40_000L, endMs = 50_000L, text = "D", speakerId = null),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 0,
+                                    startMs = 0L,
+                                    endMs = 9_000L,
+                                    text = "A",
+                                    speakerId = null,
+                                    originalText = "A",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 1,
+                                    startMs = 10_000L,
+                                    endMs = 19_000L,
+                                    text = "B",
+                                    speakerId = null,
+                                    originalText = "B",
+                                ),
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 2,
+                                    startMs = 20_000L,
+                                    endMs = 29_000L,
+                                    text = "C",
+                                    speakerId = null,
+                                    originalText = "C",
+                                ),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 0,
+                                    startMs = 30_000L,
+                                    endMs = 39_000L,
+                                    text = "B2",
+                                    speakerId = null,
+                                    originalText = "B2",
+                                ),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 1,
+                                    startMs = 40_000L,
+                                    endMs = 50_000L,
+                                    text = "D",
+                                    speakerId = null,
+                                    originalText = "D",
+                                ),
                             ),
                         )
                     }
@@ -93,13 +248,29 @@ class SegmentRepositorySpec :
 
                         val transcribed =
                             listOf(
-                                Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 37_940L, text = " So.", speakerId = null),
-                                Segment(chunkIdx = 1, seq = 1, startMs = 37_940L, endMs = 40_760L, text = " Bye.", speakerId = null),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 0,
+                                    startMs = 30_000L,
+                                    endMs = 37_940L,
+                                    text = " So.",
+                                    speakerId = null,
+                                    originalText = " So.",
+                                ),
+                                Segment(
+                                    chunkIdx = 1,
+                                    seq = 1,
+                                    startMs = 37_940L,
+                                    endMs = 40_760L,
+                                    text = " Bye.",
+                                    speakerId = null,
+                                    originalText = " Bye.",
+                                ),
                             )
                         segments.completeChunk(taskId, chunkIdx = 1, transcribed)
 
                         chunks.findByTask(taskId).map { it.status }.shouldBe(listOf(ChunkStatus.DONE, ChunkStatus.DONE))
-                        segments.findByTask(taskId).shouldBe(transcribed)
+                        segments.findByTask(taskId).withoutIds().shouldBe(transcribed)
 
                         // start_ms = -1 violates CHECK (start_ms >= 0), so the second insert fails after the status update.
                         val rejected = listOf(transcribed[0], transcribed[1].copy(startMs = -1L))
@@ -122,7 +293,16 @@ class SegmentRepositorySpec :
                         storePlan(db, taskId, listOf(PlannedChunk(0L, 30_000L)))
                         val plan = listOf(Chunk(idx = 0, startMs = 0L, endMs = 30_000L, status = ChunkStatus.PENDING))
 
-                        val orphan = Segment(chunkIdx = 5, seq = 0, startMs = 150_000L, endMs = 152_000L, text = " Lost.", speakerId = null)
+                        val orphan =
+                            Segment(
+                                chunkIdx = 5,
+                                seq = 0,
+                                startMs = 150_000L,
+                                endMs = 152_000L,
+                                text = " Lost.",
+                                speakerId = null,
+                                originalText = " Lost.",
+                            )
                         shouldThrowAny { segments.completeChunk(taskId, chunkIdx = 5, listOf(orphan)) }
 
                         segments.findByTask(taskId).shouldBe(emptyList())
@@ -141,19 +321,28 @@ class SegmentRepositorySpec :
                         val taskId = tasks.insert(queuedTask("talk.wav", createdAt = 1L))
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
                         segments.insertAll(taskId, threeSegments)
-                        val other = Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 4_000L, text = "Other.", speakerId = null)
+                        val other =
+                            Segment(
+                                chunkIdx = 0,
+                                seq = 0,
+                                startMs = 0L,
+                                endMs = 4_000L,
+                                text = "Other.",
+                                speakerId = null,
+                                originalText = "Other.",
+                            )
                         segments.insertAll(otherTaskId, listOf(other))
 
                         shouldThrowAny { segments.storeSpeakers(taskId, speakerIds = listOf(0, 1)) }
 
-                        segments.findByTask(taskId).shouldBe(threeSegments)
+                        segments.findByTask(taskId).withoutIds().shouldBe(threeSegments)
                         segments.findSpeakers(taskId).shouldBe(emptyList())
 
                         segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
 
                         segments.findByTask(taskId).map { it.speakerId }.shouldBe(listOf(0, 1, 0))
                         segments.findSpeakers(taskId).shouldBe(speakers1And2)
-                        segments.findByTask(otherTaskId).shouldBe(listOf(other))
+                        segments.findByTask(otherTaskId).withoutIds().shouldBe(listOf(other))
                         segments.findSpeakers(otherTaskId).shouldBe(emptyList())
                     }
                 }
@@ -193,7 +382,16 @@ class SegmentRepositorySpec :
                         val otherTaskId = tasks.insert(queuedTask("other.wav", createdAt = 2L))
                         segments.insertAll(taskId, threeSegments)
                         segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
-                        val other = Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 4_000L, text = "Other.", speakerId = null)
+                        val other =
+                            Segment(
+                                chunkIdx = 0,
+                                seq = 0,
+                                startMs = 0L,
+                                endMs = 4_000L,
+                                text = "Other.",
+                                speakerId = null,
+                                originalText = "Other.",
+                            )
                         segments.insertAll(otherTaskId, listOf(other))
                         segments.storeSpeakers(otherTaskId, speakerIds = listOf(1))
                         val storedSegments = segments.findByTask(taskId)
@@ -226,7 +424,15 @@ class SegmentRepositorySpec :
                         segments.insertAll(taskT, threeSegments)
                         segments.storeSpeakers(taskT, speakerIds = listOf(0, 0, 0))
                         val laterSegment =
-                            Segment(chunkIdx = 2, seq = 0, startMs = 60_000L, endMs = 62_000L, text = "Later.", speakerId = 0)
+                            Segment(
+                                chunkIdx = 2,
+                                seq = 0,
+                                startMs = 60_000L,
+                                endMs = 62_000L,
+                                text = "Later.",
+                                speakerId = 0,
+                                originalText = "Later.",
+                            )
 
                         // T's speaker 0 is not U's: the foreign key is (task_id, speaker_id).
                         shouldThrowAny { segments.insertAll(taskU, listOf(laterSegment)) }
@@ -240,14 +446,72 @@ class SegmentRepositorySpec :
                 }
             }
         }
+
+        // Root review 2026-10-23: the route checks the task's status, then the store writes; a retry that
+        // starts in between must not have its transcription overwritten by an edit of the old one.
+        given("a COMPLETED task with a stored segment that has been edited") {
+            `when`("an edit reaches the store after the task left COMPLETED (a retry started)") {
+                then("nothing is stored and the write reports the task as no longer completed") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        val segments = SegmentRepository(db)
+                        val id = tasks.insert(queuedTask("talk.wav", createdAt = 1L).copy(status = TaskStatus.COMPLETED))
+                        segments.insertAll(
+                            id,
+                            listOf(
+                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
+                            ),
+                        )
+                        val segmentId = segments.findByTask(id).single().id!!
+
+                        tasks.setStatus(id, TaskStatus.RUNNING)
+
+                        segments.updateSegmentText(id, segmentId, "Edited.") shouldBe
+                            SegmentWriteOutcome.NotCompleted
+                        segments.findByTask(id).single().text shouldBe "Hello."
+                    }
+                }
+            }
+
+            `when`("a revert reaches the store after the task left COMPLETED (a retry started)") {
+                then("nothing is stored and the write reports the task as no longer completed") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        val segments = SegmentRepository(db)
+                        val id = tasks.insert(queuedTask("talk.wav", createdAt = 1L).copy(status = TaskStatus.COMPLETED))
+                        segments.insertAll(
+                            id,
+                            listOf(
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 0,
+                                    startMs = 0L,
+                                    endMs = 11_500L,
+                                    text = "Edited.",
+                                    speakerId = null,
+                                    originalText = "Hello.",
+                                ),
+                            ),
+                        )
+                        val segmentId = segments.findByTask(id).single().id!!
+
+                        tasks.setStatus(id, TaskStatus.RUNNING)
+
+                        segments.revertSegmentText(id, segmentId) shouldBe
+                            SegmentWriteOutcome.NotCompleted
+                        segments.findByTask(id).single().text shouldBe "Edited."
+                    }
+                }
+            }
+        }
     })
 
 /** Three segments of a task over chunks 0 and 1, not yet diarized. */
 private val threeSegments =
     listOf(
-        Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null),
-        Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null),
-        Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null),
+        Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 11_500L, text = "Hello.", speakerId = null, originalText = "Hello."),
+        Segment(chunkIdx = 0, seq = 1, startMs = 12_000L, endMs = 29_000L, text = "Hi.", speakerId = null, originalText = "Hi."),
+        Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 44_000L, text = "So.", speakerId = null, originalText = "So."),
     )
 
 /** The speakers stored for speaker ids 0 and 1. */

@@ -88,7 +88,7 @@ test('captures the acceptance screenshots', async ({ page }) => {
   // Transcript during playback: open the completed upload-in-flight task and play it.
   await rowOf(page, SHOT_UPLOAD_CLIP).getByRole('link', { name: SHOT_UPLOAD_CLIP }).click();
   await expect(page.getByRole('heading', { name: SHOT_UPLOAD_CLIP })).toBeVisible();
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {

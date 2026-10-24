@@ -10,10 +10,18 @@ export function controllableEventStream(snapshot: unknown = snapshotFixture) {
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
   const events = {
     send(name: string, data: unknown) {
+      events.sendTogether([[name, data]]);
+    },
+    // Several events in one chunk, as one network read can deliver them: EventSource then
+    // dispatches them all before the page renders again.
+    sendTogether(frames: [name: string, data: unknown][]) {
       if (controller === undefined) {
         throw new Error('the event stream is not connected yet');
       }
-      controller.enqueue(encoder.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+      const chunk = frames.map(
+        ([name, data]) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`,
+      );
+      controller.enqueue(encoder.encode(chunk.join('')));
     },
   };
   server.use(

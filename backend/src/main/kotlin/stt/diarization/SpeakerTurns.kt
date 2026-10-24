@@ -30,7 +30,17 @@ internal fun speakerTurns(
                 // The oracle appends each trimmed text as f"{acc} {text}".strip(): the non-blank trimmed texts joined
                 // with single spaces. The kept segments carry the trimmed texts too (ADR 0030).
                 text = trimmed.filter { it.isNotEmpty() }.joinToString(" "),
-                segments = run.zip(trimmed) { segment, text -> TurnSegment(segment.startMs, segment.endMs, text) },
+                segments =
+                    run.zip(trimmed) { segment, text ->
+                        TurnSegment(
+                            segment.startMs,
+                            segment.endMs,
+                            text,
+                            segment.id,
+                            // ADR 0061: edited against whisper's original, both as readers see them.
+                            edited = text != (segment.originalText ?: segment.text).trim(),
+                        )
+                    },
             ),
         )
         start = end

@@ -10,6 +10,22 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
+import stt.queue.TaskStatus
+
+/**
+ * What an edit or a revert wrote (item 52): the stored segment, or why nothing was stored.
+ */
+sealed interface SegmentWriteOutcome {
+    data class Stored(
+        val segment: Segment,
+    ) : SegmentWriteOutcome
+
+    /** The task has no segment with that id (or a legacy row kept no original to go back to). */
+    data object NoSegment : SegmentWriteOutcome
+
+    /** The task left COMPLETED while the write was on its way — a retry started — so nothing is stored. */
+    data object NotCompleted : SegmentWriteOutcome
+}
 
 class SegmentRepository(
     private val db: Database,
@@ -53,6 +69,8 @@ class SegmentRepository(
             this[SegmentsTable.startMs] = segment.startMs
             this[SegmentsTable.endMs] = segment.endMs
             this[SegmentsTable.text] = segment.text
+            // ADR 0061: the first write keeps whisper's line, which Revert restores.
+            this[SegmentsTable.originalText] = segment.originalText ?: segment.text
             this[SegmentsTable.speakerId] = segment.speakerId
         }
     }
@@ -66,16 +84,7 @@ class SegmentRepository(
             .selectAll()
             .where { SegmentsTable.taskId eq taskId }
             .orderBy(SegmentsTable.chunkIdx to SortOrder.ASC, SegmentsTable.seq to SortOrder.ASC)
-            .map { row ->
-                Segment(
-                    chunkIdx = row[SegmentsTable.chunkIdx],
-                    seq = row[SegmentsTable.seq],
-                    startMs = row[SegmentsTable.startMs],
-                    endMs = row[SegmentsTable.endMs],
-                    text = row[SegmentsTable.text],
-                    speakerId = row[SegmentsTable.speakerId],
-                )
-            }
+            .map { it.toSegment() }
 
     /**
      * Stores the speaker of every segment of the task in one transaction (item 09, ADR 0028): one [Speaker] per
@@ -113,6 +122,77 @@ class SegmentRepository(
             }
         }
     }
+
+    /**
+     * Stores [text] on one segment of the task (item 52): an in-place update of that row's text and nothing else,
+     * in one write transaction, then returns the stored row. The task's status is read in that same transaction:
+     * once it has left COMPLETED (a retry started, root review 2026-10-23) nothing is stored and the outcome is
+     * [SegmentWriteOutcome.NotCompleted]. [SegmentWriteOutcome.NoSegment] when the task has no segment [segmentId]
+     * — a segment of another task is not addressable through this task. The caller (the edit route) has checked the
+     * text.
+     */
+    suspend fun updateSegmentText(
+        taskId: Long,
+        segmentId: Long,
+        text: String,
+    ): SegmentWriteOutcome =
+        db.writeTransaction {
+            // The route checked the status too, but a retry can start while the edit is on its way: the
+            // transcription it replaces must not be overwritten by an edit of the old one (root review
+            // 2026-10-23).
+            if (!taskIsCompleted(taskId)) return@writeTransaction SegmentWriteOutcome.NotCompleted
+            val updated =
+                SegmentsTable.update({ (SegmentsTable.id eq segmentId) and (SegmentsTable.taskId eq taskId) }) {
+                    it[SegmentsTable.text] = text
+                }
+            if (updated != 1) return@writeTransaction SegmentWriteOutcome.NoSegment
+            SegmentWriteOutcome.Stored(
+                SegmentsTable
+                    .selectAll()
+                    .where { SegmentsTable.id eq segmentId }
+                    .single()
+                    .toSegment(),
+            )
+        }
+
+    /**
+     * Restores whisper's original text onto one segment of the task (ADR 0061): an in-place update of that row's
+     * `text` from its `original_text`, the original itself untouched, in one write transaction, then returns the
+     * stored row. Like an edit, it refuses once the task has left COMPLETED ([SegmentWriteOutcome.NotCompleted],
+     * nothing stored), and answers [SegmentWriteOutcome.NoSegment] when the task has no segment [segmentId] (a
+     * segment of another task is not addressable through this task) or a legacy row has no original. The caller
+     * (the revert route) has checked the text.
+     */
+    suspend fun revertSegmentText(
+        taskId: Long,
+        segmentId: Long,
+    ): SegmentWriteOutcome =
+        db.writeTransaction {
+            if (!taskIsCompleted(taskId)) return@writeTransaction SegmentWriteOutcome.NotCompleted
+            val original =
+                SegmentsTable
+                    .select(SegmentsTable.originalText)
+                    .where { (SegmentsTable.id eq segmentId) and (SegmentsTable.taskId eq taskId) }
+                    .singleOrNull()
+                    ?.get(SegmentsTable.originalText)
+                    ?: return@writeTransaction SegmentWriteOutcome.NoSegment
+            SegmentsTable.update({ SegmentsTable.id eq segmentId }) { it[text] = original }
+            SegmentWriteOutcome.Stored(
+                SegmentsTable
+                    .selectAll()
+                    .where { SegmentsTable.id eq segmentId }
+                    .single()
+                    .toSegment(),
+            )
+        }
+
+    /** Whether [taskId] is COMPLETED, read inside the caller's transaction. */
+    private fun taskIsCompleted(taskId: Long): Boolean =
+        TasksTable
+            .select(TasksTable.status)
+            .where { TasksTable.id eq taskId }
+            .singleOrNull()
+            ?.get(TasksTable.status) == TaskStatus.COMPLETED
 
     /**
      * Renames one speaker of the task (item 22): updates only that speaker's row, so no segment row and no other
@@ -215,3 +295,16 @@ class SegmentRepository(
 
 /** A row of `speakers` as a [Speaker]. */
 private fun ResultRow.toSpeaker() = Speaker(speakerId = this[SpeakersTable.speakerId], speaker = this[SpeakersTable.speaker])
+
+/** A row of `segments` as a [Segment], carrying its row id. */
+private fun ResultRow.toSegment() =
+    Segment(
+        chunkIdx = this[SegmentsTable.chunkIdx],
+        seq = this[SegmentsTable.seq],
+        startMs = this[SegmentsTable.startMs],
+        endMs = this[SegmentsTable.endMs],
+        text = this[SegmentsTable.text],
+        speakerId = this[SegmentsTable.speakerId],
+        id = this[SegmentsTable.id],
+        originalText = this[SegmentsTable.originalText],
+    )

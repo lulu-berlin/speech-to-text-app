@@ -62,13 +62,13 @@ class DatabaseSpec :
 
         given("an empty data directory") {
             `when`("opening the database for the first time") {
-                then("stt.db is created, V1 to V12 apply, and a reopen applies nothing and preserves rows") {
+                then("stt.db is created, V1 to V13 apply, and a reopen applies nothing and preserves rows") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
 
                         Database.open(dataDir).use { first ->
                             tableNames(first).shouldContainAll(expectedTables)
-                            migratedCount(first).shouldBe(12)
+                            migratedCount(first).shouldBe(13)
                             first.connection
                                 .createStatement()
                                 .use { st ->
@@ -84,7 +84,7 @@ class DatabaseSpec :
 
                         Database.open(dataDir).use { second ->
                             rowCount(second, "tasks").shouldBe(1)
-                            migratedCount(second).shouldBe(12)
+                            migratedCount(second).shouldBe(13)
                         }
                     }
                 }
@@ -123,10 +123,26 @@ class DatabaseSpec :
 
                         Database.open(dataDir).use { db ->
                             val segments = SegmentRepository(db)
-                            segments.findByTask(1L).shouldBe(
+                            segments.findByTask(1L).withoutIds().shouldBe(
                                 listOf(
-                                    Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "Hello.", speakerId = null),
-                                    Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 31_000L, text = "Bye.", speakerId = null),
+                                    Segment(
+                                        chunkIdx = 0,
+                                        seq = 0,
+                                        startMs = 0L,
+                                        endMs = 900L,
+                                        text = "Hello.",
+                                        speakerId = null,
+                                        originalText = "Hello.",
+                                    ),
+                                    Segment(
+                                        chunkIdx = 1,
+                                        seq = 0,
+                                        startMs = 30_000L,
+                                        endMs = 31_000L,
+                                        text = "Bye.",
+                                        speakerId = null,
+                                        originalText = "Bye.",
+                                    ),
                                 ),
                             )
                             segments.findSpeakers(1L).shouldBe(emptyList())

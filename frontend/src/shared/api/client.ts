@@ -4,6 +4,7 @@ import type {
   Queue,
   ServerEvent,
   StreamEvent,
+  Segment,
   Settings,
   SettingsNotice,
   SettingsUpdate,
@@ -88,6 +89,26 @@ export async function renameSpeaker(
     body: JSON.stringify({ speaker }),
   });
   return json<Speakers>(response);
+}
+
+// Item 52 contract: PUT /api/tasks/{id}/segments/{segmentId} with { text } -> 200 Turns (the
+// same body /turns returns, the edited segment already updated); 409 not-completed and 404
+// not-found are the refusals.
+export async function editSegment(id: number, segmentId: number, text: string): Promise<Turns> {
+  const response = await fetch(`/api/tasks/${id}/segments/${segmentId}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  return json<Turns>(response);
+}
+
+// Item 52 / ADR 0061: POST /api/tasks/{id}/segments/{segmentId}/revert puts whisper's original
+// text back and answers 200 Turns, like an edit; 409 not-completed and 404 not-found are the
+// refusals.
+export async function revertSegment(id: number, segmentId: number): Promise<Turns> {
+  const response = await fetch(`/api/tasks/${id}/segments/${segmentId}/revert`, { method: 'POST' });
+  return json<Turns>(response);
 }
 
 // Item 22 contract: POST /api/tasks/{id}/speakers/merge with { group, into } -> 200 Speakers
@@ -232,6 +253,11 @@ export function subscribeToEvents(
       type: 'speakers-merged',
       id,
       speakers,
+    }));
+    listen<{ id: number; segment: Segment }>('segment-edited', ({ id, segment }) => ({
+      type: 'segment-edited',
+      id,
+      segment,
     }));
     listen<SettingsNotice>('settings-updated', (settings) => ({
       type: 'settings-updated',

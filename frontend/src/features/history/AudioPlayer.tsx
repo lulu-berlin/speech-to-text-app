@@ -19,6 +19,14 @@ const Times = styled.span`
   font-variant-numeric: tabular-nums;
 `;
 
+// The media's playhead in whole milliseconds, the unit of the segments' bounds and of every seek
+// target. The element keeps seconds as a double, so a seek to a segment's start can read back a
+// hair before it — 32.76 s is 32759.999999999996 ms once multiplied — and the previous segment
+// would take the highlight (CI, 2026-10-24).
+export function playheadMs(audio: HTMLMediaElement): number {
+  return Math.round(audio.currentTime * 1000);
+}
+
 export interface AudioPlayerProps {
   src: string;
   filename: string;
@@ -36,8 +44,13 @@ export interface AudioPlayerProps {
   onSeek: (ms: number) => void;
   // The user is dragging the seek bar towards `ms`; nothing is seeked yet.
   onDrag: (ms: number) => void;
-  // The audio element started or stopped playing.
+  // The audio element started playing, or no longer plays (a pause, a stop, or the audio's end).
   onPlayingChange: (playing: boolean) => void;
+  // The Play/Pause button was pressed: the owner pauses or resumes the audio (item 52: the
+  // segment keys' toggle shares it, so there is one description of what the button does).
+  onToggle: () => void;
+  // Whether the button is disabled — an open segment editor blocks playback (item 52).
+  disabled?: boolean;
 }
 
 // The themed transcript player (item 25): the audio element without native controls, and
@@ -55,30 +68,17 @@ export function AudioPlayer({
   onSeek,
   onDrag,
   onPlayingChange,
+  onToggle,
+  disabled = false,
 }: AudioPlayerProps) {
-  const toggle = () => {
-    const audio = audioRef.current;
-    if (audio === null) {
-      return;
-    }
-    if (playing) {
-      audio.pause();
-    } else {
-      audio.play().catch(() => {
-        /* A browser may refuse playback (autoplay policy); the element's own events keep
-           the button in step with what actually happens. */
-      });
-    }
-  };
-
   return (
     <Surface role="group" aria-label="Audio player" padding="md">
       <audio
         ref={audioRef}
         src={src}
         aria-label={`Audio for ${filename}`}
-        onTimeUpdate={(event) => onPlayhead(event.currentTarget.currentTime * 1000)}
-        onSeeked={(event) => onPlayhead(event.currentTarget.currentTime * 1000)}
+        onTimeUpdate={(event) => onPlayhead(playheadMs(event.currentTarget))}
+        onSeeked={(event) => onPlayhead(playheadMs(event.currentTarget))}
         onPlay={() => onPlayingChange(true)}
         onPause={() => onPlayingChange(false)}
         onEnded={() => onPlayingChange(false)}
@@ -95,7 +95,8 @@ export function AudioPlayer({
           <IconButton
             icon={playing ? Pause : Play}
             label={playing ? 'Pause' : 'Play'}
-            onClick={toggle}
+            onClick={onToggle}
+            disabled={disabled}
           />
           <Times>{`${formatDuration(currentTimeMs)} / ${formatDuration(durationMs)}`}</Times>
         </ControlsRow>

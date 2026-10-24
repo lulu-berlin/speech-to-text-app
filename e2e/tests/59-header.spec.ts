@@ -90,7 +90,7 @@ test('the header brand is a padded ≤ 40 px static icon, text-only once scrolle
   await page.evaluate(() => window.scrollTo(0, 0));
   const region = page.getByRole('region', { name: 'Transcript' });
   await expect(region.locator('[role="button"]').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   const active = region.locator('[data-active]');
   const firstActive = await active
     .first()
