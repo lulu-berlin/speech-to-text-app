@@ -201,7 +201,9 @@ Part 3 — the recorded CI flakes:
 - 2026-10-24 (workspace, test-list item 1): red run 40110339285 (dispatch on the temporary failing
   spec `e2e/tests/00-deliberate-failure.spec.ts`): `Linux (e2e)` failed on that spec alone and the
   run kept no `Linux (e2e)` artifact. Green run 40111711324 (`Test:` commit `0fa230e2`): the
-  failure-only upload attached `e2e-test-results-linux` (3 files: `trace.zip`,
-  `test-failed-1.png`, `error-context.md`; 813,979 bytes; expires 2026-10-31, 7 days). No refactor
-  (the user). The temporary spec stays through test-list item 2 and is reverted before item 3
-  (the user).
+  failure-only upload attached `e2e-test-results-linux` (813,979 bytes; expires 2026-10-31,
+  7 days). The downloaded artifact holds exactly the failing spec's directory: a 781 KB
+  `trace.zip` with the test, action and network traces and the screencast, a 45 KB PNG
+  `test-failed-1.png`, and `error-context.md` with the error and the page's ARIA snapshot. No
+  refactor (the user). The temporary spec stays through test-list item 2 and is reverted before
+  item 3 (the user).
