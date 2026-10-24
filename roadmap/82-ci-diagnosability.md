@@ -1,6 +1,6 @@
 # 82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network
 
-Status: spec-approved
+Status: in-progress
 Depends on: —
 Blocks: —
 
