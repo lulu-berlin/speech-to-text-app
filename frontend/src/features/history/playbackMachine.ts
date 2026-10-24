@@ -4,8 +4,10 @@ import { assign, setup } from 'xstate';
 // whether the audio plays. The audio element's timeupdate/seeked events, the click-to-seek
 // flow and the seek bar report the current position; the transcript derives the
 // highlighted segment from it. The element's own play/pause/ended events drive
-// paused/playing (item 25's themed player shows Play or Pause from it), so the state
-// follows what the browser actually does, not the click.
+// idle/playing (item 25's themed player shows Play or Pause from it), so the state
+// follows what the browser actually does, not the click. Idle is any time nothing plays:
+// paused, stopped (item 52's Pause/Stop model — the element reports both as `pause`), ended,
+// or not started.
 //
 // The seek bar (item 29): while the user drags it, the thumb's position is a draft
 // ([dragMs]) — the audio keeps playing and the element's events keep updating
@@ -18,13 +20,13 @@ export const playbackMachine = setup({
       | { type: 'PLAYHEAD'; ms: number }
       | { type: 'DRAG'; ms: number }
       | { type: 'SEEK'; ms: number }
-      | { type: 'PLAYED' }
-      | { type: 'PAUSED' },
+      | { type: 'PLAYING' }
+      | { type: 'IDLE' },
   },
 }).createMachine({
   id: 'playback',
   context: { currentTimeMs: 0, dragMs: null },
-  initial: 'paused',
+  initial: 'idle',
   on: {
     PLAYHEAD: { actions: assign({ currentTimeMs: ({ event }) => event.ms }) },
     DRAG: { actions: assign({ dragMs: ({ event }) => event.ms }) },
@@ -33,7 +35,7 @@ export const playbackMachine = setup({
     },
   },
   states: {
-    paused: { on: { PLAYED: 'playing' } },
-    playing: { on: { PAUSED: 'paused' } },
+    idle: { on: { PLAYING: 'playing' } },
+    playing: { on: { IDLE: 'idle' } },
   },
 });

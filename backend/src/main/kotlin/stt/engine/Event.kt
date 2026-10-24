@@ -1,6 +1,7 @@
 package stt.engine
 
 import stt.db.DiarizationStage
+import stt.db.Segment
 import stt.db.Settings
 import stt.db.Speaker
 import stt.db.StoredTask
@@ -52,6 +53,12 @@ sealed interface Event {
     data class SpeakersMerged(
         val id: Long,
         val speakers: List<Speaker>,
+    ) : Event
+
+    /** One segment's text was stored; item 52's `segment-edited` event, carrying the stored segment. */
+    data class SegmentEdited(
+        val id: Long,
+        val segment: Segment,
     ) : Event
 
     /** The settings were stored (`PUT /api/settings`); item 32's `settings-updated` event, so open tabs follow. */

@@ -18,14 +18,18 @@
       "text": "Good morning. Thanks for joining us today.",
       "segments": [
         {
+          "id": 1,
           "startMs": 0,
           "endMs": 2100,
-          "text": "Good morning."
+          "text": "Good morning.",
+          "edited": false
         },
         {
+          "id": 2,
           "startMs": 2400,
           "endMs": 5200,
-          "text": "Thanks for joining us today."
+          "text": "Thanks for joining us today.",
+          "edited": false
         }
       ]
     },
@@ -36,9 +40,11 @@
       "text": "Happy to be here.",
       "segments": [
         {
+          "id": 3,
           "startMs": 5800,
           "endMs": 9100,
-          "text": "Happy to be here."
+          "text": "Happy to be here.",
+          "edited": false
         }
       ]
     },
@@ -49,9 +55,11 @@
       "text": "Let's start with your background.",
       "segments": [
         {
+          "id": 4,
           "startMs": 9600,
           "endMs": 14250,
-          "text": "Let's start with your background."
+          "text": "Let's start with your background.",
+          "edited": false
         }
       ]
     }

@@ -25,11 +25,15 @@ export interface TurnSpeaker {
   speaker: string;
 }
 
-// Item 12 contract: one spoken segment of a turn (docs/api/turns.json).
+// Item 12 contract: one spoken segment of a turn (docs/api/turns.json). `id` is the
+// stored segment row (item 52), which the edit endpoint addresses.
 export interface Segment {
+  id: number;
   startMs: number;
   endMs: number;
   text: string;
+  // ADR 0061: the stored text differs from whisper's original, so the editor offers Revert.
+  edited: boolean;
 }
 
 // Item 12 contract: one speaker turn (docs/api/turns.json); times are on the /audio
@@ -114,6 +118,8 @@ export type ServerEvent =
   // speakers after a stored rename, or after a merge or reset of all merges.
   | { type: 'speakers-renamed'; id: number; speakers: TurnSpeaker[] }
   | { type: 'speakers-merged'; id: number; speakers: TurnSpeaker[] }
+  // Item 52 (docs/api/segment-edited.json): the one segment a stored edit changed.
+  | { type: 'segment-edited'; id: number; segment: Segment }
   // Item 32 (docs/api/settings-updated*.json): the stored settings after a write, a dismissed
   // CPU-fallback notice, or the engine's switch of an unusable GPU to the CPU.
   | { type: 'settings-updated'; settings: SettingsNotice };

@@ -162,6 +162,7 @@ private suspend fun Event.sseName(): String =
         is Event.QueueUpdated -> "queue-updated"
         is Event.SpeakersRenamed -> "speakers-renamed"
         is Event.SpeakersMerged -> "speakers-merged"
+        is Event.SegmentEdited -> "segment-edited"
         is Event.SettingsUpdated -> "settings-updated"
     }
 
@@ -194,6 +195,10 @@ private suspend fun Event.sseData(tasks: TaskRepository): String =
             SseJson.encodeToString(SpeakersEventJson(id, speakers.map { it.toJson() }))
         }
 
+        is Event.SegmentEdited -> {
+            SseJson.encodeToString(SegmentEditedJson(id, segment.toJson()))
+        }
+
         is Event.SettingsUpdated -> {
             SseJson.encodeToString(settings.toEventJson())
         }
@@ -209,6 +214,13 @@ private data class DeletedJson(
 data class SpeakersEventJson(
     val id: Long,
     val speakers: List<SpeakerJson>,
+)
+
+/** The payload of `segment-edited` (item 52, `docs/api/segment-edited.json`): the task and the segment it changed. */
+@Serializable
+data class SegmentEditedJson(
+    val id: Long,
+    val segment: TurnSegmentJson,
 )
 
 /** One SSE frame; [data] is a single line (kotlinx serialization writes no newlines). */

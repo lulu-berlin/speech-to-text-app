@@ -24,7 +24,6 @@ import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import stt.db.Database
@@ -35,6 +34,7 @@ import stt.db.Speaker
 import stt.db.Task
 import stt.db.TaskRepository
 import stt.db.queuedTask
+import stt.db.withoutIds
 import stt.queue.TaskStatus
 import java.nio.file.Path
 
@@ -228,14 +228,14 @@ class SpeakerRoutesSpec :
                                     {
                                       "speakerId": 0, "startMs": 0, "endMs": 3000, "text": "Hello. Hi. Hey.",
                                       "segments": [
-                                        { "startMs": 0, "endMs": 1000, "text": "Hello." },
-                                        { "startMs": 1000, "endMs": 2000, "text": "Hi." },
-                                        { "startMs": 2000, "endMs": 3000, "text": "Hey." }
+                                        { "id": 1, "startMs": 0, "endMs": 1000, "text": "Hello.", "edited": false },
+                                        { "id": 2, "startMs": 1000, "endMs": 2000, "text": "Hi.", "edited": false },
+                                        { "id": 3, "startMs": 2000, "endMs": 3000, "text": "Hey.", "edited": false }
                                       ]
                                     },
                                     {
                                       "speakerId": 2, "startMs": 3000, "endMs": 4000, "text": "Bye.",
-                                      "segments": [ { "startMs": 3000, "endMs": 4000, "text": "Bye." } ]
+                                      "segments": [ { "id": 4, "startMs": 3000, "endMs": 4000, "text": "Bye.", "edited": false } ]
                                     }
                                   ]
                                 }
@@ -247,7 +247,7 @@ class SpeakerRoutesSpec :
                     Database.open(dataDir).use { db ->
                         val segments = SegmentRepository(db)
                         val seeded = fourSegments.zip(listOf(0, 1, 0, 2)) { segment, speakerId -> segment.copy(speakerId = speakerId) }
-                        segments.findByTask(id) shouldBe seeded
+                        segments.findByTask(id).withoutIds() shouldBe seeded
                         segments.findSpeakers(id) shouldBe
                             listOf(Speaker(0, "Alice"), Speaker(1, "Speaker 2"), Speaker(2, "Speaker 3"))
                     }
@@ -521,10 +521,10 @@ class SpeakerRoutesSpec :
                                     {
                                       "speakerId": 2, "startMs": 0, "endMs": 4000, "text": "Hello. Hi. Hey. Bye.",
                                       "segments": [
-                                        { "startMs": 0, "endMs": 1000, "text": "Hello." },
-                                        { "startMs": 1000, "endMs": 2000, "text": "Hi." },
-                                        { "startMs": 2000, "endMs": 3000, "text": "Hey." },
-                                        { "startMs": 3000, "endMs": 4000, "text": "Bye." }
+                                        { "id": 1, "startMs": 0, "endMs": 1000, "text": "Hello.", "edited": false },
+                                        { "id": 2, "startMs": 1000, "endMs": 2000, "text": "Hi.", "edited": false },
+                                        { "id": 3, "startMs": 2000, "endMs": 3000, "text": "Hey.", "edited": false },
+                                        { "id": 4, "startMs": 3000, "endMs": 4000, "text": "Bye.", "edited": false }
                                       ]
                                     }
                                   ]
@@ -585,25 +585,25 @@ private suspend fun HttpClient.nameAliceAndMerge1Into0(id: Long) {
 /** Two segments of a task, one per speaker once `storeSpeakers(listOf(0, 1))` has run. */
 private val twoSegments =
     listOf(
-        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null),
-        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null),
+        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null, originalText = " Hello."),
+        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null, originalText = " Hi."),
     )
 
 /** Three segments of a task, one per speaker once `storeSpeakers(listOf(0, 1, 2))` has run. */
 private val threeSegments =
     listOf(
-        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null),
-        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null),
-        Segment(0, 2, 2_000, 3_000, " Hey.", speakerId = null),
+        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null, originalText = " Hello."),
+        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null, originalText = " Hi."),
+        Segment(0, 2, 2_000, 3_000, " Hey.", speakerId = null, originalText = " Hey."),
     )
 
 /** Four segments of a task, for speakers stored as `[0, 1, 0, 2]`. */
 private val fourSegments =
     listOf(
-        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null),
-        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null),
-        Segment(0, 2, 2_000, 3_000, " Hey.", speakerId = null),
-        Segment(0, 3, 3_000, 4_000, " Bye.", speakerId = null),
+        Segment(0, 0, 0, 1_000, " Hello.", speakerId = null, originalText = " Hello."),
+        Segment(0, 1, 1_000, 2_000, " Hi.", speakerId = null, originalText = " Hi."),
+        Segment(0, 2, 2_000, 3_000, " Hey.", speakerId = null, originalText = " Hey."),
+        Segment(0, 3, 3_000, 4_000, " Bye.", speakerId = null, originalText = " Bye."),
     )
 
 /** A COMPLETED copy of a freshly queued task. */
@@ -655,9 +655,6 @@ private suspend fun HttpClient.merge(
         )
     }
 
-/** The body of `GET /api/tasks/{id}/turns`. */
-private suspend fun HttpClient.turnsOf(id: Long): JsonObject = Json.parseToJsonElement(get("/api/tasks/$id/turns").bodyAsText()).jsonObject
-
 /** The task's speakers as `/turns` reports them. */
 private suspend fun HttpClient.speakersOf(id: Long): JsonElement = turnsOf(id).getValue("speakers")
 
@@ -672,14 +669,3 @@ private fun speakers(vararg names: String): JsonElement =
                 }
             }.toString(),
     )
-
-/** Asserts an error response (item 12's contract): [status], the `docs/api/error.json` shape, and the [code]. */
-private suspend fun HttpResponse.shouldBeError(
-    status: HttpStatusCode,
-    code: String,
-) {
-    this.status shouldBe status
-    val body = Json.parseToJsonElement(bodyAsText()).jsonObject
-    body shouldHaveShapeOf apiExample("error.json")
-    body.getValue("error").jsonPrimitive.content shouldBe code
-}

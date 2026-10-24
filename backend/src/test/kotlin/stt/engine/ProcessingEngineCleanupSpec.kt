@@ -12,6 +12,7 @@ import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.entries
 import stt.db.rowCount
+import stt.db.withoutIds
 import stt.queue.TaskStatus
 import stt.transcribe.WhisperSegment
 import java.nio.file.Path
@@ -62,8 +63,18 @@ class ProcessingEngineCleanupSpec :
 
                         statusOf(fixture, task) shouldBe TaskStatus.CANCELED
                         chunksOf(db, task).map { it.status } shouldBe listOf(ChunkStatus.DONE, ChunkStatus.PENDING)
-                        segmentsOf(db, task) shouldBe
-                            listOf(Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null))
+                        segmentsOf(db, task).withoutIds() shouldBe
+                            listOf(
+                                Segment(
+                                    chunkIdx = 0,
+                                    seq = 0,
+                                    startMs = 0,
+                                    endMs = 1_000,
+                                    text = " hello ",
+                                    speakerId = null,
+                                    originalText = " hello ",
+                                ),
+                            )
                         entries(fixture.scratchDir.taskDirPath(task)) shouldBe emptyList()
                     }
                 }
