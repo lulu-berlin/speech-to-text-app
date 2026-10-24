@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { MoreVertical } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { editSegment, revertSegment } from '../../shared/api/client';
 import { errorMessage } from '../../shared/api/types';
-import type { Task, TaskPhase } from '../../shared/api/types';
+import type { Segment, Task, TaskPhase, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { MetaText, PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
@@ -18,13 +19,13 @@ import { LoadingState } from '../../shared/ui/LoadingState';
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
 import { TextLink } from '../../shared/ui/TextLink';
 import { turnsMachine } from './turnsMachine';
-import { segmentAtTime } from './segmentTiming';
+import { currentSegmentAt } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { formatDuration } from '../../shared/formatDuration';
 import { formatTaskMeta } from './formatTask';
 import { TranscriptTurns } from './TranscriptTurns';
-import { AudioPlayer } from './AudioPlayer';
+import { AudioPlayer, playheadMs } from './AudioPlayer';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
 import { SpeakersPanel } from './SpeakersPanel';
@@ -48,6 +49,24 @@ const PENDING: ReadonlySet<Task['status']> = new Set(['QUEUED', 'RUNNING', 'PAUS
 
 // The transcript download formats (item 10, ADR 0035): txt, srt, vtt.
 const DOWNLOAD_FORMATS = ['txt', 'srt', 'vtt'] as const;
+
+// What a click must land on to act as itself (item 52): a segment and its controls are
+// buttons, and so are the player's controls, the download links and the speakers panel's
+// fields. Anything else is "outside" — it stops playback and lands on the current segment.
+const CONTROLS =
+  'button, a, input, textarea, select, label, [role="button"], [role="link"], [role="slider"], [contenteditable="true"]';
+
+// The transcript's segments: the button-role elements without an aria-label (the current
+// segment's controls carry one), in reading order (item 52).
+const SEGMENTS = '[role="button"]:not([aria-label])';
+
+// The arrow keys' step between segments (item 52): the previous segment, or the next.
+const ARROW_STEP: Record<string, number> = {
+  ArrowLeft: -1,
+  ArrowUp: -1,
+  ArrowRight: 1,
+  ArrowDown: 1,
+};
 
 // The scroll keys (item 36): the keys a browser turns into scrolling for the focused
 // scroll container — the transcript region, when focus is on one of its segments.
@@ -181,6 +200,18 @@ export function TaskTranscriptView() {
     turnsSend({ type: 'RELOAD' });
   }, [id, speakerChange, turnsSend]);
 
+  // Item 52: the latest edit of each edited segment of this task replaces that segment in
+  // place; a text edit changes no turn boundary, so /turns is not read again. The edits are
+  // applied again whenever the turns have (re)loaded: a /turns answer read before an edit was
+  // stored still holds the old text.
+  const segmentEdits = ConnectionContext.useSelector((state) => state.context.segmentEdits[id]);
+  const turnsLoaded = turnsState.matches('loaded');
+  useEffect(() => {
+    if (segmentEdits !== undefined && turnsLoaded) {
+      turnsSend({ type: 'SEGMENTS', segments: Object.values(segmentEdits) });
+    }
+  }, [segmentEdits, turnsLoaded, turnsSend]);
+
   const theme = useTheme();
   const tints = theme.colors.speakerTints;
   const turnsBySpeaker = useMemo(() => {
@@ -200,22 +231,38 @@ export function TaskTranscriptView() {
   // element's timeupdate and seeked events; drives the playback highlight.
   const [playback, playbackSend] = useMachine(playbackMachine);
   const currentTimeMs = playback.context.currentTimeMs;
+  const playing = playback.matches('playing');
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Moves the audio and the playhead to `ms`: the player's seek bar (on release) and
-  // click-to-seek. The machine's SEEK also ends any drag draft.
+  // All segments in time order, so the highlight can be a binary search over the starts.
+  const segmentsInOrder = useMemo(
+    () => (turns === null ? [] : turns.turns.map((turn) => turn.segments).flat()),
+    [turns],
+  );
+  // The leading silence is unplayable (item 52); both the seek and the play path use this.
+  const firstSegmentStartMs = segmentsInOrder[0]?.startMs;
+
+  // Moves the audio and the playhead to `ms`: the player's seek bar (on release) and a click
+  // on a segment (item 52: it makes the segment current; playing goes on if it was playing).
+  // The machine's SEEK also ends any drag draft. A seek also ends a segment played on its own
+  // (item 52, confirmed 2026-10-23): playback goes on from there as an ordinary play.
   const seek = (ms: number) => {
     const audio = audioRef.current;
     if (audio === null) {
       return;
     }
-    playbackSend({ type: 'SEEK', ms });
-    audio.currentTime = ms / 1000;
+    // The silence before the first segment is unplayable (item 52, discovered): a seek into it
+    // lands on the first segment's start, so a current segment always exists.
+    const target =
+      firstSegmentStartMs !== undefined && ms < firstSegmentStartMs ? firstSegmentStartMs : ms;
+    setWindowSegment(null);
+    playbackSend({ type: 'SEEK', ms: target });
+    audio.currentTime = target / 1000;
   };
 
-  // Clicking a segment seeks the player to the segment's start and plays from there
-  // (item 9, decided 2026-10-09).
-  const seekTo = (startMs: number) => {
+  // A double-click or Enter/Space on a segment plays from its start (item 9, moved off the
+  // single click by item 52).
+  const playFrom = (startMs: number) => {
     seek(startMs);
     audioRef.current?.play().catch(() => {
       /* A browser may refuse playback before any user gesture (autoplay policy); the seek
@@ -223,35 +270,224 @@ export function TaskTranscriptView() {
     });
   };
 
-  // All segments in time order, so the highlight can be a binary search over the starts.
-  const segmentsInOrder = useMemo(
-    () => (turns === null ? [] : turns.turns.map((turn) => turn.segments).flat()),
-    [turns],
-  );
-  const activeSegment = segmentAtTime(segmentsInOrder, currentTimeMs);
+  // Where a resume must start (item 52): after the media's end, play() rewinds to 0, so the
+  // current segment restarts; in the leading silence, the first segment does.
+  const settleResumePosition = (audio: HTMLAudioElement) => {
+    if (audio.ended && currentSegment !== null) {
+      seek(currentSegment.startMs);
+    }
+    if (firstSegmentStartMs !== undefined && playheadMs(audio) < firstSegmentStartMs) {
+      seek(firstSegmentStartMs);
+    }
+  };
+
+  // A Stop (the user's Pause/Stop model, item 52): playback ends at the segment's start, which
+  // stays current, so playing again starts it over; the seek ends a segment played on its own.
+  const stopAt = (segment: Segment) => {
+    audioRef.current?.pause();
+    seek(segment.startMs);
+    setChosenSegmentId(segment.id);
+  };
+
+  // Escape and a click on no control: a Stop at the current segment — while a segment plays on
+  // its own, that segment.
+  const stopPlaying = () => {
+    if (!playing) {
+      return;
+    }
+    const segment = windowSegment ?? currentSegment;
+    if (segment === null) {
+      audioRef.current?.pause();
+      return;
+    }
+    stopAt(segment);
+  };
+
+  // Pauses where it is, or resumes from where it paused — not from the segment's start:
+  // Enter/Space on the current segment (item 52), and the player's Play/Pause button. A segment
+  // played on its own stays so through the pause, and still stops at its end.
+  const togglePlayback = () => {
+    const audio = audioRef.current;
+    if (audio === null) {
+      return;
+    }
+    if (playing) {
+      audio.pause();
+    } else {
+      settleResumePosition(audio);
+      audio.play().catch(() => {
+        /* Refused before any user gesture (autoplay policy); nothing to undo. */
+      });
+    }
+  };
+
+  // The segment the user chose last (click, double-click, Enter/Space): at its own instant it is
+  // the current segment even when the next one starts there too — whisper can emit such a
+  // duplicate (item 52, user report 2026-10-23). A zero-length segment counts as containing its
+  // own instant; otherwise the playhead's segment wins.
+  const [chosenSegmentId, setChosenSegmentId] = useState<number | null>(null);
+  // The segment whose inline editor is open (item 52), or null, and a rejected save's detail
+  // shown in it.
+  const [editingSegmentId, setEditingSegmentId] = useState<number | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  // The segment an isolated play is playing (item 52), or null: it stops at the segment's end.
+  const [windowSegment, setWindowSegment] = useState<Segment | null>(null);
+  const chosenSegment =
+    chosenSegmentId === null
+      ? null
+      : (segmentsInOrder.find((segment) => segment.id === chosenSegmentId) ?? null);
+  const chosenHolds =
+    chosenSegment !== null &&
+    currentTimeMs >= chosenSegment.startMs &&
+    (chosenSegment.startMs === chosenSegment.endMs
+      ? currentTimeMs === chosenSegment.startMs
+      : currentTimeMs < chosenSegment.endMs);
+  const currentSegment = chosenHolds
+    ? chosenSegment
+    : currentSegmentAt(segmentsInOrder, currentTimeMs);
 
   // Follow mode (item 10): while the playhead moves and the user has not scrolled by hand,
-  // the active segment is kept in view. A hand scroll stops following; "Back to playing
+  // the current segment is kept in view. A hand scroll stops following; "Back to playing
   // position" resumes it.
   const [followMode, followModeSend] = useMachine(followModeMachine);
   const following = followMode.matches('following');
   const transcriptRegionRef = useRef<HTMLDivElement>(null);
+  // The rendered element of the current segment — the one the highlight marks. Follow mode
+  // scrolls to it, focus rides to it, and Escape lands on it (item 52).
+  const currentSegmentElement = (): HTMLElement | null =>
+    transcriptRegionRef.current?.querySelector<HTMLElement>('[data-active]') ?? null;
   // Where the region stood when a pointer press started: a press that ends with the region
   // scrolled is a drag on its scrollbar (item 36); a plain press or a selection that does
   // not scroll leaves following alone.
   const dragStartScrollRef = useRef<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
-    if (!following || activeSegment === null) {
+    if (!following || currentSegment === null) {
       return;
     }
-    // The active segment is where the highlight is; scroll it into the reader's sight.
-    const active = transcriptRegionRef.current?.querySelector('[data-active]');
-    if (active === null || active === undefined) {
+    // The current segment is where the highlight is; scroll it into the reader's sight.
+    currentSegmentElement()?.scrollIntoView({ block: 'nearest' });
+  }, [following, currentSegment]);
+
+  // Focus rides along with the current segment, so a repeated Space acts on what is playing
+  // (item 52, the user's keyboard trial) — only when it was on the previous current segment:
+  // focus the user put elsewhere stays there. Its move must not scroll; follow mode owns
+  // scrolling. Searched by the rendered mark so it needs no ref per segment.
+  const previousElementRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const previous = previousElementRef.current;
+    const element = currentSegmentElement();
+    previousElementRef.current = element;
+    const active = document.activeElement;
+    if (
+      previous === null ||
+      active === null ||
+      !(active === previous || previous.contains(active))
+    ) {
       return;
     }
-    active.scrollIntoView({ block: 'nearest' });
-  }, [following, activeSegment]);
+    if (element instanceof HTMLElement) {
+      element.focus({ preventScroll: true });
+    }
+  }, [currentSegment]);
+
+  // An edit's or a revert's answer (item 52, ADR 0061): the stored segment is applied in place
+  // (no /turns refetch) and the editor closes; a rejection keeps the draft open and shows the
+  // server's detail.
+  const settleEdit = (request: Promise<Turns>, segmentId: number) => {
+    void request
+      .then((next) => {
+        const stored = next.turns
+          .flatMap((turn) => turn.segments)
+          .find((candidate) => candidate.id === segmentId);
+        if (stored !== undefined) {
+          turnsSend({ type: 'SEGMENTS', segments: [stored] });
+        }
+        setEditingSegmentId(null);
+        setEditError(null);
+      })
+      .catch((error: unknown) => {
+        setEditError(errorMessage(error));
+      });
+  };
+
+  // Opening a segment's editor (item 52): the segment becomes current and the dialog opens. The
+  // Edit control, Enter on it and the segment's own `e` all land here.
+  const openEditor = (segment: Segment) => {
+    setChosenSegmentId(segment.id);
+    setEditError(null);
+    setEditingSegmentId(segment.id);
+  };
+
+  // Saving an edit (item 52): the client trims the text before it is stored.
+  const saveEdit = (segment: Segment, text: string) => {
+    settleEdit(editSegment(id, segment.id, text.trim()), segment.id);
+  };
+
+  // Isolated segment playback (item 52): play exactly [startMs, endMs) and stop at its end,
+  // without running on into the next segment.
+  const playSegmentWindow = (segment: Segment) => {
+    seek(segment.startMs);
+    setWindowSegment(segment);
+    audioRef.current?.play().catch(() => {
+      /* Refused before any user gesture (autoplay policy); the seek itself landed. */
+    });
+  };
+
+  // Reverting an edit (ADR 0061): whisper's text comes back through the same answer path.
+  const revertEdit = (segment: Segment) => {
+    settleEdit(revertSegment(id, segment.id), segment.id);
+  };
+
+  // The player's Play/Pause does not keep focus: it goes to the current segment — before the
+  // playhead has reached one, to the first — so Enter/Space toggles there and Tab continues
+  // from it (item 52, the user's keyboard trial).
+  const toggleFromButton = () => {
+    togglePlayback();
+    const target =
+      currentSegmentElement() ?? transcriptRegionRef.current?.querySelector<HTMLElement>(SEGMENTS);
+    target?.focus({ preventScroll: true });
+  };
+
+  // A click that lands on no control is "outside" (item 52): it removes the staging focus and
+  // stops playback, landing on the current segment, which keeps its highlight. The player's own
+  // controls, the downloads and the speakers panel are controls and act as themselves.
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest(CONTROLS) !== null) {
+        return;
+      }
+      // An open editor keeps its draft and its focus through any click (item 52, the user's
+      // decision): only Discard or Escape close it.
+      if (editingSegmentId !== null) {
+        return;
+      }
+      stopPlaying();
+      currentSegmentElement()?.focus({ preventScroll: true });
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [playback, editingSegmentId, windowSegment, currentSegment]);
+
+  // A staging focus — focus on a segment that is not current, by Tab or an arrow key — is a
+  // scroll away by hand: following stops (item 52, the user's trial). The view's own focus
+  // moves all land on the current segment, so they never stop it. A native `focusin` listener:
+  // Tab moves focus outside any React handler, and the event bubbles from the segment.
+  useEffect(() => {
+    const region = transcriptRegionRef.current;
+    if (region === null) {
+      return;
+    }
+    const handleFocusIn = (event: FocusEvent) => {
+      const segment = event.target instanceof Element ? event.target.closest(SEGMENTS) : null;
+      if (segment !== null && segment !== currentSegmentElement()) {
+        sendScrolled();
+      }
+    };
+    region.addEventListener('focusin', handleFocusIn);
+    return () => region.removeEventListener('focusin', handleFocusIn);
+  });
 
   // A hand scroll is input that scrolls the region (item 36, decided 2026-10-11): wheel,
   // touch, the scroll keys, or a scrollbar drag. A bare scroll event is never input
@@ -262,10 +498,63 @@ export function TaskTranscriptView() {
   };
 
   // The scroll keys' default is the browser scrolling the focused scroll container. A key
-  // press whose default is already handled (Enter/Space on a segment button, which seek
+  // press whose default is already handled (Enter/Space on a segment button, which play
   // instead of scrolling) is not scroll input.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.defaultPrevented) {
+      return;
+    }
+    // The editor's dialog renders inside this region's React tree (its panel is portalled out),
+    // so its keys still bubble here: they belong to the dialog, not to the transcript's scroll
+    // keys or shortcuts (root review 2026-10-23).
+    if (event.target instanceof Element && event.target.closest('[role="dialog"]') !== null) {
+      return;
+    }
+    // The focused segment answers two bare keys (root review 2026-10-23): `e` opens its editor,
+    // `p` plays it on its own — and stops it again, as its own control does. The segments render
+    // in time order, so the focused one is the same index in the ordered list.
+    const onSegment =
+      event.target instanceof Element ? event.target.closest<HTMLElement>(SEGMENTS) : null;
+    if (onSegment !== null && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const focused = [
+        ...(transcriptRegionRef.current?.querySelectorAll<HTMLElement>(SEGMENTS) ?? []),
+      ].indexOf(onSegment);
+      const segment = segmentsInOrder[focused] ?? null;
+      if (segment !== null && event.key.toLowerCase() === 'e') {
+        event.preventDefault();
+        openEditor(segment);
+        return;
+      }
+      if (segment !== null && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        if (playing && windowSegment?.id === segment.id) {
+          stopPlaying();
+        } else {
+          playSegmentWindow(segment);
+          setChosenSegmentId(segment.id);
+        }
+        return;
+      }
+    }
+    // Escape (item 52): stop what is playing and land on the current segment — the one the
+    // highlight marks, not a segment that only holds the staging focus — so Space resumes
+    // from it; the highlight stays.
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      stopPlaying();
+      currentSegmentElement()?.focus({ preventScroll: true });
+      return;
+    }
+    // The arrow keys with focus on a segment step the staging focus to the previous (Left/Up)
+    // or next (Right/Down) segment, skipping the controls, and are not a hand scroll; with
+    // focus anywhere else they scroll the transcript as before (item 52).
+    const step = ARROW_STEP[event.key];
+    if (onSegment !== null && step !== undefined) {
+      event.preventDefault();
+      const segments = [
+        ...(transcriptRegionRef.current?.querySelectorAll<HTMLElement>(SEGMENTS) ?? []),
+      ];
+      segments[segments.indexOf(onSegment) + step]?.focus();
       return;
     }
     if (SCROLL_KEYS[event.key] === true) {
@@ -356,12 +645,22 @@ export function TaskTranscriptView() {
       durationMs={task.durationMs ?? 0}
       currentTimeMs={currentTimeMs}
       dragMs={playback.context.dragMs}
-      playing={playback.matches('playing')}
+      playing={playing}
       audioRef={audioRef}
-      onPlayhead={(ms) => playbackSend({ type: 'PLAYHEAD', ms })}
+      onPlayhead={(ms) => {
+        // At its end a segment played on its own stops — the next segment never becomes
+        // current, however late the time update lands.
+        if (windowSegment !== null && ms >= windowSegment.endMs) {
+          stopAt(windowSegment);
+          return;
+        }
+        playbackSend({ type: 'PLAYHEAD', ms });
+      }}
       onSeek={seek}
       onDrag={(ms) => playbackSend({ type: 'DRAG', ms })}
-      onPlayingChange={(playing) => playbackSend({ type: playing ? 'PLAYED' : 'PAUSED' })}
+      onPlayingChange={(playing) => playbackSend({ type: playing ? 'PLAYING' : 'IDLE' })}
+      onToggle={toggleFromButton}
+      disabled={editingSegmentId !== null}
     />
   ) : (
     <NoAudioNote>This task has no audio because it ended before chunking.</NoAudioNote>
@@ -467,8 +766,29 @@ export function TaskTranscriptView() {
           >
             <TranscriptTurns
               turnsBySpeaker={turnsBySpeaker}
-              activeSegment={activeSegment}
-              onSegmentClick={seekTo}
+              currentSegment={currentSegment}
+              playing={playing}
+              playingOnItsOwnId={playing ? (windowSegment?.id ?? null) : null}
+              onStopSegment={stopPlaying}
+              onSegmentSeek={(segment) => {
+                seek(segment.startMs);
+                setChosenSegmentId(segment.id);
+              }}
+              onSegmentPlay={(segment) => {
+                playFrom(segment.startMs);
+                setChosenSegmentId(segment.id);
+              }}
+              onCurrentToggle={togglePlayback}
+              onPlaySegment={playSegmentWindow}
+              editingSegmentId={editingSegmentId}
+              onEdit={openEditor}
+              onSaveEdit={saveEdit}
+              onDiscardEdit={() => {
+                setEditError(null);
+                setEditingSegmentId(null);
+              }}
+              onRevertEdit={revertEdit}
+              editError={editError}
             />
           </TranscriptRegion>
         )}

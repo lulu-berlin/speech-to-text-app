@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, type Mock } from 'vitest';
@@ -12,6 +12,7 @@ import {
   taskFailed,
   turns as turnsFixture,
 } from '../../shared/api/fixtures';
+import type { Turns } from '../../shared/api/types';
 import { controllableEventStream } from '../../test/eventStream';
 import { mediaRulesFor, px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
@@ -25,6 +26,39 @@ function renderTranscript(taskId: string) {
   return screen.findByText('Live');
 }
 
+// The current segment's inline editor, opened from its Edit control; returns its field.
+function openSegmentEditor(name: string): HTMLElement {
+  fireEvent.click(screen.getByRole('button', { name }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
+  return screen.getByLabelText('Segment text');
+}
+
+// The media element reports its playhead: moves it to `seconds` and fires the time update.
+function playheadAt(audio: HTMLAudioElement, seconds: number) {
+  audio.currentTime = seconds;
+  fireEvent(audio, new Event('timeupdate'));
+}
+
+// The current segment played on its own from its Play-segment control, until `seconds`.
+function playOnItsOwnUntil(audio: HTMLAudioElement, seconds: number) {
+  fireEvent.click(screen.getByRole('button', { name: 'Play segment' }));
+  fireEvent(audio, new Event('play'));
+  playheadAt(audio, seconds);
+}
+
+// turns.json with segment 2's text replaced; `edited` follows whether it differs.
+function turnsWithSegmentTwo(text: string): Turns {
+  return {
+    ...turnsFixture,
+    turns: turnsFixture.turns.map((turn) => ({
+      ...turn,
+      segments: turn.segments.map((segment) =>
+        segment.id === 2 ? { ...segment, text, edited: text !== segment.text } : segment,
+      ),
+    })),
+  };
+}
+
 // jsdom has no scrollIntoView, which the follow scroll calls; a test that wants to observe
 // follow scrolls (or one that just needs the call to not throw) stubs it. The prototype
 // assignment and the spy are the same stub, so the call sites share it.
@@ -36,6 +70,19 @@ function stubScrollIntoView(): Mock {
 // "Back to playing position" is the stopped state's control: present when following has
 // stopped, absent while it holds; clicking it resumes following.
 const backButton = () => screen.queryByRole('button', { name: /back to playing position/i });
+
+// A /turns mock that answers body() (by default turns.json) and counts its requests, for the
+// tests that check whether an event made the view read /turns again.
+function countTurnsRequests(body: () => Turns = () => turnsFixture): () => number {
+  let requests = 0;
+  server.use(
+    http.get('/api/tasks/:id/turns', () => {
+      requests += 1;
+      return HttpResponse.json(body());
+    }),
+  );
+  return () => requests;
+}
 
 // A navigation renders a whole other view; under a loaded test run that can take longer than
 // Testing Library's 1 s default (seen with two suites in parallel), so the waits that follow a
@@ -142,51 +189,1376 @@ describe('the transcript view', () => {
     expect(screen.getByText(/has no audio/i)).toBeInTheDocument();
   });
 
-  it('highlights the segment containing the playhead, nothing in a gap, and moves on seek', async () => {
+  it('highlights the segment containing the playhead, keeps the one just played through a gap, and moves on seek', async () => {
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
     const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
-    const activeSegment = () => document.querySelector('[data-active]');
+    const currentSegment = () => document.querySelector('[data-active]');
 
     // turns.json segments: turn 1 [0,2100) + [2400,5200); turn 2 [5800,9100);
     // turn 3 [9600,14250); gaps at 2100-2400 and 5200-5800.
 
     // Inside the first segment.
-    audio.currentTime = 1.0; // 1000 ms
-    fireEvent(audio, new Event('timeupdate'));
-    expect(activeSegment()?.textContent).toContain('Good morning.');
+    playheadAt(audio, 1.0); // 1000 ms
+    expect(currentSegment()?.textContent).toContain('Good morning.');
 
-    // In the gap after the first turn's first segment: nothing is highlighted.
-    audio.currentTime = 2.25; // 2250 ms, between 2100 and 2400
-    fireEvent(audio, new Event('timeupdate'));
-    expect(activeSegment()).toBeNull();
+    // In the gap after the first turn's first segment: the segment just played stays
+    // highlighted until the next one starts (item 52, user decision 2026-10-23; item 9 showed
+    // nothing here).
+    playheadAt(audio, 2.25); // 2250 ms, between 2100 and 2400
+    expect(currentSegment()?.textContent).toContain('Good morning.');
+
+    // The next segment starts at 2400 ms and takes the highlight.
+    playheadAt(audio, 2.4);
+    expect(currentSegment()?.textContent).toContain('Thanks for joining us today.');
+
+    // The gap between turns 1 and 2 keeps the turn's last segment too.
+    playheadAt(audio, 5.5); // 5500 ms, between 5200 and 5800
+    expect(currentSegment()?.textContent).toContain('Thanks for joining us today.');
 
     // Inside the second turn.
-    audio.currentTime = 6.0; // 6000 ms, inside [5800,9100)
-    fireEvent(audio, new Event('timeupdate'));
-    expect(activeSegment()?.textContent).toContain('Happy to be here.');
+    playheadAt(audio, 6.0); // 6000 ms, inside [5800,9100)
+    expect(currentSegment()?.textContent).toContain('Happy to be here.');
 
     // Seeking moves the highlight to the new position.
     audio.currentTime = 3.0; // 3000 ms, inside [2400,5200)
     fireEvent(audio, new Event('seeked'));
-    expect(activeSegment()?.textContent).toContain('Thanks for joining us today.');
+    expect(currentSegment()?.textContent).toContain('Thanks for joining us today.');
   });
 
-  it('clicks a segment to seek the player to its start and play', async () => {
+  it('keeps the last segment highlighted after it ends', async () => {
+    // Item 52 (discovered 2026-10-23): the segment just played stays highlighted until the next
+    // one starts, and after the last one none does. turns.json's last segment is turn 3's
+    // [9600,14250).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+
+    playheadAt(audio, 15.0); // 15000 ms, past 14250
+    expect(document.querySelector('[data-active]')?.textContent).toContain(
+      "Let's start with your background.",
+    );
+  });
+
+  it('clicks a segment while not playing to make it current at its start, without playing', async () => {
+    // Item 52 (user decision 2026-10-23, one current segment): a click chooses the segment —
+    // the player moves to its start, so it is the current segment with the one filled
+    // highlight and its Edit control — and a click while not playing does not start playback. There is no
+    // separate selection mark. turns.json: segment 2 starts at 2400 ms, segment 4 at 9600 ms.
     await renderTranscript('3'); // task 3 is COMPLETED (id 3, fixed speakers).
     const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
     const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
 
-    // Click the "Thanks for joining us today." segment (starts at 2400 ms).
-    fireEvent.click(screen.getByRole('button', { name: /Thanks for joining us today\./ }));
+    fireEvent.click(second);
+    expect(audio.currentTime).toBe(2.4);
+    expect(play).not.toHaveBeenCalled();
+    expect(second).toHaveAttribute('data-active');
+    expect(second).toHaveAttribute('aria-current', 'true');
+    expect(getComputedStyle(second).backgroundColor).toBe(asRgb(lightTheme.colors.accent));
+    expect(getComputedStyle(second).outlineStyle).not.toBe('solid');
+    expect(second.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
 
-    // The player sought to the segment's start (2400 ms) and played.
+    // Another click moves the current segment, its highlight and its Edit control; still silent.
+    fireEvent.click(fourth);
+    expect(audio.currentTime).toBe(9.6);
+    expect(play).not.toHaveBeenCalled();
+    expect(fourth).toHaveAttribute('data-active');
+    expect(fourth).toHaveAttribute('aria-current', 'true');
+    expect(second).not.toHaveAttribute('aria-current');
+    expect(screen.getAllByRole('button', { name: 'Edit segment' })).toHaveLength(1);
+    expect(fourth.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
+  });
+
+  it('clicks a segment while playing to jump there, and playback goes on', async () => {
+    // Item 52 (user decision 2026-10-23): a click while playing makes the segment current at
+    // its start and keeps playing from there — no pause, no restart. turns.json: segment 4
+    // starts at 9600 ms.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    fireEvent(audio, new Event('play'));
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    fireEvent.click(fourth);
+    expect(audio.currentTime).toBe(9.6);
+    expect(fourth).toHaveAttribute('aria-current', 'true');
+    expect(pause).not.toHaveBeenCalled();
+    expect(within(player).getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
+  it('double-clicks a segment to play from its start, which makes it current', async () => {
+    // Item 52 (user decision 2026-10-23): a double-click chooses the segment and plays from its
+    // start; the single click only moves the player there (the test above).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+
+    fireEvent.dblClick(second);
+
+    // Sought to the segment's start (2400 ms) and played, so it is the current segment.
+    expect(audio.currentTime).toBe(2.4);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(second).toHaveAttribute('aria-current', 'true');
+    expect(second.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
+  });
+
+  it('plays from a focused segment on Enter or Space, which makes it current, like the double-click', async () => {
+    // Discovered in item 52: the keyboard's way to a segment does what the double-click does,
+    // not only the seek. turns.json: segment 2 starts at 2400 ms, segment 4 at 9600 ms.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    // Enter: the player plays from segment 2's start, so it is current with its Edit control.
+    fireEvent.keyDown(second, { key: 'Enter' });
+    expect(second).toHaveAttribute('aria-current', 'true');
+    expect(second.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+
+    // Space on segment 4 does the same: it becomes current and plays from its start.
+    fireEvent.keyDown(fourth, { key: ' ' });
+    expect(fourth).toHaveAttribute('aria-current', 'true');
+    expect(second).not.toHaveAttribute('aria-current');
+    expect(fourth.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
+    expect(play).toHaveBeenCalledTimes(2);
+    expect(audio.currentTime).toBe(9.6);
+  });
+
+  it('toggles playback with Enter or Space on the current segment: pause, then resume where it paused', async () => {
+    // Item 52 (user decision 2026-10-23, the user's keyboard trial): on the current segment the
+    // keys pause and resume — they do not restart it — and focus stays on the segment.
+    // turns.json: segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    second.focus();
+
+    // Enter on segment 2 (not current yet) plays from its start; playback runs on to 3 s.
+    fireEvent.keyDown(second, { key: 'Enter' });
+    fireEvent(audio, new Event('play'));
+    playheadAt(audio, 3.0);
+    expect(play).toHaveBeenCalledTimes(1);
+
+    // Enter on it again, now current and playing: pause where it is; it stays current.
+    fireEvent.keyDown(second, { key: 'Enter' });
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(play).toHaveBeenCalledTimes(1);
+    fireEvent(audio, new Event('pause'));
+    expect(audio.currentTime).toBe(3.0);
+    expect(second).toHaveAttribute('aria-current', 'true');
+    expect(within(player).getByRole('button', { name: 'Play' })).toBeInTheDocument();
+
+    // Space on it while paused: resume from 3 s, not from the segment's start.
+    fireEvent.keyDown(second, { key: ' ' });
+    expect(play).toHaveBeenCalledTimes(2);
+    expect(audio.currentTime).toBe(3.0);
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(second);
+  });
+
+  it('moves focus along with the current segment while playing, unless focus was put elsewhere', async () => {
+    // Item 52 (user decision 2026-10-23, the user's keyboard trial): while playing, focus
+    // rides along with the current segment, so a repeated Space pauses what is playing; its
+    // own move must not scroll (follow mode owns scrolling). Focus the user moved elsewhere
+    // stays where it was put. turns.json: segment 2 [2400,5200), segment 3 [5800,9100),
+    // segment 4 [9600,14250).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const third = screen.getByRole('button', { name: 'Happy to be here.' });
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    // Record what each focus() call asks for (jsdom's own focus behavior is kept).
+    const focusOptions: (FocusOptions | undefined)[] = [];
+    const focus = HTMLElement.prototype.focus;
+    vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (
+      this: HTMLElement,
+      options?: FocusOptions,
+    ) {
+      focusOptions.push(options);
+      focus.call(this, options);
+    });
+
+    // Focus is on segment 2, which plays; the playhead runs on into segment 3.
+    second.focus();
+    fireEvent.keyDown(second, { key: 'Enter' });
+    fireEvent(audio, new Event('play'));
+    playheadAt(audio, 6.0);
+    expect(third).toHaveAttribute('data-active');
+    expect(document.activeElement).toBe(third);
+    expect(focusOptions.at(-1)).toEqual({ preventScroll: true });
+
+    // Focus put on another segment by hand (a Tab) stays there as the playhead runs on.
+    fourth.focus();
+    playheadAt(audio, 10.0);
+    expect(fourth).toHaveAttribute('data-active');
+    expect(document.activeElement).toBe(fourth);
+  });
+
+  it('stops on Escape and puts focus on the current segment, which keeps its highlight', async () => {
+    // Item 52 (user decision 2026-10-23, the user's keyboard trial; a Stop by the user's
+    // Pause/Stop model): Escape stops what is playing and lands on the current segment — not on
+    // a segment that only holds the staging focus — and the highlight stays, so Space plays it.
+    await renderTranscript('3');
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const third = screen.getByRole('button', { name: 'Happy to be here.' });
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    // Playing from segment 2; the playhead runs on into segment 3, focus riding along.
+    second.focus();
+    fireEvent.keyDown(second, { key: 'Enter' });
+    fireEvent(audio, new Event('play'));
+    playheadAt(audio, 6.0);
+    expect(document.activeElement).toBe(third);
+
+    // Escape: stop, keeping segment 3 current and highlighted.
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(third).toHaveAttribute('data-active');
+    expect(document.activeElement).toBe(third);
+    fireEvent(audio, new Event('pause'));
+    expect(within(player).getByRole('button', { name: 'Play' })).toBeInTheDocument();
+
+    // Focus staged on segment 4 while segment 3 is current: Escape lands on segment 3.
+    fourth.focus();
+    fireEvent.keyDown(fourth, { key: 'Escape' });
+    expect(document.activeElement).toBe(third);
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(third).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('stops on a click that lands on no control, and puts focus on the current segment', async () => {
+    // Item 52 (user decision 2026-10-23; a Stop by the user's Pause/Stop model): a click that
+    // lands on nothing interactive — not a segment, its controls, nor any button, link or field —
+    // removes the staging focus and stops playback, landing on the current segment; the
+    // highlight stays.
+    await renderTranscript('3');
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const third = screen.getByRole('button', { name: 'Happy to be here.' });
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    // Playing from segment 2; the playhead runs on into segment 3, focus riding along.
+    second.focus();
+    fireEvent.keyDown(second, { key: 'Enter' });
+    fireEvent(audio, new Event('play'));
+    playheadAt(audio, 6.0);
+    expect(document.activeElement).toBe(third);
+
+    // Staging focus moved to segment 4, then a click on the region's own area (no control).
+    fourth.focus();
+    fireEvent.click(region);
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(third);
+    expect(third).toHaveAttribute('data-active');
+    expect(fourth).not.toHaveAttribute('aria-current');
+  });
+
+  it('stops ordinary playback on Escape or a click on no control, at the current segment’s start', async () => {
+    // The user's Pause/Stop model 2026-10-23: Escape and a click on no control are a Stop —
+    // playback ends at the start of the current segment, which stays current, and Space plays it
+    // from there. turns.json: segment 3 is [5800,9100).
+    await renderTranscript('3');
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const third = screen.getByRole('button', { name: 'Happy to be here.' });
+
+    const stops: [string, () => void][] = [
+      ['Escape', () => fireEvent.keyDown(region, { key: 'Escape' })],
+      ['a click on no control', () => fireEvent.click(region)],
+    ];
+    for (const [way, stop] of stops) {
+      // Playing from segment 2, run on to 7 s inside segment 3, then stopped.
+      pause.mockClear();
+      fireEvent.doubleClick(second);
+      fireEvent(audio, new Event('play'));
+      playheadAt(audio, 7.0);
+      stop();
+      fireEvent(audio, new Event('pause'));
+      expect(pause, way).toHaveBeenCalledTimes(1);
+      expect(audio.currentTime, way).toBe(5.8);
+      expect(third, way).toHaveAttribute('aria-current', 'true');
+      expect(document.activeElement, way).toBe(third);
+    }
+
+    // Space then plays segment 3 from its start.
+    play.mockClear();
+    fireEvent.keyDown(third, { key: ' ' });
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(5.8);
+  });
+
+  it("leaves the player's Play/Pause button and the speakers panel to act as themselves", async () => {
+    // Item 52 (user decision 2026-10-23): a click that lands on a control is not "outside" —
+    // the player and the speakers panel keep working exactly as themselves.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+
+    // Play: plays, and the outside rule adds no stop of its own.
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled();
+
+    // Pause while playing: pauses exactly once — the outside rule does not also stop.
+    fireEvent(audio, new Event('play'));
+    fireEvent.click(within(player).getByRole('button', { name: 'Pause' }));
+    expect(pause).toHaveBeenCalledTimes(1);
+
+    // The speakers panel's name field is a control too: a click into it does not stop playback.
+    fireEvent.click(screen.getByLabelText('Name of speaker 1'));
+    expect(pause).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands focus to the current segment after the player's Play/Pause is pressed", async () => {
+    // Item 52 (user decision 2026-10-23, the user's keyboard trial): the player's button does
+    // not keep focus; it goes to the current segment — so Enter/Space toggles there, and Tab
+    // continues from it. At 0 ms turns.json's segment 1 [0,2100) is current.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const first = screen.getByRole('button', { name: 'Good morning.' });
+
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(first);
+
+    // With focus there, the keys toggle what is playing.
+    fireEvent(audio, new Event('play'));
+    fireEvent.keyDown(document.activeElement!, { key: ' ' });
+    expect(pause).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the current segment's Edit control only while nothing plays", async () => {
+    // Item 52 (user decision 2026-10-23): while playing, no control shows, so nothing moves
+    // under the pointer; while nothing plays, the control sits right after the current segment.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const first = screen.getByRole('button', { name: 'Good morning.' });
+    const third = screen.getByRole('button', { name: 'Happy to be here.' });
+    const edit = () => screen.queryByRole('button', { name: 'Edit segment' });
+
+    // Not playing, at 0 ms: segment 1 is current and carries the control.
+    expect(first.parentElement).toContainElement(edit());
+
+    // Playing: none anywhere, nor as the playhead runs on.
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    fireEvent(audio, new Event('play'));
+    expect(edit()).not.toBeInTheDocument();
+    playheadAt(audio, 6.0);
+    expect(edit()).not.toBeInTheDocument();
+
+    // Paused again: the control returns, after the current segment (segment 3).
+    fireEvent.click(within(player).getByRole('button', { name: 'Pause' }));
+    fireEvent(audio, new Event('pause'));
+    expect(third).toHaveAttribute('data-active');
+    expect(third.parentElement).toContainElement(edit());
+  });
+
+  it('moves the staging focus between segments with the arrow keys, without playing', async () => {
+    // Item 52 (user decision 2026-10-23): with focus on a segment the arrows step to the
+    // previous (Left/Up) or next (Right/Down) segment, skipping the current one's control;
+    // creating the staging focus is a scroll away (the user's trial), so following stops.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const first = screen.getByRole('button', { name: 'Good morning.' });
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const third = screen.getByRole('button', { name: 'Happy to be here.' });
+    first.focus();
+    // The current segment (segment 1, at 0 ms, not playing) has its control right after it.
+    expect(screen.getByRole('button', { name: 'Edit segment' })).toBeInTheDocument();
+
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(second);
+    fireEvent.keyDown(second, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(third);
+    fireEvent.keyDown(third, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(second);
+    fireEvent.keyDown(second, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(first);
+
+    // Nothing played or seeked, and the first step (focus onto a segment that is not current)
+    // counted as a scroll away, so following stopped.
+    expect(audio.currentTime).toBe(0);
+    expect(backButton()).toBeInTheDocument();
+  });
+
+  it('stops the autoscroll when a staging focus is created', async () => {
+    // Discovered in the user's trial (2026-10-23): focus put on a segment that is not current
+    // — Tab, or an arrow key — is a scroll away by hand, so the follow autoscroll stops.
+    const scrollIntoView = stubScrollIntoView();
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    // Following scrolled the current segment into view at load, and again at segment 3.
+    playheadAt(audio, 6.0);
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+
+    // Staging focus on segment 4 (segment 3 is current): following stops. A raw focus() needs
+    // act(), as React re-renders from the focus event it causes.
+    act(() => fourth.focus());
+    expect(backButton()).toBeInTheDocument();
+
+    // The playhead runs into segment 4: nothing scrolls for it any more.
+    playheadAt(audio, 10.0);
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes a segment that shares its start with the next current when it is clicked', async () => {
+    // User report 2026-10-23 (a song's refrain): whisper can emit a segment at the same start as
+    // the next one, and the last-starting rule then skipped it — it could be focused but never
+    // chosen. The chosen segment wins at its own instant, and the playhead leaving its start
+    // hands over to the next.
+    const sharedStart = {
+      ...turnsFixture,
+      turns: turnsFixture.turns.map((turn) =>
+        turn.startMs === 9600
+          ? {
+              ...turn,
+              segments: [
+                // The duplicate: zero length, at the next segment's start.
+                { id: 5, startMs: 9600, endMs: 9600, text: 'Ghosted by the bar' },
+                ...turn.segments,
+              ],
+            }
+          : turn,
+      ),
+    };
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(sharedStart)));
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const duplicate = screen.getByRole('button', { name: 'Ghosted by the bar' });
+    const next = screen.getByRole('button', { name: "Let's start with your background." });
+
+    fireEvent.click(duplicate);
+    expect(audio.currentTime).toBe(9.6);
+    expect(duplicate).toHaveAttribute('data-active');
+    expect(next).not.toHaveAttribute('data-active');
+    expect(duplicate.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
+
+    // Playing it, the next segment takes over as soon as the playhead leaves 9.6 s.
+    fireEvent.keyDown(duplicate, { key: 'Enter' });
+    fireEvent(audio, new Event('play'));
+    playheadAt(audio, 9.7);
+    expect(next).toHaveAttribute('data-active');
+    expect(duplicate).not.toHaveAttribute('data-active');
+  });
+
+  it('keeps a clicked segment current when the browser confirms the seek to its start', async () => {
+    // CI 2026-10-24: a click on the segment starting at 32760 ms seeks the audio to 32.76 s, and
+    // the browser's `seeked` then reports 32.76 s — 32759.999999999996 ms once multiplied, before
+    // the segment's start — so the previous segment became current and the Edit and Play
+    // controls moved to it.
+    const atAnInexactStart: Turns = {
+      ...turnsFixture,
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 24600,
+          endMs: 40080,
+          text: 'Ask not what your country can do for you. Ask what you can do.',
+          segments: [
+            {
+              id: 1,
+              startMs: 24600,
+              endMs: 32760,
+              text: 'Ask not what your country can do for you.',
+              edited: false,
+            },
+            { id: 2, startMs: 32760, endMs: 40080, text: 'Ask what you can do.', edited: false },
+          ],
+        },
+      ],
+    };
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(atAnInexactStart)));
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const clicked = await screen.findByRole('button', { name: 'Ask what you can do.' });
+    const previous = screen.getByRole('button', {
+      name: 'Ask not what your country can do for you.',
+    });
+
+    fireEvent.click(clicked);
+    fireEvent(audio, new Event('seeked'));
+
+    expect(clicked).toHaveAttribute('data-active');
+    expect(previous).not.toHaveAttribute('data-active');
+    expect(clicked.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
+  });
+
+  it('shows a segment with no text as a grayed-out [empty] that can be chosen', async () => {
+    // User decision 2026-10-23 (a song whisper could not render): a text-less segment gets a
+    // grayed-out placeholder in the view so it is not a hole in the text; it stays clickable and
+    // choosable, so a missed phrase can be typed in later, and the placeholder never reaches the
+    // downloads — those render the stored text.
+    const blankTurn = {
+      ...turnsFixture,
+      turns: turnsFixture.turns.map((turn) =>
+        turn.startMs === 5800
+          ? { ...turn, segments: turn.segments.map((segment) => ({ ...segment, text: '   ' })) }
+          : turn,
+      ),
+    };
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(blankTurn)));
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const empty = screen.getByRole('button', { name: '[empty]' });
+    expect(getComputedStyle(empty).color).toBe(asRgb(lightTheme.colors.textMuted));
+
+    fireEvent.click(empty);
+    expect(audio.currentTime).toBe(5.8);
+    expect(empty).toHaveAttribute('data-active');
+    expect(empty.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Edit segment' }),
+    );
+    const txt = screen.getByRole('link', { name: 'Download transcript (txt)' });
+    expect(txt).toHaveAttribute('href', '/api/tasks/3/transcript?format=txt');
+  });
+
+  it("opens a segment's text in an inline editor and shows the saved edit in place", async () => {
+    // Item 52: the current segment's Edit control opens a textarea in the segment's place,
+    // pre-filled with its stored text; Save sends it and the view shows the answer's turns —
+    // no /turns refetch (the default handler would answer the old text).
+    const editedTurns = turnsWithSegmentTwo('Thanks, everyone.');
+    const sent: unknown[] = [];
+    server.use(
+      http.put('/api/tasks/:id/segments/:segmentId', async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json(editedTurns);
+      }),
+    );
+    await renderTranscript('3');
+    fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
+
+    const editor = screen.getByLabelText('Segment text');
+    expect(editor).toHaveValue('Thanks for joining us today.');
+    fireEvent.change(editor, { target: { value: 'Thanks, everyone.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(sent).toEqual([{ text: 'Thanks, everyone.' }]));
+    expect(await screen.findByRole('button', { name: 'Thanks, everyone.' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument();
+  });
+
+  it('takes no newlines in the editor: Enter saves, Shift+Enter does nothing, a pasted break is a space', async () => {
+    // User decision 2026-10-23 after trying the editor: one line only. Enter and Ctrl+Enter
+    // save, Shift+Enter does nothing, and a line break in typed or pasted text becomes a space.
+    const editedTurns = turnsWithSegmentTwo('Thanks, everyone.');
+    const sent: unknown[] = [];
+    server.use(
+      http.put('/api/tasks/:id/segments/:segmentId', async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json(editedTurns);
+      }),
+    );
+    await renderTranscript('3');
+
+    const editor = openSegmentEditor('Thanks for joining us today.');
+
+    // Shift+Enter: no save, no change, still open.
+    fireEvent.keyDown(editor, { key: 'Enter', shiftKey: true });
+    expect(screen.getByLabelText('Segment text')).toHaveValue('Thanks for joining us today.');
+    expect(sent).toEqual([]);
+
+    // A pasted line break becomes a space.
+    fireEvent.change(editor, { target: { value: 'Thanks,\neveryone.' } });
+    expect(editor).toHaveValue('Thanks, everyone.');
+
+    // Enter saves and closes.
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    await waitFor(() => expect(sent).toEqual([{ text: 'Thanks, everyone.' }]));
+    expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument();
+
+    // Ctrl+Enter saves too (the view now shows the answer's text).
+    const again = openSegmentEditor('Thanks, everyone.');
+    fireEvent.change(again, { target: { value: 'Thanks again.' } });
+    fireEvent.keyDown(again, { key: 'Enter', ctrlKey: true });
+    await waitFor(() => expect(sent).toHaveLength(2));
+  });
+
+  it('closes the editor on Discard or Escape without saving, and a click outside leaves it open', async () => {
+    // User decisions 2026-10-23: Discard and Escape abandon the draft (nothing stored, no
+    // request); any other click — even one that lands on no control — leaves the editor and its
+    // draft alone, so typing is not lost by a stray click.
+    const sent: unknown[] = [];
+    server.use(
+      http.put('/api/tasks/:id/segments/:segmentId', async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json(turnsFixture);
+      }),
+    );
+    await renderTranscript('3');
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    const stored = 'Thanks for joining us today.';
+
+    // Discard: the stored text stays, the editor closes, no request.
+    const editor = openSegmentEditor(stored);
+    fireEvent.change(editor, { target: { value: 'Half-typed thought' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: stored })).toBeInTheDocument();
+    expect(sent).toEqual([]);
+
+    // A click on the region's own area keeps the editor and its draft open.
+    const again = openSegmentEditor(stored);
+    fireEvent.change(again, { target: { value: 'Still typing' } });
+    fireEvent.click(region);
+    expect(screen.getByLabelText('Segment text')).toHaveValue('Still typing');
+
+    // Escape abandons the draft from inside the field.
+    fireEvent.keyDown(again, { key: 'Escape' });
+    expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: stored })).toBeInTheDocument();
+    expect(sent).toEqual([]);
+  });
+
+  it("puts the player's Play/Pause under the editor's dialog, disabled", async () => {
+    // User decision 2026-10-23: playback cannot start under an unfinished edit. The dialog's
+    // modal page puts the player out of reach; its button also stays disabled (item 52) for any
+    // path that ignores the shade.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
+
+    expect(within(player).queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+    const button = required(player.querySelector('button'));
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(play).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(within(player).getByRole('button', { name: 'Play' })).toBeEnabled();
+  });
+
+  it("names the edited segment in the dialog's title: its speaker and time range", async () => {
+    // The user's review 2026-10-23: the dialog says which segment it edits.
+    await renderTranscript('3');
+    openSegmentEditor('Thanks for joining us today.');
+    // turns.json: segment 2 (Speaker 1) is [2400,5200) — "00:02–00:05".
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Speaker 1 · 00:02–00:05');
+
+    // Speakers off (task 4, turns.speakers-off.json): the range alone; segment 2 is [4100,7900).
+    cleanup();
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskFailed, id: 4, status: 'COMPLETED', speakersMode: 'off' }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('4');
+    openSegmentEditor('And call the dentist on Monday.');
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('00:04–00:07');
+  });
+
+  it("returns focus to the segment's Edit control when the editor closes, the segment still current", async () => {
+    // The user's review 2026-10-23: closing the editor — Save, Discard, Escape (and Revert, the
+    // same path) — puts focus back where it was opened from, on the segment being edited.
+    await renderTranscript('3');
+    const ways: [string, () => void][] = [
+      ['Save', () => fireEvent.click(screen.getByRole('button', { name: 'Save' }))],
+      ['Discard', () => fireEvent.click(screen.getByRole('button', { name: 'Discard' }))],
+      ['Escape', () => fireEvent.keyDown(screen.getByLabelText('Segment text'), { key: 'Escape' })],
+    ];
+    for (const [way, close] of ways) {
+      openSegmentEditor('Thanks for joining us today.');
+      close();
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), {
+        timeout: 2000,
+      });
+      expect(document.activeElement, way).toBe(
+        screen.getByRole('button', { name: 'Edit segment' }),
+      );
+      expect(
+        screen.getByRole('button', { name: 'Thanks for joining us today.' }),
+        way,
+      ).toHaveAttribute('aria-current', 'true');
+    }
+  });
+
+  it('opens the editor with e, plays the segment with p, and saves or discards with Alt or Ctrl and the letter', async () => {
+    // Root review 2026-10-23, the user's shortcuts: e and p act on the focused segment; in the
+    // dialog Alt+S / Alt+D (and Ctrl+S / Ctrl+D, the forms the user also expects) save and
+    // discard, and the buttons underline their letter. turns.json: segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    second.focus();
+
+    // e opens the editor; the controls advertise their keys.
+    expect(screen.getByRole('button', { name: 'Edit segment' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'E',
+    );
+    expect(screen.getByRole('button', { name: 'Play segment' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'P',
+    );
+    fireEvent.keyDown(second, { key: 'e' });
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    const save = within(dialog).getByRole('button', { name: 'Save' });
+    const discard = within(dialog).getByRole('button', { name: 'Discard' });
+    expect(save.querySelector('u')?.textContent).toBe('S');
+    expect(discard.querySelector('u')?.textContent).toBe('D');
+
+    // Ctrl+S saves an unchanged draft (it just closes); Alt+D discards.
+    fireEvent.keyDown(screen.getByLabelText('Segment text'), { key: 's', ctrlKey: true });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    second.focus();
+    fireEvent.keyDown(second, { key: 'e' });
+    fireEvent.keyDown(screen.getByLabelText('Segment text'), { key: 'd', altKey: true });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // p plays the segment on its own; p again stops it.
+    second.focus();
+    fireEvent.keyDown(second, { key: 'p' });
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+    fireEvent(audio, new Event('play'));
+    fireEvent.keyDown(second, { key: 'p' });
+    fireEvent(audio, new Event('pause'));
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+  });
+
+  it('keeps following while the user types in the open editor, so playback still scrolls after it closes', async () => {
+    // Root review 2026-10-23: the dialog's field events still bubble through the React tree into
+    // the transcript region, whose scroll keys treat Space and the arrows as a hand scroll —
+    // following stopped although the user never scrolled, and only showed once the dialog closed.
+    const scrollIntoView = stubScrollIntoView();
+    await renderTranscript('3');
+    const field = openSegmentEditor('Thanks for joining us today.');
+
+    // A space typed and the caret moved with the arrows: neither is a hand scroll.
+    fireEvent.keyDown(field, { key: ' ' });
+    fireEvent.keyDown(field, { key: 'ArrowLeft' });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(
+      screen.queryByRole('button', { name: 'Back to playing position' }),
+    ).not.toBeInTheDocument();
+
+    // Playback still follows: choosing another segment scrolls it into view.
+    scrollIntoView.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: "Let's start with your background." }));
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('operates its segment controls with Enter and Space, Space there not scrolling or stopping follow', async () => {
+    // Root review 2026-10-23: the controls are button-role spans, so they need Enter and Space
+    // themselves; Space on them must not fall into the region's scroll keys, which would stop
+    // follow mode. turns.json: segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    fireEvent.click(second);
+
+    // Enter on Edit opens the editor.
+    const edit = screen.getByRole('button', { name: 'Edit segment' });
+    edit.focus();
+    fireEvent.keyDown(edit, { key: 'Enter' });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText('Segment text'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // Space on Play-segment plays it on its own — and is not a scroll key: following stays on.
+    const preview = screen.getByRole('button', { name: 'Play segment' });
+    preview.focus();
+    fireEvent.keyDown(preview, { key: ' ' });
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+    expect(
+      screen.queryByRole('button', { name: 'Back to playing position' }),
+    ).not.toBeInTheDocument();
+
+    // Enter on Stop (the same control while it plays) stops it back at the segment's start.
+    fireEvent(audio, new Event('play'));
+    const stop = screen.getByRole('button', { name: 'Stop segment' });
+    stop.focus();
+    fireEvent.keyDown(stop, { key: 'Enter' });
+    fireEvent(audio, new Event('pause'));
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+  });
+
+  it('opens the editor as a modal dialog, the page inert and focus kept inside', async () => {
+    // The user's review 2026-10-23: the editor is a modal dialog — the page under the shade does
+    // not answer, does not scroll, and focus stays inside until it closes. Radix's dialog does
+    // the trapping (as ConfirmDialog does); jsdom sees the structure and the focus cycle, the
+    // browser behavior is the e2e test's.
+    await renderTranscript('3');
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    const field = openSegmentEditor('Thanks for joining us today.');
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toContainElement(field);
+    // Portalled out of the page, which the modal keeps out of reach.
+    expect(region).not.toContainElement(dialog);
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    // Tab wraps: from the last control to the field, and Shift+Tab from the field to the last.
+    const last = within(dialog).getByRole('button', { name: 'Discard' });
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(field);
+    fireEvent.keyDown(field, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+
+    // Escape closes it: the draft is gone and the page answers again.
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it("offers Revert only for an edited segment and brings whisper's text back in place", async () => {
+    // ADR 0061: the turns say whether a segment differs from whisper's line; Revert posts to the
+    // revert route and the view applies the answer in place, no /turns refetch.
+    const editedTurns = turnsWithSegmentTwo('Corrected sentence.');
+    const reverted: string[] = [];
+    server.use(
+      http.get('/api/tasks/:id/turns', () => HttpResponse.json(editedTurns)),
+      http.post('/api/tasks/:id/segments/:segmentId/revert', ({ params }) => {
+        reverted.push(String(params.segmentId));
+        return HttpResponse.json(turnsFixture);
+      }),
+    );
+    await renderTranscript('3');
+
+    // An unedited segment's editor offers no Revert.
+    fireEvent.click(screen.getByRole('button', { name: 'Happy to be here.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
+    expect(screen.queryByRole('button', { name: 'Revert' })).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText('Segment text'), { key: 'Escape' });
+
+    // The edited one does: the answer's text replaces it in place and the editor closes.
+    fireEvent.click(screen.getByRole('button', { name: 'Corrected sentence.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revert' }));
+    await waitFor(() => expect(reverted).toEqual(['2']));
+    expect(
+      await screen.findByRole('button', { name: 'Thanks for joining us today.' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument();
+  });
+
+  it('closes without a request when the save would store the text the editor opened with', async () => {
+    // User rule 2026-10-23: an unchanged draft is not a save — Save, Enter and Ctrl+Enter close
+    // the editor and send nothing; whitespace-only changes count as unchanged (both trimmed).
+    const sent: unknown[] = [];
+    server.use(
+      http.put('/api/tasks/:id/segments/:segmentId', async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json(turnsFixture);
+      }),
+    );
+    await renderTranscript('3');
+
+    // Save, untouched: closes, nothing sent.
+    openSegmentEditor('Thanks for joining us today.');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument());
+    expect(sent).toEqual([]);
+
+    // Whitespace around the same text is the same save: Enter closes, nothing sent.
+    const editor = openSegmentEditor('Thanks for joining us today.');
+    fireEvent.change(editor, { target: { value: '  Thanks for joining us today.  ' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+    expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument();
+    expect(sent).toEqual([]);
+  });
+
+  it('keeps the draft open and shows the error when the save is rejected', async () => {
+    // Item 52: a rejected edit stores nothing; the editor stays with its draft and the server's
+    // detail, so the text can be fixed and saved again.
+    server.use(
+      http.put('/api/tasks/:id/segments/:segmentId', () =>
+        HttpResponse.json(
+          {
+            error: 'invalid-segment-text',
+            message:
+              'segment text must not be empty, whitespace-only or contain control characters',
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    await renderTranscript('3');
+    fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
+    const editor = screen.getByLabelText('Segment text');
+    fireEvent.change(editor, { target: { value: 'A rejected line' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('segment text must not be empty');
+    expect(screen.getByLabelText('Segment text')).toHaveValue('A rejected line');
+
+    // Closing without saving keeps the stored text.
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(
+      screen.getByRole('button', { name: 'Thanks for joining us today.' }),
+    ).toBeInTheDocument();
+  });
+
+  it("plays exactly one segment window from the current segment's Play-segment control", async () => {
+    // Item 52: isolated playback — from the segment's start, stopping at its end, not playing on
+    // into the next segment. turns.json: segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play segment' }));
     expect(audio.currentTime).toBe(2.4);
     expect(play).toHaveBeenCalledTimes(1);
 
-    // The highlight moved to the sought segment.
-    expect(document.querySelector('[data-active]')?.textContent).toContain(
-      'Thanks for joining us today.',
+    // Inside the window nothing stops it.
+    playheadAt(audio, 5.0);
+    expect(pause).not.toHaveBeenCalled();
+
+    // At the segment's end it stops by itself.
+    playheadAt(audio, 5.2);
+    expect(pause).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops a segment played on its own at its end back at its start, the segment still current', async () => {
+    // The user's review 2026-10-23: a segment played on its own is stopped, not paused, at its
+    // end — the playhead goes back to its start and the next segment never becomes current.
+    // turns.json: segment 2 is [2400,5200), segment 3 starts at 5800. timeupdate fires
+    // coarsely, so the first one past the end can already lie inside segment 3.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const third = screen.getByRole('button', { name: 'Happy to be here.' });
+    fireEvent.click(second);
+    fireEvent.click(screen.getByRole('button', { name: 'Play segment' }));
+    fireEvent(audio, new Event('play'));
+
+    playheadAt(audio, 5.9);
+    fireEvent(audio, new Event('pause'));
+
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+    expect(second).toHaveAttribute('aria-current', 'true');
+    expect(third).not.toHaveAttribute('aria-current');
+    expect(second.parentElement).toContainElement(
+      screen.getByRole('button', { name: 'Play segment' }),
     );
+  });
+
+  it('pauses a segment played on its own in place on Space, Enter or the player, and still stops it at its end', async () => {
+    // The user's Pause/Stop model 2026-10-23: a Pause holds the playhead where it is, and resuming
+    // finishes the segment on its own, stopping at its end back at its start.
+    // turns.json: segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    fireEvent.click(second);
+
+    const pauses: [string, () => void][] = [
+      ['Space on the segment', () => fireEvent.keyDown(second, { key: ' ' })],
+      ['Enter on the segment', () => fireEvent.keyDown(second, { key: 'Enter' })],
+      ["the player's button", () => fireEvent.click(within(player).getByRole('button'))],
+    ];
+    for (const [way, toggle] of pauses) {
+      pause.mockClear();
+      playOnItsOwnUntil(audio, 3.6);
+      toggle();
+      fireEvent(audio, new Event('pause'));
+      expect(pause, way).toHaveBeenCalledTimes(1);
+      expect(audio.currentTime, way).toBe(3.6);
+      expect(second, way).toHaveAttribute('aria-current', 'true');
+
+      // Resumed in place, it still stops at the segment's end, back at its start.
+      toggle();
+      fireEvent(audio, new Event('play'));
+      expect(audio.currentTime, way).toBe(3.6);
+      playheadAt(audio, 5.3);
+      fireEvent(audio, new Event('pause'));
+      expect(pause, way).toHaveBeenCalledTimes(2);
+      expect(audio.currentTime, way).toBe(2.4);
+      expect(second, way).toHaveAttribute('aria-current', 'true');
+    }
+  });
+
+  it('stops a segment played on its own on Escape or a click on no control, back at its start', async () => {
+    // The user's Pause/Stop model 2026-10-23: a Stop ends playback at the segment's start, the
+    // segment still current, so Space then plays it from its beginning — the way a click on a
+    // segment seeks to its start. turns.json: segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const region = screen.getByRole('region', { name: 'Transcript' });
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    fireEvent.click(second);
+
+    const stops: [string, () => void][] = [
+      ['Escape', () => fireEvent.keyDown(region, { key: 'Escape' })],
+      ['a click on no control', () => fireEvent.click(region)],
+    ];
+    for (const [way, stop] of stops) {
+      pause.mockClear();
+      playOnItsOwnUntil(audio, 3.6);
+      stop();
+      fireEvent(audio, new Event('pause'));
+      expect(pause, way).toHaveBeenCalledTimes(1);
+      expect(audio.currentTime, way).toBe(2.4);
+      expect(second, way).toHaveAttribute('aria-current', 'true');
+    }
+
+    // Space then plays the segment from its beginning.
+    play.mockClear();
+    fireEvent.keyDown(second, { key: ' ' });
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+  });
+
+  it('ends playing a segment on its own when another segment is chosen or the player seeks', async () => {
+    // Confirmed 2026-10-23: choosing another segment or seeking ends a segment played on its own;
+    // playback goes on as an ordinary play, so the old segment's end (5200 ms) no longer stops
+    // it. turns.json: segment 2 is [2400,5200), segment 4 starts at 9600; one second back from
+    // 3 s on the seek bar is 2 s, inside segment 1.
+    await renderTranscript('3');
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    const ways: [string, () => void, number][] = [
+      ['a click on segment 4', () => fireEvent.click(fourth), 10.0],
+      ['a double-click on segment 4', () => fireEvent.doubleClick(fourth), 10.0],
+      ['Enter on segment 4', () => fireEvent.keyDown(fourth, { key: 'Enter' }), 10.0],
+      [
+        'the seek bar',
+        () =>
+          fireEvent.keyDown(within(player).getByRole('slider', { name: 'Seek' }), {
+            key: 'ArrowLeft',
+          }),
+        5.3,
+      ],
+    ];
+    for (const [way, leave, laterSeconds] of ways) {
+      // Segment 2 played on its own, at 3 s.
+      fireEvent(audio, new Event('pause'));
+      fireEvent.click(second);
+      pause.mockClear();
+      playOnItsOwnUntil(audio, 3.0);
+
+      leave();
+      playheadAt(audio, laterSeconds);
+      expect(pause, way).not.toHaveBeenCalled();
+      expect(audio.currentTime, way).toBe(laterSeconds);
+    }
+  });
+
+  it("turns the editor's preview into a Stop while the segment plays, keeping focus and the caret in the field", async () => {
+    // The user's review 2026-10-23: Play in the dialog plays the segment on its own; while it
+    // plays the same control is a Stop, and Stop — or the segment's end — stops it back at the
+    // segment's start. Focus never leaves the field, so the user keeps typing. turns.json:
+    // segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const field = openSegmentEditor('Thanks for joining us today.') as HTMLTextAreaElement;
+    fireEvent.change(field, { target: { value: 'Typing while listening' } });
+    field.setSelectionRange(5, 5);
+    const dialog = screen.getByRole('dialog');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Play segment' }));
+    fireEvent(audio, new Event('play'));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+
+    const stop = within(dialog).getByRole('button', { name: 'Stop segment' });
+    expect(stop.querySelector('svg.lucide-square')).not.toBeNull();
+    expect(screen.getByLabelText('Segment text')).toHaveValue('Typing while listening');
+    expect(document.activeElement).toBe(field);
+    expect(field.selectionStart).toBe(5);
+
+    // Stop: back at the segment's start, the dialog and the draft still there, Play again.
+    fireEvent.click(stop);
+    fireEvent(audio, new Event('pause'));
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+    expect(document.activeElement).toBe(field);
+    expect(field.selectionStart).toBe(5);
+    expect(within(dialog).getByRole('button', { name: 'Play segment' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Segment text')).toHaveValue('Typing while listening');
+
+    // The segment's end is a Stop too, with the dialog and the draft open throughout.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Play segment' }));
+    fireEvent(audio, new Event('play'));
+    playheadAt(audio, 5.3);
+    fireEvent(audio, new Event('pause'));
+    expect(audio.currentTime).toBe(2.4);
+    expect(screen.getByLabelText('Segment text')).toHaveValue('Typing while listening');
+  });
+
+  it('shows a square Stop and a disabled Edit while a segment plays on its own', async () => {
+    // The user's review 2026-10-23, choice (a): while a segment plays on its own its Play-segment
+    // control is a Stop (a square), and Edit stays beside it disabled — grayed out, not clickable
+    // — so the Stop keeps the Play control's place. Stop is a Stop: back at the segment's start.
+    // turns.json: segment 2 is [2400,5200).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const second = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    fireEvent.click(second);
+    playOnItsOwnUntil(audio, 3.6);
+
+    const stop = screen.getByRole('button', { name: 'Stop segment' });
+    expect(second.parentElement).toContainElement(stop);
+    expect(stop.querySelector('svg.lucide-square')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Play segment' })).not.toBeInTheDocument();
+    const edit = screen.getByRole('button', { name: 'Edit segment' });
+    expect(edit).toHaveAttribute('aria-disabled', 'true');
+    expect(getComputedStyle(edit).color).toBe(asRgb(lightTheme.colors.textMuted));
+    fireEvent.click(edit);
+    expect(screen.queryByLabelText('Segment text')).not.toBeInTheDocument();
+
+    fireEvent.click(stop);
+    fireEvent(audio, new Event('pause'));
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(2.4);
+    expect(second).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: 'Play segment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit segment' })).not.toHaveAttribute(
+      'aria-disabled',
+    );
+  });
+
+  it('keeps the editor and its draft open while its own preview plays the segment', async () => {
+    // User decision 2026-10-23: replay a segment to check a word without leaving the editor —
+    // the preview lives in the editor's box, and the draft survives it.
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
+    const editor = screen.getByLabelText('Segment text');
+    fireEvent.change(editor, { target: { value: 'Typing while listening' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play segment' }));
+    expect(audio.currentTime).toBe(2.4);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Segment text')).toHaveValue('Typing while listening');
+  });
+
+  it('skips the silence before the first segment, on playback and on seeking', async () => {
+    // Discovered 2026-10-23: silence before the first segment is unplayable — starting or
+    // seeking into it puts the playhead at the first segment's start, so a current segment
+    // always exists. This transcript's first segment starts at 800 ms.
+    const lateStart = {
+      ...turnsFixture,
+      turns: [
+        {
+          ...turnsFixture.turns[0],
+          startMs: 800,
+          segments: [
+            { id: 1, startMs: 800, endMs: 2100, text: 'Good morning.', edited: false },
+            {
+              id: 2,
+              startMs: 2400,
+              endMs: 5200,
+              text: 'Thanks for joining us today.',
+              edited: false,
+            },
+          ],
+        },
+        turnsFixture.turns[1],
+        turnsFixture.turns[2],
+      ],
+    };
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(lateStart)));
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+
+    // Play pressed in the silence: the player starts at the first segment, which is current.
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    expect(audio.currentTime).toBe(0.8);
+    expect(document.querySelector('[data-active]')?.textContent).toContain('Good morning.');
+    fireEvent(audio, new Event('play'));
+
+    // The seek bar released in the silence: the player lands on the same start.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1185,
+      height: 8,
+      x: 0,
+      y: 0,
+    } as DOMRect);
+    const seek = within(player).getByRole('slider', { name: 'Seek' });
+    const root = required(required(seek.parentElement).parentElement);
+    fireEvent.pointerDown(root, { pointerId: 7, clientX: 0 });
+    fireEvent.pointerUp(root, { pointerId: 7, clientX: 0 });
+    expect(audio.currentTime).toBe(0.8);
+  });
+
+  it('plays the last segment from its start after the audio has ended', async () => {
+    // Discovered 2026-10-23: the media element rewinds to 0 when play() follows its end, so
+    // Space on the still-current last segment would restart the whole clip; it plays that
+    // segment instead. turns.json's last segment is [9600,14250).
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const last = screen.getByRole('button', { name: "Let's start with your background." });
+
+    playheadAt(audio, 15.0); // past the end
+    fireEvent(audio, new Event('ended'));
+    vi.spyOn(audio, 'ended', 'get').mockReturnValue(true);
+    expect(last).toHaveAttribute('data-active');
+
+    last.focus();
+    fireEvent.keyDown(last, { key: ' ' });
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(audio.currentTime).toBe(9.6);
+  });
+
+  it("lets the editor field take the segment's own direction, not the paragraph's", async () => {
+    // User decision 2026-10-23: `dir="auto"` on the field alone makes the browser pick the
+    // direction from the segment's first strong character, whatever the paragraph does; closing
+    // the editor leaves the segment with no direction of its own (the paragraph rule applies
+    // again). jsdom does not resolve auto, so the attribute is what this pins — the browser
+    // check is the e2e journey's.
+    await renderTranscript('3');
+    const field = openSegmentEditor('Thanks for joining us today.');
+    expect(field).toHaveAttribute('dir', 'auto');
+
+    fireEvent.keyDown(field, { key: 'Escape' });
+    const segment = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    expect(segment).not.toHaveAttribute('dir');
+  });
+
+  it("puts focus in the editor's field on opening it, the cursor after the last character", async () => {
+    // The user's review 2026-10-23: pressing Edit must leave the user typing at once, with the
+    // caret at the end of the segment's text — not on the Edit control, and not after the first
+    // character.
+    await renderTranscript('3');
+    const field = openSegmentEditor('Thanks for joining us today.') as HTMLTextAreaElement;
+
+    expect(document.activeElement).toBe(field);
+    expect(field.selectionStart).toBe(field.value.length);
+    expect(field.selectionEnd).toBe(field.value.length);
+  });
+
+  it('marks only the current segment with the fill; a staging focus adds no mark of its own', async () => {
+    // Item 52, the user's trial model: one filled highlight (the playhead's segment); focus on
+    // another segment is only the browser's focus ring — no fill, no second frame of ours.
+    await renderTranscript('3');
+    const first = screen.getByRole('button', { name: 'Good morning.' });
+    const fourth = screen.getByRole('button', { name: "Let's start with your background." });
+
+    fourth.focus();
+    expect(fourth).not.toHaveAttribute('data-active');
+    expect(getComputedStyle(fourth).backgroundColor).not.toBe(asRgb(lightTheme.colors.accent));
+    expect(first).toHaveAttribute('data-active');
+    expect(getComputedStyle(first).backgroundColor).toBe(asRgb(lightTheme.colors.accent));
+    // The current segment carries no outline of ours either: the fill is the only mark.
+    expect(getComputedStyle(first).outlineStyle).not.toBe('solid');
+  });
+
+  it("keeps the current segment's Edit control in the text line: inline, unpadded, its icon no taller than the text", async () => {
+    // User report (item 52): a button box taller than the text raised the line height. An
+    // inline box in the segment's own font is exactly the highlight's height; jsdom has no
+    // layout, so this checks the styles that give it, and e2e spec 52 measures the result.
+    await renderTranscript('3');
+    fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
+
+    const edit = screen.getByRole('button', { name: 'Edit segment' });
+    expect(getComputedStyle(edit).display).toBe('inline');
+    expect(getComputedStyle(edit).paddingTop).toBe('0px');
+    expect(getComputedStyle(edit).paddingBottom).toBe('0px');
+    const icon = required(edit.querySelector('svg'));
+    expect(Number.parseFloat(getComputedStyle(icon).height)).toBeLessThanOrEqual(
+      Number.parseFloat(px(lightTheme.fontSizes.body)),
+    );
+  });
+
+  it("keeps the Edit control a word space apart from its segment's frame", async () => {
+    // User report (item 52): the pencil touched the frame drawn around the segment. A left
+    // margin of the theme's smallest spacing (0.25rem, about a word space) parts them; a margin,
+    // not padding, so the control's hover and focus boxes stay around the icon. jsdom has no
+    // layout, so this checks the style that gives the gap.
+    await renderTranscript('3');
+    fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
+
+    const edit = screen.getByRole('button', { name: 'Edit segment' });
+    expect(getComputedStyle(edit).marginLeft).toBe(px(lightTheme.spacing.xs));
+    expect(getComputedStyle(edit).paddingLeft).toBe('0px');
   });
 
   it('flows the segments as one paragraph of text, each still a button that seeks on Enter and Space', async () => {
@@ -220,8 +1592,7 @@ describe('the transcript view', () => {
     const region = screen.getByRole('region', { name: /transcript/i });
 
     // While playing, the active segment is scrolled into view (follow mode).
-    audio.currentTime = 1.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 1.0);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
 
     // A hand scroll stops following: a "Back to playing position" button appears. A wheel
@@ -232,8 +1603,7 @@ describe('the transcript view', () => {
 
     // While stopped, playback no longer scrolls.
     scrollIntoView.mockClear();
-    audio.currentTime = 6.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 6.0);
     expect(scrollIntoView).not.toHaveBeenCalled();
 
     // "Back to playing position" resumes following and scrolls to the current segment.
@@ -248,8 +1618,7 @@ describe('the transcript view', () => {
     const region = screen.getByRole('region', { name: /transcript/i });
 
     // The playhead moves; the follow effect scrolls the active segment into view.
-    audio.currentTime = 1.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 1.0);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
 
     // The old mechanism cleared a setTimeout(0) hold-off flag and then read the view's
@@ -275,8 +1644,7 @@ describe('the transcript view', () => {
     // through all of them (item 36).
     const followCues = [1.0, 6.0, 10.0]; // inside [0,2100), [5800,9100) and [9600,14250).
     for (const [index, cueSeconds] of followCues.entries()) {
-      audio.currentTime = cueSeconds;
-      fireEvent(audio, new Event('timeupdate'));
+      playheadAt(audio, cueSeconds);
       const { promise: tick, resolve: resolveTick } = Promise.withResolvers<void>();
       setTimeout(resolveTick, 0);
       await tick;
@@ -295,19 +1663,16 @@ describe('the transcript view', () => {
 
     // The playhead is moving; the follow effect has fired (so following is active) when
     // the wheel lands on the region mid-follow.
-    audio.currentTime = 1.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 1.0);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    audio.currentTime = 6.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 6.0);
 
     fireEvent.wheel(region);
     expect(backButton()).toBeInTheDocument();
 
     // Stopped stays stopped: the advancing playhead no longer triggers follow scrolls.
     scrollIntoView.mockClear();
-    audio.currentTime = 10.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 10.0);
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
@@ -322,8 +1687,7 @@ describe('the transcript view', () => {
     };
 
     // A plain key does not scroll, so it does not stop following.
-    audio.currentTime = 1.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 1.0);
     fireEvent.keyDown(region, { key: 'a' });
     expect(backButton()).not.toBeInTheDocument();
 
@@ -349,8 +1713,7 @@ describe('the transcript view', () => {
 
     // Following is off; the playhead advancing no longer scrolls.
     scrollIntoView.mockClear();
-    audio.currentTime = 6.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 6.0);
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
@@ -361,16 +1724,14 @@ describe('the transcript view', () => {
     const region = screen.getByRole('region', { name: /transcript/i });
 
     // Play, then a wheel stops following.
-    audio.currentTime = 1.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 1.0);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
     fireEvent.wheel(region);
     expect(backButton()).toBeInTheDocument();
 
     // While stopped, the playhead keeps moving — the highlight follows the playhead even
     // when the view is not scrolling — so the playing segment on resume is not the old one.
-    audio.currentTime = 6.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 6.0);
 
     // Resuming follows again and scrolls to the segment the playhead is in now.
     fireEvent.click(required(backButton()));
@@ -389,8 +1750,7 @@ describe('the transcript view', () => {
     // target's scroll margin for every scrolled ancestor, so the segment's top margin
     // reserves the compact header's height (the text-only header plus its border, all
     // tokens) and keeps it clear of the sticky header (item 31, item 59).
-    audio.currentTime = 1.0;
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 1.0);
     const active = required(document.querySelector('[data-active]'));
     expect(getComputedStyle(active).scrollMarginTop).toBe(
       `${
@@ -712,19 +2072,16 @@ describe('the transcript view', () => {
       ],
     };
     let isMerged = false;
-    let turnsRequests = 0;
-    server.use(
-      http.get('/api/tasks/:id/turns', () => {
-        turnsRequests += 1;
-        return HttpResponse.json(isMerged ? merged : turnsFixture);
-      }),
-    );
+    const turnsRequests = countTurnsRequests(() => (isMerged ? merged : turnsFixture));
     const events = controllableEventStream();
     await renderTranscript('3'); // task 3 is COMPLETED; turns.json has speakers 0 and 1.
     const transcript = await screen.findByRole('region', { name: 'Transcript' });
     const panel = screen.getByRole('region', { name: 'Speakers' });
-    expect(turnsRequests).toBe(1);
+    expect(turnsRequests()).toBe(1);
 
+    // Another task's rename comes first and must change nothing here; the stream keeps its
+    // order, so once this task's rename shows, the other was applied.
+    events.send('speakers-renamed', { id: 5, speakers: [{ speakerId: 0, speaker: 'Zoe' }] });
     // A rename elsewhere: its names land in the panel and every turn, with no refetch.
     events.send('speakers-renamed', {
       id: 3,
@@ -735,11 +2092,8 @@ describe('the transcript view', () => {
     });
     await waitFor(() => expect(within(transcript).getAllByText('Alice')).toHaveLength(2));
     expect(within(panel).getByRole('textbox', { name: 'Name of speaker 1' })).toHaveValue('Alice');
-    expect(turnsRequests).toBe(1);
-
-    // Another task's event changes nothing here.
-    events.send('speakers-renamed', { id: 5, speakers: [{ speakerId: 0, speaker: 'Zoe' }] });
     expect(within(transcript).queryByText('Zoe')).not.toBeInTheDocument();
+    expect(turnsRequests()).toBe(1);
 
     // A merge elsewhere: turns can join, so the view reads /turns again.
     isMerged = true;
@@ -747,9 +2101,65 @@ describe('the transcript view', () => {
     await waitFor(() =>
       expect(within(transcript).queryByText('Speaker 2')).not.toBeInTheDocument(),
     );
-    expect(turnsRequests).toBe(2);
+    expect(turnsRequests()).toBe(2);
     expect(within(transcript).getAllByText('Alice')).toHaveLength(1);
     expect(within(panel).getByRole('button', { name: 'Reset all merges' })).toBeInTheDocument();
+  });
+
+  it('applies a segment-edited event to the open view in place, without refetching /turns', async () => {
+    // Item 52 (docs/api/segment-edited.json shape): a stored edit names its task and the one
+    // segment it changed.
+    const turnsRequests = countTurnsRequests();
+    const events = controllableEventStream();
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json's segment 2 is "Thanks for joining us today."
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    expect(await within(transcript).findByText('Thanks for joining us today.')).toBeInTheDocument();
+    expect(turnsRequests()).toBe(1);
+
+    // Another task's edit of a segment with the same id comes first and must change nothing
+    // here; the stream keeps its order, so once this task's edit shows, the other was applied.
+    events.send('segment-edited', {
+      id: 5,
+      segment: { id: 2, startMs: 2400, endMs: 5200, text: 'Not this transcript.' },
+    });
+    events.send('segment-edited', {
+      id: 3,
+      segment: { id: 2, startMs: 2400, endMs: 5200, text: 'Thanks for joining us, everyone.' },
+    });
+
+    expect(
+      await within(transcript).findByText('Thanks for joining us, everyone.'),
+    ).toBeInTheDocument();
+    expect(within(transcript).queryByText('Thanks for joining us today.')).not.toBeInTheDocument();
+    expect(within(transcript).queryByText('Not this transcript.')).not.toBeInTheDocument();
+    // The rest is as loaded: the turn's other segment and the next turn.
+    expect(within(transcript).getByText('Good morning.')).toBeInTheDocument();
+    expect(within(transcript).getByText('Happy to be here.')).toBeInTheDocument();
+    expect(turnsRequests()).toBe(1);
+  });
+
+  it('shows both of two segment edits of the open transcript that arrive in one stream chunk', async () => {
+    // Discovered in item 52: one network read can carry several events, which EventSource
+    // then dispatches before the page renders again; an edit of one segment must not hide an
+    // edit of another. turns.json's segments 1 and 2 are task 3's first turn.
+    const events = controllableEventStream();
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    expect(await within(transcript).findByText('Good morning.')).toBeInTheDocument();
+
+    events.sendTogether([
+      [
+        'segment-edited',
+        { id: 3, segment: { id: 1, startMs: 0, endMs: 2100, text: 'Good morning, all.' } },
+      ],
+      [
+        'segment-edited',
+        { id: 3, segment: { id: 2, startMs: 2400, endMs: 5200, text: 'Thanks for coming.' } },
+      ],
+    ]);
+
+    expect(await within(transcript).findByText('Thanks for coming.')).toBeInTheDocument();
+    expect(within(transcript).getByText('Good morning, all.')).toBeInTheDocument();
   });
 
   it('resets a speaker name from the panel: "Speaker N" comes back in the field and every turn', async () => {
@@ -818,6 +2228,28 @@ describe('the transcript loading states', () => {
     release();
     expect(await screen.findByText('Good morning.')).toBeInTheDocument();
     expect(screen.queryByText('Loading transcript…')).not.toBeInTheDocument();
+  });
+
+  it('shows an edit that arrived while the transcript was loading, once it has loaded', async () => {
+    // Discovered in item 52: the /turns read ran before an edit was stored elsewhere, and the
+    // edit's event arrives while that answer is still on its way, so the answer holds the old
+    // text. Mock addition: /turns pushes the event, lets the stream deliver it (one macrotask),
+    // then answers turns.json, whose segment 2 is "Thanks for joining us today."
+    const events = controllableEventStream();
+    server.use(
+      http.get('/api/tasks/:id/turns', async () => {
+        events.send('segment-edited', {
+          id: 3,
+          segment: { id: 2, startMs: 2400, endMs: 5200, text: 'Thanks for joining us, everyone.' },
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return HttpResponse.json(turnsFixture);
+      }),
+    );
+    await renderTranscript('3');
+
+    expect(await screen.findByText('Thanks for joining us, everyone.')).toBeInTheDocument();
+    expect(screen.queryByText('Thanks for joining us today.')).not.toBeInTheDocument();
   });
 });
 
@@ -928,8 +2360,7 @@ describe('the themed player', () => {
     const seek = within(player).getByRole('slider', { name: 'Seek' });
     expect(seek).toHaveAttribute('aria-valuemax', '1185');
     expect(within(player).getByText('00:00 / 19:45')).toBeInTheDocument();
-    audio.currentTime = 6.0; // 6000 ms, inside turn 2 [5800,9100)
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 6.0); // 6000 ms, inside turn 2 [5800,9100)
     expect(seek).toHaveAttribute('aria-valuenow', '6');
     const times = within(player).getByText('00:06 / 19:45');
     expect(getComputedStyle(times).color).toBe(asRgb(lightTheme.colors.textMuted));
@@ -971,8 +2402,7 @@ describe('the themed player', () => {
     vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
     fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
     fireEvent(audio, new Event('play'));
-    audio.currentTime = 6.0; // 6000 ms, inside turn 2 [5800,9100)
-    fireEvent(audio, new Event('timeupdate'));
+    playheadAt(audio, 6.0); // 6000 ms, inside turn 2 [5800,9100)
     expect(seek).toHaveAttribute('aria-valuenow', '6');
 
     // Radix maps clientX to a value via the slider's bounding rect (pointer capture is
@@ -998,8 +2428,7 @@ describe('the themed player', () => {
 
       // Still dragging: the playhead keeps advancing, but the thumb stays on the draft
       // position and the audio is not seeked.
-      audio.currentTime = 6.4;
-      fireEvent(audio, new Event('timeupdate'));
+      playheadAt(audio, 6.4);
       expect(seek).toHaveAttribute('aria-valuenow', '5');
       expect(audio.currentTime).toBe(6.4);
 
@@ -1028,7 +2457,7 @@ describe('times past one hour', () => {
           speakerId: 0,
           startMs: 3661000,
           endMs: 3700000,
-          segments: [{ startMs: 3661000, endMs: 3700000, text: 'A long turn.' }],
+          segments: [{ id: 1, startMs: 3661000, endMs: 3700000, text: 'A long turn.' }],
         },
       ],
     };

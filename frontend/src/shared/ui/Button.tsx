@@ -6,6 +6,8 @@ import { interactiveStates } from './buttonStates';
 import { Spinner } from './Spinner';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger';
+// `md` is the app's action button; `sm` fits inside a line of text (item 52's editor).
+export type ButtonSize = 'md' | 'sm';
 
 // The colours of each variant and its states, all from tokens.
 const variantColors = (theme: ThemeTokens) => ({
@@ -31,15 +33,24 @@ const variantColors = (theme: ThemeTokens) => ({
   },
 });
 
-const ButtonBase = styled.button<{ $variant: ButtonVariant }>`
+const ButtonBase = styled.button<{ $variant: ButtonVariant; $size: ButtonSize }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: ${(props) => props.theme.spacing.sm};
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
+  padding: ${(props) =>
+    props.$size === 'sm'
+      ? `${props.theme.spacing.xs} ${props.theme.spacing.sm}`
+      : `${props.theme.spacing.sm} ${props.theme.spacing.md}`};
   border: ${(props) => props.theme.borderWidths.thin} solid transparent;
   border-radius: ${(props) => props.theme.radii.button};
-  font: inherit;
+  // Typography inherited from around the button, spelled as longhands: a jsdom CSSOM rule
+  // ignores a font-size that follows the font shorthand in one declaration block.
+  font-family: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  line-height: inherit;
+  font-size: ${(props) => (props.$size === 'sm' ? props.theme.fontSizes.small : 'inherit')};
   cursor: pointer;
   background: ${(props) => variantColors(props.theme).background[props.$variant]};
   color: ${(props) => variantColors(props.theme).text[props.$variant]};
@@ -62,6 +73,7 @@ const ButtonBase = styled.button<{ $variant: ButtonVariant }>`
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   children: ReactNode;
 }
@@ -69,7 +81,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // A token-styled action button. `loading` disables the control and flags it busy; the
 // spinner glyph itself arrives with the Spinner primitive.
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'primary', loading = false, disabled, children, ...rest },
+  { variant = 'primary', size = 'md', loading = false, disabled, children, ...rest },
   ref,
 ) {
   return (
@@ -77,6 +89,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type="button"
       $variant={variant}
+      $size={size}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...rest}

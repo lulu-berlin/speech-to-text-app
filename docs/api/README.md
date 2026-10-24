@@ -23,7 +23,8 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 | Snapshot | `snapshot.json` | event `snapshot` (first event of every `/api/events` connection) |
 | Task progress | `task-progress.json`, `task-progress.speakers-off.json` | event `task-progress` |
 | Task deleted | `task-deleted.json` | event `task-deleted` |
-| Turns | `turns.json`, `turns.speakers-off.json` | `GET /api/tasks/{id}/turns` |
+| Turns | `turns.json`, `turns.speakers-off.json` | `GET /api/tasks/{id}/turns`; `200` of `PUT /api/tasks/{id}/segments/{segmentId}` and of `POST /api/tasks/{id}/segments/{segmentId}/revert` (item 52, ADR 0061) |
+| Segment edited event | `segment-edited.json` | event `segment-edited`: the one segment a stored edit changed (item 52) |
 | Speakers | `speakers.json` | `200` of `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge` and `DELETE /api/tasks/{id}/speakers/merges` (item 22) |
 | Speakers event | `speakers-renamed.json`, `speakers-merged.json` | events `speakers-renamed` and `speakers-merged` (item 22) |
 | Heartbeat | `heartbeat.json` | event `heartbeat`: sent after 5 s without any other event; carries no state (item 29, [ADR 0044](../decisions/0044-sse-heartbeat-and-client-watchdog.md)) |

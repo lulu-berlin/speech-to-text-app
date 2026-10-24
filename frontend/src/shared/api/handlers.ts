@@ -156,6 +156,32 @@ export const handlers = [
     });
   }),
 
+  // Edit a segment: PUT /api/tasks/{id}/segments/{segmentId} -> 200 turns.json with that
+  // segment's text set to the sent one (item 52). Mock addition: the answer carries the edit,
+  // which the view applies in place; GET /turns keeps serving the fixture, so in dev:mock a
+  // reload shows the original text again.
+  http.put('/api/tasks/:id/segments/:segmentId', async ({ params, request }) => {
+    const segmentId = Number(params.segmentId);
+    const body = (await request.json()) as { text: string };
+    return HttpResponse.json({
+      ...turnsFixture,
+      turns: turnsFixture.turns.map((turn) => ({
+        ...turn,
+        segments: turn.segments.map((segment) =>
+          segment.id === segmentId
+            ? // The mock's fixture is whisper's text, so any different text is an edit (ADR 0061).
+              { ...segment, text: body.text, edited: body.text !== segment.text }
+            : segment,
+        ),
+      })),
+    });
+  }),
+
+  // Revert a segment: POST /api/tasks/{id}/segments/{segmentId}/revert -> 200 turns.json
+  // (ADR 0061). Mock addition: the fixture is whisper's text, so it answers turns.json (and
+  // GET /turns keeps serving it, the mock storing no edits).
+  http.post('/api/tasks/:id/segments/:segmentId/revert', () => HttpResponse.json(turnsFixture)),
+
   // Merge speakers: POST /api/tasks/{id}/speakers/merge -> 200 speakers.json, and reset all
   // merges: DELETE /api/tasks/{id}/speakers/merges -> 200 speakers.json. Mock addition
   // (item 22): the examples unchanged; GET /turns stays turns.json, so dev:mock shows the

@@ -2,12 +2,18 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { FOLLOW_CLIP } from '../lib/backend.mjs';
 import { uploadAndOpen } from './helpers/ui';
 
+// The transcript's segments: every element with the button role except the current
+// segment's controls, which carry an aria-label (item 52) where segments do not.
+const SEGMENTS = '[role="button"]:not([aria-label])';
+
 // The index of the highlighted segment among the transcript's segment buttons (-1: none).
 async function activeIndex(region: Locator): Promise<number> {
-  return region.evaluate((element) =>
-    [...element.querySelectorAll('[role="button"]')].findIndex((segment) =>
-      segment.hasAttribute('data-active'),
-    ),
+  return region.evaluate(
+    (element, segments) =>
+      [...element.querySelectorAll(segments)].findIndex((segment) =>
+        segment.hasAttribute('data-active'),
+      ),
+    SEGMENTS,
   );
 }
 
@@ -27,8 +33,8 @@ async function activeInView(region: Locator): Promise<boolean> {
 // The first segment after the highlighted one that starts below the region's visible box
 // — the next content the playhead runs into that following has to scroll to (-1: none).
 async function nextOutOfViewSegment(region: Locator): Promise<number> {
-  return region.evaluate((element) => {
-    const segments = [...element.querySelectorAll('[role="button"]')];
+  return region.evaluate((element, selector) => {
+    const segments = [...element.querySelectorAll(selector)];
     const activeIndex = segments.findIndex((segment) => segment.hasAttribute('data-active'));
     const box = element.getBoundingClientRect();
     return segments.findIndex((segment, index) => {
@@ -37,7 +43,7 @@ async function nextOutOfViewSegment(region: Locator): Promise<number> {
       }
       return segment.getBoundingClientRect().top >= box.bottom - 1;
     });
-  });
+  }, SEGMENTS);
 }
 
 // The audio element's currentTime in seconds. The playhead's progress signal: playback
@@ -104,7 +110,7 @@ test('follow mode: long playback never shows "Back to playing position" without 
   // driven by playback alone. Each round: take the first segment after the highlighted
   // one that is out of view, wait for playback to reach it, and check that following
   // scrolled it into view. A limited number of rounds bounds the run.
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   let scrolled = 0;
   for (let round = 0; round < 4; round += 1) {
     const target = await nextOutOfViewSegment(region);

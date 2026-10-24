@@ -91,13 +91,13 @@ class TurnsSpec :
                                     {
                                       "speakerId": 0, "startMs": 0, "endMs": 3250, "text": "Hello there. again.",
                                       "segments": [
-                                        { "startMs": 0, "endMs": 1500, "text": "Hello there." },
-                                        { "startMs": 1500, "endMs": 3250, "text": "again." }
+                                        { "id": 1, "startMs": 0, "endMs": 1500, "text": "Hello there.", "edited": false },
+                                        { "id": 2, "startMs": 1500, "endMs": 3250, "text": "again.", "edited": false }
                                       ]
                                     },
                                     {
                                       "speakerId": 1, "startMs": 3250, "endMs": 4000, "text": "Fine.",
-                                      "segments": [ { "startMs": 3250, "endMs": 4000, "text": "Fine." } ]
+                                      "segments": [ { "id": 3, "startMs": 3250, "endMs": 4000, "text": "Fine.", "edited": false } ]
                                     }
                                   ]
                                 }
@@ -138,11 +138,11 @@ class TurnsSpec :
                                   "turns": [
                                     {
                                       "speakerId": null, "startMs": 0, "endMs": 1000, "text": "One.",
-                                      "segments": [ { "startMs": 0, "endMs": 1000, "text": "One." } ]
+                                      "segments": [ { "id": 1, "startMs": 0, "endMs": 1000, "text": "One.", "edited": false } ]
                                     },
                                     {
                                       "speakerId": null, "startMs": 1000, "endMs": 2000, "text": "Two.",
-                                      "segments": [ { "startMs": 1000, "endMs": 2000, "text": "Two." } ]
+                                      "segments": [ { "id": 2, "startMs": 1000, "endMs": 2000, "text": "Two.", "edited": false } ]
                                     }
                                   ]
                                 }
@@ -185,9 +185,9 @@ class TurnsSpec :
                                     {
                                       "speakerId": 0, "startMs": 0, "endMs": 3000, "text": "Hi there",
                                       "segments": [
-                                        { "startMs": 0, "endMs": 1000, "text": "Hi" },
-                                        { "startMs": 1000, "endMs": 2000, "text": "" },
-                                        { "startMs": 2000, "endMs": 3000, "text": "there" }
+                                        { "id": 1, "startMs": 0, "endMs": 1000, "text": "Hi", "edited": false },
+                                        { "id": 2, "startMs": 1000, "endMs": 2000, "text": "", "edited": false },
+                                        { "id": 3, "startMs": 2000, "endMs": 3000, "text": "there", "edited": false }
                                       ]
                                     }
                                   ]

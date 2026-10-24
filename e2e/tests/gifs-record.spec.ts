@@ -251,11 +251,15 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       // still has at least 60 px of transcript after it: following scrolls into that rest
       // (the region cannot scroll past its bottom), and the video runs the transcript to its
       // end, so the last segment is the highlighted one when it closes (user: "never shows
-      // the last segment highlighted"). A DOM click seeks there and plays (a Playwright
-      // click would scroll it into view first), and pausing at once leaves it there.
+      // the last segment highlighted"). A DOM double-click plays from there (item 52: a single
+      // click only moves the player; a Playwright double-click would scroll it into view first),
+      // and pausing at once leaves it there. Segments are the button-role elements without an
+      // aria-label: the current segment's controls carry one.
       const deep = await region.evaluate((element) => {
         const box = element.getBoundingClientRect();
-        const segments = [...element.querySelectorAll<HTMLElement>('[role="button"]')];
+        const segments = [
+          ...element.querySelectorAll<HTMLElement>('[role="button"]:not([aria-label])'),
+        ];
         const index = segments.findLastIndex((segment) => {
           const rect = segment.getBoundingClientRect();
           return (
@@ -263,7 +267,7 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
             rect.bottom - box.top <= element.scrollHeight - 60
           );
         });
-        segments[index]?.click();
+        segments[index]?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
         return index;
       });
       expect(deep).toBeGreaterThan(0);
@@ -304,14 +308,14 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       // start — so the video closes on the last highlighted segment with the player at
       // its full duration (user: "it would be nice to see it getting to the end").
       const lastIndex = await region.evaluate(
-        (element) => element.querySelectorAll('[role="button"]').length - 1,
+        (element) => element.querySelectorAll('[role="button"]:not([aria-label])').length - 1,
       );
       await expect
         .poll(
           () =>
             region.evaluate((element) =>
-              [...element.querySelectorAll('[role="button"]')].findIndex((segment) =>
-                segment.hasAttribute('data-active'),
+              [...element.querySelectorAll('[role="button"]:not([aria-label])')].findIndex(
+                (segment) => segment.hasAttribute('data-active'),
               ),
             ),
           { timeout: 60_000 },

@@ -2,12 +2,18 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { PLAYBACK_CLIP } from '../lib/backend.mjs';
 import { uploadAndOpen } from './helpers/ui';
 
+// The transcript's segments: every element with the button role except the current
+// segment's controls, which carry an aria-label (item 52) where segments do not.
+const SEGMENTS = '[role="button"]:not([aria-label])';
+
 // The index of the highlighted segment among the transcript's segment buttons (-1: none).
 async function activeIndex(region: Locator): Promise<number> {
-  return region.evaluate((element) =>
-    [...element.querySelectorAll('[role="button"]')].findIndex((segment) =>
-      segment.hasAttribute('data-active'),
-    ),
+  return region.evaluate(
+    (element, segments) =>
+      [...element.querySelectorAll(segments)].findIndex((segment) =>
+        segment.hasAttribute('data-active'),
+      ),
+    SEGMENTS,
   );
 }
 
@@ -32,18 +38,18 @@ async function activeInView(region: Locator): Promise<boolean> {
 
 // The index of a segment fully visible in the region that is not the highlighted one.
 async function visibleOtherSegment(region: Locator): Promise<number> {
-  return region.evaluate((element) => {
+  return region.evaluate((element, segments) => {
     const box = element.getBoundingClientRect();
-    return [...element.querySelectorAll('[role="button"]')].findIndex((segment) => {
+    return [...element.querySelectorAll(segments)].findIndex((segment) => {
       const rect = segment.getBoundingClientRect();
       return (
         !segment.hasAttribute('data-active') && rect.top >= box.top && rect.bottom <= box.bottom
       );
     });
-  });
+  }, SEGMENTS);
 }
 
-test('playback: the highlight follows seeking and pausing, a click seeks and plays, and follow mode holds', async ({
+test('playback: the highlight follows seeking and pausing, a double-click seeks and plays, and follow mode holds', async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -91,7 +97,7 @@ test('playback: the highlight follows seeking and pausing, a click seeks and pla
   // has caught up it stops changing together with the highlight. The display can render one more
   // timeupdate after the click, so binding the freeze to the element — not to a text read taken right
   // after Pause — is what makes the check race-free (PR #46).
-  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
   const started = await times.textContent();
   await expect.poll(() => times.textContent(), { timeout: 10_000 }).not.toBe(started);
   await page.getByRole('button', { name: 'Pause' }).click();
@@ -105,11 +111,11 @@ test('playback: the highlight follows seeking and pausing, a click seeks and pla
   expect(await activeIndex(region)).toBe(pausedIndex);
   await expect(back).toBeHidden();
 
-  // Clicking a visible segment seeks to it and plays: it becomes the highlighted one, and
-  // the player shows Pause (playing).
+  // Double-clicking a visible segment plays from it (item 52: a single click only moves the
+  // player there): it becomes the highlighted one, and the player shows Pause (playing).
   const target = await visibleOtherSegment(region);
   expect(target).toBeGreaterThanOrEqual(0);
-  await region.getByRole('button').nth(target).click();
+  await region.locator(SEGMENTS).nth(target).dblclick();
   await expect.poll(() => activeIndex(region)).toBe(target);
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
 

@@ -47,6 +47,7 @@ import stt.db.QueueStateRepository
 import stt.db.RenameOutcome
 import stt.db.ScratchDir
 import stt.db.SegmentRepository
+import stt.db.SegmentWriteOutcome
 import stt.db.Settings
 import stt.db.SettingsRepository
 import stt.db.SpeakersMode
@@ -309,6 +310,35 @@ class ProcessingEngine internal constructor(
     ): RenameOutcome {
         val outcome = segments.renameSpeaker(id, speakerId, name)
         if (outcome == RenameOutcome.Renamed) _events.emit(Event.SpeakersRenamed(id, segments.findDiarized(id).speakers))
+        return outcome
+    }
+
+    /**
+     * Stores [text] on segment [segmentId] of task [id] (item 52) and, only once the row is stored, publishes
+     * `segment-edited` with the stored segment, so an open transcript can apply it in place. Returns false (storing
+     * and publishing nothing) when the task has no such segment.
+     */
+    suspend fun editSegment(
+        id: Long,
+        segmentId: Long,
+        text: String,
+    ): SegmentWriteOutcome {
+        val outcome = segments.updateSegmentText(id, segmentId, text)
+        if (outcome is SegmentWriteOutcome.Stored) _events.emit(Event.SegmentEdited(id, outcome.segment))
+        return outcome
+    }
+
+    /**
+     * Puts whisper's original text back on segment [segmentId] of task [id] (ADR 0061) and, once stored, publishes
+     * it as `segment-edited`, so every open view applies it like an edit. A segment the task does not have stores
+     * nothing and publishes nothing.
+     */
+    suspend fun revertSegment(
+        id: Long,
+        segmentId: Long,
+    ): SegmentWriteOutcome {
+        val outcome = segments.revertSegmentText(id, segmentId)
+        if (outcome is SegmentWriteOutcome.Stored) _events.emit(Event.SegmentEdited(id, outcome.segment))
         return outcome
     }
 

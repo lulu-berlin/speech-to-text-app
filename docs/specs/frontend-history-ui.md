@@ -21,8 +21,8 @@ Let the user browse past transcriptions: find a finished task, read its transcri
   - speaker turns with timestamps from `/turns`; each speaker's name shown with **a subtle per-speaker tint** from a speaker palette (tokens added to item 24, light and dark, AA-checked; speaker N uses palette entry N mod palette size); speakers-off transcripts show no labels;
   - download buttons for the three formats: txt, srt and vtt (`GET /api/tasks/{id}/transcript?format=...`); json was dropped ([ADR 0035](../decisions/0035-no-json-download.md));
   - the audio player sourced from `/audio`, with a seek bar (item 24's Slider);
-  - **playback highlight**: while the audio plays, the segment whose `[startMs, endMs)` contains the current time is highlighted inside its turn; nothing in a gap between segments; it follows seeking and pausing;
-  - **click-to-seek**: clicking a segment (or a turn's timestamp) seeks the player to its start **and plays** (decided 2026-10-09);
+  - **playback highlight**: while the audio plays, the segment whose `[startMs, endMs)` contains the current time is highlighted inside its turn; nothing in a gap between segments; it follows seeking and pausing. **Amended 2026-10-23 (item 52):** in a gap the segment just played stays highlighted until the next one starts — the highlight marks item 52's current segment;
+  - **click-to-seek**: clicking a segment (or a turn's timestamp) seeks the player to its start **and plays** (decided 2026-10-09). **Amended 2026-10-23 (item 52, twice the same day — see the log):** a single click on a segment moves the player to its start and so makes it the current segment, without starting playback (while playing, playback goes on from there); playing from a segment's start is a double-click, or Enter/Space on a focused segment that is not the current one — on the current segment Enter/Space pause, or play on from the playhead. **Amended 2026-10-23 (item 52, the Pause/Stop model):** a Pause holds the playhead where it is (the player's Pause button, Enter/Space on the current segment); a Stop ends playback at the current segment's start, which stays current (Escape, a click on no control, the end of a segment played on its own, and its Stop control — while a segment plays on its own, its Play-segment control is a square Stop in the same place, with Edit beside it disabled); choosing another segment or seeking ends playing a segment on its own; the editor itself opens as a **modal dialog** over a shade that covers the whole page (the page inert and not scrolling while it is open, focus trapped inside and returned to the Edit control when it closes);
   - **follow mode**: the highlighted segment is kept in view while playing; scrolling by hand stops following and shows a "Back to playing position" button that resumes it (decided 2026-10-09).
 - **Status page for a FAILED or CANCELED task** (same route; decided 2026-10-09): what happened, e.g. "Failed while transcribing at 12:34" (from `phase` and `transcribedUntilMs`) or "Cancelled while chunking", the error message, **Retry** and **Delete**, and the audio player if `hasAudio`. No transcript.
 - **No audio**: when `hasAudio` is false the player is not rendered; a short note says the task has no audio because it ended before chunking.
@@ -33,7 +33,7 @@ Let the user browse past transcriptions: find a finished task, read its transcri
 
 ## Open questions (answered 2026-10-09)
 - Search/filter? → **Filename search plus status filter, client-side.**
-- Click-to-seek? → **Seeks there and plays.**
+- Click-to-seek? → **Seeks there and plays.** (Amended 2026-10-23 by item 52: the single click seeks without starting playback; the double-click or Enter/Space seeks and plays.)
 - Follow playback? → **Follow until the user scrolls**, with a "Back to playing position" button.
 - Task without audio? → **New Task field `hasAudio`** (item 12 contract change); the player is hidden with a note.
 - FAILED/CANCELED detail? → **A status page** with what happened, the error, Retry, Delete and the audio if stored.
@@ -111,3 +111,20 @@ Approved 2026-10-09 with the spec. Behaviors only; discovered scenarios are appe
   programmatic scroll. The native `<audio controls>` player is the accepted seek/playback control;
   the Slider-seek-bar question is open on item 25. Spec and final test list moved here from
   `roadmap/15-frontend-history-ui.md`.
+- 2026-10-23 (item 52, user decision): the single click on a segment selects it (item 52's segment
+  controls) instead of seeking; seeking and playing from a segment moves to a double-click or
+  Enter/Space. The Proposal and the answered question above carry the amendment; the ticked test
+  item "Clicking a segment seeks the player to its start and plays" is history, and the unit test
+  behind it now asserts the click selects without seeking (`TaskTranscriptView.test.tsx`).
+- 2026-10-23 (item 52, user decision): the playback highlight keeps the segment just played
+  through a gap until the next segment starts (it marks item 52's current segment); the Proposal
+  bullet carries the amendment, the ticked "in a gap between segments none is" item is history,
+  and its test now asserts the kept highlight.
+- 2026-10-23 (item 52, user decision, later the same day): the single click moves the player to
+  the segment's start again — making it item 52's current segment — but does not start
+  playback (it goes on if it was playing); item 52's separate selection is gone. The Proposal
+  bullet and the answered question carry the new wording; the unit test asserts the seek without
+  `play()`.
+- 2026-10-23 (item 52, cycle 21): Enter/Space on the current segment toggle playback (pause, or
+  resume where it stopped) instead of restarting it; on any other segment they still play from
+  its start. The Proposal's click-to-seek bullet carries it.

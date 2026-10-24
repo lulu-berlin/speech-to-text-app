@@ -19,6 +19,7 @@ import stt.db.SegmentRepository
 import stt.db.TaskRepository
 import stt.db.queuedTask
 import stt.db.storePlan
+import stt.db.withoutIds
 import stt.process.ProcessRunner
 import stt.withCapturedLogs
 import java.nio.file.Files
@@ -33,7 +34,16 @@ private const val ONE_SEGMENT_JSON = """{"transcription": [{"offsets": {"from": 
 
 /** [ONE_SEGMENT_JSON]'s segment as stored for [CHUNK_1]: 30 000 + 0 and 30 000 + 7 940 ms. */
 private val CHUNK_1_SEGMENT =
-    Segment(chunkIdx = 1, seq = 0, startMs = 30_000L, endMs = 37_940L, text = " And so my fellow Americans", speakerId = null)
+    Segment(
+        chunkIdx = 1,
+        seq = 0,
+        startMs = 30_000L,
+        endMs = 37_940L,
+        text = " And so my fellow Americans",
+        speakerId = null,
+        // Item 52 (ADR 0061): the first write keeps whisper's line as the original.
+        originalText = " And so my fellow Americans",
+    )
 
 class ChunkTranscriptionSpec :
     BehaviorSpec({
@@ -75,7 +85,7 @@ class ChunkTranscriptionSpec :
                         Files.exists(flac).shouldBeFalse()
                         Files.exists(json).shouldBeFalse()
                         chunks.findByTask(taskId).map { it.status }.shouldBe(listOf(ChunkStatus.PENDING, ChunkStatus.DONE))
-                        segments.findByTask(taskId).shouldBe(listOf(CHUNK_1_SEGMENT))
+                        segments.findByTask(taskId).withoutIds().shouldBe(listOf(CHUNK_1_SEGMENT))
                     }
                 }
             }
@@ -107,7 +117,7 @@ class ChunkTranscriptionSpec :
                             }
 
                             chunks.findByTask(taskId).map { it.status }.shouldBe(listOf(ChunkStatus.PENDING, ChunkStatus.DONE))
-                            segments.findByTask(taskId).shouldBe(listOf(CHUNK_1_SEGMENT))
+                            segments.findByTask(taskId).withoutIds().shouldBe(listOf(CHUNK_1_SEGMENT))
                             // The JSON was deletable and is gone; the FLAC directory stays as a leftover.
                             Files.exists(json).shouldBeFalse()
                             Files.exists(flacDir).shouldBeTrue()

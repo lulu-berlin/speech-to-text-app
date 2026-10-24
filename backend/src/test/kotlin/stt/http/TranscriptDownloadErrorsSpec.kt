@@ -2,17 +2,9 @@ package stt.http
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.engine.spec.tempdir
-import io.kotest.matchers.shouldBe
 import io.ktor.client.request.get
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.TaskRepository
@@ -47,17 +39,6 @@ class TranscriptDownloadErrorsSpec :
 
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }
-
-                        suspend fun HttpResponse.shouldBeError(
-                            status: HttpStatusCode,
-                            error: String,
-                        ) {
-                            this.status shouldBe status
-                            contentType()?.withoutParameters() shouldBe ContentType.Application.Json
-                            val body = Json.parseToJsonElement(bodyAsText()).jsonObject
-                            body shouldHaveShapeOf apiExample("error.json")
-                            body.getValue("error").jsonPrimitive.content shouldBe error
-                        }
 
                         // json was dropped (ADR 0035); a missing format is no format either.
                         client

@@ -23,6 +23,7 @@ import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.TaskRepository
 import stt.db.singleValue
+import stt.db.withoutIds
 import stt.engine.awaitUntil
 import stt.queue.TaskStatus
 import stt.transcribe.transcriptFixtures
@@ -119,8 +120,17 @@ class AudioMigrationSpec :
                         (task?.status to task?.error) shouldBe (TaskStatus.COMPLETED to null)
                         ChunkRepository(db).findByTask(2).map { it.status } shouldBe listOf(ChunkStatus.DONE, ChunkStatus.DONE)
                         // Chunk 0's transcript from before the upgrade is kept; only chunk 1 was transcribed now.
-                        SegmentRepository(db).findByTask(2).first() shouldBe
-                            Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null)
+                        SegmentRepository(db).findByTask(2).withoutIds().first() shouldBe
+                            Segment(
+                                chunkIdx = 0,
+                                seq = 0,
+                                startMs = 0,
+                                endMs = 1_000,
+                                text = " hello ",
+                                speakerId = null,
+                                // Item 52 (ADR 0061): the migration backfills the original with the stored text.
+                                originalText = " hello ",
+                            )
                     }
                 }
             }

@@ -3,7 +3,7 @@
 // stream drops, until the next snapshot. Server state is applied as received.
 import { assign, fromCallback, setup } from 'xstate';
 import { subscribeToEvents } from '../api/client';
-import type { Queue, SettingsNotice, StreamEvent, Task, TurnSpeaker } from '../api/types';
+import type { Queue, Segment, SettingsNotice, StreamEvent, Task, TurnSpeaker } from '../api/types';
 import { isAllowedTransition } from './transitions';
 
 // The latest speakers event of a task (item 22): its effective speakers, and whether it was
@@ -17,6 +17,10 @@ export interface ConnectionContext {
   tasks: Task[];
   queue: Queue | null;
   speakerChanges: Record<number, SpeakerChange>;
+  // The latest segment-edited event of each segment, by task and segment id (item 52): a view
+  // showing that transcript applies them in place. Per segment, not per task, so edits of two
+  // segments that arrive before the view renders again both survive.
+  segmentEdits: Record<number, Record<number, Segment>>;
   // The latest settings-updated event (item 32), null until one arrives; views holding the
   // settings they fetched apply it.
   settingsUpdate: SettingsNotice | null;
@@ -33,7 +37,7 @@ export const connectionMachine = setup({
   },
 }).createMachine({
   id: 'connection',
-  context: { tasks: [], queue: null, speakerChanges: {}, settingsUpdate: null },
+  context: { tasks: [], queue: null, speakerChanges: {}, segmentEdits: {}, settingsUpdate: null },
   invoke: { src: 'eventStream' },
   initial: 'connecting',
   // Every snapshot (first connection or reconnect) replaces the whole state.
@@ -113,6 +117,14 @@ export const connectionMachine = setup({
             speakerChanges: ({ context, event }) => ({
               ...context.speakerChanges,
               [event.id]: { speakers: event.speakers, merged: true },
+            }),
+          }),
+        },
+        'segment-edited': {
+          actions: assign({
+            segmentEdits: ({ context, event }) => ({
+              ...context.segmentEdits,
+              [event.id]: { ...context.segmentEdits[event.id], [event.segment.id]: event.segment },
             }),
           }),
         },

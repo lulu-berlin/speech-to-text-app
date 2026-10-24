@@ -99,7 +99,7 @@ graph TD
   16 --> 50[50 Electron desktop app ✓]:::done
   50 --> 48
   50 --> 49
-  22 --> 52[52 edit transcription]
+  22 --> 52[52 edit transcription ✓]:::done
   12 --> 52
   49 --> 54[54 TypeScript for the remaining scripts]
   11 --> 43[43 diarization memory ✓]:::done
@@ -217,7 +217,7 @@ graph TD
 | [49 — Windows support](../docs/specs/windows-support.md)                                                                                                                        | done          | 33, 48, 50, 51              |
 | [50 — Electron desktop app](../docs/specs/electron-desktop-app.md)                                                                                                   | done          | 16                          |
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md)                                                                              | done          | —                           |
-| [52 — Edit the transcription: correct a segment's text, with isolated segment playback](52-edit-transcription.md)                                                    | spec-approved | 12, 22                      |
+| [52 — Edit the transcription: correct a segment's text, with isolated segment playback](../docs/specs/edit-transcription.md)                                                    | done          | 12, 22                      |
 | [53 — The Nix store cache: one writer per key, versioned past the stale entry](../docs/specs/nix-store-cache.md)                                                     | done          | 51                          |
 | [54 — TypeScript for the remaining hand-written JavaScript](54-typescript-for-the-remaining-scripts.md)                                                              | spec-approved | 49                          |
 | [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md)                                    | done          | —                           |
