@@ -1,6 +1,6 @@
 # 65 — `59-row-color`'s chunking-phase observation is flaky
 
-Status: spec-approved
+Status: done (roadmap item 65, approved 2026-10-24)
 Depends on: —
 Blocks: —
 
@@ -46,9 +46,10 @@ correctly.
 
 - **The collector lives in `59-row-color.spec.ts`** (the user): one consumer, so no shared helper
   until a second spec needs it.
-- **The spec stops observing on the task's own finish signal**: the existing
-  `expectCompletedOrCanceled(page, COLOR_ROW_CLIP)` (`e2e/tests/helpers/ui.ts:144`) replaces both
-  fixed-timeout phase polls.
+- **The spec stops observing when the task's row leaves the Pending tasks list, then asserts the
+  terminal badge in History**: the collector needs the queue view mounted, so
+  `expectCompletedOrCanceled(page, COLOR_ROW_CLIP)` (`e2e/tests/helpers/ui.ts:144`) follows the
+  stop; both fixed-timeout phase polls are gone.
 - **All observed phases must read differently** (the user): chunking, transcribing and diarizing
   are asserted pairwise different, as item 59's Proposal 3 words it; the three theme tokens are
   distinct by construction (`TaskRow.tsx:36-40`).
@@ -58,19 +59,24 @@ correctly.
 
 ## Test list (approved 2026-10-19; behaviors only)
 
-- [ ] (basic) The row-color journey observes one running task's status line through its phases and
+- [x] (basic) The row-color journey observes one running task's status line through its phases and
       asserts the recorded `Chunking…` and `Transcribing…` colors differ.
-- [ ] (basic) The same journey records `Diarizing…` and its color is distinct from both — all three
+- [x] (basic) The same journey records `Diarizing…` and its color is distinct from both — all three
       phases read differently, as item 59's Proposal 3 claims.
-- [ ] (edge — the flake's regression) A phase that renders for a single frame is recorded: a
+- [x] (edge — the flake's regression) A phase that renders for a single frame is recorded: a
       synthetic status line shows `Chunking… · 0:01` for one frame and then
       `Transcribing… 42% · 0:02`, and the observation records both pairs.
-- [ ] (edge) The observation is scoped to the uploaded row: a sibling synthetic row's
+- [x] (edge) The observation is scoped to the uploaded row: a sibling synthetic row's
       `Transcribing… 7%` line is not recorded against the target row.
-- [ ] (must not break) The spec still waits for an idle queue before its upload; the shared backend
+- [x] (must not break) The spec still waits for an idle queue before its upload; the shared backend
       state and the other 39 journey specs stay green.
-- [ ] (must not break) The observation ends on the task's own finish signal
-      (`expectCompletedOrCanceled`), with no fixed 120 s/240 s phase window.
+- [x] (must not break) The observation ends when the task's row leaves the Pending tasks list;
+      `expectCompletedOrCanceled` is then asserted on History (the collector needs the queue view
+      mounted), with no fixed 120 s/240 s phase window.
+- [x] (discovered) The observation reads the Pending tasks row, not the Uploads row that carries the
+      same filename while the upload settles (`144a078c`).
+- [x] (discovered) Each observed phase shows exactly one color: a phase that renders in two colors
+      fails with the observed pairs named.
 
 ## Acceptance criteria
 
@@ -87,3 +93,10 @@ correctly.
   the task's own finish signal via `expectCompletedOrCanceled`; all observed phases (chunking,
   transcribing, diarizing) must read differently; the e2e stance is stated above. Test list
   approved as worded. Status: spec-approved.
+- 2026-10-24 (review, confirmed by the user): item 6 and the matching Decided bullet now say the
+  observation ends when the row leaves the Pending tasks list and `expectCompletedOrCanceled`
+  follows on History (the collector needs the queue view mounted); two discovered scenarios were
+  appended to the test list — the pending-task row versus the upload row, and exactly one color per
+  phase.
+- 2026-10-24: diff reviewed by the root agent and approved by the user; the e2e verification runs
+  in the pull request's CI. Status: done (roadmap item 65).
