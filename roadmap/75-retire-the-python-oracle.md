@@ -41,9 +41,9 @@ is the behavior; no further oracle parity work is done.
 ## Proposal
 
 1. Delete `docs/oracle/` (git history keeps the file); no Python remains in the tree.
-2. A new **ADR 0060** supersedes ADR 0002: no Python in the app, build or tests (unchanged), the
+2. A new **ADR 0062** supersedes ADR 0002: no Python in the app, build or tests (unchanged), the
    oracle retired, and the app's code/tests/specs/`docs/api` as the behavioral authority. The
-   decisions index marks 0002 as superseded by 0060.
+   decisions index marks 0002 as superseded by 0062.
 3. Update AGENTS.md's project line and no-Python rule, and Canon TDD's expected-value wording
    (hand calculation or the spec; the oracle is not a source).
 4. Update `docs/backend-reimplementation.md`: drop the oracle from the authority list and section 15,
@@ -55,7 +55,7 @@ is the behavior; no further oracle parity work is done.
 ## Open questions
 
 - Whether ADR 0002 is superseded or amended in place — ADRs are historical records here, so a new
-  ADR 0060 supersedes it; 0002's text stays.
+  ADR 0062 supersedes it; 0002's text stays.
 - How far to reword code comments: only the claim (the behavior is the spec's / the app's), not the
   historical rationale where it explains a past port.
 - Whether the docs package (item 54) should gain a guard that fails when a live document names the
@@ -67,7 +67,7 @@ is the behavior; no further oracle parity work is done.
 - [ ] No live document (AGENTS.md, README.md, docs/architecture.md, docs/conventions, the roadmap)
       names the oracle as a behavioral reference or asks for oracle parity; historical ADRs and
       moved specs may still mention it
-- [ ] The decisions index shows ADR 0060 superseding ADR 0002, and ADR 0060 states the authority
+- [ ] The decisions index shows ADR 0062 superseding ADR 0002, and ADR 0062 states the authority
       (code, tests, specs, `docs/api`) and the unchanged no-Python rule
 - [ ] `docs/backend-reimplementation.md`'s authority list and conformance section name only current
       sources, with no oracle reference
@@ -78,7 +78,7 @@ is the behavior; no further oracle parity work is done.
 
 ## Acceptance criteria
 
-- The oracle is deleted, ADR 0060 records the decision, AGENTS and the reimplementation doc are
+- The oracle is deleted, ADR 0062 records the decision, AGENTS and the reimplementation doc are
   updated, live references are gone, and no app behavior changes.
 - All test-list items ticked and green; user approved the diff.
 
