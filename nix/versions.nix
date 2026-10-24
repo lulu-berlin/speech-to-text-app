@@ -26,8 +26,9 @@ in {
   #   first pinned here was deleted after 14 days. 8.1.2 is the flake's ffmpeg_8. Each jar holds
   #   a self-contained `ffmpeg` executable with its libav* libraries beside it (RUNPATH $ORIGIN
   #   on Linux, @rpath = @loader_path on macOS). Central publishes SHA-1 only: the sha256 below
-  #   was computed over bytes that match Central's SHA-1. Apple Silicon gets our own audio-only
-  #   build instead (roadmap item 69), the same `.tar.gz` asset the flake and the DMG ship.
+  #   was computed over bytes that match Central's SHA-1. Apple Silicon (roadmap item 69) and
+  #   Windows (roadmap item 68) get our own audio-only build instead, the same `.tar.gz` assets
+  #   the flake/DMG and the Windows packages ship.
   downloads = {
     # linux-x64 and darwin-x64 come from the upstream jiang1997 tag. darwin-arm64 is our own
     # `desktop-whisper-cpp-v1` static build: the upstream darwin tarballs omit the libggml-metal/
@@ -72,10 +73,12 @@ in {
         url = ffmpegUrl "macosx-x86_64";
         sha256 = "917327cd6178e7ecddd4fb9dd5981cb4c5f04631a06dc0bd81cfe0377b1f3705";
       };
-      # Windows x64: the same bytedeco jar shape as Linux, with ffmpeg.exe and its DLLs (item 49).
+      # Windows x64: our own audio-only build (roadmap item 68), one static ffmpeg.exe with only
+      # system DLL imports and no ffprobe — the same enable list as Linux and macOS, built by the
+      # manual `windows-ffmpeg-asset` job and published under desktop-ffmpeg-v2.
       "windows-x64" = {
-        url = ffmpegUrl "windows-x86_64";
-        sha256 = "9c4bbdecba752fb2d0a8e537e69d330c6db6b02087f5035f88decad0050e5550";
+        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-windows-x64.tar.gz";
+        sha256 = "983118c378778f542c3190e7ecac84e02ff5d7d2dd05bce4c199e30f5a30a001";
       };
     };
 

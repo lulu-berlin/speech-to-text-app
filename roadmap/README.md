@@ -127,7 +127,7 @@ graph TD
   66 --> 70[70 Rust GUI window]
   67 --> 70
   49 --> 70
-  62 --> 68[68 Windows audio-only ffmpeg]
+  62 --> 68[68 Windows audio-only ffmpeg ✓]:::done
   49 --> 68
   62 --> 69[69 macOS audio-only ffmpeg ✓]:::done
   48 --> 69
@@ -233,7 +233,7 @@ graph TD
 | [65 — `59-row-color`'s chunking-phase observation is flaky](../docs/specs/row-color-phase-observation.md)                                                                    | done          | —                           |
 | [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](66-local-service-and-frontends.md)                                   | spec-approved | 48, 49, 64                  |
 | [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66                          |
-| [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](68-windows-audio-only-ffmpeg.md)                                                    | spec-approved | 62, 49                      |
+| [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
 | [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
 | [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](71-repository-and-chunking-performance.md)               | draft         | —                           |

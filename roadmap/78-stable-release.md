@@ -2,7 +2,7 @@
 
 Status: spec-approved
 Depends on: [49](../docs/specs/windows-support.md), [52](../docs/specs/edit-transcription.md),
-[65](../docs/specs/row-color-phase-observation.md), [68](68-windows-audio-only-ffmpeg.md),
+[65](../docs/specs/row-color-phase-observation.md), [68](../docs/specs/windows-audio-only-ffmpeg.md),
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](72-frontend-state-and-errors.md),
 [74](74-desktop-presentation.md), [76](76-right-to-left-transcription.md),
 [77](../docs/specs/test-harness-temp-dirs.md), [79](79-full-e2e-journey-on-windows.md) — the gates
@@ -56,7 +56,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 65 `59-row-color` chunking observation flake | done | **yes** | a flaky journey weakens release verification |
 | 66 Local service and frontends | spec-approved | after 1.0 | architecture change; new frontends |
 | 67 TUI frontend | spec-approved | after 1.0 | new frontend |
-| 68 Windows audio-only ffmpeg | spec-approved | **yes** | otherwise the Windows deliverable ships bytedeco's full GPL `ffmpeg`+`ffprobe`, unlike Linux/macOS; licensing and size |
+| 68 Windows audio-only ffmpeg | done | **yes** | otherwise the Windows deliverable ships bytedeco's full GPL `ffmpeg`+`ffprobe`, unlike Linux/macOS; licensing and size |
 | 69 macOS audio-only ffmpeg | in progress | **yes** | nearly done; darwin artifact consistency |
 | 70 Rust GUI window | spec-approved | after 1.0 | replaces Electron; a new shell |
 | 71 Repository and chunking performance | draft | after 1.0 | scaling improvement, not a correctness defect |

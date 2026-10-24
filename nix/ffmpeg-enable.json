@@ -1,0 +1,145 @@
+{
+  "flags": [
+    "--disable-everything",
+    "--disable-autodetect",
+    "--enable-static",
+    "--disable-shared",
+    "--enable-ffmpeg",
+    "--disable-ffprobe",
+    "--disable-ffplay"
+  ],
+  "forbid": [
+    "--enable-lib",
+    "--enable-network",
+    "--enable-avdevice",
+    "--enable-gpl",
+    "--enable-version3"
+  ],
+  "enable": [
+    {
+      "kind": "demuxer",
+      "components": [
+        "aac",
+        "aiff",
+        "amr",
+        "asf",
+        "concat",
+        "flac",
+        "loas",
+        "matroska",
+        "mov",
+        "mp3",
+        "ogg",
+        "wav"
+      ]
+    },
+    {
+      "kind": "decoder",
+      "components": [
+        "aac",
+        "aac_latm",
+        "ac3",
+        "alac",
+        "amrnb",
+        "amrwb",
+        "adpcm_ima_qt",
+        "adpcm_ima_wav",
+        "adpcm_ms",
+        "atrac3",
+        "atrac3al",
+        "atrac3plus",
+        "atrac3plusal",
+        "dca",
+        "eac3",
+        "flac",
+        "g722",
+        "mlp",
+        "mp1",
+        "mp2",
+        "mp3",
+        "mp3float",
+        "opus",
+        "pcm_alaw",
+        "pcm_f32be",
+        "pcm_f32le",
+        "pcm_f64be",
+        "pcm_f64le",
+        "pcm_mulaw",
+        "pcm_s16be",
+        "pcm_s16be_planar",
+        "pcm_s16le",
+        "pcm_s16le_planar",
+        "pcm_s24be",
+        "pcm_s24le",
+        "pcm_s24le_planar",
+        "pcm_s32be",
+        "pcm_s32le",
+        "pcm_s32le_planar",
+        "pcm_s64be",
+        "pcm_s64le",
+        "pcm_s8",
+        "pcm_s8_planar",
+        "pcm_u16be",
+        "pcm_u16le",
+        "pcm_u24be",
+        "pcm_u24le",
+        "pcm_u32be",
+        "pcm_u32le",
+        "pcm_u8",
+        "speex",
+        "truehd",
+        "vorbis",
+        "wmalossless",
+        "wmapro",
+        "wmav1",
+        "wmav2",
+        "wmavoice"
+      ]
+    },
+    {
+      "kind": "parser",
+      "components": [
+        "aac",
+        "ac3",
+        "flac",
+        "mpegaudio",
+        "opus",
+        "vorbis"
+      ]
+    },
+    {
+      "kind": "encoder",
+      "components": [
+        "flac",
+        "pcm_f32le",
+        "pcm_s16le"
+      ]
+    },
+    {
+      "kind": "muxer",
+      "components": [
+        "flac",
+        "pcm_f32le",
+        "null"
+      ]
+    },
+    {
+      "kind": "filter",
+      "components": [
+        "aformat",
+        "anull",
+        "anullsink",
+        "aresample",
+        "atrim",
+        "silencedetect"
+      ]
+    },
+    {
+      "kind": "protocol",
+      "components": [
+        "file",
+        "pipe"
+      ]
+    }
+  ]
+}

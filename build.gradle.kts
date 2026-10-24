@@ -71,8 +71,10 @@ tasks.register("checkVersions") {
             val downloads = manifest["downloads"] as Map<*, *>
             val windowsAssets =
                 mapOf(
-                    "whisper-cli" to "whisper-cpp-1.8.4-windows-x64.tar.gz",
-                    "ffmpeg" to "windows-x86_64-gpl.jar",
+                    "whisper-cli" to "releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-windows-x64.tar.gz",
+                    // The audio-only single binary (roadmap item 68): the release tag and the asset
+                    // name, so a pin on another tag or another artifact cannot pass.
+                    "ffmpeg" to "releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-windows-x64.tar.gz",
                     "temurin-jdk" to "windows_hotspot",
                 )
             for ((tool, asset) in windowsAssets) {
