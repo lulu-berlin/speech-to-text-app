@@ -125,7 +125,9 @@ export function TaskRow({
   lifted = false,
 }: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
-  const [action, send] = useMachine(rowActionMachine, { input: { taskId: task.id } });
+  const [action, send] = useMachine(rowActionMachine, {
+    input: { taskId: task.id, status: task.status },
+  });
   // Delete runs through the shared dialog-action machine (item 28): the menu item opens
   // its dialog, done removes the task from the live state.
   const [deleteState, deleteSend, deleteActor] = useMachine(confirmActionMachine, {
@@ -174,6 +176,12 @@ export function TaskRow({
       connection.send({ type: 'task-updated', task: action.context.task });
     }
   }, [action, connection]);
+
+  // The row machine checks a command kept during another one against the task's live
+  // status (item 81).
+  useEffect(() => {
+    send({ type: 'STATUS', status: task.status });
+  }, [send, task.status]);
 
   useEffect(() => {
     if (deleteState.matches('done')) {
@@ -252,6 +260,9 @@ export function TaskRow({
                   <IconButton
                     icon={icon}
                     label={`${verb} ${task.filename}`}
+                    // Item 81: not offered while the row's own command is in flight; the SSE
+                    // status can offer the next command before that request settles.
+                    disabled={action.matches('running')}
                     onClick={() =>
                       send({
                         type: 'ACTIVATE',
@@ -272,7 +283,7 @@ export function TaskRow({
             />
           </RowControls>
         </RowContent>
-        {action.matches({ ready: 'failed' }) ? (
+        {action.context.error !== null ? (
           <RowActionError>{errorMessage(action.context.error)}</RowActionError>
         ) : null}
         {deleteState.matches('failed') ? (

@@ -1,6 +1,6 @@
 # 81 — A row command clicked while another one is in flight is dropped
 
-Status: spec-approved
+Status: done (roadmap item 81, approved 2026-10-24)
 Depends on: —
 Blocks: —
 
@@ -95,37 +95,45 @@ bullet.)
 
 Queue row (Vitest):
 
-- [ ] While a row command's request is in flight, the row's command buttons are disabled; they are
+- [x] While a row command's request is in flight, the row's command buttons are disabled; they are
       enabled again once the request settles, successfully or not
-- [ ] A command that still reaches the row while one is in flight (e.g. dispatched before the
+- [x] A command that still reaches the row while one is in flight (e.g. dispatched before the
       buttons re-render) runs once the first one settles
-- [ ] Of several commands arriving while one is in flight, only the last one runs
-- [ ] A kept command the transition table no longer allows for the task's live status is dropped:
+- [x] Of several commands arriving while one is in flight, only the last one runs
+- [x] A kept command the transition table no longer allows for the task's live status is dropped:
       no request, no error
-- [ ] A kept cancel still asks for confirmation before it runs
-- [ ] If the in-flight command fails, its inline error shows, and the kept command then runs
-      (clearing the error, as a new action does today)
-- [ ] (must not break) The row takes a second command after a successful one, a failed action can
-      start the next one (item 40), and the delete flow is unchanged
+- [x] A kept cancel still asks for confirmation before it runs
+- [x] If the in-flight command fails, its inline error shows, and the kept command then runs; the
+      error stays while the kept command runs and is cleared by its success or replaced by its
+      failure (reworded 2026-10-24: an immediate replay would clear the error before it renders)
+- [x] (must not break) The row takes a second command after a successful one, a failed action can
+      start the next one (item 40), and the delete flow is unchanged (covered by the existing
+      `QueueView.test.tsx` tests "runs a second command on the same row…", "shows a failed
+      command's error on the task's row until the next action" and "deletes a task only after
+      confirmation…", green throughout)
+- [x] (discovered) Dismissing a replayed cancel's confirmation leaves the earlier failure's error
+      on the row until the next action
 
 History (Vitest):
 
-- [ ] History's Retry is disabled while its request runs, and enabled again if it fails
+- [x] History's Retry is disabled while its request runs, and enabled again if it fails
 
 Backend (Kotest):
 
-- [ ] Pausing a running task publishes PAUSED only after the run is frozen: a subscriber that
+- [x] Pausing a running task publishes PAUSED only after the run is frozen: a subscriber that
       receives the PAUSED update finds the process already paused
-- [ ] (must not break) Pausing a queued (not started) task still publishes PAUSED and freezes
+- [x] (must not break) Pausing a queued (not started) task still publishes PAUSED and freezes
       nothing; the atomic-transition specs stay green
 
 e2e (Playwright, real backend):
 
-- [ ] With the Pause response held in the browser, the row's Resume is disabled until the response
+- [x] With the Pause response held in the browser, the row's Resume is disabled until the response
       arrives; clicking it then resumes the task, which completes, and the queue behind it starts
-- [ ] (must not break) `40-atomic-transitions` passes repeatedly with Resume clicked as soon as it
-      is visible
-- [ ] (must not break) The queue-wide Pause switch and the Settings page behave as today
+- [x] (must not break) `40-atomic-transitions` passes repeatedly with Resume clicked as soon as it
+      is visible (2026-10-24: 10 of 10 local runs passed, each on a fresh backend)
+- [x] (must not break) The queue-wide Pause switch and the Settings page behave as today
+      (2026-10-24: `17-settings` and `04-reorder` pass locally; the Vitest queue-switch and
+      Settings tests are green)
 
 ## Acceptance criteria
 
@@ -148,3 +156,14 @@ e2e (Playwright, real backend):
   deterministic e2e holds the Pause response with `page.route`. Open questions answered from `main`.
   Test list approved as worded, including the "only the last one runs" behavior. Status:
   spec-approved.
+- 2026-10-24 (workspace, the user): test-list item 6 reworded. The kept command is replayed in
+  the same step as the failure, so clearing the error on replay "as a new action does" would hide
+  it before it renders; the first command's error instead stays on the row while the kept command
+  runs, cleared by its success or replaced by its failure.
+- 2026-10-24 (review, root agent; decision by the user): approved. Accepted edge case: `pauseTask`
+  now publishes PAUSED only after `freezeCurrentRun()` returns, so if freezing ever threw, the
+  stored status would be PAUSED with no update published and the row would show RUNNING until the
+  task's next update. No such throw is reachable today: the freeze is a native signal behind an
+  is-alive guard (`ProcessTree.signal`), and item 49's lazily loaded libc that once failed there was
+  reverted. Publishing in a `finally` was considered and not taken. The full Playwright journey runs
+  in the pull request's CI. Status: done (roadmap item 81).

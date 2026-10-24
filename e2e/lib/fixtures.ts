@@ -137,6 +137,8 @@ export function writeFixtures(fixturesDir: string): void {
     { loops: 5, file: FIXTURE_CLIPS[42] }, // ~55s, item 59's phase-color row clip
     { loops: 17, file: FIXTURE_CLIPS[44] }, // ~187s, item 59's header-typing clip
     { loops: 2, file: FIXTURE_CLIPS[45] }, // ~22s, item 48's Metal app e2e
+    { loops: 15, file: FIXTURE_CLIPS[46] }, // ~165s, item 81's held-pause running clip
+    { start: 1, seconds: 4, file: FIXTURE_CLIPS[47] }, // 1-5s, item 81's held-pause queued clip
   ];
   const jfk = process.env.TEST_JFK_WAV;
   if (!jfk) throw new Error('TEST_JFK_WAV is unset');

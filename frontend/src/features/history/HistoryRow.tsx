@@ -116,6 +116,8 @@ export function HistoryRow({ task }: { task: Task }) {
         <Actions>
           {isAllowedCommand('retry', task.status) ? (
             <TextButton
+              // Item 81: not offered again while its request runs.
+              disabled={retryState.matches('sending')}
               onClick={() => {
                 if (retryState.matches('failed') || retryState.matches('done')) {
                   retryActor.stop();

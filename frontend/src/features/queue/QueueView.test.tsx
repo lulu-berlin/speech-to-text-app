@@ -719,6 +719,55 @@ describe('task controls', () => {
     expect(calls).toEqual(['pause 5', 'resume 5']);
   });
 
+  it("disables the row's commands while one is in flight, and enables them once it settles, successfully or not", async () => {
+    // Item 81: the buttons follow the request, not the task's status. Each command's
+    // response is held until the test releases it.
+    const pauseAnswer = Promise.withResolvers<void>();
+    const resumeAnswer = Promise.withResolvers<void>();
+    server.use(
+      http.post('/api/tasks/:id/pause', async () => {
+        await pauseAnswer.promise;
+        return HttpResponse.json({ ...taskRunning, status: 'PAUSED' });
+      }),
+      // 409 illegal-transition has no docs/api example, so error.json stands in.
+      http.post('/api/tasks/:id/resume', async () => {
+        await resumeAnswer.promise;
+        return HttpResponse.json(errorFixture, { status: 409 });
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+
+    // In flight: both of the running task's commands are disabled.
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' }));
+    await waitFor(() =>
+      expect(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' })).toBeDisabled(),
+    );
+    expect(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' })).toBeDisabled();
+
+    // Settled successfully: the paused task's commands are enabled.
+    pauseAnswer.resolve();
+    await waitFor(() => expect(within(lecture).getByText('PAUSED')).toBeInTheDocument());
+    expect(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' })).toBeEnabled();
+    expect(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' })).toBeEnabled();
+
+    // In flight again, then settled with a failure: enabled again, beside the error.
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' }));
+    await waitFor(() =>
+      expect(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' })).toBeDisabled(),
+    );
+    expect(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' })).toBeDisabled();
+
+    resumeAnswer.resolve();
+    await waitFor(() =>
+      expect(within(lecture).getByText('Task 42 does not exist')).toBeInTheDocument(),
+    );
+    expect(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' })).toBeEnabled();
+    expect(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' })).toBeEnabled();
+  });
+
   it('confirms cancel only when work would be lost, then calls the cancel endpoint', async () => {
     const events = controllableEventStream();
     const canceled: string[] = [];

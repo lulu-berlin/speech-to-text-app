@@ -93,6 +93,8 @@ export const FIXTURE_CLIPS = [
   'broken-59-status.wav', // item 59's status-page delete fixture
   'jfk-ai.wav', // the sample looped 17x, ~187s, item 59's header-typing clip
   'jfk-metal.wav', // the sample twice (~22s), item 48's Metal app e2e
+  'jfk-aj.wav', // the sample looped 15x, ~165s, item 81's held-pause running clip
+  'jfk-ak.wav', // 1-5s, item 81's held-pause queued clip
 ] as const;
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -204,6 +206,12 @@ export const HEADER_TYPING_CLIP = FIXTURE_CLIPS[44];
 // Item 48's app-level Metal e2e: a unique clip (the sample twice) whose transcript must
 // carry the JFK quote while the task runs through MTL0 on the macOS runner.
 export const METAL_CLIP = FIXTURE_CLIPS[45];
+
+// Item 81's held-pause journey: a long clip paused while its Pause response is held in the
+// browser, and a short one queued behind it that must start once the first resumes and
+// completes. Unique bytes: no other test loops the sample 15x, and 1-5s is no existing trim.
+export const HELD_PAUSE_CLIP = FIXTURE_CLIPS[46];
+export const HELD_PAUSE_NEXT_CLIP = FIXTURE_CLIPS[47];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];

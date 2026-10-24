@@ -227,16 +227,17 @@ class ProcessingEngine internal constructor(
      * QUEUED or RUNNING task can be paused (item 04's table). The write is conditional: a pause that races
      * a task's finish is refused instead of writing PAUSED over the newer status, and the losing pause
      * freezes nothing — the process and the pause gate are only touched when the pause won (frozen
-     * processes and a paused gate would stall the *next* task).
+     * processes and a paused gate would stall the *next* task). PAUSED is published once the run is
+     * frozen, so a subscriber never sees a PAUSED task whose process still runs (item 81).
      */
     suspend fun pauseTask(id: Long): TaskCommandOutcome =
         command(id, TaskStatus.PAUSED) {
             val runningHere = runningJob(id) != null
             if (tasks.pauseIfPossible(id)) {
-                publish(id)
                 if (runningHere) {
                     freezeCurrentRun()
                 }
+                publish(id)
                 TaskCommandOutcome.Accepted
             } else {
                 lostTransition(id, TaskStatus.PAUSED)
