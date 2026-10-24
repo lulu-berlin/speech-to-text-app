@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { HEADER_TYPING_CLIP, appUrl } from '../lib/backend.mjs';
+import { HEADER_TYPING_CLIP, appUrl } from '../lib/backend.ts';
 import { appLive, rowOf, uploadClips } from './helpers/ui';
 
 // Item 59 (reversed on 2026-10-18): the favicon's animation could not be confirmed at tab

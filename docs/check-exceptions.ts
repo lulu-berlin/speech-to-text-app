@@ -157,7 +157,7 @@ for (const file of kotlinFiles(root)) {
 
   const catchPattern = /\bcatch\s*\(\s*(\w+)\s*:\s*(Exception|Throwable)\s*\)\s*\{/g;
   for (const match of code.matchAll(catchPattern)) {
-    const name = match[1];
+    const name = match[1] ?? '';
     const open = match.index + match[0].length - 1;
     const end = closingIndex(code, open);
     const body = code.slice(open, end);
@@ -175,4 +175,6 @@ if (violations.length > 0) {
   console.error(violations.join('\n'));
   process.exit(1);
 }
-console.log(`Every broad catch follows the exception policy and no runCatching remains in ${root}.`);
+console.log(
+  `Every broad catch follows the exception policy and no runCatching remains in ${root}.`,
+);

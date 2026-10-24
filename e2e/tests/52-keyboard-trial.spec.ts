@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { HEADER_CLIP } from '../lib/backend.mjs';
+import { HEADER_CLIP } from '../lib/backend.ts';
 import { ensureTranscript, openTranscript } from './helpers/ui';
 
 // Item 52, the user's keyboard trial in a real browser: the player hands focus to the current

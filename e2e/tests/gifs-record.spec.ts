@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
-import { CANCEL_CLIP, MERGE_CLIP, SHOT_CLIP, SHOT_UPLOAD_CLIP, appUrl } from '../lib/backend.mjs';
+import { CANCEL_CLIP, MERGE_CLIP, SHOT_CLIP, SHOT_UPLOAD_CLIP, appUrl } from '../lib/backend.ts';
 import {
   DESKTOP_VIEWPORT,
   appLive,
@@ -16,7 +16,7 @@ import {
 // agreed flows — uploading files and watching the queue progress, transcript playback
 // with follow mode, and renaming and merging speakers — each recorded as one desktop,
 // dark mode webm under e2e/screenshots/recordings/. Run standalone (`pnpm record:gifs`)
-// against the real backend from global-setup.mjs; the rest of the suite never runs this
+// against the real backend from global-setup.ts; the rest of the suite never runs this
 // spec (playwright.config.ts ignores it). The webm files are gitignored like the
 // screenshots; the user converts them to the GIFs the README shows, under 1 MB each
 // (decided with the user), in docs/images/ (run from e2e/, <name> without the gif- prefix):
@@ -282,7 +282,11 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       const turns: { turns: { segments: { endMs: number }[] }[] } = await (
         await page.request.get(appUrl(`/api/tasks/${playbackUrl.split('/').pop()}/turns`))
       ).json();
-      const deepEndMs = turns.turns.flatMap((turn) => turn.segments)[deep].endMs;
+      const deepSegment = turns.turns.flatMap((turn) => turn.segments)[deep];
+      if (deepSegment === undefined) {
+        throw new Error(`the clip's turns have no segment ${deep}`);
+      }
+      const deepEndMs = deepSegment.endMs;
       await page.locator('audio').evaluate(
         (audio: HTMLAudioElement, seconds) => {
           audio.currentTime = seconds;

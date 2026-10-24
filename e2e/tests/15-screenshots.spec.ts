@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { join } from 'node:path';
-import { SHOT_CLIP, SHOT_UPLOAD_CLIP, loadState } from '../lib/backend.mjs';
+import { SHOT_CLIP, SHOT_UPLOAD_CLIP, loadState } from '../lib/backend.ts';
 import { DESKTOP_VIEWPORT, PHONE_VIEWPORT, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 
 // The acceptance screenshots (roadmap item 21, item 15): the Queue with a running task

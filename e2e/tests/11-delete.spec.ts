@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { DELETE_CLIP, loadState, scratchDirPath } from '../lib/backend.mjs';
+import { DELETE_CLIP, loadState, scratchDirPath } from '../lib/backend.ts';
 import { goTo, rowOf, taskIdOf, uploadAndOpen, uploadClips } from './helpers/ui';
 
 test('deleting a task removes it from History and frees its file for re-upload', async ({

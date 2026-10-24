@@ -5,11 +5,18 @@ import type { Page, Request, Response } from '@playwright/test';
 // Nothing is intercepted — the app talks to the same-origin /api normally; these
 // listeners only observe.
 
+export type SseEvent = { name: string; data: unknown };
+
+declare global {
+  // The SSE recorder the init script installs in the page, which `capturedSse` reads back.
+  var __sttE2eSseEvents: SseEvent[] | undefined;
+}
+
 export type HttpCapture = { url: string; method: string; status: number; json: unknown }[];
 
 export type Captured = {
   http: HttpCapture;
-  sse: { name: string; data: unknown }[];
+  sse: SseEvent[];
 };
 
 // Installs the SSE recorder before the app's EventSource opens, so every event that
@@ -58,7 +65,7 @@ export async function installSseCapture(page: Page): Promise<void> {
   });
 }
 
-export function capturedSse(page: Page): Promise<{ name: string; data: unknown }[]> {
+export function capturedSse(page: Page): Promise<SseEvent[]> {
   return page.evaluate(() => [...(globalThis.__sttE2eSseEvents ?? [])]);
 }
 

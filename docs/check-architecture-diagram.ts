@@ -5,7 +5,7 @@
 // in the diagram without evidence fails, evidence for a box or arrow no longer in the
 // diagram fails, and evidence that no longer matches the code fails. Exits 1 on any failure.
 //
-//   node docs/check-architecture-diagram.mjs [docs/architecture.md]
+//   node docs/check-architecture-diagram.ts [docs/architecture.md]
 import { existsSync, readFileSync } from 'node:fs';
 
 const STT = 'backend/src/main/kotlin/stt';
@@ -14,8 +14,11 @@ const ENGINE = `${STT}/engine/ProcessingEngine.kt`;
 const ENGINE_MODULE = `${STT}/engine/EngineModule.kt`;
 const CLIP_PCM_SOURCE = `${STT}/engine/ClipPcmSource.kt`;
 
+/** A file and a pattern its text must match. */
+type Evidence = [path: string, pattern: RegExp][];
+
 // Box id → what makes it a real component: [file, pattern] pairs that must all match.
-const boxes = {
+const boxes: Record<string, Evidence> = {
   Browser: [['frontend/index.html', /id="root"/]],
   UI: [['frontend/src/main.tsx', /createRoot\(/]],
   JVM: [[`${STT}/Main.kt`, /embeddedServer\(/]],
@@ -33,7 +36,7 @@ const boxes = {
 };
 
 // "from->to" → what makes the arrow a real call or event.
-const arrows = {
+const arrows: Record<string, Evidence> = {
   'UI->Routes': [
     [CLIENT, /fetch\('\/api\/tasks'\)/],
     [CLIENT, /xhr\.open\('POST', '\/api\/tasks'\)/],
@@ -74,28 +77,33 @@ const arrows = {
   ],
 };
 
+interface Diagram {
+  boxes: Set<string>;
+  arrows: Map<string, string>;
+}
+
 // The boxes (nodes and subgraphs) and the labelled arrows of the first Mermaid block.
-function diagramOf(markdown) {
+function diagramOf(markdown: string): Diagram | null {
   const block = /```mermaid\n([\s\S]*?)```/.exec(markdown);
   if (block === null) {
     return null;
   }
-  const found = { boxes: new Set(), arrows: new Map() };
-  for (const line of block[1].split('\n')) {
+  const found: Diagram = { boxes: new Set(), arrows: new Map() };
+  for (const line of (block[1] ?? '').split('\n')) {
     const arrow = /^\s*(\w+)\s+--\s+"([^"]+)"\s+-->\s+(\w+)\s*$/.exec(line);
     if (arrow !== null) {
-      found.arrows.set(`${arrow[1]}->${arrow[3]}`, arrow[2]);
+      found.arrows.set(`${arrow[1] ?? ''}->${arrow[3] ?? ''}`, arrow[2] ?? '');
       continue;
     }
     const subgraph = /^\s*subgraph\s+(\w+)/.exec(line);
     const node = /^\s*(\w+)\[/.exec(line);
-    if (subgraph !== null) found.boxes.add(subgraph[1]);
-    else if (node !== null) found.boxes.add(node[1]);
+    if (subgraph !== null) found.boxes.add(subgraph[1] ?? '');
+    else if (node !== null) found.boxes.add(node[1] ?? '');
   }
   return found;
 }
 
-function failedEvidence(evidence) {
+function failedEvidence(evidence: Evidence): string[] {
   return evidence
     .filter(([path, pattern]) => !existsSync(path) || !pattern.test(readFileSync(path, 'utf8')))
     .map(([path, pattern]) => `${path} ${pattern}`);
@@ -103,24 +111,28 @@ function failedEvidence(evidence) {
 
 const file = process.argv[2] ?? 'docs/architecture.md';
 const diagram = diagramOf(readFileSync(file, 'utf8'));
-const failures = [];
 if (diagram === null) {
-  failures.push(`${file}: no Mermaid diagram`);
-} else {
-  for (const box of diagram.boxes) {
-    if (!(box in boxes)) failures.push(`box ${box}: no evidence that it is a real component`);
-  }
-  for (const [arrow, label] of diagram.arrows) {
-    if (!(arrow in arrows)) failures.push(`arrow ${arrow} ("${label}"): no evidence of the call`);
-  }
-  for (const [box, evidence] of Object.entries(boxes)) {
-    if (!diagram.boxes.has(box)) failures.push(`box ${box}: has evidence but is not in the diagram`);
-    for (const missing of failedEvidence(evidence)) failures.push(`box ${box}: ${missing} does not match`);
-  }
-  for (const [arrow, evidence] of Object.entries(arrows)) {
-    if (!diagram.arrows.has(arrow)) failures.push(`arrow ${arrow}: has evidence but is not in the diagram`);
-    for (const missing of failedEvidence(evidence)) failures.push(`arrow ${arrow}: ${missing} does not match`);
-  }
+  // The only failure there can be without a diagram: same line, same exit code as the list below.
+  console.error(`${file}: no Mermaid diagram`);
+  process.exit(1);
+}
+const failures: string[] = [];
+for (const box of diagram.boxes) {
+  if (!(box in boxes)) failures.push(`box ${box}: no evidence that it is a real component`);
+}
+for (const [arrow, label] of diagram.arrows) {
+  if (!(arrow in arrows)) failures.push(`arrow ${arrow} ("${label}"): no evidence of the call`);
+}
+for (const [box, evidence] of Object.entries(boxes)) {
+  if (!diagram.boxes.has(box)) failures.push(`box ${box}: has evidence but is not in the diagram`);
+  for (const missing of failedEvidence(evidence))
+    failures.push(`box ${box}: ${missing} does not match`);
+}
+for (const [arrow, evidence] of Object.entries(arrows)) {
+  if (!diagram.arrows.has(arrow))
+    failures.push(`arrow ${arrow}: has evidence but is not in the diagram`);
+  for (const missing of failedEvidence(evidence))
+    failures.push(`arrow ${arrow}: ${missing} does not match`);
 }
 
 if (failures.length > 0) {

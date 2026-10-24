@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { HEADER_CLIP } from '../lib/backend.mjs';
+import { HEADER_CLIP } from '../lib/backend.ts';
 import { appLive, ensureTranscript, goTo, openTranscript } from './helpers/ui';
 
 // Item 59, finding 1: the brand is a small static icon in the header corner (at most 40 px,

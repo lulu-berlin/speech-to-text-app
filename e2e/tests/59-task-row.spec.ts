@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { QUEUED_ROW_CLIP, RUNNING_ROW_CLIP, appUrl } from '../lib/backend.mjs';
+import { QUEUED_ROW_CLIP, RUNNING_ROW_CLIP, appUrl } from '../lib/backend.ts';
 import { appLive, rowOf, uploadClips } from './helpers/ui';
 
 // Item 59, finding 3: a running row showed the phase text and an all-caps RUNNING badge

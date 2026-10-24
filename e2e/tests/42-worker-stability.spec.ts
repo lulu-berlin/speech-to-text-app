@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { STABILITY_BROKEN_CLIP, STABILITY_CLIP, appUrl } from '../lib/backend.mjs';
+import { STABILITY_BROKEN_CLIP, STABILITY_CLIP, appUrl } from '../lib/backend.ts';
 import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 
 test('a task that fails mid-run does not stop the queue', async ({ page }) => {

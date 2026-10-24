@@ -136,7 +136,7 @@ The shell's `ffmpeg` is the app's audio-only build from the pinned `desktop-ffmp
 
 The shell's `whisper-cli` is the same pinned 1.8.4 build (Vulkan on Linux, Metal on darwin) that `nix build .` and `.#desktop` ship, from the `desktop-whisper-cpp-v1` asset on x86_64-linux (roadmap item 63). Every system the flake declares must pin a whisper-cpp artifact — a flake check enforces it — so no machine compiles it.
 
-The end-to-end fixture generator (`e2e/lib/fixtures.ts`, run by `e2e/global-setup.mjs`) decodes the pinned sample to `f32le` and cuts, loops and concatenates the clips as 16 kHz mono PCM WAV itself. It needs only a decoder and the `f32le` muxer, not the `wav` muxer or the `concat` filter, so `./gradlew e2e` needs no general-purpose ffmpeg: on macOS it runs with the pinned audio-only artifact, on Linux with the bytedeco build `./gradlew` manages. `e2e/lib/fixtures.test.ts` checks the generator with whichever `ffmpeg` is first on `PATH`; on macOS CI that is the pinned slim binary.
+The end-to-end fixture generator (`e2e/lib/fixtures.ts`, run by `e2e/global-setup.ts`) decodes the pinned sample to `f32le` and cuts, loops and concatenates the clips as 16 kHz mono PCM WAV itself. It needs only a decoder and the `f32le` muxer, not the `wav` muxer or the `concat` filter, so `./gradlew e2e` needs no general-purpose ffmpeg: on macOS it runs with the pinned audio-only artifact, on Linux with the bytedeco build `./gradlew` manages. `e2e/lib/fixtures.test.ts` checks the generator with whichever `ffmpeg` is first on `PATH`; on macOS CI that is the pinned slim binary.
 
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git

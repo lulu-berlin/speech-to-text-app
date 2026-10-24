@@ -246,5 +246,5 @@ The pages are [docs/specs/frontend-queue-ui.md](specs/frontend-queue-ui.md), [do
 | Package | [`flake.nix`](../flake.nix), [`nix/models.nix`](../nix/models.nix), [`nix/whisper-cpp.nix`](../nix/whisper-cpp.nix) |
 | Backend build | [`backend/build.gradle.kts`](../backend/build.gradle.kts) |
 | Frontend build | [`frontend/package.json`](../frontend/package.json), [`frontend/vite.config.ts`](../frontend/vite.config.ts) |
-| End-to-end suite | [`e2e/tests/`](../e2e/tests/), [`e2e/global-setup.mjs`](../e2e/global-setup.mjs) |
+| End-to-end suite | [`e2e/tests/`](../e2e/tests/), [`e2e/global-setup.ts`](../e2e/global-setup.ts) |
 | Continuous verification | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`.github/actions/`](../.github/actions/) |

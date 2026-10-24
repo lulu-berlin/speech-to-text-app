@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { BROKEN2_CLIP, HISTORY_CLIPS, appUrl } from '../lib/backend.mjs';
+import { BROKEN2_CLIP, HISTORY_CLIPS, appUrl } from '../lib/backend.ts';
 import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
 
 // This test's own uploads: two trims no other test uses (the shared run finishes the
@@ -50,10 +50,12 @@ test('the history list shows finished tasks newest first with status, finish dat
     const href = await card.getByRole('link').first().getAttribute('href');
     cardIds.push(Number(href?.split('/').pop() ?? '0'));
   }
-  const taskList = await (await page.request.get(appUrl('/api/tasks'))).json();
+  const taskList: { tasks: { id: number; finishedAt: number | null }[] } = await (
+    await page.request.get(appUrl('/api/tasks'))
+  ).json();
   const finishedAt: Record<number, number> = Object.fromEntries(
     taskList.tasks
-      .filter((task) => task.finishedAt !== null)
+      .filter((task): task is { id: number; finishedAt: number } => task.finishedAt !== null)
       .map((task) => [task.id, task.finishedAt]),
   );
   const times = cardIds.map((id) => finishedAt[id] ?? -1);

@@ -45,6 +45,13 @@ items; this one carries the infrastructure they all need.
 - **The same run showed the observability gap for e2e.** `E2E (Playwright)` (job 120645846612) and
   `macOS (e2e)` failed too (10:58 and 14:25 in `gradle e2e`); their logs require a token and their
   traces were not kept.
+- **The always-on docs job needs the npm registry since item 54.** `docs-check` (`.github/workflows/ci.yml:110`)
+  installed nothing and ran Node alone; item 54 made it a pnpm package, so the job now runs
+  `pnpm --dir docs install --frozen-lockfile` before `pnpm --dir docs test`. It is the one job a
+  Markdown-only pull request still runs besides `changes` and `CI (all checks)`, so a registry outage
+  reddens the required check on a pull request that changes no code. The node-toolchain action's
+  pnpm store cache (keyed on `docs/pnpm-lock.yaml`) narrows this to cold caches (item 54's review,
+  2026-10-24).
 - **Leftover timing assumptions already recorded:** the packaged `.deb` spec's `finally` reads
   `app.process()` after the app exited and throws `TypeError` (`e2e/desktop-tests/13-second-quit-during-shutdown.spec.ts:33`;
   run #212, and the MED row in `docs/known-issues.md`), `59-row-bars`'s bar count (the row on
@@ -63,6 +70,8 @@ items; this one carries the infrastructure they all need.
    - make `nix-toolchain` save the Nix store cache on failure as well (`save` runs at post even when
      the job fails), so a cold shell is built once and reused.
    The first is the real fix; the second is cheap and bounds the blast radius.
+   The same applies to `docs-check`'s package install: a warm pnpm store must let it pass with the
+   registry unreachable, or the job must run the checks that need no dependencies before installing.
 3. **Retire the remaining timing assumptions where a signal exists**: the `13-second-quit` guard
    (capture `app.process()` before the quit, or `app.process?.()`), and `ProcessRunnerSpec`'s
    wall-clock assertions where virtual time can express the same claim. `59-row-bars`'s observation
@@ -88,6 +97,7 @@ Rejected alternatives:
 - [ ] A deliberately failing desktop packaged run attaches its failure artifacts too
 - [ ] The lint/test jobs' shell closure does not contain the shipped whisper-cpp/ffmpeg artifacts
       (or: a cold shell whose asset host is unreachable still lets actionlint pass)
+- [ ] `docs-check` passes on a Markdown-only pull request when the npm registry is unreachable
 - [ ] The `13-second-quit` spec passes when the app exits before its `finally` runs
 - [ ] (must not break) A green run uploads nothing and keeps its durations
 - [ ] (must not break) The artifact-producing jobs still publish their DMG/tar.gz artifacts
@@ -105,3 +115,5 @@ Rejected alternatives:
 
 - 2026-10-23: filed as a draft by the root agent at the user's request, after the CI triage of runs
   #212, #216, #223, #236, #239 and #246. Not yet discussed.
+- 2026-10-24: item 54's review added the `docs-check` registry dependency to the Evidence, the
+  Proposal and the test list (the user's decision). Still a draft.

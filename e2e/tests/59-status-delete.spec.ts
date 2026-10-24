@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { STATUS_BROKEN_CLIP } from '../lib/backend.mjs';
+import { STATUS_BROKEN_CLIP } from '../lib/backend.ts';
 import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 
 // Item 59, finding 4 extended to the failed/canceled status page: the completed transcript

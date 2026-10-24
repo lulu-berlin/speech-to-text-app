@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { QUEUE_CLIPS } from '../lib/backend.mjs';
+import { QUEUE_CLIPS } from '../lib/backend.ts';
 import { appLive, expectLiveQueue, uploadClips } from './helpers/ui';
 
 // What one pending row showed at one moment: its text and the names of its progress bars.

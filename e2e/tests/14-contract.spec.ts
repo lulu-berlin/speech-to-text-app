@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { CONTRACT_CLIP, appUrl } from '../lib/backend.mjs';
+import { CONTRACT_CLIP, appUrl } from '../lib/backend.ts';
+import type { HttpCapture } from './helpers/capture';
 import { capturedSse, installHttpCapture, installSseCapture } from './helpers/capture';
 import { mustConform } from './helpers/contract';
 import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
@@ -65,7 +66,7 @@ test('the responses the browser received match the structure of their docs/api e
   page,
 }) => {
   test.setTimeout(300_000);
-  const http: { url: string; status: number; json: unknown }[] = [];
+  const http: HttpCapture = [];
   installHttpCapture(page, http);
   await installSseCapture(page);
 
@@ -105,7 +106,8 @@ test('the responses the browser received match the structure of their docs/api e
     try {
       mustConform(examples, json);
     } catch (error) {
-      throw new Error(`${error.message}\n  from ${method} ${url}`);
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`${reason}\n  from ${method} ${url}`);
     }
   }
 

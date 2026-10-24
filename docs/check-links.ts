@@ -3,22 +3,23 @@
 // Markdown file names one of its headings (GitHub's anchor rules). External URLs, mailto:
 // and in-page anchors of non-Markdown targets are not checked. Exits 1 on any broken link.
 //
-//   node docs/check-links.mjs README.md docs/architecture.md
+//   node docs/check-links.ts README.md docs/architecture.md
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { proseLines } from './markdown-lines.mjs';
+import { proseLines } from './markdown-lines.ts';
 
 // GitHub's heading anchor: lower case, punctuation other than hyphens and spaces dropped,
 // spaces become hyphens; repeated headings get -1, -2, … suffixes.
-function anchorsOf(markdown) {
-  const anchors = new Set();
-  const seen = new Map();
+function anchorsOf(markdown: string): Set<string> {
+  const anchors = new Set<string>();
+  const seen = new Map<string, number>();
   for (const { line } of proseLines(markdown)) {
     const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
     if (heading === null) {
       continue;
     }
-    const base = heading[1]
+    // The pattern always captures the heading text.
+    const base = (heading[1] ?? '')
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s_-]/gu, '')
       .replace(/\s/g, '-');
@@ -29,17 +30,22 @@ function anchorsOf(markdown) {
   return anchors;
 }
 
+interface Target {
+  line: number;
+  target: string;
+}
+
 // Link targets outside fenced code blocks and inline code: Markdown links and images, and
 // the src of HTML images.
-function targetsOf(markdown) {
-  const targets = [];
+function targetsOf(markdown: string): Target[] {
+  const targets: Target[] = [];
   for (const { number, line } of proseLines(markdown)) {
     const text = line.replace(/`[^`]*`/g, '');
     for (const match of text.matchAll(/!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
-      targets.push({ line: number, target: match[1] });
+      targets.push({ line: number, target: match[1] ?? '' });
     }
     for (const match of text.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g)) {
-      targets.push({ line: number, target: match[1] });
+      targets.push({ line: number, target: match[1] ?? '' });
     }
   }
   return targets;
@@ -47,11 +53,11 @@ function targetsOf(markdown) {
 
 const files = process.argv.slice(2);
 if (files.length === 0) {
-  console.error('usage: node docs/check-links.mjs <file.md>…');
+  console.error('usage: node docs/check-links.ts <file.md>…');
   process.exit(2);
 }
 
-const broken = [];
+const broken: string[] = [];
 for (const file of files) {
   if (!existsSync(file)) {
     broken.push(`${file}: file does not exist`);
@@ -62,7 +68,7 @@ for (const file of files) {
     if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
       continue; // http:, https:, mailto: …
     }
-    const [path, fragment] = target.split('#');
+    const [path = '', fragment] = target.split('#');
     const resolved = path === '' ? resolve(file) : resolve(dirname(file), decodeURI(path));
     if (!existsSync(resolved)) {
       broken.push(`${file}:${line}: ${target} — no such file`);

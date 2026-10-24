@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { REORDER_CLIPS } from '../lib/backend.mjs';
+import { REORDER_CLIPS } from '../lib/backend.ts';
 import { appLive, rowOrder, uploadClips } from './helpers/ui';
 
 test('the row menu reorders the queue and the order survives a reload', async ({ page }) => {

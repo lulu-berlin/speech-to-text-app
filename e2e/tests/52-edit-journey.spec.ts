@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { appUrl, HEADER_CLIP } from '../lib/backend.mjs';
+import { appUrl, HEADER_CLIP } from '../lib/backend.ts';
 import { apiTaskIdOf, ensureTranscript, openTranscript } from './helpers/ui';
 
 // Item 52 (ADR 0046): the whole edit journey against the real backend — a segment's text is

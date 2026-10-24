@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { METAL_CLIP } from '../lib/backend.mjs';
+import { METAL_CLIP } from '../lib/backend.ts';
 import { JFK_QUOTE, appLive, goTo, uploadAndOpen } from './helpers/ui';
 
 // Roadmap item 48: on the macOS runner (Apple paravirtual Metal), choosing gpu:0 makes the app's

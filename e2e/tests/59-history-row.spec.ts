@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { HISTORY_BROKEN_CLIP, HISTORY_ROW_CLIP, appUrl } from '../lib/backend.mjs';
+import { HISTORY_BROKEN_CLIP, HISTORY_ROW_CLIP, appUrl } from '../lib/backend.ts';
 import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 
 // Item 59, finding 5: the filename was the only way into a completed task and read as

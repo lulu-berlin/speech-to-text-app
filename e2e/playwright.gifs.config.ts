@@ -9,7 +9,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   testMatch: '**/gifs-record.spec.ts',
-  globalSetup: './global-setup.mjs',
+  globalSetup: './global-setup.ts',
   workers: 1,
   reporter: 'list',
   timeout: 900_000,

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { UPLOAD_RACE_CLIP, appUrl, loadState } from '../lib/backend.mjs';
+import { UPLOAD_RACE_CLIP, appUrl, loadState } from '../lib/backend.ts';
 import { appLive, uploadClips } from './helpers/ui';
 
 // Item 41's upload hardening (ADR 0046): two identical uploads sent at the same time must leave exactly

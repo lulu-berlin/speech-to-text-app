@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
-import { HEADER_CLIP, appUrl } from '../lib/backend.mjs';
+import { HEADER_CLIP, appUrl } from '../lib/backend.ts';
 import { ensureTranscript, openTranscript, turnTextOf } from './helpers/ui';
 
 const FORMATS = ['txt', 'srt', 'vtt'] as const;

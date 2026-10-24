@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { appUrl, choosePort, startBackend, stopBackend } from '../lib/backend.mjs';
+import { appUrl, choosePort, startBackend, stopBackend } from '../lib/backend.ts';
 
 // Item 60 (ADR 0046): a failed device probe is reported as a failed probe, never as "no GPU". The shared
 // suite backend runs with whisper-cli, so the failure half starts its own backend on a free port with the

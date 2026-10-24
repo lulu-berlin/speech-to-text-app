@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { MERGE_CLIP } from '../lib/backend.mjs';
+import { MERGE_CLIP } from '../lib/backend.ts';
 import { uploadAndOpen } from './helpers/ui';
 
 // The speaker labels of the transcript's turns, in order.

@@ -43,7 +43,7 @@ in
       # pinned to the playwright version THIS devenv provides (devenv's pkgs come from
       # the flake's shared nixpkgs pin — ADR 0036 — currently
       # playwright 1.63.0, browser revisions 1243;
-      # e2e/check-playwright.mjs verifies comment, package.json and the realized store
+      # e2e/check-playwright.ts verifies comment, package.json and the realized store
       # agree): the npm package and the farm
       # must agree on the browser revisions. Bump both together. Dev only — the flake's
       # build is untouched (ADR 0010).

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RESTART_CLIPS, loadState, saveState, startBackend, stopBackend } from '../lib/backend.mjs';
+import { RESTART_CLIPS, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
 import { appLive, rowOrder, uploadClips } from './helpers/ui';
 
 test('restarting the backend reconnects the event stream and the state is restored from the snapshot', async ({

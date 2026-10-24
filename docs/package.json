@@ -1,0 +1,15 @@
+{
+  "name": "stt-docs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "cd .. && tsc -p docs/tsconfig.json && prettier --check \"docs/*.ts\" docs/package.json docs/tsconfig.json && node docs/check-links.ts README.md docs/architecture.md && node docs/check-readme-windows.ts && node docs/check-architecture-names.ts && node docs/check-architecture-diagram.ts && node docs/check-exceptions.ts && node --test docs/check-exceptions.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/type-check.test.ts",
+    "format": "prettier --write \"docs/*.ts\" docs/package.json docs/tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "prettier": "^3.9.9",
+    "typescript": "^7.0.2"
+  }
+}

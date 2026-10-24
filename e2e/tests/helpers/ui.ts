@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { expect, type Locator, type Page } from '@playwright/test';
-import { appUrl, loadState } from '../../lib/backend.mjs';
+import { appUrl, loadState } from '../../lib/backend.ts';
 
 // The two widths the spec fixes: phone ~390 px, desktop ~1280 px.
 export const PHONE_VIEWPORT = { width: 390, height: 844 };

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ATOMIC_NEXT_CLIP, ATOMIC_RACE_CLIP } from '../lib/backend.mjs';
+import { ATOMIC_NEXT_CLIP, ATOMIC_RACE_CLIP } from '../lib/backend.ts';
 import {
   appLive,
   expectCompletedOrCanceled,

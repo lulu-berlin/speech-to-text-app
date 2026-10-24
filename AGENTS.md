@@ -89,13 +89,16 @@ Frontend (pnpm — ADR 0012):
 - `pnpm build` — `tsc --noEmit` + `vite build` (output: `frontend/dist/`).
 - `pnpm dev` — Vite dev server; proxies `/api` to `http://localhost:8080`.
 
-Documentation (Node, run from the repository root; run them after changing `README.md` or `docs/architecture.md`, code the overview names, backend exception handling, or the CI workflow):
+Documentation (the `docs/` package — TypeScript run by Node's type stripping, ADR 0054 — plus the individual checks; everything below runs from the repository root, so run it after changing `README.md` or `docs/architecture.md`, code the overview names, backend exception handling, or the CI workflow):
 
-- `node docs/check-links.mjs README.md docs/architecture.md` — every relative link, `#anchor` and image resolves.
-- `node docs/check-readme-windows.mjs` — `README.md` documents the Windows x64 path: the bootstrap commands, the Vulkan driver requirement, the CPU fallback, the per-user data directory and the ARM64 scope.
-- `node docs/check-architecture-names.mjs && node docs/check-architecture-diagram.mjs` — every code name in the architecture overview exists in the code, and its diagram's boxes and arrows are real components and calls.
+- `pnpm --dir docs install` — install the package's dependencies from `docs/pnpm-lock.yaml`.
+- `pnpm --dir docs test` — `tsc --noEmit` over `docs/*.ts`, `prettier --check` over them and the package files, then every check below and their `node --test`. The standard verification command.
+- `node docs/check-links.ts README.md docs/architecture.md` — every relative link, `#anchor` and image resolves.
+- `node docs/check-readme-windows.ts` — `README.md` documents the Windows x64 path: the bootstrap commands, the Vulkan driver requirement, the CPU fallback, the per-user data directory and the ARM64 scope.
+- `node docs/check-architecture-names.ts && node docs/check-architecture-diagram.ts` — every code name in the architecture overview exists in the code, and its diagram's boxes and arrows are real components and calls.
 - `node docs/check-exceptions.ts` — every broad `catch` in `backend/src/main/kotlin` rethrows, logs its throwable, or carries `// exceptions: swallow-ok <reason>`, and no `runCatching` remains; `node --test docs/check-exceptions.test.ts` covers the check itself.
-- `node --test docs/check-ci-gating.test.mjs` — `.github/decide-code-change.sh` runs everything off a pull request and on the `ci:full` label, `.github/classify-change.sh` calls only `*.md` and `LICENSE` documentation (everything else code), every heavy job in `ci.yml` carries the `changes` gate, and `docs-check` and `CI (all checks)` stay ungated.
+- `node --test docs/checks.test.ts docs/checks-failures.test.ts` — the four checks above still print their green lines over the current tree, and, on a planted tree with a broken link, an unknown code name and a wrong diagram arrow, their failure lines and exit 1.
+- `node --test docs/check-ci-gating.test.ts` — `.github/decide-code-change.sh` runs everything off a pull request and on the `ci:full` label, `.github/classify-change.sh` calls only `*.md` and `LICENSE` documentation (everything else code), every heavy job in `ci.yml` carries the `changes` gate, and `docs-check` and `CI (all checks)` stay ungated.
 
 ## Git
 

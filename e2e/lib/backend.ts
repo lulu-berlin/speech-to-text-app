@@ -6,15 +6,16 @@
 // The backend runs as `gradle --no-daemon run`. Even so, gradle forks a single-use daemon
 // JVM that actually launches the app's JVM, and that daemon is outside the group of the
 // gradle launcher pid the harness holds — so stops find and kill the app JVM by its
-// arguments (lib/processes.mjs), not by the group alone.
+// arguments (lib/processes.ts), not by the group alone.
 import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ancestors, findProcess, processes } from './processes.mjs';
+import { ancestors, findProcess, processes } from './processes.ts';
 
 export const e2eRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const repoRoot = join(e2eRoot, '..');
@@ -23,9 +24,17 @@ export const frontendDist = join(repoRoot, 'frontend', 'dist');
 export const BACKEND_LOG_FILE = join(e2eRoot, '.e2e-backend.log');
 
 const STATE_FILE = join(e2eRoot, '.e2e-state.json');
-const healthUrl = (port) => `http://127.0.0.1:${port}/api/health`;
+const healthUrl = (port: number): string => `http://127.0.0.1:${port}/api/health`;
 
-// The journey's fixture clips, created by global-setup.mjs: from TEST_JFK_WAV the full
+/** What `.e2e-state.json` holds for one run: global setup writes it, the tests and teardown read it. */
+export interface E2eState {
+  port: number;
+  dataDir: string;
+  fixturesDir: string;
+  pid: number | undefined;
+}
+
+// The journey's fixture clips, created by global-setup.ts: from TEST_JFK_WAV the full
 // sample, its distinct trims and loops (every clip has its own bytes); from item 08's
 // committed LibriSpeech clips a two-speaker recording; and a .wav that cannot be decoded.
 // Uploaded tasks are deduplicated by content sha256, and every test shares one backend per
@@ -84,7 +93,7 @@ export const FIXTURE_CLIPS = [
   'broken-59-status.wav', // item 59's status-page delete fixture
   'jfk-ai.wav', // the sample looped 17x, ~187s, item 59's header-typing clip
   'jfk-metal.wav', // the sample twice (~22s), item 48's Metal app e2e
-];
+] as const;
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
 export const PLAYBACK_CLIP = FIXTURE_CLIPS[6];
@@ -98,8 +107,8 @@ export const CONTRACT_CLIP = FIXTURE_CLIPS[20];
 // The history and restart tests' own trims (unique bytes, so they still upload when the
 // shared run's clips are finished tasks) — four trims partition the sample, two per
 // test, so 12's uploads cannot be 13's already-finished tasks.
-export const HISTORY_CLIPS = [FIXTURE_CLIPS[11], FIXTURE_CLIPS[12]]; // 0-3s, 7-11s
-export const RESTART_CLIPS = [FIXTURE_CLIPS[13], FIXTURE_CLIPS[14]]; // 0-7s, 4-11s
+export const HISTORY_CLIPS: [string, string] = [FIXTURE_CLIPS[11], FIXTURE_CLIPS[12]]; // 0-3s, 7-11s
+export const RESTART_CLIPS: [string, string] = [FIXTURE_CLIPS[13], FIXTURE_CLIPS[14]]; // 0-7s, 4-11s
 // The history test's own undecodable fixture — the cancel test's broken.wav is already
 // a FAILED task by the time this file runs, so a second upload would be 409.
 export const BROKEN2_CLIP = FIXTURE_CLIPS[15];
@@ -200,28 +209,28 @@ export const METAL_CLIP = FIXTURE_CLIPS[45];
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];
 export const librispeechDir = join(backendDir, 'src', 'test', 'resources', 'librispeech');
 
-export function loadState() {
+export function loadState(): E2eState {
   if (!existsSync(STATE_FILE)) {
     throw new Error(
       `no e2e state at ${STATE_FILE} — the suite must run through globalSetup (pnpm --dir e2e test)`,
     );
   }
-  return JSON.parse(readFileSync(STATE_FILE, 'utf8'));
+  return JSON.parse(readFileSync(STATE_FILE, 'utf8')) as E2eState;
 }
 
-export function saveState(patch) {
+export function saveState(patch: Partial<E2eState>): void {
   const state = existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, 'utf8')) : {};
   writeFileSync(STATE_FILE, JSON.stringify({ ...state, ...patch }));
 }
 
 // The app's origin for this run; the tests reach the backend through it (the app itself
 // talks to same-origin /api, so no port ever appears in frontend code).
-export function appUrl(path = '/') {
+export function appUrl(path = '/'): string {
   return `http://127.0.0.1:${loadState().port}${path}`;
 }
 
 // Without Nix, `./gradlew e2e` sets all of these (roadmap item 33).
-export function checkPreconditions() {
+export function checkPreconditions(): void {
   const setBy = 'run inside the devenv shell (devenv.nix sets it) or use ./gradlew e2e';
   if (!process.env.TEST_WHISPER_TINY_EN_MODEL) {
     throw new Error(`TEST_WHISPER_TINY_EN_MODEL is unset — ${setBy}`);
@@ -239,34 +248,37 @@ export function checkPreconditions() {
   }
 }
 
-export async function choosePort() {
-  return await new Promise((resolve, reject) => {
-    const probe = createServer();
-    probe.unref();
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      if (address !== null && typeof address === 'object') {
-        probe.close(() => resolve(address.port));
-      } else {
-        reject(new Error('choosePort: probe server gave no port'));
-      }
-    });
+export async function choosePort(): Promise<number> {
+  const { promise, resolve, reject } = Promise.withResolvers<number>();
+  const probe = createServer();
+  probe.unref();
+  probe.once('error', reject);
+  probe.listen(0, '127.0.0.1', () => {
+    const address = probe.address();
+    if (address !== null && typeof address === 'object') {
+      probe.close(() => resolve(address.port));
+    } else {
+      reject(new Error('choosePort: probe server gave no port'));
+    }
   });
+  return await promise;
 }
 
 // The scratch the backend keeps for a task outside the database: one directory per data directory under
 // the OS temp dir (`java.io.tmpdir/stt-<fingerprint of STT_DATA_DIR>`), one subdirectory per task. It holds
 // the chunker's scratch, whisper's inputs and the clip decoded for diarization, and it is removed when the
 // task ends — every task's audio lives in the database (item 44).
-export function scratchDirPath(dataDir, taskId) {
+export function scratchDirPath(dataDir: string, taskId: number | string): string {
   const fingerprint = createHash('sha256').update(dataDir).digest('hex').slice(0, 16);
   return join(tmpdir(), `stt-${fingerprint}`, String(taskId));
 }
 
 // Waits until /api/health answers (startup) or, with `down: true`, until it stops
 // answering (shutdown, and the restart test's kill).
-export async function waitForHealth(port, { down = false, timeoutMs = 600_000 } = {}) {
+export async function waitForHealth(
+  port: number,
+  { down = false, timeoutMs = 600_000 }: { down?: boolean; timeoutMs?: number } = {},
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     let up = false;
@@ -282,7 +294,7 @@ export async function waitForHealth(port, { down = false, timeoutMs = 600_000 } 
         `backend on :${port} ${down ? 'still answering after' : 'did not answer within'} ${timeoutMs} ms`,
       );
     }
-    const { promise, resolve } = Promise.withResolvers();
+    const { promise, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, 300);
     await promise;
   }
@@ -292,7 +304,11 @@ export async function waitForHealth(port, { down = false, timeoutMs = 600_000 } 
 // launcher and a single-use daemon — that are outside this harness's process group by
 // now; find the app JVM by its args and SIGKILL the whole chain, so nothing survives to
 // hold the port or linger.
-export async function stopBackend(pid, port, dataDir) {
+export async function stopBackend(
+  pid: number | undefined,
+  port: number,
+  dataDir: string,
+): Promise<void> {
   const rows = processes();
   const jvm = findProcess(rows, ['stt.MainKt', dataDir]);
   if (jvm !== null) {
@@ -313,7 +329,8 @@ export async function stopBackend(pid, port, dataDir) {
   await waitForHealth(port, { down: true, timeoutMs: 60_000 });
 }
 
-export function killGroup(pid) {
+export function killGroup(pid: number | undefined): void {
+  if (pid === undefined) return; // nothing was spawned
   try {
     process.kill(-pid, 'SIGTERM');
   } catch {
@@ -337,7 +354,7 @@ export function killGroup(pid) {
 // probe-failure spec strips whisper-cli from PATH for its own backend (a second one on a free port;
 // the shared backend is untouched).
 /** The Gradle to run the backend with: PATH's gradle when present, else the repository wrapper. */
-function backendGradle() {
+function backendGradle(): { command: string; args: string[]; cwd: string } {
   const hasGradle = (process.env.PATH ?? '')
     .split(delimiter)
     .some((dir) => existsSync(join(dir, 'gradle')));
@@ -354,7 +371,7 @@ function backendGradle() {
  * Mirrors the backend's stdout/stderr to the console and appends them to [BACKEND_LOG_FILE], so a
  * CI step can assert which whisper backend a task used (roadmap item 48).
  */
-function captureBackendOutput(child) {
+function captureBackendOutput(child: ChildProcess): void {
   const log = createWriteStream(BACKEND_LOG_FILE, { flags: 'a' });
   child.stdout?.on('data', (chunk) => {
     process.stdout.write(chunk);
@@ -367,13 +384,21 @@ function captureBackendOutput(child) {
   child.once('exit', () => log.end());
 }
 
-export async function startBackend({ port, dataDir, env = {} }) {
+export async function startBackend({
+  port,
+  dataDir,
+  env = {},
+}: {
+  port: number;
+  dataDir: string;
+  env?: NodeJS.ProcessEnv;
+}): Promise<{ pid: number | undefined }> {
   checkPreconditions();
   const backendCmd = process.env.E2E_BACKEND_CMD;
   if (backendCmd) {
     // A command line is allowed (e.g. './gradlew run'); a bare path (item 16's
     // ./result/bin/stt-app) still works — the split is a no-op without spaces.
-    const [cmd, ...args] = backendCmd.split(/\s+/).filter(Boolean);
+    const [cmd = '', ...args] = backendCmd.split(/\s+/).filter(Boolean);
     const child = spawn(cmd, args, {
       cwd: repoRoot,
       detached: true, // own session + process group: a group kill reaches the wrapper and the app JVM

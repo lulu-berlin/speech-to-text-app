@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { PLAYBACK_CLIP } from '../lib/backend.mjs';
+import { PLAYBACK_CLIP } from '../lib/backend.ts';
 import { uploadAndOpen } from './helpers/ui';
 
 // The transcript's segments: every element with the button role except the current
