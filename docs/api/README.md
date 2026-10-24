@@ -1,6 +1,6 @@
 # API contract examples
 
-Example JSON for every response body, SSE event payload and error of the HTTP API. The contract itself is the "Contract" section of [roadmap item 12](../../roadmap/12-http-api-and-sse.md) (moved to `docs/specs/` when the item is done). The rule for these files is [ADR 0029](../decisions/0029-contract-first-frontend-shared-api-examples.md).
+Example JSON for every response body, SSE event payload and error of the HTTP API. The contract itself is the "Contract" section of [roadmap item 12](../specs/http-api-and-sse.md) (moved to `docs/specs/` when the item is done). The rule for these files is [ADR 0029](../decisions/0029-contract-first-frontend-shared-api-examples.md).
 
 ## Rules
 
