@@ -249,6 +249,14 @@ jobs:
         run: |
           rm -f e2e/.e2e-backend.log
           ./gradlew e2e
+      # Roadmap item 82: the failed specs' traces, as in `e2e`.
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-test-results-macos
+          path: e2e/test-results/
+          retention-days: 7
       - name: Assert a task ran through Metal
         run: |
           set -euo pipefail
@@ -416,6 +424,14 @@ jobs:
         run: >-
           pnpm exec playwright test -c playwright.desktop.config.ts
           01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
+      # Roadmap item 82: the failed specs' traces, as in `e2e`.
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-results-macos-dmg
+          path: e2e/test-results/
+          retention-days: 7
 
   # Manual tool (roadmap item 48, aligned with item 63's `desktop-whisper-cpp-v1` release): the
   # pinned jiang1997 darwin prebuild's binaries load libggml-metal/libggml-blas dylibs the tarball
@@ -715,6 +731,15 @@ jobs:
           $ErrorActionPreference = 'Stop'
           pnpm exec playwright test -c playwright.desktop.config.ts 15-msi-install.spec.ts
           if ($LASTEXITCODE -ne 0) { throw 'the MSI spec failed' }
+      # Roadmap item 82: the failed specs' traces, as in `e2e`. Each Playwright step above clears
+      # e2e/test-results, and the job stops at the first failing one, so this holds that step's.
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-results-windows
+          path: e2e/test-results/
+          retention-days: 7
 
   # The Windows whisper-cli asset (manual, roadmap item 49). The published prebuilts are not
   # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC
@@ -1065,6 +1090,14 @@ jobs:
       - name: Run the packaged desktop e2e
         working-directory: e2e
         run: xvfb-run -a pnpm exec playwright test -c playwright.desktop.config.ts
+      # Roadmap item 82: the failed specs' traces, as in `e2e`.
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-results-linux-deb
+          path: e2e/test-results/
+          retention-days: 7
 
   # The desktop app's flake package (ADR 0053), tested the way `pnpm --dir e2e test:desktop:nix`
   # tests it on a developer's machine: `nix build .#desktop` on the runner, then the same packaged
@@ -1088,6 +1121,15 @@ jobs:
         run: >-
           devenv shell -- bash -euo pipefail -c
           'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:nix'
+      # Roadmap item 82: the failed specs' traces, as in `e2e`; the container writes them into the
+      # mounted e2e/ (desktop/run-in-docker.ts).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-results-linux-flake
+          path: e2e/test-results/
+          retention-days: 7
 
   # The desktop bundle (ADR 0053), tested the way `pnpm --dir e2e test:desktop:bundle` tests it on a
   # developer's machine: `nix build .#desktop-bundle` on the runner, then the packaged specs in a
@@ -1126,6 +1168,15 @@ jobs:
         run: >-
           devenv shell -- bash -euo pipefail -c
           'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:bundle'
+      # Roadmap item 82: the failed specs' traces, as in `e2e`; the container writes them into the
+      # mounted e2e/ (desktop/run-in-docker.ts).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-results-linux-bundle
+          path: e2e/test-results/
+          retention-days: 7
 
   # The three Nix checks run in parallel, but GitHub Actions cache keys are immutable: the first
   # job to save wins. Only `nix-build` writes the shared cache, because it materializes the full
