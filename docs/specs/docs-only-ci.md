@@ -1,0 +1,218 @@
+# 80 — Documentation-only pull requests skip the heavy CI jobs
+
+Status: done (roadmap item 80, approved 2026-10-23)
+Depends on: [49](windows-support.md) (adds the Windows jobs this must cover too),
+[51](ci-verification.md) (done; the workflow and the `CI (all checks)` aggregator)
+Blocks: —
+
+## Goal
+
+A pull request that changes only documentation still needs its PR and the required `CI (all checks)`
+check, but it should not spend 19–31 minutes building the backend, frontend, Nix closures and
+desktop packages. The workflow decides once, from the PR's diff, whether code changed; the heavy
+jobs are skipped when it did not, and `CI (all checks)` stays green and required. Push, schedule and
+dispatch runs always run everything.
+
+## Evidence
+
+- `main`'s `.github/workflows/ci.yml` has more than 20 jobs; the aggregator `ci` (`CI (all checks)`,
+  `ci.yml:708-722`) lists every build/test job in `needs` and fails only on a `failure` or
+  `cancelled` result, so a skipped job is already accepted (the failure step checks only those two
+  results).
+- The branch protection on `main` now requires exactly `CI (all checks)` (verified 2026-10-23), so a
+  workflow-level `paths-ignore` would leave a docs PR without the required check and block it. The
+  aggregator must run.
+- A docs PR runs the full matrix today: item 79's roadmap-only change would build the backend,
+  frontend, both e2e suites, the Nix packages and all desktop artifacts. Item 78's docs PRs did the
+  same.
+- The cheap jobs that should always run: `docs-check` (`ci.yml:70-82`) and the aggregator. The
+  manual asset jobs (`macos-whisper-asset`, `macos-ffmpeg-asset`) are dispatch-only and outside the
+  aggregator's `needs`.
+- Item 49's branch adds `Windows (gradle check)`, `Windows (pnpm test, pnpm build)` and
+  `Windows (packaged zip e2e)` to the same aggregator, so this must be written for every code job
+  rather than an enumerated list of today's jobs.
+
+## Proposal
+
+1. **A `changes` job**, first in the graph, `ubuntu-24.04`, read-only permissions:
+   - `actions/checkout@v7` with `fetch-depth: 0`;
+   - on `pull_request`, `git diff --name-only <base.sha> <head.sha>` and an output `code` that is
+     `false` only when every path matches `docs/`, `roadmap/`, `LICENSE`, or ends in `.md`;
+   - every other event (`push`, `schedule`, `workflow_dispatch`) sets `code=true`.
+2. **Every job that builds, tests or packages code** gets `needs: [changes]` and
+   `if: needs.changes.outputs.code == 'true'`; the manual asset jobs keep their dispatch `if` and
+   stay out of the skip. `docs-check` and `ci` always run; `ci` gains `changes` in `needs`.
+3. **A forced full run** for a docs PR: the `ci:full` label makes `changes` report `code=true`, so
+   the same PR can run the whole matrix; a `workflow_dispatch` run always runs everything.
+4. **Document it** in AGENTS § Commands and the workflow comment.
+
+## Decided (consultation, 2026-10-23)
+
+- **The `ci:full` label** forces the full matrix on a documentation-only PR: `changes` reports
+  `code=true` when the PR carries it.
+- **The documentation set** is `docs/`, `roadmap/`, any `*.md`, and `LICENSE`. Everything else is
+  code, including `.github/`, `.editorconfig`, `.gitattributes`, `devenv.nix`, `flake.nix`,
+  `versions.json`, `build.gradle.kts` and `stt.cmd`.
+- **Revised the same day, before the filter shipped:** the documentation set is any `*.md` file and
+  `LICENSE`. A directory does not make documentation: `docs/api/*.json` is the API contract the
+  backend tests read, `docs/backend-schema.sql` and `docs/images/*` are not prose, and the `.txt`
+  files are build inputs (`desktop/jlink-modules.txt` builds the bundled JRE,
+  `nix/fixtures/whisper-cpp-sample-transcript.txt` backs a flake check). Everything else is code.
+- **`codeql.yml` stays unchanged**: it is a separate workflow and is not the required check.
+- **Empty or unknown diffs run everything** (`code=true`), so a missing base can never skip a job.
+
+## Open questions (answered 2026-10-23)
+
+- Full run on a docs PR? → **the `ci:full` label**.
+- The filter's definition? → the set above; a build-affecting dotfile is code. (Revised the same
+  day: `*.md` and `LICENSE` only — a directory, a `.txt` or an image does not make documentation.)
+- `codeql.yml`? → unchanged.
+
+## Test list (approved 2026-10-23; behaviors only)
+
+- [x] (CI) A pull request whose diff is documentation only skips every heavy job, runs
+      `Docs (exception policy)`, and `CI (all checks)` is green
+- [x] (CI) A pull request touching one code path runs every heavy job (no skip)
+- [x] (CI) Changes to `.github/`, `devenv.nix`, `flake.nix`, `versions.json` or
+      `build.gradle.kts` count as code, not documentation
+- [x] (discovered) A non-Markdown file under `docs/` (a contract example the tests read, an image,
+      the schema) counts as code, and so does every `.txt` (they are build inputs)
+- [x] (CI) A push to `main` and the nightly schedule run every heavy job
+- [x] (CI) With the `ci:full` label, a documentation-only PR runs every heavy job
+- [x] (must not break) The required check keeps the name `CI (all checks)`; the aggregator's `needs`
+      covers every heavy job; the manual asset jobs and the macOS-only jobs keep their conditions
+- [x] (must not break) A skipped job does not make `CI (all checks)` red, and a failing job still
+      does
+
+## e2e stance
+
+This changes only how CI decides which jobs to run; no app feature changes, so it adds no feature
+e2e (the reason is recorded here, as in item 65).
+
+## Acceptance criteria
+
+- A documentation-only PR merges with a green `CI (all checks)` in a couple of minutes, and a code
+  PR still runs the full matrix.
+- The required check's name and semantics are unchanged; no job can be skipped because of a stale or
+  missing comparison (an empty or unknown diff runs everything).
+- All test-list items ticked and green; user approved the diff.
+
+## Approval log
+
+- 2026-10-23: filed as a draft by the root agent at the user's request, after `main`'s protection
+  was tightened to require `CI (all checks)` (the earlier docs fast-track merged PRs by bypassing
+  checks). Not yet discussed.
+- 2026-10-23 (consultation, the user): the `changes` job and the per-job gating approved as
+  proposed; a `ci:full` label forces the full matrix on a docs PR; the documentation set is
+  `docs/`, `roadmap/`, `*.md` and `LICENSE` (build-affecting dotfiles are code); `codeql.yml` stays
+  unchanged; empty/unknown diffs run everything. Test list approved as worded. Status:
+  spec-approved.
+- 2026-10-23 (cycle 1, test-list item 1): red — `node --test docs/check-ci-gating.test.mjs`
+  failed at "`.github/classify-change.sh` exists: the changes job classifies its diff instead of
+  guessing" (no classifier, no `changes` job, no gate). Green after adding `.github/classify-change.sh`,
+  the `changes` job and `needs`/`if` on all 16 code jobs: 1 test passes, `actionlint` clean,
+  `node docs/check-links.mjs AGENTS.md` clean. The GitHub job list for a documentation-only PR is
+  pending the user's push.
+- 2026-10-23 (cycle 2, test-list item 2): the test passed on its first run — no red was available,
+  because cycle 1's classifier already defaults to `code=true` for anything that is not
+  documentation; the test pins that one Kotlin path (alone and among docs) reports `code=true` and
+  that every heavy job's only `if` is the `changes` output. 2 tests pass, `actionlint` clean.
+  GitHub proof: this branch's own PR (its diff touches `.github/`) must show every heavy job run.
+- 2026-10-23 (refactor, approved): the `changes` step's shell moved to
+  `.github/decide-code-change.sh` (event, `ci:full`, diff, unreadable-diff fallback), so items 4
+  and 5 can execute the decision instead of pinning YAML text; the workflow step is now one call.
+  Smoke on temp repos: docs-only PR `code=false`; code PR, docs + `ci:full`, push, schedule, empty
+  diff and unknown base all `code=true`. 2 tests pass, `actionlint` clean, AGENTS links resolve.
+- 2026-10-23 (cycle 3, test-list item 3): passed on its first run — the classifier's catch-all makes
+  every non-documentation path code, so there was no red to record; the pin covers `.github/`
+  (workflow and composite action), `devenv.nix`/`.lock`, `flake.nix`/`.lock`, `versions.json`,
+  `build.gradle.kts` (root and backend), `settings.gradle.kts` and the `package.json`/`pnpm-lock.yaml`
+  pairs (added at the user's request while confirming the item). 3 tests pass.
+- 2026-10-23 (discovered + approved, test-list item `(discovered)`): while checking item 3,
+  `docs/api/*.json` turned out to be the contract the backend tests read and all three `.txt` files
+  to be build inputs, so the user approved narrowing documentation to `*.md` + `LICENSE`. Red: the
+  new test failed at "the contract tests read docs/api/*.json" (`code=false`). Green after
+  `classify-change.sh` dropped its `docs/`, `roadmap/` and `.txt` exceptions: 4 tests pass,
+  `actionlint` clean, AGENTS links resolve. The Decided and Open-questions sections record the
+  revision.
+- 2026-10-23 (cycle 5, test-list item 4): passed on its first run — the decision script already
+  runs everything outside a pull request, so the test executes it on a temp repo whose range is
+  documentation only (`pull_request` → `code=false`, the control) and gets `code=true` for `push`,
+  `schedule` and `workflow_dispatch`. 5 tests pass. GitHub half: the `main` push run after merge.
+- 2026-10-23 (cycle 6, test-list item 5): passed on its first run — the decision script already
+  honours `FORCE_FULL`; the test flips a documentation-only temp-repo range from `code=false` to
+  `code=true` and pins the `changes` job's `FORCE_FULL: contains(github.event.pull_request.labels.*.name, 'ci:full')`
+  wiring. 6 tests pass. GitHub half: a documentation-only PR carrying the label.
+- 2026-10-23 (cycle 7, test-list item 6): passed on its first run — a pin over the post-change
+  workflow: the aggregator keeps the name, lists every heavy job (and every `needs` entry names a
+  real job), the two manual asset jobs keep `workflow_dispatch && inputs.assets` and no `needs`,
+  the macOS jobs keep their `macos-backend-check`/`macos-frontend-check` dependencies alongside the
+  gate, and `model-hosts` keeps its cron and stays out of the aggregator. 7 tests pass.
+- 2026-10-23 (cycle 8, test-list item 7): passed on its first run — the aggregator's condition is
+  unchanged, so the test evaluates its `contains(needs.*.result, …)` terms out of `ci.yml`:
+  `success` + `skipped` stays green, `failure` and `cancelled` redden it, and the job-level
+  `if: always()` keeps it scheduled. 8 tests pass; `actionlint`, the links check and the whole test
+  file were re-run before this line. All test-list items ticked; Status: in-review.
+- 2026-10-23 (GitHub evidence 1 — documentation-only PR): run
+  [40040260117](https://github.com/lulu-berlin/speech-to-text-app/actions/runs/40040260117),
+  PR #58 `docs/80-proof` → base `roadmap/80-docs-only-ci` (`32af1224`), head `00fe1c0f`
+  (`docs/ci-gating-proof.md` only). The run finished `success` in 40 s with 26 jobs: scheduled and
+  green were `Changes (code vs documentation)`, `Linux (docs exception policy)` and
+  `CI (all checks)`. Twenty-three jobs were skipped: `Linux (gradle check)`, `Linux (pnpm test,
+  pnpm build)`, `Linux (gradle integrationTest)`, `Linux (e2e)`, `Linux (packaged .deb e2e)`,
+  `Linux (flake package e2e)`, `Linux (bundle e2e)`, `Linux (Nix devenv shell)`,
+  `Linux (Nix flake check)`, `Linux (Nix build)`, `macOS (gradle check)`, `macOS (pnpm test, pnpm
+  build)`, `macOS (gradle integrationTest)`, `macOS (e2e)`, `macOS (Nix build + devenv)`,
+  `macOS (DMG + packaged e2e)`, `Windows (gradle check)`, `Windows (pnpm test, pnpm build)`,
+  `Windows (packaged zip e2e)`, the three manual assets and `Linux (pinned model hosts resolve)`.
+  Skipped needs left `CI (all checks)` green (test-list items 1 and 7 observed on GitHub). A
+  superseded run on the code PR, [40039773631](https://github.com/lulu-berlin/speech-to-text-app/actions/runs/40039773631),
+  was cancelled mid-flight and its aggregator correctly failed on `cancelled` — the other half of
+  item 7. The code PR's full-matrix run and the `ci:full` run are recorded separately.
+- 2026-10-23 (rebase onto `main` after item 49): resolved `ci.yml` keeping both changes — the three
+  Windows jobs (`windows-backend-check`, `windows-frontend-check`, `windows-desktop-zip`) carry
+  `needs: [changes]` and the gate, `windows-desktop-zip` keeps its two Windows dependencies, the
+  dispatch-only `windows-whisper-asset` stays outside the filter, and `CI (all checks)` lists all
+  three Windows jobs plus `changes` and keeps its name. Item 49 also renamed display names
+  (`Linux (docs exception policy)`, `Linux (pinned model hosts resolve)`), so the checks pin the
+  documentable contract — the aggregator's name — and job ids elsewhere. 8 tests pass after the
+  rebase; `actionlint` clean. GitHub run evidence still pending.
+- 2026-10-23 (discovered + approved, test-list item 5, after the rebase): the label alone started no
+  run — GitHub's `pull_request` defaults are `opened`/`synchronize`/`reopened` — so the trigger
+  gained `labeled` with the defaults restated. Red: the new assertion failed ("a labeled
+  pull_request triggers a run"); green after `types: [opened, synchronize, reopened, labeled]`.
+  8 tests pass, `actionlint` clean.
+- 2026-10-23 (discovered + approved, test-list item 5, after the second rebase): removing `ci:full`
+  did not stop the full matrix. GitHub evaluates `github.event.pull_request.labels` from the payload
+  captured when the run is created, so an already-created run keeps `code=true`, and `unlabeled`
+  was not a trigger type, so nothing started to replace it. The trigger is now
+  `types: [opened, synchronize, reopened, labeled, unlabeled]`: removing the label starts a run
+  whose payload has no label, which decides `code=false`, skips the heavy jobs and cancels the
+  forced run through the concurrency group. Red: the exact-list assertion failed; green after the
+  workflow change. 8 tests pass, `actionlint` and the links check clean.
+- 2026-10-24 (GitHub evidence 2 — `ci:full` on the documentation-only PR): run
+  [40041462244](https://github.com/lulu-berlin/speech-to-text-app/actions/runs/40041462244),
+  PR #58 head `dda6a1f5` (base `7af6640d`). The run was created by the "Update branch" push at
+  23:45:44 while `ci:full` was still attached (removed at 23:45:57), so it read `FORCE_FULL=true`:
+  `Changes` decided `code=true` and all 19 heavy jobs ran and succeeded — Linux (gradle check,
+  pnpm test/build, integrationTest, e2e, packaged .deb, flake package, bundle, Nix devenv, flake
+  check, Nix build), macOS (gradle check, pnpm test/build, integrationTest, e2e, Nix, DMG),
+  Windows (gradle check, pnpm test/build, packaged zip). The three manual assets and
+  `Linux (pinned model hosts resolve)` skipped. `CI (all checks)` ran at 00:10:28 and went green in
+  2 s: "Report the job results" succeeded and "Every job succeeded" (the failure step) was skipped.
+  Twenty-two success and four skipped in total — test-list item 5, and item 7's green half, observed
+  on GitHub.
+- 2026-10-24 (GitHub evidence 3 — the code PR): run
+  [40041313804](https://github.com/lulu-berlin/speech-to-text-app/actions/runs/40041313804) at
+  `7af6640d` (PR #57): 20 success, 4 skipped, and `macOS (gradle integrationTest)` failed inside its
+  `gradle integrationTest` step, so `CI (all checks)` failed in "Every job succeeded" — the
+  aggregator's red half, observed. The change-filter is not implicated: the same job succeeded on
+  `dda6a1f5` minutes later (run 40041462244) and on `32af1224` (run 40039983395), so this is a
+  flake. Filed in `docs/known-issues.md` (Tests) with the assertion line
+  (`ProcessRunnerSpec.kt:521-524`) and this job's URL.
+- 2026-10-23 (PR prep, the user): rebased onto `main` `aff2206a` and squashed to one commit carrying
+  the finished state: the item moved to `docs/specs/docs-only-ci.md` with `Status: done`, the
+  `roadmap/README.md` row is `done` and its graph node `✓`/`:::done`. Two root-review lows were
+  accepted as-is by the user: the classifier's `.github/` claim is narrower than its `*.md` arm (no
+  such file exists today), and the empty/unreadable-diff fallbacks are documented but not pinned by a
+  test. The `ProcessRunnerSpec` known-issue row stays: it is a real finding from this item's runs.

@@ -68,6 +68,8 @@ Keep [docs/known-issues.md](docs/known-issues.md) current: add every real findin
 
 Run backend commands from `backend/`, frontend commands from `frontend/`.
 
+CI (`.github/workflows/ci.yml`) decides once per run whether code changed: a pull request whose diff is only Markdown files (`*.md`, any directory) or `LICENSE` skips every job that builds, tests or packages code, while `docs-check` and the required `CI (all checks)` still run, so the PR stays mergeable in minutes. Every push, schedule and dispatch run, a PR labelled `ci:full`, and a diff the comparison cannot read run everything; removing the label starts the run that returns to the skip. Everything else is code — including `.github/`, a dotfile, a `.txt` (they are build inputs here), a `docs/api/*.json` contract example the tests read, `devenv.nix`, `flake.nix` and `versions.json`.
+
 Root (devenv):
 
 - `devenv up` — start the whole app for development: the frontend (`pnpm dev`, Vite dev server with HMR on port 5173, proxying `/api` to the backend) and the backend (Ktor on 8080; rebuilt and restarted when backend sources change; `STT_DATA_DIR` comes from the devenv shell). No browser opens; the Vite URL and both processes' logs are printed. Stop with Ctrl-C, then `q` to confirm — or `devenv down`. Dev data (`stt.db`, uploads) lives in `.devenv/state/stt`, a fixed, git-ignored location that survives restarts. Changes to `devenv.nix` need `direnv reload` to take effect.
@@ -87,12 +89,13 @@ Frontend (pnpm — ADR 0012):
 - `pnpm build` — `tsc --noEmit` + `vite build` (output: `frontend/dist/`).
 - `pnpm dev` — Vite dev server; proxies `/api` to `http://localhost:8080`.
 
-Documentation (Node, run from the repository root; run them after changing `README.md` or `docs/architecture.md`, code the overview names, or backend exception handling):
+Documentation (Node, run from the repository root; run them after changing `README.md` or `docs/architecture.md`, code the overview names, backend exception handling, or the CI workflow):
 
 - `node docs/check-links.mjs README.md docs/architecture.md` — every relative link, `#anchor` and image resolves.
 - `node docs/check-readme-windows.mjs` — `README.md` documents the Windows x64 path: the bootstrap commands, the Vulkan driver requirement, the CPU fallback, the per-user data directory and the ARM64 scope.
 - `node docs/check-architecture-names.mjs && node docs/check-architecture-diagram.mjs` — every code name in the architecture overview exists in the code, and its diagram's boxes and arrows are real components and calls.
 - `node docs/check-exceptions.ts` — every broad `catch` in `backend/src/main/kotlin` rethrows, logs its throwable, or carries `// exceptions: swallow-ok <reason>`, and no `runCatching` remains; `node --test docs/check-exceptions.test.ts` covers the check itself.
+- `node --test docs/check-ci-gating.test.mjs` — `.github/decide-code-change.sh` runs everything off a pull request and on the `ci:full` label, `.github/classify-change.sh` calls only `*.md` and `LICENSE` documentation (everything else code), every heavy job in `ci.yml` carries the `changes` gate, and `docs-check` and `CI (all checks)` stay ungated.
 
 ## Git
 
