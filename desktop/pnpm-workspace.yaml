@@ -1,8 +1,14 @@
 minimumReleaseAgeExclude:
-  - electron@44.7.1
+  - electron@44.9.1
 
 # No dependency's install script runs: electron-builder downloads (and checksums) the
 # Electron release it packages itself, and electron-winstaller is Windows-only.
 allowBuilds:
   electron: false
   electron-winstaller: false
+
+# node-gyp 12.4.0 requires undici ^6.25.0 and the lockfile still held the vulnerable 6.29.0
+# (patched in 6.29.1); pnpm 11 does not move a transitive pin on `update`, so the 6.x line is
+# overridden to the patch release (GHSA-xjj6-f33q-929c).
+overrides:
+  'undici@<6.29.1': 6.29.1
