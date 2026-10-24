@@ -172,6 +172,16 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" "$gradle_home" "$GITHUB_WORKSPACE"
       - name: gradle e2e
         run: ./gradlew e2e
+      # Roadmap item 82: a failing spec's trace, screenshot and error-context.md (Playwright's
+      # `retain-on-failure`, written to e2e/test-results) are attached to the run, so a red job is
+      # diagnosable without the console log. Failure only: a green run keeps nothing.
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-test-results-linux
+          path: e2e/test-results/
+          retention-days: 7
 
   # macOS (roadmap item 48): Apple Silicon only — Apple and nixpkgs dropped Intel Macs. These jobs
   # run on every push to main, every pull request that touches code, workflow dispatch and the
