@@ -1,8 +1,8 @@
 # 68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact
 
-Status: spec-approved
-Depends on: [62 — An audio-only ffmpeg](../docs/specs/audio-only-ffmpeg.md) (done; its enable list,
-exact-set check and format fixtures), [49 — Windows support](../docs/specs/windows-support.md) (the Windows
+Status: done (roadmap item 68, approved 2026-10-24)
+Depends on: [62 — An audio-only ffmpeg](audio-only-ffmpeg.md) (done; its enable list,
+exact-set check and format fixtures), [49 — Windows support](windows-support.md) (the Windows
 tool pins, bootstrap, packaging and its e2e leg)
 Blocks: —
 
@@ -88,20 +88,20 @@ None. (All four settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 
 ## Test list (approved; behaviors only)
 
-- [ ] The manual `windows-ffmpeg-asset` job builds `windows-x64` with the shared enable list, and
+- [x] The manual `windows-ffmpeg-asset` job builds `windows-x64` with the shared enable list, and
       the exact-set check passes: the configure line equals `nix/ffmpeg.nix`'s component sets, no
       `ffprobe`/`ffplay`, no `--enable-gpl`/`--enable-version3`, and the exe imports only system
       DLLs (no VC runtime, no non-system libraries)
-- [ ] The committed per-extension fixtures decode/encode through the app's surface with the Windows
+- [x] The committed per-extension fixtures decode/encode through the app's surface with the Windows
       binary (`f32le`, `silencedetect`, `atrim`, FLAC, `concat`), with the same result as item 62's
       Linux check
-- [ ] `./gradlew prepareRuntime` on Windows downloads the pinned `.tar.gz`, sha256-verifies it and
+- [x] `./gradlew prepareRuntime` on Windows downloads the pinned `.tar.gz`, sha256-verifies it and
       resolves `ffmpeg.exe`; the Windows e2e leg stays green
-- [ ] The packaged Windows artifact (portable zip and MSI) ships the audio-only exe — no bytedeco
+- [x] The packaged Windows artifact (portable zip and MSI) ships the audio-only exe — no bytedeco
       jar, no `ffprobe` — and transcribes an upload end-to-end
-- [ ] `verifyWindowsPins` accepts the new asset name and fails on a wrong asset, url or sha256; the
+- [x] `verifyWindowsPins` accepts the new asset name and fails on a wrong asset, url or sha256; the
       asset-pin check names the pinned tag
-- [ ] (must not break) The Linux and macOS pins, `nix flake check` and the Linux e2e stay green
+- [x] (must not break) The Linux and macOS pins, `nix flake check` and the Linux e2e stay green
 
 ## Acceptance criteria
 
@@ -122,3 +122,68 @@ None. (All four settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   performance question: SIMD dominates, no measured reason for MSVC), one static exe, `.tar.gz`
   and the same release, and approved the test list. Status: spec-approved; work starts after item
   49 merges.
+
+- 2026-10-24: cycle 1 (test-list item 1) green on the Windows runner. The shared component lists
+  moved to `nix/ffmpeg-enable.json` (read by `nix/ffmpeg.nix`, by flake.nix's expected-surface
+  rendering and by the new job), and `windows-ffmpeg-asset` builds ffmpeg 8.1.2 with MSYS2's
+  mingw-w64 gcc, proves the surface and packages `bin/ffmpeg.exe`. Red runs: `e94ccfe`
+  (`ERROR: pthreads requested but not found` → `--disable-pthreads --enable-w32threads`) and
+  `ee326b31` (`curl: (35) Recv failure: Connection reset by peer` → curl retries). Green at
+  `3af00e73` (run 40094395175, job 120873691774, every step success). The user published
+  `ffmpeg-audio-only-8.1.2-windows-x64.tar.gz` under the `desktop-ffmpeg-v2` prerelease; sha256
+  `99fc0986b1a1fe5719349d13c371e5b57b8b5ebbff596c111b70146fd04bc1a9` (the release digest and a
+  fresh local download agree). Independently re-checked here: the tar holds only `bin/ffmpeg.exe`
+  (4,427,264 B, PE32+ x86-64, stripped); its imports are KERNEL32.dll, SHELL32.dll, bcrypt.dll and
+  msvcrt.dll (no VC runtime, no library beside it); and its embedded `configuration:` line equals
+  `nix/ffmpeg-enable.json` exactly (7 kinds, 58 decoders, no `--enable-gpl`/`--enable-version3`).
+  `nix flake check` over the JSON move: green (9m35s; the Linux checks, `ffmpeg-closure-slim`
+  included; `aarch64-darwin` is not checkable from the Linux host and Nix said so).
+
+- 2026-10-24: cycle 2 (test-list item 2) green on the Windows runner, run 40096476640
+  (`2cf9fe92`), job 120879725628: every step success. Red first: the proof's concat step failed with
+  `Impossible to open 'D:/tmp/app-uses/one.flac'` — `nix/ffmpeg-app-uses.sh` wrote absolute POSIX
+  paths into the concat list, which `ffmpeg.exe` reads as a drive-relative path. The app itself
+  writes bare file names relative to the list (`V10__BackfillCanonicalClip.kt:81`), so the script
+  now matches the app; local rerun green. The same run's build logged the configure summary
+  (static, w32threads, LGPL 2.1, no external libraries) and the import proof
+  (`bcrypt.dll KERNEL32.dll msvcrt.dll SHELL32.dll`). The macOS asset job in that run was green too.
+
+- 2026-10-24: cycle 3 (test-list item 5) green. The pin is
+  `ffmpeg.windows-x64` = the `desktop-ffmpeg-v2` asset `ffmpeg-audio-only-8.1.2-windows-x64.tar.gz`
+  (2,074,086 B), sha256 `983118c378778f542c3190e7ecac84e02ff5d7d2dd05bce4c199e30f5a30a001` — the
+  release digest and a fresh local download agree; the exe inside is the run-40096476640 build
+  (imports KERNEL32/SHELL32/bcrypt/msvcrt, configure line equal to `nix/ffmpeg-enable.json`).
+  `verifyWindowsPins` names the release tag and asset for ffmpeg and whisper-cli. `checkVersions`
+  green with the pin; red naming the pin for a wrong tag, a wrong asset name, and a non-64-hex
+  sha256 (a well-formed wrong sha256 is caught by the download's verification, item 3).
+  The asset first published in cycle 1 (sha256 `99fc0986…`, run 40094395175) was replaced under the
+  same name by the run-40096476640 build before the pin was recorded; no pin ever named the first
+  upload. The job's builds are not byte-reproducible (run 40099483165 built yet another digest), so
+  the pinned bytes are re-proven by the surface and import checks, not rebuilt identically.
+
+- 2026-10-24: cycles 4 and 5 (test-list items 3 and 4) green together on the Windows runner, run
+  40099483165 (`4633bc81`), job 120889367398 `Windows (packaged zip e2e)`, every step success:
+  `prepareRuntime` downloaded the pinned `.tar.gz`, sha256-verified it and resolved `ffmpeg.exe`;
+  `dist:win` built the portable zip and the MSI; the unpacked zip passed specs 01-04 (01 is the
+  upload-to-transcription journey) and the installed MSI passed the same specs plus the MSI
+  lifecycle spec. Red for item 4 was recorded locally on the pinned tar with the operation the old
+  `stage.ts` performed: `jar xf` → `java.util.zip.ZipException: zip END header not found`;
+  `stage.ts` now shares the single-binary `.tar.gz` branch between Apple Silicon and Windows
+  (`ffmpeg.exe`, no classifier directory, no `ffprobe`), Linux keeps the bytedeco jar. The same run
+  also had `Linux (Nix flake check)`, `Linux (packaged .deb e2e)` and both macOS asset jobs green.
+
+- 2026-10-24: cycle 6 (test-list item 6) ticked from the same run 40099483165: `Linux (Nix flake
+  check)` (the `versions-sync` check covers the pinned `versions.nix`/`versions.json` pair),
+  `Linux (e2e)`, `Linux (packaged .deb e2e)`, `Linux (bundle e2e)`, both macOS asset jobs,
+  `macOS (Nix build + devenv)` and `macOS (DMG + packaged e2e)` all green — the Linux and macOS
+  pins are unchanged and keep passing. One job in that run, `macOS (e2e)`, failed outside this
+  item's criteria (it runs the nixpkgs headless ffmpeg, not the audio-only artifact); the rerun is
+  pending, and if it repeats its failing spec belongs in `docs/known-issues.md`.
+- 2026-10-24: test list complete; `Status: in-review`.
+- 2026-10-24 (review, root agent; decisions by the user): approved. Independently re-checked the
+  pinned asset: sha256 and size as pinned, only `bin/ffmpeg.exe`, imports `bcrypt.dll`,
+  `KERNEL32.dll`, `msvcrt.dll` and `SHELL32.dll`, and an embedded configure line carrying every
+  `nix/ffmpeg-enable.json` component flag with no GPL/version3/external-library flag; the JSON
+  lists equal the former `nix/ffmpeg.nix` lists in order. The `MINGW64` deprecation went to
+  `docs/known-issues.md`. The run's `macOS (e2e)` failure is left to the pull request's CI. Status:
+  done (roadmap item 68).

@@ -21,7 +21,13 @@ const decidePath = join(repoRoot, '.github/decide-code-change.sh');
 const UNGATED = new Set(['changes', 'docs-check', 'ci']);
 // Jobs that are gated by their own event instead: the manual assets (a dispatch with `assets`)
 // and the weekly model-host probe (a cron string); none of them is in the aggregator.
-const EVENT_GATED = new Set(['macos-whisper-asset', 'macos-ffmpeg-asset', 'windows-whisper-asset', 'model-hosts']);
+const EVENT_GATED = new Set([
+  'macos-whisper-asset',
+  'macos-ffmpeg-asset',
+  'windows-whisper-asset',
+  'windows-ffmpeg-asset',
+  'model-hosts',
+]);
 
 // The job ids of `.github/workflows/ci.yml`, with the job-level keys this check reads. The file is
 // parsed rather than loaded with a YAML library because the repository has none and this check
@@ -277,7 +283,7 @@ test('the required check and the jobs it gates keep their names and conditions',
   assert.ok(ci.needs.includes('docs-check'), 'the always-on docs job reports through the aggregator');
 
   // The manual assets stay dispatch-only and outside the change filter.
-  for (const id of ['macos-whisper-asset', 'macos-ffmpeg-asset', 'windows-whisper-asset']) {
+  for (const id of ['macos-whisper-asset', 'macos-ffmpeg-asset', 'windows-whisper-asset', 'windows-ffmpeg-asset']) {
     const job = jobs.get(id);
     assert.equal(job.if, "github.event_name == 'workflow_dispatch' && inputs.assets", `${id} keeps its dispatch condition`);
     assert.deepEqual(job.needs, [], `${id} does not wait for the change filter`);

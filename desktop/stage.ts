@@ -6,8 +6,8 @@
 //                       2026-10-14: no fat-jar plugin)
 //   dist/stage/ui       frontend/dist
 //   dist/stage/tools    the pinned whisper-cli and ffmpeg (versions.json), flat — on Linux
-//                       with their .so libraries, on Apple Silicon as single binaries
-//                       (whisper-cli static, ffmpeg linking only system libraries);
+//                       with their .so libraries, on Apple Silicon and Windows as single
+//                       binaries (whisper-cli static, ffmpeg linking only system libraries);
 //                       backend.ts adds the dir to PATH and LD_LIBRARY_PATH when it spawns
 //                       the backend
 //
@@ -113,24 +113,26 @@ function stageTools(): void {
     rmSync(whisperTmp, { recursive: true, force: true });
   }
 
-  // ffmpeg: on Linux and Windows bytedeco's jar is a zip carrying the executable and its libav*
-  // libraries under one directory, whose flat contents belong next to the binary (the libraries
-  // carry no RUNPATH; backend.ts sets LD_LIBRARY_PATH on Linux, and the DLLs sit beside the exe on
-  // Windows). Apple Silicon ships the pinned audio-only build (roadmap item 69), a .tar.gz with one
-  // `bin/ffmpeg`: no libraries and no ffprobe.
+  // ffmpeg: Linux keeps bytedeco's jar, a zip carrying the executable and its libav* libraries
+  // under one directory, whose flat contents belong next to the binary (the libraries carry no
+  // RUNPATH; backend.ts sets LD_LIBRARY_PATH). Apple Silicon (roadmap item 69) and Windows
+  // (roadmap item 68) ship the pinned audio-only build instead, a .tar.gz with one binary: no
+  // libraries, no ffprobe and no classifier directory.
   const ffmpeg = artifact('ffmpeg');
   const ffmpegTmp = join(toolsBin, 'ffmpeg-tmp');
   mkdirSync(ffmpegTmp, { recursive: true });
-  if (process.platform === 'darwin' && process.arch === 'arm64') {
+  const singleBinary = windows || (process.platform === 'darwin' && process.arch === 'arm64');
+  if (singleBinary) {
+    const exeName = windows ? 'ffmpeg.exe' : 'ffmpeg';
     spawnSync('tar', ['-xzf', ffmpeg, '-C', ffmpegTmp], { stdio: 'inherit' });
-    const exe = findFile(ffmpegTmp, 'ffmpeg') ?? fail('ffmpeg not in the extracted tarball');
+    const exe = findFile(ffmpegTmp, exeName) ?? fail(`${exeName} not in the extracted tarball`);
+    copyTo(exe, join(toolsBin, exeName));
     // tar keeps the executable bit; the app runs ffmpeg from PATH (backend.ts prepends
-    // tools/bin), so the staged copy must stay executable.
-    copyTo(exe, join(toolsBin, 'ffmpeg'));
-    chmodSync(join(toolsBin, 'ffmpeg'), 0o755);
+    // tools/bin), so the staged copy must stay executable (Windows has no such bit).
+    if (!windows) chmodSync(join(toolsBin, exeName), 0o755);
     rmSync(ffmpegTmp, { recursive: true, force: true });
   } else {
-    const ffmpegClassifier = windows ? 'windows-x86_64-gpl' : 'linux-x86_64-gpl';
+    const ffmpegClassifier = 'linux-x86_64-gpl';
     // `jar` (the JDK's) rather than unzip: no unzip on a Nix shell.
     spawnSync('jar', ['xf', ffmpeg], { cwd: ffmpegTmp, stdio: 'inherit' });
     const libs = readdirSync(join(ffmpegTmp, 'org', 'bytedeco', 'ffmpeg', ffmpegClassifier), {
@@ -143,14 +145,11 @@ function stageTools(): void {
       );
     }
     rmSync(ffmpegTmp, { recursive: true, force: true });
-    if (!existsSync(join(toolsBin, windows ? 'ffmpeg.exe' : 'ffmpeg')))
-      fail('ffmpeg not in the extracted jar');
+    if (!existsSync(join(toolsBin, 'ffmpeg'))) fail('ffmpeg not in the extracted jar');
     // A zip stores no file modes, so `jar xf` left the executables non-executable. The backend
     // runs ffmpeg from PATH (backend.ts prepends tools/bin), so the bit has to be restored here.
-    if (!windows) {
-      for (const executable of ['ffmpeg', 'ffprobe']) {
-        if (existsSync(join(toolsBin, executable))) chmodSync(join(toolsBin, executable), 0o755);
-      }
+    for (const executable of ['ffmpeg', 'ffprobe']) {
+      if (existsSync(join(toolsBin, executable))) chmodSync(join(toolsBin, executable), 0o755);
     }
   }
 }

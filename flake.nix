@@ -109,25 +109,19 @@
         config = import ./nix/ffmpeg.nix {inherit pkgs;};
         audioOnly = config.source;
         ffmpeg = "${audioOnly}/bin/ffmpeg";
-        # The same lists the build derives its `--enable-<kind>=` flags from, plus the plain flags and
-        # the tokens it must not carry; nix/ffmpeg-audio-only.sh compares the built configuration to
-        # them exactly.
+        # The same data the build derives its flags from (roadmap item 68 moved it to
+        # nix/ffmpeg-enable.json so the Windows job builds from the same lists); the plain flags and
+        # the tokens it must not carry, and the component sets; nix/ffmpeg-audio-only.sh compares the
+        # built configuration to them exactly.
+        surface = builtins.fromJSON (builtins.readFile ./nix/ffmpeg-enable.json);
         expected = pkgs.writeText "ffmpeg-audio-only-expected" ''
-          flag --disable-everything
-          flag --disable-autodetect
-          flag --enable-static
-          flag --disable-shared
-          flag --enable-ffmpeg
-          flag --disable-ffprobe
-          flag --disable-ffplay
-          forbid --enable-lib
-          forbid --enable-network
-          forbid --enable-avdevice
-          ${lib.concatStrings (map ({
+          ${lib.concatMapStrings (flag: "flag ${flag}\n") surface.flags}
+          ${lib.concatMapStrings (forbid: "forbid ${forbid}\n") surface.forbid}
+          ${lib.concatMapStrings ({
             kind,
             components,
           }: "${kind} ${lib.concatStringsSep "," components}\n")
-          config.enable)}
+          surface.enable}
         '';
       in
         pkgs.runCommand "ffmpeg-audio-only" {

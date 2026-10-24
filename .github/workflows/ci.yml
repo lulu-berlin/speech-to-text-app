@@ -861,6 +861,100 @@ jobs:
           path: whisper-cpp-1.8.4-windows-x64.tar.gz
           retention-days: 90
 
+  # The Windows audio-only ffmpeg (manual, roadmap item 68): the Windows counterpart of
+  # `macos-ffmpeg-asset` and the producer of the asset the Gradle bootstrap, the portable zip, the
+  # MSI and the Windows e2e leg all ship. Windows has no Nix, so MSYS2's mingw-w64 gcc builds
+  # ffmpeg 8.1.2 from the same component lists the Linux and macOS recipes read
+  # (nix/ffmpeg-enable.json), statically, into one ffmpeg.exe. The job proves the configure
+  # surface exactly with the same nix/ffmpeg-audio-only.sh the flake checks run (no ffprobe/ffplay,
+  # no GPL/version3, no component outside the list) and that the exe imports only Windows system
+  # DLLs, then packages the `.tar.gz` and prints its sha256. The user publishes it as another
+  # `desktop-ffmpeg-v2` asset and records the pin; agents never publish.
+  windows-ffmpeg-asset:
+    name: Windows ffmpeg asset (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.assets
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      # Pinned by commit: this action runs in the job that builds the published Windows asset.
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            diffutils
+            jq
+            make
+            tar
+            mingw-w64-x86_64-binutils
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-nasm
+      - name: Build ffmpeg 8.1.2 (static, audio-only)
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          # The release of the nixpkgs pin (ffmpeg 8.1.2); its tarball hash is pinned here, so a
+          # replaced download fails before configure runs. The retries survive a transient TLS
+          # failure (run 2 died with curl's exit 35 before anything was built), and the phase
+          # markers put the failing step in a log that carries no other detail.
+          echo "ffmpeg-8.1.2: downloading the source"
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30 \
+            -o ffmpeg-8.1.2.tar.xz https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz
+          echo "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c  ffmpeg-8.1.2.tar.xz" | sha256sum -c -
+          tar xf ffmpeg-8.1.2.tar.xz
+          bash nix/ffmpeg-enable-list.sh expected nix/ffmpeg-enable.json > expected-surface.txt
+          mapfile -t enable < <(bash nix/ffmpeg-enable-list.sh configure nix/ffmpeg-enable.json)
+          cd ffmpeg-8.1.2
+          echo "ffmpeg-8.1.2: configuring"
+          # The shared component flags, plus the static single-program recipe: one exe, no ffprobe,
+          # no shuffling in libraries from the build host (`-static` links mingw's import libraries).
+          # Win32 threads, not pthreads: the native Windows threading carries no extra library, and
+          # MSYS2's winpthreads does not satisfy ffmpeg's `-pthread` probe (run 1: "pthreads
+          # requested but not found"); choosing it explicitly keeps the choice off autodetection.
+          ./configure --prefix="$PWD/../stage" "${enable[@]}" \
+            --disable-pthreads --enable-w32threads --disable-os2threads \
+            --disable-debug --disable-stripping \
+            --disable-doc --disable-network --disable-avdevice \
+            --extra-cflags=-static --extra-ldflags="-static -static-libgcc"
+          echo "ffmpeg-8.1.2: building"
+          make -j"$(nproc)"
+          echo "ffmpeg-8.1.2: installing the program"
+          make install-progs
+      - name: Prove the surface and the imports
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          # Strip only the symbols: the configure line stays, and the asset stays small.
+          strip --strip-all stage/bin/ffmpeg.exe
+          bash nix/windows-ffmpeg-surface.sh stage/bin expected-surface.txt
+      # Roadmap item 68 (test-list item 2): the two scripts item 62's flake checks run, unchanged —
+      # every accepted extension and the bit-depth/endianness variants decode to the canonical FLAC
+      # (validated from its STREAMINFO), and the app's f32le, silencedetect, atrim and concat
+      # commands work — now with the exe this job built.
+      - name: Prove the fixtures and the app's commands on this build
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          bash nix/windows-ffmpeg-fixtures.sh stage/bin/ffmpeg.exe .
+      - name: Package the asset and print the sha256
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          tar -czf ffmpeg-audio-only-8.1.2-windows-x64.tar.gz -C stage bin
+          sha256sum ffmpeg-audio-only-8.1.2-windows-x64.tar.gz | tee sha256.txt
+          {
+            echo "### ffmpeg Windows asset"
+            echo '```'
+            cat sha256.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-audio-only-8.1.2-windows-x64
+          path: ffmpeg-audio-only-8.1.2-windows-x64.tar.gz
+          retention-days: 90
+
   # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds
   # the .deb, apt installs it as a user would (its declared Depends pull the runtime libraries the
   # bundled Electron, whisper-cli and ffmpeg are linked against), and the packaged specs run

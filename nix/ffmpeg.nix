@@ -39,96 +39,11 @@
 
   # The component lists the build's `--enable-<kind>=…` flags come from, and the same lists the
   # `ffmpeg-audio-only` app compares the built configuration against: one source, so the check cannot
-  # drift from the recipe.
-  enable = [
-    {
-      kind = "demuxer";
-      components = ["aac" "aiff" "amr" "asf" "concat" "flac" "loas" "matroska" "mov" "mp3" "ogg" "wav"];
-    }
-    {
-      kind = "decoder";
-      components = [
-        "aac"
-        "aac_latm"
-        "ac3"
-        "alac"
-        "amrnb"
-        "amrwb"
-        "adpcm_ima_qt"
-        "adpcm_ima_wav"
-        "adpcm_ms"
-        "atrac3"
-        "atrac3al"
-        "atrac3plus"
-        "atrac3plusal"
-        "dca"
-        "eac3"
-        "flac"
-        "g722"
-        "mlp"
-        "mp1"
-        "mp2"
-        "mp3"
-        "mp3float"
-        "opus"
-        "pcm_alaw"
-        "pcm_f32be"
-        "pcm_f32le"
-        "pcm_f64be"
-        "pcm_f64le"
-        "pcm_mulaw"
-        "pcm_s16be"
-        "pcm_s16be_planar"
-        "pcm_s16le"
-        "pcm_s16le_planar"
-        "pcm_s24be"
-        "pcm_s24le"
-        "pcm_s24le_planar"
-        "pcm_s32be"
-        "pcm_s32le"
-        "pcm_s32le_planar"
-        "pcm_s64be"
-        "pcm_s64le"
-        "pcm_s8"
-        "pcm_s8_planar"
-        "pcm_u16be"
-        "pcm_u16le"
-        "pcm_u24be"
-        "pcm_u24le"
-        "pcm_u32be"
-        "pcm_u32le"
-        "pcm_u8"
-        "speex"
-        "truehd"
-        "vorbis"
-        "wmalossless"
-        "wmapro"
-        "wmav1"
-        "wmav2"
-        "wmavoice"
-      ];
-    }
-    {
-      kind = "parser";
-      components = ["aac" "ac3" "flac" "mpegaudio" "opus" "vorbis"];
-    }
-    {
-      kind = "encoder";
-      components = ["flac" "pcm_f32le" "pcm_s16le"];
-    }
-    {
-      kind = "muxer";
-      components = ["flac" "pcm_f32le" "null"];
-    }
-    {
-      kind = "filter";
-      components = ["aformat" "anull" "anullsink" "aresample" "atrim" "silencedetect"];
-    }
-    {
-      kind = "protocol";
-      components = ["file" "pipe"];
-    }
-  ];
+  # drift from the recipe. The data lives in nix/ffmpeg-enable.json (roadmap item 68), because the
+  # Windows build has no Nix: the manual `windows-ffmpeg-asset` job renders the same component sets
+  # and flags from it, so all three platforms build from one list.
+  enable = (builtins.fromJSON (builtins.readFile ./ffmpeg-enable.json)).enable;
+
   # One recipe for both systems (roadmap item 69): the same enable list and configure flags; only
   # `base` differs (a static musl package set on Linux, the native set on darwin, which has no
   # static libc). The darwin build links its av* code in and names only the OS's libraries.

@@ -14,8 +14,8 @@
         "url": "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/8.1.2-1.5.14/ffmpeg-8.1.2-1.5.14-linux-x86_64-gpl.jar"
       },
       "windows-x64": {
-        "sha256": "9c4bbdecba752fb2d0a8e537e69d330c6db6b02087f5035f88decad0050e5550",
-        "url": "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/8.1.2-1.5.14/ffmpeg-8.1.2-1.5.14-windows-x86_64-gpl.jar"
+        "sha256": "983118c378778f542c3190e7ecac84e02ff5d7d2dd05bce4c199e30f5a30a001",
+        "url": "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-windows-x64.tar.gz"
       }
     },
     "temurin-jdk": {

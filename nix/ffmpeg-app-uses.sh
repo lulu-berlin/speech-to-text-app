@@ -39,9 +39,11 @@ streaminfo_total() {
 [ "$(streaminfo_total "$work/window.flac")" = 3200 ] || fail "the window cut did not yield 3200 samples"
 
 # V10__BackfillCanonicalClip: two stored clips through a concat list, re-encoded canonically.
+# The app writes bare file names, relative to the list (V10__BackfillCanonicalClip.kt); an absolute
+# POSIX path would be read as a drive-relative path (`D:/tmp/...`) by ffmpeg.exe on Windows.
 cp "$work/canonical.flac" "$work/one.flac"
 cp "$work/canonical.flac" "$work/two.flac"
-printf "file '%s'\nfile '%s'\n" "$work/one.flac" "$work/two.flac" > "$work/concat.txt"
+printf "file '%s'\nfile '%s'\n" one.flac two.flac > "$work/concat.txt"
 "$ffmpeg" -y -loglevel error -f concat -safe 0 -i "$work/concat.txt" -vn -ar 16000 -ac 1 -sample_fmt s16 -c:a flac -frame_size 4000 "$work/backfill.flac" ||
   fail "the V10 concat backfill failed"
 [ "$(streaminfo_total "$work/backfill.flac")" = 16000 ] || fail "the backfill did not yield 16000 samples"
