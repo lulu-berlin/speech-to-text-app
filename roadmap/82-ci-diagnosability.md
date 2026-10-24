@@ -139,7 +139,7 @@ None. (Both settled 2026-10-24, see "Decided (consultation, 2026-10-24)".)
 
 Part 1 — failure artifacts:
 
-- [ ] A deliberately failing journey spec in `Linux (e2e)` attaches that spec's trace, screenshot
+- [x] A deliberately failing journey spec in `Linux (e2e)` attaches that spec's trace, screenshot
       and `error-context.md` to the run as an artifact named for the job, kept 7 days
 - [ ] The same holds for every job that runs Playwright specs: `macOS (e2e)`, the packaged Linux
       jobs (`.deb`, flake package, bundle), the macOS DMG job and the Windows packaged zip/MSI job
@@ -198,3 +198,10 @@ Part 3 — the recorded CI flakes:
   for new and existing steps; exempt from ADR 0046 (no app feature). Test list approved as worded.
   The flake rows (`13-second-quit`, `ProcessRunnerSpec`, `59-row-bars`) left
   `docs/known-issues.md` in the same commit. Status: spec-approved.
+- 2026-10-24 (workspace, test-list item 1): red run 40110339285 (dispatch on the temporary failing
+  spec `e2e/tests/00-deliberate-failure.spec.ts`): `Linux (e2e)` failed on that spec alone and the
+  run kept no `Linux (e2e)` artifact. Green run 40111711324 (`Test:` commit `0fa230e2`): the
+  failure-only upload attached `e2e-test-results-linux` (3 files: `trace.zip`,
+  `test-failed-1.png`, `error-context.md`; 813,979 bytes; expires 2026-10-31, 7 days). No refactor
+  (the user). The temporary spec stays through test-list item 2 and is reverted before item 3
+  (the user).
