@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { QUEUE_OPTIONS_CLIP, appUrl } from '../lib/backend.mjs';
+import { QUEUE_OPTIONS_CLIP, appUrl } from '../lib/backend.ts';
 import { appLive, uploadClips } from './helpers/ui';
 
 // Item 59, finding 2: the batch options sat above the drop zone, so nothing grouped them

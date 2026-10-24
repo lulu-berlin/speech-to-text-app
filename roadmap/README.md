@@ -101,7 +101,7 @@ graph TD
   50 --> 49
   22 --> 52[52 edit transcription ✓]:::done
   12 --> 52
-  49 --> 54[54 TypeScript for the remaining scripts]
+  49 --> 54[54 TypeScript for the remaining scripts ✓]:::done
   11 --> 43[43 diarization memory ✓]:::done
   38 --> 44[44 audio in database ✓]:::done
   11 --> 44
@@ -219,7 +219,7 @@ graph TD
 | [51 — CI verification: first GitHub Actions workflow](../docs/specs/ci-verification.md)                                                                              | done          | —                           |
 | [52 — Edit the transcription: correct a segment's text, with isolated segment playback](../docs/specs/edit-transcription.md)                                                    | done          | 12, 22                      |
 | [53 — The Nix store cache: one writer per key, versioned past the stale entry](../docs/specs/nix-store-cache.md)                                                     | done          | 51                          |
-| [54 — TypeScript for the remaining hand-written JavaScript](54-typescript-for-the-remaining-scripts.md)                                                              | spec-approved | 49                          |
+| [54 — TypeScript for the remaining hand-written JavaScript](../docs/specs/typescript-for-the-remaining-scripts.md)                                                              | done          | 49                          |
 | [55 — The atomic-transitions pin's writer-lock probe is still schedule-dependent](../docs/specs/atomic-transitions-lock-probe.md)                                    | done          | —                           |
 | [56 — Prebuild the desktop bundle's Vulkan-only Mesa for Linux x86_64](../docs/specs/desktop-bundle-mesa-artifact.md)                                                | done          | 50                          |
 | [57 — Diagnose and fix the desktop-nix-e2e container exit 6](../docs/specs/desktop-nix-e2e-container-failure.md)                                                     | done          | —                           |

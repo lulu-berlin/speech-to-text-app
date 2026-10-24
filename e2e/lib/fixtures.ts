@@ -1,5 +1,5 @@
 // The e2e suite's fixture clips (FIXTURE_CLIPS, MERGE_CLIP), written into a fresh directory by
-// global-setup.mjs and by lib/fixtures.test.ts.
+// global-setup.ts and by lib/fixtures.test.ts.
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,7 +10,7 @@ import {
   MERGE_CLIP,
   MERGE_SOURCE_IDS,
   librispeechDir,
-} from './backend.mjs';
+} from './backend.ts';
 
 const SAMPLE_RATE = 16000;
 
@@ -91,11 +91,6 @@ function wavPcm16(samples: Float32Array): Buffer {
 }
 
 export function writeFixtures(fixturesDir: string): void {
-  // backend.mjs is untyped until roadmap item 54, so its clip names type as possibly undefined.
-  const into = (file: string | undefined): string => {
-    if (file === undefined) throw new Error('a fixture names a clip past the end of FIXTURE_CLIPS');
-    return join(fixturesDir, file);
-  };
   // The journey's clips: the committed LibriSpeech sample plus distinct trims and loops of it —
   // every fixture must have unique bytes (the backend deduplicates by content sha256 and the
   // tests share one backend). Short trims still transcribe as real speech.
@@ -148,28 +143,31 @@ export function writeFixtures(fixturesDir: string): void {
   const sample = decodeSamples(jfk);
   for (const { file, start = 0, seconds, loops = 1 } of recipes) {
     const clip = repeatSamples(samplesOf(sample, start, seconds), loops);
-    writeFileSync(into(file), wavPcm16(clip));
+    writeFileSync(join(fixturesDir, file), wavPcm16(clip));
   }
   // The two-speaker recording: the three committed LibriSpeech clips back to back.
   const merge = MERGE_SOURCE_IDS.map((id) => decodeSamples(join(librispeechDir, `${id}.flac`)));
-  writeFileSync(into(MERGE_CLIP), wavPcm16(concatSamples(merge)));
+  writeFileSync(join(fixturesDir, MERGE_CLIP), wavPcm16(concatSamples(merge)));
   // A .wav whose bytes are not audio: it passes the upload's extension check and fails
   // when the engine decodes it (CHUNKING).
-  writeFileSync(into(BROKEN_CLIP), "not audio — the e2e suite's undecodable fixture\n".repeat(256));
   writeFileSync(
-    into(BROKEN2_CLIP),
+    join(fixturesDir, BROKEN_CLIP),
+    "not audio — the e2e suite's undecodable fixture\n".repeat(256),
+  );
+  writeFileSync(
+    join(fixturesDir, BROKEN2_CLIP),
     "also not audio — the history test's own undecodable fixture\n".repeat(256),
   );
   writeFileSync(
-    into(FIXTURE_CLIPS[30]),
+    join(fixturesDir, FIXTURE_CLIPS[30]),
     "not audio either — item 42's queue-survives-a-failure fixture\n".repeat(256),
   );
   writeFileSync(
-    into(FIXTURE_CLIPS[37]),
+    join(fixturesDir, FIXTURE_CLIPS[37]),
     "still not audio — item 59's history-row retry fixture\n".repeat(256),
   );
   writeFileSync(
-    into(FIXTURE_CLIPS[43]),
+    join(fixturesDir, FIXTURE_CLIPS[43]),
     "still not audio — item 59's status-page delete fixture\n".repeat(256),
   );
 }

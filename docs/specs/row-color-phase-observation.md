@@ -21,11 +21,11 @@ correctly.
   job; the item-62 worktree's local journey passed 40/40. Flaky, not a regression.
 - The run's five `Task N failed … Invalid data found when processing input` lines are the suite's
   five deliberate undecodable fixtures (`broken.wav`, `broken-2.wav`, `broken-stability.wav`,
-  `broken-59.wav`, `broken-59-status.wav`; `e2e/lib/backend.mjs:48,54,69,76,82`); the specs that
+  `broken-59.wav`, `broken-59-status.wav`; `e2e/lib/backend.ts:59,65,80,87,93`); the specs that
   use them passed.
 - Before the upload the spec verified the queue idle (`59-row-color.spec.ts:20-27`), and later
   specs saw running tasks, so the queue and engine were healthy.
-- `COLOR_ROW_CLIP` is the sample looped 5× (~55 s; `e2e/lib/backend.mjs:181`); its chunking phase is
+- `COLOR_ROW_CLIP` is the sample looped 5× (~55 s; `e2e/lib/backend.ts:193`); its chunking phase is
   well under a second on the runner, while the poll samples every 100 ms.
 - The run's trace (the row's state at timeout) needs an authenticated artifact download and was not
   examined; the mechanism above is `[INFERENCE]` from the spec, the queue logs and the reruns.

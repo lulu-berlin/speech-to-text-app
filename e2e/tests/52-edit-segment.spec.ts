@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { HEADER_CLIP } from '../lib/backend.mjs';
+import { HEADER_CLIP } from '../lib/backend.ts';
 import { ensureTranscript, openTranscript } from './helpers/ui';
 
 // The transcript's segments from the API, in the order the buttons render, with the buttons
@@ -42,6 +42,9 @@ test("the current segment's Edit control is exactly the highlight's height, its 
     }
     const lines = segment.getClientRects();
     const highlight = lines[lines.length - 1];
+    if (highlight === undefined) {
+      throw new Error('the segment has at least one line box');
+    }
     const own = control.getBoundingClientRect();
     const glyph = icon.getBoundingClientRect();
     return {

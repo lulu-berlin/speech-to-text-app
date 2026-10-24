@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { PAUSE_QUEUED_CLIP, PAUSE_QUEUED_RUNNING_CLIP } from '../lib/backend.mjs';
+import { PAUSE_QUEUED_CLIP, PAUSE_QUEUED_RUNNING_CLIP } from '../lib/backend.ts';
 import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 
 // Pausing a queued upload (roadmap item 40, the review): the pause used to freeze "the

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { BAR_ROW_CLIP, appUrl } from '../lib/backend.mjs';
+import { BAR_ROW_CLIP, appUrl } from '../lib/backend.ts';
 import { appLive, rowOf, uploadClips } from './helpers/ui';
 
 // Item 59, Proposal 3: a running row shows one visible progress bar, and the diarization

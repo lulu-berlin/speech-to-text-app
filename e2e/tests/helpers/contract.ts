@@ -58,9 +58,10 @@ function variantToShape(value: unknown, seen: Set<object>): Shape {
   } else if (typeof value === 'object' && value !== null) {
     if (seen.has(value)) return shape;
     seen.add(value);
-    shape.fields = Object.create(null);
+    const fields: Record<string, Shape> = Object.create(null);
+    shape.fields = fields;
     for (const [key, child] of Object.entries(value)) {
-      shape.fields[key] = variantToShape(child, seen);
+      fields[key] = variantToShape(child, seen);
     }
   }
   return shape;

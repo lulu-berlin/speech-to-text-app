@@ -1,9 +1,9 @@
 # 54 — TypeScript for the remaining hand-written JavaScript
 
-Status: spec-approved
+Status: done (roadmap item 54, approved 2026-10-24)
 Depends on: 49 (sequencing decision 2026-10-22: the conversion runs after it merges — its branch edits
-the same files); ADR [0054](../docs/decisions/0054-no-hand-written-javascript.md) landed with item
-[50](../docs/specs/electron-desktop-app.md)
+the same files); ADR [0054](../decisions/0054-no-hand-written-javascript.md) landed with item
+[50](electron-desktop-app.md)
 Blocks: —
 
 ## Goal
@@ -88,18 +88,37 @@ None. (Both settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 
 ## Test list (approved; behaviors only)
 
-- [ ] The documentation checks report exactly what they reported before on the current tree: the
+- [x] The documentation checks report exactly what they reported before on the current tree: the
       same stdout lines and exit 0 for the green run over `README.md` and `docs/architecture.md`
-- [ ] On a tree with a broken relative link, a code name the tree lacks and a wrong diagram arrow,
+      (cycle 1, 2026-10-24: `docs/checks.test.ts`; the five scripts became `.ts` in a `docs/`
+      package and the lines recorded on `0606ebd9` are pinned, the two tree counts as numbers)
+- [x] (discovered 2026-10-24, confirmed) `docs/check-ci-gating.test.mjs` is converted too:
+      `node --test docs/check-ci-gating.test.ts` passes 8/8, and the CI `docs-check` job, AGENTS.md
+      § Commands and the file's own comment name the `.ts`
+      (cycle 3, 2026-10-24: red `Could not find`, then 8/8 with the same eight test names; the CI
+      job's separate step is gone because `pnpm --dir docs test` runs it)
+- [x] On a tree with a broken relative link, a code name the tree lacks and a wrong diagram arrow,
       each check still reports the same failure lines (`file:line:` and the reason) and exits 1
-- [ ] The e2e harness runs as before: `node --test lib/processes.test.ts` and
+      (cycle 2, 2026-10-24: `docs/checks-failures.test.ts` plants the tree in a sandbox of symlinks and
+      pins the lines the pre-conversion scripts printed on `a1cbbdfe`; green on its first run because
+      cycle 1 converted the checks unchanged, so the assertions were mutation-checked instead)
+- [x] The e2e harness runs as before: `node --test lib/processes.test.ts` and
       `node check-playwright.ts` pass, and `pnpm --dir e2e test` boots the real backend and the full
       journey suite passes (Linux)
-- [ ] A type error introduced in a converted documentation check fails `pnpm --dir docs test`; a
+      (cycle 4, 2026-10-24: red `Could not find 'lib/processes.test.ts'`; the five scripts are `.ts`
+      and one `e2e/tsconfig.json` replaced `desktop/tsconfig.json`; the suite ran 48 passed,
+      1 skipped against the real backend in 10.2 min)
+- [x] A type error introduced in a converted documentation check fails `pnpm --dir docs test`; a
       type error introduced in a converted e2e script or spec fails the type check in
       `pnpm --dir e2e test`
-- [ ] (must not break) `gradle check`, `pnpm test` in frontend and e2e, and the CI job commands
+      (cycle 5, 2026-10-24: `docs/type-check.test.ts` and `e2e/lib/type-check.test.ts` run each
+      package's `tsc` over a symlinked sandbox copy with a planted error; removing
+      `noUncheckedIndexedAccess` from either real tsconfig fails the matching test)
+- [x] (must not break) `gradle check`, `pnpm test` in frontend and e2e, and the CI job commands
       (actionlint clean)
+      (cycle 6, 2026-10-24: `gradle check` BUILD SUCCESSFUL in 4m09s; frontend `vitest run` 225/225
+      and prettier clean; e2e `node --test` 4/4, `check-playwright` ok, prettier and `tsc` clean,
+      `playwright test` 48 passed / 1 skipped in 8.7 min; `actionlint` 0; docs gate 20/20)
 
 ## Acceptance criteria
 
@@ -115,3 +134,14 @@ None. (Both settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   the older ones (the user's choice). Not yet discussed.
 - 2026-10-22: consulted (main tree). The user approved the goal, the three decisions above and the
   test list. Status: spec-approved. Work starts after item 49 merges.
+- 2026-10-24 (review, root agent; decisions by the user): approved. The two type-check tests no
+  longer remove `noUncheckedIndexedAccess` from their sandbox (that half tested TypeScript, not the
+  package); the planted index error still fails only under the package's own flag. `docs-check`'s new
+  dependency on the npm registry went to item 82, and the symlink-based test sandboxes (`EPERM` on
+  Windows without Developer Mode) to item 79. Two stale known-issues rows were removed in
+  `3668c3fd`: the audio-only-ffmpeg fixture failure (fixed by item 69) and the "gradle 8.14"
+  comments (gone from the harness).
+- 2026-10-24: rebased onto `main` after item 65 merged: `59-row-color.spec.ts` keeps item 65's
+  observation and imports `../lib/backend.ts`; item 65 had already removed the `59-row-color`
+  known-issues row. The Playwright journey runs in the pull request's CI. Status: done (roadmap
+  item 54).

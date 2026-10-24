@@ -12,10 +12,10 @@ import {
   saveState,
   startBackend,
   stopBackend,
-} from './lib/backend.mjs';
+} from './lib/backend.ts';
 import { writeFixtures } from './lib/fixtures.ts';
 
-export default async function globalSetup() {
+export default async function globalSetup(): Promise<() => Promise<void>> {
   checkPreconditions();
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-'));
   const fixturesDir = mkdtempSync(join(tmpdir(), 'stt-e2e-fixtures-'));

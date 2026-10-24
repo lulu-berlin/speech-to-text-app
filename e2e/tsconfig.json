@@ -1,0 +1,18 @@
+{
+  "//": "The e2e package's TypeScript (ADR 0054): the backend harness, global setup, the Playwright check and its configs, item 50's docker harness and desktop specs, and every journey spec. Node and Playwright run the files themselves, so imports name their .ts target and only erasable syntax is allowed; this is a type check only.",
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["*.ts", "lib/**/*.ts", "desktop/**/*.ts", "desktop-tests/**/*.ts", "tests/**/*.ts"]
+}

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { FOLLOW_CLIP } from '../lib/backend.mjs';
+import { FOLLOW_CLIP } from '../lib/backend.ts';
 import { uploadAndOpen } from './helpers/ui';
 
 // The transcript's segments: every element with the button role except the current
@@ -76,7 +76,7 @@ async function playheadReaches(
       lastSecond = at;
       lastAdvanceMs = Date.now();
     } else if (Date.now() - lastAdvanceMs > 8_000) {
-      if (await page.locator('audio').evaluate((audio) => audio.ended)) {
+      if (await page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.ended)) {
         return false; // played out before this segment: nothing more to follow into.
       }
       throw new Error(
@@ -153,9 +153,13 @@ test('follow mode: long playback never shows "Back to playing position" without 
   // ~130 s of the 154 s clip, and it must keep going and fire `ended` on its own — the
   // joined-FLAC stall this item was filed for (playhead frozen at ~90 s, `ended` never
   // firing) would fail right here. The clip is long, so a short file cannot fake it.
-  const duration = await page.locator('audio').evaluate((audio) => audio.duration);
+  const duration = await page
+    .locator('audio')
+    .evaluate((audio: HTMLAudioElement) => audio.duration);
   expect(duration).toBeGreaterThan(90);
   await expect
-    .poll(() => page.locator('audio').evaluate((audio) => audio.ended), { timeout: 90_000 })
+    .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.ended), {
+      timeout: 90_000,
+    })
     .toBe(true);
 });

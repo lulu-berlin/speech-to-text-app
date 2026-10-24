@@ -27,7 +27,10 @@ function runCheck(args: string[]): Outcome {
     return { status: 0, output };
   } catch (error) {
     const failure = error as { status?: number; stdout?: string; stderr?: string };
-    return { status: failure.status ?? -1, output: `${failure.stdout ?? ''}${failure.stderr ?? ''}` };
+    return {
+      status: failure.status ?? -1,
+      output: `${failure.stdout ?? ''}${failure.stderr ?? ''}`,
+    };
   }
 }
 

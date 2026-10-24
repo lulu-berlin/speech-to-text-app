@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { ancestors, findProcess, processes } from './processes.mjs';
+import { ancestors, findProcess, processes } from './processes.ts';
 
 // The shape of `ps -axo pid=,ppid=,command=` on macOS: padded numeric columns, then the command.
 const PS = `  735     1 /sbin/launchd
@@ -15,7 +15,8 @@ test('the ps fallback finds the app JVM and walks its ancestors', () => {
   const rows = processes({ psOutput: () => PS });
 
   const jvm = findProcess(rows, ['stt.MainKt', '/tmp/stt-data']);
-  assert.equal(jvm?.pid, 4812);
+  assert.ok(jvm);
+  assert.equal(jvm.pid, 4812);
   assert.deepEqual(ancestors(rows, jvm.pid), [4812, 735]);
   assert.equal(findProcess(rows, ['stt.MainKt', '/other-data']), null);
 });
@@ -34,7 +35,7 @@ test('the /proc path reads the same rows', () => {
   assert.deepEqual(ancestors(rows, 4812), [4812, 735]);
 });
 
-function writeProc(root, pid, ppid, cmdline) {
+function writeProc(root: string, pid: number, ppid: number, cmdline: string): void {
   mkdirSync(join(root, String(pid)), { recursive: true });
   writeFileSync(join(root, String(pid), 'cmdline'), cmdline);
   writeFileSync(join(root, String(pid), 'stat'), `${pid} (process) S ${ppid} 1 1 0 -1\n`);

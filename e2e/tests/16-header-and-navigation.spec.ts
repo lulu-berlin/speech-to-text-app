@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { HEADER_CLIP } from '../lib/backend.mjs';
+import { HEADER_CLIP } from '../lib/backend.ts';
 import {
   DESKTOP_VIEWPORT,
   MASCOT,

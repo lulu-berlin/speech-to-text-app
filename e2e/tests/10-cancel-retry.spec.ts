@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { BROKEN_CLIP, CANCEL_CLIP, appUrl, loadState, scratchDirPath } from '../lib/backend.mjs';
+import { BROKEN_CLIP, CANCEL_CLIP, appUrl, loadState, scratchDirPath } from '../lib/backend.ts';
 import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
 
 // The entries left in a task's scratch directory (the app's OS-temp area, one per data directory); none

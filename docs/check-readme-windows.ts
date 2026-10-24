@@ -5,16 +5,23 @@
 // inside it. The prose itself is read by the user; this pin keeps those facts from being dropped
 // silently. Exits 1 on any missing fact.
 //
-//   node docs/check-readme-windows.mjs
+//   node docs/check-readme-windows.ts
 import { readFileSync } from 'node:fs';
 
 const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 
 const heading = /^#{3,4} Windows x64$/m.exec(readme);
-const section = heading === null ? '' : readme.slice(heading.index + heading[0].length).split(/^#{2,4} /m)[0];
+const section =
+  heading === null
+    ? ''
+    : (readme.slice(heading.index + heading[0].length).split(/^#{2,4} /m)[0] ?? '');
 
-const facts = [
-  ['a Windows x64 entry in the ways-to-run table', /\[Gradle without Nix\]\(#gradle-without-nix\)[^\n]*Windows x64/, readme],
+const facts: [what: string, pattern: RegExp, text: string][] = [
+  [
+    'a Windows x64 entry in the ways-to-run table',
+    /\[Gradle without Nix\]\(#gradle-without-nix\)[^\n]*Windows x64/,
+    readme,
+  ],
   ['a Windows section', /^#{3,4} Windows x64$/m, readme],
   ['the Gradle bootstrap command', /\bgradlew\.bat\b/, section],
   ['the app launcher', /\bstt\.cmd\b/, section],

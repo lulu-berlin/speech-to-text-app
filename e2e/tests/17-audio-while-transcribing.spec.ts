@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { COMPLETED_PLAYER_CLIP, TRANSCRIBING_BACKGROUND_CLIP, appUrl } from '../lib/backend.mjs';
+import { COMPLETED_PLAYER_CLIP, TRANSCRIBING_BACKGROUND_CLIP, appUrl } from '../lib/backend.ts';
 import {
   apiTaskIdOf,
   appLive,

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { COLOR_ROW_CLIP, appUrl } from '../lib/backend.mjs';
+import { COLOR_ROW_CLIP, appUrl } from '../lib/backend.ts';
 import { appLive, expectCompletedOrCanceled, goTo, uploadClips } from './helpers/ui';
 
 // Item 65: the status line's phase prefixes; the collector records each distinct

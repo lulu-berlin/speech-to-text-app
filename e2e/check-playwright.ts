@@ -17,12 +17,12 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
-const fail = (message) => {
+function fail(message: string): never {
   console.error(`FAILED: ${message}`);
   process.exit(1);
-};
+}
 
-const ok = (message) => console.log(`ok: ${message}`);
+const ok = (message: string): void => console.log(`ok: ${message}`);
 
 // 1. What the comment names (devenv.nix's e2e comment keeps this parseable form).
 const devenv = readFileSync(join(root, 'devenv.nix'), 'utf8');
@@ -31,7 +31,9 @@ if (!pin) fail("devenv.nix's e2e comment must name 'playwright <version>, browse
 const [commentedVersion, commentedRevision] = [pin[1], pin[2]];
 
 // 2. What e2e/package.json requires.
-const pkg = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8'));
+const pkg = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8')) as {
+  devDependencies?: Record<string, string>;
+};
 const required = pkg.devDependencies?.['@playwright/test'];
 if (!required) fail('e2e/package.json has no @playwright/test devDependency');
 
@@ -42,12 +44,12 @@ if (!store) {
     'PLAYWRIGHT_BROWSERS_PATH is not set (devenv.nix sets it; re-enter the shell — without Nix, ./gradlew e2e sets it)',
   );
 }
-let storeRevision;
+let storeRevision: string | undefined;
 try {
   const chromium = readdirSync(store).find((entry) => /^chromium-\d+$/.test(entry));
   storeRevision = chromium?.split('-')[1];
 } catch (err) {
-  fail(`store ${store} is not readable: ${err.message}`);
+  fail(`store ${store} is not readable: ${err instanceof Error ? err.message : String(err)}`);
 }
 
 if (commentedVersion !== required) {
@@ -68,31 +70,40 @@ if (commentedRevision !== storeRevision) {
 // @playwright/test is a transitive-dep consumer, so pnpm keeps playwright-core in
 // the virtual store (node_modules/.pnpm/playwright-core@<version>/…) rather than
 // hoisting it to the package root — locate it by the installed version.
-const npmRoot = join(here, 'node_modules');
-let installed, expectedRevision;
-try {
-  installed = JSON.parse(
-    readFileSync(join(npmRoot, '@playwright/test/package.json'), 'utf8'),
-  ).version;
-  const coreDir = readdirSync(join(npmRoot, '.pnpm')).find(
-    (entry) => entry === `playwright-core@${installed}`,
-  );
-  if (!coreDir) {
-    fail(`playwright-core@${installed} is missing — pnpm --dir e2e install`);
+function readInstalled(): { installed: string; expectedRevision: string } {
+  const npmRoot = join(here, 'node_modules');
+  try {
+    const installedPackage = JSON.parse(
+      readFileSync(join(npmRoot, '@playwright/test/package.json'), 'utf8'),
+    ) as { version: string };
+    const installed = installedPackage.version;
+    const coreDir = readdirSync(join(npmRoot, '.pnpm')).find(
+      (entry) => entry === `playwright-core@${installed}`,
+    );
+    if (!coreDir) {
+      fail(`playwright-core@${installed} is missing — pnpm --dir e2e install`);
+    }
+    const browsers = JSON.parse(
+      readFileSync(
+        join(npmRoot, '.pnpm', coreDir, 'node_modules', 'playwright-core', 'browsers.json'),
+        'utf8',
+      ),
+    ) as { browsers: { name: string; revision: number }[] };
+    const chromiumEntry = browsers.browsers.find((entry) => entry.name === 'chromium');
+    if (chromiumEntry === undefined) {
+      fail(`the installed playwright's browsers.json lists no chromium — pnpm --dir e2e install`);
+    }
+    return { installed, expectedRevision: String(chromiumEntry.revision) };
+  } catch (err) {
+    // A missing node_modules is the common failure this check exists for; anything else is a bug.
+    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+      fail('e2e dependencies are not installed — pnpm --dir e2e install');
+    }
+    throw err;
   }
-  const browsers = JSON.parse(
-    readFileSync(
-      join(npmRoot, '.pnpm', coreDir, 'node_modules', 'playwright-core', 'browsers.json'),
-      'utf8',
-    ),
-  );
-  expectedRevision = String(browsers.browsers.find((b) => b.name === 'chromium').revision);
-} catch (err) {
-  if (err.code === 'ENOENT') {
-    fail('e2e dependencies are not installed — pnpm --dir e2e install');
-  }
-  throw err;
 }
+
+const { installed, expectedRevision } = readInstalled();
 
 if (installed !== required) {
   fail(

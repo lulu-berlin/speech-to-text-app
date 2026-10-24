@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { appUrl } from '../lib/backend.mjs';
+import { appUrl } from '../lib/backend.ts';
 
 // Item 59, finding 7: the connection indicator was the bare word "Live", with no visual
 // state beyond the text. It is now a dot plus its label, informational (no reconnect

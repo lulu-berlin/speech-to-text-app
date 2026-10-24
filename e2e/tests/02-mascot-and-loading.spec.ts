@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { appUrl } from '../lib/backend.mjs';
+import { appUrl } from '../lib/backend.ts';
 import { MASCOT, mascotAbove } from './helpers/ui';
 
 test('shell, loading and empty regions show the mascot', async ({ page }) => {

@@ -52,7 +52,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | --- | --- | --- | --- |
 | 49 Windows support | in progress | **yes** | 1.0 claims Windows as a supported platform |
 | 52 Edit transcription | in progress | **yes** | the copy-edit workflow is core to a finished transcript |
-| 54 TypeScript for the remaining scripts | spec-approved | after 1.0 | hygiene; no behavior change |
+| 54 TypeScript for the remaining scripts | done | after 1.0 | hygiene; no behavior change |
 | 65 `59-row-color` chunking observation flake | done | **yes** | a flaky journey weakens release verification |
 | 66 Local service and frontends | spec-approved | after 1.0 | architecture change; new frontends |
 | 67 TUI frontend | spec-approved | after 1.0 | new frontend |

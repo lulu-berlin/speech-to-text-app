@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SETTINGS_CLIP, loadState, saveState, startBackend, stopBackend } from '../lib/backend.mjs';
+import { SETTINGS_CLIP, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
 import { appLive, goTo, uploadClips } from './helpers/ui';
 
 // The settings journey (item 32, ADR 0046): change the device, the thread count and the

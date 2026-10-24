@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { FAVICON_CLIP } from '../lib/backend.mjs';
+import { FAVICON_CLIP } from '../lib/backend.ts';
 import { appLive, rowOf, uploadClips } from './helpers/ui';
 
 // Item 59, decided header follow-up: the running signal left the header, so the page's

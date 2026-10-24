@@ -27,10 +27,16 @@ Windows only by hand on the Windows 11 guest.
   shim path was wrong and the tasks now fail fast with a pointer to the packaged e2e
   (`build.gradle.kts`'s `requirePosixE2e`, item 49's branch and Approval log, finding 4). This item
   restores the tasks with npm's actual global layout on Windows.
-- The harness assumes POSIX in at least one place: `e2e/lib/backend.mjs:318` stops the app with
+- The harness assumes POSIX in at least one place: `e2e/lib/backend.ts:335` stops the app with
   `process.kill(-pid, 'SIGTERM')`, a process-group kill Windows does not have; the process listing
-  in `e2e/lib/processes.mjs` reads `/proc` or `ps -axo` (lines 1-15), neither of which exists on
+  (`e2e/lib/processes.ts:19-34`) reads `/proc` or runs `ps -axo`, neither of which exists on
   Windows (item 48 added the macOS path).
+- Item 54's type-check and documentation-check tests build their sandboxes from symlinks
+  (`symlinkSync` in `e2e/lib/type-check.test.ts:51,55,61`, `docs/type-check.test.ts:35,39` and
+  `docs/checks-failures.test.ts:41`). Windows refuses to create a symlink without Developer Mode or
+  an elevated shell (`EPERM`), and `e2e/lib/type-check.test.ts` runs in the e2e package's
+  `pnpm test`, which `gradlew.bat e2e` would run. Today these tests run only on Linux and macOS
+  (item 54's review, 2026-10-24).
 - Queue semantics, pause/resume/cancel, the device probe and the GPU path on Windows are currently
   user-verified on the guest, not CI-verified (item 49's Approval log, cycles 5-8).
 - Item 49 measured its Windows path at ~12 min; macOS e2e runs 13-16 min, the band item 49 used for
@@ -73,6 +79,8 @@ Windows only by hand on the Windows 11 guest.
       readable log
 - [ ] (gating) Every spec that cannot run on Windows is named in the test list and skipped with a
       visible reason; no spec is skipped silently
+- [ ] (harness) The e2e package's `node --test` suite, including the type-check sandbox, passes on
+      the Windows runner without symlink privileges
 - [ ] (must not break) The Linux and macOS journeys stay green, with the same spec count
 - [ ] (must not break) `gradlew.bat e2e` on Windows fails with a clear message when the managed pnpm
       is missing, instead of skipping or hanging
@@ -95,3 +103,5 @@ scope.
 
 - 2026-10-23: filed as a draft by the root agent at the user's request, as a 1.0 gate of roadmap
   item 78. Not yet discussed.
+- 2026-10-24: item 54's review added the symlink-based sandboxes to the Evidence and the test list
+  (the user's decision). Still a draft.

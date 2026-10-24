@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { ROW_CONTROLS_CLIP, ROW_CONTROLS_SECOND_CLIP, appUrl } from '../lib/backend.mjs';
+import { ROW_CONTROLS_CLIP, ROW_CONTROLS_SECOND_CLIP, appUrl } from '../lib/backend.ts';
 import { appLive, rowOf, uploadClips } from './helpers/ui';
 
 // An icon-only control's hint: hover it and the tooltip carries the same words as its

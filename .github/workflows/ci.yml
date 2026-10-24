@@ -108,24 +108,23 @@ jobs:
         run: pnpm build
 
   docs-check:
-    name: Linux (docs exception policy)
+    name: Linux (documentation checks)
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/node-toolchain
         with:
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: node docs/check-exceptions.ts
-        run: node docs/check-exceptions.ts
-      - name: node --test docs/check-exceptions.test.ts
-        run: node --test docs/check-exceptions.test.ts
-      # The change filter's shape is pinned here because this job runs on every event, including
-      # the documentation-only pull requests the filter skips (roadmap item 80): a gate that
-      # dropped a heavy job or skipped itself would otherwise only show up as a silently unrun
-      # check on GitHub.
-      - name: node --test docs/check-ci-gating.test.mjs
-        run: node --test docs/check-ci-gating.test.mjs
+          cache-dependency-path: docs/pnpm-lock.yaml
+      - name: pnpm install
+        run: pnpm --dir docs install --frozen-lockfile
+      # The docs package's whole gate (roadmap item 54): the type check and Prettier over its
+      # TypeScript, then every documentation check and its tests — the change filter's shape among
+      # them, pinned here because this job runs on every event, including the documentation-only
+      # pull requests the filter skips (roadmap item 80): a gate that dropped a heavy job or
+      # skipped itself would otherwise only show up as a silently unrun check on GitHub.
+      - name: pnpm test
+        run: pnpm --dir docs test
 
   backend-integration:
     name: Linux (gradle integrationTest)
@@ -326,7 +325,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm --dir desktop test
-          pnpm --dir e2e exec tsc -p desktop/tsconfig.json
+          pnpm --dir e2e exec tsc -p tsconfig.json
       - name: Build the DMG
         run: |
           set -euo pipefail
@@ -623,7 +622,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           pnpm --dir desktop test
           if ($LASTEXITCODE -ne 0) { throw 'desktop checks failed' }
-          pnpm --dir e2e exec tsc -p desktop/tsconfig.json
+          pnpm --dir e2e exec tsc -p tsconfig.json
           if ($LASTEXITCODE -ne 0) { throw 'spec type check failed' }
       - name: Build the portable zip
         shell: pwsh
@@ -1007,7 +1006,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm --dir desktop test
-          pnpm --dir e2e exec tsc -p desktop/tsconfig.json
+          pnpm --dir e2e exec tsc -p tsconfig.json
       # electron-builder fetches its own fpm and Electron here: USE_SYSTEM_FPM is the devenv's
       # Nix-shell workaround (ADR 0010) and is deliberately not set in CI.
       - name: Build the .deb
