@@ -247,4 +247,4 @@ graph TD
 | [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | draft         | 21, 49, 51                  |
 | [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
 | [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](82-ci-diagnosability.md)                                     | spec-approved | —                           |
-| [81 — A row command clicked while another one is in flight is dropped](81-dropped-row-command.md)                                                                  | draft         | —                           |
+| [81 — A row command clicked while another one is in flight is dropped](81-dropped-row-command.md)                                                                  | spec-approved | —                           |
