@@ -227,6 +227,31 @@ describe('the history list', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 
+  it('disables Retry while its request runs, and enables it again when the retry fails', async () => {
+    // Item 81. The retry answer is held until the test releases it; 409 with error.json
+    // stands in for a refused retry (there is no 409 illegal-transition example).
+    const retryAnswer = Promise.withResolvers<void>();
+    server.use(
+      http.get('/api/events', () => eventStreamResponse([['snapshot', historySnapshot]])),
+      http.post('/api/tasks/:id/retry', async () => {
+        await retryAnswer.promise;
+        return HttpResponse.json(errorFixture, { status: 409 });
+      }),
+    );
+    await renderHistory();
+
+    fireEvent.click(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' }));
+    await waitFor(() =>
+      expect(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' })).toBeDisabled(),
+    );
+
+    retryAnswer.resolve();
+    expect(
+      await within(rowOf('call.ogg')).findByText(/Task 42 does not exist/),
+    ).toBeInTheDocument();
+    expect(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' })).toBeEnabled();
+  });
+
   it('shows an inline error when a delete is refused', async () => {
     let confirmClicks = 0;
     // Mock addition: the delete handler answers 409 with error.json, standing in for a

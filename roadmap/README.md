@@ -139,7 +139,7 @@ graph TD
   75[75 retire the Python oracle]
   76[76 RTL transcription]
   77[77 private test temp dirs ✓]:::done
-  81[81 dropped row command]
+  81[81 dropped row command ✓]:::done
   78[78 stable release]
   49 --> 78
   52 --> 78
@@ -247,4 +247,4 @@ graph TD
 | [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | draft         | 21, 49, 51                  |
 | [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
 | [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](82-ci-diagnosability.md)                                     | spec-approved | —                           |
-| [81 — A row command clicked while another one is in flight is dropped](81-dropped-row-command.md)                                                                  | spec-approved | —                           |
+| [81 — A row command clicked while another one is in flight is dropped](../docs/specs/dropped-row-command.md)                                                                  | done          | —                           |

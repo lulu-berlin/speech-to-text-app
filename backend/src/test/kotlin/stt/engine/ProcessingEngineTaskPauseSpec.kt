@@ -3,6 +3,9 @@ package stt.engine
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.queue.TaskStatus
@@ -46,6 +49,45 @@ class ProcessingEngineTaskPauseSpec :
                         fixture.completed.receive() shouldBe task
                         fixture.processControl.pauses shouldBe 1
                         fixture.processControl.resumes shouldBe 1
+                    }
+                }
+            }
+        }
+
+        given("a running task that is paused while a subscriber watches the events") {
+            `when`("the PAUSED update reaches the subscriber") {
+                then("the task's process is already frozen") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+
+                        // Item 81: an Unconfined collector runs inside the engine's emit, so it sees the
+                        // process as it is at the moment PAUSED is published.
+                        val frozenWhenPublished = CompletableDeferred<Boolean>()
+                        backgroundScope.launch(Dispatchers.Unconfined) {
+                            fixture.engine.events.collect { event ->
+                                if (event is Event.TaskUpdated && event.task.task.status == TaskStatus.PAUSED) {
+                                    frozenWhenPublished.complete(fixture.processControl.frozen)
+                                }
+                            }
+                        }
+
+                        val release = CompletableDeferred<Unit>()
+                        fixture.transcriber.hold = release
+                        fixture.engine.start()
+                        taskIdOf(
+                            fixture.transcriber.entered
+                                .receive()
+                                .parent,
+                        ) shouldBe task
+
+                        fixture.engine.pauseTask(task) shouldBe TaskCommandOutcome.Accepted
+                        frozenWhenPublished.await() shouldBe true
+
+                        fixture.engine.resumeTask(task) shouldBe TaskCommandOutcome.Accepted
+                        fixture.transcriber.hold = null
+                        release.complete(Unit)
+                        fixture.completed.receive() shouldBe task
                     }
                 }
             }
@@ -161,6 +203,25 @@ class ProcessingEngineTaskPauseSpec :
                         pumpUntil(200.milliseconds) { fixture.chunker.workDirs.size > 1 }
                         fixture.chunker.workDirs.map(::taskIdOf) shouldBe listOf(running)
                         statusOf(fixture, queued) shouldBe TaskStatus.PAUSED
+                    }
+                }
+            }
+        }
+
+        given("a queued task that has never started") {
+            `when`("it is paused") {
+                then("PAUSED is published and nothing is frozen") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+
+                        // Item 81: publishing after the freeze must not skip a task the worker is not running.
+                        fixture.engine.pauseTask(task) shouldBe TaskCommandOutcome.Accepted
+                        runCurrent()
+
+                        statusesOf(fixture, task) shouldBe listOf(TaskStatus.PAUSED)
+                        fixture.processControl.pauses shouldBe 0
+                        fixture.processControl.frozen shouldBe false
                     }
                 }
             }
