@@ -154,7 +154,7 @@ graph TD
   49 --> 79
   51 --> 79
   79 --> 78
-  80[80 docs-only CI]
+  80[80 docs-only CI ✓]:::done
   49 --> 80
   51 --> 80
   classDef done fill:#d4edda,stroke:#2e7d32
@@ -243,4 +243,4 @@ graph TD
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |
 | [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | draft         | 21, 49, 51                  |
-| [80 — Documentation-only pull requests skip the heavy CI jobs](80-docs-only-ci.md)                                                                                | spec-approved | 49, 51                      |
+| [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
