@@ -234,6 +234,14 @@ export function TaskTranscriptView() {
   const playing = playback.matches('playing');
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  // A pause command reports idle at once: the element's `pause` event can land a frame after the
+  // command, and the current segment's controls enter the tab order only when idle (item 82, the
+  // macOS keyboard trial). pause() itself is immediate.
+  const pauseToIdle = (audio: HTMLAudioElement | null) => {
+    audio?.pause();
+    playbackSend({ type: 'IDLE' });
+  };
+
   // All segments in time order, so the highlight can be a binary search over the starts.
   const segmentsInOrder = useMemo(
     () => (turns === null ? [] : turns.turns.map((turn) => turn.segments).flat()),
@@ -284,7 +292,7 @@ export function TaskTranscriptView() {
   // A Stop (the user's Pause/Stop model, item 52): playback ends at the segment's start, which
   // stays current, so playing again starts it over; the seek ends a segment played on its own.
   const stopAt = (segment: Segment) => {
-    audioRef.current?.pause();
+    pauseToIdle(audioRef.current);
     seek(segment.startMs);
     setChosenSegmentId(segment.id);
   };
@@ -297,7 +305,7 @@ export function TaskTranscriptView() {
     }
     const segment = windowSegment ?? currentSegment;
     if (segment === null) {
-      audioRef.current?.pause();
+      pauseToIdle(audioRef.current);
       return;
     }
     stopAt(segment);
@@ -312,7 +320,7 @@ export function TaskTranscriptView() {
       return;
     }
     if (playing) {
-      audio.pause();
+      pauseToIdle(audio);
     } else {
       settleResumePosition(audio);
       audio.play().catch(() => {
