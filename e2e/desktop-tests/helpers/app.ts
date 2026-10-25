@@ -1,8 +1,10 @@
 import {
   _electron as electron,
   expect,
+  test,
   type ElectronApplication,
   type Page,
+  type TestInfo,
 } from '@playwright/test';
 import {
   copyFileSync,
@@ -15,7 +17,7 @@ import {
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { JFK_QUOTE, turnTextOf } from '../../tests/helpers/ui';
+import { JFK_QUOTE, turnTextOf } from '../../tests/helpers/ui.ts';
 
 // Shared setup for the desktop tests (roadmap item 50): desktop/run-in-docker.ts runs these specs
 // in a stock container against one packaged app — the installed .deb's `stt-app` command, the
@@ -44,9 +46,10 @@ export interface LaunchOptions {
 
 /**
  * Launches the packaged app the way a user starts it: a fresh HOME (the per-user data directory
- * starts empty) and Chromium's sandbox on.
+ * starts empty) and Chromium's sandbox on. The app window's trace is recorded and saved by `close`
+ * (see `recordAppTrace`).
  */
-export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronApplication> {
+export async function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronApplication> {
   const {
     home = temporaryDir('home'),
     executable = DESKTOP_APP,
@@ -70,12 +73,44 @@ export function launchDesktopApp(options: LaunchOptions = {}): Promise<ElectronA
     delete appEnv.STT_WHISPER_MODEL;
     delete appEnv.STT_SPEAKER_MODEL;
   }
-  return electron.launch({
+  const app = await electron.launch({
     executablePath: executable,
     // Playwright adds --no-sandbox on Linux by default; the app runs as shipped, sandboxed.
     chromiumSandbox: true,
     env: appEnv,
   });
+  await recordAppTrace(app, test.info());
+  return app;
+}
+
+/**
+ * Roadmap item 82: the trace of the app window — its actions, DOM snapshots, network and
+ * screencast. The config's `trace: 'retain-on-failure'` covers only the contexts Playwright's own
+ * fixtures create; `_electron.launch` opens its context outside them, so their trace holds the
+ * test's steps alone. Tracing starts here and stops in `close`, before the context it records is
+ * gone; the file goes into the test's output directory, which the config's
+ * `preserveOutput: 'failures-only'` keeps for a failing spec only. The process handle is taken
+ * here, while the app exists: Playwright's `app.process()` throws once the app has exited, and a
+ * quit spec closes the app in its `finally` (runs 39540019816, 39891003455, 40156465546). The
+ * captured handle's exit fields then say the app is gone, and there is nothing left to stop. A
+ * spec that launches the app more than once gets one numbered trace per launch.
+ */
+export async function recordAppTrace(app: ElectronApplication, testInfo: TestInfo): Promise<void> {
+  const appProcess = app.process();
+  await app
+    .context()
+    .tracing.start({ screenshots: true, snapshots: true, sources: true, title: testInfo.title });
+  const close = app.close.bind(app);
+  app.close = async () => {
+    const { exitCode, signalCode } = appProcess;
+    if (exitCode === null && signalCode === null) {
+      const ordinal = testInfo.attachments.filter(({ name }) => name === 'app trace').length + 1;
+      const path = testInfo.outputPath(`app-trace-${ordinal}.zip`);
+      await app.context().tracing.stop({ path });
+      testInfo.attachments.push({ name: 'app trace', path, contentType: 'application/zip' });
+    }
+    await close();
+  };
 }
 
 /**

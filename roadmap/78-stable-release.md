@@ -78,7 +78,7 @@ are not gates.
 | Upload acceptance is the client-supplied extension only (any bytes renamed `x.mp3` pass `201` and fail at decode) | `backend/src/main/kotlin/stt/http/UploadRequest.kt:44-58` |
 | The stored `originalFilename` is embedded raw into `Content-Disposition` (a `"`/CR/LF breaks or injects header lines) | `outputs/DownloadFileName.kt:22-29`; `http/TranscriptRoutes.kt:82` |
 | Wall-clock/flaky test patterns that pass vacuously on a slow machine | `engine/ProcessingEngineQueuePauseSpec.kt:35`; `engine/ProcessingEngineCancelSpec.kt:78,112`; `diarization/SpeakerIdsSpec.kt:224`; `diarization/EmbeddingsSpec.kt:97-98`; `http/EventsDisconnectSpec.kt:47`; `process/ProcessRunnerSpec.kt:376` |
-| The packaged-desktop quit spec's `finally` throws after `await exited`, failing a passing spec and masking the outcome (planned by [item 82](82-ci-diagnosability.md), 2026-10-24) | `e2e/desktop-tests/13-second-quit-during-shutdown.spec.ts:33` (`:29`) |
+| The packaged-desktop quit spec's `finally` throws after `await exited`, failing a passing spec and masking the outcome (fixed by [item 82](../docs/specs/ci-diagnosability.md), 2026-10-25) | `e2e/desktop-tests/13-second-quit-during-shutdown.spec.ts:33` (`:29`) |
 | JDK 21 hardcoded in four places in `backend/build.gradle.kts` while `versions.json` holds the pin; `checkVersions` does not cover it | `backend/build.gradle.kts`; `versions.json` |
 | Docker build cache busted by non-input files (`COPY . .`) | `Dockerfile`; `.dockerignore` |
 

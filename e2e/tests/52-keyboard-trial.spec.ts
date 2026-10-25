@@ -29,6 +29,12 @@ test('the keyboard walks the transcript: Tab, Space and Escape', async ({ page }
   await expect.poll(focused).toMatchObject({ current: true, inPlayer: false });
   const current = await focused();
 
+  // The player shows Pause only once the audio element's `play` event has made it playing —
+  // the state the current segment's controls, and so the tab order, follow. A Tab pressed
+  // before it lands on the current segment's Edit control, which then unmounts with the focus:
+  // the focus fell to the body and the Spaces did nothing (run 40219747549's Linux flake).
+  await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
+
   // Tab: the next segment holds the staging focus — the player's controls are not revisited.
   await page.keyboard.press('Tab');
   await expect.poll(focused).toMatchObject({ inPlayer: false });
