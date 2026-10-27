@@ -237,7 +237,7 @@ graph TD
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
 | [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
 | [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](71-repository-and-chunking-performance.md)               | draft         | —                           |
-| [72 — Frontend state and error handling: visible errors, one settings owner, validated input](72-frontend-state-and-errors.md)                                      | draft         | —                           |
+| [72 — Frontend state and error handling: visible errors, one settings owner, validated input](72-frontend-state-and-errors.md)                                      | spec-approved | —                           |
 | [73 — Diarization speaker separation: unseparated speakers, and a split remedy](73-diarization-speaker-separation.md)                                              | draft         | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | draft         | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | draft         | —                           |
