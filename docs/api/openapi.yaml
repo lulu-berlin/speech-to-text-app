@@ -384,6 +384,15 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/Settings"}
         "400": {$ref: "#/components/responses/BadRequest"}
+    delete:
+      tags: [settings]
+      summary: Restore the default settings (also clears the CPU-fallback notice)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Settings"}
   /api/settings/device-fallback:
     delete:
       tags: [settings]
