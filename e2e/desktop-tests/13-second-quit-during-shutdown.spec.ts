@@ -12,7 +12,13 @@ import { APP_PROCESSES, BACKEND, launchDesktopApp, processes, survivors } from '
 
 test('a second quit request while the backend is stopping still waits for it', async () => {
   const app = await launchDesktopApp();
-  const exited = once(app.process(), 'exit');
+  // The app has exited by the time the cleanup below runs, and Playwright's ElectronApplication
+  // stops answering `process()` once its connection is closed: that threw
+  // `TypeError: Cannot read properties of undefined (reading '_object')` and masked the outcome
+  // (roadmap item 82, runs 39540019816, 39891003455 and 40156465546). Take the handle while the
+  // app runs and read the exit codes from it.
+  const appProcess = app.process();
+  const exited = once(appProcess, 'exit');
   let paused: string | undefined;
   try {
     const window = await app.firstWindow();
@@ -30,7 +36,7 @@ test('a second quit request while the backend is stopping still waits for it', a
 
     expect(await survivors(APP_PROCESSES, 5_000), 'nothing the app owns outlives it').toEqual([]);
   } finally {
-    const { exitCode, signalCode } = app.process();
+    const { exitCode, signalCode } = appProcess;
     if (exitCode === null && signalCode === null) await app.close();
     // A paused JVM left by a failing run would stop the next spec's survivor checks from passing.
     if (paused && processes(BACKEND).some(({ pid }) => pid === paused)) {

@@ -116,8 +116,21 @@ jobs:
       - uses: ./.github/actions/node-toolchain
         with:
           cache-dependency-path: docs/pnpm-lock.yaml
+      # Roadmap item 82: every check that needs no package runs before `pnpm install`. A registry
+      # outage or a cold store can then fail only the type check and Prettier, and the checks' results
+      # stay in the log — this job gates a documentation-only pull request, where no code runs.
+      - name: The dependency-free checks
+        run: node --test docs/check-exceptions.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/check-action-versions.test.ts
+      # Tolerated on purpose: with the registry unreachable install cannot resolve, and its failure
+      # must not hide the checks above. A real install failure still fails `pnpm test` below on the
+      # packages it did not lay down, so the job stays red.
+      # The frozen lockfile is reviewed and a documentation-only pull request changes no code, so the
+      # supply-chain verification, which asks the registry for every entry's publish data, is skipped
+      # with `trustLockfile` (roadmap item 82): without it a warm store still fails this step when
+      # the registry is unreachable, although every package it needs is already there.
       - name: pnpm install
-        run: pnpm --dir docs install --frozen-lockfile
+        continue-on-error: true
+        run: pnpm --dir docs install --frozen-lockfile --config.trustLockfile=true
       # The docs package's whole gate (roadmap item 54): the type check and Prettier over its
       # TypeScript, then every documentation check and its tests — the change filter's shape among
       # them, pinned here because this job runs on every event, including the documentation-only
@@ -172,6 +185,12 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" "$gradle_home" "$GITHUB_WORKSPACE"
       - name: gradle e2e
         run: ./gradlew e2e
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: e2e-test-results-linux
 
   # macOS (roadmap item 48): Apple Silicon only — Apple and nixpkgs dropped Intel Macs. These jobs
   # run on every push to main, every pull request that touches code, workflow dispatch and the
@@ -239,6 +258,12 @@ jobs:
         run: |
           rm -f e2e/.e2e-backend.log
           ./gradlew e2e
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: e2e-test-results-macos
       - name: Assert a task ran through Metal
         run: |
           set -euo pipefail
@@ -261,8 +286,9 @@ jobs:
           save-cache: 'true'
       - name: Install the devenv CLI
         run: nix profile install nixpkgs#devenv
+      # Roadmap item 82: linted without the devenv shell, as in `nix-devenv`.
       - name: actionlint the workflows
-        run: devenv shell -- actionlint .github/workflows/*.yml
+        run: nix run --inputs-from . nixpkgs#actionlint -- .github/workflows/*.yml
       - name: devenv test
         run: devenv test
       # Roadmap item 69 (test-list item 3): the shell's ffmpeg is the flake's ffmpeg, and that is
@@ -396,7 +422,7 @@ jobs:
           fi
           echo "packaged ffmpeg: $(head -n 1 <<<"$version")"
       - name: Upload the DMG
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Speech-to-Text-macos-arm64-dmg
           path: desktop/dist/*.dmg
@@ -406,6 +432,12 @@ jobs:
         run: >-
           pnpm exec playwright test -c playwright.desktop.config.ts
           01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: desktop-test-results-macos-dmg
 
   # Manual tool (roadmap item 48, aligned with item 63's `desktop-whisper-cpp-v1` release): the
   # pinned jiang1997 darwin prebuild's binaries load libggml-metal/libggml-blas dylibs the tarball
@@ -447,7 +479,7 @@ jobs:
           shasum -a 256 whisper-cpp-1.8.4-aarch64-darwin.tar.gz | tee sha256.txt
           echo "### whisper-cpp asset" >> "$GITHUB_STEP_SUMMARY"
           cat sha256.txt >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: whisper-cpp-1.8.4-aarch64-darwin
           path: whisper-cpp-1.8.4-aarch64-darwin.tar.gz
@@ -514,7 +546,7 @@ jobs:
       - name: Prove the recorded pin matches the built asset
         run: nix run --print-build-logs .#ffmpeg-asset-pin
       # The tar is what the user publishes: upload it even when the pin proof failed above.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ffmpeg-audio-only-aarch64-darwin
@@ -705,6 +737,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           pnpm exec playwright test -c playwright.desktop.config.ts 15-msi-install.spec.ts
           if ($LASTEXITCODE -ne 0) { throw 'the MSI spec failed' }
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results). Each
+      # Playwright step above clears e2e/test-results, and the job stops at the first failing one,
+      # so this holds that step's.
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: desktop-test-results-windows
 
   # The Windows whisper-cli asset (manual, roadmap item 49). The published prebuilts are not
   # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC
@@ -854,7 +894,7 @@ jobs:
           "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz"
           "### whisper-cpp Windows asset" >> $env:GITHUB_STEP_SUMMARY
           "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz" >> $env:GITHUB_STEP_SUMMARY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: whisper-cpp-1.8.4-windows-x64
           path: whisper-cpp-1.8.4-windows-x64.tar.gz
@@ -948,7 +988,7 @@ jobs:
             cat sha256.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-audio-only-8.1.2-windows-x64
           path: ffmpeg-audio-only-8.1.2-windows-x64.tar.gz
@@ -1055,6 +1095,12 @@ jobs:
       - name: Run the packaged desktop e2e
         working-directory: e2e
         run: xvfb-run -a pnpm exec playwright test -c playwright.desktop.config.ts
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: desktop-test-results-linux-deb
 
   # The desktop app's flake package (ADR 0053), tested the way `pnpm --dir e2e test:desktop:nix`
   # tests it on a developer's machine: `nix build .#desktop` on the runner, then the same packaged
@@ -1078,6 +1124,13 @@ jobs:
         run: >-
           devenv shell -- bash -euo pipefail -c
           'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:nix'
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results); the
+      # container writes them into the mounted e2e/ (desktop/run-in-docker.ts).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: desktop-test-results-linux-flake
 
   # The desktop bundle (ADR 0053), tested the way `pnpm --dir e2e test:desktop:bundle` tests it on a
   # developer's machine: `nix build .#desktop-bundle` on the runner, then the packaged specs in a
@@ -1116,6 +1169,13 @@ jobs:
         run: >-
           devenv shell -- bash -euo pipefail -c
           'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:bundle'
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results); the
+      # container writes them into the mounted e2e/ (desktop/run-in-docker.ts).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: desktop-test-results-linux-bundle
 
   # The three Nix checks run in parallel, but GitHub Actions cache keys are immutable: the first
   # job to save wins. Only `nix-build` writes the shared cache, because it materializes the full
@@ -1140,9 +1200,26 @@ jobs:
       # The workflows are linted with the actionlint the devenv pins (ADR 0010), so a YAML mistake or
       # a bad `${{ … }}` expression fails in CI instead of at the next push — the reason
       # `pkgs.actionlint` was added. actionlint 1.7.12 checks workflow files only, so the composite
-      # `action.yml` files are still reviewed by hand.
+      # `action.yml` files are still reviewed by hand. Roadmap item 82: it runs from the flake's
+      # nixpkgs pin, which devenv.yaml shares (ADR 0036; `devenv-pin-sync` checks it), not inside
+      # `devenv shell`: the shell realizes the pinned release assets from github.com, and a lint
+      # must not fail because that host is down (run #246).
       - name: actionlint the workflows
-        run: devenv shell -- actionlint .github/workflows/*.yml
+        run: nix run --inputs-from . nixpkgs#actionlint -- .github/workflows/*.yml
+      # Roadmap item 82: the lock, not the job's PATH, decides which actionlint lints — and it
+      # must be the one the devenv pins. `devenv.lock` is that pin (the file the CLI evaluates;
+      # `devenv-pin-sync` checks it names the same nixpkgs as flake.lock). A lint tool that
+      # silently drifted to another nixpkgs would report rules devenv never runs.
+      - name: actionlint matches the devenv's pin
+        run: |
+          rev=$(jq -r '.nodes.nixpkgs.locked.rev' devenv.lock)
+          linted=$(nix run --inputs-from . nixpkgs#actionlint -- --version | head -n1)
+          pinned=$(nix eval --raw "github:NixOS/nixpkgs/$rev#actionlint.version")
+          if [ "$linted" != "$pinned" ]; then
+            echo "actionlint-version: the lint runs actionlint $linted but devenv.lock pins nixpkgs $rev with $pinned" >&2
+            exit 1
+          fi
+          echo "actionlint $linted is the version devenv.lock pins (nixpkgs $rev)"
       # The dev shell's own test list (devenv.nix enterTest): node, JDK 21 with Gradle and Kotlin,
       # whisper-cli, ffmpeg, sqlite3, curl, jq and the model hashes.
       - name: devenv test

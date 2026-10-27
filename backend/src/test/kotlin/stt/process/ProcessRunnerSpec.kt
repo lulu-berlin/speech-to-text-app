@@ -514,15 +514,26 @@ class ProcessRunnerSpec :
         given("a pause() issued while the process is being spawned") {
             `when`("the run starts") {
                 then("the process produces no output until resume(), then starts from its first line") {
-                    val run =
-                        pausedFromSpawn(
-                            start = ProcessBuilder::start,
-                            // The 0.5 s head start keeps output from racing the SIGSTOP right after spawn.
-                            command = countingLoop(headStart = 500.milliseconds),
-                        )
+                    // A gate file, not a wall-clock head start: the child prints nothing until the
+                    // test has seen the whole run tree stopped and only then opens the gate. The
+                    // 500 ms head start lost that race on a loaded runner (run 40041313804).
+                    val gate = Files.createTempDirectory("stt-pause-gate-").resolve("open")
+                    try {
+                        val run =
+                            pausedFromSpawn(
+                                start = ProcessBuilder::start,
+                                command = gatedCountingLoop(gate),
+                                beforeResume = {
+                                    awaitFrozen()
+                                    Files.createFile(gate)
+                                },
+                            )
 
-                    run.deliveredWhilePaused.shouldBeEmpty()
-                    run.firstLineAfterResume.shouldBe("1")
+                        run.deliveredWhilePaused.shouldBeEmpty()
+                        run.firstLineAfterResume.shouldBe("1")
+                    } finally {
+                        gate.parent.toFile().deleteRecursively()
+                    }
                 }
             }
         }
@@ -567,11 +578,18 @@ class ProcessRunnerSpec :
         }
     })
 
-/** A shell loop that prints 1, 2, 3, … every 50 ms, after [headStart] of silence. */
-private fun countingLoop(headStart: Duration = Duration.ZERO): List<String> {
-    val delay = if (headStart > Duration.ZERO) "sleep ${headStart.inWholeMilliseconds / 1000.0}; " else ""
-    return listOf("sh", "-c", "${delay}i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done")
-}
+/** A shell loop that prints 1, 2, 3, … every 50 ms. */
+private fun countingLoop(): List<String> = listOf("sh", "-c", "i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done")
+
+/** [countingLoop] behind a gate file: it prints nothing until [gate] exists. */
+private fun gatedCountingLoop(gate: Path): List<String> =
+    listOf(
+        "sh",
+        "-c",
+        "while [ ! -e \"\$1\" ]; do sleep 0.01; done; i=0; while :; do i=\$((i+1)); echo \$i; sleep 0.05; done",
+        "sh",
+        gate.toString(),
+    )
 
 /** How long the slow reader takes per line: three times the counting loop's 50 ms. */
 private const val SLOW_READ_MS = 150L
@@ -612,6 +630,11 @@ private inline fun <T> killingReportedPids(
  */
 private suspend fun pauseAndExpectFrozen(runner: ProcessRunner) {
     runner.pause()
+    awaitFrozen()
+}
+
+/** Waits until every process of the run's tree is stopped (a zombie child writes nothing either). */
+private suspend fun awaitFrozen() {
     pollUntil {
         val states = runTree().mapNotNull(::processState)
         'T' in states && states.all { it == 'T' || it == 'Z' }
@@ -706,12 +729,13 @@ private class CancelledRun(
 
 /**
  * Runs [command] on a runner that is paused from inside its process start, which starts the built
- * process with [start]; waits 1 s after the start, records what was delivered, then resumes and
- * waits for the first line. Cancels the run either way.
+ * process with [start]; runs [beforeResume] (1 s of settling by default), records what was
+ * delivered, then resumes and waits for the first line. Cancels the run either way.
  */
 private suspend fun pausedFromSpawn(
     start: (ProcessBuilder) -> Process,
     command: List<String>,
+    beforeResume: suspend () -> Unit = { delay(1.seconds) },
 ): PausedRun =
     coroutineScope {
         lateinit var runner: ProcessRunner
@@ -735,7 +759,7 @@ private suspend fun pausedFromSpawn(
             }
         try {
             withTimeout(10.seconds) { spawned.await() }
-            delay(1.seconds)
+            beforeResume()
             val deliveredWhilePaused = underLock(delivered) { delivered.toList() }
             runner.resume()
             PausedRun(deliveredWhilePaused, withTimeout(10.seconds) { firstLine.await() })

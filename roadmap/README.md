@@ -158,7 +158,7 @@ graph TD
   80[80 docs-only CI ✓]:::done
   49 --> 80
   51 --> 80
-  82[82 CI diagnosability]
+  82[82 CI diagnosability ✓]:::done
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -246,5 +246,5 @@ graph TD
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |
 | [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | draft         | 21, 49, 51                  |
 | [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
-| [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](82-ci-diagnosability.md)                                     | spec-approved | —                           |
+| [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](../docs/specs/ci-diagnosability.md)                                | done          | —                           |
 | [81 — A row command clicked while another one is in flight is dropped](../docs/specs/dropped-row-command.md)                                                                  | done          | —                           |
