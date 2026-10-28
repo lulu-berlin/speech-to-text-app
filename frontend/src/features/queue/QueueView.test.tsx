@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { SettingsContext, SettingsSync } from '../../app/SettingsContext';
 import {
   error as errorFixture,
   errorDuplicateAudio,
@@ -33,9 +34,12 @@ function renderQueue() {
   return render(
     <ThemedProviders>
       <ConnectionContext.Provider>
-        <MemoryRouter>
-          <QueueView />
-        </MemoryRouter>
+        <SettingsContext.Provider>
+          <SettingsSync />
+          <MemoryRouter>
+            <QueueView />
+          </MemoryRouter>
+        </SettingsContext.Provider>
       </ConnectionContext.Provider>
     </ThemedProviders>,
   );
@@ -158,6 +162,28 @@ describe('the queue view CPU-fallback banner', () => {
     fireEvent.click(within(banner).getByRole('button', { name: 'Dismiss' }));
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     expect(dismissals).toBe(1);
+  });
+
+  it('says so when dismissing the notice fails, and leaves it to try again', async () => {
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFallback)),
+      http.delete('/api/settings/device-fallback', () =>
+        HttpResponse.json(errorFixture, { status: 500 }),
+      ),
+    );
+    renderQueue();
+
+    // The banner stays (the notice is still stored) and the failure is announced, rather
+    // than the click vanishing silently (item 72).
+    const banner = await screen.findByRole('alert');
+    fireEvent.click(within(banner).getByRole('button', { name: 'Dismiss' }));
+    expect(await screen.findByText('Could not dismiss the notice')).toBeInTheDocument();
+    expect(screen.getByText('Task 42 does not exist')).toBeInTheDocument();
+    expect(screen.getByText(/was unavailable/)).toBeInTheDocument();
+    // The failed dismissal settles back to idle: the user can try again.
+    await waitFor(() =>
+      expect(within(banner).getByRole('button', { name: 'Dismiss' })).toBeEnabled(),
+    );
   });
 
   it('appears when a settings-updated event brings a notice, without a reload', async () => {
@@ -1075,6 +1101,71 @@ describe('the queue pause', () => {
     fireEvent.click(toggle);
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'));
     expect(calls).toEqual(['pause', 'resume']);
+  });
+
+  it("shows a failed pause's error beside the switch and leaves the switch at the queue's state", async () => {
+    // 409 queue-not-paused has no docs/api example, so error.json stands in.
+    server.use(
+      http.post('/api/queue/pause', () => HttpResponse.json(errorFixture, { status: 409 })),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    const toggle = screen.getByRole('switch', { name: 'Pause the queue' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+
+    // The rejection is an alert beside the control, naming the command and the server's message.
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Could not pause the queue');
+    expect(alert).toHaveTextContent('Task 42 does not exist');
+
+    // The queue never paused, so the switch shows that real state and is usable again.
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(toggle).toBeEnabled();
+  });
+
+  it("shows a failed resume's error beside the switch and clears it at the next command", async () => {
+    const calls: string[] = [];
+    let resumes = 0;
+    server.use(
+      http.post('/api/queue/pause', () => {
+        calls.push('pause');
+        return HttpResponse.json({ ...queueFixture, paused: true });
+      }),
+      http.post('/api/queue/resume', () => {
+        calls.push('resume');
+        resumes += 1;
+        // The first resume is rejected (409 queue-not-paused has no docs/api example, so
+        // error.json stands in); the retry is served.
+        return resumes === 1
+          ? HttpResponse.json(errorFixture, { status: 409 })
+          : HttpResponse.json({ ...queueFixture, paused: false });
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+    const toggle = screen.getByRole('switch', { name: 'Pause the queue' });
+
+    // Pause first, so the failed resume starts from a paused queue.
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
+
+    fireEvent.click(toggle);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Could not resume the queue');
+    expect(alert).toHaveTextContent('Task 42 does not exist');
+    // The queue never resumed, so the switch still shows it paused.
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(calls).toEqual(['pause', 'resume']);
+
+    // The switch is the retry: the next command clears the message, and its own answer lands.
+    fireEvent.click(toggle);
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'));
+    expect(calls).toEqual(['pause', 'resume', 'resume']);
   });
 });
 

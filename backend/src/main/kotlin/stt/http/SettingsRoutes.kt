@@ -62,8 +62,9 @@ data class SettingsRequest(
 /**
  * The settings endpoints (item 32): read them with the GPUs the startup probe reported as choices and its
  * launch failure, if any (item 60); write them as a whole — validated in contract order, stored (which clears
- * the CPU-fallback notice), answered and published as `settings-updated`; or dismiss the CPU-fallback notice,
- * answered and published the same way.
+ * the CPU-fallback notice), answered and published as `settings-updated`; restore the defaults in one write
+ * that also clears the notice (item 72, ADR 0062); or dismiss the CPU-fallback notice, answered and published
+ * the same way.
  */
 fun Application.settingsRoutes(
     gpus: List<GpuDevice>,
@@ -88,6 +89,12 @@ fun Application.settingsRoutes(
                     call.respond(request.settings.toJson(gpus, deviceProbeError))
                 }
             }
+        }
+
+        delete("/api/settings") {
+            val reset = settings.reset()
+            engine.settingsUpdated(reset)
+            call.respond(reset.toJson(gpus, deviceProbeError))
         }
 
         delete("/api/settings/device-fallback") {

@@ -26,6 +26,23 @@ export interface ConnectionContext {
   settingsUpdate: SettingsNotice | null;
 }
 
+// Drops one task's entry from a per-task map (item 72): a deleted task leaves nothing behind.
+function withoutTask<T>(map: Record<number, T>, id: number): Record<number, T> {
+  const kept = { ...map };
+  delete kept[id];
+  return kept;
+}
+
+// Keeps only the entries of the tasks a snapshot lists (item 72): the maps are bounded by the
+// tasks the state holds, never by every task the stream ever mentioned.
+function onlyTasks<T>(map: Record<number, T>, tasks: Task[]): Record<number, T> {
+  const ids = new Set(tasks.map((task) => task.id));
+  return Object.fromEntries(Object.entries(map).filter(([id]) => ids.has(Number(id)))) as Record<
+    number,
+    T
+  >;
+}
+
 export const connectionMachine = setup({
   types: {
     context: {} as ConnectionContext,
@@ -44,9 +61,11 @@ export const connectionMachine = setup({
   on: {
     snapshot: {
       target: '.live',
-      actions: assign(({ event }) => ({
+      actions: assign(({ context, event }) => ({
         tasks: event.snapshot.tasks,
         queue: event.snapshot.queue,
+        speakerChanges: onlyTasks(context.speakerChanges, event.snapshot.tasks),
+        segmentEdits: onlyTasks(context.segmentEdits, event.snapshot.tasks),
       })),
     },
   },
@@ -102,6 +121,8 @@ export const connectionMachine = setup({
         'task-deleted': {
           actions: assign({
             tasks: ({ context, event }) => context.tasks.filter((task) => task.id !== event.id),
+            speakerChanges: ({ context, event }) => withoutTask(context.speakerChanges, event.id),
+            segmentEdits: ({ context, event }) => withoutTask(context.segmentEdits, event.id),
           }),
         },
         'speakers-renamed': {

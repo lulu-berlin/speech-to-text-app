@@ -4,7 +4,11 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { eventStreamResponse } from '../shared/api/handlers';
 import {
+  error as errorFixture,
   errorDuplicateAudio,
+  settings as settingsFixture,
+  settingsFallback,
+  settingsFixed,
   snapshot as snapshotFixture,
   taskCompleted,
   taskRunning,
@@ -16,6 +20,7 @@ import { Spinner } from '../shared/ui/Spinner';
 import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { controllableEventStream } from '../test/eventStream';
 import { server } from '../test/server';
+import settingsUpdatedFallback from '../../../docs/api/settings-updated.fallback.json';
 import { App } from './App';
 
 function renderAt(path: string) {
@@ -629,5 +634,346 @@ describe('the shell and the views on the tokens', () => {
 
     renderAt('/no-such-page');
     assertView();
+  });
+});
+
+describe('the shared settings instance', () => {
+  it('fetches the settings once for the whole app, whichever view is open', async () => {
+    let gets = 0;
+    server.use(
+      http.get('/api/settings', () => {
+        gets += 1;
+        return HttpResponse.json(settingsFixed);
+      }),
+    );
+
+    renderAt('/queue');
+    await screen.findByText('lecture.m4a');
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    // settings.fixed.json stores 6 threads.
+    await waitFor(() => expect(screen.getByLabelText('Threads')).toHaveValue(6));
+
+    expect(gets).toBe(1);
+  });
+});
+
+describe('restoring the settings from the shared instance', () => {
+  it('clears the CPU-fallback banner through the reset', async () => {
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFallback)),
+      http.delete('/api/settings', () => HttpResponse.json(settingsFixture)),
+    );
+
+    renderAt('/queue');
+    expect(await screen.findByText('GPU 1 was unavailable')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore default settings' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Restore' }));
+
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    await screen.findByText('lecture.m4a');
+    expect(screen.queryByText('GPU 1 was unavailable')).not.toBeInTheDocument();
+  });
+});
+
+describe('a change made in the settings', () => {
+  it('is visible in the queue without a second fetch', async () => {
+    let gets = 0;
+    let puts = 0;
+    server.use(
+      http.get('/api/settings', () => {
+        gets += 1;
+        return HttpResponse.json(settingsFixed);
+      }),
+      http.put('/api/settings', async ({ request }) => {
+        puts += 1;
+        const update = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...settingsFixed, ...update });
+      }),
+    );
+
+    renderAt('/settings');
+    await waitFor(() => expect(screen.getByLabelText('Threads')).toHaveValue(6));
+
+    fireEvent.change(screen.getByLabelText('Speakers'), { target: { value: 'auto' } });
+    await waitFor(() => expect(puts).toBe(1));
+
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    await screen.findByText('lecture.m4a');
+    fireEvent.click(screen.getByRole('button', { name: 'Upload options' }));
+    // The queue's upload defaults read the shared settings: speakers auto, no count.
+    expect(screen.getByLabelText('Speakers')).toHaveValue('auto');
+    expect(screen.queryByLabelText('Speaker count')).not.toBeInTheDocument();
+    // No second GET: one settings instance served both views.
+    expect(gets).toBe(1);
+  });
+});
+
+describe('a failed settings load', () => {
+  it('is shared across the views, and Retry recovers both without another GET', async () => {
+    let gets = 0;
+    server.use(
+      http.get('/api/settings', () => {
+        gets += 1;
+        return gets === 1
+          ? HttpResponse.json(errorFixture, { status: 500 })
+          : HttpResponse.json(settingsFixed);
+      }),
+    );
+
+    renderAt('/settings');
+    await screen.findByRole('alert');
+    expect(gets).toBe(1);
+    expect(screen.getByLabelText('Device')).toBeDisabled();
+
+    // Navigating away and back shows the same shared failure, without a second fetch.
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    await screen.findByText('lecture.m4a');
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Task 42 does not exist');
+    expect(gets).toBe(1);
+
+    // Retry fetches once and recovers the form...
+    const alert = await screen.findByRole('alert');
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.getByLabelText('Threads')).toHaveValue(6));
+    expect(gets).toBe(2);
+
+    // ...and the queue's defaults read the same recovered settings, with no third fetch.
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    await screen.findByText('lecture.m4a');
+    fireEvent.click(screen.getByRole('button', { name: 'Upload options' }));
+    expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('german');
+    expect(gets).toBe(2);
+  });
+});
+
+describe('one settings operation at a time', () => {
+  it('disables Dismiss while a write runs, and the form while a dismissal runs', async () => {
+    const write = Promise.withResolvers<Response>();
+    const dismissal = Promise.withResolvers<Response>();
+    let puts = 0;
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFallback)),
+      http.put('/api/settings', () => {
+        puts += 1;
+        return write.promise;
+      }),
+      http.delete('/api/settings/device-fallback', () => dismissal.promise),
+    );
+    const dismissButton = () =>
+      within(
+        required(screen.getByText(/was unavailable/).closest('[role="alert"]')) as HTMLElement,
+      ).getByRole('button', { name: 'Dismiss' });
+    renderAt('/queue');
+
+    // settings.fallback.json: a notice names gpu:1, so the banner is up and Dismiss works.
+    await screen.findByText(/was unavailable/);
+    expect(dismissButton()).toBeEnabled();
+
+    // A device change starts a write; leaving the page keeps the shared actor writing.
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.change(await screen.findByLabelText('Device'), { target: { value: 'auto' } });
+    await waitFor(() => expect(puts).toBe(1));
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+
+    // Dismiss waits for the write: it cannot be sent into a dropped state.
+    await waitFor(() => expect(dismissButton()).toBeDisabled());
+
+    write.resolve(HttpResponse.json(settingsFallback));
+    await waitFor(() => expect(dismissButton()).toBeEnabled());
+
+    // A dismissal in flight disables the settings form and the restore action.
+    fireEvent.click(dismissButton());
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    await waitFor(() => expect(screen.getByLabelText('Device')).toBeDisabled());
+    expect(screen.getByLabelText('Threads')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeDisabled();
+    expect(screen.getByLabelText('Speakers')).toBeDisabled();
+    expect(screen.getByLabelText('Max speakers')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Restore default settings' })).toBeDisabled();
+
+    dismissal.resolve(HttpResponse.json(settingsFixture));
+    await waitFor(() => expect(screen.getByLabelText('Device')).toBeEnabled());
+  });
+});
+
+describe('a settings-updated while a write is in flight', () => {
+  it('keeps the settings the event carried when the write answer arrives afterwards', async () => {
+    const events = controllableEventStream();
+    const write = Promise.withResolvers<Response>();
+    let puts = 0;
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFixed)),
+      http.put('/api/settings', () => {
+        puts += 1;
+        return write.promise;
+      }),
+    );
+    renderAt('/settings');
+    await screen.findByText('Live');
+    await waitFor(() => expect(screen.getByLabelText('Threads')).toHaveValue(6));
+
+    // A device change starts a write...
+    fireEvent.change(screen.getByLabelText('Device'), { target: { value: 'gpu:0' } });
+    await waitFor(() => expect(puts).toBe(1));
+
+    // ...and the engine's CPU fallback arrives while it runs: settings newer than the write.
+    events.send('settings-updated', settingsUpdatedFallback);
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    await screen.findByText('GPU 1 — AMD Radeon RX 6600 was unavailable');
+
+    // The write answers with the settings it was built from — no fallback notice, device
+    // auto — and must not overwrite the newer settings the event stored.
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    await screen.findByLabelText('Device');
+    write.resolve(HttpResponse.json({ ...settingsFixed, device: 'auto' }));
+    await waitFor(() => expect(screen.queryByText('Saving…')).not.toBeInTheDocument());
+
+    // The form shows the event's device, not the answer's...
+    expect(screen.getByLabelText('Device')).toHaveValue('cpu');
+    // ...and the queue still carries the fallback notice the event stored.
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    await screen.findByText('GPU 1 — AMD Radeon RX 6600 was unavailable');
+  });
+});
+
+describe('a settings-updated before the settings load answers', () => {
+  it('keeps the settings the event carried instead of the older fetch answer', async () => {
+    const events = controllableEventStream();
+    const load = Promise.withResolvers<Response>();
+    let gets = 0;
+    server.use(
+      http.get('/api/settings', () => {
+        gets += 1;
+        return load.promise;
+      }),
+    );
+    renderAt('/queue');
+    await screen.findByText('Live');
+
+    // The engine's CPU fallback arrives while the first GET is still unanswered...
+    events.send('settings-updated', settingsUpdatedFallback);
+
+    // ...and the fetch answers with the settings it read before the fallback.
+    load.resolve(HttpResponse.json(settingsFixed));
+    await screen.findByText('GPU 1 — AMD Radeon RX 6600 was unavailable');
+
+    // The event's settings stand: its device and notice, not the fetched GPU 1 / no notice.
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    await waitFor(() => expect(screen.getByLabelText('Device')).toHaveValue('cpu'));
+    expect(screen.getByLabelText('Threads')).toHaveValue(null);
+    expect(gets).toBe(1);
+  });
+});
+
+describe('a successful fallback dismissal and a settings rejection', () => {
+  it('keeps the rejection the user has not answered', async () => {
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFallback)),
+      http.put('/api/settings', () =>
+        HttpResponse.json(
+          { error: 'invalid-device', message: 'device is not one of the available devices' },
+          { status: 400 },
+        ),
+      ),
+      http.delete('/api/settings/device-fallback', () => HttpResponse.json(settingsFixture)),
+    );
+    renderAt('/queue');
+    await screen.findByText('Live');
+    await screen.findByText(/was unavailable/);
+
+    // A device change is rejected: its message shows on the device field.
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    await waitFor(() => expect(screen.getByLabelText('Device')).toHaveValue('cpu'));
+    fireEvent.change(screen.getByLabelText('Device'), { target: { value: 'auto' } });
+    await waitFor(() =>
+      expect(screen.getByLabelText('Device')).toHaveAccessibleDescription(
+        /device is not one of the available devices/,
+      ),
+    );
+
+    // The fallback notice is dismissed from the queue: the notice goes...
+    fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+    const banner = await screen.findByRole('alert');
+    fireEvent.click(within(banner).getByRole('button', { name: 'Dismiss' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+
+    // ...and the rejection the user has not answered stays on its field.
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Device')).toHaveAccessibleDescription(
+        /device is not one of the available devices/,
+      ),
+    );
+  });
+});
+
+describe('a settings-updated while a dismissal is in flight', () => {
+  it('keeps the fallback notice the event carried when the dismissal answer arrives afterwards', async () => {
+    const events = controllableEventStream();
+    const dismissal = Promise.withResolvers<Response>();
+    let deletes = 0;
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFallback)),
+      http.delete('/api/settings/device-fallback', () => {
+        deletes += 1;
+        return dismissal.promise;
+      }),
+    );
+    renderAt('/queue');
+    await screen.findByText('Live');
+    const dismissButton = () =>
+      within(
+        required(screen.getByText(/was unavailable/).closest('[role="alert"]')) as HTMLElement,
+      ).getByRole('button', { name: 'Dismiss' });
+    await screen.findByText(/was unavailable/);
+
+    fireEvent.click(dismissButton());
+    await waitFor(() => expect(deletes).toBe(1));
+
+    // The engine reports another fallback while the dismissal runs: newer than the answer.
+    events.send('settings-updated', { ...settingsUpdatedFallback, deviceFallback: 'gpu:0' });
+    await screen.findByText('GPU 0 — NVIDIA GeForce RTX 3060 was unavailable');
+
+    // The dismissal answers with the settings it was sent for — no notice — and must not
+    // overwrite the notice the newer event carried.
+    dismissal.resolve(HttpResponse.json(settingsFixture));
+    await waitFor(() => expect(dismissButton()).toBeEnabled());
+    expect(screen.getByText('GPU 0 — NVIDIA GeForce RTX 3060 was unavailable')).toBeInTheDocument();
+  });
+});
+
+describe('the shared settings handlers', () => {
+  it('save, reset and dismiss the fallback notice without per-test settings overrides', async () => {
+    const events = controllableEventStream();
+    renderAt('/queue');
+    await screen.findByText('lecture.m4a');
+
+    // The engine's fallback notice arrives through the stream; Dismiss goes through the
+    // shared DELETE /api/settings/device-fallback handler, whose answer has no notice.
+    events.send('settings-updated', settingsUpdatedFallback);
+    const banner = await screen.findByRole('alert');
+    expect(banner).toHaveTextContent('GPU 1 — AMD Radeon RX 6600 was unavailable');
+    fireEvent.click(within(banner).getByRole('button', { name: 'Dismiss' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+
+    // A device change goes through the shared PUT handler, which answers the stored settings
+    // (settings.json with the sent update; its device is auto).
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    await waitFor(() => expect(screen.getByLabelText('Device')).toHaveValue('auto'));
+    fireEvent.change(screen.getByLabelText('Device'), { target: { value: 'cpu' } });
+    await waitFor(() => expect(screen.getByLabelText('Device')).toHaveValue('cpu'));
+
+    // Restore goes through the shared DELETE /api/settings handler (settings.json's defaults).
+    fireEvent.click(screen.getByRole('button', { name: 'Restore default settings' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Restore' }),
+    );
+    await waitFor(() => expect(screen.getByLabelText('Device')).toHaveValue('auto'));
+    expect(screen.getByLabelText('Threads')).toHaveValue(null);
   });
 });

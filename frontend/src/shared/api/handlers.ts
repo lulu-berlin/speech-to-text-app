@@ -18,6 +18,7 @@ import {
   taskTransitions,
   settings as settingsFixture,
 } from './fixtures';
+import type { SettingsUpdate } from './types';
 
 export interface EventStreamOptions {
   // SSE `retry` field: the reconnect delay the client should use after a drop.
@@ -189,8 +190,32 @@ export const handlers = [
   http.post('/api/tasks/:id/speakers/merge', () => HttpResponse.json(speakersFixture)),
   http.delete('/api/tasks/:id/speakers/merges', () => HttpResponse.json(speakersFixture)),
 
-  // Settings: GET /api/settings -> 200 settings.json (item 32).
+  // Settings: GET /api/settings -> 200 settings.json (item 32). The mock stores nothing, so
+  // GET keeps serving the example (the segments precedent).
   http.get('/api/settings', () => HttpResponse.json(settingsFixture)),
+
+  // Mock addition (item 72): PUT /api/settings -> 200 Settings, the sent update over the
+  // example's fetch-only fields (the device choices and the probe failure), with the
+  // CPU-fallback notice cleared as the contract has it.
+  http.put('/api/settings', async ({ request }) => {
+    const update = (await request.json()) as SettingsUpdate;
+    return HttpResponse.json({
+      ...settingsFixture,
+      ...update,
+      deviceFallback: null,
+      availableDevices: settingsFixture.availableDevices,
+      gpuNames: settingsFixture.gpuNames,
+      deviceProbeError: settingsFixture.deviceProbeError,
+    });
+  }),
+
+  // Mock addition (item 72, ADR 0062): DELETE /api/settings -> 200 Settings, the defaults
+  // (settings.json), clearing the CPU-fallback notice in the same answer.
+  http.delete('/api/settings', () => HttpResponse.json(settingsFixture)),
+
+  // Mock addition (item 72): DELETE /api/settings/device-fallback -> 200 Settings with the
+  // notice cleared (settings.json has none).
+  http.delete('/api/settings/device-fallback', () => HttpResponse.json(settingsFixture)),
 
   // Transcript and audio are URLs, not JSON: no handlers here (the client never fetches them).
 

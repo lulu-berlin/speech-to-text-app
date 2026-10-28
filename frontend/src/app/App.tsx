@@ -10,6 +10,7 @@ import { usePrefersDark } from '../shared/theme/usePrefersDark';
 import { AppHeader } from './AppHeader';
 import { ConnectingRegion } from './ConnectingRegion';
 import { ConnectionContext } from './ConnectionContext';
+import { SettingsContext, SettingsSync } from './SettingsContext';
 import { NotFoundView } from './NotFoundView';
 import { TypingFavicon } from './TypingFavicon';
 
@@ -55,21 +56,24 @@ export function App() {
     <ThemeProvider theme={theme}>
       <GlobalStyle />
       <ConnectionContext.Provider>
-        <TypingFavicon />
-        <Shell>
-          <AppHeader themeMode={themeMode} onCycleThemeMode={cycleMode} />
-          <ConnectingRegion />
-          <Main>
-            <Routes>
-              <Route path="/" element={<Navigate to="/queue" replace />} />
-              <Route path="/queue" element={<QueueView />} />
-              <Route path="/settings" element={<SettingsView />} />
-              <Route path="/history" element={<HistoryView />} />
-              <Route path="/history/:taskId" element={<TaskTranscriptView />} />
-              <Route path="*" element={<NotFoundView />} />
-            </Routes>
-          </Main>
-        </Shell>
+        <SettingsContext.Provider>
+          <SettingsSync />
+          <TypingFavicon />
+          <Shell>
+            <AppHeader themeMode={themeMode} onCycleThemeMode={cycleMode} />
+            <ConnectingRegion />
+            <Main>
+              <Routes>
+                <Route path="/" element={<Navigate to="/queue" replace />} />
+                <Route path="/queue" element={<QueueView />} />
+                <Route path="/settings" element={<SettingsView />} />
+                <Route path="/history" element={<HistoryView />} />
+                <Route path="/history/:taskId" element={<TaskTranscriptView />} />
+                <Route path="*" element={<NotFoundView />} />
+              </Routes>
+            </Main>
+          </Shell>
+        </SettingsContext.Provider>
       </ConnectionContext.Provider>
     </ThemeProvider>
   );

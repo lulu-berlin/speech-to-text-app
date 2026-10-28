@@ -65,6 +65,13 @@ export async function dismissDeviceFallback(): Promise<Settings> {
   return json<Settings>(response);
 }
 
+// Item 72 contract (ADR 0062): DELETE /api/settings -> 200 Settings, the defaults restored in
+// one write that also clears the CPU-fallback notice.
+export async function resetSettings(): Promise<Settings> {
+  const response = await fetch('/api/settings', { method: 'DELETE' });
+  return json<Settings>(response);
+}
+
 // Item 32 contract: PUT /api/settings with the settings as a whole -> 200 Settings,
 // or 400 with the matching error code for the first invalid field.
 export async function saveSettings(settings: SettingsUpdate): Promise<Settings> {

@@ -2,14 +2,15 @@
 // /resume. The returned queue sits in context; the view applies it to the live state
 // (the server's own queue-updated carries the same queue, so applying it twice is
 // harmless). The switch shows the connection's `paused` flag and is disabled while
-// sending; a failure leaves the flag as it was.
+// sending; a failure leaves the flag as it was and keeps its error and the attempted
+// `paused` value (which names the command the view reports), until the next TOGGLE.
 import { assign, fromPromise, setup } from 'xstate';
 import { setQueuePaused } from '../../shared/api/client';
 import type { Queue } from '../../shared/api/types';
 
 export const queuePauseMachine = setup({
   types: {
-    context: {} as { queue: Queue | null; error: unknown },
+    context: {} as { queue: Queue | null; attempted: boolean | null; error: unknown },
     events: {} as { type: 'TOGGLE'; paused: boolean },
   },
   actors: {
@@ -17,12 +18,15 @@ export const queuePauseMachine = setup({
   },
 }).createMachine({
   id: 'queuePause',
-  context: { queue: null, error: null },
+  context: { queue: null, attempted: null, error: null },
   initial: 'idle',
   states: {
     idle: {
       on: {
-        TOGGLE: { target: 'sending', actions: assign({ error: null }) },
+        TOGGLE: {
+          target: 'sending',
+          actions: assign({ attempted: ({ event }) => event.paused, error: null }),
+        },
       },
     },
     sending: {

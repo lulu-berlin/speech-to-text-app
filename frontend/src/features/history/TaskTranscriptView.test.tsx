@@ -1,8 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { App } from '../../app/App';
+import { ConnectionContext } from '../../app/ConnectionContext';
+import { SettingsContext, SettingsSync } from '../../app/SettingsContext';
 import { lightTheme } from '../../shared/theme/theme';
 import { eventStreamResponse } from '../../shared/api/handlers';
 import {
@@ -16,6 +18,8 @@ import type { Turns } from '../../shared/api/types';
 import { controllableEventStream } from '../../test/eventStream';
 import { mediaRulesFor, px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
+import { ThemedProviders } from '../../test/render';
+import { TaskTranscriptView } from './TaskTranscriptView';
 
 function renderTranscript(taskId: string) {
   render(
@@ -2550,3 +2554,54 @@ function asRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
   return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
 }
+
+describe('a transcript opened after a merge', () => {
+  // The connection's view of the merge, so the test can wait for the event before opening.
+  function MergeArrived() {
+    const merged = ConnectionContext.useSelector(
+      (state) => state.context.speakerChanges[3]?.merged ?? false,
+    );
+    return <span>{merged ? 'merged' : 'pending'}</span>;
+  }
+
+  function OpenTranscript() {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate('/history/3')}>open</button>;
+  }
+
+  it('fetches /turns once on opening: the stale merge is not replayed', async () => {
+    const turnsRequests = countTurnsRequests();
+    const events = controllableEventStream();
+    render(
+      <ThemedProviders>
+        <ConnectionContext.Provider>
+          <SettingsContext.Provider>
+            <SettingsSync />
+            <MemoryRouter initialEntries={['/history']}>
+              <MergeArrived />
+              <OpenTranscript />
+              <Routes>
+                <Route path="/history" element={<p>history</p>} />
+                <Route path="/history/:taskId" element={<TaskTranscriptView />} />
+              </Routes>
+            </MemoryRouter>
+          </SettingsContext.Provider>
+        </ConnectionContext.Provider>
+      </ThemedProviders>,
+    );
+
+    // The merge lands before the transcript opens; the probe confirms the connection holds it.
+    await waitFor(() =>
+      events.send('speakers-merged', { id: 3, speakers: [{ speakerId: 0, speaker: 'Alice' }] }),
+    );
+    await screen.findByText('merged');
+
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    expect(await screen.findByText('Good morning.')).toBeInTheDocument();
+
+    // One read on opening; the stale merge was not replayed over it.
+    expect(turnsRequests()).toBe(1);
+    const transcript = screen.getByRole('region', { name: 'Transcript' });
+    expect(within(transcript).getByText('Speaker 2')).toBeInTheDocument();
+  });
+});

@@ -46,6 +46,15 @@ class SettingsRepository(
     }
 
     /**
+     * Restores [DEFAULT_SETTINGS] in one write (roadmap item 72, ADR 0062): every stored setting goes back to the
+     * defaults, and the CPU-fallback notice is cleared with them.
+     */
+    suspend fun reset(): Settings {
+        update(DEFAULT_SETTINGS)
+        return DEFAULT_SETTINGS
+    }
+
+    /**
      * The engine found the chosen [gpu] unusable (item 32): stores the device as CPU and the notice naming [gpu] in one
      * write, leaving every other setting as it is, and returns the settings as they are now.
      */
