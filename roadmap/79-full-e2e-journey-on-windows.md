@@ -1,7 +1,7 @@
 # 79 — The full e2e journey on Windows
 
-Status: draft
-Depends on: [49](../docs/specs/windows-support.md) (in progress; the Windows CI legs, packaged e2e and the
+Status: spec-approved
+Depends on: [49](../docs/specs/windows-support.md) (done; the Windows CI legs, packaged e2e and the
 process-control seam), [21](../docs/specs/frontend-backend-end-to-end.md) (done; the journey and its
 harness), [51](../docs/specs/ci-verification.md) (done; the CI legs)
 Blocks: [78](78-stable-release.md) (a 1.0 gate: Windows is a supported platform)
@@ -58,21 +58,21 @@ Windows only by hand on the Windows 11 guest.
 4. **Wire the job** into the Windows leg and `CI (all checks)`'s `needs`, and record its measured
    wall time against the macOS band before deciding whether it runs on every PR or nightly only.
 
-## Open questions
+## Decided (consultation, 2026-10-28)
 
-1. **Per-spec gating**: does any journey spec assert POSIX-only behavior (signals, process groups,
-   `setsid`, a display server)? Which, and should they be skipped on Windows with a named reason or
-   rewritten to the platform-neutral signal?
-2. **Cadence**: a Windows e2e job adds ~12 min. Start nightly-only and move to every PR once the
-   measured time is comparable to macOS, or every PR from the start?
-3. **Which backend**: the journey starts the Gradle-managed backend itself (as `gradle e2e` does on
-   Linux and macOS). Is that also the Windows target, with the packaged zip remaining covered by
-   the packaged specs, or should the journey run against the unpacked zip?
+- **Nightly first**: the job starts in the nightly workflow, its wall time is measured against the
+  macOS 13–16 min band, and it joins the every-PR legs (`CI (all checks)`) only once comparable.
+- **The journey starts the Gradle-managed backend**, as `gradle e2e` does on Linux and macOS; the
+  packaged zip stays covered by `Windows (packaged zip e2e)`.
+- **POSIX-only specs are audited one by one**: each is rewritten to a platform-neutral assertion
+  where that is cheap, otherwise skipped with a named reason listed in this item's test list; no
+  spec is skipped silently.
 
-## Test list (proposed; behaviors only)
+## Test list (approved; behaviors only)
 
-- [ ] (CI) `Windows (e2e)` runs the whole journey green on the Windows runner, the same specs as
-      `E2E (Playwright)`, and is part of `CI (all checks)`
+- [ ] (CI) `Windows (e2e)` runs the whole journey green on the Windows runner with the same specs as
+      `E2E (Playwright)`; it starts nightly and joins `CI (all checks)` once its measured time is
+      comparable to the macOS band
 - [ ] (harness) The journey starts and stops the backend on Windows without a POSIX group kill, and
       a run leaves no orphan JVM, whisper-cli or ffmpeg process
 - [ ] (harness) A spec that fails mid-run still stops the backend and leaves no orphan process and a
@@ -105,3 +105,7 @@ scope.
   item 78. Not yet discussed.
 - 2026-10-24: item 54's review added the symlink-based sandboxes to the Evidence and the test list
   (the user's decision). Still a draft.
+- 2026-10-28: consultation with the user: the job starts nightly and joins the every-PR legs once
+  its time is comparable to macOS; the journey starts the Gradle-managed backend; POSIX-only specs
+  are rewritten where cheap and otherwise skipped with a named reason. Test list approved as
+  written; status set to spec-approved.

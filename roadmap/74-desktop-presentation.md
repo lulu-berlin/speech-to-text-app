@@ -1,6 +1,6 @@
 # 74 — Desktop presentation: font coverage for every language, Japanese glyphs, and an app icon with a desktop entry
 
-Status: draft
+Status: spec-approved
 Depends on: —
 Blocks: —
 
@@ -22,40 +22,52 @@ carries the app's icon and a `.desktop` entry so the menu and the running window
 - **Japanese renders in Simplified Chinese forms**: the UI never marks a transcript's language
   (`frontend/index.html:2` is `lang="en"`), and the bundle's fallback order is SC → TC → JP
   (`nix/desktop-bundle.nix:60-63`), so fontconfig picks the SC face for kanji and kana.
-- **No app icon or desktop identity**: `desktop/electron-builder.yml` declares no `icon` and
-  `desktop/package.json` no `desktopName`; the user's 2026-10-15 `pnpm --dir desktop dist` warned
-  about Electron's default icon and that desktop environments may not link the window to the menu
-  entry. The Nix package and the bundle have no `.desktop` entry at all.
+- **No app icon or desktop identity on Linux and macOS**: the MSI target has `icon: icon.png`
+  (`desktop/electron-builder.yml:107`, the favicon raster at 512×512, file verified 2026-10-28), but
+  nothing else does — the `.deb`, the Nix package and the bundle declare no icon, no
+  `desktopName`/`syncDesktopName` and no `.desktop` entry; the user's 2026-10-15 `pnpm --dir desktop
+  dist` warned about Electron's default icon and that desktop environments may not link the window
+  to the menu entry.
 - Item 70 replaces the Electron shell with Slint and rewrites the packaging; the icon, the desktop
   entries and the font set must be carried into that packaging (a requirement on its implementation,
   not a dependency, so this item can land first and its test list guards the result).
 
 ## Proposal
 
-1. Choose a fallback font strategy by measurement: add per-script fallback families (e.g. Noto for
-   the missing scripts and the two extra Latin letters) or switch the UI family to one with wider
-   coverage; record the closure/payload delta for the bundle as item 50 measured fonts.
-2. Mark the transcript's language on the rendered transcript (task language/detected language) so
-   fontconfig picks the JP/TC/Hans face; keep the app shell's own `lang="en"`.
-3. Add the app icon (the mascot still) and `desktopName` + `linux.syncDesktopName` to the packages,
-   and `.desktop` entries for the Nix package and the bundle; verify one window/menu identity.
+1. Add per-script Noto fallback families for the missing scripts and the two extra Latin letters,
+   keeping Plex as the UI face; record the closure/payload delta for the bundle as item 50 measured
+   fonts.
+2. Store whisper's detected language with the task and mark it on the rendered transcript, falling
+   back to the requested language, so fontconfig picks the JP/TC/Hans face; keep the app shell's own
+   `lang="en"`.
+3. Add the favicon-mark app icon and `desktopName` + `linux.syncDesktopName` to the packages, and
+   `.desktop` entries for the Nix package and the bundle; verify one window/menu identity.
 4. Note in item 70's implementation that the Slint window must keep the fonts, language marking and
    desktop entries.
 
-## Open questions
+## Decided (consultation, 2026-10-28)
 
-- The font set and its size budget (per-script Noto subsets vs a single wide-coverage family);
-  which scripts share a family.
-- The language source for the `lang` attribute: the task's requested language, whisper's detected
-  language, or both (fallback).
-- The icon artwork and sizes (the mascot still vs the favicon; `.icns`/`.ico`/PNG set) and whether
-  the Nix package/bundle entries share the `.deb`'s desktop file.
+- **Per-script Noto fallbacks**: add Noto families for the 15 uncovered scripts (three weights, the
+  weights the UI uses) plus the Latin extended letters for Hausa/Lingala, keep IBM Plex Sans as the
+  UI face, and record the compressed/unpacked delta the way item 50 measured fonts. Host fonts stay
+  out of the bundle.
+- **The transcript's `lang` comes from whisper's detected language**, stored as a nullable task
+  column and exposed in the task JSON, with the requested language as the fallback when detection
+  produced none; whisper-cli's JSON carries a `result` object next to `transcription` (the pinned
+  1.8.4 binary's strings, checked 2026-10-28), so the first cycle verifies the field and reports if
+  it is absent. Auto-detected Japanese therefore marks `ja`.
+- **The icon is the existing favicon mark** (`frontend/src/shared/brand/favicon.svg`, rasterized to
+  512 PNG and derived `.icns`/`.ico`); one `.desktop` file and icon set is shared by the `.deb`, the
+  Nix package and the bundle, and the MSI keeps the same artwork.
 
-## Test list (proposed; to be approved at the consultation)
+## Test list (approved; behaviors only)
 
 - [ ] Every language in `docs/api/languages.json` renders its sample text in the bundle with no
       missing glyphs (a font-coverage check over the shipped font set)
 - [ ] A `ja` transcript renders Japanese glyph forms; `zh-Hans` and `zh-Hant` stay distinct
+- [ ] An `auto`-uploaded task stores whisper's detected language, the API exposes it, and its
+      transcript marks that language; a task whose detection is empty falls back to the requested
+      language
 - [ ] The `.deb` installs a menu entry with the app icon and `desktopName`, and the running window
       is associated with it (one app identity)
 - [ ] The Nix package and the bundle carry matching `.desktop` entries and icon
@@ -72,3 +84,6 @@ carries the app's icon and a `.desktop` entry so the menu and the running window
 
 - 2026-10-23: filed from the `docs/known-issues.md` triage (bundle fonts, Japanese SC, `.deb`
   icon/`desktopName`); not yet discussed.
+- 2026-10-28: consultation with the user: per-script Noto fallbacks, detected language stored with
+  the requested language as fallback, the favicon mark as the one icon, `.desktop` entries shared by
+  all Linux forms. Test list approved as written; status set to spec-approved.

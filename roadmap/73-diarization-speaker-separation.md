@@ -1,6 +1,6 @@
 # 73 — Diarization speaker separation: unseparated speakers, and a split remedy
 
-Status: draft
+Status: spec-approved
 Depends on: —
 Blocks: —
 
@@ -29,36 +29,40 @@ gives the user the remedy that unseparation lacks today (merge exists, split doe
 
 ## Proposal
 
-1. **Measure first**: build a labelled set from the user's real recordings (and the existing
-   LibriSpeech fixtures as controls), score today's auto count (speaker error rate / cluster
-   purity), then test the levers:
+1. **Split remedy first**: `POST /api/tasks/{id}/speakers/{speakerId}/split` moves the selected turns
+   (one or more) to a new speaker with a default name, under the same COMPLETED-only rule as
+   rename/merge, published as an SSE event, with a UI action beside Merge.
+2. **Then measure**: build a labelled set from the user's real recordings (kept local, never
+   committed) and score today's auto count (speaker error rate / cluster purity), then test the
+   levers on it:
    - recalibrate `SPEAKER_DISTANCE_THRESHOLD` and the gap window on that set;
    - a sensitivity/“expected speakers” control per task (beyond the existing fixed count);
    - embedding-side improvements only if the numbers point there.
-2. **Split remedy**: an API `POST /api/tasks/{id}/speakers/{speakerId}/split` (or a turns-based
-   move) that moves the selected turns to a new speaker, with an SSE event and the same
-   COMPLETED-only rule as rename/merge; a UI action beside Merge.
 3. Record the measured before/after and the chosen threshold in a new ADR.
 
-## Open questions
+## Decided (consultation, 2026-10-28)
 
-- Which lever first: recalibration alone may fix the merge cases; a per-task sensitivity control may
-  be more honest than a new default for everyone.
-- The split's semantics: move selected turns to a new speaker (new id/name) vs split by a chosen
-  point; how renamed speakers and merges interact with it.
-- The evaluation set and metric (cluster purity, speaker error rate, or a simpler pairwise
-  same/different score) and whether the user's recordings can be committed or must stay local.
-- Whether the auto count should default to `maxSpeakers`-guided or offer an “expected speakers”
-  field in the upload options.
+- **Split first, measurement second** in the same item: the missing remedy is the user-visible gap
+  and has no data dependency; the auto-count work follows on the labelled set.
+- **A split moves the selected turns** to a new speaker (default name, renameable), one or more
+  turns per action and repeated splits allowed. It is COMPLETED-only (409 otherwise, 404 for an
+  unknown speaker id), publishes its own SSE event, and renames, merges and split→merge keep
+  working across it.
+- **The user's recordings stay local**: only the metric definition, aggregate scores and
+  synthetic/licensed clips are committed; the LibriSpeech fixtures remain the controls.
+- The levers (threshold, gap window, sensitivity control, embeddings) are decided by the measured
+  scores on that set, not in advance.
 
-## Test list (proposed; to be approved at the consultation)
+## Test list (approved; behaviors only)
 
-- [ ] On the labelled evaluation set, the chosen auto-count rule separates the speakers in a
-      measured share of the cases that fail today, without regressing the cases that pass
 - [ ] A split action on a COMPLETED task moves the selected turns to a new speaker, persists, and
-      the view updates in place; a non-COMPLETED task answers 409 and an unknown id 404
-- [ ] Merging after a split still works (split → merge round-trips), and renamed speakers keep their
-      names
+      the view updates in place; a further split works, a non-COMPLETED task answers 409 and an
+      unknown speaker id 404
+- [ ] Merging after a split still works (split → merge round-trips)
+- [ ] Renamed speakers keep their names across a split, and a split speaker can be renamed
+- [ ] On the labelled local evaluation set, the chosen auto-count rule separates the speakers in a
+      measured share of the cases that fail today, without regressing the cases that pass; the
+      aggregate scores, without recordings, are recorded
 - [ ] (must not break) The existing rename/merge, fixed-count and diarization suites stay green
 
 ## Acceptance criteria
@@ -71,3 +75,6 @@ gives the user the remedy that unseparation lacks today (merge exists, split doe
 
 - 2026-10-23: filed from the `docs/known-issues.md` triage (user report 2026-10-14); not yet
   discussed.
+- 2026-10-28: consultation with the user: split remedy first (moving selected turns to a new
+  speaker), then the auto-count measurement on a local-only labelled set with only aggregate scores
+  committed. Test list approved as written; status set to spec-approved.

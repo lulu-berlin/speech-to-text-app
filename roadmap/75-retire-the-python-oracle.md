@@ -1,6 +1,6 @@
 # 75 — Retire the Python oracle: the app is the behavioral reference
 
-Status: draft
+Status: spec-approved
 Depends on: —
 Blocks: —
 
@@ -41,9 +41,9 @@ is the behavior; no further oracle parity work is done.
 ## Proposal
 
 1. Delete `docs/oracle/` (git history keeps the file); no Python remains in the tree.
-2. A new **ADR 0062** supersedes ADR 0002: no Python in the app, build or tests (unchanged), the
+2. A new **ADR 0063** supersedes ADR 0002: no Python in the app, build or tests (unchanged), the
    oracle retired, and the app's code/tests/specs/`docs/api` as the behavioral authority. The
-   decisions index marks 0002 as superseded by 0062.
+   decisions index marks 0002 as superseded by 0063.
 3. Update AGENTS.md's project line and no-Python rule, and Canon TDD's expected-value wording
    (hand calculation or the spec; the oracle is not a source).
 4. Update `docs/backend-reimplementation.md`: drop the oracle from the authority list and section 15,
@@ -52,22 +52,25 @@ is the behavior; no further oracle parity work is done.
    or the current behavior; leave historical ADRs and moved specs untouched.
 6. Run the docs checks (links, architecture names) and the full suites.
 
-## Open questions
+## Decided (consultation, 2026-10-28)
 
-- Whether ADR 0002 is superseded or amended in place — ADRs are historical records here, so a new
-  ADR 0062 supersedes it; 0002's text stays.
-- How far to reword code comments: only the claim (the behavior is the spec's / the app's), not the
-  historical rationale where it explains a past port.
-- Whether the docs package (item 54) should gain a guard that fails when a live document names the
-  oracle again; the first cycle decides after 54 exists.
+- **ADR 0063 supersedes ADR 0002** (the number moved from 0062, which
+  `0062-settings-auto-save-and-default-reset.md` already uses); 0002's text stays as the record.
+- **Only the claim is reworded**: comments that present the oracle as the source of truth name the
+  spec or the current behavior; historical rationale explaining a past port stays.
+- **The docs package gains the guard now** (`docs/check-oracle-retired.ts`, run by
+  `pnpm --dir docs test`): it fails when a live document names the oracle as the behavioral
+  reference, allowing historical ADRs and moved specs by path.
 
-## Test list (proposed; to be approved at the consultation)
+## Test list (approved; behaviors only)
 
 - [ ] No Python file is tracked (`git ls-files '*.py'` is empty) and `docs/oracle/` is gone
 - [ ] No live document (AGENTS.md, README.md, docs/architecture.md, docs/conventions, the roadmap)
       names the oracle as a behavioral reference or asks for oracle parity; historical ADRs and
       moved specs may still mention it
-- [ ] The decisions index shows ADR 0062 superseding ADR 0002, and ADR 0062 states the authority
+- [ ] `docs/check-oracle-retired.ts` fails on a planted live-document reference and passes on the
+      current tree, with historical ADRs and moved specs allowed
+- [ ] The decisions index shows ADR 0063 superseding ADR 0002, and ADR 0063 states the authority
       (code, tests, specs, `docs/api`) and the unchanged no-Python rule
 - [ ] `docs/backend-reimplementation.md`'s authority list and conformance section name only current
       sources, with no oracle reference
@@ -78,7 +81,7 @@ is the behavior; no further oracle parity work is done.
 
 ## Acceptance criteria
 
-- The oracle is deleted, ADR 0062 records the decision, AGENTS and the reimplementation doc are
+- The oracle is deleted, ADR 0063 records the decision, AGENTS and the reimplementation doc are
   updated, live references are gone, and no app behavior changes.
 - All test-list items ticked and green; user approved the diff.
 
@@ -87,3 +90,6 @@ is the behavior; no further oracle parity work is done.
 - 2026-10-23: filed from the `docs/known-issues.md` triage after the user's decision to retire the
   oracle (the `.txt` casing row is resolved by it: the app's `[Speaker 1]` stays). Not yet
   discussed.
+- 2026-10-28: consultation with the user: ADR 0063 supersedes 0002 (0062 is taken), only the
+  source-of-truth claims are reworded, and the docs package gains the oracle-retirement guard now.
+  Test list approved as written; status set to spec-approved.
