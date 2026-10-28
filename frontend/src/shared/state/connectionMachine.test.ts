@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { createActor, fromCallback, waitFor } from 'xstate';
 import { describe, expect, it, vi } from 'vitest';
+import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { eventStreamResponse } from '../api/handlers';
 import { subscribeToEvents } from '../api/client';
@@ -277,6 +278,52 @@ describe('the connection machine', () => {
     expect(visited).toEqual(['connecting', 'live', 'reconnecting', 'live']);
     expect(connections).toBe(2);
     expect(reconnected.context.tasks).toEqual(snapshotWithoutTask4.tasks);
+    actor.stop();
+  });
+});
+
+describe('the per-task maps', () => {
+  it('hold only tasks the state holds: task-deleted drops its entries, and a snapshot drops the rest', async () => {
+    const events = controllableEventStream();
+    const actor = createActor(connectionMachine).start();
+    await waitFor(actor, (state) => state.matches('live'));
+
+    const speakers = [{ speakerId: 0, speaker: 'Alice' }];
+    const segment = { id: 2, startMs: 2400, endMs: 5200, text: 'Thanks.', edited: true };
+    for (const id of [5, 7]) {
+      events.send('speakers-renamed', { id, speakers });
+      events.send('segment-edited', { id, segment });
+    }
+    // Many more events for tasks the snapshot does not hold: the maps grow until a snapshot.
+    for (let id = 100; id < 140; id += 1) {
+      events.send('speakers-renamed', { id, speakers });
+      events.send('segment-edited', { id, segment });
+    }
+    await waitFor(actor, (state) => Object.keys(state.context.speakerChanges).length === 42, {
+      timeout: 2000,
+    });
+
+    // task-deleted drops that task's entries.
+    events.send('task-deleted', { id: 5 });
+    const afterDelete = await waitFor(
+      actor,
+      (state) => !state.context.tasks.some((task) => task.id === 5),
+      { timeout: 2000 },
+    );
+    expect(Object.keys(afterDelete.context.speakerChanges)).not.toContain('5');
+    expect(Object.keys(afterDelete.context.segmentEdits)).not.toContain('5');
+    expect(Object.keys(afterDelete.context.speakerChanges)).toContain('7');
+
+    // A snapshot keeps only the entries of the tasks it lists: snapshot.json's task 3, and
+    // the maps are bounded by it.
+    events.send('snapshot', { ...snapshot, tasks: [snapshot.tasks[2]] });
+    const afterSnapshot = await waitFor(
+      actor,
+      (state) => state.matches('live') && state.context.tasks.length === 1,
+      { timeout: 2000 },
+    );
+    expect(afterSnapshot.context.speakerChanges).toEqual({});
+    expect(afterSnapshot.context.segmentEdits).toEqual({});
     actor.stop();
   });
 });

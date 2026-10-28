@@ -40,15 +40,20 @@ test('the settings the user saves survive a restart and the queue runs with them
     expect(optionTexts).toContain(`GPU ${key.replace('gpu:', '')} — ${name}`);
   }
 
-  // Save a change: CPU, 2 threads, German, 3 fixed speakers, max 12.
+  // The page saves itself (ADR 0062): there is no Save button, a select commits on change,
+  // and a typed field commits when it is left (or on Enter). The choices: CPU, 2 threads,
+  // German, 3 fixed speakers, max 12.
+  await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
   await device.selectOption('cpu');
   await page.locator('#threads').fill('2');
+  await page.locator('#max-speakers').fill('12');
+  // Leaving a typed field commits it; focus moves on to the language field.
   await page.getByRole('combobox', { name: 'Language' }).click();
   await page.getByRole('option', { name: /german/ }).click();
+  // The count exists only with fixed: the mode is stored by the count's own commit.
   await page.locator('#speakers').selectOption('fixed');
   await page.locator('#speaker-count').fill('3');
-  await page.locator('#max-speakers').fill('12');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.locator('#speaker-count').press('Enter');
   await expect(device).toHaveValue('cpu');
   await expect(page.locator('#threads')).toHaveValue('2');
 
@@ -106,6 +111,26 @@ test('the settings the user saves survive a restart and the queue runs with them
           (await page.evaluate(() => fetch('/api/settings').then((r) => r.json()))).device,
       )
       .toBe('cpu');
+
+    // Restore default settings (ADR 0062): the action asks first, then the server's defaults
+    // replace every field. The reset also clears the CPU-fallback notice (there is none here)
+    // and leaves the shared backend on the defaults for the later specs.
+    await goTo(page, 'Settings');
+    await page.getByRole('button', { name: 'Restore default settings' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('Restore default settings?');
+    await dialog.getByRole('button', { name: 'Restore' }).click();
+    await expect(device).toHaveValue('auto');
+    await expect(page.locator('#threads')).toHaveValue('');
+    await expect(page.getByRole('combobox', { name: 'Language' })).toHaveValue('auto-detect');
+    await expect(page.locator('#speakers')).toHaveValue('auto');
+    await expect(page.locator('#max-speakers')).toHaveValue('8');
+    await expect
+      .poll(
+        async () =>
+          (await page.evaluate(() => fetch('/api/settings').then((r) => r.json()))).device,
+      )
+      .toBe('auto');
   } finally {
     // Stop the restarted backend (the global teardown only knows the original pid), then
     // hand a fresh shared backend on the same socket and data dir to the later specs,

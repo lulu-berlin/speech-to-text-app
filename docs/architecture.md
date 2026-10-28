@@ -184,7 +184,7 @@ The browser and the backend talk over a small JSON API under `/api`. Commands ar
 | `GET /api/tasks/{id}/transcript?format=txt\|srt\|vtt` | download the transcript |
 | `GET /api/tasks/{id}/audio` | the recording for playback (FLAC, with range requests) |
 | `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge`, `DELETE /api/tasks/{id}/speakers/merges` | rename, merge, undo merges |
-| `GET /api/settings`, `PUT /api/settings`, `DELETE /api/settings/device-fallback` | read and change the settings |
+| `GET /api/settings`, `PUT /api/settings`, `DELETE /api/settings`, `DELETE /api/settings/device-fallback` | read and change the settings, restore their defaults, dismiss the CPU-fallback notice |
 | `GET /api/health` | health check |
 | `GET /api/events` | the live event stream |
 

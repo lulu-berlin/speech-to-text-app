@@ -13,9 +13,15 @@ test('gpu:0 transcribes through MTL0 and yields the expected transcript', async 
   await goTo(page, 'Settings');
   const device = page.locator('#device');
   await expect(device.locator('option[value="gpu:0"]')).toHaveText('GPU 0 — Metal (MTL0)');
+  // The choice saves itself (ADR 0062): no Save button. The task reads the stored device when
+  // it starts, so wait until the write reached the backend.
   await device.selectOption('gpu:0');
-  await page.getByRole('button', { name: 'Save' }).click();
   await expect(device).toHaveValue('gpu:0');
+  await expect
+    .poll(
+      async () => (await page.evaluate(() => fetch('/api/settings').then((r) => r.json()))).device,
+    )
+    .toBe('gpu:0');
 
   try {
     await uploadAndOpen(page, METAL_CLIP);
@@ -26,6 +32,11 @@ test('gpu:0 transcribes through MTL0 and yields the expected transcript', async 
     // Leave the shared backend on auto for the rest of the journey.
     await goTo(page, 'Settings');
     await device.selectOption('auto');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await expect
+      .poll(
+        async () =>
+          (await page.evaluate(() => fetch('/api/settings').then((r) => r.json()))).device,
+      )
+      .toBe('auto');
   }
 });

@@ -153,8 +153,9 @@ export async function transcribeOnGpu(window: Page, name: RegExp): Promise<void>
 
   const navigation = window.getByRole('navigation');
   await navigation.getByRole('link', { name: 'Settings' }).click();
+  // The choice saves itself (ADR 0062): no Save button; wait for the stored device, which the
+  // task reads when it starts.
   await window.locator('#device').selectOption(device);
-  await window.getByRole('button', { name: 'Save' }).click();
   await expect.poll(async () => (await settings()).device).toBe(device);
 
   await navigation.getByRole('link', { name: 'Queue' }).click();

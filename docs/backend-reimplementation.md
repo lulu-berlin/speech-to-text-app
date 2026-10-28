@@ -186,6 +186,7 @@ must match it (keys, types, nullability).
 | `DELETE /api/tasks/{id}/speakers/merges` | — | `200` Speakers | Reset all merges. |
 | `GET /api/settings` | — | `200` Settings | Includes `availableDevices`, `gpuNames` and `deviceProbeError` (null unless the startup probe failed). |
 | `PUT /api/settings` | the settings without `availableDevices`/`gpuNames` | `200` Settings | Validates in order; emits `settings-updated`. |
+| `DELETE /api/settings` | — | `200` Settings | Restores the defaults in one write (`auto`, `null`, `auto`, `auto`, `null`, `8`), clears the notice and emits `settings-updated`; idempotent. |
 | `DELETE /api/settings/device-fallback` | — | `200` Settings | Clears the notice (also when none); emits `settings-updated`. |
 | `GET /api/health` | — | `200` `{status:"ok"}` | — |
 | `GET /api/events` | — | `text/event-stream` | Snapshot first, then events; heartbeat every 5 s of silence. |
@@ -485,8 +486,10 @@ Applying: the engine reads the settings once when it claims a task RUNNING (a ru
 its snapshot); `device`/`threads` shape whisper-cli and the ONNX session. If a chosen GPU turns
 out unavailable while the task runs (whisper-cli reports `no GPU found` and transcribes on the
 CPU), the task completes on the CPU, the stored `device` becomes `cpu`, `deviceFallback` names
-the GPU, and `settings-updated` is emitted; the notice persists until dismissed or any `PUT`.
-`DELETE /api/settings/device-fallback` clears it (also when none) and emits `settings-updated`.
+the GPU, and `settings-updated` is emitted; the notice persists until dismissed, any `PUT`, or
+`DELETE /api/settings`. `DELETE /api/settings/device-fallback` clears it (also when none) and emits
+`settings-updated`; `DELETE /api/settings` restores every default in the same write and emits
+`settings-updated` too.
 
 ## 12. Process control
 

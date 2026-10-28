@@ -19,6 +19,15 @@ export interface SearchableSelectProps {
   options: SearchableSelectOption[];
   value: string;
   onChange: (value: string) => void;
+  // Set when the value is rejected: the input is marked invalid and described by the field's
+  // error line (the caller owns that line and its id).
+  invalid?: boolean;
+  describedBy?: string;
+  // Set while the field must not change, e.g. before the stored settings are known.
+  disabled?: boolean;
+  // The field's own focus, for a form that keeps a focused draft (the settings page).
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 // The searchable select (item 14): a combobox input that shows the selected option's
@@ -64,7 +73,18 @@ const Wrap = styled.div`
   position: relative;
 `;
 
-export function SearchableSelect({ id, label, options, value, onChange }: SearchableSelectProps) {
+export function SearchableSelect({
+  id,
+  label,
+  options,
+  value,
+  onChange,
+  invalid,
+  describedBy,
+  disabled,
+  onFocus,
+  onBlur,
+}: SearchableSelectProps) {
   const [combobox, sendCombobox] = useMachine(comboboxMachine);
   const listboxId = useId();
   const open = combobox.matches('open');
@@ -132,6 +152,9 @@ export function SearchableSelect({ id, label, options, value, onChange }: Search
         type="text"
         role="combobox"
         aria-label={label}
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
+        disabled={disabled}
         aria-expanded={open}
         aria-controls={listboxId}
         aria-activedescendant={
@@ -139,9 +162,15 @@ export function SearchableSelect({ id, label, options, value, onChange }: Search
         }
         value={open ? query : (selected?.label ?? '')}
         onChange={(event) => sendCombobox({ type: 'QUERY', value: event.target.value })}
-        onFocus={() => sendCombobox({ type: 'OPEN' })}
+        onFocus={() => {
+          onFocus?.();
+          sendCombobox({ type: 'OPEN' });
+        }}
         onClick={() => sendCombobox({ type: 'OPEN' })}
-        onBlur={() => sendCombobox({ type: 'CLOSE' })}
+        onBlur={() => {
+          onBlur?.();
+          sendCombobox({ type: 'CLOSE' });
+        }}
         onKeyDown={onKeyDown}
       />
       {open ? (

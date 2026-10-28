@@ -1,8 +1,8 @@
 # 72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset
 
-Status: spec-approved
+Status: done (roadmap item 72, approved 2026-10-28)
 Depends on: —
-Blocks: [78](78-stable-release.md) (the release gates depend on this item)
+Blocks: [78](../../roadmap/78-stable-release.md) (the release gates depend on this item)
 
 ## Goal
 
@@ -158,46 +158,74 @@ Line numbers are `main` after item 82.
 - **Restore UX (change request of 2026-10-27, the user)**: confirmation first, through the existing
   dialog and confirm machine, then the reset.
 - No new ADR for the actor/prune/Retry decisions (ADR 0038, ADR 0029 cover them). The interaction
-  change has its own: [ADR 0062](../docs/decisions/0062-settings-auto-save-and-default-reset.md).
+  change has its own: [ADR 0062](../decisions/0062-settings-auto-save-and-default-reset.md).
 
 ## Test list
 
-- [ ] A failed queue pause shows the server's error beside the pause control, and the switch returns
+- [x] A failed queue pause shows the server's error beside the pause control, and the switch returns
       to the queue's real (unpaused) state
-- [ ] A failed queue resume shows its error the same way, and the next command clears it
-- [ ] A failed settings load shows an error with Retry; Retry fetches again and the form shows the
+- [x] A failed queue resume shows its error the same way, and the next command clears it
+- [x] A failed settings load shows an error with Retry; Retry fetches again and the form shows the
       stored settings
-- [ ] While no settings are stored (failed load), the fields are disabled and no write is sent
-- [ ] Choosing a device sends the whole settings at once, with no Save button on the page, and the
+- [x] While no settings are stored (failed load), the fields are disabled and no write is sent
+- [x] Choosing a device sends the whole settings at once, with no Save button on the page, and the
       page keeps showing the answer
-- [ ] A threads edit is not sent while typing; leaving the field (or Enter) sends the whole settings
+- [x] A threads edit is not sent while typing; leaving the field (or Enter) sends the whole settings
       with the new count
-- [ ] Clearing the threads field and leaving it stores `null` (whisper's default)
-- [ ] Invalid threads or speaker-count input (0, negative, a fraction, pasted junk) shows a field
+- [x] Clearing the threads field and leaving it stores `null` (whisper's default)
+- [x] Invalid threads or speaker-count input (0, negative, a fraction, pasted junk) shows a field
       error and is never sent; the stored value is unchanged
-- [ ] Two changes made before the first write settles collapse into one follow-up write carrying both
+- [x] Two changes made before the first write settles collapse into one follow-up write carrying both
       (at most two writes, the second with the latest values)
-- [ ] A rejected write shows the server's message on the field its code names and puts that field back
+- [x] A rejected write shows the server's message on the field its code names and puts that field back
       to its last stored value, changing nothing on the server; a change the rejected write also
       carried is stored by the next write
-- [ ] While a write is in flight the page says "Saving…", and it is gone once the settings are stored
-- [ ] Restore default settings asks first; confirming resets the stored settings and every field
+- [x] While a write is in flight the page says "Saving…", and it is gone once the settings are stored
+- [x] Restore default settings asks first; confirming resets the stored settings and every field
       shows the defaults (auto, empty threads, auto-detect, auto speakers, 8 max speakers)
-- [ ] Cancelling the restore sends no request and changes nothing
-- [ ] The restore clears the CPU-fallback notice, and other tabs follow through `settings-updated`
-- [ ] Every view reads one shared settings instance: `/queue` then `/settings` in one app load issue
+- [x] Cancelling the restore sends no request and changes nothing
+- [x] The restore clears the CPU-fallback notice, and other tabs follow through `settings-updated`
+- [x] Every view reads one shared settings instance: `/queue` then `/settings` in one app load issue
       a single `GET /api/settings`
-- [ ] A save made in Settings is visible in the Queue without a second fetch
-- [ ] A failed settings load is shared: navigating between the two views issues no new GET, and
+- [x] A save made in Settings is visible in the Queue without a second fetch
+- [x] A failed settings load is shared: navigating between the two views issues no new GET, and
       Retry in either recovers both
-- [ ] The connection's per-task maps hold only tasks the state holds: `task-deleted` drops a task's
+- [x] The connection's per-task maps hold only tasks the state holds: `task-deleted` drops a task's
       speaker and segment entries, and a snapshot drops entries for tasks it no longer lists (many
       events, bounded result)
-- [ ] A transcript whose last speakers event was a merge fetches `/turns` once on opening (the stale
+- [x] A transcript whose last speakers event was a merge fetches `/turns` once on opening (the stale
       merge is not replayed)
-- [ ] The shared MSW handlers save, reset and answer the stored settings; the queue banner dismisses
+- [x] The shared MSW handlers save, reset and answer the stored settings; the queue banner dismisses
       the device-fallback notice through them — no per-test override
-- [ ] (must not break) The frontend suite and `pnpm build` stay green, `pnpm dev:mock` saves and
+- [x] (discovered) Switching the speakers mode to `fixed` with no valid count writes nothing until a
+      valid count is typed; switching to `auto` or `off` writes with a null count
+- [x] (discovered, review) A settings-updated from another tab or the engine keeps the focused
+      field's draft and an invalid field's draft and error, and a queued follow-up is not flashed
+      back to the previous answer
+- [x] (discovered, review) A change made during a rejected write is sent once, rebuilt from the form
+      with the rejected field reverted
+- [x] (discovered, review) A write rejection that names no field shows its callout without a Retry
+      action; only the failed load retries
+- [x] (discovered, review) Dismiss waits while a settings write runs, the settings form and restore
+      wait while a dismissal runs, and a failed dismissal says so beside the banner
+- [x] (discovered, review) `fixed` without a valid count never sends `fixed` with a null count when
+      another field changes; the stored speakers travel instead
+- [x] (discovered, review) A refused paste's held draft is not committed on blur
+- [x] (discovered, review) The reset's defaults are pinned to the fresh V6 seed, the contract docs
+      list `DELETE /api/settings`, and the pause error and settings Retry have e2e journeys
+- [x] (discovered, review) A write answer that a settings-updated superseded does not overwrite the
+      event's settings: the CPU-fallback banner and the form's device keep the event's values
+- [x] (discovered, review) A settings-updated keeps the message of a write rejection the user has
+      not answered, on the field its code names
+- [x] (discovered, review) A failed reset shows the server's message in the page callout with no
+      Retry, leaves every field as it was, and re-enables Restore default settings
+- [x] (discovered, review) A dismissal answer that a settings-updated superseded does not overwrite
+      the event's settings: the fallback notice the event carried stays
+- [x] (discovered, review) A settings-updated that arrives before the settings load answers is kept:
+      the form and the fallback banner show the event's settings, not the older fetch answer
+- [x] (discovered, review) A successful fallback dismissal does not clear a settings write rejection
+      the user has not answered
+- [x] (must not break) The frontend suite and `pnpm build` stay green, `pnpm dev:mock` saves and
       restores settings, and the three e2e journeys that clicked Save (`17-settings`,
       `18-macos-metal`, the desktop helper) are rewritten to the auto-save flow and stay green
 
@@ -227,6 +255,39 @@ Line numbers are `main` after item 82.
   fields commit on their own blur or Enter, selects and switches on change; one write in flight with
   coalescing; the restore asks first. Consequences recorded above: proposals 3, 4, 6, 7 and 9
   rewritten, the e2e journeys that clicked Save are rewritten (ADR 0046), item 32's Save flow is
-  superseded ([ADR 0062](../docs/decisions/0062-settings-auto-save-and-default-reset.md)). The two
+  superseded ([ADR 0062](../decisions/0062-settings-auto-save-and-default-reset.md)). The two
   earlier "Save disabled" test-list items became the disabled-fields item, and the auto-save items
   were added. Status: spec-approved.
+- 2026-10-27 (rebase onto the amended spec — Canon TDD §3 "push on", the user): eight commits made
+  under the previous test-list wording were replayed onto the amended spec. Their ticks were re-keyed
+  to the items that survive: the pause and the resume cycles (items 1 and 2), the failed-load Retry
+  (item 3 — its test still asserts the Save button, and that clause goes in item 5's cycle), and the
+  one settings instance (item 15). Three cycles are Save-bound and were un-ticked: "disable Save while
+  no settings are stored", "reject invalid threads and block a junk paste" and "save an empty threads
+  field as null"; their code stays, and items 4, 8 and 7 re-establish the behavior under the
+  auto-save rules. `parseThreads` (a whole-number parse, never `parseInt`) and the shared
+  `SettingsContext`/`SettingsSync` survive as they are. Item 5 (removing Save) comes before the
+  commit mechanics, since items 6–11 drive the save trigger it introduces.
+- 2026-10-28 (review, the root agent): changes requested and made on the branch — the sync effect
+  keeps focused and invalid drafts and does not apply an answer that starts a queued follow-up; a
+  rejected write with a queued change rebuilds that change from the form; Dismiss waits for a write
+  and the form waits for a dismissal (no event is dropped); a failed dismissal is shown in the
+  banner; Retry is offered only by the failed load; `fixed` with no valid count sends the stored
+  speakers, so another field still stores; the reset spec pins the fresh V6 seed to
+  `DEFAULT_SETTINGS`; the contract docs, the route comment and the duplicate-helpers issue are
+  current; a refused paste is not committed on blur; and the pause error and settings Retry have
+  e2e journeys. The new scenarios are ticked above as `(discovered, review)`. Status: in-review.
+- 2026-10-28 (second review, the root agent): the three findings and the dismissal hole were fixed
+  on the branch. A write answer superseded by a `settings-updated` no longer overwrites the event's
+  settings (red-first, `bd5911b4`); a shown rejection survives a `settings-updated` (red-first,
+  `3e5e83fa`); the failed reset is pinned to its page callout with no Retry and unchanged fields
+  (passed on its first run — a regression pin, not a defect — `f376c928`); and the dismissal's
+  answer is under the same guard, included on the user's approval in this review (red-first,
+  `0559da98`). The freshness check was extracted into one helper (`Refactor:`, `693b4876`), and
+  ADR 0062's Decision gained the dated ordering rule. The four items are ticked above; Status
+  stays `in-review`.
+- 2026-10-28 (PR preparation, the user's approval): the two remaining review notes were closed on the
+  branch — a `settings-updated` that arrives before the settings load answers is laid over the fetch
+  answer instead of dropped, and a successful dismissal no longer clears a write rejection the user
+  has not answered; both red-first in `App.test.tsx`, and ADR 0062's ordering rule names the
+  pre-load case. The user approved the diff and the PR preparation. Status: done.

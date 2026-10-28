@@ -18,3 +18,19 @@ data class Settings(
     val defaultMaxSpeakers: Int,
     val deviceFallback: Device? = null,
 )
+
+/**
+ * The defaults `V6__settings.sql` seeds and `DELETE /api/settings` restores (roadmap item 72, ADR 0062): auto,
+ * whisper's and the speaker model's own thread count (null), auto-detect, auto speakers, 8 max speakers, and no
+ * CPU-fallback notice. Changing a default requires the migration and this constant together; the reset route spec
+ * pins these values.
+ */
+val DEFAULT_SETTINGS =
+    Settings(
+        device = Device.Auto,
+        threads = null,
+        defaultLanguage = "auto",
+        speakersMode = SpeakersMode.AUTO,
+        speakersCount = null,
+        defaultMaxSpeakers = 8,
+    )

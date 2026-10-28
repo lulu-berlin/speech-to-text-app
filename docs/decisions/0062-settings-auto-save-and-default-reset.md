@@ -45,6 +45,16 @@ And the defaults exist only as the seed of `V6__settings.sql`, mirrored by
   confirm machine; cancelling sends nothing.
 - **The e2e journeys that clicked Save are rewritten** to the auto-save flow — `17-settings`,
   `18-macos-metal` and the desktop helper (ADR 0046: a feature's journey follows the feature).
+- **2026-10-28 — An answer or a load cannot overwrite a newer `settings-updated`.** A write (`PUT`
+  or the reset `DELETE`), or a fallback dismissal, whose answer is superseded by a
+  `settings-updated` received while it ran leaves the event-derived settings in place: it still
+  clears the writing flag and the queued body and still starts the queued follow-up, but does not
+  apply its answer (a write's answer still clears the error; a dismissal does not). The stored
+  baseline therefore always follows the event, whatever order the answer and the event arrive in
+  (the server emits `settings-updated` for every write). A `settings-updated` received before the
+  settings load is answered is kept and laid over the fetch answer when it lands, since the event
+  is the newer settings; a shown write rejection stays until the user answers it — neither a
+  `settings-updated` nor a dismissal clears it.
 
 ## Consequences
 

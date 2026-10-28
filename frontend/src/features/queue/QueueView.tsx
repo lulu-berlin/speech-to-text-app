@@ -21,6 +21,8 @@ import { finishNoticeMachine } from './finishNoticeMachine';
 import { dropZoneMachine } from './dropZoneMachine';
 import { DeviceFallbackBanner } from './DeviceFallbackBanner';
 import type { FinishNotice } from './finishNoticeMachine';
+import { errorMessage } from '../../shared/errorMessage';
+import { ErrorCallout } from '../../shared/ui/ErrorCallout';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
 import { ListRow } from '../../shared/ui/ListRow';
@@ -29,7 +31,7 @@ import { Switch } from '../../shared/ui/Switch';
 import { StenographerAnimation } from '../../shared/brand/StenographerAnimation';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
-import { settingsMachine } from '../../shared/state/settingsMachine';
+import { SettingsContext } from '../../app/SettingsContext';
 import { queuePauseMachine } from './queuePauseMachine';
 import { reorderMachine } from './reorderMachine';
 import { RowContent, RowName } from './rowParts';
@@ -188,14 +190,14 @@ function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
 
 export function QueueView() {
   const connection = ConnectionContext.useActorRef();
-  const { tasks, queue, settingsUpdate } = ConnectionContext.useSelector((state) => state.context);
+  const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
   const live = ConnectionContext.useSelector((state) => state.value === 'live');
   const [language, setLanguage] = useState(languages.default);
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
   const [speakerCount, setSpeakerCount] = useState(2);
   const [maxSpeakers, setMaxSpeakers] = useState(8);
   const [upload, sendToUploader] = useMachine(uploadBatchMachine);
-  const [settings, sendSettings] = useMachine(settingsMachine);
+  const settings = SettingsContext.useSelector((state) => state);
   const [reorder, sendReorder] = useMachine(reorderMachine, {
     input: { order: queue?.taskIds ?? [] },
   });
@@ -228,14 +230,6 @@ export function QueueView() {
     }
     setMaxSpeakers(stored.maxSpeakers);
   }, [stored]);
-
-  // The settings follow the live stream (item 32): another tab's write, a dismiss, or the
-  // engine's switch of an unusable GPU to the CPU.
-  useEffect(() => {
-    if (settingsUpdate !== null) {
-      sendSettings({ type: 'UPDATED', update: settingsUpdate });
-    }
-  }, [settingsUpdate, sendSettings]);
 
   // The pause POST answered: apply its queue to the live state (the server's own
   // queue-updated carries the same queue, so applying it twice is harmless).
@@ -340,14 +334,7 @@ export function QueueView() {
     <Page>
       <Stack gap="lg">
         <PageHeading>Queue</PageHeading>
-        {stored?.deviceFallback != null ? (
-          <DeviceFallbackBanner
-            device={stored.deviceFallback}
-            gpuNames={stored.gpuNames}
-            dismissing={settings.matches({ loaded: 'dismissing' })}
-            onDismiss={() => sendSettings({ type: 'DISMISS' })}
-          />
-        ) : null}
+        <DeviceFallbackBanner />
         {notices.context.notices.length > 0 ? (
           <Stack gap="sm">
             {notices.context.notices.map((notice) => (
@@ -398,6 +385,16 @@ export function QueueView() {
             disabled={pause.matches('sending')}
           />
         </Row>
+        {pause.context.error !== null ? (
+          <ErrorCallout
+            title={
+              pause.context.attempted === true
+                ? 'Could not pause the queue'
+                : 'Could not resume the queue'
+            }
+            detail={errorMessage(pause.context.error)}
+          />
+        ) : null}
         {pendingTasks.length > 0 ? (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <SortableContext items={reorder.context.order} strategy={verticalListSortingStrategy}>
