@@ -32,7 +32,7 @@ class EmbeddingsSpec :
         given("a segment list and an empty PCM") {
             `when`("embedding") {
                 then("every segment gets an all-zero embedding of the model's output dim, in segment order") {
-                    // Oracle embed_windows: total <= 0 -> np.zeros((len(segments), 192)).
+                    // total <= 0 -> every embedding all zeros (one 192-dim row per segment), in segment order.
                     SpeakerModel.load(realSpeakerModelPath()).use { model ->
                         val segments = listOf(segment(0, 100), segment(4000, 4500), segment(9000, 10_000))
 

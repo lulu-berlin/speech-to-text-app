@@ -1,8 +1,8 @@
 package stt.outputs
 
 /**
- * The download file name for a transcript: the [originalFilename]'s stem plus [extension], like the oracle's output
- * prefix `Path(audio).stem` (`interview.mp3` → `interview.srt`). Only the last suffix is stripped; a leading dot
+ * The download file name for a transcript: the [originalFilename]'s stem plus [extension]
+ * (`Path(audio).stem`; `interview.mp3` → `interview.srt`). Only the last suffix is stripped; a leading dot
  * (`.hidden`) is not a suffix.
  */
 internal fun downloadFileName(

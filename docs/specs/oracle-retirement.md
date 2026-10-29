@@ -1,6 +1,6 @@
 # 75 — Retire the Python oracle: the app is the behavioral reference
 
-Status: spec-approved
+Status: done (roadmap item 75, approved 2026-10-29)
 Depends on: —
 Blocks: —
 
@@ -64,20 +64,25 @@ is the behavior; no further oracle parity work is done.
 
 ## Test list (approved; behaviors only)
 
-- [ ] No Python file is tracked (`git ls-files '*.py'` is empty) and `docs/oracle/` is gone
-- [ ] No live document (AGENTS.md, README.md, docs/architecture.md, docs/conventions, the roadmap)
+- [x] No Python file is tracked (`git ls-files '*.py'` is empty) and `docs/oracle/` is gone
+- [x] No live document (AGENTS.md, README.md, docs/architecture.md, docs/conventions, the roadmap)
       names the oracle as a behavioral reference or asks for oracle parity; historical ADRs and
       moved specs may still mention it
-- [ ] `docs/check-oracle-retired.ts` fails on a planted live-document reference and passes on the
+- [x] `docs/check-oracle-retired.ts` fails on a planted live-document reference and passes on the
       current tree, with historical ADRs and moved specs allowed
-- [ ] The decisions index shows ADR 0063 superseding ADR 0002, and ADR 0063 states the authority
+- [x] The decisions index shows ADR 0063 superseding ADR 0002, and ADR 0063 states the authority
       (code, tests, specs, `docs/api`) and the unchanged no-Python rule
-- [ ] `docs/backend-reimplementation.md`'s authority list and conformance section name only current
+- [x] `docs/backend-reimplementation.md`'s authority list and conformance section name only current
       sources, with no oracle reference
-- [ ] App behavior is unchanged: diarized txt keeps `[Speaker 1]`, srt/vtt and the downloads are
+- [x] App behavior is unchanged: diarized txt keeps `[Speaker 1]`, srt/vtt and the downloads are
       byte-identical, and the output-format suites stay green
-- [ ] (must not break) `gradle check`, `gradle integrationTest`, the frontend and e2e `pnpm test`,
+- [x] (must not break) `gradle check`, `gradle integrationTest`, the frontend and e2e `pnpm test`,
       and the docs checks stay green
+- [x] (discovered) No live source or test comment (`backend/src/main`, `backend/src/test`, `e2e`)
+      presents the oracle as the source of behavior or asks for oracle parity: the comments name
+      the spec or the current behavior, while a comment recording the rationale of a past port stays
+- [x] (discovered) No non-comment source line (`backend/src/main`, `backend/src/test`, `e2e`) names
+      the oracle: test descriptions and fixture names say the spec or the current behavior
 
 ## Acceptance criteria
 
@@ -93,3 +98,7 @@ is the behavior; no further oracle parity work is done.
 - 2026-10-28: consultation with the user: ADR 0063 supersedes 0002 (0062 is taken), only the
   source-of-truth claims are reworded, and the docs package gains the oracle-retirement guard now.
   Test list approved as written; status set to spec-approved.
+- 2026-10-29: item 75's review: the live-document rule is one shared implementation that also reads
+  `docs/known-issues.md`; ADR 0002's own header records its supersession (the index convention);
+  the comment reader ignores strings and URLs; the planted sandbox skips where the platform refuses
+  symlinks; and the source comments name git history instead of the deleted oracle path.

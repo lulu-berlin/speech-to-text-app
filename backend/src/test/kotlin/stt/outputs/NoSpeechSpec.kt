@@ -8,7 +8,7 @@ class NoSpeechSpec :
         given("a task with no segments") {
             `when`("its outputs are rendered") {
                 then("txt, srt and vtt are empty") {
-                    // Oracle `transcribe_one`, zero segments: the output files are touched, i.e. 0 bytes (vtt without
+                    // Zero segments: the output files are touched, i.e. 0 bytes (vtt without
                     // its header).
                     renderTxt(emptyList(), emptyList()) shouldBe ""
                     renderSrt(emptyList(), emptyList()) shouldBe ""

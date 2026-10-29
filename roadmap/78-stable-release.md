@@ -63,7 +63,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 72 Frontend state and errors | draft | **yes** | a stable UI must not hide failed actions |
 | 73 Diarization speaker separation | draft | after 1.0 | quality improvement with a split remedy |
 | 74 Desktop presentation | draft | **yes** | icon, `.desktop` entry and glyph coverage are release polish, not optional |
-| 75 Retire the Python oracle | draft | after 1.0 | docs-only |
+| 75 Retire the Python oracle | done | after 1.0 | docs-only |
 | 76 Right-to-left transcription | draft | **yes** | correctness for scripts the app already accepts |
 | 77 Upload spec shared temp dir | in progress | **yes** | a `macOS (gradle check)` flake undermines release verification |
 | 79 Full e2e journey on Windows | draft | **yes** | 1.0 claims Windows support; the journey is the only suite not run there (item 49 covers the packaged specs only) |

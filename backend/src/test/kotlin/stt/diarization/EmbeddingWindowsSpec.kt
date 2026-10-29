@@ -53,10 +53,10 @@ class EmbeddingWindowsSpec :
         }
         given("a 25 s PCM and a 40 s segment that ends past the clip's end") {
             `when`("building the embedding window") {
-                then("it is the oracle's center-capped slice, clamped to the clip's end instead of failing") {
-                    // Oracle embed_windows (docs/oracle/transcribe.py:244-248): dur = min(t1, total) - t0 = 400 000 > cap,
+                then("it is the center-capped slice, clamped to the clip's end instead of failing") {
+                    // Item 09's cap rule, by hand: dur = min(t1, total) - t0 = 400 000 > cap,
                     // mid = (0 + 640 000) / 2 = 320 000, st = max(0, 320 000 - 160 000) = 160 000,
-                    // en = min(640 000, 480 000) = 480 000 — and the oracle's slice pcm[160 000:480 000] clamps to the
+                    // en = min(640 000, 480 000) = 480 000 — the slice pcm[160 000:480 000] clamps to the
                     // clip's 400 000 samples. The port clamps with the clip's own count: min(t1, total, st + cap) = 400 000.
                     val pcm = FloatArray(400_000) { i -> i.toFloat() } // pcm[i] = i
 

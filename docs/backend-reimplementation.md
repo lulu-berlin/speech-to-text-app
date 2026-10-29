@@ -10,8 +10,6 @@ Authoritative sources used to write and check this document:
 
 - `docs/api/` — one example JSON per response, event and error; the frontend's mock server and
 the backend's shape checks use these bytes. Treat them as the wire contract.
-- `docs/oracle/transcribe.py` — the behavioral oracle for decoding, chunking, transcription,
-diarization and output formats. Read it, never run it from the app.
 - The current backend code and tests under `backend/src/` — the authority for exact strings
   (error messages, headers, log lines) and edge cases where this document is summarized.
 - `docs/specs/*.md` — detailed current behavior per area (their history sections can be ignored).
@@ -345,7 +343,7 @@ Every state change is persisted before its event is emitted.
 
 ## 8. Audio pipeline
 
-Decoding (oracle `decode_pcm`):
+Decoding:
 
 ```
 ffmpeg -hide_banner -nostats -loglevel error -i <input> -f f32le -ac 1 -ar 16000 <pcm-file>
@@ -362,7 +360,7 @@ frames = one second; row k covers `[k·1000,(k+1)·1000)` ms). The splitter vali
 header CRC-8, consecutive frame numbers and CRC-16; only the last frame may be shorter than 4000
 samples; frames must sum to STREAMINFO's total; anything else is refused as not canonical.
 
-Chunk planning (oracle logic):
+Chunk planning:
 
 ```
 ffmpeg -hide_banner -nostats -i <input> -af silencedetect=noise=-30dB:d=0.5 -f null -
@@ -523,7 +521,7 @@ reports whether it wrote.
 
 Each list is a behavioral test list for that area; drive them one item at a time (red → green →
 refactor question → tick), in this order unless a dependency forces otherwise. Use the published
-fixtures and the oracle for expected values.
+fixtures and the current behavior in `docs/specs/*.md` and `backend/src/` for expected values.
 
 ### Cycle group A — configuration and database
 
@@ -661,14 +659,11 @@ fixtures and the oracle for expected values.
       a SIGTERM-ignoring process dies after the grace; single-flight; pause-before-spawn and
       leftover pause behavior
 
-## 15. Conformance and equivalence
+## 15. Conformance and equivalence to the current backend
 
 - **Wire contract**: every response/event/error must match its `docs/api/*.json` example. Reuse the
   examples as golden shapes, and the frontend (already built) against the Rust backend as the
   end-to-end check: serve the built UI and drive the existing e2e journey.
-- **Oracle**: transcription, chunk planning, embedding windows, clustering, turns and output
-  formats are ported from `docs/oracle/transcribe.py`; derive expected values from the oracle's
-  code by hand, never by running Python from the app.
 - **Fixtures** (already in the repo): `backend/src/test/resources/librispeech/` (three CC BY 4.0
   clips), `backend/src/test/resources/upload-formats/` (19 per-extension fixtures + 0.5 s
   `sample.flac`), `e2e` clips, and the pinned models (`ggml-tiny.en` for tests, CAM++ for

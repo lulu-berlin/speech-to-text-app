@@ -53,11 +53,11 @@ class ProcessingEngineCanonicalStorageSpec :
                     val task = queuedTask("jfk.wav", createdAt = 1L).copy(queuePosition = 0)
                     var taskId = 0L
 
-                    // The independent oracle: what a faithful decode of the upload sounds like. jfk is an 11 s clip
+                    // The independent reference: what a faithful decode of the upload sounds like. jfk is an 11 s clip
                     // (the fixture's tested length, item 07), so 11 s × 16 000 samples/s = 176 000 samples; the
                     // canonical clip was decoded from the same original with the same ffmpeg, so the stored rows
                     // must reproduce that stream sample for sample.
-                    val expectedPcm = toS16(jfk, tempdir("stt-oracle").toPath())
+                    val expectedPcm = toS16(jfk, tempdir("stt-reference").toPath())
 
                     testApplication {
                         application { sttApp(config) }
@@ -90,7 +90,7 @@ class ProcessingEngineCanonicalStorageSpec :
                         rows.shouldHaveSize(11)
                         rows.forEach { row -> row.frames shouldBe 4 }
 
-                        // Reassembled and decoded, the rows reproduce the oracle PCM, second by second.
+                        // Reassembled and decoded, the rows reproduce the reference PCM, second by second.
                         val scratch = tempdir("stt-scratch").toPath()
                         val joined = joinRows(stored, rows, scratch.resolve("joined.flac"))
                         toS16(joined, scratch).shouldBe(expectedPcm)

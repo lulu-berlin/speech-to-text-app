@@ -17,7 +17,7 @@ class SpeakerLabelsSpec :
                         )
 
                     // ADR 0034: txt block header "[{name}]", srt/vtt cue text "{name}: {turn text}", name = the stored
-                    // Speaker.speaker; layouts as in the oracle's write_diarized_outputs.
+                    // Speaker.speaker; layouts as item 10's spec gives them.
                     renderTxt(segments, speakers) shouldBe "[Alice]\nHi.\n\n[Bob]\nHello.\n"
                     renderSrt(segments, speakers) shouldBe
                         "1\n00:00:00,000 --> 00:00:01,000\nAlice: Hi.\n\n" +

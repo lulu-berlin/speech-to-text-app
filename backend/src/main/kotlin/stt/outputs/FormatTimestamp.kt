@@ -3,7 +3,7 @@ package stt.outputs
 import java.util.Locale
 
 /**
- * Formats [ms] like the oracle's `fmt_srt`/`fmt_vtt`: `HH:MM:SS{separator}mmm` with [separator] `,` for srt and `.`
+ * Formats [ms] as `HH:MM:SS{separator}mmm` with [separator] `,` for srt and `.`
  * for vtt. Hours are zero-padded to two digits and never wrap (100 h → `100:00:00,000`).
  */
 internal fun formatTimestamp(

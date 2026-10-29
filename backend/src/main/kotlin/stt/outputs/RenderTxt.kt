@@ -5,7 +5,7 @@ import stt.db.Speaker
 
 /**
  * Renders a task's [segments] as txt, each trimmed text on its own line (ADR 0030). With [speakers] (the task's stored
- * speakers; oracle `write_diarized_outputs`): segment-level, a `[{name}]` line with the speaker's stored name
+ * speakers): segment-level, a `[{name}]` line with the speaker's stored name
  * (ADR 0034) at every speaker change, blocks separated by one blank line. With `null` [speakers] (speakers off): no
  * speaker lines.
  */

@@ -15,8 +15,8 @@ class RenderSrtSpec :
                             segment(speakerId = 1, startMs = 3_250, endMs = 4_000, text = " Fine."),
                         )
 
-                    // Oracle `write_diarized_outputs`, srt: per turn f"{i}\n{fmt_srt(start)} --> {fmt_srt(end)}\n{name}: {text}\n\n";
-                    // speaker_turns merges segments 0 and 1 (same speaker) into one turn, texts joined with single spaces.
+                    // srt per item 10's spec: per turn f"{i}\n{fmt_srt(start)} --> {fmt_srt(end)}\n{name}: {text}\n\n";
+                    // turns merge segments 0 and 1 (same speaker) into one turn, texts joined with single spaces.
                     // fmt_srt: ms = int(round(t*1000)), divmod by 3_600_000/60_000/1000, f"{h:02d}:{m:02d}:{s:02d},{ms:03d}".
                     renderSrt(segments, speakers(0, 1)) shouldBe
                         "1\n00:00:00,000 --> 00:00:03,250\nSpeaker 1: Hello there. again.\n\n" +

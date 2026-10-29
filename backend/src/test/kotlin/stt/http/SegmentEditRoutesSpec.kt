@@ -448,7 +448,7 @@ class SegmentEditRoutesSpec :
                         application { sttApp(stt.config.testConfig(dataDir)) }
                         client.editSegment(id, editedSegmentId, "  Corrected sentence.  ").status shouldBe HttpStatusCode.OK
 
-                        // Derived by hand from item 10's rules (oracle write_diarized_outputs) for the same seed as
+                        // Derived by hand from item 10's rules for the same seed as
                         // TranscriptDownloadSpec: turns Speaker 1 0–3 250 ms, Speaker 2 3 250–4 000 ms, with " again."
                         // replaced by the edit, trimmed at read time (ADR 0030).
                         val expected =

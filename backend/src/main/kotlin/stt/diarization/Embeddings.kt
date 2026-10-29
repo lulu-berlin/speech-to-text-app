@@ -13,7 +13,7 @@ import java.nio.FloatBuffer
  * Speaker embeddings over [SpeakerModel]: one L2-normalized vector per segment, from each segment's
  * window through the Kaldi fbank + global-mean front-end and one ONNX Runtime inference call per window.
  *
- * Ported from oracle `embed_windows` (docs/oracle/transcribe.py), minus the length-sorted batching, which is a
+ * Ported from the retired Python oracle's `embed_windows` (git history), minus the length-sorted batching, which is a
  * PyTorch memory workaround, not behavior. Window values are 16-bit-quantized PCM in `[-1, 1]` (ADR 0024); like
  * sherpa-onnx's feature extractor (`features.cc` `AcceptWaveform`), they go in unchanged when the model metadata
  * says `normalize_samples` (all 3D-Speaker models, CAM++ included) and are scaled to the int16 range (× 32768)
@@ -28,7 +28,7 @@ internal class Embeddings(
 
     /**
      * One embedding per [segments] segment, in segment order. A clip with no samples ([PcmSource.totalSamples] 0)
-     * yields every embedding all zeros (oracle `embed_windows` with `total <= 0`), without touching the session.
+     * yields every embedding all zeros (no samples to embed), without touching the session.
      *
      * Each segment's window is read from [pcm] by range (item 43), so only one window is in heap at a time and the
      * clip is never materialized. Cancellation of this coroutine is checked before every window, so a cancel lands

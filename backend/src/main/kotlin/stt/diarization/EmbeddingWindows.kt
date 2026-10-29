@@ -1,14 +1,14 @@
 package stt.diarization
 
-/** 2 s at 16 kHz: minimum analysis window, zero-padded with the segment centered (oracle MIN_EMBED_SECONDS). */
+/** 2 s at 16 kHz: minimum analysis window, zero-padded with the segment centered (item 09's spec). */
 internal const val SHORT_WINDOW_SAMPLES = 32_000
 
-/** 20 s at 16 kHz: longer segments use a centered slice of this length (oracle MAX_EMBED_SECONDS). */
+/** 20 s at 16 kHz: longer segments use a centered slice of this length (item 09's spec). */
 internal const val CAP_WINDOW_SAMPLES = 320_000
 
 /**
- * The embedding window of one segment over the clip [pcm], ported 1:1 from the oracle's `embed_windows`
- * (docs/oracle/transcribe.py): timestamps in ms become sample indices as `ms * 16` (`int(seconds * 16000)` with
+ * The embedding window of one segment over the clip [pcm], ported 1:1 from the retired Python oracle's
+ * `embed_windows` (git history): timestamps in ms become sample indices as `ms * 16` (`int(seconds * 16000)` with
  * whole ms), and each branch of the oracle is reproduced:
  * - past the end or empty segment: the last [SHORT_WINDOW_SAMPLES] samples (or all of them);
  * - still empty after clipping: an all-zero [SHORT_WINDOW_SAMPLES] window;

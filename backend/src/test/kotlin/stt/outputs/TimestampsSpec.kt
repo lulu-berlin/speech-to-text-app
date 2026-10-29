@@ -10,7 +10,7 @@ class TimestampsSpec :
                 then(
                     "minutes and hours roll over, hours are zero-padded to two digits, and hours above 99 are not wrapped",
                 ) {
-                    // Oracle `fmt_srt`/`fmt_vtt`: ms = int(round(t * 1000)), divmod by 3_600_000, 60_000, 1000,
+                    // Timestamps: ms = int(round(t * 1000)), divmod by 3_600_000, 60_000, 1000,
                     // f"{h:02d}:{m:02d}:{s:02d},{ms:03d}" (srt) / "…{ms:03d}" with a dot (vtt).
                     fmtSrt(0) shouldBe "00:00:00,000"
                     fmtSrt(59_999) shouldBe "00:00:59,999"
@@ -26,8 +26,8 @@ class TimestampsSpec :
         }
         given("a timestamp of 1 234 ms") {
             `when`("it is formatted") {
-                then("it equals the oracle's int(round(t * 1000)) result for the same time") {
-                    // Oracle with t = 1.234 s: ms = int(round(1.234 * 1000)) = 1234, divmod → 00:00:01,234.
+                then("it equals the int(round(t * 1000)) result for the same time in seconds") {
+                    // With t = 1.234 s: ms = int(round(1.234 * 1000)) = 1234, divmod → 00:00:01,234.
                     fmtSrt(1_234) shouldBe "00:00:01,234"
                     fmtVtt(1_234) shouldBe "00:00:01.234"
                 }

@@ -33,8 +33,8 @@ internal fun dot(
 }
 
 /**
- * L2-normalizes [vector] in place; a zero vector (no energy) stays all zeros, as the oracle sets the norm to 1
- * only when it is non-zero (`embed_windows`: `norms[norms == 0] = 1.0`).
+ * L2-normalizes [vector] in place; a zero vector (no energy) stays all zeros, the norm set to 1
+ * only when it is non-zero (a zero norm is treated as 1).
  */
 internal fun l2Normalize(vector: FloatArray): FloatArray {
     var sumSquares = 0.0
