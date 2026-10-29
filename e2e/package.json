@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node --test lib/processes.test.ts lib/fixtures.test.ts lib/type-check.test.ts lib/app-trace.test.ts && node check-playwright.ts && prettier --check . && tsc -p tsconfig.json && playwright test",
+    "test": "node --test lib/processes.test.ts lib/backend.test.ts lib/platform-gates.test.ts lib/place.test.ts lib/managed-pnpm.test.ts lib/executable.test.ts lib/fixtures.test.ts lib/type-check.test.ts lib/app-trace.test.ts && node check-playwright.ts && prettier --check . && tsc -p tsconfig.json && playwright test",
     "record:gifs": "playwright test --config=playwright.gifs.config.ts",
     "test:desktop": "tsc -p tsconfig.json && node desktop/run-in-docker.ts",
     "test:desktop:nix": "tsc -p tsconfig.json && node desktop/run-in-docker.ts --nix",

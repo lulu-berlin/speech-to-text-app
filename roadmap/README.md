@@ -151,7 +151,7 @@ graph TD
   74 --> 78
   76 --> 78
   77 --> 78
-  79[79 full e2e journey on Windows]
+  79[79 full e2e journey on Windows ✓]:::done
   21 --> 79
   49 --> 79
   51 --> 79
@@ -245,7 +245,7 @@ graph TD
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70                           |
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |
-| [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | spec-approved | 21, 49, 51                  |
+| [79 — The full e2e journey on Windows](../docs/specs/windows-e2e-journey.md)                                                                                 | done          | 21, 49, 51                  |
 | [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
 | [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](../docs/specs/ci-diagnosability.md)                                | done          | —                           |
 | [81 — A row command clicked while another one is in flight is dropped](../docs/specs/dropped-row-command.md)                                                                  | done          | —                           |

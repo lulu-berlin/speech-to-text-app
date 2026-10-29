@@ -379,13 +379,10 @@ fun appEnv(): Map<String, String> =
         "PATH" to
             (
                 runtimeBinDirs.map { it.absolutePath } +
-                    nodeInstallDir().let { n ->
-                        listOf(
-                            (if (platform == "windows-x64") pnpmHome else File(pnpmHome, "bin")).absolutePath,
-                            File(n, "nodejs/node-v${manifest["node"]}-${nodePlatform()}")
-                                .let { if (platform == "windows-x64") it.absolutePath else File(it, "bin").absolutePath },
-                        )
-                    } + System.getenv("PATH")
+                    listOf(
+                        (if (platform == "windows-x64") pnpmHome else File(pnpmHome, "bin")).absolutePath,
+                        nodeBinDir.absolutePath,
+                    ) + System.getenv("PATH")
             ).joinToString(File.pathSeparator),
         "JAVA_HOME" to runtimeJavaHome.get(),
         // Gradle 9's HTML test report writes one directory per test name, and names like "0°, 20°"
@@ -453,6 +450,15 @@ fun applyAppEnv(task: Exec) = appEnv().forEach { (k, v) -> task.environment(k, r
 // Gradle provides what the devenv otherwise sets: the pinned fixtures, the managed
 // tools on PATH, the browsers and the backend command. A user-set variable wins.
 val e2eDir = rootProject.file("e2e")
+// The Node this build downloads: appEnv puts its directory first on the tasks' PATH, and the e2e
+// tasks start it by this absolute path (roadmap item 79, review finding 1). Gradle's Exec resolves
+// a program on the *Gradle process's* PATH, never on the task's environment, so a bare `node` needs
+// Node installed on the host — which the no-Nix path promises it does not.
+val nodeBinDir =
+    File(nodeInstallDir(), "nodejs/node-v${manifest["node"]}-${nodePlatform()}")
+        .let { if (platform == "windows-x64") it else File(it, "bin") }
+val nodeExe = File(nodeBinDir, if (platform == "windows-x64") "node.exe" else "node")
+
 // npm's global bin on Windows is the prefix itself, so pnpm sits in the version directory there and
 // in its `bin/` on POSIX (the same layout node-gradle's own VariantComputer computes).
 val pnpmHome = File(nodeInstallDir(), "pnpm/pnpm-v${manifest["pnpm"]}")
@@ -463,21 +469,21 @@ val pnpmExe =
     )
 val fixtures = manifest["fixtures"] as Map<*, *>
 
-// The e2e tasks drive the frontend and Playwright through the POSIX toolchain layout. On Windows the
-// packaged app's own e2e (`e2e/desktop-tests`) is the supported path, so these tasks fail there when
-// they run — not at configuration time, which would break every other task on that host.
-fun requirePosixE2e(task: String) {
-    if (platform == "windows-x64") {
-        throw GradleException(
-            "$task is not supported on Windows: run the packaged app's e2e (e2e/desktop-tests) instead",
-        )
-    }
-}
+// The e2e tasks run pnpm through `e2e/run.ts` (roadmap item 79): Gradle passes the managed pnpm's
+// path in STT_E2E_PNPM and the launcher fails with the `e2eInstall` command when it is missing, on
+// every platform. Windows thus reaches the same tasks; its `.cmd` shim starts under the launcher's
+// shell. `gradlew.bat e2e` needs no POSIX-only guard any more.
 
 val jfkWavFile = assetCacheFile("fixtures", fixtures["jfkWav"] as Map<*, *>)
 val tinyModelFile = modelCacheFile("whisperTinyEn")
 // Playwright's own browser download, shared across clones like the other tools.
 val playwrightBrowsers = System.getenv("PLAYWRIGHT_BROWSERS_PATH") ?: File(sttCache, "ms-playwright").absolutePath
+
+// The launcher (e2e/run.ts) checks the managed pnpm and runs it; a missing install is one line,
+// not a CreateProcess failure (roadmap item 79). A user-set path wins, like every other setting.
+fun applyPnpmEnv(task: Exec) {
+    task.environment("STT_E2E_PNPM", System.getenv("STT_E2E_PNPM") ?: pnpmExe.absolutePath)
+}
 
 // The pinned test fixtures from versions.json (item 33); the devenv exports the same two.
 // A user-set value wins, so a branch-only fixture can be passed explicitly.
@@ -490,6 +496,7 @@ fun applyFixtureEnv(task: Exec) {
 // speaker model) plus the fixtures, the browsers and the backend command.
 fun applyE2eEnv(task: Exec) {
     applyAppEnv(task)
+    applyPnpmEnv(task)
     task.environment("PLAYWRIGHT_BROWSERS_PATH", playwrightBrowsers)
     applyFixtureEnv(task)
     // The installed backend `run` starts, relative to the repository root (the harness's
@@ -515,9 +522,8 @@ tasks.register<Exec>("e2eInstall") {
     description = "Install the e2e package's dependencies (frozen lockfile) with the managed pnpm"
     dependsOn(":frontend:pnpmSetup")
     doFirst {
-        requirePosixE2e("e2eInstall")
         applyE2eEnv(this as Exec)
-        setCommandLine(pnpmExe.absolutePath, "install", "--frozen-lockfile")
+        setCommandLine(nodeExe.absolutePath, "run.ts", "install", "--frozen-lockfile")
     }
 }
 
@@ -528,9 +534,8 @@ tasks.register<Exec>("e2eBrowsers") {
     // A user-set PLAYWRIGHT_BROWSERS_PATH (the devenv's read-only Nix browser farm) is used as is.
     onlyIf { System.getenv("PLAYWRIGHT_BROWSERS_PATH") == null }
     doFirst {
-        requirePosixE2e("e2eBrowsers")
         applyE2eEnv(this as Exec)
-        setCommandLine(pnpmExe.absolutePath, "exec", "playwright", "install", "chromium")
+        setCommandLine(nodeExe.absolutePath, "run.ts", "exec", "playwright", "install", "chromium")
     }
 }
 
@@ -558,9 +563,9 @@ tasks.register<Exec>("e2eSystemDeps") {
         if (runningAsRoot) {
             // Gradle gives the process no terminal, so apt's debconf must not ask anything.
             environment("DEBIAN_FRONTEND", System.getenv("DEBIAN_FRONTEND") ?: "noninteractive")
-            setCommandLine(pnpmExe.absolutePath, "exec", "playwright", "install-deps", "chromium")
+            setCommandLine(nodeExe.absolutePath, "run.ts", "exec", "playwright", "install-deps", "chromium")
         } else {
-            setCommandLine(pnpmExe.absolutePath, "exec", "playwright", "install-deps", "--dry-run", "chromium")
+            setCommandLine(nodeExe.absolutePath, "run.ts", "exec", "playwright", "install-deps", "--dry-run", "chromium")
             standardOutput = dryRunOutput
             isIgnoreExitValue = true
         }
@@ -604,9 +609,8 @@ tasks.register<Exec>("e2e") {
         "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: ./gradlew e2eSystemDeps)"
     dependsOn("prepareRuntime", "prepareE2eFixtures", "e2eBrowsers", backendInstallDist, ":frontend:frontendBuild")
     doFirst {
-        requirePosixE2e("e2e")
         applyE2eEnv(this as Exec)
-        setCommandLine(pnpmExe.absolutePath, "test")
+        setCommandLine(nodeExe.absolutePath, "run.ts", "test")
     }
 }
 

@@ -1,9 +1,9 @@
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { appUrl, choosePort, startBackend, stopBackend } from '../lib/backend.ts';
+import { commandDirectory } from '../lib/executable.ts';
 
 // Item 60 (ADR 0046): a failed device probe is reported as a failed probe, never as "no GPU". The shared
 // suite backend runs with whisper-cli, so the failure half starts its own backend on a free port with the
@@ -13,18 +13,21 @@ test('a backend without whisper-cli reports the failed probe on the Settings pag
   page,
 }) => {
   test.setTimeout(360_000);
-  const whisperCliDir = dirname(
-    execFileSync('which', ['whisper-cli'], { encoding: 'utf8' }).trim(),
-  );
-  const pathWithoutWhisperCli = (process.env.PATH ?? '')
-    .split(':')
+  // PATH lookup, not `which`: Windows has no `which`, separates PATH with ';' and names the binary
+  // whisper-cli.exe (roadmap item 79).
+  const whisperCliDir = commandDirectory('whisper-cli');
+  expect(whisperCliDir, 'whisper-cli is on PATH for the shared backend').not.toBeNull();
+  // Windows spells the variable `Path`; overriding another spelling would hand the child two.
+  const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
+  const pathWithoutWhisperCli = (process.env[pathKey] ?? '')
+    .split(delimiter)
     .filter((dir) => dir !== whisperCliDir)
-    .join(':');
+    .join(delimiter);
 
   const port = await choosePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-probe-'));
   const origin = `http://127.0.0.1:${port}`;
-  const { pid } = await startBackend({ port, dataDir, env: { PATH: pathWithoutWhisperCli } });
+  const { pid } = await startBackend({ port, dataDir, env: { [pathKey]: pathWithoutWhisperCli } });
   try {
     const settings = await (await page.request.get(`${origin}/api/settings`)).json();
     expect(settings.deviceProbeError).toBeTruthy();

@@ -19,8 +19,10 @@ const decidePath = join(repoRoot, '.github/decide-code-change.sh');
 // Jobs that must run on every event. `changes` decides, `docs-check` is the cheap always-on
 // check, and `ci` is the required aggregator that reports the run's result.
 const UNGATED: Record<string, true> = { changes: true, 'docs-check': true, ci: true };
-// Jobs that are gated by their own event instead: the manual assets (a dispatch with `assets`)
-// and the weekly model-host probe (a cron string); none of them is in the aggregator.
+// Jobs that are gated by their own event instead: the manual assets (a dispatch with `assets`) and
+// the weekly model-host probe (a cron string); none of them is in the aggregator. The Windows
+// journey started here while it was nightly-only and left once its time matched macOS (roadmap
+// item 79).
 const EVENT_GATED: Record<string, true> = {
   'macos-whisper-asset': true,
   'macos-ffmpeg-asset': true,
@@ -422,7 +424,7 @@ test('the required check and the jobs it gates keep their names and conditions',
   const modelHosts = assertJobOf(jobs, 'model-hosts');
   assert.equal(
     modelHosts.if,
-    "github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'",
+    "github.event_name == 'schedule' && github.event.schedule == '43 4 * * 1'",
   );
   assert.ok(
     !ci.needs.includes('model-hosts'),
