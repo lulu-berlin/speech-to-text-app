@@ -1,8 +1,10 @@
 # 76 — Right-to-left transcription: direction-aware transcripts and layout
 
-Status: draft
-Depends on: — (shares the transcript's language source with [74](74-desktop-presentation.md) for
-fonts only; direction itself is content-derived)
+Status: spec-approved
+Depends on: [70](70-rust-gui-window.md) (the Slint window implements the same rule, and it exists
+only after 70) — the browser part is independent of 70; [74](74-desktop-presentation.md) supplies
+the transcript's `lang`/fonts, a related but independent change (direction itself is
+content-derived)
 Blocks: —
 
 ## Goal
@@ -11,9 +13,11 @@ Transcribed text in right-to-left scripts — Arabic, Hebrew, Urdu, Persian, Sin
 — reads and lays out correctly: **each paragraph's direction is decided by its first alphabetic
 character** (numbers and punctuation before it do not count), the transcript's reading column
 mirrors for an RTL-first transcript, and speaker names and filenames follow the same rule. The
-direction comes from the text itself, not from the task language, so mixed-language and
+The direction comes from the text itself, not from the task language, so mixed-language and
 auto-detected recordings work without storing a detected language. LTR content is untouched.
 Direction is presentation only: the stored text and the txt/srt/vtt downloads stay byte-identical.
+The same rule applies in the Slint window (item 70), whose bidi support this item checks; the
+terminal TUI's lack of bidi is recorded as unsupported.
 
 ## Evidence
 
@@ -43,7 +47,8 @@ Direction is presentation only: the stored text and the txt/srt/vtt downloads st
 - Exports are plain UTF-8 txt/srt/vtt (`docs/specs/output-formats.md`); the files carry no direction
   metadata, and none is needed for them.
 - The e2e fixture model is `whisperTinyEn` (`TEST_WHISPER_TINY_EN_MODEL`, `versions.json`), which is
-  English-only, so it cannot produce a real RTL transcript; the e2e data is an open question.
+  English-only, so it cannot produce a real RTL transcript; the e2e seeds a completed task's rows
+  instead (Decided, 2026-10-28).
 
 ## Decided (2026-10-23, user)
 
@@ -89,25 +94,22 @@ Direction is presentation only: the stored text and the txt/srt/vtt downloads st
 7. **ADR** for the direction model: content-derived paragraph direction, `dir="auto"` on
    paragraphs/names/filenames, logical CSS, the fallback rule.
 
-## Open questions
+## Decided (consultation, 2026-10-28)
 
-- **E2E data**: a pinned multilingual tiny model (`ggml-tiny.bin`, ~75 MB) plus a licensed
-  Arabic/Hebrew clip, a user-recorded clip, or seeding a completed task's rows into the SQLite
-  fixture; which is acceptable, and whether the transcript text needs to be asserted or only the
-  layout.
-- **Bidi details**: whether any element needs `unicode-bidi: isolate`/`plaintext` in addition to
-  `dir="auto"` (e.g. a segment that must not affect its paragraph), and how numbers, punctuation
-  and timestamps sit inside RTL paragraphs.
-- **Short names and acronyms**: a name like `WHO` is LTR by the rule even when the person is
-  Arabic-speaking — confirm that the rule, not a per-task override, is the behavior (the user's
-  stated rule says yes).
-- **Other frontends**: the TUI (item 67) — terminal bidi is generally unsupported — and the Slint
-  window (item 70), whose text layout/bidi support must be checked; recorded as out of scope or
-  tracked in those items.
-- **Non-DOM consumers**: if anything outside the browser needs the same direction (e.g. the Slint
-  window), it uses the same first-strong rule rather than the task language.
+- **The e2e seeds the database**: a completed task with RTL segments is inserted into the fixture
+  SQLite database before the app starts — no multilingual model download, no licensed or recorded
+  audio committed; the transcript text is asserted exactly.
+- **`dir="auto"` is the mechanism**; `unicode-bidi: isolate`/`plaintext` is added only if a test
+  shows an inline segment leaking into its paragraph; timestamps and the player stay `dir="ltr"`.
+- **A short Latin-first name (`WHO`) stays LTR**: the first-strong rule, not a per-task override, is
+  the behavior (the user's stated rule).
+- **The TUI is recorded as unsupported** (terminal bidi) — a documented scope line, not a skip in
+  the browser tests. **The Slint window implements the same rule** in this item, after item 70
+  (this item's dependency); non-DOM consumers use the same first-strong rule.
+- Because the window is part of this deliverable, the item starts after item 70; its browser part is
+  ready before that.
 
-## Test list (proposed; to be approved at the consultation)
+## Test list (approved; behaviors only)
 
 - [ ] An RTL-first paragraph is RTL even when the task's language is English or `auto`, and even
       when it starts with digits or punctuation (those do not decide)
@@ -122,14 +124,14 @@ Direction is presentation only: the stored text and the txt/srt/vtt downloads st
 - [ ] Queue/history filenames in RTL scripts render start-aligned with their own direction, and
       mixed-script names keep their order
 - [ ] The same task's txt/srt/vtt downloads are byte-identical before and after
-- [ ] (e2e) An RTL transcript in a real browser at desktop and phone widths shows the mirrored
+- [ ] (e2e) A seeded RTL transcript in a real browser at desktop and phone widths shows the mirrored
       layout with no overflow or clipped text
 - [ ] In edit mode (item 52), the segment editor is aligned by the segment's first alphabetic
       character, independent of its paragraph's direction; closing it restores the paragraph rule
+- [ ] (after item 70) The Slint window applies the same paragraph and name direction rule to a
+      seeded RTL transcript; the TUI's terminal-bidi limitation is recorded as unsupported
 - [ ] (must not break) LTR transcripts, the existing e2e journey, the frontend suite and the
       output-format suites stay green
-- [ ] (documented scope) The TUI/window behavior is recorded: terminal bidi unsupported, and the
-      Slint window's bidi checked or tracked
 
 ## Acceptance criteria
 
@@ -151,3 +153,7 @@ Direction is presentation only: the stored text and the txt/srt/vtt downloads st
   takes the segment's own first-alphabetic direction, independent of the paragraph; it is the one
   sub-paragraph exception and does not overrule the paragraph rule. Item 52's spec and test list
   were amended in the same change.
+- 2026-10-28: consultation with the user: the e2e seeds a completed RTL task's rows into the SQLite
+  fixture, `dir="auto"` is the mechanism, and the Slint window implements the same rule (so this
+  item depends on item 70), while the TUI's terminal-bidi limitation is recorded as unsupported.
+  Test list approved as written; status set to spec-approved.

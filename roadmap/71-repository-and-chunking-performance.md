@@ -1,6 +1,6 @@
 # 71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory
 
-Status: draft
+Status: spec-approved
 Depends on: —
 Blocks: —
 
@@ -41,22 +41,29 @@ reading it whole.
    during the existing frame walk without the extra join array, and keep the stored bytes identical.
 4. Record the index set, the grouped query's shape and the peak-heap measurement in the item's log.
 
-## Open questions
+## Decided (consultation, 2026-10-28)
 
-- The exact index set (single-column vs composite; whether `status` alone suffices for every plan) —
-  decided by `EXPLAIN QUERY PLAN` on the real queries.
-- The peak-heap bound the long-clip test asserts, and which fixture it uses (a generated 20-minute
-  clip or an existing long fixture).
-- Whether `listDetails`'s two per-task values can move into a materialized column instead of a
-  grouped query (the simpler option wins by measurement).
+- **The index set is chosen by `EXPLAIN QUERY PLAN`**, not by preference: `tasks(status)`,
+  `tasks(queue_position)` or a composite only where a single-column index still leaves a scan. The
+  chosen set and both plans (before/after) go into the migration's comment and this item's log.
+- **`listDetails` is one grouped query**, not a materialized column: one left join on `audio_header`
+  plus a grouped `MAX(endMs)`; a materialized column is reconsidered only if the grouped query
+  measures slower on a filled database. The test pins the statement count, which is the behavior.
+- **The memory proof is a forked-JVM Integration test**: a generated 20-minute, pseudo-random
+  (incompressible) 16 kHz mono clip — no committed fixture — chunked in a child JVM whose max heap is
+  the bound recorded in this item's log (set after the first measurement, so today's whole-file read
+  exceeds it), with the stored rows compared byte-for-byte. It runs no whisper pass: the shipped
+  audio-only ffmpeg gave a 20-minute incompressible clip a 0.43 s canonical encode and a 0.27 s
+  `silencedetect` pass (measured 2026-10-28), so the test is seconds. If a cycle measures it above
+  60 s, use a 10-minute clip with a proportionally smaller cap.
 
-## Test list (proposed; to be approved at the consultation)
+## Test list (approved; behaviors only)
 
 - [ ] The queue and list queries use an index: their query plans show a search, not a full table
       scan, and stay the same shape as the data grows
 - [ ] One list/snapshot request issues a constant number of SQL statements, not two per task
-- [ ] A long clip's chunking peak heap stays under the agreed bound, and the stored chunk rows are
-      byte-identical to before
+- [ ] Chunking a generated 20-minute clip in a child JVM under the recorded heap bound completes,
+      and the stored chunk rows are byte-identical to before
 - [ ] (must not break) The backend unit and Integration suites are green; queue ordering and
       history output are unchanged
 
@@ -70,3 +77,7 @@ reading it whole.
 
 - 2026-10-23: filed from the `docs/known-issues.md` triage (indexes, `listDetails`, CHUNKING
   memory); not yet discussed.
+- 2026-10-28: consultation with the user: the memory proof is the forked-JVM test over a generated
+  20-minute clip under the bound recorded in the log (measured ffmpeg cost makes it seconds); the
+  index set and `listDetails`'s shape stay measurement-decided. Test list approved as written;
+  status set to spec-approved.

@@ -127,6 +127,7 @@ graph TD
   66 --> 70[70 Rust GUI window]
   67 --> 70
   49 --> 70
+  70 --> 76
   62 --> 68[68 Windows audio-only ffmpeg ✓]:::done
   49 --> 68
   62 --> 69[69 macOS audio-only ffmpeg ✓]:::done
@@ -236,15 +237,15 @@ graph TD
 | [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
 | [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
-| [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](71-repository-and-chunking-performance.md)               | draft         | —                           |
+| [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](71-repository-and-chunking-performance.md)               | spec-approved | —                           |
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
-| [73 — Diarization speaker separation: unseparated speakers, and a split remedy](73-diarization-speaker-separation.md)                                              | draft         | —                           |
-| [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | draft         | —                           |
-| [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | draft         | —                           |
-| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | draft         | —                           |
+| [73 — Diarization speaker separation: unseparated speakers, and a split remedy](73-diarization-speaker-separation.md)                                              | spec-approved | —                           |
+| [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | spec-approved | —                           |
+| [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | spec-approved | —                           |
+| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70                           |
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |
-| [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | draft         | 21, 49, 51                  |
+| [79 — The full e2e journey on Windows](79-full-e2e-journey-on-windows.md)                                                                                 | spec-approved | 21, 49, 51                  |
 | [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
 | [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](../docs/specs/ci-diagnosability.md)                                | done          | —                           |
 | [81 — A row command clicked while another one is in flight is dropped](../docs/specs/dropped-row-command.md)                                                                  | done          | —                           |
