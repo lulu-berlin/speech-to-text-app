@@ -6,8 +6,8 @@ import stt.pause.PauseGate
 
 /**
  * The item 09 `O(n³)` implementation of [upgmaMerges] and [clusterSegments], kept in test sources as the reference for
- * the nearest-neighbor-chain differential tests (roadmap item 23): it must stay the 1:1 port of `docs/oracle/transcribe.py`
- * so that it never drifts from the behavior the chain is compared against.
+ * the nearest-neighbor-chain differential tests (roadmap item 23): it must stay the 1:1 expression of item 09's
+ * clustering spec, so that it never drifts from the behavior the chain is compared against.
 
  * [naiveUpgmaMerges] matches [upgmaMerges]'s contract exactly (bridge suspend, gate, cancellation, and progress
  * between merges); [naiveClusterSegments] matches [clusterSegments]'s labels for the same inputs. Neither takes the

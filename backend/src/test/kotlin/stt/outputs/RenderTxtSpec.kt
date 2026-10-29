@@ -18,8 +18,8 @@ class RenderTxtSpec :
                             segment(speakerId = 0, text = " Bye."),
                         )
 
-                    // Oracle `write_diarized_outputs`, txt: on a speaker change "\n" (except before the first block),
-                    // then the block header, here "[{stored name}]\n" (ADR 0034; the oracle prints f"[speaker {spk + 1}]\n");
+                    // txt per item 10's spec: on a speaker change "\n" (except before the first block),
+                    // then the block header, here "[{stored name}]\n" (ADR 0034);
                     // every segment f"{seg['text'].strip()}\n". The stored names are "Speaker 1" and "Speaker 2".
                     renderTxt(segments, speakers(0, 1)) shouldBe
                         "[Speaker 1]\nHello there.\nHow are you?\n\n[Speaker 2]\nFine.\n\n[Speaker 1]\nBye.\n"

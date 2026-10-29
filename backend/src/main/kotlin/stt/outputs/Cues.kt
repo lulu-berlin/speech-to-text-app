@@ -5,8 +5,8 @@ import stt.db.Speaker
 import stt.diarization.speakerTurns
 
 /**
- * The srt/vtt cues of a task's [segments]. With [speakers] (the task's stored speakers; oracle
- * `write_diarized_outputs`): one cue per speaker turn, `{name}: {turn text}` with the speaker's stored name (ADR 0034).
+ * The srt/vtt cues of a task's [segments]. With [speakers] (the task's stored speakers): one cue
+ * per speaker turn, `{name}: {turn text}` with the speaker's stored name (ADR 0034).
  * With `null` [speakers] (speakers off): one cue per segment with its trimmed text, without a label; a segment whose
  * trimmed text is empty gets no cue.
  */

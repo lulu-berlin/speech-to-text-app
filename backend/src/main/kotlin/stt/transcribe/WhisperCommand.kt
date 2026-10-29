@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 /**
  * One whisper-cli run over [audio] (ADR 0004): JSON output to `<outputPrefix>.json` (`-oj -of`), progress
- * on stderr (`-pp`). `-t` only when threads are configured, as in oracle `transcribe_one`; `--prompt`
+ * on stderr (`-pp`). `-t` only when threads are configured; `--prompt`
  * only when the previous chunk left a tail.
  */
 fun whisperCommand(

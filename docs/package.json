@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "cd .. && tsc -p docs/tsconfig.json && prettier --check \"docs/*.ts\" docs/package.json docs/tsconfig.json && node docs/check-links.ts README.md docs/architecture.md && node docs/check-readme-windows.ts && node docs/check-architecture-names.ts && node docs/check-architecture-diagram.ts && node docs/check-exceptions.ts && node --test docs/check-exceptions.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/check-action-versions.test.ts docs/type-check.test.ts",
+    "test": "cd .. && tsc -p docs/tsconfig.json && prettier --check \"docs/*.ts\" docs/package.json docs/tsconfig.json && node docs/check-links.ts README.md docs/architecture.md && node docs/check-readme-windows.ts && node docs/check-architecture-names.ts && node docs/check-architecture-diagram.ts && node docs/check-exceptions.ts && node docs/check-oracle-retired.ts && node --test docs/check-exceptions.test.ts docs/check-oracle-retired.test.ts docs/oracle-comments.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/check-action-versions.test.ts docs/type-check.test.ts",
     "format": "prettier --write \"docs/*.ts\" docs/package.json docs/tsconfig.json"
   },
   "devDependencies": {

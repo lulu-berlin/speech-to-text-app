@@ -7,7 +7,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | #    | Title                                                                                   | Status   | Date       |
 | ---- | --------------------------------------------------------------------------------------- | -------- | ---------- |
 | 0001 | [Stack and monorepo layout](0001-stack-and-monorepo.md)                                 | accepted | 2026-10-05 |
-| 0002 | [No Python in the app; transcribe.py is a reference oracle only](0002-no-python-oracle-only.md) | accepted, json output dropped by [0035](0035-no-json-download.md) | 2026-10-05 |
+| 0002 | [No Python in the app; transcribe.py is a reference oracle only](0002-no-python-oracle-only.md) | superseded by [0063](0063-app-is-the-behavioral-reference.md) | 2026-10-05 |
 | 0003 | [Diarization in Kotlin with CAM++ via ONNX Runtime](0003-kotlin-diarization-campplus-onnx.md) | accepted, auto speaker-count rule amended by [0027](0027-auto-speaker-count-allows-one-speaker.md) | 2026-10-05 |
 | 0004 | [Chunked transcription with SIGSTOP/SIGCONT pause](0004-chunked-transcription-sigstop-pause.md) | accepted | 2026-10-05 |
 | 0005 | [Uploaded audio stored as SQLite BLOB](0005-audio-as-sqlite-blob.md)                    | superseded by [0024](0024-audio-storage-original-until-chunking-flac-chunks.md) | 2026-10-05 |
@@ -73,3 +73,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0060 | [Windows releases through the Microsoft Store (MSIX); the macOS DMG stays unsigned with a documented Gatekeeper bypass](0060-windows-store-and-unsigned-macos.md) | accepted | 2026-10-23 |
 | 0061 | [A segment keeps whisper's original text, and Revert restores it](0061-segment-keeps-original-text.md) | accepted, adds `edited` to the turns contract and `POST …/segments/{id}/revert` | 2026-10-23 |
 | 0062 | [Settings save themselves, and a reset restores the server's defaults](0062-settings-auto-save-and-default-reset.md) | accepted, supersedes item 32's Save flow and adds `DELETE /api/settings` | 2026-10-27 |
+| 0063 | [The app is the behavioral reference; the Python oracle is retired](0063-app-is-the-behavioral-reference.md) | accepted, supersedes [0002](0002-no-python-oracle-only.md) | 2026-10-29 |

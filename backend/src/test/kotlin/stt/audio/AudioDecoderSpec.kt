@@ -47,7 +47,7 @@ class AudioDecoderSpec :
 
                     val error = shouldThrow<AudioDecodeException> { decode(source) }
 
-                    error.message.shouldContain("ffmpeg failed to decode $source") // the oracle's wording
+                    error.message.shouldContain("ffmpeg failed to decode $source") // the spec's wording
                     error.message.shouldContain("Invalid data found when processing input") // ffmpeg's stderr
                 }
             }
@@ -62,7 +62,7 @@ class AudioDecoderSpec :
 
                     val error = shouldThrow<AudioDecodeException> { decode(source) }
 
-                    error.message.shouldContain("no audio decoded from $source") // the oracle's wording
+                    error.message.shouldContain("no audio decoded from $source") // the spec's wording
                 }
             }
         }

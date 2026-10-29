@@ -53,7 +53,7 @@ class TranscriptDownloadSpec :
                             id
                         }
 
-                    // Golden strings derived by hand from item 10's spec (oracle write_diarized_outputs,
+                    // Golden strings derived by hand from item 10's spec (srt/vtt layouts,
                     // ADR 0034 stored names): turns Speaker 1 0–3 250 ms, Speaker 2 3 250–4 000 ms.
                     testApplication {
                         application { sttApp(stt.config.testConfig(dataDir)) }

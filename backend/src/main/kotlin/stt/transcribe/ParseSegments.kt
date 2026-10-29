@@ -24,7 +24,7 @@ fun parseSegments(json: String): List<WhisperSegment> {
     return transcription.jsonArray.map { parseTranscriptionSegment(it.jsonObject) }
 }
 
-/** Oracle defaults: missing `offsets`, `from` or `to` → 0; missing `text` → empty string. */
+/** Defaults: missing `offsets`, `from` or `to` → 0; missing `text` → empty string. */
 private fun parseTranscriptionSegment(segment: JsonObject): WhisperSegment {
     val offsets = segment["offsets"]?.jsonObject
     return WhisperSegment(
@@ -34,7 +34,7 @@ private fun parseTranscriptionSegment(segment: JsonObject): WhisperSegment {
     )
 }
 
-/** No defaults, unlike [parseTranscriptionSegment]: the oracle passes legacy entries through and fails later on a missing key. */
+/** No defaults, unlike [parseTranscriptionSegment]: legacy entries pass through and fail later on a missing key. */
 private fun parseLegacySegment(segment: JsonObject): WhisperSegment =
     WhisperSegment(
         startMs = secondsToMs(segment.legacyField("start").double),

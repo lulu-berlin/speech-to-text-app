@@ -17,7 +17,7 @@ class SpeakersOffSpec :
                             segment(speakerId = null, startMs = 3_250, endMs = 4_000, text = " Fine."),
                         )
 
-                    // Spec "Speakers off" (no oracle code: the oracle delegates to whisper-cli's writers): the diarized
+                    // Spec "Speakers off": the diarized
                     // shapes without labels, trimmed text (ADR 0030), one cue per segment.
                     renderTxt(segments, null) shouldBe "Hello there.\nagain.\nFine.\n"
                     renderSrt(segments, null) shouldBe

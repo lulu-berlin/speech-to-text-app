@@ -173,7 +173,7 @@ class TurnsSpec :
                         application { sttApp(stt.config.testConfig(dataDir)) }
                         val response = client.get("/api/tasks/$id/turns")
                         response.status shouldBe HttpStatusCode.OK
-                        // Hand trace of the oracle's speaker_turns: "Hi"; f"Hi ".strip() = "Hi";
+                        // Hand trace of item 09's turns: "Hi"; f"Hi ".strip() = "Hi";
                         // f"Hi there".strip() = "Hi there" — the blank segment adds no second space.
                         Json.parseToJsonElement(response.bodyAsText()) shouldBe
                             Json.parseToJsonElement(

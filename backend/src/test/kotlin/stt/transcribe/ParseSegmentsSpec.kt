@@ -46,7 +46,7 @@ class ParseSegmentsSpec :
 
         given("whisper-cli JSON with a legacy segments array in seconds, next to a transcription array") {
             `when`("it is parsed") {
-                then("it yields the same segments in milliseconds, taken from segments (oracle precedence)") {
+                then("it yields the same segments in milliseconds, taken from segments, which take precedence") {
                     // Older whisper.cpp shape: start/end in seconds. The transcription entry must be ignored.
                     val json =
                         """

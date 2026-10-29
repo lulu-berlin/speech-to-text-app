@@ -137,7 +137,7 @@ graph TD
   72[72 frontend state and errors ✓]:::done
   73[73 diarization speaker separation]
   74[74 desktop presentation]
-  75[75 retire the Python oracle]
+  75[75 retire the Python oracle ✓]:::done
   76[76 RTL transcription]
   77[77 private test temp dirs ✓]:::done
   81[81 dropped row command ✓]:::done
@@ -241,7 +241,7 @@ graph TD
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
 | [73 — Diarization speaker separation: unseparated speakers, and a split remedy](73-diarization-speaker-separation.md)                                              | spec-approved | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | spec-approved | —                           |
-| [75 — Retire the Python oracle: the app is the behavioral reference](75-retire-the-python-oracle.md)                                                               | spec-approved | —                           |
+| [75 — Retire the Python oracle: the app is the behavioral reference](../docs/specs/oracle-retirement.md)                                                               | done          | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70                           |
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |

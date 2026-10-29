@@ -3,8 +3,8 @@ import { expect, test } from '@playwright/test';
 import { JFK_QUOTE, openTranscript } from './helpers/ui';
 
 // What each format must look like for task 1 (jfk-a.wav: one voice → one speaker named
-// "Speaker 1" → one turn from 0 ms, under a minute). The formats follow the oracle's
-// writers with stored speaker names (ADR 0034): txt is a bracketed speaker header and one
+// "Speaker 1" → one turn from 0 ms, under a minute). The formats follow item 10's spec
+// with stored speaker names (ADR 0034): txt is a bracketed speaker header and one
 // segment per line; srt and vtt are one cue per turn, labelled "Speaker 1: …". The content
 // types come from the transcript route's format table (item 12), the filenames from the
 // "stem.extension" rule.

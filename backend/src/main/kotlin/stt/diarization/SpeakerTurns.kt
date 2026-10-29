@@ -4,7 +4,7 @@ import stt.db.Segment
 import stt.db.Speaker
 
 /**
- * Collapses consecutive [segments] with the same `speakerId` into one [SpeakerTurn] each (oracle `speaker_turns`),
+ * Collapses consecutive [segments] with the same `speakerId` into one [SpeakerTurn] each (item 09's turns),
  * labelled with that speaker's name from [speakers]. Turns merge by `speakerId`, not by name, so two speakers renamed
  * alike stay apart (ADR 0028). Every segment must have a speakerId that [speakers] contains.
  */
@@ -27,7 +27,7 @@ internal fun speakerTurns(
                 speaker = speakerOf.getValue(speakerId),
                 startMs = run.first().startMs,
                 endMs = run.last().endMs,
-                // The oracle appends each trimmed text as f"{acc} {text}".strip(): the non-blank trimmed texts joined
+                // Each trimmed text is appended as f"{acc} {text}".strip(): the non-blank trimmed texts joined
                 // with single spaces. The kept segments carry the trimmed texts too (ADR 0030).
                 text = trimmed.filter { it.isNotEmpty() }.joinToString(" "),
                 segments =

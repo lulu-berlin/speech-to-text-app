@@ -12,8 +12,8 @@ internal const val SPEAKER_DISTANCE_THRESHOLD = 0.5448
 
 /**
  * The `speakerId` (0-based) of every row of [embeddings] (L2-normalized, one per clustered segment), by average-linkage
- * (UPGMA) agglomerative clustering on cosine distance. Ported from oracle `cluster_segments`
- * (docs/oracle/transcribe.py); [k] = `null` picks the count automatically (ADR 0027), otherwise it is the fixed count,
+ * (UPGMA) agglomerative clustering on cosine distance. Ported from the retired Python oracle's
+ * `cluster_segments` (git history); [k] = `null` picks the count automatically (ADR 0027), otherwise it is the fixed count,
  * clamped to `[1, n]` and not limited by [maxSpeakers]. [gate] and cancellation are checked between merges and
  * [onMergeDone] reports `(merges done, total merges)` (see [upgmaMerges]).
  */
@@ -91,7 +91,7 @@ private fun cutLabels(
 }
 
 /**
- * The `n - 1` average-linkage merges of [embeddings] in merge order (oracle `cluster_segments` merge loop), found by the
+ * The `n - 1` average-linkage merges of [embeddings] in merge order (item 09's merge loop), found by the
  * nearest-neighbor chain (ADR 0037).
  *
  * Average linkage is reducible, so the chain finds the same merges: a chain of clusters is built by repeatedly appending

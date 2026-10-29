@@ -22,7 +22,7 @@ class SpeakerTurnsSpec :
                             segment(speakerId = 0, startMs = 4_000, endMs = 5_000, text = " Bye."),
                         )
 
-                    // Oracle `speaker_turns`: each text trimmed, appended as f"{acc} {text}".strip(), so the blank segment
+                    // Each text trimmed, appended as f"{acc} {text}".strip(), so the blank segment
                     // adds no space: "Hello" -> "Hello" -> "Hello there.". The kept segments' texts are trimmed too (ADR 0030).
                     speakerTurns(segments, speakers).shouldBe(
                         listOf(

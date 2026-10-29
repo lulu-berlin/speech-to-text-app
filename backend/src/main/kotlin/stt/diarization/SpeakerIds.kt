@@ -7,20 +7,20 @@ import stt.pause.PauseGate
 import kotlin.math.sqrt
 
 /**
- * Segments shorter than this, in whole milliseconds, are not clustered (oracle `SHORT_SEGMENT_SECONDS` = 0.5 s):
+ * Segments shorter than this, in whole milliseconds, are not clustered (0.5 s, item 09's spec):
  * whisper fragments of that length are mostly silence once padded to the embedding window, so they could fabricate
  * a speaker or take a fixed-count slot.
  */
 internal const val SHORT_SEGMENT_MS = 500L
 
 /**
- * The `speakerId` (0-based) of every segment of a task, in segment order (oracle `diarize_and_write`, minus the
+ * The `speakerId` (0-based) of every segment of a task, in segment order (item 09's algorithm, minus the
  * embedding and the file writing). [embeddings] holds one L2-normalized row per segment; [k] = `null` is auto mode.
  *
  * Only segments of at least [SHORT_SEGMENT_MS] are clustered, or all of them when none is that long; the others start
  * at speakerId 0 and are then rescued to the nearest speaker (see [rescueShortSegments]). Finally [summary] (by default
  * [logSpeakerSummary]) gets the clustered rows with their final speakerIds; it is diagnostics only, so a failure in it
- * is logged and never fails the labelling (oracle: `except Exception: pass`). Runs on [Dispatchers.Default]; the
+ * is logged and never fails the labelling. Runs on [Dispatchers.Default]; the
  * clustering checks [gate] and cancellation between merges and reports progress to [onMergeDone] (see [upgmaMerges]).
  */
 internal suspend fun speakerIds(
@@ -49,8 +49,8 @@ internal suspend fun speakerIds(
 
 /**
  * Gives every segment shorter than [SHORT_SEGMENT_MS] the speaker whose centroid ([speakerCentroids] of the long
- * segments) is nearest to its own embedding, any speaker, not only its neighbours in time (oracle
- * `_rescue_short_segments`): the highest dot product among the non-zero centroids (the first on ties). Without long
+ * segments) is nearest to its own embedding, any speaker, not only its neighbours in time (item 09
+ * rescue): the highest dot product among the non-zero centroids (the first on ties). Without long
  * segments, or without a non-zero centroid, speakerIds stay as they are.
  */
 private fun rescueShortSegments(

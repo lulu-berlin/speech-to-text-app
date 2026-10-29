@@ -40,13 +40,13 @@ class JfkIntegrationSpec :
 
                     with(segments) {
                         shouldNotBeEmpty()
-                        // whisper-cli segments always carry text; trimming happens when rendering (oracle).
+                        // whisper-cli segments always carry text; trimming happens when rendering (item 10's spec).
                         map { it.text }
                             .joinToString("")
                             .trim()
                             .length
                             .shouldBeGreaterThan(0)
-                        // Offsets are milliseconds from the audio's start (oracle parse_segments), so the
+                        // Offsets are milliseconds from the audio's start (item 07's spec), so the
                         // first segment begins at the clip's start.
                         first().startMs.shouldBe(0L)
                     }

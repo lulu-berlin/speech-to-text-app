@@ -8,12 +8,12 @@ import java.util.Locale
 internal val speakerSummaryLogger: Logger = LoggerFactory.getLogger("stt.diarization.SpeakerSummary")
 
 /**
- * Logs per-speaker cohesion and cross-speaker confusion of the clustered rows (oracle `_print_speaker_summary`), at
+ * Logs per-speaker cohesion and cross-speaker confusion of the clustered rows (item 09's summary), at
  * INFO: per present speaker, ascending, `speaker {N}: {n} segments, within-cos {wc}` (`wc` = mean off-diagonal cosine
  * of its rows, 1.0 for a single row); with more than one speaker, `cluster-to-cluster cosine: ` and `{a}-{b} {mean
  * cross cosine}` per pair, joined by two spaces; numbers with three decimals, speakers 1-based. A low within-cos next
  * to high ones hints at two voices in one speaker; a high cross cosine at two voices clustering cannot separate.
- * [embeddings] are the clustered rows, [speakerIds] their final speakerIds; empty input fails, as in the oracle.
+ * [embeddings] are the clustered rows, [speakerIds] their final speakerIds; empty input fails.
  */
 internal fun logSpeakerSummary(
     embeddings: Array<FloatArray>,

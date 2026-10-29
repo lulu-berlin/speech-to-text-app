@@ -15,7 +15,7 @@ class RenderVttSpec :
                             segment(speakerId = 1, startMs = 3_250, endMs = 4_000, text = " Fine."),
                         )
 
-                    // Oracle `write_diarized_outputs`, vtt: f"WEBVTT\n\n" first, then per turn
+                    // vtt per item 10's spec: f"WEBVTT\n\n" first, then per turn
                     // f"{fmt_vtt(start)} --> {fmt_vtt(end)}\n{name}: {text}\n\n" with no cue number.
                     // fmt_vtt is fmt_srt with "." before the milliseconds.
                     renderVtt(segments, speakers(0, 1)) shouldBe
