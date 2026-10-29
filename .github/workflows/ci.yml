@@ -27,15 +27,17 @@ on:
         description: 'Also build the manual macOS/Windows whisper-cli and ffmpeg assets'
         type: boolean
         default: false
-  # Nightly at 03:00 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry.
+  # Nightly at 03:17 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry. No
+  # cron here starts on minute :00 — GitHub's busiest minute, when scheduled runs are delayed or
+  # dropped (roadmap item 79, the user's rule); the minutes are off the quarter-hours too.
   # The nightly runs the whole tree, including the macOS and Windows legs. GitHub runs a scheduled
   # workflow only from the default branch.
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '17 3 * * *'
       timezone: 'Europe/Berlin'
-    # Weekly (Mondays) at 04:00 Europe/Berlin: the model-host smoke job below is gated on this cron
+    # Weekly (Mondays) at 04:43 Europe/Berlin: the model-host smoke job below is gated on this cron
     # string, so the rest of the scheduled work stays nightly (ADR 0055).
-    - cron: '0 4 * * 1'
+    - cron: '43 4 * * 1'
       timezone: 'Europe/Berlin'
 
 permissions:
@@ -592,6 +594,34 @@ jobs:
         run: pnpm test
       - name: pnpm build
         run: pnpm build
+
+  # The item-21 journey on Windows (roadmap item 79): the Gradle-managed backend and the same specs
+  # as Linux (e2e) and macOS (e2e), except the named platform skips (e2e/lib/platform-gates.test.ts).
+  # It runs on every push and code-touching pull request like the other journeys, and is in the
+  # aggregator. It started nightly; run #389 measured it at 15:54 against macOS's 15:32 (band 13-16
+  # min), the condition the consultation set for joining the every-PR legs. It waits for the Windows
+  # checks, as macOS (e2e) waits for macOS's. The runner has no GPU, so the journey runs on the CPU
+  # path.
+  windows-e2e:
+    name: Windows (e2e)
+    needs: [changes, windows-backend-check, windows-frontend-check]
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/jvm-toolchain
+        with:
+          downloads-cache: 'true'
+      - name: gradlew.bat e2e
+        shell: cmd
+        run: gradlew.bat e2e
+      # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
+      - name: Upload the failed specs' traces
+        if: failure()
+        uses: ./.github/actions/upload-test-results
+        with:
+          name: e2e-test-results-windows
 
   # The portable Windows zip, built and tested the way item 49 ships it (roadmap item 49's
   # packaged-zip item): electron-builder packs the staged app, the zip is unpacked like a user's
@@ -1262,7 +1292,7 @@ jobs:
   # aggregator: a weekly network check must not gate a pull request.
   model-hosts:
     name: Linux (pinned model hosts resolve)
-    if: github.event_name == 'schedule' && github.event.schedule == '0 4 * * 1'
+    if: github.event_name == 'schedule' && github.event.schedule == '43 4 * * 1'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -1283,7 +1313,7 @@ jobs:
   # protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
-    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
+    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-e2e, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

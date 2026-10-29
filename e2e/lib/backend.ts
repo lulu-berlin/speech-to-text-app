@@ -7,7 +7,7 @@
 // JVM that actually launches the app's JVM, and that daemon is outside the group of the
 // gradle launcher pid the harness holds — so stops find and kill the app JVM by its
 // arguments (lib/processes.ts), not by the group alone.
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -16,6 +16,8 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ancestors, findProcess, processes } from './processes.ts';
+import type { ProcessRow } from './processes.ts';
+import { waitUntil } from './wait.ts';
 
 export const e2eRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const repoRoot = join(e2eRoot, '..');
@@ -285,56 +287,110 @@ export function scratchDirPath(dataDir: string, taskId: number | string): string
 // answering (shutdown, and the restart test's kill).
 export async function waitForHealth(
   port: number,
-  { down = false, timeoutMs = 600_000 }: { down?: boolean; timeoutMs?: number } = {},
+  {
+    down = false,
+    timeoutMs = 600_000,
+    signal,
+  }: { down?: boolean; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    let up = false;
+  const answering = async (): Promise<boolean> => {
     try {
       const response = await fetch(healthUrl(port), { signal: AbortSignal.timeout(2_000) });
-      up = response.ok;
+      return response.ok;
     } catch {
-      up = false;
+      return false;
     }
-    if ((!down && up) || (down && !up)) return;
-    if (Date.now() > deadline) {
-      throw new Error(
-        `backend on :${port} ${down ? 'still answering after' : 'did not answer within'} ${timeoutMs} ms`,
-      );
-    }
-    const { promise, resolve } = Promise.withResolvers<void>();
-    setTimeout(resolve, 300);
-    await promise;
+  };
+  const reached = await waitUntil(async () => (down ? !(await answering()) : await answering()), {
+    timeoutMs,
+    intervalMs: 300,
+    signal,
+  });
+  // Aborted by the caller: there is no answer to wait for, and a timeout error would be a lie.
+  if (!reached && signal?.aborted !== true) {
+    throw new Error(
+      `backend on :${port} ${down ? 'still answering after' : 'did not answer within'} ${timeoutMs} ms`,
+    );
   }
 }
 
 // Stops a backend running on [port]. `gradle run` launches through two JVMs — a
 // launcher and a single-use daemon — that are outside this harness's process group by
 // now; find the app JVM by its args and SIGKILL the whole chain, so nothing survives to
-// hold the port or linger.
+// hold the port or linger. Windows has neither a POSIX group nor a catchable SIGTERM
+// (roadmap item 79): there the same listing finds the app JVM and `taskkill /T /F` ends
+// its tree, whisper-cli and ffmpeg included.
 export async function stopBackend(
   pid: number | undefined,
   port: number,
   dataDir: string,
+  {
+    platform = process.platform,
+    list = () => processes({ platform }),
+    forceKill = taskkill,
+    spawnTree = false,
+  }: {
+    platform?: NodeJS.Platform;
+    list?: () => ProcessRow[];
+    forceKill?: (pid: number) => Promise<boolean>;
+    /** End the spawn's own tree before the app JVM's (a start failure still owns its spawn). */
+    spawnTree?: boolean;
+  } = {},
 ): Promise<void> {
-  const rows = processes();
+  const rows = list();
   const jvm = findProcess(rows, ['stt.MainKt', dataDir]);
-  if (jvm !== null) {
-    for (const chainPid of ancestors(rows, jvm.pid)) {
+  if (platform === 'win32') {
+    // The app JVM's own tree is the narrower kill; the spawn's pid is the fallback when the listing
+    // cannot see the JVM, and the target when the failure is still in the caller's hands.
+    const target = spawnTree ? (pid ?? jvm?.pid) : (jvm?.pid ?? pid);
+    if (target !== undefined) await forceKill(target);
+  } else {
+    if (jvm !== null) {
+      for (const chainPid of ancestors(rows, jvm.pid)) {
+        // The caller may have spawned this backend itself (a start failure, specs 13/17/60): the
+        // chain then runs through this very process, which must survive its own stop.
+        if (chainPid === process.pid) break;
+        try {
+          process.kill(chainPid, 'SIGTERM');
+        } catch {
+          // already gone
+        }
+      }
       try {
-        process.kill(chainPid, 'SIGTERM');
+        process.kill(jvm.pid, 'SIGKILL');
       } catch {
         // already gone
       }
     }
-    try {
-      process.kill(jvm.pid, 'SIGKILL');
-    } catch {
-      // already gone
-    }
+    killGroup(pid);
   }
-  killGroup(pid);
   await waitForHealth(port, { down: true, timeoutMs: 60_000 });
+}
+
+/** `taskkill`'s arguments: the pid and its whole tree, forcefully (Windows has no SIGTERM). */
+export function taskkillArgs(pid: number): string[] {
+  return ['/pid', String(pid), '/T', '/F'];
+}
+
+/**
+ * Whether [command] starts only through a shell: Windows refuses to spawn a .bat or .cmd without one
+ * since Node's 2024 security fix (EINVAL), and the Gradle-built backend there is `stt-backend.bat`.
+ * The command runs unquoted under the shell, which is safe for the relative, space-free paths the
+ * harness passes.
+ */
+export function needsShell(command: string, platform: NodeJS.Platform = process.platform): boolean {
+  return platform === 'win32' && /\.(bat|cmd)$/i.test(command);
+}
+
+/** Ends [pid]'s tree with `taskkill`; false when the process was already gone. */
+async function taskkill(pid: number): Promise<boolean> {
+  try {
+    execFileSync('taskkill', taskkillArgs(pid), { stdio: 'ignore', windowsHide: true });
+    return true;
+  } catch {
+    // already gone, or not ours to kill
+    return false;
+  }
 }
 
 export function killGroup(pid: number | undefined): void {
@@ -392,65 +448,144 @@ function captureBackendOutput(child: ChildProcess): void {
   child.once('exit', () => log.end());
 }
 
+/** The environment every backend gets after [env]: a fresh data dir, the tiny model and the port. */
+function backendEnv(
+  dataDir: string,
+  port: number,
+  env: NodeJS.ProcessEnv,
+  staticDir: string,
+): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    ...env,
+    STT_DATA_DIR: dataDir,
+    STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,
+    STT_STATIC_DIR: staticDir,
+    STT_PORT: String(port),
+  };
+}
+
+/**
+ * Waits for the backend to answer health, or fails as soon as its process exits or cannot start: a
+ * dead process can never answer, so the failure names its exit at once instead of after the whole
+ * health timeout.
+ */
+async function waitForHealthOrExit(
+  child: ChildProcess,
+  port: number,
+  timeoutMs: number,
+): Promise<void> {
+  const ended = Promise.withResolvers<never>();
+  // Ends the health wait with the start: a dead process can never answer, and polling it again would only
+  // keep the harness busy for the rest of the timeout.
+  const aborted = new AbortController();
+  const failed = (reason: string): Error =>
+    new Error(
+      `the backend ${reason} before answering health on :${port}; its output is in ${BACKEND_LOG_FILE}`,
+    );
+  const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
+    aborted.abort();
+    ended.reject(
+      failed(`exited with code ${code ?? 'none'}${signal === null ? '' : ` (${signal})`}`),
+    );
+  };
+  const onError = (error: Error): void => {
+    aborted.abort();
+    ended.reject(failed(`could not start: ${error.message}`));
+  };
+  child.once('exit', onExit);
+  child.once('error', onError);
+  try {
+    await Promise.race([waitForHealth(port, { timeoutMs, signal: aborted.signal }), ended.promise]);
+  } finally {
+    child.off('exit', onExit);
+    child.off('error', onError);
+  }
+}
+
+/**
+ * Spawns one backend process in its own group, mirrors its output into the log, and waits for it to
+ * answer health. A backend that never comes up — or that exits first — is stopped again before the
+ * error surfaces.
+ */
+async function launchBackend({
+  command,
+  args,
+  cwd,
+  port,
+  dataDir,
+  env = {},
+  staticDir,
+  healthTimeoutMs = 600_000,
+}: {
+  command: string;
+  args: string[];
+  cwd: string;
+  port: number;
+  dataDir: string;
+  env?: NodeJS.ProcessEnv;
+  staticDir: string;
+  healthTimeoutMs?: number;
+}): Promise<{ pid: number | undefined }> {
+  const child = spawn(command, args, {
+    cwd,
+    detached: true, // own session + process group: a group kill reaches the backend and the app JVM
+    env: backendEnv(dataDir, port, env, staticDir),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: needsShell(command),
+  });
+  captureBackendOutput(child);
+  try {
+    await waitForHealthOrExit(child, port, healthTimeoutMs);
+  } catch (error) {
+    // A start that failed still owns its spawn: the stop ends the whole tree (POSIX finds and
+    // SIGKILLs the app JVM even when it ignores SIGTERM; Windows kills the spawn's tree, which
+    // reaches the app JVM and the tools its own JVM kill could leave behind).
+    await stopBackend(child.pid, port, dataDir, { spawnTree: true });
+    throw error;
+  }
+  return { pid: child.pid };
+}
+
 export async function startBackend({
   port,
   dataDir,
   env = {},
+  healthTimeoutMs = 600_000,
 }: {
   port: number;
   dataDir: string;
   env?: NodeJS.ProcessEnv;
+  healthTimeoutMs?: number;
 }): Promise<{ pid: number | undefined }> {
   checkPreconditions();
   const backendCmd = process.env.E2E_BACKEND_CMD;
   if (backendCmd) {
     // A command line is allowed (e.g. './gradlew run'); a bare path (item 16's
     // ./result/bin/stt-app) still works — the split is a no-op without spaces.
-    const [cmd = '', ...args] = backendCmd.split(/\s+/).filter(Boolean);
-    const child = spawn(cmd, args, {
+    const [command = '', ...args] = backendCmd.split(/\s+/).filter(Boolean);
+    return await launchBackend({
+      command,
+      args,
       cwd: repoRoot,
-      detached: true, // own session + process group: a group kill reaches the wrapper and the app JVM
-      env: {
-        ...process.env,
-        ...env,
-        STT_DATA_DIR: dataDir,
-        STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,
-        STT_PORT: String(port),
-        // The command may be the packaged wrapper (which sets its own static dir) or a bare
-        // backend (`java -cp …`, `./gradlew run`), which serves 404 at `/` without this.
-        STT_STATIC_DIR: process.env.STT_STATIC_DIR ?? frontendDist,
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      port,
+      dataDir,
+      env,
+      // The command may be the packaged wrapper (which sets its own static dir) or a bare
+      // backend (`java -cp …`, `./gradlew run`), which serves 404 at `/` without this.
+      staticDir: process.env.STT_STATIC_DIR ?? frontendDist,
+      healthTimeoutMs,
     });
-    captureBackendOutput(child);
-    try {
-      await waitForHealth(port);
-    } catch (error) {
-      killGroup(child.pid);
-      throw error;
-    }
-    return { pid: child.pid };
   }
   const gradle = backendGradle();
-  const child = spawn(gradle.command, gradle.args, {
+  return await launchBackend({
+    command: gradle.command,
+    args: gradle.args,
     cwd: gradle.cwd,
-    detached: true, // own session + process group: a group kill reaches gradle and the app JVM
-    env: {
-      ...process.env,
-      ...env,
-      STT_DATA_DIR: dataDir,
-      STT_STATIC_DIR: frontendDist,
-      STT_WHISPER_MODEL: process.env.TEST_WHISPER_TINY_EN_MODEL,
-      STT_PORT: String(port),
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    port,
+    dataDir,
+    env,
+    staticDir: frontendDist,
+    healthTimeoutMs,
   });
-  captureBackendOutput(child);
-  try {
-    await waitForHealth(port);
-  } catch (error) {
-    killGroup(child.pid);
-    throw error;
-  }
-  return { pid: child.pid };
 }

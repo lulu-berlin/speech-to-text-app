@@ -1,9 +1,10 @@
 // The e2e package's type check gates every script and spec it runs (roadmap item 54, test-list item
 // 4): a type error in a converted spec fails `tsc -p tsconfig.json`, the step `pnpm --dir e2e test`
 // runs before Playwright. A type check needs a tree with an error in it, so the test copies the
-// package into a sandbox — every included .ts file symlinked, node_modules and tsconfig.json taken
-// along, one spec copied and broken. It runs `tsc` itself: the package's test command would start
-// Playwright against the real backend as well.
+// package into a sandbox — every included .ts file linked into it (copied where the OS refuses a
+// link, as Windows does without Developer Mode; roadmap item 79), node_modules and tsconfig.json
+// taken along, one spec copied and broken. It runs `tsc` itself: the package's test command would
+// start Playwright against the real backend as well.
 //
 // Two errors are planted: a plain assignment mismatch, and an index read that only
 // `noUncheckedIndexedAccess` rejects, so the package's strict settings are what fail it.
@@ -16,13 +17,13 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { place } from './place.ts';
 
 const packageDir = fileURLToPath(new URL('..', import.meta.url));
 const tsc = join(packageDir, 'node_modules', 'typescript', 'bin', 'tsc');
@@ -48,17 +49,17 @@ function filesUnder(dir: string): string[] {
 
 function sandbox(): string {
   const root = mkdtempSync(join(tmpdir(), 'stt-e2e-types-'));
-  symlinkSync(join(packageDir, 'node_modules'), join(root, 'node_modules'));
+  place(join(packageDir, 'node_modules'), join(root, 'node_modules'));
   copyFileSync(join(packageDir, 'tsconfig.json'), join(root, 'tsconfig.json'));
   for (const entry of readdirSync(packageDir)) {
     if (!entry.endsWith('.ts')) continue;
-    symlinkSync(join(packageDir, entry), join(root, entry));
+    place(join(packageDir, entry), join(root, entry));
   }
   for (const file of INCLUDED.flatMap((dir) => filesUnder(join(packageDir, dir)))) {
     const path = join(root, relative(packageDir, file));
     if (path === join(root, BROKEN_FILE)) continue;
     mkdirSync(dirname(path), { recursive: true });
-    symlinkSync(file, path);
+    place(file, path);
   }
   return root;
 }

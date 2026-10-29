@@ -48,19 +48,7 @@ class TestLoggingIntegrationSpec :
                         """.trimIndent(),
                     )
 
-                    val gradleHome =
-                        System.getProperty("stt.test.gradleHome")
-                            ?: error("backend/build.gradle.kts must set stt.test.gradleHome for the fixture build")
-                    val launcher =
-                        (
-                            if (System.getProperty("os.name").startsWith("Windows")) {
-                                listOf("gradle.bat", "gradlew.bat", "gradlew")
-                            } else {
-                                listOf("gradle", "gradlew")
-                            }
-                        ).map { Path.of(gradleHome, "bin", it) }
-                            .firstOrNull(Files::exists)
-                            ?: error("no Gradle launcher in $gradleHome/bin")
+                    val launcher = gradleLauncher()
                     val command =
                         listOf(
                             launcher.toString(),

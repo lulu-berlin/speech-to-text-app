@@ -43,7 +43,8 @@ a Mac or a Windows machine, and the repo has no CI today.
 - **Triggers**: push to `main` and `pull_request`, plus `workflow_dispatch`. A pushed branch
   without a PR gets no run; every triggered run runs the whole Linux tree (fast gate, then
   integration and e2e) and, since item 48, the macOS tree.
-- **Nightly**: `schedule` at 03:00 Europe/Berlin (the `timezone:` field). It runs the Linux and
+- **Nightly**: `schedule` at 03:17 Europe/Berlin (the `timezone:` field; moved off minute :00, the
+  busiest one for scheduled runs, in roadmap item 79). It runs the Linux and
   macOS trees (the Windows legs follow with item 49), so the trigger itself is exercised.
 - **macOS/Windows legs belong to 48/49**: each platform item adds its own legs to the workflow as
   part of its work — item 48 runs macOS on every push and pull request (amended 2026-10-21), item 49
@@ -73,7 +74,7 @@ a Mac or a Windows machine, and the repo has no CI today.
 - [x] Caches hit on the second run (no multi-GB re-download of models/tools)
 - [x] (discovered) The Linux Nix job passes the devenv shell, `nix flake check` and `nix build`, and
       a warm run reuses the cached store instead of rebuilding
-- [ ] (discovered) The nightly schedule runs the workflow at 03:00 Europe/Berlin — deferred to after
+- [ ] (discovered) The nightly schedule runs the workflow at 03:17 Europe/Berlin — deferred to after
       the merge (chosen with the user, 2026-10-14): GitHub runs a scheduled workflow only from the
       default branch, so the first real nightly run is observed once this branch is on `main`
 - [x] A flaky CI failure is reported to the known-issues backlog, not silently tolerated

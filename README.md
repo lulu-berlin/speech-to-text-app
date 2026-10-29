@@ -264,9 +264,13 @@ Vulkan-capable driver the startup probe finds no GPU and transcription runs on t
 
 `gradlew.bat dev` (dev mode) is not available on Windows yet; `stt.cmd` runs the built app.
 
-The Gradle e2e tasks (`gradlew.bat e2e`, `e2eInstall`, `e2eBrowsers`) are POSIX-only and say so when
-run on Windows; the packaged app's own end-to-end suite ([`e2e/desktop-tests`](e2e/desktop-tests)) is
-the Windows path, and CI runs it for the zip and the MSI.
+`gradlew.bat e2e` runs the same end-to-end suite as `./gradlew e2e` on Windows: the journey in
+[`e2e/`](e2e/) against the app this checkout builds. Gradle downloads Node.js, pnpm, Chromium and the
+test fixtures itself, starts the built backend and drives it with Playwright, so nothing beyond the
+Java 21 above is needed; it runs the same specs as Linux and macOS, minus the macOS-only Metal one,
+which skips with its reason. A Vulkan driver decides whether the app's tasks use a GPU or the CPU
+(the suite itself needs no GPU). The packaged app's own suite ([`e2e/desktop-tests`](e2e/desktop-tests))
+still runs against the zip and the MSI in CI.
 
 ## Configuration
 

@@ -78,6 +78,20 @@ application {
     mainClass.set("stt.MainKt")
 }
 
+// The Windows start script names every jar as `%APP_HOME%\lib\<jar>` on one `set CLASSPATH=` line; under a deep
+// checkout path cmd.exe expands it past its 8,191-character limit and refuses to start ("The input line is too
+// long", roadmap item 79). Java's classpath wildcard names the same jars in one entry at any depth; the java call
+// keeps quoting it, so cmd.exe passes `lib\*` through and Java expands it. The POSIX script keeps its jar list.
+tasks.named<CreateStartScripts>("startScripts") {
+    doLast {
+        val script = windowsScript
+        val text = script.readText()
+        val classpathLine = Regex("(?m)^set CLASSPATH=.*$")
+        check(classpathLine.containsMatchIn(text)) { "no `set CLASSPATH=` line in $script" }
+        script.writeText(text.replace(classpathLine, Regex.escapeReplacement("set CLASSPATH=%APP_HOME%\\lib\\*")))
+    }
+}
+
 // Formatting gate (ADR 0015): `gradle check` runs ktlintCheck before the tests.
 val ktlintMain = "com.pinterest.ktlint.Main"
 
@@ -155,6 +169,12 @@ tasks.withType<Test>().configureEach {
 // the kotest.tags expression (`!Tag` = exclude).
 tasks.named<Test>("test") {
     systemProperty("kotest.tags", "!Integration")
+    // WindowsStartScriptSpec measures the generated Windows start script (roadmap item 79).
+    val startScripts = tasks.named<CreateStartScripts>("startScripts")
+    dependsOn(startScripts)
+    doFirst {
+        systemProperty("stt.test.windowsStartScript", startScripts.get().windowsScript.absolutePath)
+    }
 }
 
 tasks.register<Test>("integrationTest") {
