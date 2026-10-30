@@ -28,9 +28,9 @@ import stt.db.TestDataDir
 import stt.db.queuedTask
 import stt.process.ProcessRunner
 import stt.queue.TaskStatus
+import stt.transcribe.TranscribedChunk
 import stt.transcribe.Transcriber
 import stt.transcribe.TranscriptionException
-import stt.transcribe.WhisperSegment
 import stt.transcribe.WhisperSettings
 import java.nio.file.Files
 import java.nio.file.Path
@@ -202,11 +202,11 @@ private class DecodingTranscriber(
         prompt: String?,
         onProgress: (Double) -> Unit,
         onGpuUnavailable: suspend () -> Unit,
-    ): List<WhisperSegment> {
+    ): TranscribedChunk {
         inputs.add(audio)
         samples.add(toS16(audio, scratch))
         if (inputs.size - 1 == failOnCall) throw TranscriptionException("fake whisper-cli failure on $audio")
-        return emptyList()
+        return TranscribedChunk(emptyList(), detectedLanguage = null)
     }
 }
 

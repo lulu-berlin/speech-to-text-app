@@ -13,6 +13,7 @@ internal object TasksTable : Table("tasks") {
     val phase = enumerationByName("phase", 16, TaskPhase::class).nullable()
     val queuePosition = integer("queue_position").nullable()
     val language = text("language")
+    val detectedLanguage = text("detected_language").nullable()
     val speakersMode =
         customEnumeration(
             "speakers_mode",

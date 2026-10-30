@@ -89,7 +89,8 @@ All timestamps are INTEGER epoch milliseconds UTC. Audio bytes are stored in the
 files. `tasks.id` is the task id used everywhere.
 
 `tasks`: `id PK`, `original_filename`, `content_type`, `duration_ms NULL`, `status`, `phase NULL`,
-`queue_position NULL`, `language`, `speakers_mode`, `speakers_count NULL`, `max_speakers`,
+`queue_position NULL`, `language`, `detected_language NULL`, `speakers_mode`, `speakers_count NULL`,
+`max_speakers`,
 `model`, `progress REAL`, `error NULL`, `created_at`, `started_at NULL`, `finished_at NULL`,
 `diarization_stage NULL`, `diarization_progress REAL NULL`.
 
@@ -196,7 +197,9 @@ must match it (keys, types, nullability).
 ### Task shape
 
 `id`, `filename`, `status`, `phase` (null on QUEUED/COMPLETED; kept on FAILED/CANCELED),
-`language`, `speakersMode` (`auto|off|fixed`), `speakersCount` (number or null), `maxSpeakers`,
+`language` (whisper's detected language once a chunk names one — `detected_language` — otherwise
+the requested language), `speakersMode` (`auto|off|fixed`), `speakersCount` (number or null),
+`maxSpeakers`,
 `durationMs` (null before chunking), `sizeBytes`, `hasAudio` (whether `audio_header` exists),
 `transcriptionProgress` 0–1, `diarizationStage` (`EMBEDDING|CLUSTERING|null`), `diarizationProgress`
 (0–1 or null: null when speakers off or no segments; before diarization 0; 1 when stored),
@@ -411,6 +414,12 @@ missing text → ""); legacy `{segments:[{start,end,text}]}` (seconds, must have
 takes precedence when present; missing keys → malformed). No key/empty → no segments. Stored
 times = chunk `start_ms` + offset; `seq` numbers segments from 0 within the chunk. A chunk with
 no segments is valid and DONE with zero segments.
+
+Language: the JSON's `result.language` is what whisper detected; `params.language` only echoes the
+requested language and is never read as the detection. The task stores the detected language of the
+first chunk that names one (`detected_language`; a later chunk, or a resumed task that already stored
+one, does not overwrite it), and the task JSON exposes it as `language`, falling back to the
+requested language when no chunk named one.
 
 Prompt: the previous chunk's segment texts joined and trimmed; keep at most the last 200
 characters; if the cut falls inside a word, drop that partial word up to the next whitespace,

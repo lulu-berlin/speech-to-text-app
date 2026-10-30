@@ -2,7 +2,7 @@
 
 Status: spec-approved
 Depends on: [70](70-rust-gui-window.md) (the Slint window implements the same rule, and it exists
-only after 70) — the browser part is independent of 70; [74](74-desktop-presentation.md) supplies
+only after 70) — the browser part is independent of 70; [74](../docs/specs/desktop-presentation.md) supplies
 the transcript's `lang`/fonts, a related but independent change (direction itself is
 content-derived)
 Blocks: —

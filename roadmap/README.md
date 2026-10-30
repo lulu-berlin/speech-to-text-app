@@ -136,7 +136,7 @@ graph TD
   71[71 repository and chunking performance ✓]:::done
   72[72 frontend state and errors ✓]:::done
   73[73 split a speaker]
-  74[74 desktop presentation]
+  74[74 desktop presentation ✓]:::done
   75[75 retire the Python oracle ✓]:::done
   76[76 RTL transcription]
   77[77 private test temp dirs ✓]:::done
@@ -244,7 +244,7 @@ graph TD
 | [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](../docs/specs/repository-and-chunking-performance.md)    | done          | —                           |
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
 | [73 — Split a speaker: move selected turns to a new speaker](73-diarization-speaker-separation.md)                                                                 | spec-approved | —                           |
-| [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | spec-approved | —                           |
+| [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](../docs/specs/desktop-presentation.md)                                      | done          | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](../docs/specs/oracle-retirement.md)                                                               | done          | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70                           |
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |

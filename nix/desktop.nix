@@ -17,6 +17,8 @@
   ffmpeg,
 }: let
   electronPin = import ./electron.nix;
+  # The Linux desktop identity shared with the bundle (roadmap item 74): .desktop entry and icon.
+  identity = import ./desktop-identity.nix {inherit (pkgs) lib;};
   packageJson = builtins.fromJSON (builtins.readFile ../desktop/package.json);
 
   # The Java runtime, as the .deb builds it (desktop/stage.ts): jlink over exactly the modules the
@@ -145,6 +147,13 @@ in
       makeWrapper ${electron}/bin/electron $out/bin/stt-app \
         --add-flags $resources/app \
         --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.util-linux pkgs.coreutils]}
+      # The menu entry and its icon (roadmap item 74): `nix profile install` links share/ into the
+      # profile, where desktop environments find both.
+      mkdir -p $out/share/applications $out/share/icons/hicolor/scalable/apps
+      cat > $out/share/applications/${identity.desktopName} <<ENTRY
+      ${identity.entry "$out/bin/stt-app"}
+      ENTRY
+      cp ${identity.icon} $out/share/icons/hicolor/scalable/apps/stt-app.svg
       runHook postInstall
     '';
     meta = {

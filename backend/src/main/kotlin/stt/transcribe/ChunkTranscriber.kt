@@ -34,7 +34,7 @@ class ChunkTranscriber internal constructor(
         prompt: String?,
         onProgress: (Double) -> Unit,
         onGpuUnavailable: suspend () -> Unit,
-    ): List<WhisperSegment> {
+    ): TranscribedChunk {
         val command = whisperCommand(settings, audio, outputPrefix, prompt, executable)
         val result =
             runner.run(
@@ -58,9 +58,9 @@ class ChunkTranscriber internal constructor(
                 ?: throw TranscriptionException("whisper-cli JSON output $json is missing after transcribing $audio:\n$stderr")
         val parsed =
             try {
-                parseSegments(output)
+                parseWhisperOutput(output)
             } catch (e: IllegalArgumentException) {
-                // parseSegments reports malformed output (parse errors, wrong shapes, missing legacy keys) as IllegalArgumentException.
+                // parseWhisperOutput reports malformed output (parse errors, wrong shapes, missing legacy keys) as IllegalArgumentException.
                 throw TranscriptionException("whisper-cli JSON output $json is malformed (${e.message}):\n$stderr")
             }
         if (settings.device is Device.Gpu && result.stderr.any { it.contains(NO_GPU_LINE) }) onGpuUnavailable()

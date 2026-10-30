@@ -37,6 +37,12 @@ linux:
     - target: deb
       arch: [x64]
   category: AudioVideo
+  # Item 74: the .desktop entry is installed under the app's desktopName (package.json) and carries
+  # StartupWMClass=app.stt.desktop - the window's WM_CLASS Electron derives from that same name -
+  # so the menu entry and the running window are one app. The icon is the app's mark, the 512x512
+  # PNG the MSI also uses; electron-builder generates the hicolor sizes from it.
+  syncDesktopName: true
+  icon: icon.png
   # /usr/bin/stt-app is a symlink into /opt/Speech-to-Text (the after-install script).
   executableName: stt-app
 deb:
@@ -85,6 +91,11 @@ mac:
     - target: dmg
       arch: [arm64]
   category: public.app-category.productivity
+  # Item 74: the app's mark as the app icon (a 512x512 PNG, converted to .icns), the same artwork
+  # the MSI and the Linux packages carry. Naming it is explicit: without this line electron-builder
+  # finds the same file by convention (`icon.png` in the project directory) and the app still gets
+  # the mark - as the macOS leg measured on 2026-10-29 - but only as an accident of naming.
+  icon: icon.png
   # Unsigned v1 (item 50's decision): no signing identity, no hardened runtime, no notarization.
   identity: null
   hardenedRuntime: false

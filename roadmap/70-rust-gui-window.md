@@ -117,6 +117,14 @@ including the stenographer animation and audio playback. The browser frontend st
   pinned Rust toolchain, `Cargo.lock` and the sync check; the `gui` descriptor launches it.
 - **Electron leaves in the same cutover**, only after the new window's packaged e2e passes on all
   three OSes; `desktop/` and its CI jobs are deleted then.
+- **Item 74's presentation carries over** (the user, 2026-10-29; item 74's Proposal step 4): the
+  window ships the bundle's fonts and their fontconfig configuration (IBM Plex plus the per-script
+  Noto fallbacks, `nix/bundle-fonts.nix`, which maps `ja`/`zh`/`zh-cn`/`zh-tw`/`yue` to their Han
+  faces), marks the transcript region with the task's exposed language (`lang`; whisper's detected
+  language, the requested one as fallback, `auto` omitted) — the app shell itself keeps `lang="en"` —
+  and installs the same desktop identity as the other packages: the entry named
+  `app.stt.desktop.desktop` with `StartupWMClass=app.stt.desktop`, and the app's mark as its icon
+  (`nix/desktop-identity.nix`, the favicon as the `Icon=` it names).
 - **Test list** approved as worded below (11 items).
 - **A new ADR** records the shell choice, the royalty-free Slint dependency, the drop adapter risk
   and the renderer policy, superseding ADR 0059's shell decision and restating ADR 0055's boundary

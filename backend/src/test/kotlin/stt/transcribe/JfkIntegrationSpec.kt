@@ -26,7 +26,7 @@ class JfkIntegrationSpec :
                     val outputPrefix = tempdir("stt-jfk").toPath().resolve("jfk")
 
                     // 11 s clip: one chunk, well under whisper-cli's default 30 s window.
-                    val segments =
+                    val output =
                         withTimeout(120.seconds) {
                             ChunkTranscriber(ProcessRunner())
                                 .transcribe(
@@ -38,7 +38,7 @@ class JfkIntegrationSpec :
                                 )
                         }
 
-                    with(segments) {
+                    with(output.segments) {
                         shouldNotBeEmpty()
                         // whisper-cli segments always carry text; trimming happens when rendering (item 10's spec).
                         map { it.text }
@@ -52,7 +52,10 @@ class JfkIntegrationSpec :
                     }
                     // Segments are stitched contiguously from the start of the clip, so their starts
                     // strictly increase.
-                    segments.map { it.startMs }.zipWithNext().forEach { (a, b) -> a.shouldBeLessThan(b) }
+                    output.segments
+                        .map { it.startMs }
+                        .zipWithNext()
+                        .forEach { (a, b) -> a.shouldBeLessThan(b) }
                 }
             }
         }

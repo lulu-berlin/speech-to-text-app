@@ -764,17 +764,23 @@ class ProcessingEngine internal constructor(
                 pauseGate.checkpoint()
                 val audio = scratch.resolve("chunk-${chunk.idx}.flac")
                 writeChunkInput(id, chunk, audio)
-                transcription.transcribe(
-                    taskId = id,
-                    chunk = chunk,
-                    settings = settingsFor(task, current),
-                    audio = audio,
-                    outputPrefix = scratch.resolve("chunk-${chunk.idx}"),
-                    prompt = resumePrompt(segments, id, chunk.idx),
-                    // whisper's -pp lines arrive on a non-suspending callback.
-                    onProgress = { fraction -> report(TranscriptionReport(chunk.idx, fraction)) },
-                    onGpuUnavailable = { current = fallBackToCpu(id, current) },
-                )
+                val output =
+                    transcription.transcribe(
+                        taskId = id,
+                        chunk = chunk,
+                        settings = settingsFor(task, current),
+                        audio = audio,
+                        outputPrefix = scratch.resolve("chunk-${chunk.idx}"),
+                        prompt = resumePrompt(segments, id, chunk.idx),
+                        // whisper's -pp lines arrive on a non-suspending callback.
+                        onProgress = { fraction -> report(TranscriptionReport(chunk.idx, fraction)) },
+                        onGpuUnavailable = { current = fallBackToCpu(id, current) },
+                    )
+                // Item 74: the first chunk that names a language decides it; the task JSON and the transcript
+                // use it, falling back to the requested language when no chunk names one.
+                output.detectedLanguage?.let { detected ->
+                    if (tasks.setDetectedLanguageIfAbsent(id, detected)) publish(id)
+                }
             }
         }
     }

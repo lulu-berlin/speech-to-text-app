@@ -14,5 +14,11 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["stage.ts", "fetch-jdk.ts", "verified-download.ts", "check-model-hosts.ts"]
+  "include": [
+    "stage.ts",
+    "fetch-jdk.ts",
+    "verified-download.ts",
+    "check-model-hosts.ts",
+    "check-mac-icon.ts"
+  ]
 }

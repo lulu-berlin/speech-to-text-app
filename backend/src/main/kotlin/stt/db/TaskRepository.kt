@@ -8,6 +8,7 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNotNull
+import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.max
 import org.jetbrains.exposed.v1.core.statements.UpdateStatement
 import org.jetbrains.exposed.v1.exceptions.ExposedSQLException
@@ -298,6 +299,18 @@ class TaskRepository(
         updateTask(id) { it[TasksTable.durationMs] = durationMs }
     }
 
+    /**
+     * Stores the language whisper detected for the task (item 74), only while the row has none: the first chunk
+     * naming a language wins, and a resumed task that already stored one keeps it. Returns whether it wrote.
+     */
+    suspend fun setDetectedLanguageIfAbsent(
+        id: Long,
+        language: String,
+    ): Boolean =
+        updateTaskIf(id, TasksTable.detectedLanguage.isNull()) {
+            it[TasksTable.detectedLanguage] = language
+        }
+
     /** Marks the task COMPLETED, clears its phase and records when it finished. */
     suspend fun setCompleted(
         id: Long,
@@ -458,6 +471,7 @@ internal fun JdbcTransaction.insertTaskRow(task: Task): Long =
         it[phase] = task.phase
         it[queuePosition] = task.queuePosition
         it[language] = task.language
+        it[detectedLanguage] = task.detectedLanguage
         it[speakersMode] = task.speakersMode
         it[speakersCount] = task.speakersCount
         it[maxSpeakers] = task.maxSpeakers
@@ -509,6 +523,7 @@ private fun ResultRow.toTask() =
         phase = this[TasksTable.phase],
         queuePosition = this[TasksTable.queuePosition],
         language = this[TasksTable.language],
+        detectedLanguage = this[TasksTable.detectedLanguage],
         speakersMode = this[TasksTable.speakersMode],
         speakersCount = this[TasksTable.speakersCount],
         maxSpeakers = this[TasksTable.maxSpeakers],

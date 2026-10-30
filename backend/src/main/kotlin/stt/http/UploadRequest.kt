@@ -89,6 +89,7 @@ internal class UploadRequest(
                 // The route (UploadRoutes) assigns the end-of-queue position; the request has no queue context.
                 queuePosition = null,
                 language = language,
+                detectedLanguage = null,
                 speakersMode = speakersMode,
                 speakersCount = speakersCount,
                 maxSpeakers = maxSpeakers,

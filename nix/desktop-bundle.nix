@@ -32,63 +32,13 @@
       done > $out
     '';
 
-  # The fonts: IBM Plex Sans (the app's own typeface, ADR 0033) and the Plex families that cover the
-  # scripts of the languages in docs/api/languages.json — Arabic (ar, fa, ur, ps, sd), Devanagari
-  # (hi, mr, ne, sa), Hebrew (he, yi), Thai, Chinese SC and TC (zh, yue; SC lacks common Traditional
-  # characters such as 見 and 門), Japanese and Korean. Only the three weights the UI uses
-  # (regular, medium, semibold) and only TTF: 27 files, +32.9 MB to the bundle (zstd -19) and
-  # +69.4 MB unpacked, against +179 MB / +329 MB for the whole families (measured 2026-10-15).
-  # Plex has no font for the other scripts in that list (Tamil, Malayalam, Telugu, Bengali/Assamese,
-  # Kannada, Armenian, Gurmukhi, Sinhala, Khmer, Georgian, Gujarati, Ethiopic, Lao, Myanmar,
-  # Tibetan) nor for Hausa's ƙ ƴ Ɗ Ƙ Ƴ and Lingala's capital Ɛ Ɔ; the bundle shows those as missing
-  # glyphs (ADR 0053).
-  plex = pkgs.ibm-plex.override {
-    families = ["sans" "sans-arabic" "sans-devanagari" "sans-hebrew" "sans-thai" "sans-sc" "sans-tc" "sans-jp" "sans-kr"];
-  };
-  fonts = pkgs.runCommand "stt-bundle-fonts" {} ''
-    mkdir -p $out/share/fonts/truetype
-    for weight in Regular Medium SemiBold; do
-      cp ${plex}/share/fonts/truetype/*-$weight.ttf $out/share/fonts/truetype/
-    done
-    count=$(ls $out/share/fonts/truetype | wc -l)
-    if [ "$count" -ne 27 ]; then
-      echo "expected 27 font files (9 families x 3 weights), got $count" >&2
-      exit 1
-    fi
-  '';
+  # The bundle's fonts and their fontconfig configuration (nix/bundle-fonts.nix; roadmap item 74's
+  # coverage check judges the same set).
+  bundleFonts = import ./bundle-fonts.nix {inherit pkgs;};
 
-  # The bundle's whole font configuration: only the fonts above, no host directories and no host
-  # `conf.d` (the namespace sees the host's /etc). The fallback order decides Han glyph forms, since
-  # the UI does not mark a transcript's language: Simplified Chinese first, then Traditional, then
-  # Japanese.
-  fontFamilies = [
-    "IBM Plex Sans"
-    "IBM Plex Sans Arabic"
-    "IBM Plex Sans Devanagari"
-    "IBM Plex Sans Hebrew"
-    "IBM Plex Sans Thai"
-    "IBM Plex Sans SC"
-    "IBM Plex Sans TC"
-    "IBM Plex Sans JP"
-    "IBM Plex Sans KR"
-  ];
-  fontAlias = generic: ''
-    <alias binding="same">
-      <family>${generic}</family>
-      <prefer>
-        ${lib.concatMapStrings (family: "<family>${family}</family>") fontFamilies}
-      </prefer>
-    </alias>
-  '';
-  fontsConf = pkgs.writeText "stt-bundle-fonts.conf" ''
-    <?xml version="1.0"?>
-    <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-    <fontconfig>
-      <dir>${fonts}/share/fonts</dir>
-      <cachedir prefix="xdg">fontconfig</cachedir>
-      ${lib.concatMapStrings fontAlias ["sans-serif" "sans" "system-ui"]}
-    </fontconfig>
-  '';
+  # The Linux desktop identity shared with the Nix package (roadmap item 74): .desktop entry and
+  # icon, which the launcher writes out only when asked.
+  identity = import ./desktop-identity.nix {inherit lib;};
 
   # GTK's icon themes (the user, 2026-10-15), the bundle's own like its fonts: the launcher points
   # XDG_DATA_DIRS at them alone, so the file chooser looks the same on every host (when the
@@ -118,7 +68,7 @@
         --sort=name \
         --mtime="@$SOURCE_DATE_EPOCH" \
         --owner=0 --group=0 --mode=u+rw,uga+r \
-        $(cat ${pkgs.closureInfo {rootPaths = [desktop bwrap fontsConf vulkanMesa] ++ iconThemes ++ nvidiaDriverLibs;}}/store-paths) \
+        $(cat ${pkgs.closureInfo {rootPaths = [desktop bwrap bundleFonts.fontsConf vulkanMesa] ++ iconThemes ++ nvidiaDriverLibs;}}/store-paths) \
         | zstd -19 -T0 -o $out
     '';
 
@@ -137,6 +87,36 @@
     id=@id@
     payload_bytes=@payload_bytes@
     cache=''${XDG_CACHE_HOME:-$HOME/.cache}/stt-app-bundle/$id
+
+    # The menu entry and icon, written or removed only when asked (the user, 2026-10-29): the bundle
+    # has no install step and installs nothing by itself. Both travel inside this script, so the
+    # flags need no unpacking; the entry launches this file where it lies. Removal deletes exactly
+    # the two files installation writes, and nothing else in the data directory.
+    case "''${1-}" in
+      --install-desktop-entry)
+        case $self in /*) ;; *) self=$PWD/$self ;; esac
+        data=''${XDG_DATA_HOME:-$HOME/.local/share}
+        mkdir -p "$data/applications" "$data/icons/hicolor/scalable/apps"
+        # The Exec value as the desktop-entry spec defines it: double-quoted, with backslashes,
+        # double quotes, backticks and dollars escaped, so a bundle under a path with spaces or
+        # those characters still launches from the menu.
+        quoted=$(printf '%s' "$self" | sed -e 's/[\\"]/\\&/g' -e 's/[`$]/\\&/g')
+        cat > "$data/applications/${identity.desktopName}" <<ENTRY
+    ${identity.entry "\"$quoted\""}
+    ENTRY
+        cat > "$data/icons/hicolor/scalable/apps/stt-app.svg" <<'ICON'
+    ${lib.removeSuffix "\n" (builtins.readFile identity.icon)}
+    ICON
+        echo "stt-app-bundle: installed $data/applications/${identity.desktopName} and its icon" >&2
+        exit 0
+        ;;
+      --remove-desktop-entry)
+        data=''${XDG_DATA_HOME:-$HOME/.local/share}
+        rm -f "$data/applications/${identity.desktopName}" "$data/icons/hicolor/scalable/apps/stt-app.svg"
+        echo "stt-app-bundle: removed $data/applications/${identity.desktopName} and its icon" >&2
+        exit 0
+        ;;
+    esac
 
     if [ ! -e "$cache/.extracted" ]; then
       for tool in tar zstd; do
@@ -211,7 +191,7 @@
       --dev-bind /dev /dev \
       --proc /proc \
       --ro-bind "$cache/nix" /nix \
-      --setenv FONTCONFIG_FILE ${fontsConf} \
+      --setenv FONTCONFIG_FILE ${bundleFonts.fontsConf} \
       --setenv XDG_DATA_DIRS ${lib.makeSearchPath "share" iconThemes} \
       --setenv VK_ADD_DRIVER_FILES "$drivers" \
       "$@"
@@ -219,7 +199,7 @@
 in
   pkgs.runCommand "stt-app-bundle" {
     nativeBuildInputs = [pkgs.bash pkgs.coreutils pkgs.gnused];
-    passthru = {inherit bwrap payload fonts fontsConf vulkanMesa nvidiaDriverLibs;};
+    passthru = {inherit bwrap payload vulkanMesa nvidiaDriverLibs;} // {inherit (bundleFonts) fonts fontsConf;};
     meta = {
       description = "Speech-to-Text desktop app as one self-contained executable";
       mainProgram = "stt-app-bundle";

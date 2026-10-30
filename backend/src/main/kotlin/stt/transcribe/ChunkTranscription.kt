@@ -31,13 +31,14 @@ class ChunkTranscription(
         prompt: String?,
         onProgress: (Double) -> Unit = {},
         onGpuUnavailable: suspend () -> Unit = {},
-    ) {
-        val whisperSegments = transcriber.transcribe(settings, audio, outputPrefix, prompt, onProgress, onGpuUnavailable)
-        segments.completeChunk(taskId, chunk.idx, chunkSegments(chunk.idx, chunk.startMs, whisperSegments))
+    ): TranscribedChunk {
+        val output = transcriber.transcribe(settings, audio, outputPrefix, prompt, onProgress, onGpuUnavailable)
+        segments.completeChunk(taskId, chunk.idx, chunkSegments(chunk.idx, chunk.startMs, output.segments))
         withContext(Dispatchers.IO) {
             deleteBestEffort(audio)
             deleteBestEffort(jsonOutput(outputPrefix))
         }
+        return output
     }
 
     /** Deletes [file], logging one warning on failure instead of failing the (already committed) chunk. */

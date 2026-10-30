@@ -102,7 +102,7 @@ The package carries its own Java runtime, whisper.cpp and ffmpeg; its whisper.cp
 nix run .#desktop
 ```
 
-`nix build .#desktop` builds it into `./result/bin/stt-app` without starting it. On NixOS it uses the system's GPU drivers (tested with an AMD and an NVIDIA GPU).
+`nix build .#desktop` builds it into `./result/bin/stt-app` without starting it. On NixOS it uses the system's GPU drivers (tested with an AMD and an NVIDIA GPU). The package carries its menu entry and icon (`share/applications/app.stt.desktop.desktop`, with `StartupWMClass=app.stt.desktop`, so a running window is tied to it), so `nix profile install .#desktop` adds the app to the desktop's menu.
 
 #### Single-file bundle (any distribution)
 
@@ -111,9 +111,11 @@ nix build .#desktop-bundle                  # or: nix bundle --bundler .#desktop
 ./result/bin/stt-app-bundle
 ```
 
-One file of about 400 MB that a machine without Nix can run — copy `result/bin/stt-app-bundle` there. On its first start it unpacks itself once into `${XDG_CACHE_HOME:-~/.cache}/stt-app-bundle/` (about 1.2 GB) and then runs the app in a [bubblewrap](https://github.com/containers/bubblewrap) namespace that shows the whole machine — your files, with your permissions — except `/nix`, which is the bundle's own ([ADR 0053](docs/decisions/0053-linux-desktop-deb-flake-package-bundle.md)). It needs no root, no glibc of the host (tested on Alpine) and no packages besides `tar` and `zstd`, but it does need **unprivileged user namespaces**: Ubuntu 24.04 restricts them by default (AppArmor), and there the `.deb` is the way. On NixOS use the Nix package instead.
+One file of about 400 MB that a machine without Nix can run — copy `result/bin/stt-app-bundle` there. On its first start it unpacks itself once into `${XDG_CACHE_HOME:-~/.cache}/stt-app-bundle/` (about 1.2 GB) and then runs the app in a [bubblewrap](https://github.com/containers/bubblewrap) namespace that shows the whole machine — your files, with your permissions — except `/nix`, which is the bundle's own ([ADR 0053](docs/decisions/0053-linux-desktop-deb-flake-package-bundle.md)). It needs no root, no glibc of the host (tested on Alpine) and no packages besides `tar` and `zstd` (`sed` too, only for `--install-desktop-entry`), but it does need **unprivileged user namespaces**: Ubuntu 24.04 restricts them by default (AppArmor), and there the `.deb` is the way. On NixOS use the Nix package instead.
 
-The bundle brings its own fonts (IBM Plex, which has no fonts for 15 of whisper's scripts yet — see [Known issues](docs/known-issues.md)) and its own GPU drivers for transcription:
+The bundle installs nothing by itself. To add it to the desktop's menu, run it once with `--install-desktop-entry`: it writes `app.stt.desktop.desktop` (launching the bundle file where it lies — run it again after moving the file — with `StartupWMClass=app.stt.desktop`, the window's class) and the app's icon into `${XDG_DATA_HOME:-~/.local/share}`, without unpacking anything. `--remove-desktop-entry` deletes exactly those two files again and leaves the rest of the directory alone.
+
+The bundle brings its own fonts (IBM Plex, and Noto for the scripts Plex lacks, so every language whisper accepts renders) and its own GPU drivers for transcription:
 
 | GPU | In the bundle | Tested |
 | --- | --- | --- |
@@ -338,4 +340,4 @@ The app is licensed under the [BSD 3-Clause License](LICENSE). Third-party mater
 
 - **Test fixtures** — clips from the LibriSpeech ASR corpus (CC BY 4.0); see [docs/attributions.md](docs/attributions.md).
 - **Models** — the whisper.cpp model ([ADR 0008](docs/decisions/0008-default-whisper-model.md)) and the CAM++ speaker model ([ADR 0003](docs/decisions/0003-kotlin-diarization-campplus-onnx.md)) are downloaded at build time (the desktop app: at its first start), not stored in the repository: the whisper model from this repository's GitHub release `desktop-models-v1`, a byte-identical mirror of its publisher's file, and the CAM++ model from its publisher's GitHub release; both are pinned in [`nix/models.nix`](nix/models.nix).
-- **Desktop bundle** — it carries the IBM Plex fonts (SIL Open Font License 1.1) and Mesa's Vulkan drivers (MIT); NVIDIA's driver is not shipped but borrowed from the machine it runs on.
+- **Desktop bundle** — it carries the IBM Plex fonts and, for the scripts Plex lacks, Noto fonts (both SIL Open Font License 1.1; the notices ship inside the bundle, `share/licenses/stt-bundle-fonts`) and Mesa's Vulkan drivers (MIT); NVIDIA's driver is not shipped but borrowed from the machine it runs on.

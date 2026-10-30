@@ -364,6 +364,9 @@ for (const [name, value] of Object.entries(pinEnv)) {
     fail(`${name} is not a sha256 in versions.json: ${value}`);
 }
 const xvfbRun = whichInStore('xvfb-run');
+// Roadmap item 74: the window-class spec reads the running app's WM_CLASS with xprop, resolved
+// from the devenv shell like the rest of the test tooling (it is not installed in the container).
+const xprop = whichInStore('xprop');
 const node = realpathSync(process.execPath);
 if (!node.startsWith('/nix/store/')) fail(`node must come from /nix/store, got ${node}`);
 const playwrightCli = join(e2eRoot, 'node_modules', '@playwright', 'test', 'cli.js');
@@ -406,6 +409,8 @@ const args = [
   `STT_DESKTOP_PACKAGE=${app.kind}`,
   '-e',
   `STT_DESKTOP_GPU=${gpu}`,
+  '-e',
+  `STT_XPROP=${xprop}`,
   ...passedEnv.flatMap((name) => ['-e', `${name}=${process.env[name]}`]),
   ...Object.entries(pinEnv).flatMap(([name, value]) => ['-e', `${name}=${value}`]),
   app.machine.image,
