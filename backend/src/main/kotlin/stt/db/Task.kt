@@ -11,6 +11,8 @@ data class Task(
     val phase: TaskPhase?,
     val queuePosition: Int?,
     val language: String,
+    /** whisper's detected language (item 74); null until a run names one, then that of the first chunk naming any. */
+    val detectedLanguage: String?,
     val speakersMode: SpeakersMode,
     val speakersCount: Int?,
     val maxSpeakers: Int,

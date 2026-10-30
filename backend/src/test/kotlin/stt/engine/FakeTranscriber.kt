@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import stt.config.Device
+import stt.transcribe.TranscribedChunk
 import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSegment
 import stt.transcribe.WhisperSettings
@@ -44,6 +45,9 @@ internal class FakeTranscriber : Transcriber {
 
     /** The segments every call returns per task id, offsets relative to the chunk's audio; none by default. */
     var segmentsByTask: Map<Long, List<WhisperSegment>> = emptyMap()
+
+    /** The language each task's runs detect (item 74); a task absent from the map detects none. */
+    var detectedLanguageByTask: Map<Long, String> = emptyMap()
 
     /** The chunk fractions every call reports through `onProgress`, in order, before it returns. */
     var progressScript: List<Double> = emptyList()
@@ -82,7 +86,7 @@ internal class FakeTranscriber : Transcriber {
         prompt: String?,
         onProgress: (Double) -> Unit,
         onGpuUnavailable: suspend () -> Unit,
-    ): List<WhisperSegment> =
+    ): TranscribedChunk =
         probe.around {
             coroutineNames.add(currentCoroutineContext()[CoroutineName]?.name)
             logger.info("transcribing {}", audio)
@@ -124,6 +128,7 @@ internal class FakeTranscriber : Transcriber {
                 reader.await()
             }
             if (gpuUnavailable && settings.device is Device.Gpu) onGpuUnavailable()
-            segmentsByTask[taskIdOf(audio.parent)].orEmpty()
+            val taskId = taskIdOf(audio.parent)
+            TranscribedChunk(segmentsByTask[taskId].orEmpty(), detectedLanguageByTask[taskId])
         }
 }

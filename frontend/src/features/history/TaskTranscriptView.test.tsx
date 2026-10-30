@@ -2491,6 +2491,50 @@ describe('times past one hour', () => {
 });
 
 describe('the reading column', () => {
+  it("marks the transcript region with the task's exposed language", async () => {
+    // Item 74: the API's task.language is whisper's detected language (the requested one as
+    // fallback); the transcript carries it so fontconfig picks that script's glyph forms.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskCompleted, id: 3, language: 'ja' }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('3');
+    await screen.findByText('Good morning.');
+
+    expect(screen.getByRole('region', { name: 'Transcript' })).toHaveAttribute('lang', 'ja');
+  });
+
+  it('never marks the transcript with the auto placeholder as its language', async () => {
+    // Item 74 (discovered): an auto upload whose run detected nothing exposes the request's
+    // placeholder "auto", which is not a language tag; the transcript then carries no lang.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [{ ...taskCompleted, id: 3, language: 'auto' }],
+              queue: { paused: false, taskIds: [] },
+            },
+          ],
+        ]),
+      ),
+    );
+    await renderTranscript('3');
+    await screen.findByText('Good morning.');
+
+    expect(screen.getByRole('region', { name: 'Transcript' })).not.toHaveAttribute('lang');
+  });
+
   it('is one centred 70ch column: header, player, downloads, then the turns with the start time in a left gutter and the speaker above the text', async () => {
     await renderTranscript('3'); // task 3 is COMPLETED; turns.json has three turns.
     await screen.findByText('Good morning.');

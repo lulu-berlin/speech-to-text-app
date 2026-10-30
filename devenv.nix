@@ -77,6 +77,11 @@ in
       # read-only /nix/store mount — nothing test-only is installed into that machine.
       pkgs.fpm
       pkgs.xvfb-run
+
+      # Desktop identity (roadmap item 74): xprop reads the packaged app's window class
+      # (WM_CLASS) in that same container, so the e2e can compare it with the installed
+      # .desktop entry's StartupWMClass.
+      pkgs.xorg.xprop
     ];
 
   # https://devenv.sh/languages/

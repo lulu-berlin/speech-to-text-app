@@ -39,7 +39,8 @@ fun TaskDetails.toJson(): TaskJson =
         filename = task.originalFilename,
         status = task.status.name,
         phase = task.phase?.name,
-        language = task.language,
+        // Item 74: whisper's detected language when a run named one, otherwise the requested language.
+        language = task.detectedLanguage ?: task.language,
         speakersMode = task.speakersMode.dbValue,
         speakersCount = task.speakersCount,
         maxSpeakers = task.maxSpeakers,

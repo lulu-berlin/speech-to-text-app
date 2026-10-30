@@ -4,7 +4,7 @@ Status: spec-approved
 Depends on: [49](../docs/specs/windows-support.md), [52](../docs/specs/edit-transcription.md),
 [65](../docs/specs/row-color-phase-observation.md), [68](../docs/specs/windows-audio-only-ffmpeg.md),
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](../docs/specs/frontend-state-and-errors.md),
-[74](74-desktop-presentation.md), [76](76-right-to-left-transcription.md),
+[74](../docs/specs/desktop-presentation.md), [76](76-right-to-left-transcription.md),
 [77](../docs/specs/test-harness-temp-dirs.md), [79](../docs/specs/windows-e2e-journey.md),
 [84](84-e2e-reliability.md) — the gates
 proposed below — and the six MED known issues listed under Evidence, which no roadmap item handles
@@ -63,7 +63,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 71 Repository and chunking performance | done | after 1.0 | scaling improvement, not a correctness defect |
 | 72 Frontend state and errors | draft | **yes** | a stable UI must not hide failed actions |
 | 73 Split a speaker | spec-approved | after 1.0 | the manual remedy for wrongly merged speakers |
-| 74 Desktop presentation | draft | **yes** | icon, `.desktop` entry and glyph coverage are release polish, not optional |
+| 74 Desktop presentation | done | **yes** | icon, `.desktop` entry and glyph coverage are release polish, not optional |
 | 75 Retire the Python oracle | done | after 1.0 | docs-only |
 | 76 Right-to-left transcription | draft | **yes** | correctness for scripts the app already accepts |
 | 77 Upload spec shared temp dir | in progress | **yes** | a `macOS (gradle check)` flake undermines release verification |

@@ -36,7 +36,10 @@ CREATE TABLE tasks (
     started_at          INTEGER,
     finished_at         INTEGER,
     diarization_stage   TEXT    CHECK (diarization_stage IN ('EMBEDDING', 'CLUSTERING')),
-    diarization_progress REAL
+    diarization_progress REAL,
+    -- V15 (item 74): whisper's detected language, null until a chunk names one; the task JSON's
+    -- `language` is this, else `language` above. Last, as ALTER TABLE ADD COLUMN puts it.
+    detected_language   TEXT
 );
 
 -- V14 (item 71): the queue reads look tasks up by status and by queue position.

@@ -721,6 +721,36 @@
               echo ok > $out
             '';
 
+          # Roadmap item 74 (test-list item 1): every language in docs/api/languages.json has every
+          # character of its sample text in the bundle's shipped fonts, so a language with no font
+          # fails the check instead of rendering as missing glyphs. The fonts come from the module the
+          # bundle composes (nix/bundle-fonts.nix), so the check cannot drift from what ships.
+          font-coverage = import ./nix/font-coverage.nix {
+            inherit pkgs;
+            fontsConf = (import ./nix/bundle-fonts.nix {inherit pkgs;}).fontsConf;
+          };
+
+          # Roadmap item 74 (test-list item 2): the bundle's fontconfig resolves Han text by the
+          # language it is marked with, so a Japanese transcript gets IBM Plex Sans JP's glyph forms
+          # rather than the Simplified Chinese face's, and SC and TC keep their own faces.
+          font-forms = import ./nix/font-forms.nix {
+            inherit pkgs;
+            fontsConf = (import ./nix/bundle-fonts.nix {inherit pkgs;}).fontsConf;
+          };
+
+          # Roadmap item 74 (test-list item 6): the Nix package and the bundle carry matching .desktop
+          # entries and the app's mark as their icon; the bundle installs its own only when asked
+          # (`--install-desktop-entry`). Builds both, like the bundle e2e does.
+          desktop-entries = let
+            identity = import ./nix/desktop-identity.nix {inherit (pkgs) lib;};
+          in
+            import ./nix/desktop-entries.nix {
+              inherit pkgs;
+              desktop = self.packages.${system}.desktop;
+              bundle = self.packages.${system}.desktop-bundle;
+              inherit (identity) desktopName windowClass icon;
+            };
+
           # Roadmap item 62 (test-list item 5): the ffmpeg artifact's integrity gates, like the Mesa ones —
           # a registered asset that is missing or does not match its sha256 fails naming the asset, url and
           # sha256; an asset pinned to another source build fails at evaluation naming both paths; the
@@ -1232,7 +1262,7 @@
         } (
           if isLinux
           then []
-          else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-closure-size"]
+          else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-closure-size" "font-coverage" "font-forms" "desktop-entries"]
         );
     };
   in {

@@ -137,7 +137,7 @@ class ChunkTranscriberSpec :
                     val reports =
                         listOf(Device.Gpu(1), Device.Cpu, Device.Auto).map { device ->
                             var unavailable = 0
-                            val segments =
+                            val output =
                                 withTimeout(30.seconds) {
                                     transcriber.transcribe(
                                         TEST_SETTINGS.copy(device = device),
@@ -147,7 +147,7 @@ class ChunkTranscriberSpec :
                                         onGpuUnavailable = { unavailable++ },
                                     )
                                 }
-                            segments.map { it.text } shouldBe listOf(" And so my fellow Americans")
+                            output.segments.map { it.text } shouldBe listOf(" And so my fellow Americans")
                             unavailable
                         }
 

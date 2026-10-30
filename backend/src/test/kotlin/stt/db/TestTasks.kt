@@ -14,6 +14,7 @@ internal fun queuedTask(
     phase = null,
     queuePosition = null,
     language = "en",
+    detectedLanguage = null,
     speakersMode = SpeakersMode.AUTO,
     speakersCount = null,
     maxSpeakers = 8,

@@ -8,7 +8,8 @@ import java.nio.file.Path
  */
 interface Transcriber {
     /**
-     * Transcribes [audio] and returns its segments with offsets relative to it. [onProgress] reports the
+     * Transcribes [audio] and returns its segments with offsets relative to it, plus the language whisper
+     * detected in this chunk when its output names one (item 74). [onProgress] reports the
      * chunk fraction parsed from whisper-cli's `-pp` output. [onGpuUnavailable] is called after a run with a
      * chosen GPU that whisper-cli could not use and ran on the CPU instead (item 32). Failures are
      * [TranscriptionException]s.
@@ -20,5 +21,5 @@ interface Transcriber {
         prompt: String?,
         onProgress: (Double) -> Unit = {},
         onGpuUnavailable: suspend () -> Unit = {},
-    ): List<WhisperSegment>
+    ): TranscribedChunk
 }

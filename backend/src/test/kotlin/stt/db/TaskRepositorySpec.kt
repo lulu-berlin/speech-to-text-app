@@ -31,6 +31,7 @@ class TaskRepositorySpec :
                                 phase = TaskPhase.TRANSCRIBING,
                                 queuePosition = 3,
                                 language = "de",
+                                detectedLanguage = "de",
                                 speakersMode = SpeakersMode.FIXED,
                                 speakersCount = 2,
                                 maxSpeakers = 4,

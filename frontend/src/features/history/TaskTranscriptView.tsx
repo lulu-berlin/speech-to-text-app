@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { editSegment, revertSegment } from '../../shared/api/client';
+import { languages } from '../../shared/api/fixtures';
 import { errorMessage } from '../../shared/api/types';
 import type { Segment, Task, TaskPhase, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
@@ -764,6 +765,13 @@ export function TaskTranscriptView() {
             ref={transcriptRegionRef}
             role="region"
             aria-label="Transcript"
+            // Item 74: the task's language (whisper's detected one, the requested one as
+            // fallback) marks the transcript, so fontconfig picks that script's glyph forms
+            // — Japanese kanji and kana in their JP forms, not the SC fallback's. The app
+            // shell keeps its own lang="en" (index.html). The contract's auto default
+            // (requested auto, nothing detected) is a request, not a language tag, so the
+            // transcript carries none.
+            lang={task.language === languages.default ? undefined : task.language}
             onWheel={sendScrolled}
             onTouchMove={sendScrolled}
             onKeyDown={handleKeyDown}

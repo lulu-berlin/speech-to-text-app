@@ -173,9 +173,14 @@ internal suspend fun enqueueTask(
     queuePosition: Int,
     createdAt: Long,
     speakersMode: SpeakersMode = SpeakersMode.OFF,
+    language: String = "en",
 ): Long =
     tasks.createFromUpload(
-        queuedTask(filename, createdAt).copy(queuePosition = queuePosition, speakersMode = speakersMode),
+        queuedTask(filename, createdAt).copy(
+            queuePosition = queuePosition,
+            speakersMode = speakersMode,
+            language = language,
+        ),
         "fake source audio of $filename".toByteArray().inputStream(),
     )
 
