@@ -190,3 +190,12 @@ scope.
   known-issues row has its verb again. Skip reasons now also print into the run's `<system-out>`. Verified here:
   e2e `node --test` 17/17, prettier, tsc, the docs package (30/30), `gradle -p backend check` and
   `gradle integrationTest` green with 0 failures. Windows behavior and `Windows (e2e)` remain unverified here.
+- 2026-10-30 (amendment, the user): `Windows (e2e)` leaves the `CI (all checks)` aggregator while its
+  load flake is open. It still runs on every code change and reports on the pull request, but cannot
+  hold a merge. Evidence: runs #400 and #404 failed 3 and 7 different specs on a single worker, the
+  failed set changing between runs, while a rerun of the same tree passed `51 passed, 3 skipped`
+  (filed as a `docs/known-issues.md` row by roadmap item 74); pull request #79 (roadmap item 71) sat
+  in `gradlew.bat e2e` for 29+ minutes with every other job green. It rejoins the aggregator once it
+  is reliably green — for example after the journey is sharded across jobs — and item 79's gate
+  decision stands otherwise. `.github/workflows/ci.yml` and `docs/check-ci-gating.test.ts` carry the
+  exception; `docs/specs/ci-verification.md` records the current cadence.

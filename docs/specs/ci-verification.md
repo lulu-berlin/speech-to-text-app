@@ -33,6 +33,10 @@ a Mac or a Windows machine, and the repo has no CI today.
 - **Cadence**: every push (to `main` and PRs): Linux unit + format + pnpm + integration + e2e, and
   (amended 2026-10-21, item 48) the full macOS legs on every push and pull request. Lower cadence
   (nightly scheduled runs) for the Windows legs; item 49's PRs can trigger their own leg on demand.
+  (amended 2026-10-30) The Windows journey (`Windows (e2e)`) runs and reports on every code change
+  but is outside the aggregate `CI (all checks)` while its load flake is open — see
+  [windows-e2e-journey.md](windows-e2e-journey.md) and the `Windows (e2e)` row of
+  `docs/known-issues.md`.
 - **Nix**: macOS CI legs run the flake build (`nix build`/`nix run` and the devenv shell) — that is
   item 48's Nix-darwin verification. No Nix job on Windows (Nix has no Windows support). Linux CI is
   not required to use Nix (the Gradle/pnpm/bootstrap path is sufficient and matches ADR 0010's

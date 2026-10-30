@@ -30,6 +30,13 @@ const EVENT_GATED: Record<string, true> = {
   'windows-ffmpeg-asset': true,
   'model-hosts': true,
 };
+// Heavy jobs that run on every code change and report, but do not gate merges: their result is
+// visible on the pull request while their own flakiness is open. `windows-e2e` is here while the
+// journey's load flake is open (docs/specs/windows-e2e-journey.md, amended 2026-10-30, and the
+// Windows (e2e) row of docs/known-issues.md); it rejoins the aggregator once it is reliably green.
+// A job listed here is still heavy: it must carry the `changes` gate like every other, checked
+// below.
+const REPORTING_ONLY: Record<string, true> = { 'windows-e2e': true };
 
 interface Job {
   id: string;
@@ -365,11 +372,19 @@ test('the required check and the jobs it gates keep their names and conditions',
   );
 
   // Every heavy job reports through the aggregator, so the gate cannot hide a job from the required
-  // check; and a typo in a `needs` entry names nothing and would silently un-gate.
+  // check; and a typo in a `needs` entry names nothing and would silently un-gate. A
+  // reporting-only job keeps its name and its own `changes` gate (checked in the heavy-job test)
+  // but is deliberately outside the aggregator, with its reason in REPORTING_ONLY.
   for (const job of jobs.values()) {
     if (UNGATED[job.id] === true || EVENT_GATED[job.id] === true) continue;
+    if (REPORTING_ONLY[job.id] === true) {
+      assert.equal(ci.needs.includes(job.id), false, `${job.id} is outside CI (all checks)`);
+      continue;
+    }
     assert.ok(ci.needs.includes(job.id), `${job.id} is in CI (all checks)`);
   }
+  const windowsE2e = assertJobOf(jobs, 'windows-e2e');
+  assert.equal(windowsE2e.name, 'Windows (e2e)', 'the reporting-only journey keeps its name');
   for (const need of ci.needs) {
     assert.ok(jobs.has(need), `ci needs ${need}, which is a job`);
   }

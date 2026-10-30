@@ -597,11 +597,15 @@ jobs:
 
   # The item-21 journey on Windows (roadmap item 79): the Gradle-managed backend and the same specs
   # as Linux (e2e) and macOS (e2e), except the named platform skips (e2e/lib/platform-gates.test.ts).
-  # It runs on every push and code-touching pull request like the other journeys, and is in the
-  # aggregator. It started nightly; run #389 measured it at 15:54 against macOS's 15:32 (band 13-16
-  # min), the condition the consultation set for joining the every-PR legs. It waits for the Windows
-  # checks, as macOS (e2e) waits for macOS's. The runner has no GPU, so the journey runs on the CPU
-  # path.
+  # It runs on every push and code-touching pull request like the other journeys. It started
+  # nightly; run #389 measured it at 15:54 against macOS's 15:32 (band 13-16 min), the condition the
+  # consultation set for joining the every-PR legs. It waits for the Windows checks, as macOS (e2e)
+  # waits for macOS's. The runner has no GPU, so the journey runs on the CPU path.
+  # It is NOT in the `ci` aggregator while its load flake is open (2026-10-30): 55 specs on one
+  # worker exhaust their 240 s waits when the runner is loaded, the failing set changes between
+  # runs, and a rerun of the same tree passes. It still runs and reports on every code change; it
+  # rejoins the aggregator once it is reliably green (docs/specs/windows-e2e-journey.md, amended
+  # 2026-10-30).
   windows-e2e:
     name: Windows (e2e)
     needs: [changes, windows-backend-check, windows-frontend-check]
@@ -1307,13 +1311,14 @@ jobs:
   # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
   # renaming a job cannot silently un-gate merges. `changes` is in `needs` so the decision itself is
   # reported; a documentation-only pull request reaches this job with every heavy job skipped and
-  # still goes green (roadmap item 80). `model-hosts` is the one deliberate exception (its own
-  # comment says why); a job absent from this list cannot gate merges. Every other job's name starts
+  # still goes green (roadmap item 80). `model-hosts` is one deliberate exception (its own comment
+  # says why) and `windows-e2e` the other while its load flake is open (docs/specs/
+  # windows-e2e-journey.md, amended 2026-10-30); a job absent from this list cannot gate merges. Every other job's name starts
   # with the platform it targets (Linux, macOS, Windows); this one covers all of them, and branch
   # protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
-    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-e2e, windows-desktop-zip]
+    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
