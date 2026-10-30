@@ -135,11 +135,13 @@ graph TD
   70[70 Rust GUI window]
   71[71 repository and chunking performance]
   72[72 frontend state and errors ✓]:::done
-  73[73 diarization speaker separation]
+  73[73 split a speaker]
   74[74 desktop presentation]
   75[75 retire the Python oracle ✓]:::done
   76[76 RTL transcription]
   77[77 private test temp dirs ✓]:::done
+  83[83 diarization accuracy]
+  73 --> 83
   81[81 dropped row command ✓]:::done
   78[78 stable release]
   49 --> 78
@@ -239,7 +241,7 @@ graph TD
 | [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
 | [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](71-repository-and-chunking-performance.md)               | spec-approved | —                           |
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
-| [73 — Diarization speaker separation: unseparated speakers, and a split remedy](73-diarization-speaker-separation.md)                                              | spec-approved | —                           |
+| [73 — Split a speaker: move selected turns to a new speaker](73-diarization-speaker-separation.md)                                                                 | spec-approved | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | spec-approved | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](../docs/specs/oracle-retirement.md)                                                               | done          | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70                           |
@@ -249,3 +251,4 @@ graph TD
 | [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
 | [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](../docs/specs/ci-diagnosability.md)                                | done          | —                           |
 | [81 — A row command clicked while another one is in flight is dropped](../docs/specs/dropped-row-command.md)                                                                  | done          | —                           |
+| [83 — Diarization accuracy: fewer wrongly merged and wrongly split speakers in automatic detection](83-diarization-accuracy.md)                                    | spec-approved | 73                          |

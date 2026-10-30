@@ -1,4 +1,4 @@
-# 73 — Diarization speaker separation: unseparated speakers, and a split remedy
+# 73 — Split a speaker: move selected turns to a new speaker
 
 Status: spec-approved
 Depends on: —
@@ -6,20 +6,19 @@ Blocks: —
 
 ## Goal
 
-The automatic speaker count separates real recordings better than it does today — distinct
-speakers less often collapse under one id — and when a speaker still gets split, a **split** action
-gives the user the remedy that unseparation lacks today (merge exists, split does not).
+When diarization puts distinct speakers under one id, the user can fix it: a **split** action moves
+the selected turns to a new speaker, the remedy that wrongly merged speakers lack today (merge
+exists for the opposite case, split does not). Improving the automatic detection itself is item
+[83](83-diarization-accuracy.md).
 
 ## Evidence
 
 - **User report 2026-10-14**: diarization sometimes puts distinct speakers under one id and
   sometimes splits one speaker across ids. A split has the merge remedy; an unseparated pair has no
   split tool, and re-running reproduces the same clustering for the same input.
-- The auto count is two hard-coded heuristics: one speaker when the last merge's cosine distance is
-  below `SPEAKER_DISTANCE_THRESHOLD = 0.5448` (`diarization/Clustering.kt:8-11`), otherwise the
-  largest-gap cut among the last `maxSpeakers` gaps (`:30-36`, ADR 0027). The threshold was
-  calibrated on 18 LibriSpeech clips of 6 readers (ADR 0032) — studio speech, not the user's
-  recordings.
+- Improving the detection that produces these errors (the speaker count, the embedding windows,
+  the clustering) is item [83](83-diarization-accuracy.md) since 2026-10-29; it was this item's
+  second half until then.
 - Embeddings are CAM++ (`diarization/SpeakerModel.kt`); the fixed-speaker-count mode already exists
   per upload (`settings`/task options) and is the current manual workaround when the auto count is
   wrong.
@@ -32,26 +31,18 @@ gives the user the remedy that unseparation lacks today (merge exists, split doe
 1. **Split remedy first**: `POST /api/tasks/{id}/speakers/{speakerId}/split` moves the selected turns
    (one or more) to a new speaker with a default name, under the same COMPLETED-only rule as
    rename/merge, published as an SSE event, with a UI action beside Merge.
-2. **Then measure**: build a labelled set from the user's real recordings (kept local, never
-   committed) and score today's auto count (speaker error rate / cluster purity), then test the
-   levers on it:
-   - recalibrate `SPEAKER_DISTANCE_THRESHOLD` and the gap window on that set;
-   - a sensitivity/“expected speakers” control per task (beyond the existing fixed count);
-   - embedding-side improvements only if the numbers point there.
-3. Record the measured before/after and the chosen threshold in a new ADR.
+2. The auto-count measurement that was step 2 here (a labelled local set, the threshold and gap
+   window, a sensitivity control) moved to item [83](83-diarization-accuracy.md) on 2026-10-29.
 
 ## Decided (consultation, 2026-10-28)
 
 - **Split first, measurement second** in the same item: the missing remedy is the user-visible gap
-  and has no data dependency; the auto-count work follows on the labelled set.
+  and has no data dependency; the auto-count work follows on the labelled set. *(Superseded
+  2026-10-29: the measurement is item 83; this item is the split action only.)*
 - **A split moves the selected turns** to a new speaker (default name, renameable), one or more
   turns per action and repeated splits allowed. It is COMPLETED-only (409 otherwise, 404 for an
   unknown speaker id), publishes its own SSE event, and renames, merges and split→merge keep
   working across it.
-- **The user's recordings stay local**: only the metric definition, aggregate scores and
-  synthetic/licensed clips are committed; the LibriSpeech fixtures remain the controls.
-- The levers (threshold, gap window, sensitivity control, embeddings) are decided by the measured
-  scores on that set, not in advance.
 
 ## Test list (approved; behaviors only)
 
@@ -60,15 +51,11 @@ gives the user the remedy that unseparation lacks today (merge exists, split doe
       unknown speaker id 404
 - [ ] Merging after a split still works (split → merge round-trips)
 - [ ] Renamed speakers keep their names across a split, and a split speaker can be renamed
-- [ ] On the labelled local evaluation set, the chosen auto-count rule separates the speakers in a
-      measured share of the cases that fail today, without regressing the cases that pass; the
-      aggregate scores, without recordings, are recorded
 - [ ] (must not break) The existing rename/merge, fixed-count and diarization suites stay green
 
 ## Acceptance criteria
 
-- The auto count's measured quality is recorded and improved (or the chosen control makes the
-  failure recoverable), and a split action exists with API, event, UI and tests.
+- A split action exists with API, event, UI and tests.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
@@ -78,3 +65,7 @@ gives the user the remedy that unseparation lacks today (merge exists, split doe
 - 2026-10-28: consultation with the user: split remedy first (moving selected turns to a new
   speaker), then the auto-count measurement on a local-only labelled set with only aggregate scores
   committed. Test list approved as written; status set to spec-approved.
+- 2026-10-30 (amendment, the user): the detection measurement moved to item
+  [83](83-diarization-accuracy.md); this item is the split action only. Proposal step 2, test-list
+  item 4 and the two measurement decisions left; the title, Goal and acceptance criteria were
+  narrowed to match. Status stays spec-approved.
