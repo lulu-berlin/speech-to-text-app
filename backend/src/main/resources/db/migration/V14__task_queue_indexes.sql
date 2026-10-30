@@ -1,0 +1,28 @@
+-- Item 71: the queue queries filter and sort on tasks.status and tasks.queue_position, which had no
+-- index, so each read every task. The set below is what EXPLAIN QUERY PLAN asked for (SQLite 3.50.3,
+-- TaskQueryPlanSpec): one single-column index each. A composite (status, queue_position) is not
+-- added: with these two no plan scans `tasks`; the remaining TEMP B-TREE sorts only the rows the
+-- status lookup found (queue order is ASC NULLS LAST, id). The list reads every task by design: its
+-- one pass over `tasks` stays, and its joins were already lookups.
+--
+-- Before:
+--   nextQueuePosition  SCAN tasks | USE TEMP B-TREE FOR ORDER BY
+--   startedPaused      SCAN tasks | USE TEMP B-TREE FOR ORDER BY
+--   pendingOrderedIds  SCAN tasks | USE TEMP B-TREE FOR ORDER BY
+--   nextQueued         SCAN tasks | USE TEMP B-TREE FOR ORDER BY
+--   retryIfPossible    SCAN tasks | USE TEMP B-TREE FOR ORDER BY | SEARCH tasks USING INTEGER PRIMARY KEY (rowid=?)
+--   recoverRunning     SCAN tasks
+--   listDetails        SCAN tasks | SEARCH audio USING INTEGER PRIMARY KEY (rowid=?)
+--                      | SEARCH audio_header USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN
+--                      | SEARCH segments USING INDEX sqlite_autoindex_segments_1 (task_id=?) LEFT-JOIN
+-- After:
+--   nextQueuePosition  SEARCH tasks USING INDEX tasks_queue_position (queue_position>?)
+--   startedPaused      SEARCH tasks USING INDEX tasks_status (status=?) | USE TEMP B-TREE FOR ORDER BY
+--   pendingOrderedIds  SEARCH tasks USING INDEX tasks_status (status=?) | USE TEMP B-TREE FOR ORDER BY
+--   nextQueued         SEARCH tasks USING INDEX tasks_status (status=?) | USE TEMP B-TREE FOR ORDER BY
+--   retryIfPossible    SEARCH tasks USING INDEX tasks_queue_position (queue_position>?)
+--                      | SEARCH tasks USING INTEGER PRIMARY KEY (rowid=?)
+--   recoverRunning     SEARCH tasks USING INDEX tasks_status (status=?)
+--   listDetails        unchanged
+CREATE INDEX tasks_status ON tasks (status);
+CREATE INDEX tasks_queue_position ON tasks (queue_position);

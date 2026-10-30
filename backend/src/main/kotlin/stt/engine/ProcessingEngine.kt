@@ -30,7 +30,6 @@ import stt.audio.PcmDecoder
 import stt.audio.SAMPLES_PER_MS
 import stt.audio.WindowCutter
 import stt.audio.streamInfoTotalSamples
-import stt.audio.toCanonicalRows
 import stt.config.Config
 import stt.config.Device
 import stt.config.dbValue
@@ -695,7 +694,8 @@ class ProcessingEngine internal constructor(
             writeOriginal(id, source)
             val chunked = chunker.chunk(source, chunkerDir)
             tasks.setDurationMs(id, chunked.durationMs)
-            chunks.storeChunked(id, chunked.chunks, chunked.canonical.header, chunked.canonical.toCanonicalRows())
+            // The clip's rows are read from the chunker's scratch as they are inserted (item 71), so this precedes its removal.
+            chunks.storeChunked(id, chunked)
             // The canonical clip is now the task's stored audio: the original upload is no longer needed.
             audio.deleteOriginal(id)
         } finally {

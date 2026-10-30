@@ -39,6 +39,10 @@ CREATE TABLE tasks (
     diarization_progress REAL
 );
 
+-- V14 (item 71): the queue reads look tasks up by status and by queue position.
+CREATE INDEX tasks_status ON tasks (status);
+CREATE INDEX tasks_queue_position ON tasks (queue_position);
+
 -- One metadata row per task; the unique sha256 is the duplicate rule (at most one task per
 -- audio content). The audio itself lives in original_audio (until chunking) and in
 -- audio_header/audio_second (the canonical clip) afterwards.

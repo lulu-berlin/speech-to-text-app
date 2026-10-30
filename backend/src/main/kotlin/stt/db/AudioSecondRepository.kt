@@ -33,10 +33,10 @@ class AudioSecondRepository(
         db.readTransaction { AudioSecondTable.selectAll().where { AudioSecondTable.taskId eq taskId }.count() }
 }
 
-/** Replaces the task's canonical rows with [rows], inside the caller's transaction. */
+/** Replaces the task's canonical rows with [rows], inserted as [rows] yields them, inside the caller's transaction. */
 internal fun JdbcTransaction.replaceCanonicalRows(
     taskId: Long,
-    rows: List<CanonicalAudio>,
+    rows: Iterable<CanonicalAudio>,
 ) {
     AudioSecondTable.deleteWhere { AudioSecondTable.taskId eq taskId }
     rows.forEach { row ->

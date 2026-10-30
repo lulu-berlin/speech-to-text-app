@@ -5,21 +5,33 @@ import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import stt.audio.ChunkedAudio
 import stt.audio.PlannedChunk
 
 class ChunkRepository(
     private val db: Database,
 ) {
     /**
+     * Stores [chunked] — the windows and the canonical clip one chunking run produced — for [taskId], as the engine's
+     * CHUNKING phase does: the clip's rows are read one at a time while they are inserted (item 71).
+     */
+    suspend fun storeChunked(
+        taskId: Long,
+        chunked: ChunkedAudio,
+    ) {
+        chunked.canonical.useRows { rows -> storeChunked(taskId, chunked.chunks, chunked.canonical.header, rows.asIterable()) }
+    }
+
+    /**
      * Stores a chunking run's whole result in one write transaction (item 44): [taskId]'s chunk windows and the
-     * canonical clip's [header] and one-second [rows]. Whatever an interrupted earlier run stored for the task is
-     * replaced, so a stored plan always comes with its whole clip.
+     * canonical clip's [header] and one-second [rows], inserted as [rows] yields them. Whatever an interrupted earlier
+     * run stored for the task is replaced, so a stored plan always comes with its whole clip.
      */
     suspend fun storeChunked(
         taskId: Long,
         chunks: List<PlannedChunk>,
         header: ByteArray,
-        rows: List<CanonicalAudio>,
+        rows: Iterable<CanonicalAudio>,
     ) {
         db.writeTransaction {
             ChunksTable.deleteWhere { ChunksTable.taskId eq taskId }

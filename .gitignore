@@ -24,5 +24,9 @@ node_modules/
 dist/
 result
 
+# Heap dumps: a test that runs out of memory on purpose (item 71's heap bound) or a crashed worker
+# writes one into the working directory, and it is hundreds of megabytes.
+*.hprof
+
 # The e2e backend log (roadmap item 48: the macOS CI greps it for the whisper backend)
 /e2e/.e2e-backend.log

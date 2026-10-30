@@ -1,19 +1,6 @@
 package stt.audio
 
 /**
- * A stored canonical FLAC, split into its header (the `fLaC` marker and the metadata blocks, everything before
- * the first audio frame) and its frames in order. The header plus the frames is the encoded file byte for byte.
- */
-data class SplitFlac(
-    val header: ByteArray,
-    val frames: List<ByteArray>,
-) {
-    /** The clip's sample count, from STREAMINFO ([streamInfoTotalSamples]). */
-    val totalSamples: Long
-        get() = streamInfoTotalSamples(header)
-}
-
-/**
  * The clip's exact sample count: the total `header`'s STREAMINFO declares. STREAMINFO is the header's first
  * block, which FLAC requires: its 36-bit total sits at bit 108 of the block's data (after the 4-byte marker and
  * the 4-byte block header). The canonical encode writes to a file, so the count is filled in (a pipe would leave
@@ -36,7 +23,7 @@ internal fun streamInfoTotalSamples(header: ByteArray): Long {
 object FlacSplitter {
     private const val FRAME_SAMPLES = 4000
 
-    /** The header byte just past STREAMINFO's total sample count ([SplitFlac.totalSamples] reads bytes 21–25). */
+    /** The header byte just past STREAMINFO's total sample count ([FlacLayout.totalSamples] reads bytes 21–25). */
     private const val STREAMINFO_TOTAL_END = 26
 
     /** Thrown when [flac] is not the canonical frame layout, so it cannot be stored as a canonical clip. */
@@ -44,7 +31,11 @@ object FlacSplitter {
         message: String,
     ) : Exception(message)
 
-    fun split(flac: ByteArray): SplitFlac {
+    /**
+     * Walks [flac]'s frames and records where each one ends, copying out only the header (item 71): the frames stay
+     * where they are, for [FlacLayout.rows] to read a row at a time.
+     */
+    internal fun layout(flac: FlacBytes): FlacLayout {
         require(
             flac.size >= 4 && flac[0] == 0x66.toByte() && flac[1] == 0x4C.toByte() && flac[2] == 0x61.toByte() && flac[3] == 0x43.toByte(),
         ) {
@@ -64,12 +55,12 @@ object FlacSplitter {
             scan = sync + 2
         }
 
-        val frames = mutableListOf<ByteArray>()
+        val frameEnds = mutableListOf<Int>()
         var sampleCount = 0L
         var start = audioStart
         var next = 0
         while (start < flac.size) {
-            val number = frames.size
+            val number = frameEnds.size
             val header = frameHeaderAt(flac, start)
             if (header == null || !header.startsFrame(number)) throw NotCanonical("no frame $number at byte $start")
             val samples = header.blocksize
@@ -100,19 +91,19 @@ object FlacSplitter {
             if (samples != FRAME_SAMPLES && end != flac.size) {
                 throw NotCanonical("frame $number has $samples samples but is not the last")
             }
-            frames.add(flac.copyOfRange(start, end))
+            frameEnds.add(end)
             sampleCount += samples
             start = end
         }
-        if (frames.isEmpty()) throw NotCanonical("no frames found after the header")
+        if (frameEnds.isEmpty()) throw NotCanonical("no frames found after the header")
         // A frame the walk did not recognize would be folded into the one before it (a CRC-16 over two whole frames
         // closes where the second one's does); the frames then hold fewer samples than STREAMINFO declares.
         if (audioStart < STREAMINFO_TOTAL_END) throw NotCanonical("the header is too short for STREAMINFO")
-        val split = SplitFlac(flac.copyOfRange(0, audioStart), frames)
-        if (sampleCount != split.totalSamples) {
-            throw NotCanonical("the frames hold $sampleCount samples, but STREAMINFO declares ${split.totalSamples}")
+        val layout = FlacLayout(flac.copy(0, audioStart), frameEnds.toIntArray())
+        if (sampleCount != layout.totalSamples) {
+            throw NotCanonical("the frames hold $sampleCount samples, but STREAMINFO declares ${layout.totalSamples}")
         }
-        return split
+        return layout
     }
 
     /**
@@ -120,7 +111,7 @@ object FlacSplitter {
      * codes and the coded number's leading byte), then the whole header that length implies must fit too.
      */
     private fun frameHeaderAt(
-        flac: ByteArray,
+        flac: FlacBytes,
         at: Int,
     ): FrameHeader? {
         if (at + 4 >= flac.size) return null
@@ -136,7 +127,7 @@ object FlacSplitter {
      * header CRC-8 (1). Only [frameHeaderAt] makes one, so every field lies within [flac].
      */
     private class FrameHeader(
-        private val flac: ByteArray,
+        private val flac: FlacBytes,
         private val at: Int,
     ) {
         private val blockSizeCode = (flac[at + 2].toInt() ushr 4) and 0x0F
@@ -193,7 +184,7 @@ object FlacSplitter {
                 this.number == number
     }
 
-    private fun metadataEnd(flac: ByteArray): Int {
+    private fun metadataEnd(flac: FlacBytes): Int {
         var p = 4
         while (true) {
             if (p + 4 > flac.size) throw NotCanonical("truncated metadata")
@@ -209,7 +200,7 @@ object FlacSplitter {
 
     /** The next frame sync (0xFF 0xF8/0xF9) at or after [from], or null. */
     private fun findSync(
-        flac: ByteArray,
+        flac: FlacBytes,
         from: Int,
     ): Int? {
         var i = from
@@ -225,7 +216,7 @@ object FlacSplitter {
      * one byte, `110xxxxx` two, `1110xxxx` three, and so on (frame numbers stay well under 2^21).
      */
     private fun utf8Length(
-        flac: ByteArray,
+        flac: FlacBytes,
         p: Int,
     ): Int {
         val first = flac[p].toInt() and 0xFF
@@ -240,7 +231,7 @@ object FlacSplitter {
     }
 
     private fun crc8(
-        data: ByteArray,
+        data: FlacBytes,
         from: Int,
         toExclusive: Int,
     ): Int {
@@ -260,7 +251,7 @@ object FlacSplitter {
      * MSB-first, seeded with 0 (libFLAC's `FLAC__CRC16_UPDATE` over the frame, footer excluded).
      */
     private fun crc16(
-        flac: ByteArray,
+        flac: FlacBytes,
         from: Int,
         toExclusive: Int,
     ): Boolean {

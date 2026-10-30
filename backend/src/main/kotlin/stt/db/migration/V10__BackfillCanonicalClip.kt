@@ -5,12 +5,11 @@ import org.flywaydb.core.api.migration.BaseJavaMigration
 import org.flywaydb.core.api.migration.Context
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import stt.audio.ArrayFlacBytes
 import stt.audio.CANONICAL_FLAC_ARGS
 import stt.audio.FFMPEG
-import stt.audio.FlacRows
 import stt.audio.FlacSplitter
 import stt.audio.expectSuccess
-import stt.audio.toCanonicalRows
 import stt.process.ProcessRunner
 import java.nio.file.Files
 import java.nio.file.Path
@@ -122,13 +121,14 @@ class V10__BackfillCanonicalClip(
         taskId: Long,
         clip: ByteArray,
     ) {
-        val split = FlacSplitter.split(clip)
+        val bytes = ArrayFlacBytes(clip)
+        val layout = FlacSplitter.layout(bytes)
         connection.prepareStatement("INSERT INTO audio_header (task_id, header) VALUES (?, ?)").use { statement ->
             statement.setLong(1, taskId)
-            statement.setBytes(2, split.header)
+            statement.setBytes(2, layout.header)
             statement.executeUpdate()
         }
-        val rows = FlacRows.from(split).toCanonicalRows()
+        val rows = layout.rows(bytes)
         connection.prepareStatement("INSERT INTO audio_second (task_id, second, frames, bytes) VALUES (?, ?, ?, ?)").use { statement ->
             rows.forEach { row ->
                 statement.setLong(1, taskId)

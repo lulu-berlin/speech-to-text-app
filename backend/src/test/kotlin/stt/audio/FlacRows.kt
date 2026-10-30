@@ -2,6 +2,26 @@ package stt.audio
 
 import stt.db.CanonicalAudio
 
+/**
+ * A canonical FLAC in memory, split into its header (the `fLaC` marker and the metadata blocks, everything before
+ * the first audio frame) and copies of its frames in order: the header plus the frames is the encoded file byte for
+ * byte. Test-side form of [FlacLayout], for building clips and malformed streams.
+ */
+data class SplitFlac(
+    val header: ByteArray,
+    val frames: List<ByteArray>,
+) {
+    /** The clip's sample count, from STREAMINFO ([streamInfoTotalSamples]). */
+    val totalSamples: Long
+        get() = streamInfoTotalSamples(header)
+}
+
+/** Splits an in-memory FLAC into its header and copies of its frames, as [FlacSplitter.layout] finds them. */
+internal fun FlacSplitter.split(flac: ByteArray): SplitFlac {
+    val layout = layout(ArrayFlacBytes(flac))
+    return SplitFlac(layout.header, (0 until layout.frameCount).map { flac.copyOfRange(layout.frameStart(it), layout.frameEnd(it)) })
+}
+
 /** One stored row of a canonical clip: the [frames] of second [second], up to four 250 ms frames (item 44). */
 data class FlacRow(
     val second: Int,
@@ -26,7 +46,7 @@ data class FlacRows(
                 header = flac.header,
                 rows =
                     flac.frames
-                        .chunked(4)
+                        .chunked(FRAMES_PER_ROW)
                         .mapIndexed { second, frames -> FlacRow(second, frames) },
             )
     }

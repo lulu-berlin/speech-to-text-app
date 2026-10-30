@@ -105,6 +105,10 @@ files. `tasks.id` is the task id used everywhere.
 - `speakers_mode ∈ auto, off, fixed`; `speakers_count` is 1–20 only with `fixed`, else null.
 - `max_speakers` 1–20. `language` is a code from `docs/api/languages.json` or `auto`.
 - `diarization_stage ∈ EMBEDDING, CLUSTERING` only during DIARIZING, else null.
+- Indexes (V14, item 71): `tasks_status` on `tasks (status)` and `tasks_queue_position` on
+  `tasks (queue_position)`. The queue reads (next queued task, pending ids in queue order, the
+  started PAUSED task, the next queue position, retry's append, restart recovery) look rows up
+  through them instead of reading every task; only the task list reads all of `tasks`.
 
 `audio`: `task_id PK/FK`, `size_bytes`, `sha256 UNIQUE` (the duplicate rule: at most one task per
 audio content; the unique constraint is the authority).
@@ -201,6 +205,12 @@ segments), `createdAt`, `startedAt`, `finishedAt` (epoch ms or null).
 
 `transcriptionProgress` = (sum of DONE chunk durations + current chunk duration × chunk fraction)
 / total duration; zero total duration reports 0.
+
+The task list and the SSE snapshot read every task's shape in **one SQL statement**, whatever the
+number of tasks: `tasks` inner-joined with `audio`, left-joined with `audio_header` (`hasAudio` = a
+header row exists; the blob is not read) and with `segments`, grouped by `tasks.id` with
+`MAX(segments.end_ms)` as `transcribedUntilMs`. A single task's shape (`GET /api/tasks/{id}`) is the
+same statement restricted to its id. A rewrite must not query per task here (item 71).
 
 ### Queue
 
@@ -359,6 +369,10 @@ total is correct). Split into `audio_header` (the FLAC header) and `audio_second
 frames = one second; row k covers `[k·1000,(k+1)·1000)` ms). The splitter validates frame sync,
 header CRC-8, consecutive frame numbers and CRC-16; only the last frame may be shorter than 4000
 samples; frames must sum to STREAMINFO's total; anything else is refused as not canonical.
+The split reads the encoded file in place and records only where each frame ends; the rows are
+read from the file one at a time while they are inserted, in the same transaction as the plan and
+header (item 71). Chunking a clip never holds it whole in memory: the forked-JVM test stores a
+20-minute incompressible clip (~38.5 MB of FLAC) under a 48 MiB heap.
 
 Chunk planning:
 

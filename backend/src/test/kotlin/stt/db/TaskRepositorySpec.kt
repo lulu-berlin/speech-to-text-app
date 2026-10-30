@@ -226,4 +226,44 @@ class TaskRepositorySpec :
                 }
             }
         }
+
+        given("three tasks with audio: one chunked with two segments, one chunked without segments, one not chunked") {
+            `when`("the task list is read with its details") {
+                then("it issues one SQL statement, and each task's hasAudio and transcribedUntilMs are its own") {
+                    withDatabase { db ->
+                        val tasks = TaskRepository(db)
+                        val chunks = ChunkRepository(db)
+                        val transcribedId =
+                            tasks.createFromUpload(queuedTask("transcribed.wav", createdAt = 1L), "transcribed".byteInputStream())
+                        val chunkedId = tasks.createFromUpload(queuedTask("chunked.wav", createdAt = 2L), "chunked".byteInputStream())
+                        val uploadedId = tasks.createFromUpload(queuedTask("uploaded.wav", createdAt = 3L), "uploaded".byteInputStream())
+                        for (taskId in listOf(transcribedId, chunkedId)) {
+                            chunks.storeChunked(
+                                taskId,
+                                listOf(PlannedChunk(0L, 2_000L)),
+                                header = "header".toByteArray(),
+                                rows = listOf(CanonicalAudio(second = 0, frames = 4, bytes = "frames".toByteArray())),
+                            )
+                        }
+                        SegmentRepository(db).insertAll(
+                            transcribedId,
+                            listOf(
+                                Segment(chunkIdx = 0, seq = 0, startMs = 0L, endMs = 900L, text = "x", speakerId = null),
+                                Segment(chunkIdx = 0, seq = 1, startMs = 900L, endMs = 1_800L, text = "y", speakerId = null),
+                            ),
+                        )
+
+                        val (listed, statements) = StatementCounter.countStatements(dataDir) { tasks.listDetails() }
+
+                        statements shouldBe 1
+                        listed.associate { it.id to (it.hasAudio to it.transcribedUntilMs) } shouldBe
+                            mapOf(
+                                transcribedId to (true to 1_800L),
+                                chunkedId to (true to null),
+                                uploadedId to (false to null),
+                            )
+                    }
+                }
+            }
+        }
     })
