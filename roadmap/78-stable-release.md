@@ -5,7 +5,8 @@ Depends on: [49](../docs/specs/windows-support.md), [52](../docs/specs/edit-tran
 [65](../docs/specs/row-color-phase-observation.md), [68](../docs/specs/windows-audio-only-ffmpeg.md),
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](../docs/specs/frontend-state-and-errors.md),
 [74](74-desktop-presentation.md), [76](76-right-to-left-transcription.md),
-[77](../docs/specs/test-harness-temp-dirs.md), [79](../docs/specs/windows-e2e-journey.md) — the gates
+[77](../docs/specs/test-harness-temp-dirs.md), [79](../docs/specs/windows-e2e-journey.md),
+[84](84-e2e-reliability.md) — the gates
 proposed below — and the six MED known issues listed under Evidence, which no roadmap item handles
 today
 Blocks: —
@@ -68,6 +69,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 77 Upload spec shared temp dir | in progress | **yes** | a `macOS (gradle check)` flake undermines release verification |
 | 79 Full e2e journey on Windows | done | **yes** | 1.0 claims Windows support; the journey is the only suite not run there (item 49 covers the packaged specs only) |
 | 83 Diarization accuracy | spec-approved | after 1.0 | detection quality, measured on the user's recordings (decided 2026-10-30) |
+| 84 e2e reliability | spec-approved | **yes** | the Windows journey must gate again and the suites must not depend on clocks, sleeps or a stale UI (decided 2026-10-30) |
 
 ### Known issues a stable release must close (MED; planned by this item)
 
@@ -205,3 +207,6 @@ the e2e ffmpeg WAV-muxer issue (recorded on branch 52). Both must be closed befo
 - 2026-10-23 (the user): roadmap item 79 — the full e2e journey on Windows — is added as a 1.0 gate
   and to this item's dependencies, since 1.0 claims Windows support and the journey is the only
   suite not run there.
+- 2026-10-30 (the user): roadmap item 84 — e2e reliability (the Windows journey back in the
+  aggregate, no wall-clock or sleep-based assertions, a journey against the current UI, the settings
+  draft race) — is added as a 1.0 gate and to this item's dependencies.
