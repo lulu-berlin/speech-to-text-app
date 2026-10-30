@@ -112,15 +112,12 @@ class TaskRepository(
         }
 
     /**
-     * The task with the facts the API reports beside its row ([TaskDetails]), read in one transaction so they
-     * agree with each other. Every task is created with its upload's `audio` row ([createFromUpload]), so a
-     * task is read together with it.
+     * The task with the facts the API reports beside its row ([TaskDetails]), read in one statement — the list's
+     * ([listDetails]), restricted to [id] — so they agree with each other.
      */
     suspend fun details(id: Long): TaskDetails? =
         db.readTransaction {
-            TasksTable
-                .join(AudioTable, JoinType.INNER, TasksTable.id, AudioTable.taskId)
-                .selectAll()
+            detailsQuery()
                 .where { TasksTable.id eq id }
                 .singleOrNull()
                 ?.toDetails()
@@ -136,15 +133,13 @@ class TaskRepository(
         }
 
     /**
-     * Every task with the facts the API reports beside its row ([TaskDetails]), read in one transaction so
-     * the list is one consistent snapshot. Item 12's list route orders the result (pending tasks in queue
-     * order, then finished tasks newest `finishedAt` first).
+     * Every task with the facts the API reports beside its row ([TaskDetails]), read in one statement (item 71), so
+     * the list is one consistent snapshot whose cost does not grow by queries per task. Item 12's list route orders
+     * the result (pending tasks in queue order, then finished tasks newest `finishedAt` first).
      */
     suspend fun listDetails(): List<TaskDetails> =
         db.readTransaction {
-            TasksTable
-                .join(AudioTable, JoinType.INNER, TasksTable.id, AudioTable.taskId)
-                .selectAll()
+            detailsQuery()
                 .map { row -> row.toDetails() }
                 .sortedWith(ListOrder)
         }
@@ -478,27 +473,32 @@ internal fun JdbcTransaction.insertTaskRow(task: Task): Long =
 
 private fun ResultRow.toStoredTask() = StoredTask(this[TasksTable.id], toTask())
 
-/** The row (joined with `audio`) as the API's task view ([TaskDetails]). */
-private fun ResultRow.toDetails(): TaskDetails {
-    val id = this[TasksTable.id]
-    val lastSegmentEnd = SegmentsTable.endMs.max()
-    return TaskDetails(
-        id = id,
+/** The end of a task's last stored segment in [detailsQuery]'s rows; null while it has none. */
+private val lastSegmentEnd = SegmentsTable.endMs.max()
+
+/**
+ * Tasks with the facts [toDetails] reads, one row per task (item 71): every task is created with its upload's `audio`
+ * row ([createFromUpload]), so it is inner-joined; `audio_header` (one row or none per task) and `segments` are
+ * left-joined, and grouping by the task folds its segments into [lastSegmentEnd]. The header blob is never read.
+ */
+private fun detailsQuery() =
+    TasksTable
+        .join(AudioTable, JoinType.INNER, TasksTable.id, AudioTable.taskId)
+        .join(AudioHeaderTable, JoinType.LEFT, TasksTable.id, AudioHeaderTable.taskId)
+        .join(SegmentsTable, JoinType.LEFT, TasksTable.id, SegmentsTable.taskId)
+        .select(TasksTable.columns + AudioTable.sizeBytes + AudioHeaderTable.taskId + lastSegmentEnd)
+        .groupBy(TasksTable.id)
+
+/** A [detailsQuery] row as the API's task view ([TaskDetails]). */
+private fun ResultRow.toDetails() =
+    TaskDetails(
+        id = this[TasksTable.id],
         task = toTask(),
         sizeBytes = this[AudioTable.sizeBytes],
         // A task has audio once its canonical clip's header is stored (item 44); the clip is what `/audio` serves.
-        hasAudio =
-            !AudioHeaderTable
-                .select(AudioHeaderTable.taskId)
-                .where { AudioHeaderTable.taskId eq id }
-                .empty(),
-        transcribedUntilMs =
-            SegmentsTable
-                .select(lastSegmentEnd)
-                .where { SegmentsTable.taskId eq id }
-                .single()[lastSegmentEnd],
+        hasAudio = getOrNull(AudioHeaderTable.taskId) != null,
+        transcribedUntilMs = this[lastSegmentEnd],
     )
-}
 
 private fun ResultRow.toTask() =
     Task(

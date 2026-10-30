@@ -17,6 +17,7 @@ import stt.audio.FlacRows
 import stt.audio.FlacSplitter
 import stt.audio.encodeCanonical
 import stt.audio.sineWav
+import stt.audio.split
 import stt.audio.toCanonicalRows
 import stt.db.Database
 import stt.db.QueueStateRepository

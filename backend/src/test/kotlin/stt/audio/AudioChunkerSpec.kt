@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.coroutines.withTimeout
 import stt.Integration
+import stt.db.CanonicalAudio
 import stt.process.ProcessRunner
 import java.nio.file.Files
 import java.nio.file.Path
@@ -63,8 +64,8 @@ class AudioChunkerSpec :
                     streamInfo(workDir.resolve("canonical.flac")).shouldBe(FLAC_16_BIT_16K_MONO)
                     // The overwrite also reached the canonical FLAC, and what is stored is that file in the
                     // canonical layout: 48 000 / 4 000 = 12 frames of 4000 samples, four per one-second row.
-                    chunked.canonical.rows
-                        .map { it.frames.size }
+                    rowsOf(chunked.canonical)
+                        .map { it.frames }
                         .shouldBe(listOf(4, 4, 4))
                     storedBytes(chunked.canonical).shouldBe(Files.readAllBytes(workDir.resolve("canonical.flac")))
                 }
@@ -89,8 +90,8 @@ class AudioChunkerSpec :
                 then("the stored header and rows are the canonical FLAC byte for byte and decode to the source's samples in order") {
                     val chunked = chunkNoise(tempdir("stt-audio").toPath(), 10_048)
                     // Three frames in one row: 4000, 4000 and the 2048-sample tail; 10 048 / 16 = 628 ms.
-                    chunked.canonical.rows
-                        .map { it.frames.size }
+                    rowsOf(chunked.canonical)
+                        .map { it.frames }
                         .shouldBe(listOf(3))
                     chunked.durationMs.shouldBe(628L)
                 }
@@ -114,11 +115,14 @@ class AudioChunkerSpec :
         }
     })
 
-/** What the database stores for [rows]: the header row followed by every second's frames, in order. */
-private fun storedBytes(rows: FlacRows): ByteArray {
+/** The clip's rows, read as the store reads them. */
+private suspend fun rowsOf(clip: CanonicalRows): List<CanonicalAudio> = clip.useRows { it.toList() }
+
+/** What the database stores for [clip]: the header row followed by every second's frames, in order. */
+private suspend fun storedBytes(clip: CanonicalRows): ByteArray {
     val out = java.io.ByteArrayOutputStream()
-    out.write(rows.header)
-    rows.rows.forEach { out.write(it.joinToBytes()) }
+    out.write(clip.header)
+    rowsOf(clip).forEach { out.write(it.bytes) }
     return out.toByteArray()
 }
 

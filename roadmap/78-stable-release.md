@@ -59,7 +59,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 68 Windows audio-only ffmpeg | done | **yes** | otherwise the Windows deliverable ships bytedeco's full GPL `ffmpeg`+`ffprobe`, unlike Linux/macOS; licensing and size |
 | 69 macOS audio-only ffmpeg | in progress | **yes** | nearly done; darwin artifact consistency |
 | 70 Rust GUI window | spec-approved | after 1.0 | replaces Electron; a new shell |
-| 71 Repository and chunking performance | draft | after 1.0 | scaling improvement, not a correctness defect |
+| 71 Repository and chunking performance | done | after 1.0 | scaling improvement, not a correctness defect |
 | 72 Frontend state and errors | draft | **yes** | a stable UI must not hide failed actions |
 | 73 Split a speaker | spec-approved | after 1.0 | the manual remedy for wrongly merged speakers |
 | 74 Desktop presentation | draft | **yes** | icon, `.desktop` entry and glyph coverage are release polish, not optional |

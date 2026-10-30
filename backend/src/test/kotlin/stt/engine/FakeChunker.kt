@@ -3,12 +3,15 @@ package stt.engine
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import stt.audio.AudioDecodeException
+import stt.audio.CanonicalRows
 import stt.audio.ChunkedAudio
 import stt.audio.Chunker
 import stt.audio.FlacRow
 import stt.audio.FlacRows
 import stt.audio.PlannedChunk
 import stt.audio.fakeCanonicalHeader
+import stt.audio.toCanonicalRows
+import stt.db.CanonicalAudio
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -64,8 +67,17 @@ internal class FakeChunker : Chunker {
             if (workDirs.size >= holdFrom) hold?.await()
             if (task == decodeFailsFor) throw AudioDecodeException("fake decode failure of task $task")
             val clip = if (task == unwritablePlanFor) canonical.copy(rows = canonical.rows + canonical.rows.first()) else canonical
-            ChunkedAudio(durationMs = planned.last().endMs, chunks = planned, canonical = clip)
+            ChunkedAudio(durationMs = planned.last().endMs, chunks = planned, canonical = InMemoryClip(clip))
         }
+}
+
+/** [clip] as the store reads a clip: its rows one at a time. */
+private class InMemoryClip(
+    private val clip: FlacRows,
+) : CanonicalRows {
+    override val header: ByteArray get() = clip.header
+
+    override suspend fun <T> useRows(block: suspend (Sequence<CanonicalAudio>) -> T): T = block(clip.toCanonicalRows().asSequence())
 }
 
 /** The stand-in clip's length: one second, the one one-second row [FakeChunker] plans. */

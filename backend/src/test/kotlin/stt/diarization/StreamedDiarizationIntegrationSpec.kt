@@ -10,7 +10,6 @@ import stt.Integration
 import stt.audio.AudioChunker
 import stt.audio.AudioDecoder
 import stt.audio.SAMPLES_PER_MS
-import stt.audio.toCanonicalRows
 import stt.audio.toS16
 import stt.audio.writeWav
 import stt.config.realSpeakerModelPath
@@ -176,7 +175,7 @@ private suspend fun storedRecording(
     chunked.durationMs shouldBe totalSamples.toLong() / SAMPLES_PER_MS
     val tasks = TaskRepository(db)
     val taskId = tasks.createFromUpload(queuedTask("recording.wav", createdAt = 1), Files.newInputStream(recording))
-    ChunkRepository(db).storeChunked(taskId, chunked.chunks, chunked.canonical.header, chunked.canonical.toCanonicalRows())
+    ChunkRepository(db).storeChunked(taskId, chunked)
 
     // Each clip is split into two segments meeting at its midpoint: six segments whose windows start and end
     // mid-row and span several of the clip's one-second rows.

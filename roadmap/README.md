@@ -133,7 +133,7 @@ graph TD
   62 --> 69[69 macOS audio-only ffmpeg ✓]:::done
   48 --> 69
   70[70 Rust GUI window]
-  71[71 repository and chunking performance]
+  71[71 repository and chunking performance ✓]:::done
   72[72 frontend state and errors ✓]:::done
   73[73 split a speaker]
   74[74 desktop presentation]
@@ -239,7 +239,7 @@ graph TD
 | [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
 | [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
-| [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](71-repository-and-chunking-performance.md)               | spec-approved | —                           |
+| [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](../docs/specs/repository-and-chunking-performance.md)    | done          | —                           |
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
 | [73 — Split a speaker: move selected turns to a new speaker](73-diarization-speaker-separation.md)                                                                 | spec-approved | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](74-desktop-presentation.md)                                                 | spec-approved | —                           |
