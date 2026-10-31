@@ -123,6 +123,10 @@ None. (All settled 2026-10-31, see "Decided (consultation, 2026-10-31)".)
 - [ ] (setup) The journey jobs restore their dependencies, browsers and built UI from caches, a
       changed input (a lockfile, a frontend build input) misses the cache instead of serving stale
       content, and a cold run still passes; the effect over 5 runs is recorded
+- [ ] (specs) The fixed waits item 84 left outside its list are gone as assertions: `40-pause-queued`
+      no longer assumes a 3 s window for "the paused task never started", and `52-edit-segment`'s
+      no-scroll check and `59-header`'s sampling bound their windows to a signal or a recorded
+      measurement — each still able to fail on the regression it exists for
 - [ ] (must not break) Each journey runs the same specs as before (55, `18-macos-metal` skipped off
       macOS, counted across shards), a docs-only pull request still skips every heavy job, and the
       packaged desktop suites are unchanged
@@ -151,3 +155,8 @@ harness, not an app feature, and the existing journeys running unchanged are its
   `17-follow-mode` stays as it is; the account is on GitHub Free; after 1.0; exempt from ADR 0046.
   Test list proposed.
 - 2026-10-31: the user approved the test list as written; status set to spec-approved.
+- 2026-10-31: amended from item 84's review: the three fixed waits item 84 did not plan —
+  `40-pause-queued.spec.ts:35` (3 s, "the worker looked again"), `52-edit-segment.spec.ts:267`
+  (200 ms, no-scroll) and `59-header.spec.ts:110` (250 ms, a sampling cadence) — are folded here as
+  a test-list item, since this item already works on the journey's specs; the user chose this over a
+  new backlog row. Status stays spec-approved.
