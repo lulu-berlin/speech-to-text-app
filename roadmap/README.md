@@ -142,6 +142,7 @@ graph TD
   77[77 private test temp dirs ✓]:::done
   83[83 diarization accuracy]
   84[84 e2e reliability]
+  85[85 CI wall time]
   73 --> 83
   81[81 dropped row command ✓]:::done
   78[78 stable release]
@@ -160,6 +161,7 @@ graph TD
   51 --> 79
   79 --> 78
   84 --> 78
+  84 --> 85
   80[80 docs-only CI ✓]:::done
   49 --> 80
   51 --> 80
@@ -255,3 +257,4 @@ graph TD
 | [81 — A row command clicked while another one is in flight is dropped](../docs/specs/dropped-row-command.md)                                                                  | done          | —                           |
 | [83 — Diarization accuracy: fewer wrongly merged and wrongly split speakers in automatic detection](83-diarization-accuracy.md)                                    | spec-approved | 73                          |
 | [84 — e2e reliability: a Windows journey that can gate again, no wall-clock or sleep-based assertions, and a journey that tests the current UI](84-e2e-reliability.md) | spec-approved | —                           |
+| [85 — CI wall time: a code pull request's checks finish sooner without proving less](85-ci-wall-time.md)                                                                    | spec-approved | 84                          |
