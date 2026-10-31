@@ -73,6 +73,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 85 CI wall time | spec-approved | after 1.0 | CI speed, not release quality; item 84 covers reliability (decided 2026-10-31) |
 | 86 Mobile feasibility | spec-approved | after 1.0 | research into an Android/iOS port; the 1.0 support matrix is desktop only (decided 2026-10-31) |
 | 87 Writes wait for the connection | spec-approved | **yes** | a live write control while the app cannot write, and a browser's error text on screen, are release quality issues (decided 2026-10-31) |
+| 88 Localization | spec-approved | after 1.0 | every whisper language in the UI; 1.0 ships in English (decided 2026-10-31) |
 
 ### Known issues a stable release must close (MED; planned by this item)
 
