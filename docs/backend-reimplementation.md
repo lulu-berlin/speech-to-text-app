@@ -187,6 +187,7 @@ must match it (keys, types, nullability).
 | `PUT /api/tasks/{id}/speakers/{speakerId}` | `{speaker: string|null}` | `200` Speakers | Rename/reset; validations below. |
 | `POST /api/tasks/{id}/speakers/merge` | `{group:[ids], into:id}` | `200` Speakers | Folds members into `into`; mapping only. |
 | `DELETE /api/tasks/{id}/speakers/merges` | — | `200` Speakers | Reset all merges. |
+| `POST /api/tasks/{id}/speakers/reassign` | `{segmentIds:[ids], speakerId:id|null}` | `200` Speakers | Moves those segments to `speakerId`, or to a new speaker when null; rewrites `speaker_id`. |
 | `GET /api/settings` | — | `200` Settings | Includes `availableDevices`, `gpuNames` and `deviceProbeError` (null unless the startup probe failed). |
 | `PUT /api/settings` | the settings without `availableDevices`/`gpuNames` | `200` Settings | Validates in order; emits `settings-updated`. |
 | `DELETE /api/settings` | — | `200` Settings | Restores the defaults in one write (`auto`, `null`, `auto`, `auto`, `null`, `8`), clears the notice and emits `settings-updated`; idempotent. |
@@ -237,6 +238,14 @@ not-completed`. Merge: `group` of ≥ 2 ids, `into` in the group, no member alre
 `400 invalid-merge`; merged members bring along their own merges. Reset removes all merges. Both
 emit `speakers-merged`/`speakers-renamed` and answers the effective speakers.
 
+Reassign: `speakerId: null` creates a new speaker, its id the highest over all the task's speaker
+rows + 1 and its name the first free `Speaker N` from N = id + 1; the listed segments get the
+target's id in one write transaction, and a speaker left without segments loses its row. A task with
+merges bakes them in first, in the same write, its new speaker's id read over all rows before that.
+The answer is the effective speakers. Refusals, nothing stored: `409 not-completed`; `404 not-found` (unknown task, or
+a target unknown or merged away, re-checked inside the write); `400 invalid-reassignment` (empty selection, a segment the task
+does not have, or every selected segment already the target's).
+
 ### Events (`event:` name, `data:` JSON)
 
 - `snapshot` → `{tasks:[Task], queue:Queue}` (first on every connection).
@@ -244,7 +253,7 @@ emit `speakers-merged`/`speakers-renamed` and answers the effective speakers.
 - `task-progress` → `{id, transcriptionProgress, diarizationStage, diarizationProgress}`.
 - `queue-updated` → Queue (after every queue-membership change: pause/resume/reorder/leave).
 - `task-deleted` → `{id}`.
-- `speakers-renamed`/`speakers-merged` → `{id, speakers:[{speakerId,speaker}]}`.
+- `speakers-renamed`/`speakers-merged`/`speakers-reassigned` → `{id, speakers:[{speakerId,speaker}]}`.
 - `heartbeat` → `{}` every 5 s of silence; a client silent for 15 s reconnects and re-snapshots.
 - `settings-updated` → the settings without `availableDevices`/`gpuNames`.
 

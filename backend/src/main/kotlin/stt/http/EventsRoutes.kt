@@ -162,6 +162,7 @@ private suspend fun Event.sseName(): String =
         is Event.QueueUpdated -> "queue-updated"
         is Event.SpeakersRenamed -> "speakers-renamed"
         is Event.SpeakersMerged -> "speakers-merged"
+        is Event.SpeakersReassigned -> "speakers-reassigned"
         is Event.SegmentEdited -> "segment-edited"
         is Event.SettingsUpdated -> "settings-updated"
     }
@@ -187,11 +188,7 @@ private suspend fun Event.sseData(tasks: TaskRepository): String =
             SseJson.encodeToString(QueueJson(paused, taskIds))
         }
 
-        is Event.SpeakersRenamed -> {
-            SseJson.encodeToString(SpeakersEventJson(id, speakers.map { it.toJson() }))
-        }
-
-        is Event.SpeakersMerged -> {
+        is Event.SpeakersChanged -> {
             SseJson.encodeToString(SpeakersEventJson(id, speakers.map { it.toJson() }))
         }
 
@@ -209,7 +206,10 @@ private data class DeletedJson(
     val id: Long,
 )
 
-/** The payload of `speakers-renamed` and `speakers-merged` (item 22, `docs/api/speakers-*.json`): the task and its speakers. */
+/**
+ * The payload of `speakers-renamed` and `speakers-merged` (item 22) and `speakers-reassigned` (item
+ * 73's amendment), `docs/api/speakers-*.json`: the task and its speakers.
+ */
 @Serializable
 data class SpeakersEventJson(
     val id: Long,

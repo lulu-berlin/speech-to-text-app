@@ -2449,6 +2449,466 @@ describe('the themed player', () => {
       vi.restoreAllMocks();
     }
   });
+
+  it('offers Reassign speakers before Merge speakers…, and for a task with one speaker too', async () => {
+    // Item 73's amendment (user decision 2026-10-31): reassigning is the general correction, merging
+    // only helps a wrongly split speaker, so Reassign comes first and needs no second speaker.
+    await renderTranscript('3');
+    const panel = await screen.findByRole('region', { name: 'Speakers' });
+    await within(panel).findByRole('button', { name: 'Merge speakers…' });
+    const labels = within(panel)
+      .getAllByRole('button')
+      .map((button) => button.textContent);
+    expect(labels.indexOf('Reassign speakers')).toBeGreaterThanOrEqual(0);
+    expect(labels.indexOf('Reassign speakers')).toBeLessThan(labels.indexOf('Merge speakers…'));
+
+    // One speaker: merging has nothing to merge, reassigning is the main case to correct.
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json({
+          speakers: [{ speakerId: 0, speaker: 'Speaker 1' }],
+          hasMerges: false,
+          turns: [
+            { ...turnsFixture.turns[0]!, speakerId: 0 },
+            { ...turnsFixture.turns[1]!, speakerId: 0 },
+          ],
+        }),
+      ),
+    );
+    cleanup();
+    await renderTranscript('3');
+    const single = await screen.findByRole('region', { name: 'Speakers' });
+    expect(await within(single).findByRole('button', { name: 'Reassign speakers' })).toBeVisible();
+    expect(
+      within(single).queryByRole('button', { name: 'Merge speakers…' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the reassignment boxes and bar only in the mode, and counts the selected segments', async () => {
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    expect(await within(panel).findByRole('button', { name: 'Reassign speakers' })).toBeVisible();
+    // Nothing to tick until the mode starts.
+    expect(within(transcript).queryAllByRole('checkbox')).toHaveLength(0);
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Reassign speakers' }));
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    expect(bar).toHaveTextContent('Select segments to move to a different speaker');
+    expect(bar).toHaveTextContent('0 segments selected');
+    expect(within(bar).getByRole('button', { name: 'Move to…' })).toBeDisabled();
+    // A box beside every segment (4) and every turn (3).
+    expect(within(transcript).getAllByRole('checkbox')).toHaveLength(7);
+    expect(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    ).toBeInTheDocument();
+    expect(
+      within(transcript).getByRole('checkbox', { name: 'Select turn starting 00:09' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    );
+    expect(bar).toHaveTextContent('1 segment selected');
+    expect(within(bar).getByRole('button', { name: 'Move to…' })).toBeEnabled();
+  });
+
+  it('moves the selected segments to the chosen speaker and ends the mode', async () => {
+    // Item 73's amendment. Mock addition: /turns serves turns.json until the move, then segment 2
+    // under a new speaker 2 ("Speaker 3"), as the backend then reads.
+    const moved: Turns = {
+      speakers: [...turnsFixture.speakers, { speakerId: 2, speaker: 'Speaker 3' }],
+      hasMerges: false,
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 0,
+          endMs: 2100,
+          text: 'Good morning.',
+          segments: [{ id: 1, startMs: 0, endMs: 2100, text: 'Good morning.', edited: false }],
+        },
+        {
+          speakerId: 2,
+          startMs: 2400,
+          endMs: 5200,
+          text: 'Thanks for joining us today.',
+          segments: [
+            {
+              id: 2,
+              startMs: 2400,
+              endMs: 5200,
+              text: 'Thanks for joining us today.',
+              edited: false,
+            },
+          ],
+        },
+        turnsFixture.turns[1]!,
+        turnsFixture.turns[2]!,
+      ],
+    };
+    let isMoved = false;
+    const posted: { url: string; body: unknown }[] = [];
+    server.use(
+      http.get('/api/tasks/:id/turns', () => HttpResponse.json(isMoved ? moved : turnsFixture)),
+      http.post('/api/tasks/:id/speakers/reassign', async ({ request, params }) => {
+        posted.push({ url: String(params.id), body: await request.json() });
+        isMoved = true;
+        return HttpResponse.json({ speakers: moved.speakers });
+      }),
+    );
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    fireEvent.click(await within(panel).findByRole('button', { name: 'Reassign speakers' }));
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    fireEvent.click(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    );
+
+    // "Move to…" offers the shown speakers and a new one; "New speaker" is the default.
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move to…' }));
+    const picker = within(bar).getByRole('combobox', { name: 'Move to speaker' });
+    expect(within(picker).getByRole('option', { name: 'New speaker' })).toBeInTheDocument();
+    expect(within(picker).getByRole('option', { name: 'Speaker 1' })).toBeInTheDocument();
+    expect(within(picker).getByRole('option', { name: 'Speaker 2' })).toBeInTheDocument();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move' }));
+
+    // The request carries the ticked segment and a null target; the view reads /turns again and
+    // shows the moved segment under the new speaker, and the mode is over.
+    await waitFor(() => expect(within(transcript).getByText('Speaker 3')).toBeInTheDocument());
+    expect(posted).toEqual([{ url: '3', body: { segmentIds: [2], speakerId: null } }]);
+    expect(screen.queryByRole('region', { name: 'Reassign speakers' })).not.toBeInTheDocument();
+    expect(within(transcript).queryAllByRole('checkbox')).toHaveLength(0);
+  });
+
+  it("ticks all of a turn's segments from its box, and clears them when all are ticked", async () => {
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    fireEvent.click(await within(panel).findByRole('button', { name: 'Reassign speakers' }));
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    const box = (name: string) => within(transcript).getByRole('checkbox', { name });
+    const firstTurn = box('Select turn starting 00:00');
+    const firstSegment = box('Select segment starting 00:00');
+    const secondSegment = box('Select segment starting 00:02');
+    const thirdSegment = box('Select segment starting 00:05');
+
+    // The first turn holds segments 1 and 2: its box ticks both.
+    fireEvent.click(firstTurn);
+    expect(firstTurn).toBeChecked();
+    expect(firstSegment).toBeChecked();
+    expect(secondSegment).toBeChecked();
+    expect(bar).toHaveTextContent('2 segments selected');
+
+    // The second turn holds segment 3 alone; the count adds it.
+    fireEvent.click(box('Select turn starting 00:05'));
+    expect(thirdSegment).toBeChecked();
+    expect(bar).toHaveTextContent('3 segments selected');
+
+    // Ticking every segment of the first turn already, its box clears them and nothing else.
+    fireEvent.click(firstTurn);
+    expect(firstTurn).not.toBeChecked();
+    expect(firstSegment).not.toBeChecked();
+    expect(secondSegment).not.toBeChecked();
+    expect(thirdSegment).toBeChecked();
+    expect(bar).toHaveTextContent('1 segment selected');
+  });
+
+  it('leaves the mode with Cancel or Escape, Escape closing the picker first', async () => {
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    const start = () =>
+      fireEvent.click(within(panel).getByRole('button', { name: 'Reassign speakers' }));
+
+    // Escape leaves the mode, with the selection dropped and nothing sent.
+    start();
+    fireEvent.click(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    );
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Reassign speakers' })).not.toBeInTheDocument();
+    expect(within(transcript).queryAllByRole('checkbox')).toHaveLength(0);
+
+    // Entering it again starts from nothing ticked.
+    start();
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    expect(bar).toHaveTextContent('0 segments selected');
+
+    // With the picker open, Escape closes only the picker.
+    fireEvent.click(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    );
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move to…' }));
+    expect(within(bar).getByRole('combobox', { name: 'Move to speaker' })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(
+      within(bar).queryByRole('combobox', { name: 'Move to speaker' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Reassign speakers' })).toBeInTheDocument();
+
+    // Cancel leaves it too, and the transcript is untouched.
+    fireEvent.click(within(bar).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('region', { name: 'Reassign speakers' })).not.toBeInTheDocument();
+    expect((await within(transcript).findAllByText('Speaker 1')).length).toBe(2);
+  });
+
+  it('stops everything else while the mode is on, and pauses playback when it starts', async () => {
+    await renderTranscript('3');
+    const audio = screen.getByLabelText('Audio for interview.mp3') as HTMLAudioElement;
+    const play = vi.spyOn(audio, 'play').mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(audio, 'pause').mockImplementation(() => undefined);
+    const player = screen.getByRole('group', { name: 'Audio player' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    const transcript = screen.getByRole('region', { name: 'Transcript' });
+
+    // Playing, with a current segment whose controls are on show.
+    fireEvent.click(within(player).getByRole('button', { name: 'Play' }));
+    fireEvent(audio, new Event('play'));
+    fireEvent.click(within(transcript).getByText('Thanks for joining us today.'));
+    fireEvent(audio, new Event('pause'));
+
+    // Starting the mode pauses playback and takes every other control away.
+    fireEvent.click(await within(panel).findByRole('button', { name: 'Reassign speakers' }));
+    expect(pause).toHaveBeenCalled();
+    expect(within(player).getByRole('button', { name: 'Play' })).toBeDisabled();
+    expect(within(panel).getByRole('textbox', { name: 'Name of speaker 1' })).toBeDisabled();
+    fireEvent.click(within(transcript).getByText('Thanks for joining us today.'));
+    expect(
+      within(transcript).queryByRole('button', { name: 'Edit segment' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(transcript).queryByRole('button', { name: 'Play segment' }),
+    ).not.toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Merge speakers…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Actions for / })).toBeDisabled();
+
+    // The segments themselves are inert too: a click does not seek, a double-click and Enter or
+    // Space start nothing, and the text is no button role any more.
+    play.mockClear();
+    const atModeStart = audio.currentTime;
+    const segmentText = within(transcript).getByText('Thanks for joining us today.');
+    fireEvent.click(segmentText);
+    fireEvent.doubleClick(segmentText);
+    fireEvent.keyDown(segmentText, { key: 'Enter' });
+    fireEvent.keyDown(segmentText, { key: ' ' });
+    expect(audio.currentTime).toBe(atModeStart);
+    expect(play).not.toHaveBeenCalled();
+    expect(
+      within(transcript).queryByRole('button', { name: 'Thanks for joining us today.' }),
+    ).not.toBeInTheDocument();
+
+    // Cancel brings them back.
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Reassign speakers' })).getByRole('button', {
+        name: 'Cancel',
+      }),
+    );
+    expect(within(player).getByRole('button', { name: 'Play' })).toBeEnabled();
+    expect(within(panel).getByRole('textbox', { name: 'Name of speaker 1' })).toBeEnabled();
+    expect(within(panel).getByRole('button', { name: 'Merge speakers…' })).toBeEnabled();
+  });
+
+  it('asks before a move on a task with merges, and Cancel sends nothing', async () => {
+    // Item 73's amendment (user decision 2026-10-31): a move makes the merges permanent, so the
+    // view asks first. Mock addition: /turns reports merges until the move, then none (the move
+    // baked them in) and segment 2 under speaker 0.
+    const moved: Turns = {
+      speakers: turnsFixture.speakers,
+      hasMerges: false,
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 0,
+          endMs: 5200,
+          text: 'Good morning. Thanks for joining us today.',
+          segments: [
+            ...turnsFixture.turns[0]!.segments,
+            {
+              id: 2,
+              startMs: 2400,
+              endMs: 5200,
+              text: 'Thanks for joining us today.',
+              edited: false,
+            },
+          ],
+        },
+        turnsFixture.turns[1]!,
+        turnsFixture.turns[2]!,
+      ],
+    };
+    let isMoved = false;
+    const posted: unknown[] = [];
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json(isMoved ? moved : { ...turnsFixture, hasMerges: true }),
+      ),
+      http.post('/api/tasks/:id/speakers/reassign', async ({ request }) => {
+        posted.push(await request.json());
+        isMoved = true;
+        return HttpResponse.json({ speakers: moved.speakers });
+      }),
+    );
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    expect(
+      await within(panel).findByRole('button', { name: 'Reset all merges' }),
+    ).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Reassign speakers' }));
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    fireEvent.click(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    );
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move to…' }));
+    fireEvent.change(within(bar).getByRole('combobox', { name: 'Move to speaker' }), {
+      target: { value: '0' },
+    });
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move' }));
+
+    // The confirmation quotes the decision; Cancel sends nothing and keeps the selection.
+    const dialog = screen.getByRole('dialog', { name: 'Reassign speakers?' });
+    expect(dialog).toHaveTextContent(
+      'This task has merged speakers. Reassigning makes those merges permanent: "Reset all merges" will no longer be available.',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(posted).toEqual([]);
+    expect(bar).toHaveTextContent('1 segment selected');
+
+    // Confirmed, the move is sent and the merges are gone afterwards.
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Reassign speakers?' })).getByRole('button', {
+        name: 'Move',
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        within(panel).queryByRole('button', { name: 'Reset all merges' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(posted).toEqual([{ segmentIds: [2], speakerId: 0 }]);
+  });
+
+  it('re-reads /turns on a speakers-reassigned event, so a move made elsewhere shows at once', async () => {
+    // Item 73's amendment (docs/api/speakers-reassigned.json shape). Mock addition: /turns serves
+    // turns.json until another client's move, then segment 2 under a new speaker 2.
+    const moved: Turns = {
+      speakers: [...turnsFixture.speakers, { speakerId: 2, speaker: 'Speaker 3' }],
+      hasMerges: false,
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 0,
+          endMs: 2100,
+          text: 'Good morning.',
+          segments: [{ id: 1, startMs: 0, endMs: 2100, text: 'Good morning.', edited: false }],
+        },
+        {
+          speakerId: 2,
+          startMs: 2400,
+          endMs: 5200,
+          text: 'Thanks for joining us today.',
+          segments: [
+            {
+              id: 2,
+              startMs: 2400,
+              endMs: 5200,
+              text: 'Thanks for joining us today.',
+              edited: false,
+            },
+          ],
+        },
+        turnsFixture.turns[1]!,
+        turnsFixture.turns[2]!,
+      ],
+    };
+    let isMoved = false;
+    const turnsRequests = countTurnsRequests(() => (isMoved ? moved : turnsFixture));
+    const events = controllableEventStream();
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    expect((await within(transcript).findAllByText('Speaker 1')).length).toBe(2);
+    expect(turnsRequests()).toBe(1);
+
+    // Another client's move: the turns change along the moved segments, so the view reads /turns
+    // again and shows the new speaker.
+    isMoved = true;
+    events.send('speakers-reassigned', { id: 3, speakers: moved.speakers });
+    expect(await within(transcript).findByText('Speaker 3')).toBeInTheDocument();
+    expect(turnsRequests()).toBe(2);
+  });
+
+  it('keeps exactly the ticked segments across a reload of the turns', async () => {
+    // Item 73's amendment: the selection holds segment ids, so another client's change to the turns
+    // cannot move it to a different segment. Mock addition: four turns after the merge of the
+    // second and third.
+    const reloaded: Turns = {
+      speakers: turnsFixture.speakers,
+      hasMerges: false,
+      turns: [
+        {
+          speakerId: 0,
+          startMs: 0,
+          endMs: 2400,
+          text: 'Good morning.',
+          segments: [{ id: 1, startMs: 0, endMs: 2100, text: 'Good morning.', edited: false }],
+        },
+        {
+          speakerId: 0,
+          startMs: 2400,
+          endMs: 5200,
+          text: 'Thanks for joining us today.',
+          segments: [
+            {
+              id: 2,
+              startMs: 2400,
+              endMs: 5200,
+              text: 'Thanks for joining us today.',
+              edited: false,
+            },
+          ],
+        },
+        turnsFixture.turns[1]!,
+        turnsFixture.turns[2]!,
+      ],
+    };
+    let isReloaded = false;
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json(isReloaded ? reloaded : turnsFixture),
+      ),
+    );
+    const events = controllableEventStream();
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    fireEvent.click(await within(panel).findByRole('button', { name: 'Reassign speakers' }));
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    fireEvent.click(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    );
+
+    // The turns reload under the selection: segment 2 is still ticked, and nothing else is.
+    isReloaded = true;
+    events.send('speakers-merged', { id: 3, speakers: reloaded.speakers });
+    await waitFor(() =>
+      expect(
+        within(transcript).getAllByRole('checkbox', { name: /^Select segment starting / }),
+      ).toHaveLength(4),
+    );
+    const boxes = within(transcript).getAllByRole('checkbox', {
+      name: /^Select segment starting /,
+    });
+    expect(boxes.map((box) => (box as HTMLInputElement).checked)).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ]);
+    expect(bar).toHaveTextContent('1 segment selected');
+  });
 });
 
 describe('times past one hour', () => {

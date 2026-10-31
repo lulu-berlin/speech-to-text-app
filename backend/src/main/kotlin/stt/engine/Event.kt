@@ -43,17 +43,29 @@ sealed interface Event {
         val taskIds: List<Long>,
     ) : Event
 
+    /** The task's speakers changed; every such event carries the task's effective speakers as stored. */
+    sealed interface SpeakersChanged : Event {
+        val id: Long
+        val speakers: List<Speaker>
+    }
+
     /** A speaker of the task was renamed or had its name reset; item 22's `speakers-renamed` event. */
     data class SpeakersRenamed(
-        val id: Long,
-        val speakers: List<Speaker>,
-    ) : Event
+        override val id: Long,
+        override val speakers: List<Speaker>,
+    ) : SpeakersChanged
 
     /** The task's merges changed (a merge, or a reset of all merges); item 22's `speakers-merged` event. */
     data class SpeakersMerged(
-        val id: Long,
-        val speakers: List<Speaker>,
-    ) : Event
+        override val id: Long,
+        override val speakers: List<Speaker>,
+    ) : SpeakersChanged
+
+    /** Segments of the task moved to a speaker; item 73's amendment's `speakers-reassigned` event. */
+    data class SpeakersReassigned(
+        override val id: Long,
+        override val speakers: List<Speaker>,
+    ) : SpeakersChanged
 
     /** One segment's text was stored; item 52's `segment-edited` event, carrying the stored segment. */
     data class SegmentEdited(

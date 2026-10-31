@@ -135,6 +135,21 @@ export async function resetMerges(id: number): Promise<Speakers> {
   return json<Speakers>(response);
 }
 
+// Item 73's amendment: POST /api/tasks/{id}/speakers/reassign with { segmentIds, speakerId }
+// (null = a new speaker) -> 200 Speakers, the new speaker included when one was made.
+export async function reassignSegments(
+  id: number,
+  segmentIds: number[],
+  speakerId: number | null,
+): Promise<Speakers> {
+  const response = await fetch(`/api/tasks/${id}/speakers/reassign`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ segmentIds, speakerId }),
+  });
+  return json<Speakers>(response);
+}
+
 // The upload options of one file (item 12 contract): language from docs/api/languages.json,
 // speakers auto|off|<n> (1–20), maxSpeakers 1–20.
 export interface UploadOptions {
@@ -258,6 +273,11 @@ export function subscribeToEvents(
     }));
     listen<Speakers & { id: number }>('speakers-merged', ({ id, speakers }) => ({
       type: 'speakers-merged',
+      id,
+      speakers,
+    }));
+    listen<Speakers & { id: number }>('speakers-reassigned', ({ id, speakers }) => ({
+      type: 'speakers-reassigned',
       id,
       speakers,
     }));

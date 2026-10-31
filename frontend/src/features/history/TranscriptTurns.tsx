@@ -35,6 +35,13 @@ const TurnRow = styled.div`
 `;
 
 // A turn's start time in the gutter: muted, small, fixed-width digits.
+// A selection box of the reassignment mode (item 73's amendment): the accent when ticked and the
+// shared focus ring, like every focusable control.
+const SelectBox = styled.input`
+  accent-color: ${(props) => props.theme.colors.accent};
+  ${focusRing}
+`;
+
 const TurnGutter = styled.span`
   color: ${(props) => props.theme.colors.textMuted};
   font-size: ${(props) => props.theme.fontSizes.small};
@@ -61,6 +68,12 @@ const SpeakerName = styled.span<{ $color: string }>`
   display: block;
   color: ${(props) => props.$color};
   font-weight: ${(props) => props.theme.fontWeights.medium};
+`;
+
+// A segment's text while the reassignment mode is on (item 73's amendment): plain reading text, with
+// no button role, no keys and no pointer action, so the segment can only be ticked there.
+const SegmentInert = styled.span<{ $empty: boolean }>`
+  color: ${(props) => (props.$empty ? props.theme.colors.textMuted : 'inherit')};
 `;
 
 // A segment of a turn: inline text that moves the player to its start (items 9, 52), filled
@@ -445,6 +458,14 @@ function SegmentControls({
 export interface TranscriptTurnsProps {
   // Each turn with its speaker (undefined when speakers are off).
   turnsBySpeaker: { turn: Turn; speaker: TurnSpeaker | undefined }[];
+  // Item 73's amendment: the reassignment mode is on, so every segment and turn has a selection box.
+  reassigning: boolean;
+  // The segment ids ticked for the move.
+  selectedSegments: ReadonlySet<number>;
+  // A segment's box changed.
+  onToggleSegment: (segment: Segment) => void;
+  // A turn's box changed: all of its segments, or none.
+  onToggleTurn: (turn: Turn) => void;
   // The current segment (item 52): the playhead's, kept through a gap; null before the first.
   currentSegment: Segment | null;
   // Whether the audio is playing: the current segment's controls show only while nothing plays
@@ -485,6 +506,10 @@ export interface TranscriptTurnsProps {
 // segment is followed by its controls (item 52).
 export function TranscriptTurns({
   turnsBySpeaker,
+  reassigning,
+  selectedSegments,
+  onToggleSegment,
+  onToggleTurn,
   currentSegment,
   playing,
   playingOnItsOwnId,
@@ -505,7 +530,17 @@ export function TranscriptTurns({
     <TurnsList gap="lg">
       {turnsBySpeaker.map(({ turn, speaker }, index) => (
         <TurnRow key={index}>
-          <TurnGutter>{formatDuration(turn.startMs)}</TurnGutter>
+          <TurnGutter>
+            {reassigning ? (
+              <SelectBox
+                type="checkbox"
+                aria-label={`Select turn starting ${formatDuration(turn.startMs)}`}
+                checked={turn.segments.every((segment) => selectedSegments.has(segment.id))}
+                onChange={() => onToggleTurn(turn)}
+              />
+            ) : null}{' '}
+            {formatDuration(turn.startMs)}
+          </TurnGutter>
           <TurnBody>
             <Stack gap="xs">
               {speaker !== undefined ? (
@@ -523,31 +558,46 @@ export function TranscriptTurns({
                   const editing = segment.id === editingSegmentId;
                   return (
                     <span key={`${segment.startMs}-${segment.endMs}`}>
-                      <SegmentButton
-                        role="button"
-                        tabIndex={0}
-                        $current={segment === currentSegment}
-                        $empty={empty}
-                        data-active={segment === currentSegment || undefined}
-                        aria-current={segment === currentSegment || undefined}
-                        onClick={() => onSegmentSeek(segment)}
-                        onDoubleClick={() => onSegmentPlay(segment)}
-                        onKeyDown={(event) => {
-                          // A native button's keys: Enter and Space activate, and Space must
-                          // not scroll the page.
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            if (segment === currentSegment) {
-                              onCurrentToggle();
-                            } else {
-                              onSegmentPlay(segment);
+                      {reassigning ? (
+                        <SelectBox
+                          type="checkbox"
+                          aria-label={`Select segment starting ${formatDuration(segment.startMs)}`}
+                          checked={selectedSegments.has(segment.id)}
+                          onChange={() => onToggleSegment(segment)}
+                        />
+                      ) : null}
+                      {reassigning ? (
+                        <SegmentInert $empty={empty}>
+                          {empty ? EMPTY_TEXT : segment.text}
+                        </SegmentInert>
+                      ) : (
+                        <SegmentButton
+                          role="button"
+                          tabIndex={0}
+                          $current={segment === currentSegment}
+                          $empty={empty}
+                          data-active={segment === currentSegment || undefined}
+                          aria-current={segment === currentSegment || undefined}
+                          onClick={() => onSegmentSeek(segment)}
+                          onDoubleClick={() => onSegmentPlay(segment)}
+                          onKeyDown={(event) => {
+                            // A native button's keys: Enter and Space activate, and Space must
+                            // not scroll the page.
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              if (segment === currentSegment) {
+                                onCurrentToggle();
+                              } else {
+                                onSegmentPlay(segment);
+                              }
                             }
-                          }
-                        }}
-                      >
-                        {empty ? EMPTY_TEXT : segment.text}
-                      </SegmentButton>
-                      {segment === currentSegment &&
+                          }}
+                        >
+                          {empty ? EMPTY_TEXT : segment.text}
+                        </SegmentButton>
+                      )}{' '}
+                      {!reassigning &&
+                      segment === currentSegment &&
                       (!playing || segment.id === playingOnItsOwnId) ? (
                         <SegmentControls
                           segment={segment}

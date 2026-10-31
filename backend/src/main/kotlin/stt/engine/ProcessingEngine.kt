@@ -43,6 +43,7 @@ import stt.db.ChunkStatus
 import stt.db.DiarizationStage
 import stt.db.MergeOutcome
 import stt.db.QueueStateRepository
+import stt.db.ReassignOutcome
 import stt.db.RenameOutcome
 import stt.db.ScratchDir
 import stt.db.SegmentRepository
@@ -364,6 +365,23 @@ class ProcessingEngine internal constructor(
     suspend fun resetMerges(id: Long) {
         segments.resetMerges(id)
         _events.emit(Event.SpeakersMerged(id, segments.findDiarized(id).speakers))
+    }
+
+    /**
+     * Moves the segments [segmentIds] of task [id] to speaker [speakerId], a new one when null (item 73's amendment)
+     * and, only once they are stored, publishes the task's effective speakers as `speakers-reassigned`. A refused move
+     * ([ReassignOutcome.Invalid]) stores and publishes nothing.
+     */
+    suspend fun reassignSegments(
+        id: Long,
+        segmentIds: List<Long>,
+        speakerId: Int?,
+    ): ReassignOutcome {
+        val outcome = segments.reassignSegments(id, segmentIds, speakerId)
+        if (outcome == ReassignOutcome.Reassigned) {
+            _events.emit(Event.SpeakersReassigned(id, segments.findDiarized(id).speakers))
+        }
+        return outcome
     }
 
     /**

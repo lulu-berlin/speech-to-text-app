@@ -1,0 +1,4 @@
+{
+  "error": "invalid-reassignment",
+  "message": "every selected segment already belongs to speaker 0"
+}

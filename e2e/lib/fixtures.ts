@@ -9,6 +9,8 @@ import {
   FIXTURE_CLIPS,
   MERGE_CLIP,
   MERGE_SOURCE_IDS,
+  REASSIGN_CLIP,
+  REASSIGN_SOURCE_IDS,
   librispeechDir,
 } from './backend.ts';
 
@@ -150,6 +152,11 @@ export function writeFixtures(fixturesDir: string): void {
   // The two-speaker recording: the three committed LibriSpeech clips back to back.
   const merge = MERGE_SOURCE_IDS.map((id) => decodeSamples(join(librispeechDir, `${id}.flac`)));
   writeFileSync(join(fixturesDir, MERGE_CLIP), wavPcm16(concatSamples(merge)));
+  // Item 73's reassignment journey: reader 1089 twice, so one turn holds two segments.
+  const reassign = REASSIGN_SOURCE_IDS.map((id) =>
+    decodeSamples(join(librispeechDir, `${id}.flac`)),
+  );
+  writeFileSync(join(fixturesDir, REASSIGN_CLIP), wavPcm16(concatSamples(reassign)));
   // A .wav whose bytes are not audio: it passes the upload's extension check and fails
   // when the engine decodes it (CHUNKING).
   writeFileSync(

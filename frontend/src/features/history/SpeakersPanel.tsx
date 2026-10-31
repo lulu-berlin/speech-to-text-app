@@ -25,6 +25,10 @@ export interface SpeakersPanelProps {
   onSpeakersChanged: (speakers: TurnSpeaker[]) => void;
   // Runs after a stored merge or reset; the turns themselves changed.
   onMergesChanged: () => void;
+  // Item 73's amendment: whether the transcript's reassignment mode is on.
+  reassigning: boolean;
+  // The "Reassign speakers" action was pressed.
+  onStartReassign: () => void;
 }
 
 const ErrorText = styled(Text)`
@@ -49,6 +53,8 @@ export function SpeakersPanel({
   hasMerges,
   onSpeakersChanged,
   onMergesChanged,
+  reassigning,
+  onStartReassign,
 }: SpeakersPanelProps) {
   const [merge, mergeSend] = useMachine(
     speakerMergeMachine.provide({ actions: { merged: () => onMergesChanged() } }),
@@ -72,12 +78,23 @@ export function SpeakersPanel({
             key={speaker.speakerId}
             taskId={taskId}
             speaker={speaker}
+            disabled={reassigning}
             onSpeakersChanged={onSpeakersChanged}
           />
         ))}
         <Row gap="sm">
+          {!reassigning ? (
+            <Button type="button" variant="secondary" onClick={onStartReassign}>
+              Reassign speakers
+            </Button>
+          ) : null}
           {speakers.length >= 2 && merge.matches('closed') ? (
-            <Button type="button" variant="secondary" onClick={() => mergeSend({ type: 'OPEN' })}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={reassigning}
+              onClick={() => mergeSend({ type: 'OPEN' })}
+            >
               Merge speakers…
             </Button>
           ) : null}
@@ -85,7 +102,7 @@ export function SpeakersPanel({
             <Button
               type="button"
               variant="secondary"
-              disabled={reset.matches('sending')}
+              disabled={reassigning || reset.matches('sending')}
               onClick={() => resetSend({ type: 'RESET' })}
             >
               Reset all merges
@@ -93,7 +110,7 @@ export function SpeakersPanel({
           ) : null}
         </Row>
         {reset.context.error !== null ? <ErrorText>{reset.context.error.message}</ErrorText> : null}
-        {merge.matches('closed') ? null : (
+        {merge.matches('closed') || reassigning ? null : (
           <Stack gap="xs">
             {speakers.map((speaker) => (
               <label key={speaker.speakerId}>
@@ -140,7 +157,7 @@ export function SpeakersPanel({
         )}
       </Stack>
       <ConfirmDialog
-        open={merge.matches('confirming') || merge.matches('sending')}
+        open={!reassigning && (merge.matches('confirming') || merge.matches('sending'))}
         title="Merge speakers?"
         confirmLabel="Merge"
         onConfirm={() => mergeSend({ type: 'CONFIRM' })}
@@ -155,10 +172,12 @@ export function SpeakersPanel({
 interface SpeakerNameFieldProps {
   taskId: number;
   speaker: TurnSpeaker;
+  // Disabled while the transcript's reassignment mode is on (item 73's amendment).
+  disabled: boolean;
   onSpeakersChanged: (speakers: TurnSpeaker[]) => void;
 }
 
-function SpeakerNameField({ taskId, speaker, onSpeakersChanged }: SpeakerNameFieldProps) {
+function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: SpeakerNameFieldProps) {
   const [state, send] = useMachine(
     speakerRenameMachine.provide({
       actions: { renamed: (_, result) => onSpeakersChanged(result.speakers) },
@@ -178,7 +197,7 @@ function SpeakerNameField({ taskId, speaker, onSpeakersChanged }: SpeakerNameFie
           type="text"
           aria-label={`Name of speaker ${speaker.speakerId + 1}`}
           value={state.context.draft}
-          disabled={state.matches('sending')}
+          disabled={disabled || state.matches('sending')}
           onChange={(event) => send({ type: 'EDIT', value: event.target.value })}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
@@ -191,7 +210,7 @@ function SpeakerNameField({ taskId, speaker, onSpeakersChanged }: SpeakerNameFie
           type="button"
           variant="secondary"
           aria-label={`Reset name of speaker ${speaker.speakerId + 1}`}
-          disabled={state.matches('sending')}
+          disabled={disabled || state.matches('sending')}
           onClick={() => send({ type: 'RESET' })}
         >
           Reset name

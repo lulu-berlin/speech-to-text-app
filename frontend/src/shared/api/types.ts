@@ -118,6 +118,8 @@ export type ServerEvent =
   // speakers after a stored rename, or after a merge or reset of all merges.
   | { type: 'speakers-renamed'; id: number; speakers: TurnSpeaker[] }
   | { type: 'speakers-merged'; id: number; speakers: TurnSpeaker[] }
+  // Item 73 (docs/api/speakers-reassigned.json): the task's effective speakers after a stored move.
+  | { type: 'speakers-reassigned'; id: number; speakers: TurnSpeaker[] }
   // Item 52 (docs/api/segment-edited.json): the one segment a stored edit changed.
   | { type: 'segment-edited'; id: number; segment: Segment }
   // Item 32 (docs/api/settings-updated*.json): the stored settings after a write, a dismissed

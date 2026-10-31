@@ -59,6 +59,7 @@ const SSE_EXAMPLES: Record<string, string[]> = {
   'task-deleted': ['task-deleted'],
   'speakers-renamed': ['speakers-renamed'],
   'speakers-merged': ['speakers-merged'],
+  'speakers-reassigned': ['speakers-reassigned'],
   heartbeat: ['heartbeat'],
 };
 

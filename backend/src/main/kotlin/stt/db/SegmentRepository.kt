@@ -5,8 +5,11 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.isNotNull
+import org.jetbrains.exposed.v1.core.notInList
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
@@ -269,6 +272,111 @@ class SegmentRepository(
      */
     suspend fun resetMerges(taskId: Long) {
         db.writeTransaction { SpeakerMergeTable.deleteWhere { SpeakerMergeTable.taskId eq taskId } }
+    }
+
+    /**
+     * Moves the task's segments [segmentIds] to speaker [speakerId] (item 73's amendment), in one write transaction. An
+     * existing [speakerId] takes them as they are, and no speaker row is added; a null [speakerId] is a new speaker: a
+     * `speakers` row with the task's highest speaker id + 1 over all its rows, named with the first `"Speaker N"` from
+     * N = id + 1 that no speaker of the task has in any letter case.
+     */
+    suspend fun reassignSegments(
+        taskId: Long,
+        segmentIds: List<Long>,
+        speakerId: Int?,
+    ): ReassignOutcome =
+        db.writeTransaction {
+            val selected = segmentIds.toSet()
+            if (selected.isEmpty()) return@writeTransaction ReassignOutcome.Invalid("segmentIds names no segment")
+            val rows = selectSegments(taskId)
+            val intoOf = selectMerges(taskId)
+            // The target is re-checked here, in the same transaction that rewrites the rows: one that a merge made
+            // unknown since the route's look must refuse the move, never fail it on the segment's foreign key.
+            if (speakerId != null) {
+                val targets = selectSpeakers(taskId).map { it.speakerId }.toSet()
+                if (speakerId !in targets || speakerId in intoOf) return@writeTransaction ReassignOutcome.UnknownSpeaker
+            }
+            val own = rows.mapNotNull { it.id }.toSet()
+            (selected - own).firstOrNull()?.let {
+                return@writeTransaction ReassignOutcome.Invalid("task $taskId has no segment $it")
+            }
+            // A move that changes nothing: every selected segment already belongs to the target, as readers see it
+            // (through the merge mapping, since no merge has been baked yet).
+            if (speakerId != null) {
+                val unchanged =
+                    rows
+                        .filter { it.id in selected }
+                        .all { (intoOf[it.speakerId] ?: it.speakerId) == speakerId }
+                if (unchanged) {
+                    return@writeTransaction ReassignOutcome.Invalid("every selected segment already belongs to speaker $speakerId")
+                }
+            }
+            // The new speaker's id is read over all rows before the bake-in and any removal (user decision 2026-10-31).
+            val target = speakerId ?: selectSpeakers(taskId).maxOf { it.speakerId } + 1
+            bakeMerges(taskId, intoOf)
+            if (speakerId == null) insertNewSpeaker(taskId, target)
+            SegmentsTable.update({ (SegmentsTable.taskId eq taskId) and (SegmentsTable.id inList segmentIds) }) {
+                it[SegmentsTable.speakerId] = target
+            }
+            deleteEmptySpeakers(taskId)
+            ReassignOutcome.Reassigned
+        }
+
+    /**
+     * Deletes the speaker rows of task [taskId] that no segment references, inside the caller's write transaction (item
+     * 73's amendment: a speaker left without segments loses its row). Its id was counted by [insertNewSpeaker] before
+     * the removal, so it is never handed out again.
+     */
+    private fun deleteEmptySpeakers(taskId: Long) {
+        val used =
+            SegmentsTable
+                .select(SegmentsTable.speakerId)
+                .where { (SegmentsTable.taskId eq taskId) and SegmentsTable.speakerId.isNotNull() }
+                .mapNotNull { it[SegmentsTable.speakerId] }
+                .toSet()
+        if (used.isEmpty()) return
+        SpeakersTable.deleteWhere { (SpeakersTable.taskId eq taskId) and (SpeakersTable.speakerId notInList used) }
+    }
+
+    /**
+     * Adds speaker [speakerId] to task [taskId], inside the caller's write transaction: its name is the first
+     * `"Speaker N"` from N = id + 1 that no speaker of the task has in any letter case. The id itself is chosen by the
+     * caller, before any removal.
+     */
+    private fun insertNewSpeaker(
+        taskId: Long,
+        speakerId: Int,
+    ) {
+        val speakers = selectSpeakers(taskId)
+        val name =
+            generateSequence(speakerId) { it + 1 }
+                .map(::defaultSpeakerName)
+                .first { candidate -> speakers.none { it.speaker.equals(candidate, ignoreCase = true) } }
+        SpeakersTable.insert {
+            it[SpeakersTable.taskId] = taskId
+            it[SpeakersTable.speakerId] = speakerId
+            it[speaker] = name
+        }
+    }
+
+    /**
+     * Makes task [taskId]'s merges permanent, inside the caller's write transaction (item 73): every merged speaker's
+     * segments are stored under its survivor, and its `speaker_merge` row and its `speakers` row are deleted, so the
+     * transcript reads the same while "Reset all merges" has nothing left to undo. The mapping is flat, so one pass
+     * over [intoOf] suffices. Tasks without merges cost nothing.
+     */
+    private fun bakeMerges(
+        taskId: Long,
+        intoOf: Map<Int, Int>,
+    ) {
+        if (intoOf.isEmpty()) return
+        for ((merged, into) in intoOf) {
+            SegmentsTable.update({ (SegmentsTable.taskId eq taskId) and (SegmentsTable.speakerId eq merged) }) {
+                it[SegmentsTable.speakerId] = into
+            }
+        }
+        SpeakerMergeTable.deleteWhere { SpeakerMergeTable.taskId eq taskId }
+        SpeakersTable.deleteWhere { (SpeakersTable.taskId eq taskId) and (SpeakersTable.speakerId inList intoOf.keys) }
     }
 
     /**

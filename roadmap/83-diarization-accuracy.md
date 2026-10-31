@@ -1,8 +1,9 @@
 # 83 — Diarization accuracy: fewer wrongly merged and wrongly split speakers in automatic detection
 
 Status: spec-approved
-Depends on: [73](73-diarization-speaker-separation.md) (the split action: the reference labels are
-made by correcting the app's output, which needs split as well as merge)
+Depends on: [73](../docs/specs/speaker-reassignment.md) (reassigning speakers: the reference labels
+are made by correcting the app's output, which needs moving segments between speakers as well as
+merging)
 Blocks: —
 
 ## Goal
@@ -100,7 +101,7 @@ against today's pipeline, and only changes the measurement supports are adopted.
   each family in the release — 3D-Speaker, WeSpeaker and NeMo, including NeMo's different front-end —
   but not necessarily every export; `pyannote/segmentation-3.0` is compared from the first trials.
 - **The reference labels are the app's output, corrected** (the user, 2026-10-30): the user corrects
-  each recording's diarization in the transcript view (merge, split, rename), a Kotlin tool in the
+  each recording's diarization in the transcript view (merge, reassign, rename), a Kotlin tool in the
   backend's test sources exports it to one `speaker start end` line per turn, and the user then
   splits each mixed segment by hand in the exported file at the speaker change. The labels keep the
   changes inside whisper segments, so the mixed-segment share and the segmentation model stay
@@ -166,7 +167,7 @@ None. (All settled 2026-10-29/30, see "Decided (consultation, 2026-10-29)".)
       three turns
 - [ ] When the results are recorded, no Python file is tracked and the exploration's Python is
       deleted from `.devenv/state/stt-eval/`
-- [ ] (must not break) Fixed-count mode, rename, merge and split, and the existing diarization suites
+- [ ] (must not break) Fixed-count mode, rename, merge and reassign, and the existing diarization suites
       stay green
 
 ## Acceptance criteria

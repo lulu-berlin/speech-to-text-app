@@ -155,7 +155,10 @@ test('the finished shell: sticky header, nav pills, brand home link, text-only c
       await shot('shell-transcript-scrolled', width, theme, viewport);
     }
   }
+  // Back at the top, the mark returns. The page no longer fits the desktop viewport either
+  // (the transcript's controls grew since item 59), so scrolling up is what brings it back.
   await page.setViewportSize(DESKTOP_VIEWPORT);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await expect(headerMascot).toBeVisible();
 });
 

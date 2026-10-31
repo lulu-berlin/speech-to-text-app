@@ -319,6 +319,32 @@ paths:
               schema: {$ref: "#/components/schemas/Speakers"}
         "404": {$ref: "#/components/responses/NotFound"}
         "409": {$ref: "#/components/responses/Conflict"}
+  /api/tasks/{id}/speakers/reassign:
+    parameters: [{$ref: "#/components/parameters/TaskId"}]
+    post:
+      tags: [speakers]
+      summary: Move segments to an existing speaker, or to a new one (speakerId null); segment rows rewritten
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [segmentIds, speakerId]
+              properties:
+                segmentIds:
+                  type: array
+                  items: {type: integer, format: int64}
+                speakerId: {type: integer, nullable: true}
+      responses:
+        "200":
+          description: The task's effective speakers
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Speakers"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
   /api/tasks/{id}/segments/{segmentId}:
     parameters:
       - {$ref: "#/components/parameters/TaskId"}
@@ -423,7 +449,7 @@ paths:
       description: |
         `text/event-stream`. On connect the first frame is `snapshot`; then `task-updated`
         (full Task), `task-progress`, `queue-updated`, `task-deleted`, `speakers-renamed`,
-        `speakers-merged`, `segment-edited`, `settings-updated`; `heartbeat` after 5 s of silence. A subscriber
+        `speakers-merged`, `speakers-reassigned`, `segment-edited`, `settings-updated`; `heartbeat` after 5 s of silence. A subscriber
         that falls behind the buffer is disconnected (the client reconnects and re-snapshots).
       responses:
         "200":
@@ -439,6 +465,7 @@ paths:
         task-deleted: {$ref: "#/components/schemas/TaskDeletedEvent"}
         speakers-renamed: {$ref: "#/components/schemas/SpeakersChangedEvent"}
         speakers-merged: {$ref: "#/components/schemas/SpeakersChangedEvent"}
+        speakers-reassigned: {$ref: "#/components/schemas/SpeakersChangedEvent"}
         segment-edited: {$ref: "#/components/schemas/SegmentEditedEvent"}
         settings-updated: {$ref: "#/components/schemas/SettingsChanged"}
         heartbeat:

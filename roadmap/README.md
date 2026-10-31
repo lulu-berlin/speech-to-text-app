@@ -135,7 +135,7 @@ graph TD
   70[70 Rust GUI window]
   71[71 repository and chunking performance ✓]:::done
   72[72 frontend state and errors ✓]:::done
-  73[73 split a speaker]
+  73[73 reassign speakers ✓]:::done
   74[74 desktop presentation ✓]:::done
   75[75 retire the Python oracle ✓]:::done
   76[76 RTL transcription]
@@ -248,7 +248,7 @@ graph TD
 | [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
 | [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](../docs/specs/repository-and-chunking-performance.md)    | done          | —                           |
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
-| [73 — Split a speaker: move selected turns to a new speaker](73-diarization-speaker-separation.md)                                                                 | spec-approved | —                           |
+| [73 — Reassign speakers: move selected segments to an existing or a new speaker](../docs/specs/speaker-reassignment.md)                                            | done          | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](../docs/specs/desktop-presentation.md)                                      | done          | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](../docs/specs/oracle-retirement.md)                                                               | done          | —                           |
 | [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70                           |

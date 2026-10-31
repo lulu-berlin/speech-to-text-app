@@ -25,12 +25,12 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 | Task deleted | `task-deleted.json` | event `task-deleted` |
 | Turns | `turns.json`, `turns.speakers-off.json` | `GET /api/tasks/{id}/turns`; `200` of `PUT /api/tasks/{id}/segments/{segmentId}` and of `POST /api/tasks/{id}/segments/{segmentId}/revert` (item 52, ADR 0061) |
 | Segment edited event | `segment-edited.json` | event `segment-edited`: the one segment a stored edit changed (item 52) |
-| Speakers | `speakers.json` | `200` of `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge` and `DELETE /api/tasks/{id}/speakers/merges` (item 22) |
-| Speakers event | `speakers-renamed.json`, `speakers-merged.json` | events `speakers-renamed` and `speakers-merged` (item 22) |
+| Speakers | `speakers.json` | `200` of `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge` and `DELETE /api/tasks/{id}/speakers/merges` (item 22), and of `POST /api/tasks/{id}/speakers/reassign` (item 73) |
+| Speakers event | `speakers-renamed.json`, `speakers-merged.json`, `speakers-reassigned.json` | events `speakers-renamed` and `speakers-merged` (item 22), `speakers-reassigned` (item 73) |
 | Heartbeat | `heartbeat.json` | event `heartbeat`: sent after 5 s without any other event; carries no state (item 29, [ADR 0044](../decisions/0044-sse-heartbeat-and-client-watchdog.md)) |
 | Settings | `settings.json`, `settings.fixed.json`, `settings.fallback.json` | `GET /api/settings`; `200` of `PUT /api/settings`, `DELETE /api/settings` and `DELETE /api/settings/device-fallback` (item 32; `gpuNames` added by item 45; the reset by item 72) |
 | Settings event | `settings-updated.json`, `settings-updated.defaults.json`, `settings-updated.fallback.json` | event `settings-updated` (item 32) |
-| Error | `error.json`, `error.invalid-language.json` (mock addition, item 14), `error.invalid-device.json` (item 32), `error.upload-too-large.json` (item 41) | every error response except `duplicate-audio` |
+| Error | `error.json`, `error.invalid-language.json` (mock addition, item 14), `error.invalid-device.json` (item 32), `error.upload-too-large.json` (item 41), `error.invalid-reassignment.json` (item 73) | every error response except `duplicate-audio` |
 | Error (duplicate) | `error.duplicate-audio.json` | `409 duplicate-audio` of `POST /api/tasks` |
 
 Responses without a body (`204` of `DELETE /api/tasks/{id}`), the transcript downloads (item 10's formats) and `/audio` (FLAC) have no example here.
