@@ -9,10 +9,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { assertJobOf, parseJobs, workflowPath } from './ci-workflow.ts';
+import { repoRoot } from './run-check.ts';
 
-const repoRoot = fileURLToPath(new URL('..', import.meta.url));
-const workflowPath = join(repoRoot, '.github/workflows/ci.yml');
 const classifierPath = join(repoRoot, '.github/classify-change.sh');
 const decidePath = join(repoRoot, '.github/decide-code-change.sh');
 
@@ -30,78 +29,6 @@ const EVENT_GATED: Record<string, true> = {
   'windows-ffmpeg-asset': true,
   'model-hosts': true,
 };
-// Heavy jobs that run on every code change and report, but do not gate merges: their result is
-// visible on the pull request while their own flakiness is open. `windows-e2e` is here while the
-// journey's load flake is open (docs/specs/windows-e2e-journey.md, amended 2026-10-30, and the
-// Windows (e2e) row of docs/known-issues.md); it rejoins the aggregator once it is reliably green.
-// A job listed here is still heavy: it must carry the `changes` gate like every other, checked
-// below.
-const REPORTING_ONLY: Record<string, true> = { 'windows-e2e': true };
-
-interface Job {
-  id: string;
-  name: string | null;
-  needs: string[];
-  if: string | null;
-  raw: string[];
-}
-
-// The job ids of `.github/workflows/ci.yml`, with the job-level keys this check reads. The file is
-// parsed rather than loaded with a YAML library because the repository has none and this check
-// must run with only the Node the devenv pins.
-function parseJobs(text: string): Map<string, Job> {
-  const jobs = new Map<string, Job>();
-  let inJobs = false;
-  let current: Job | null = null;
-  let blockIndent = -1;
-  for (const line of text.split('\n')) {
-    const indent = line.length - line.trimStart().length;
-    if (blockIndent >= 0) {
-      if (line.trim() === '' || indent > blockIndent) continue;
-      blockIndent = -1;
-    }
-    if (/^jobs:\s*$/.test(line)) {
-      inJobs = true;
-      continue;
-    }
-    if (!inJobs) continue;
-    const job = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
-    if (job) {
-      current = { id: job[1] ?? '', name: null, needs: [], if: null, raw: [] };
-      jobs.set(current.id, current);
-      continue;
-    }
-    if (current === null) continue;
-    current.raw.push(line);
-    if (indent !== 4) continue;
-    const key = /^ {4}([A-Za-z0-9_-]+):(.*)$/.exec(line);
-    if (key === null) continue;
-    const [, name = '', rest = ''] = key;
-    const value = rest.trim().replace(/^(['"])(.*)\1$/, '$2');
-    if (/^[|>]/.test(value)) {
-      blockIndent = 4;
-      continue;
-    }
-    if (name === 'name') current.name = value;
-    if (name === 'if') current.if = value;
-    if (name === 'needs' && value.startsWith('[')) {
-      current.needs = value
-        .slice(1, -1)
-        .split(',')
-        .map((need) => need.trim())
-        .filter(Boolean);
-    }
-  }
-  return jobs;
-}
-
-// The job [id] the assertions below read; a workflow that lost it fails by name instead of as a
-// read of undefined.
-function assertJobOf(jobs: Map<string, Job>, id: string): Job {
-  const job = jobs.get(id);
-  assert.ok(job, `${id} is a job`);
-  return job;
-}
 
 // The `code` value the `changes` job reads, from the classifier the job pipes its diff into.
 function classify(paths: string[]): string {
@@ -372,19 +299,11 @@ test('the required check and the jobs it gates keep their names and conditions',
   );
 
   // Every heavy job reports through the aggregator, so the gate cannot hide a job from the required
-  // check; and a typo in a `needs` entry names nothing and would silently un-gate. A
-  // reporting-only job keeps its name and its own `changes` gate (checked in the heavy-job test)
-  // but is deliberately outside the aggregator, with its reason in REPORTING_ONLY.
+  // check; and a typo in a `needs` entry names nothing and would silently un-gate.
   for (const job of jobs.values()) {
     if (UNGATED[job.id] === true || EVENT_GATED[job.id] === true) continue;
-    if (REPORTING_ONLY[job.id] === true) {
-      assert.equal(ci.needs.includes(job.id), false, `${job.id} is outside CI (all checks)`);
-      continue;
-    }
     assert.ok(ci.needs.includes(job.id), `${job.id} is in CI (all checks)`);
   }
-  const windowsE2e = assertJobOf(jobs, 'windows-e2e');
-  assert.equal(windowsE2e.name, 'Windows (e2e)', 'the reporting-only journey keeps its name');
   for (const need of ci.needs) {
     assert.ok(jobs.has(need), `ci needs ${need}, which is a job`);
   }
@@ -444,6 +363,20 @@ test('the required check and the jobs it gates keep their names and conditions',
   assert.ok(
     !ci.needs.includes('model-hosts'),
     'a weekly network probe does not gate pull requests',
+  );
+});
+
+// Roadmap item 84: `Windows (e2e)` left the aggregator while its load flake was open; after five
+// consecutive green Windows journeys it gates merges like every other journey — a red Windows
+// journey fails `CI (all checks)`.
+test('the Windows journey gates merges like every other journey', () => {
+  const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
+  const ci = assertJobOf(jobs, 'ci');
+  assert.ok(ci.needs.includes('windows-e2e'), 'Windows (e2e) is in CI (all checks)');
+  assert.equal(
+    assertJobOf(jobs, 'windows-e2e').name,
+    'Windows (e2e)',
+    'the gating journey keeps the name branch protection and the aggregator report',
   );
 });
 

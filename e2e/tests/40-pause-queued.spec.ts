@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { PAUSE_QUEUED_CLIP, PAUSE_QUEUED_RUNNING_CLIP } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, uploadClips, waitForTranscription } from './helpers/ui';
 
 // Pausing a queued upload (roadmap item 40, the review): the pause used to freeze "the
 // current run" whichever task was paused, so pausing a task still waiting in the queue
@@ -10,8 +10,6 @@ import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 test('pausing a queued upload leaves the transcribing one running; the paused one waits until resumed', async ({
   page,
 }) => {
-  test.setTimeout(600_000);
-
   await appLive(page);
   await uploadClips(page, [PAUSE_QUEUED_RUNNING_CLIP, PAUSE_QUEUED_CLIP]);
   const running = rowOf(page, PAUSE_QUEUED_RUNNING_CLIP);
@@ -25,9 +23,8 @@ test('pausing a queued upload leaves the transcribing one running; the paused on
   await expect(running.getByText(/Transcribing… \d+%/)).toBeVisible();
 
   // The transcribing task was not frozen: it still completes and leaves the queue.
-  await expect(page.getByText(`${PAUSE_QUEUED_RUNNING_CLIP} transcribed`)).toBeVisible({
-    timeout: 240_000,
-  });
+  await waitForTranscription(page, PAUSE_QUEUED_RUNNING_CLIP);
+  await expect(page.getByText(`${PAUSE_QUEUED_RUNNING_CLIP} transcribed`)).toBeVisible();
   await expect(running).toHaveCount(0);
 
   // The paused task is not started once the queue is free: give the worker time to look
@@ -39,9 +36,8 @@ test('pausing a queued upload leaves the transcribing one running; the paused on
 
   // Resumed, it runs and completes.
   await queued.getByRole('button', { name: `Resume ${PAUSE_QUEUED_CLIP}` }).click();
-  await expect(page.getByText(`${PAUSE_QUEUED_CLIP} transcribed`)).toBeVisible({
-    timeout: 240_000,
-  });
+  await waitForTranscription(page, PAUSE_QUEUED_CLIP);
+  await expect(page.getByText(`${PAUSE_QUEUED_CLIP} transcribed`)).toBeVisible();
   await expect(queued).toHaveCount(0);
   await goTo(page, 'History');
   for (const clip of [PAUSE_QUEUED_RUNNING_CLIP, PAUSE_QUEUED_CLIP]) {

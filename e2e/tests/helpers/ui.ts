@@ -1,6 +1,8 @@
 import { join } from 'node:path';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { appUrl, loadState } from '../../lib/backend.ts';
+import { awaitTranscription } from '../../lib/await-task.ts';
+import type { TaskSnapshot } from '../../lib/await-task.ts';
 
 // The two widths the spec fixes: phone ~390 px, desktop ~1280 px.
 export const PHONE_VIEWPORT = { width: 390, height: 844 };
@@ -96,9 +98,10 @@ export async function ensureTranscript(page: Page, clip: string) {
   }
   await goTo(page, 'Queue');
   await uploadClips(page, [clip]);
+  await waitForTranscription(page, clip);
   const transcribed = page.getByText(`${clip} transcribed`);
   const duplicate = page.getByText(`${clip} Already uploaded`);
-  await expect(transcribed.or(duplicate)).toBeVisible({ timeout: 300_000 });
+  await expect(transcribed.or(duplicate)).toBeVisible();
   // A duplicate upload proves the task exists; it must be the completed transcript the
   // caller expects.
   if (await duplicate.isVisible()) {
@@ -109,13 +112,28 @@ export async function ensureTranscript(page: Page, clip: string) {
   }
 }
 
+// Waits for [clip]'s task to finish, by the task's own state (roadmap item 84, load): a loaded
+// runner can take minutes, so no 240 s ceiling ends this wait — only the task's completion, its
+// failure, or a queue that stops progressing for the stall window does.
+export async function waitForTranscription(page: Page, clip: string): Promise<void> {
+  await awaitTranscription(
+    async () => {
+      const response = await page.request.get(appUrl('/api/tasks'));
+      const body = (await response.json()) as { tasks: TaskSnapshot[] };
+      return body.tasks;
+    },
+    { clip },
+  );
+}
+
 // Uploads one clip, waits until its finish notice says it is transcribed, and opens its
 // transcript from that notice.
 export async function uploadAndOpen(page: Page, clip: string) {
   await appLive(page);
   await uploadClips(page, [clip]);
+  await waitForTranscription(page, clip);
   const notice = page.getByText(`${clip} transcribed`);
-  await expect(notice).toBeVisible({ timeout: 240_000 });
+  await expect(notice).toBeVisible();
   await notice.getByRole('link', { name: 'open' }).click();
   await expect(page.getByRole('heading', { name: clip })).toBeVisible();
 }

@@ -97,10 +97,17 @@ export async function startModelServer(
       released = true;
       for (const resolve of waiting.splice(0)) resolve();
     },
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-      }),
+    // Roadmap item 84: `server.close()` waits for every open connection, and an app that still
+    // holds one (keep-alive, a download it gave up on, a response still held) kept the packaged
+    // spec's teardown waiting with no end. Held responses go and every connection is cut first.
+    close: () => {
+      released = true;
+      for (const resolve of waiting.splice(0)) resolve();
+      server.closeAllConnections();
+      const closed = Promise.withResolvers<void>();
+      server.close((error) => (error ? closed.reject(error) : closed.resolve()));
+      return closed.promise;
+    },
   };
 }
 

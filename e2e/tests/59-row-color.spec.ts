@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { COLOR_ROW_CLIP, appUrl } from '../lib/backend.ts';
-import { appLive, expectCompletedOrCanceled, goTo, uploadClips } from './helpers/ui';
+import {
+  appLive,
+  expectCompletedOrCanceled,
+  goTo,
+  uploadClips,
+  waitForTranscription,
+} from './helpers/ui';
 
 // Item 65: the status line's phase prefixes; the collector records each distinct
 // (prefix, computed color) pair the row shows.
@@ -84,7 +90,6 @@ function phaseColor(observed: PhaseColor[], phase: string): string {
 // transcribing and diarizing each read differently, so the row says what it is doing
 // before the percentage exists.
 test('the running status line reads differently in each phase', async ({ page }) => {
-  test.setTimeout(300_000);
   await appLive(page);
 
   // The journey's earlier uploads may still be finishing; start from an idle queue.
@@ -114,7 +119,8 @@ test('the running status line reads differently in each phase', async ({ page })
     .getByRole('listitem')
     .filter({ hasText: COLOR_ROW_CLIP });
   await expect(row).toContainText('…', { timeout: 120_000 });
-  await expect(row).toHaveCount(0, { timeout: 240_000 });
+  await waitForTranscription(page, COLOR_ROW_CLIP);
+  await expect(row).toHaveCount(0);
   const observed = await stopPhaseObservation(page);
 
   await goTo(page, 'History');

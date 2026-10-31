@@ -9,6 +9,7 @@ import {
   openTranscript,
   rowOf,
   uploadClips,
+  waitForTranscription,
 } from './helpers/ui';
 
 // The acceptance of the finished shell (roadmap item 31, ADR 0046; item 59 for the brand
@@ -24,8 +25,6 @@ const THEME_STEP = 4;
 test('the finished shell: sticky header, nav pills, brand home link, text-only compact header', async ({
   page,
 }) => {
-  test.setTimeout(420_000);
-
   const themeButton = page.getByRole('button', { name: /Theme:/ });
   const setTheme = async (mode: 'light' | 'dark' | 'system') => {
     // The button's accessible name is the current mode (AppHeader THEME_LABEL); the
@@ -130,7 +129,8 @@ test('the finished shell: sticky header, nav pills, brand home link, text-only c
       );
     }
   }
-  await expect(page.getByText(`${HEADER_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, HEADER_CLIP);
+  await expect(page.getByText(`${HEADER_CLIP} transcribed`)).toBeVisible();
 
   // The transcript: short viewports so the page itself scrolls (the window scroll
   // drives the header's compact form; the transcript region scrolls internally

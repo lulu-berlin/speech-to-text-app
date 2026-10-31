@@ -199,3 +199,20 @@ scope.
   is reliably green — for example after the journey is sharded across jobs — and item 79's gate
   decision stands otherwise. `.github/workflows/ci.yml` and `docs/check-ci-gating.test.ts` carry the
   exception; `docs/specs/ci-verification.md` records the current cadence.
+- 2026-10-31 (amendment, roadmap item 84): `Windows (e2e)` rejoins the `CI (all checks)` aggregator.
+  The measurement first, as decided: per-spec durations from the same commits (#413, #415, then
+  #421) showed no per-spec Windows overhead — the same five specs took 62–64% of every journey, and
+  Windows swung 1.7x between runs of the same tree while Linux swung 1.17x, so the variance was
+  runner load, not platform; sharding was therefore not indicated. What changed instead: no e2e
+  assertion runs on a wall clock (item 84's sleeps, the 5 s bound and the fixed-start test are
+  gone), the journey builds or reuses its UI by a digest of the build inputs, the settings draft
+  race was fixed, and the harness's health wait polls through `node:http` — Node 24.21's bundled
+  undici killed the macOS worker with `setTypeOfService EINVAL` on a restart. Five consecutive green
+  Windows journeys followed (runs #421, #422, #424, #428, #430; e2e step 17:00, 9:19, 8:40, 15:12,
+  11:47), each inside the 20-minute bound. A red Windows journey now fails `CI (all checks)`.
+  (2026-10-31, root agent at PR preparation) Those five runs, and the packaged job's five, were
+  measured on trees before roadmap item 73 merged on `main`; the item's branch was rebased onto
+  that merge, so the five consecutive green runs are counted again on the pull request's head,
+  which carries item 73's reassignment and its `09-reassign` journey spec
+  ([e2e-reliability.md](e2e-reliability.md)).
+

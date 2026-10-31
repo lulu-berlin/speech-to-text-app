@@ -1,39 +1,17 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { PLAYBACK_CLIP } from '../lib/backend.ts';
+import { SEGMENTS, activeIndex, activeInView, audioSecond } from './helpers/transcript';
 import { uploadAndOpen } from './helpers/ui';
 
-// The transcript's segments: every element with the button role except the current
-// segment's controls, which carry an aria-label (item 52) where segments do not.
-const SEGMENTS = '[role="button"]:not([aria-label])';
-
-// The index of the highlighted segment among the transcript's segment buttons (-1: none).
-async function activeIndex(region: Locator): Promise<number> {
-  return region.evaluate(
-    (element, segments) =>
-      [...element.querySelectorAll(segments)].findIndex((segment) =>
-        segment.hasAttribute('data-active'),
-      ),
-    SEGMENTS,
-  );
+// The seconds the player's display shows ("00:12 / 01:39", the first field; 0 when unparsable).
+function secondsOf(text: string): number {
+  const [minutes = '0', seconds = '0'] = (text.split(' / ')[0] ?? '').split(':');
+  return Number(minutes) * 60 + Number(seconds);
 }
 
-// The audio element's playback position in seconds: the pause signal, independent of when the display
-// renders the last timeupdate (see the paused-time check below).
-async function audioPosition(page: Page): Promise<number> {
-  return page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime);
-}
-
-// Whether the highlighted segment lies inside the transcript region's visible box.
-async function activeInView(region: Locator): Promise<boolean> {
-  return region.evaluate((element) => {
-    const active = element.querySelector('[data-active]');
-    if (active === null) {
-      return false;
-    }
-    const box = element.getBoundingClientRect();
-    const segment = active.getBoundingClientRect();
-    return segment.top >= box.top - 1 && segment.bottom <= box.bottom + 1;
-  });
+// The seconds the player's display shows right now.
+async function displayedSeconds(times: Locator): Promise<number> {
+  return secondsOf((await times.textContent()) ?? '');
 }
 
 // The index of a segment fully visible in the region that is not the highlighted one.
@@ -49,10 +27,11 @@ async function visibleOtherSegment(region: Locator): Promise<number> {
   }, SEGMENTS);
 }
 
+// The waiting rule (roadmap item 84): every wait here is an awaited outcome — an element's state, a
+// display value, a scroll position — never a window in which nothing must happen.
 test('playback: the highlight follows seeking and pausing, a double-click seeks and plays, and follow mode holds', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   await uploadAndOpen(page, PLAYBACK_CLIP);
 
   // A short viewport: the transcript region (max-height 60vh) is then far shorter than the
@@ -83,31 +62,32 @@ test('playback: the highlight follows seeking and pausing, a double-click seeks 
   await expect.poll(() => activeInView(region)).toBe(true);
   const farDown = await scrollTop();
   expect(farDown).toBeGreaterThan(0);
-  await page.waitForTimeout(500);
   await expect(back).toBeHidden();
   await page.keyboard.press('Home');
   await expect.poll(() => activeIndex(region)).toBe(0);
   await expect.poll(() => activeInView(region)).toBe(true);
   expect(await scrollTop()).toBeLessThan(farDown);
-  await page.waitForTimeout(500);
   await expect(back).toBeHidden();
 
-  // The highlight follows pausing: the audio element's position is frozen (0.05 s tolerates one
-  // stalled sample, not the one-second advance a still-playing element makes), and once the display
-  // has caught up it stops changing together with the highlight. The display can render one more
-  // timeupdate after the click, so binding the freeze to the element — not to a text read taken right
-  // after Pause — is what makes the check race-free (PR #46).
+  // The highlight follows pausing: paused is a state no later movement can escape, so the display
+  // and the highlight must agree with the element's frozen position.
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   const started = await times.textContent();
   await expect.poll(() => times.textContent(), { timeout: 10_000 }).not.toBe(started);
   await page.getByRole('button', { name: 'Pause' }).click();
-  const pausedPosition = await audioPosition(page);
-  await page.waitForTimeout(1_500);
-  expect(Math.abs((await audioPosition(page)) - pausedPosition)).toBeLessThanOrEqual(0.05);
-  const pausedTime = await times.textContent();
+  const pausedPosition = await audioSecond(page);
   const pausedIndex = await activeIndex(region);
-  await page.waitForTimeout(500);
-  expect(await times.textContent()).toBe(pausedTime);
+  expect(
+    await page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.paused),
+    'the click paused the element, so nothing can move the playhead again',
+  ).toBe(true);
+  await expect
+    .poll(
+      async () => Math.abs((await displayedSeconds(times)) - (await audioSecond(page))) <= 1.05,
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  expect(Math.abs((await audioSecond(page)) - pausedPosition)).toBeLessThanOrEqual(0.05);
   expect(await activeIndex(region)).toBe(pausedIndex);
   await expect(back).toBeHidden();
 
@@ -128,6 +108,20 @@ test('playback: the highlight follows seeking and pausing, a double-click seeks 
   await expect(back).toBeVisible();
   await back.click();
   await expect.poll(() => activeInView(region)).toBe(true);
-  await page.waitForTimeout(500);
-  await expect(back).toBeHidden();
+  // The resumed follow scroll must not stop following once more. The window is playback's own
+  // progress — the display advancing three seconds — not a sleep, so a stop that lands later than a
+  // short hold-off is caught too (roadmap item 84).
+  const resumedAt = await displayedSeconds(times);
+  await expect
+    .poll(
+      async () => {
+        expect(
+          await back.isHidden(),
+          `following held at display ${await times.textContent()}`,
+        ).toBe(true);
+        return displayedSeconds(times);
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(resumedAt + 2);
 });

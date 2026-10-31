@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { FAVICON_CLIP } from '../lib/backend.ts';
-import { appLive, rowOf, uploadClips } from './helpers/ui';
+import { appLive, rowOf, uploadClips, waitForTranscription } from './helpers/ui';
 
 // Item 59, decided header follow-up: the running signal left the header, so the page's
 // favicon carries it — the typing artwork while a task runs, the static artwork when the
@@ -10,7 +10,6 @@ import { appLive, rowOf, uploadClips } from './helpers/ui';
 test('the favicon types while a task runs and is the static icon once the queue is idle', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   await appLive(page);
 
   const icon = page.locator('link[rel="icon"]');
@@ -36,6 +35,7 @@ test('the favicon types while a task runs and is the static icon once the queue 
   expect(typingSvg).toContain('animation');
 
   // Once the task finishes, no task runs and the favicon is the static artwork again.
-  await expect(page.getByText(`${FAVICON_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, FAVICON_CLIP);
+  await expect(page.getByText(`${FAVICON_CLIP} transcribed`)).toBeVisible();
   await expect.poll(() => icon.getAttribute('href')).toBe(idleHref);
 });

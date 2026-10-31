@@ -1,12 +1,18 @@
 import { existsSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { DELETE_CLIP, loadState, scratchDirPath } from '../lib/backend.ts';
-import { goTo, rowOf, taskIdOf, uploadAndOpen, uploadClips } from './helpers/ui';
+import {
+  goTo,
+  rowOf,
+  taskIdOf,
+  uploadAndOpen,
+  uploadClips,
+  waitForTranscription,
+} from './helpers/ui';
 
 test('deleting a task removes it from History and frees its file for re-upload', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   const dataDir = loadState().dataDir;
 
   // A completed task whose transcript was opened: the player's /audio serves the clip stored
@@ -39,7 +45,8 @@ test('deleting a task removes it from History and frees its file for re-upload',
   // row. The phrase is not pinned either — a 6-11 s clip starts mid-sentence.
   await goTo(page, 'Queue');
   await uploadClips(page, [DELETE_CLIP]);
-  await expect(page.getByText(`${DELETE_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, DELETE_CLIP);
+  await expect(page.getByText(`${DELETE_CLIP} transcribed`)).toBeVisible();
   await expect(page.getByText(/Already uploaded/)).toHaveCount(0);
   // Open from the History card, not the finish notice: the first task's notice may
   // still be in the capped list, and its link would 404 (the row is gone).

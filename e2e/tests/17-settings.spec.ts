@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { SETTINGS_CLIP, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
-import { appLive, goTo, uploadClips } from './helpers/ui';
+import { appLive, goTo, uploadClips, waitForTranscription } from './helpers/ui';
 
 // The settings journey (item 32, ADR 0046): change the device, the thread count and the
 // upload defaults on the Settings page; restart the backend on the same data directory —
@@ -11,8 +11,6 @@ import { appLive, goTo, uploadClips } from './helpers/ui';
 test('the settings the user saves survive a restart and the queue runs with them', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
-
   // The Settings page is reached from the navigation.
   await appLive(page);
   await goTo(page, 'Settings');
@@ -103,7 +101,8 @@ test('the settings the user saves survive a restart and the queue runs with them
     // when it starts it.
     await pause.click();
     await expect(pause).not.toBeChecked();
-    await expect(page.getByText(`${SETTINGS_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+    await waitForTranscription(page, SETTINGS_CLIP);
+    await expect(page.getByText(`${SETTINGS_CLIP} transcribed`)).toBeVisible();
     // The run restored nothing later: the stored device is still the chosen CPU.
     await expect
       .poll(

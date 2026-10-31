@@ -1,34 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { FOLLOW_CLIP } from '../lib/backend.ts';
+import { SEGMENTS, activeIndex, activeInView, audioSecond } from './helpers/transcript';
 import { uploadAndOpen } from './helpers/ui';
-
-// The transcript's segments: every element with the button role except the current
-// segment's controls, which carry an aria-label (item 52) where segments do not.
-const SEGMENTS = '[role="button"]:not([aria-label])';
-
-// The index of the highlighted segment among the transcript's segment buttons (-1: none).
-async function activeIndex(region: Locator): Promise<number> {
-  return region.evaluate(
-    (element, segments) =>
-      [...element.querySelectorAll(segments)].findIndex((segment) =>
-        segment.hasAttribute('data-active'),
-      ),
-    SEGMENTS,
-  );
-}
-
-// Whether the highlighted segment lies inside the transcript region's visible box.
-async function activeInView(region: Locator): Promise<boolean> {
-  return region.evaluate((element) => {
-    const active = element.querySelector('[data-active]');
-    if (active === null) {
-      return false;
-    }
-    const box = element.getBoundingClientRect();
-    const segment = active.getBoundingClientRect();
-    return segment.top >= box.top - 1 && segment.bottom <= box.bottom + 1;
-  });
-}
 
 // The first segment after the highlighted one that starts below the region's visible box
 // — the next content the playhead runs into that following has to scroll to (-1: none).
@@ -46,44 +19,42 @@ async function nextOutOfViewSegment(region: Locator): Promise<number> {
   }, SEGMENTS);
 }
 
-// The audio element's currentTime in seconds. The playhead's progress signal: playback
-// must keep advancing (item 38) — a freeze before the segment is reached is the joined-
-// FLAC stall, a failure, not a forgivable round end.
-async function audioSecond(page: Page): Promise<number> {
-  return page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime);
+// Whether the playhead moves on from `from` within a bound. A frozen playhead returns false rather
+// than throwing, so the caller can tell the item-38 stall from the clip playing out.
+async function playheadAdvanced(page: Page, from: number): Promise<boolean> {
+  try {
+    await expect.poll(() => audioSecond(page), { timeout: 20_000 }).toBeGreaterThan(from);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Waits for the playhead to enter `target` with the user's hands off, returning false
 // only if the audio plays out (ended) before the segment is reached — the joined flac
 // of this clip plays through to the end, so a stop that is not the end is the item-38
-// stall and fails immediately. A "Back to playing position" button at any moment is an
-// automatic stop and fails the wait too.
+// stall and fails with the position it froze at. A "Back to playing position" button at
+// any moment is an automatic stop and fails the wait too. Progress is the audio element's
+// own currentTime advancing; nothing here sleeps for a fixed spell (roadmap item 84).
 async function playheadReaches(
   page: Page,
   region: Locator,
   back: Locator,
   target: number,
 ): Promise<boolean> {
-  let lastSecond = await audioSecond(page);
-  let lastAdvanceMs = Date.now();
   for (;;) {
     await expect(back).toBeHidden();
     if ((await activeIndex(region)) >= target) {
       return true;
     }
-    const at = await audioSecond(page);
-    if (at > lastSecond) {
-      lastSecond = at;
-      lastAdvanceMs = Date.now();
-    } else if (Date.now() - lastAdvanceMs > 8_000) {
-      if (await page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.ended)) {
-        return false; // played out before this segment: nothing more to follow into.
-      }
-      throw new Error(
-        `playback stalled at ${lastSecond.toFixed(1)}s before reaching segment ${target}`,
-      );
+    const from = await audioSecond(page);
+    if (await playheadAdvanced(page, from)) {
+      continue;
     }
-    await page.waitForTimeout(500);
+    if (await page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.ended)) {
+      return false; // played out before this segment: nothing more to follow into.
+    }
+    throw new Error(`playback stalled at ${from.toFixed(1)}s before segment ${target}`);
   }
 }
 
@@ -94,7 +65,6 @@ async function playheadReaches(
 test('follow mode: long playback never shows "Back to playing position" without a hand scroll; a wheel still shows it', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   await uploadAndOpen(page, FOLLOW_CLIP);
 
   // A short viewport makes the long transcript scroll for real as the playhead moves.
@@ -143,11 +113,24 @@ test('follow mode: long playback never shows "Back to playing position" without 
   await page.mouse.wheel(0, 400);
   await expect(back).toBeVisible();
 
-  // Resuming follows again, and its own follow scroll does not stop it once more.
+  // Resuming follows again, and its own follow scroll does not stop it once more. The window is
+  // playback's own progress — the playhead advancing three seconds — not a sleep, so a stop that
+  // lands after a short hold-off is caught too (roadmap item 84).
   await back.click();
   await expect.poll(() => activeInView(region)).toBe(true);
-  await page.waitForTimeout(500);
-  await expect(back).toBeHidden();
+  const resumedAt = await audioSecond(page);
+  await expect
+    .poll(
+      async () => {
+        expect(
+          await back.isHidden(),
+          `following held at ${(await audioSecond(page)).toFixed(1)}s`,
+        ).toBe(true);
+        return audioSecond(page);
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(resumedAt + 2);
 
   // The clip plays through to its end (item 38): the rounds above left playback near
   // ~130 s of the 154 s clip, and it must keep going and fire `ended` on its own — the

@@ -11,8 +11,15 @@ export default defineConfig({
   // `pnpm record:gifs` (playwright.gifs.config.ts) against its own fresh backend.
   testIgnore: ['**/gifs-record.spec.ts'],
   workers: 1,
-  reporter: 'list',
-  timeout: 180_000,
+  // The JSON report carries every spec's duration; CI attaches it from the Linux and Windows
+  // journeys so their per-spec times can be compared (roadmap item 84). playwright-report/ is
+  // ignored and outside test-results/, which Playwright clears and the failure upload keeps.
+  reporter: [['list'], ['json', { outputFile: 'playwright-report/journey.json' }]],
+  // The outer safety net only, not a per-spec budget (roadmap item 84, load): specs wait on the
+  // task's own state, and a stalled queue ends that wait in ten minutes. A loaded runner can make
+  // a transcription take several times its usual time (CI run #435 ran the journey in 45.8 min
+  // against 12), and the old 240–600 s per-spec ceilings redded specs that were merely slow.
+  timeout: 1_200_000,
   expect: { timeout: 20_000 },
   use: {
     // The farm's chromium-headless-shell renderer hits a Blink NOTREACHED crash on the

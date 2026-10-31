@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
+import { audioSecond } from './helpers/transcript.ts';
 import { CANCEL_CLIP, MERGE_CLIP, SHOT_CLIP, SHOT_UPLOAD_CLIP, appUrl } from '../lib/backend.ts';
 import {
   DESKTOP_VIEWPORT,
@@ -43,6 +44,38 @@ const BUTTON_SPOT = 66;
 // follow them (machine speed was too fast and jumpy — user, 2026-10-11).
 const VIEWER_PAUSE = 1_500;
 const STEP_PAUSE = 700;
+const TOAST_HOLD = 1_000;
+
+// Whether the playhead moves on from `from` within a bound. A frozen playhead returns false rather
+// than throwing, so the caller can say where it froze.
+async function playheadAdvanced(page: Page, from: number): Promise<boolean> {
+  try {
+    await expect.poll(() => audioSecond(page), { timeout: 20_000 }).toBeGreaterThan(from);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Playback must keep moving for `seconds` of the clip's own audio with the user's hands off:
+// following may scroll the region, but it may not stop (no "Back to playing position"). Progress
+// is the audio element's currentTime, so a stalled playhead fails naming the position it froze at
+// instead of being slept through (roadmap item 84).
+async function playingOn(page: Page, seconds: number, back: Locator): Promise<void> {
+  const from = await audioSecond(page);
+  for (;;) {
+    await expect(back).toBeHidden();
+    const at = await audioSecond(page);
+    if (at >= from + seconds) {
+      return;
+    }
+    if (!(await playheadAdvanced(page, at))) {
+      throw new Error(
+        `playback stalled at ${at.toFixed(1)}s; expected ${from.toFixed(1)}s + ${seconds}s`,
+      );
+    }
+  }
+}
 
 // Uploads a clip and waits for its transcript outside any recording, so a flow's video
 // starts on the finished transcript instead of the upload and the wait for it; returns
@@ -185,7 +218,8 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible({
         timeout: 240_000,
       });
-      await page.waitForTimeout(1_000);
+      // Deliberate pacing for the recording: the toast stays on screen before the video ends.
+      await page.waitForTimeout(TOAST_HOLD);
     },
     600,
   );
@@ -230,17 +264,16 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       // The frame: the region's bottom BUTTON_SPOT above the viewport's bottom puts the
       // whole player above it. The page ends only 24 px under the region, too short to
       // scroll that far, so the body gets bottom padding — it lies below the frame, and
-      // without it Playwright scrolled the page to reach the button. The framing is
-      // repeated after the pause click: the setup's follow scrolls nudge the page, and
-      // the frame must be the steady state the video opens on (the header's
-      // shrink-on-scroll transition also settles).
+      // without it Playwright scrolled the page to reach the button. The frame is the
+      // steady state the video opens on: the scroll has landed and the header has
+      // switched to its compact band (the brand mark is gone), both state, not a sleep.
       const reframe = async () => {
         await page.evaluate(() => {
           document.body.style.paddingBottom = '100px';
         });
         await region.evaluate((element) => element.scrollIntoView({ block: 'end' }));
         await page.evaluate((spot) => window.scrollBy(0, spot), BUTTON_SPOT);
-        await page.waitForTimeout(500);
+        await expect(page.locator('a[aria-label="Speech-to-Text home"] svg')).toHaveCount(0);
       };
       await reframe();
       const seekBar = page.getByRole('slider', { name: 'Seek' });
@@ -304,7 +337,7 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
       await expect.poll(regionScrollTop, { timeout: 5_000 }).toBeGreaterThan(startTop);
       await expect.poll(activeInView).toBe(true);
-      await page.waitForTimeout(4_000);
+      await playingOn(page, 4, back);
       await expect(back).toBeHidden();
       expect(await pageScrollY()).toBe(framedAt);
       expect((await seekBar.boundingBox())!.y).toBeGreaterThanOrEqual(0);
@@ -333,8 +366,9 @@ test('records the three GIF source videos in dark mode', async ({ browser }) => 
       await expect.poll(activeInView).toBe(true);
       await expect(back).toBeHidden();
       expect(await pageScrollY()).toBe(framedAt);
-      await page.waitForTimeout(1_500);
-      await expect(back).toBeHidden();
+      // Deliberate pacing for the recording: hold the final frame, with no assertion behind a
+      // sleep — the hidden button was checked on the state the playhead reached, above.
+      await page.waitForTimeout(VIEWER_PAUSE);
     },
   );
 

@@ -99,6 +99,7 @@ Documentation (the `docs/` package — TypeScript run by Node's type stripping, 
 - `node docs/check-exceptions.ts` — every broad `catch` in `backend/src/main/kotlin` rethrows, logs its throwable, or carries `// exceptions: swallow-ok <reason>`, and no `runCatching` remains; `node --test docs/check-exceptions.test.ts` covers the check itself.
 - `node --test docs/checks.test.ts docs/checks-failures.test.ts` — the four checks above still print their green lines over the current tree, and, on a planted tree with a broken link, an unknown code name and a wrong diagram arrow, their failure lines and exit 1.
 - `node --test docs/check-ci-gating.test.ts` — `.github/decide-code-change.sh` runs everything off a pull request and on the `ci:full` label, `.github/classify-change.sh` calls only `*.md` and `LICENSE` documentation (everything else code), every heavy job in `ci.yml` carries the `changes` gate, and `docs-check` and `CI (all checks)` stay ungated.
+- `node --test docs/check-e2e-durations.test.ts` — the Linux and Windows journeys keep Playwright's console log, write its JSON report (every spec's duration) and upload it from every run as `e2e-durations-linux` / `e2e-durations-windows`.
 - `node --test docs/check-action-versions.test.ts` — every `actions/upload-artifact` and `actions/cache` step under `.github/`, composite actions included, is at least at the major that runs on Node 24 (upload-artifact v7, cache v6), so a run carries no Node 20 deprecation annotation.
 
 ## Git

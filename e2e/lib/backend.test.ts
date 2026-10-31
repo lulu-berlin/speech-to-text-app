@@ -5,12 +5,16 @@
 // single-use daemon whose app JVM sits outside the launcher's process group on POSIX, so the same
 // listing finds the app JVM by its arguments there.
 import assert from 'node:assert/strict';
+import { ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { subscribe, unsubscribe } from 'node:diagnostics_channel';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { setImmediate } from 'node:timers/promises';
 import * as backend from './backend.ts';
 import { processes } from './processes.ts';
 import { waitUntil } from './wait.ts';
@@ -75,8 +79,12 @@ test('on Windows a .bat or .cmd backend starts through a shell, anything else di
 
 // Roadmap item 79 (discovered): a backend that exits during startup can never answer health, so the
 // start fails at once with the exit it reported — not after the full health timeout (run #388 sat
-// idle 10 minutes on a dead backend).
-test('a backend that exits before answering health fails the start at once, naming the exit', async () => {
+// idle 10 minutes on a dead backend). Roadmap item 84: "at once" is proven by order, not by a clock —
+// a 5 s bound failed on a loaded Windows runner (5136 ms, with the right exit). The health timeout
+// runs on mocked time that stands still until the backend's exit has been heard, so only the exit
+// can end the start; the tick afterwards turns a start that missed the exit into its timeout
+// failure instead of a hang.
+test('a backend that exits before answering health fails the start naming the exit, not the health timeout', async (t) => {
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-exited-'));
   const script = writeFakeBackend(
     dataDir,
@@ -86,54 +94,122 @@ process.exit(3);
 `,
   );
   const port = await backend.choosePort();
+  const healthTimeoutMs = 60_000;
+  // Node's built-in channel hands over the spawned backend before the start subscribes to it, so the
+  // test hears the exit first; the start's own listener runs in the same emit.
+  const exited = Promise.withResolvers<void>();
+  const onSpawn = (message: unknown): void => {
+    if (typeof message !== 'object' || message === null || !('process' in message)) return;
+    if (message.process instanceof ChildProcess) {
+      message.process.once('exit', () => exited.resolve());
+    }
+  };
+  subscribe('child_process', onSpawn);
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    await withEnv(fakeBackendEnv(script), async () => {
+      const outcome = outcomeOf(backend.startBackend({ port, dataDir, healthTimeoutMs }));
+      await exited.promise;
+      // Let the start's rejection run (setImmediate is not mocked), then let the timeout fire.
+      await setImmediate();
+      t.mock.timers.tick(healthTimeoutMs);
 
-  const started = Date.now();
-  await withEnv(fakeBackendEnv(script), async () => {
-    await assert.rejects(
-      backend.startBackend({ port, dataDir, healthTimeoutMs: 60_000 }),
-      (error: unknown) => {
-        assert.match((error as Error).message, /exited with code 3/);
-        return true;
-      },
-    );
-  });
-  assert.ok(Date.now() - started < 5_000, 'the start fails at once, not after the health timeout');
-  rmSync(dataDir, { recursive: true, force: true });
+      const error = await outcome;
+      assert.ok(error instanceof Error, 'the start fails');
+      assert.match(error.message, /exited with code 3/);
+      assert.doesNotMatch(error.message, /did not answer within/);
+    });
+  } finally {
+    unsubscribe('child_process', onSpawn);
+    rmSync(dataDir, { recursive: true, force: true });
+  }
 });
 
 // Roadmap item 79, review finding 6: once the start has failed there is nothing left to wait for, so the
-// health wait must stop instead of polling a dead backend for the rest of its 600 s timeout.
-test('a start that fails stops polling the backend port', async () => {
+// health wait must stop instead of polling a dead backend for the rest of its 600 s timeout. Roadmap
+// item 84: proven by order, not by sleeps — a poll counts when the harness starts the request (Node's
+// `http.client.request.start` channel), not when it lands, the backend exits only once the test has
+// seen it poll, and the health wait's interval runs on mocked time, so after the failure the test
+// steps past the whole timeout at once.
+test('a start that fails stops polling the backend port', async (t) => {
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-poll-'));
-  const script = writeFakeBackend(dataDir, 'exits-late', 'setTimeout(() => process.exit(3), 700);');
+  const exitNow = join(dataDir, 'exit-now');
+  const script = writeFakeBackend(
+    dataDir,
+    'exits-on-cue',
+    `import { existsSync } from 'node:fs';
+// A separate process the test's mocked clock cannot reach: it watches for the test's cue file.
+setInterval(() => {
+  if (existsSync(${JSON.stringify(exitNow)})) process.exit(3);
+}, 10);
+`,
+  );
   const port = await backend.choosePort();
-  let requests = 0;
   const server = createServer((_request, response) => {
-    requests += 1;
     response.writeHead(503);
     response.end();
   });
-  await new Promise<void>((resolve) => {
-    server.listen(port, '127.0.0.1', resolve);
-  });
+  const listening = Promise.withResolvers<void>();
+  server.listen(port, '127.0.0.1', listening.resolve);
+  await listening.promise;
+  let polls = 0;
+  const polled = Promise.withResolvers<void>();
+  const onRequest = (): void => {
+    polls += 1;
+    polled.resolve();
+  };
+  subscribe('http.client.request.start', onRequest);
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   try {
     await withEnv(fakeBackendEnv(script), async () => {
-      await assert.rejects(
-        backend.startBackend({ port, dataDir, healthTimeoutMs: 60_000 }),
-        /exited with code 3/,
-      );
+      const outcome = outcomeOf(backend.startBackend({ port, dataDir, healthTimeoutMs: 60_000 }));
+      await polled.promise;
+      writeFileSync(exitNow, '');
+      const error = await outcome;
+      assert.ok(error instanceof Error, 'the start fails');
+      assert.match(error.message, /exited with code 3/);
     });
-    // Real timers on purpose: let any request already in flight land, then require the polling to be over.
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    const settled = requests;
-    assert.ok(settled >= 1, 'the health wait polled while the backend was starting');
-    await new Promise((resolve) => setTimeout(resolve, 1_200));
-    assert.equal(requests, settled, 'no health poll after the start failed');
+    const settled = polls;
+    t.mock.timers.tick(60_000);
+    // Let a woken health wait run its next attempt (setImmediate is not mocked).
+    await setImmediate();
+    assert.equal(polls, settled, 'no health poll after the start failed');
   } finally {
-    await new Promise((resolve) => {
-      server.close(resolve);
-    });
+    unsubscribe('http.client.request.start', onRequest);
+    const closed = Promise.withResolvers<void>();
+    server.close(() => closed.resolve());
+    await closed.promise;
     rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+// Roadmap item 84 (discovered): Node 24's bundled undici calls `socket.setTypeOfService()` on every
+// HTTP/1.1 request, and on macOS that can throw EINVAL on a socket in teardown — outside the `fetch`
+// promise, so it killed the Playwright worker while `17-settings` restarted the backend (macOS e2e,
+// CI run 41165893251; nodejs/undici#5544, unfixed on Node 24). Here every socket refuses the call, so
+// the health wait answers only if it does not depend on it.
+test('the health wait answers even when every socket refuses setTypeOfService', async (t) => {
+  t.mock.method(Socket.prototype, 'setTypeOfService', () => {
+    throw Object.assign(new Error('setTypeOfService EINVAL'), {
+      code: 'EINVAL',
+      syscall: 'setTypeOfService',
+    });
+  });
+  const server = createServer((_request, response) => {
+    response.writeHead(200);
+    response.end();
+  });
+  const port = await backend.choosePort();
+  const listening = Promise.withResolvers<void>();
+  server.listen(port, '127.0.0.1', listening.resolve);
+  await listening.promise;
+  try {
+    await backend.waitForHealth(port, { timeoutMs: 60_000 });
+  } finally {
+    server.closeAllConnections();
+    const closed = Promise.withResolvers<void>();
+    server.close(() => closed.resolve());
+    await closed.promise;
   }
 });
 
@@ -229,3 +305,13 @@ async function withEnv(vars: NodeJS.ProcessEnv, body: () => Promise<void>): Prom
     }
   }
 }
+
+/**
+ * What [start] settles with — null when it succeeds, the error when it fails — without awaiting it, so
+ * a test can cue the backend's exit or move the clock before it looks.
+ */
+const outcomeOf = (start: Promise<unknown>): Promise<unknown> =>
+  start.then(
+    () => null,
+    (error: unknown) => error,
+  );

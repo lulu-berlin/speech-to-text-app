@@ -9,14 +9,24 @@ import {
   checkPreconditions,
   choosePort,
   loadState,
+  repoRoot,
   saveState,
   startBackend,
   stopBackend,
 } from './lib/backend.ts';
 import { writeFixtures } from './lib/fixtures.ts';
+import { buildUi } from './lib/ui-build.ts';
+import { ensureUiBuilt } from './lib/ui-dist.ts';
 
 export default async function globalSetup(): Promise<() => Promise<void>> {
   checkPreconditions();
+  // Roadmap item 84: the journey serves a UI built from this checkout — rebuilt when a build
+  // input changed since the last build, and reused when nothing did.
+  await ensureUiBuilt({
+    root: repoRoot,
+    build: () => buildUi({ root: repoRoot }),
+    log: console.log,
+  });
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-'));
   const fixturesDir = mkdtempSync(join(tmpdir(), 'stt-e2e-fixtures-'));
   writeFixtures(fixturesDir);
