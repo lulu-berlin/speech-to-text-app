@@ -71,6 +71,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 83 Diarization accuracy | spec-approved | after 1.0 | detection quality, measured on the user's recordings (decided 2026-10-30) |
 | 84 e2e reliability | spec-approved | **yes** | the Windows journey must gate again and the suites must not depend on clocks, sleeps or a stale UI (decided 2026-10-30) |
 | 85 CI wall time | spec-approved | after 1.0 | CI speed, not release quality; item 84 covers reliability (decided 2026-10-31) |
+| 86 Mobile feasibility | spec-approved | after 1.0 | research into an Android/iOS port; the 1.0 support matrix is desktop only (decided 2026-10-31) |
 
 ### Known issues a stable release must close (MED; planned by this item)
 
