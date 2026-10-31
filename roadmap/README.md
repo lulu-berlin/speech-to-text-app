@@ -145,6 +145,7 @@ graph TD
   85[85 CI wall time]
   86[86 mobile feasibility]
   87[87 writes wait for the connection]
+  88[88 localization]
   73 --> 83
   81[81 dropped row command ✓]:::done
   78[78 stable release]
@@ -262,3 +263,4 @@ graph TD
 | [85 — CI wall time: a code pull request's checks finish sooner without proving less](85-ci-wall-time.md)                                                                    | spec-approved | 84                          |
 | [86 — Mobile feasibility: can the app run on a phone with transcription and diarization fully on the device?](86-mobile-feasibility.md)                                    | spec-approved | —                           |
 | [87 — Writes wait for the connection, and a control with nothing to do says so](87-writes-wait-for-the-connection.md)                                                       | spec-approved | —                           |
+| [88 — Localization: the app's own language, in every language whisper transcription supports](88-localization.md)                                                          | spec-approved | 74                          |
