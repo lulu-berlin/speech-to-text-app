@@ -1,6 +1,6 @@
 # 84 — e2e reliability: a Windows journey that can gate again, no wall-clock or sleep-based assertions, and a journey that tests the current UI
 
-Status: spec-approved
+Status: in-progress
 Depends on: —
 Blocks: [78](78-stable-release.md) (a 1.0 gate: a flaky journey weakens release verification, and
 1.0 claims Windows support)
@@ -116,6 +116,11 @@ None. (All settled 2026-10-30, see "Decided (consultation, 2026-10-30)".)
 - [ ] (e2e, ADR 0046) `17-settings` passes on every platform's journey with the fix in place
 - [ ] (must not break) The Linux and macOS journeys stay green with the same spec count, and the
       packaged desktop suites are unchanged
+- [ ] (discovered, load) A spec waiting for a transcription survives a heavily loaded runner: the
+      wait follows the task's own progress (`status`, `phase`, `transcriptionProgress`, `error` from
+      `GET /api/tasks`) and succeeds however long the task takes; it fails only when the task fails
+      or its queue stops progressing, naming the task and the progress it reached — not a bare
+      locator timeout
 
 ## e2e stance
 
@@ -143,3 +148,17 @@ frontend unit test of the race.
   left to the workspace agent. Test list approved as written; status set to spec-approved. The four
   rows on `main` left `docs/known-issues.md` in the same commit; the implementation worktree was
   created from this commit at the user's request, before the docs PR merged.
+- 2026-10-31 (reopened, the user): CI run 41174944948 (#435, `workflow_dispatch`, head `6152536a`)
+  is red on `Windows (e2e)`: `06-playback` 4.6 min, `10-cancel-retry` 4.2 min, `40-pause-queued`
+  4.1 min, `59-dropzone` 1.0 min and `59-header-typing` 2.0 min failed, and the journey took roughly
+  five times its usual time, so the runner was heavily loaded. The ~4-minute failures line up with
+  `uploadAndOpen`'s `toBeVisible({ timeout: 240_000 })` (`e2e/tests/helpers/ui.ts:118`): a fixed
+  wait for a locator, not a wait on the task. #435's tree is `ff6ae1ce…`, the same as the open pull
+  request's head (PR #87, `538485f8`), and the same tree was green on Windows in that PR's run
+  41176270823 (#436, 12:26) — the failure is load-dependent, not content-dependent. Item 84's goal
+  is reliability on CI, so it is not done while a loaded runner can red a job that now gates merges:
+  the user decided to reopen it and not merge PR #87 until the new item is green. The fix is
+  state-based transcription waits with a stall detector — the wait reads the task's own `status`,
+  `phase`, `transcriptionProgress` and `error` from `GET /api/tasks` and ends only on the task's
+  outcome or on a queue that stops progressing — proven by unit tests of the wait and by the
+  journeys, whose waits gain enough headroom that only a stall or a failure ends them.
