@@ -1,7 +1,15 @@
 import { expect, test } from '@playwright/test';
 import { join } from 'node:path';
 import { SHOT_CLIP, SHOT_UPLOAD_CLIP, loadState } from '../lib/backend.ts';
-import { DESKTOP_VIEWPORT, PHONE_VIEWPORT, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import {
+  DESKTOP_VIEWPORT,
+  PHONE_VIEWPORT,
+  appLive,
+  goTo,
+  rowOf,
+  uploadClips,
+  waitForTranscription,
+} from './helpers/ui';
 
 // The acceptance screenshots (roadmap item 21, item 15): the Queue with a running task
 // and an upload in flight, History, the transcript during playback, and a canceled
@@ -15,7 +23,6 @@ const VIEWPORTS: Record<'phone' | 'desktop', { width: number; height: number }> 
 };
 
 test('captures the acceptance screenshots', async ({ page }) => {
-  test.setTimeout(360_000);
   const fixturesDir = loadState().fixturesDir;
 
   const themeButton = page.getByRole('button', { name: /Theme:/ });
@@ -73,7 +80,8 @@ test('captures the acceptance screenshots', async ({ page }) => {
   await expect(running).toHaveCount(0);
   await pause.click();
   await expect(pause).not.toBeChecked();
-  await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, SHOT_UPLOAD_CLIP);
+  await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible();
 
   // History with the canceled card.
   await goTo(page, 'History');

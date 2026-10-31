@@ -11,6 +11,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { get } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
@@ -244,7 +245,8 @@ export function appUrl(path = '/'): string {
   return `http://127.0.0.1:${loadState().port}${path}`;
 }
 
-// Without Nix, `./gradlew e2e` sets all of these (roadmap item 33).
+// Without Nix, `./gradlew e2e` sets all of these (roadmap item 33). The built UI is not checked
+// here: global-setup.ts builds it when its inputs changed since the last build (roadmap item 84).
 export function checkPreconditions(): void {
   const setBy = 'run inside the devenv shell (devenv.nix sets it) or use ./gradlew e2e';
   if (!process.env.TEST_WHISPER_TINY_EN_MODEL) {
@@ -255,11 +257,6 @@ export function checkPreconditions(): void {
   }
   if (!process.env.TEST_JFK_WAV) {
     throw new Error(`TEST_JFK_WAV is unset — ${setBy}`);
-  }
-  if (!process.env.E2E_BACKEND_CMD && !existsSync(join(frontendDist, 'index.html'))) {
-    throw new Error(
-      `no built frontend at ${frontendDist} — build it first: pnpm --dir frontend install && pnpm --dir frontend build`,
-    );
   }
 }
 
@@ -298,13 +295,26 @@ export async function waitForHealth(
     signal,
   }: { down?: boolean; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<void> {
-  const answering = async (): Promise<boolean> => {
-    try {
-      const response = await fetch(healthUrl(port), { signal: AbortSignal.timeout(2_000) });
-      return response.ok;
-    } catch {
-      return false;
-    }
+  // node:http, not fetch: Node 24's bundled undici calls `socket.setTypeOfService()` on every
+  // request, and macOS can refuse it with an EINVAL thrown outside the fetch promise — a poll during
+  // a backend restart then killed the Playwright worker (roadmap item 84, nodejs/undici#5544). One
+  // connection per poll (`agent: false`), so no pooled socket outlives the backend it reached.
+  const answering = (): Promise<boolean> => {
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const request = get(
+      healthUrl(port),
+      { agent: false, signal: AbortSignal.timeout(2_000) },
+      (response) => {
+        const status = response.statusCode ?? 0;
+        response.once('end', () => resolve(status >= 200 && status < 300));
+        // A body cut off by a dying backend: `close` without `end`, or an `error`.
+        response.once('error', () => resolve(false));
+        response.once('close', () => resolve(false));
+        response.resume();
+      },
+    );
+    request.once('error', () => resolve(false));
+    return promise;
   };
   const reached = await waitUntil(async () => (down ? !(await answering()) : await answering()), {
     timeoutMs,

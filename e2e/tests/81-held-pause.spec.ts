@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { HELD_PAUSE_CLIP, HELD_PAUSE_NEXT_CLIP } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, uploadClips, waitForTranscription } from './helpers/ui';
 
 // A row command clicked while another is in flight used to be dropped (roadmap item 81): the
 // event stream shows a paused task's Resume before the Pause request has answered, and a
@@ -12,8 +12,6 @@ import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 test('a held Pause response keeps Resume disabled; once it arrives, Resume resumes the task and the queue goes on', async ({
   page,
 }) => {
-  test.setTimeout(600_000);
-
   await appLive(page);
   await uploadClips(page, [HELD_PAUSE_CLIP, HELD_PAUSE_NEXT_CLIP]);
   const running = rowOf(page, HELD_PAUSE_CLIP);
@@ -44,10 +42,10 @@ test('a held Pause response keeps Resume disabled; once it arrives, Resume resum
   await page.unroute('**/api/tasks/*/pause');
 
   // The resumed task completes, and the one queued behind it starts and completes too.
-  await expect(page.getByText(`${HELD_PAUSE_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
-  await expect(page.getByText(`${HELD_PAUSE_NEXT_CLIP} transcribed`)).toBeVisible({
-    timeout: 240_000,
-  });
+  await waitForTranscription(page, HELD_PAUSE_CLIP);
+  await waitForTranscription(page, HELD_PAUSE_NEXT_CLIP);
+  await expect(page.getByText(`${HELD_PAUSE_CLIP} transcribed`)).toBeVisible();
+  await expect(page.getByText(`${HELD_PAUSE_NEXT_CLIP} transcribed`)).toBeVisible();
   await expect(running).toHaveCount(0);
   await expect(next).toHaveCount(0);
   await goTo(page, 'History');

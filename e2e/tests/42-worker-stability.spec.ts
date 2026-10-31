@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { STABILITY_BROKEN_CLIP, STABILITY_CLIP, appUrl } from '../lib/backend.ts';
-import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips, waitForTranscription } from './helpers/ui';
 
 test('a task that fails mid-run does not stop the queue', async ({ page }) => {
-  test.setTimeout(360_000);
   await appLive(page);
   await uploadClips(page, [STABILITY_BROKEN_CLIP, STABILITY_CLIP]);
 
@@ -32,5 +31,6 @@ test('a task that fails mid-run does not stop the queue', async ({ page }) => {
 
   // The task queued behind the failure still runs to completion: the queue survived it.
   const healthy = rowOf(page, STABILITY_CLIP);
-  await expect(healthy.getByText('COMPLETED', { exact: true })).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, STABILITY_CLIP);
+  await expect(healthy.getByText('COMPLETED', { exact: true })).toBeVisible();
 });

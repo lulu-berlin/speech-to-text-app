@@ -603,11 +603,25 @@ tasks.register<Exec>("e2eSystemDeps") {
     }
 }
 
+// Roadmap item 84: the journey's UI is rebuilt when the digest of its build inputs differs from
+// the one stored beside frontend/dist, and reused when it matches — the same decision a direct
+// Playwright run makes in global-setup.ts, from the same code (e2e/ensure-ui.ts, e2e/lib/ui-dist.ts).
+tasks.register<Exec>("e2eFrontend") {
+    group = "verification"
+    description =
+        "Build the frontend for the e2e journey when its sources, configs, lockfile or the docs/api examples it imports changed since the last build (a stored digest decides), reusing dist when they did not"
+    dependsOn(":frontend:pnpmInstall")
+    doFirst {
+        applyE2eEnv(this as Exec)
+        setCommandLine(nodeExe.absolutePath, "ensure-ui.ts")
+    }
+}
+
 tasks.register<Exec>("e2e") {
     group = "verification"
     description =
         "Run the item-21 e2e suite against the built app with the Gradle-managed tools, fixtures and browsers (Chromium's system libraries: ./gradlew e2eSystemDeps)"
-    dependsOn("prepareRuntime", "prepareE2eFixtures", "e2eBrowsers", backendInstallDist, ":frontend:frontendBuild")
+    dependsOn("prepareRuntime", "prepareE2eFixtures", "e2eBrowsers", backendInstallDist, "e2eFrontend")
     doFirst {
         applyE2eEnv(this as Exec)
         setCommandLine(nodeExe.absolutePath, "run.ts", "test")

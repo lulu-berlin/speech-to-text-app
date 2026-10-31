@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileWithin } from '../lib/bounded.ts';
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -34,12 +34,16 @@ test('the per-user MSI installs the app, transcribes, and the uninstall keeps th
   // A rerun after a failed attempt starts from an uninstalled machine, not from a half state.
   const previous = await productCode();
   if (previous) {
-    uninstall(previous);
-    await waitFor(() => installedExe() === null, 120_000, 'the previous installation to go away');
+    await uninstall(previous, 'msiexec-previous-uninstall.log');
+    await waitFor(
+      async () => (await installedExe()) === null,
+      120_000,
+      'the previous installation to go away',
+    );
   }
 
-  install(msi);
-  // msiexec is synchronous: what it installed is on disk now, so a per-machine install is caught here,
+  await install(msi);
+  // msiexec has exited: what it installed is on disk now, so a per-machine install is caught here,
   // naming the Program Files path, instead of as a timeout of the per-user search below.
   expect(installedUnderProgramFiles()).toEqual([]);
   const exe = await waitFor(installedExe, 180_000, 'the MSI to install Speech-to-Text.exe');
@@ -78,8 +82,12 @@ test('the per-user MSI installs the app, transcribes, and the uninstall keeps th
   // The uninstall by the ProductCode the installer registered: the program files go.
   const code = await productCode();
   if (!code) throw new Error('the MSI registered no uninstall entry named Speech-to-Text');
-  uninstall(code);
-  await waitFor(() => installedExe() === null, 120_000, 'the uninstalled program files to go');
+  await uninstall(code, 'msiexec-uninstall.log');
+  await waitFor(
+    async () => (await installedExe()) === null,
+    120_000,
+    'the uninstalled program files to go',
+  );
 
   // What the user keeps: the database with the transcript and the verified model cache.
   expectUserDataKept(paths, models);
@@ -105,38 +113,38 @@ function installedUnderProgramFiles(): string[] {
     .filter((exe) => existsSync(exe));
 }
 
-/** Runs `msiexec` and fails on anything but success (3010 is "success, reboot required"). */
-function msiexec(args: string[]): void {
-  const result = spawnSync('msiexec.exe', args, { stdio: 'inherit', timeout: 600_000 });
-  if (result.error) throw result.error;
-  if (result.status !== 0 && result.status !== 3010) {
-    throw new Error(`msiexec ${args[0]} failed with exit code ${result.status}`);
+/**
+ * Runs `msiexec` within the 3-minute ceiling (roadmap item 84: run #443 sat 53 minutes in this
+ * spec) and fails on anything but success (3010 is "success, reboot required"). Its verbose log
+ * goes into the test's output directory, which the failure upload keeps — including after a kill.
+ */
+async function msiexec(args: string[], log: string): Promise<void> {
+  const { code } = await execFileWithin('msiexec.exe', [...args, '/l*v', log]);
+  if (code !== 0 && code !== 3010) {
+    throw new Error(`msiexec ${args[0]} failed with exit code ${code}; its log is ${log}`);
   }
 }
 
-function install(msi: string): void {
-  msiexec(['/i', msi, '/quiet', '/norestart']);
+async function install(msi: string): Promise<void> {
+  await msiexec(['/i', msi, '/quiet', '/norestart'], test.info().outputPath('msiexec-install.log'));
 }
 
-function uninstall(productCode: string): void {
-  msiexec(['/x', productCode, '/quiet', '/norestart']);
+async function uninstall(productCode: string, log: string): Promise<void> {
+  await msiexec(['/x', productCode, '/quiet', '/norestart'], test.info().outputPath(log));
 }
 
 /** The installed executable under the per-user programs directory, or null while none is there. */
-function installedExe(): string | null {
+async function installedExe(): Promise<string | null> {
   const programs = join(process.env.LOCALAPPDATA ?? '', 'Programs');
   if (!existsSync(programs)) return null;
-  const found = execFileSync(
-    'powershell.exe',
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      `Get-ChildItem -LiteralPath '${programs}' -Recurse -Filter 'Speech-to-Text.exe' -File ` +
-        '-ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName',
-    ],
-    { encoding: 'utf8', timeout: 120_000 },
-  ).trim();
+  const { stdout } = await execFileWithin('powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    `Get-ChildItem -LiteralPath '${programs}' -Recurse -Filter 'Speech-to-Text.exe' -File ` +
+      '-ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName',
+  ]);
+  const found = stdout.trim();
   return found === '' ? null : found;
 }
 
@@ -153,11 +161,12 @@ async function productCode(): Promise<string | null> {
     '  }',
     '}',
   ].join('\n');
-  const output = execFileSync(
-    'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-Command', script],
-    { encoding: 'utf8', timeout: 120_000 },
-  );
+  const { stdout: output } = await execFileWithin('powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    script,
+  ]);
   const first = output
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -167,13 +176,13 @@ async function productCode(): Promise<string | null> {
 
 /** Polls `probe` until it returns non-null (or true), or fails the test with `what` at `timeoutMs`. */
 async function waitFor<T>(
-  probe: () => T | null | false,
+  probe: () => T | null | false | Promise<T | null | false>,
   timeoutMs: number,
   what: string,
 ): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const value = probe();
+    const value = await probe();
     if (value) return value;
     if (Date.now() >= deadline)
       throw new Error(`timed out after ${timeoutMs} ms waiting for ${what}`);

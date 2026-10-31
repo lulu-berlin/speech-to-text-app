@@ -9,6 +9,7 @@ import {
   rowOf,
   unlessGone,
   uploadClips,
+  waitForTranscription,
 } from './helpers/ui';
 
 // Item 37 (ADR 0046): a completed transcript's player used to fetch /audio 500 whenever
@@ -20,16 +21,16 @@ import {
 // The file sorts before 17-follow-mode and 17-settings deliberately: 17-settings stops the
 // backend it restarted in its finally block, so no test after it has a live backend.
 test('a completed player has playable audio while another task transcribes', async ({ page }) => {
-  test.setTimeout(360_000);
   await appLive(page);
 
   // A short clip completes quickly; its transcript is checked later, while a long clip
   // keeps the engine transcribing.
   await uploadClips(page, [COMPLETED_PLAYER_CLIP]);
   await goTo(page, 'History');
+  await waitForTranscription(page, COMPLETED_PLAYER_CLIP);
   await expect(
     rowOf(page, COMPLETED_PLAYER_CLIP).getByText('COMPLETED', { exact: true }),
-  ).toBeVisible({ timeout: 240_000 });
+  ).toBeVisible();
   const completedId = await apiTaskIdOf(page, COMPLETED_PLAYER_CLIP);
 
   // The long clip (the queue was idle, so it starts right away) keeps the engine in

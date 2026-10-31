@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { BROKEN_CLIP, CANCEL_CLIP, appUrl, loadState, scratchDirPath } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, taskIdOf, uploadClips, waitForTranscription } from './helpers/ui';
 
 // The entries left in a task's scratch directory (the app's OS-temp area, one per data directory); none
 // when the directory is gone — the app removes it when the task ends (item 44).
@@ -13,7 +13,6 @@ function scratchEntries(id: string): string[] {
 test('cancelling a running task, retrying it, and retrying a failed one work through the UI', async ({
   page,
 }) => {
-  test.setTimeout(360_000);
   const pause = page.getByRole('switch', { name: 'Pause the queue' });
 
   // Cancel a running task once it is past chunking (its row says "Transcribing"): the
@@ -38,9 +37,8 @@ test('cancelling a running task, retrying it, and retrying a failed one work thr
   // Retrying the canceled task runs it again, to completion; a completed task's scratch
   // directory is removed too.
   await canceled.getByRole('button', { name: 'Retry' }).click();
-  await expect(canceled.getByText('COMPLETED', { exact: true })).toBeVisible({
-    timeout: 240_000,
-  });
+  await waitForTranscription(page, CANCEL_CLIP);
+  await expect(canceled.getByText('COMPLETED', { exact: true })).toBeVisible();
   expect(scratchEntries(canceledId)).toEqual([]);
 
   // A file that cannot be decoded fails in chunking: its card shows the stored error, and

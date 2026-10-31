@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { QUEUE_CLIPS } from '../lib/backend.ts';
-import { appLive, expectLiveQueue, uploadClips } from './helpers/ui';
+import { appLive, expectLiveQueue, uploadClips, waitForTranscription } from './helpers/ui';
 
 // What one pending row showed at one moment: its text and the names of its progress bars.
 interface RowState {
@@ -101,9 +101,10 @@ test('uploads several clips, queues them in order, and shows status, phase and b
   // The queue drains in order (the engine runs one task at a time): each finish notice appears
   // when its task completes — a's, then b's, then c's. Once the queue is empty, the drop zone
   // returns to its empty state.
-  await expect
-    .poll(() => page.evaluate(() => window.noticeOrder), { timeout: 240_000 })
-    .toEqual(QUEUE_CLIPS);
+  for (const clip of QUEUE_CLIPS) {
+    await waitForTranscription(page, clip);
+  }
+  await expect.poll(() => page.evaluate(() => window.noticeOrder)).toEqual(QUEUE_CLIPS);
   await expectLiveQueue(page);
 
   // What the pending list showed on the way there, from the recorder.

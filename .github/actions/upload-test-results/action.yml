@@ -1,7 +1,8 @@
 # The failed specs' traces (roadmap item 82): Playwright's `retain-on-failure` writes a failing
 # spec's trace, screenshot and error-context.md to e2e/test-results, and this attaches them to the
 # run, so a red job is diagnosable without the console log. The calling step carries
-# `if: failure()` — a composite action cannot — so a green run keeps nothing.
+# `if: always()` (roadmap item 84 — a step timeout must upload too) and a green run uploads
+# nothing, which `if-no-files-found: ignore` tolerates.
 name: Upload test results
 description: Attach e2e/test-results to the run under the given name, kept 7 days
 
@@ -17,4 +18,5 @@ runs:
       with:
         name: ${{ inputs.name }}
         path: e2e/test-results/
+        if-no-files-found: ignore
         retention-days: 7

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { BROKEN2_CLIP, HISTORY_CLIPS, appUrl } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, taskIdOf, uploadClips, waitForTranscription } from './helpers/ui';
 
 // This test's own uploads: two trims no other test uses (the shared run finishes the
 // common clips before this file runs) plus BROKEN2_CLIP, which fails in CHUNKING. The
@@ -12,14 +12,14 @@ const SECOND_CLIP = HISTORY_CLIPS[1]; // 4-11s
 test('the history list shows finished tasks newest first with status, finish date and duration', async ({
   page,
 }) => {
-  test.setTimeout(240_000);
-
   // Two completed cards, in upload order: the second finishes after the first.
   await appLive(page);
   await uploadClips(page, [FIRST_CLIP]);
-  await expect(page.getByText(`${FIRST_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, FIRST_CLIP);
+  await expect(page.getByText(`${FIRST_CLIP} transcribed`)).toBeVisible();
   await uploadClips(page, [SECOND_CLIP]);
-  await expect(page.getByText(`${SECOND_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, SECOND_CLIP);
+  await expect(page.getByText(`${SECOND_CLIP} transcribed`)).toBeVisible();
 
   // A FAILED card with a stored error.
   await uploadClips(page, [BROKEN2_CLIP]);

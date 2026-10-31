@@ -3,7 +3,7 @@ import { CONTRACT_CLIP, appUrl } from '../lib/backend.ts';
 import type { HttpCapture } from './helpers/capture';
 import { capturedSse, installHttpCapture, installSseCapture } from './helpers/capture';
 import { mustConform } from './helpers/contract';
-import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, uploadClips, waitForTranscription } from './helpers/ui';
 
 // The docs/api shapes, by destination and method (docs/api/README.md): a task's shape
 // is the union of its examples. The upload's `POST /api/tasks` body is one task, while
@@ -66,7 +66,6 @@ const SSE_EXAMPLES: Record<string, string[]> = {
 test('the responses the browser received match the structure of their docs/api examples', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   const http: HttpCapture = [];
   installHttpCapture(page, http);
   await installSseCapture(page);
@@ -85,7 +84,8 @@ test('the responses the browser received match the structure of their docs/api e
   await expect(page.getByRole('listitem').filter({ hasText: clip })).toBeVisible();
   await pause.click();
   await expect(pause).not.toBeChecked();
-  await expect(page.getByText(`${clip} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTranscription(page, clip);
+  await expect(page.getByText(`${clip} transcribed`)).toBeVisible();
   // The duplicate answer (409) exercises the error shape.
   await uploadClips(page, [clip]);
   await expect(page.getByText(/Already uploaded/)).toBeVisible();

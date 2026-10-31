@@ -1,7 +1,7 @@
 # 85 — CI wall time: a code pull request's checks finish sooner without proving less
 
 Status: spec-approved
-Depends on: [84](84-e2e-reliability.md) (it returns `Windows (e2e)` to the aggregate, which makes
+Depends on: [84](../docs/specs/e2e-reliability.md) (it returns `Windows (e2e)` to the aggregate, which makes
 that job the run's critical path, and it is still rewriting the journey's waits and counting its
 five green Windows runs on the current job layout)
 Blocks: — (after 1.0, decided 2026-10-31)
@@ -47,7 +47,7 @@ weakened.
   step (checkout, toolchains, caches) added 1:33 on Linux and 0:40 on Windows in #421.
 - **Item 84 set sharding aside for reliability, not for speed**: its measurement found the
   Windows journey's variance, not its mean, breaking the 20 min bound, so it fixed waits instead
-  of adding jobs (`roadmap/84-e2e-reliability.md`, Approval log, 2026-10-30, finding 5).
+  of adding jobs (`docs/specs/e2e-reliability.md`, Approval log, 2026-10-30, finding 5).
 - **Parallel jobs are capped**: GitHub-hosted standard runners allow 20 concurrent jobs and 5
   concurrent macOS jobs on the Free plan, 40 and 5 on Pro
   ([Actions limits](https://docs.github.com/en/actions/reference/limits#job-concurrency-limits-for-github-hosted-runners)).

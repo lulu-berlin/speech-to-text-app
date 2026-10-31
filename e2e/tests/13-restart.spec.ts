@@ -1,12 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { RESTART_CLIPS, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
-import { appLive, rowOrder, uploadClips } from './helpers/ui';
+import { appLive, rowOrder, uploadClips, waitForTranscription } from './helpers/ui';
 
 test('restarting the backend reconnects the event stream and the state is restored from the snapshot', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
-
   // Seed server state that only a fresh process can restore: the queue paused with the
   // clips reordered away from upload order (the engine would otherwise drain them).
   await appLive(page);
@@ -38,7 +36,8 @@ test('restarting the backend reconnects the event stream and the state is restor
     await pause.click();
     await expect(pause).not.toBeChecked();
     for (const clip of RESTART_CLIPS) {
-      await expect(page.getByText(`${clip} transcribed`)).toBeVisible({ timeout: 240_000 });
+      await waitForTranscription(page, clip);
+      await expect(page.getByText(`${clip} transcribed`)).toBeVisible();
     }
   } finally {
     // The global teardown only knows the run's original pid — stop the restarted

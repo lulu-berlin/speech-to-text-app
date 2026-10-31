@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { BAR_ROW_CLIP, appUrl } from '../lib/backend.ts';
-import { appLive, uploadClips } from './helpers/ui';
+import { appLive, uploadClips, waitForTranscription } from './helpers/ui';
 
 // Item 82: the phase line and the bar count belong to one page-side observation. Two separate
 // checks raced the task's end — the `Diarizing…` text was visible, then the row left the queue
@@ -91,7 +91,6 @@ async function stopBarObservation(page: Page): Promise<BarObservation[]> {
 // diarizationProgress 0.0 with a null stage, so the row used to show a second, empty bar through
 // chunking and transcription (queue-running-light-desktop.png).
 test('a running task shows one progress bar until diarizing starts', async ({ page }) => {
-  test.setTimeout(300_000);
   await appLive(page);
 
   // The journey's earlier uploads may still be finishing; start from an idle queue.
@@ -119,7 +118,8 @@ test('a running task shows one progress bar until diarizing starts', async ({ pa
     .getByRole('listitem')
     .filter({ hasText: BAR_ROW_CLIP });
   await expect(row).toContainText('…', { timeout: 120_000 });
-  await expect(row).toHaveCount(0, { timeout: 240_000 });
+  await waitForTranscription(page, BAR_ROW_CLIP);
+  await expect(row).toHaveCount(0);
   const observed = await stopBarObservation(page);
 
   // One observation per fact: a task finishing between two checks cannot fail it.
