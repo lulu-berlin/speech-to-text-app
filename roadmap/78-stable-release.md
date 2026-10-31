@@ -6,7 +6,7 @@ Depends on: [49](../docs/specs/windows-support.md), [52](../docs/specs/edit-tran
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](../docs/specs/frontend-state-and-errors.md),
 [74](../docs/specs/desktop-presentation.md), [76](76-right-to-left-transcription.md),
 [77](../docs/specs/test-harness-temp-dirs.md), [79](../docs/specs/windows-e2e-journey.md),
-[84](84-e2e-reliability.md) — the gates
+[84](84-e2e-reliability.md), [87](87-writes-wait-for-the-connection.md) — the gates
 proposed below — and the six MED known issues listed under Evidence, which no roadmap item handles
 today
 Blocks: —
@@ -72,6 +72,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 84 e2e reliability | spec-approved | **yes** | the Windows journey must gate again and the suites must not depend on clocks, sleeps or a stale UI (decided 2026-10-30) |
 | 85 CI wall time | spec-approved | after 1.0 | CI speed, not release quality; item 84 covers reliability (decided 2026-10-31) |
 | 86 Mobile feasibility | spec-approved | after 1.0 | research into an Android/iOS port; the 1.0 support matrix is desktop only (decided 2026-10-31) |
+| 87 Writes wait for the connection | spec-approved | **yes** | a live write control while the app cannot write, and a browser's error text on screen, are release quality issues (decided 2026-10-31) |
 
 ### Known issues a stable release must close (MED; planned by this item)
 
@@ -212,3 +213,6 @@ the e2e ffmpeg WAV-muxer issue (recorded on branch 52). Both must be closed befo
 - 2026-10-30 (the user): roadmap item 84 — e2e reliability (the Windows journey back in the
   aggregate, no wall-clock or sleep-based assertions, a journey against the current UI, the settings
   draft race) — is added as a 1.0 gate and to this item's dependencies.
+- 2026-10-31 (the user): roadmap item 87 — writes wait for the connection, a message for a failed
+  write in the app's words, and "Reset name" disabled when there is nothing to reset — is added as a
+  1.0 gate and to this item's dependencies.
