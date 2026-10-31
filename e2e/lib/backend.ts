@@ -97,6 +97,7 @@ export const FIXTURE_CLIPS = [
   'jfk-metal.wav', // the sample twice (~22s), item 48's Metal app e2e
   'jfk-aj.wav', // the sample looped 15x, ~165s, item 81's held-pause running clip
   'jfk-ak.wav', // 1-5s, item 81's held-pause queued clip
+  'librispeech-1089-1089-1188.wav', // item 73's reassign journey: reader 1089 twice, then 1188
 ] as const;
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -214,6 +215,10 @@ export const METAL_CLIP = FIXTURE_CLIPS[45];
 // completes. Unique bytes: no other test loops the sample 15x, and 1-5s is no existing trim.
 export const HELD_PAUSE_CLIP = FIXTURE_CLIPS[46];
 export const HELD_PAUSE_NEXT_CLIP = FIXTURE_CLIPS[47];
+// Item 73's amendment: reader 1089 speaks twice, so its two segments form one turn of two, then
+// reader 1188 answers — a two-speaker recording with a turn a single segment can be moved out of.
+export const REASSIGN_CLIP = 'librispeech-1089-1089-1188.wav';
+export const REASSIGN_SOURCE_IDS = ['1089-134686-0002', '1089-134691-0023', '1188-133604-0025'];
 
 // Item 09's two-speaker fixture (LibriSpeechDiarizationSpec): speakers 1089, 1188, 1089.
 export const MERGE_SOURCE_IDS = ['1089-134686-0002', '1188-133604-0025', '1089-134691-0023'];

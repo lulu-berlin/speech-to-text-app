@@ -27,6 +27,7 @@ class EventsOverflowSpec :
                         is Event.TaskDeleted -> "task-deleted"
                         is Event.SpeakersRenamed -> "speakers-renamed"
                         is Event.SpeakersMerged -> "speakers-merged"
+                        is Event.SpeakersReassigned -> "speakers-reassigned"
                         is Event.SegmentEdited -> "segment-edited"
                         is Event.SettingsUpdated -> "settings-updated"
                     }

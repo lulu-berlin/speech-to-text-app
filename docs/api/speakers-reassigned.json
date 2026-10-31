@@ -1,0 +1,8 @@
+{
+  "id": 3,
+  "speakers": [
+    { "speakerId": 0, "speaker": "Alice" },
+    { "speakerId": 1, "speaker": "Speaker 2" },
+    { "speakerId": 2, "speaker": "Speaker 3" }
+  ]
+}

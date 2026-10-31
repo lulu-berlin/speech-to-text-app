@@ -17,13 +17,16 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import stt.db.Database
@@ -216,30 +219,17 @@ class SpeakerRoutesSpec :
                         // Derived by hand from the contract: speaker 1's segment now reads as speaker 0's, so segments
                         // 0–2 are one turn (first start, last end, texts trimmed and joined); segment 3 stays apart.
                         client.turnsOf(id) shouldBe
-                            Json.parseToJsonElement(
-                                """
-                                {
-                                  "hasMerges": true,
-                                  "speakers": [
-                                    { "speakerId": 0, "speaker": "Alice" },
-                                    { "speakerId": 2, "speaker": "Speaker 3" }
-                                  ],
-                                  "turns": [
-                                    {
-                                      "speakerId": 0, "startMs": 0, "endMs": 3000, "text": "Hello. Hi. Hey.",
-                                      "segments": [
-                                        { "id": 1, "startMs": 0, "endMs": 1000, "text": "Hello.", "edited": false },
-                                        { "id": 2, "startMs": 1000, "endMs": 2000, "text": "Hi.", "edited": false },
-                                        { "id": 3, "startMs": 2000, "endMs": 3000, "text": "Hey.", "edited": false }
-                                      ]
-                                    },
-                                    {
-                                      "speakerId": 2, "startMs": 3000, "endMs": 4000, "text": "Bye.",
-                                      "segments": [ { "id": 4, "startMs": 3000, "endMs": 4000, "text": "Bye.", "edited": false } ]
-                                    }
-                                  ]
-                                }
-                                """.trimIndent(),
+                            turnsJson(
+                                hasMerges = true,
+                                speakers = speakerList(0 to "Alice", 2 to "Speaker 3"),
+                                turn(
+                                    0,
+                                    "Hello. Hi. Hey.",
+                                    turnSegment(1, 0, 1_000, "Hello."),
+                                    turnSegment(2, 1_000, 2_000, "Hi."),
+                                    turnSegment(3, 2_000, 3_000, "Hey."),
+                                ),
+                                turn(2, "Bye.", turnSegment(4, 3_000, 4_000, "Bye.")),
                             )
                     }
 
@@ -512,36 +502,22 @@ class SpeakerRoutesSpec :
 
                         // Derived by hand: every segment reads as speaker 2's, so the four form one turn.
                         client.turnsOf(id) shouldBe
-                            Json.parseToJsonElement(
-                                """
-                                {
-                                  "hasMerges": true,
-                                  "speakers": [ { "speakerId": 2, "speaker": "Speaker 3" } ],
-                                  "turns": [
-                                    {
-                                      "speakerId": 2, "startMs": 0, "endMs": 4000, "text": "Hello. Hi. Hey. Bye.",
-                                      "segments": [
-                                        { "id": 1, "startMs": 0, "endMs": 1000, "text": "Hello.", "edited": false },
-                                        { "id": 2, "startMs": 1000, "endMs": 2000, "text": "Hi.", "edited": false },
-                                        { "id": 3, "startMs": 2000, "endMs": 3000, "text": "Hey.", "edited": false },
-                                        { "id": 4, "startMs": 3000, "endMs": 4000, "text": "Bye.", "edited": false }
-                                      ]
-                                    }
-                                  ]
-                                }
-                                """.trimIndent(),
+                            turnsJson(
+                                hasMerges = true,
+                                speakers = speakerList(2 to "Speaker 3"),
+                                turn(
+                                    2,
+                                    "Hello. Hi. Hey. Bye.",
+                                    turnSegment(1, 0, 1_000, "Hello."),
+                                    turnSegment(2, 1_000, 2_000, "Hi."),
+                                    turnSegment(3, 2_000, 3_000, "Hey."),
+                                    turnSegment(4, 3_000, 4_000, "Bye."),
+                                ),
                             )
                     }
 
                     // The stored mapping is flat: no into_id is itself a merged_id.
-                    Database.open(dataDir).use { db ->
-                        val rows = ArrayList<Pair<Int, Int>>()
-                        val query = "SELECT merged_id, into_id FROM speaker_merge WHERE task_id = $id ORDER BY merged_id"
-                        db.connection.createStatement().use { statement ->
-                            statement.executeQuery(query).use { while (it.next()) rows += it.getInt(1) to it.getInt(2) }
-                        }
-                        rows shouldBe listOf(0 to 2, 1 to 2)
-                    }
+                    mergeRows(dataDir, id) shouldBe listOf(0 to 2, 1 to 2)
                 }
             }
         }
@@ -570,7 +546,346 @@ class SpeakerRoutesSpec :
                 }
             }
         }
+
+        given("a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 0, so its last turn holds 3 and 4 (queue paused)") {
+            `when`("segment 3 alone is reassigned to a new speaker") {
+                then("it is stored under a new speaker 2 named \"Speaker 3\", and /turns splits the last turn around it") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 0))
+                    val threeSpeakers = speakers("Speaker 1", "Speaker 2", "Speaker 3")
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+
+                        // Item 73's amendment: `speakerId: null` is a new speaker, with the split's id and name
+                        // rules: the highest id over all rows + 1 (2), and its first free default "Speaker 3".
+                        val moved = client.reassign(id, segmentIds = listOf(3), speakerId = null)
+                        moved.status shouldBe HttpStatusCode.OK
+                        val body = Json.parseToJsonElement(moved.bodyAsText()).jsonObject
+                        body shouldHaveShapeOf apiExample("speakers.json")
+                        body shouldBe Json.parseToJsonElement("""{ "speakers": $threeSpeakers }""")
+                    }
+
+                    // A fresh server reads it from the database. Derived by hand: segment 3 leaves the turn of 3 and 4,
+                    // so speaker 0's last turn now holds 4 alone, after the new speaker's turn.
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.turnsOf(id) shouldBe
+                            turnsJson(
+                                hasMerges = false,
+                                speakers = threeSpeakers,
+                                turn(0, "Hello.", turnSegment(1, 0, 1_000, "Hello.")),
+                                turn(1, "Hi.", turnSegment(2, 1_000, 2_000, "Hi.")),
+                                turn(2, "Hey.", turnSegment(3, 2_000, 3_000, "Hey.")),
+                                turn(0, "Bye.", turnSegment(4, 3_000, 4_000, "Bye.")),
+                            )
+                    }
+                }
+            }
+        }
+
+        given("a COMPLETED task whose four segments are spoken by speakers 0, 1, 1, 0 (queue paused)") {
+            `when`("segment 2 is reassigned to the existing speaker 0") {
+                then("it is stored under speaker 0, no speaker is created, and speaker 0's turns 1 and 2 join") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 1, 0))
+                    val twoSpeakers = speakers("Speaker 1", "Speaker 2")
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        val moved = client.reassign(id, segmentIds = listOf(2), speakerId = 0)
+                        moved.status shouldBe HttpStatusCode.OK
+                        Json.parseToJsonElement(moved.bodyAsText()) shouldBe Json.parseToJsonElement("""{ "speakers": $twoSpeakers }""")
+
+                        // Derived by hand: segments 1 and 2 are now both speaker 0's and adjacent, so they form one turn;
+                        // speaker 1 keeps segment 3, so it stays a speaker.
+                        client.turnsOf(id) shouldBe
+                            turnsJson(
+                                hasMerges = false,
+                                speakers = twoSpeakers,
+                                turn(0, "Hello. Hi.", turnSegment(1, 0, 1_000, "Hello."), turnSegment(2, 1_000, 2_000, "Hi.")),
+                                turn(1, "Hey.", turnSegment(3, 2_000, 3_000, "Hey.")),
+                                turn(0, "Bye.", turnSegment(4, 3_000, 4_000, "Bye.")),
+                            )
+                    }
+
+                    // In the database: no speaker row was added.
+                    Database.open(dataDir).use { db ->
+                        SegmentRepository(db).findSpeakers(id) shouldBe listOf(Speaker(0, "Speaker 1"), Speaker(1, "Speaker 2"))
+                    }
+                }
+            }
+        }
+
+        given("a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 1 (queue paused)") {
+            `when`("segment 2 (speaker 1's) and segment 3 (speaker 0's) are reassigned together to a new speaker") {
+                then("both are stored under the new speaker 2 and form one turn; speakers 0 and 1 keep their other segments") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 1))
+                    val threeSpeakers = speakers("Speaker 1", "Speaker 2", "Speaker 3")
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        val moved = client.reassign(id, segmentIds = listOf(2, 3), speakerId = null)
+                        moved.status shouldBe HttpStatusCode.OK
+                        Json.parseToJsonElement(moved.bodyAsText()) shouldBe Json.parseToJsonElement("""{ "speakers": $threeSpeakers }""")
+
+                        // Derived by hand: the two moved segments are adjacent and now share speaker 2, so they are one
+                        // turn between speaker 0's segment 1 and speaker 1's segment 4.
+                        client.turnsOf(id) shouldBe
+                            turnsJson(
+                                hasMerges = false,
+                                speakers = threeSpeakers,
+                                turn(0, "Hello.", turnSegment(1, 0, 1_000, "Hello.")),
+                                turn(2, "Hi. Hey.", turnSegment(2, 1_000, 2_000, "Hi."), turnSegment(3, 2_000, 3_000, "Hey.")),
+                                turn(1, "Bye.", turnSegment(4, 3_000, 4_000, "Bye.")),
+                            )
+                    }
+                }
+            }
+        }
+
+        given("a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2 (queue paused)") {
+            `when`("segment 4, speaker 2's only segment, is reassigned to a new speaker") {
+                then("speaker 2's row goes, and the new speaker takes id 3 — read over all rows before the removal") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 2))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        val moved = client.reassign(id, segmentIds = listOf(4), speakerId = null)
+                        moved.status shouldBe HttpStatusCode.OK
+                        // Derived by hand from the amendment: the id is the highest over all rows (2) + 1 = 3, so the
+                        // emptied speaker's id is not handed out again; its default name "Speaker 4" is free.
+                        val remaining = speakerList(0 to "Speaker 1", 1 to "Speaker 2", 3 to "Speaker 4")
+                        Json.parseToJsonElement(moved.bodyAsText()) shouldBe Json.parseToJsonElement("""{ "speakers": $remaining }""")
+                        client.turnsOf(id) shouldBe
+                            turnsJson(
+                                hasMerges = false,
+                                speakers = remaining,
+                                turn(0, "Hello.", turnSegment(1, 0, 1_000, "Hello.")),
+                                turn(1, "Hi.", turnSegment(2, 1_000, 2_000, "Hi.")),
+                                turn(0, "Hey.", turnSegment(3, 2_000, 3_000, "Hey.")),
+                                turn(3, "Bye.", turnSegment(4, 3_000, 4_000, "Bye.")),
+                            )
+                    }
+
+                    // In the database: speaker 2's row is gone, and nothing references it.
+                    Database.open(dataDir).use { db ->
+                        val segments = SegmentRepository(db)
+                        segments.findSpeakers(id) shouldBe
+                            listOf(Speaker(0, "Speaker 1"), Speaker(1, "Speaker 2"), Speaker(3, "Speaker 4"))
+                        segments.findByTask(id).withoutIds() shouldBe
+                            fourSegments.zip(listOf(0, 1, 0, 3)) { segment, speakerId -> segment.copy(speakerId = speakerId) }
+                    }
+                }
+            }
+        }
+
+        given("a QUEUED and a FAILED task, cycle 8's COMPLETED task and a copy with {0, 1} merged into 0 (queue paused)") {
+            `when`("reassignments are asked there, on unknown tasks and targets, and with selections that change nothing") {
+                then("409 not-completed, 404 not-found and 400 invalid-reassignment, and nothing changes") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    // Segment ids follow the seeding order: queued 1–2, failed 3–4, id 5–8, merged 9–12.
+                    val queued =
+                        seed(dataDir, queuedTask("q.wav", createdAt = 1).copy(queuePosition = 0), twoSegments, speakerIds = listOf(0, 1))
+                    val failed =
+                        seed(dataDir, queuedTask("f.wav", createdAt = 2).copy(status = TaskStatus.FAILED), twoSegments, listOf(0, 1))
+                    val id = seedSpeakers0102(dataDir)
+                    val merged = seed(dataDir, completed("merged.wav"), fourSegments, speakerIds = listOf(0, 1, 0, 2))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.merge(merged, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+                        val turnsBefore = client.turnsOf(id)
+                        val mergedTurnsBefore = client.turnsOf(merged)
+
+                        // Only a COMPLETED task's speakers can be reassigned (item 22's rule).
+                        client.reassign(queued, listOf(1), null).shouldBeError(HttpStatusCode.Conflict, "not-completed")
+                        client.reassign(failed, listOf(3), 0).shouldBeError(HttpStatusCode.Conflict, "not-completed")
+
+                        // An unknown or non-numeric task, and a target that is unknown or merged away.
+                        for (path in listOf("999/speakers/reassign", "abc/speakers/reassign")) {
+                            client
+                                .post("/api/tasks/$path") {
+                                    contentType(ContentType.Application.Json)
+                                    setBody("""{ "segmentIds": [5], "speakerId": null }""")
+                                }.shouldBeError(HttpStatusCode.NotFound, "not-found")
+                        }
+                        client.reassign(id, listOf(5), 7).shouldBeError(HttpStatusCode.NotFound, "not-found")
+                        client.reassign(merged, listOf(9), 1).shouldBeError(HttpStatusCode.NotFound, "not-found")
+
+                        // An empty selection, a segment the task does not have (another task's), or a move that changes
+                        // nothing (segments already the target's) is refused.
+                        client.reassign(id, emptyList(), null).shouldBeError(HttpStatusCode.BadRequest, "invalid-reassignment")
+                        client.reassign(id, listOf(1), null).shouldBeError(HttpStatusCode.BadRequest, "invalid-reassignment")
+                        // Segment 1 is speaker 0's of task id; segment 1 of the queued task is not this task's.
+                        client.reassign(id, listOf(5, 99), null).shouldBeError(HttpStatusCode.BadRequest, "invalid-reassignment")
+
+                        // Nothing changed anywhere; the merge of task merged is intact, so it can still be undone.
+                        client.turnsOf(id) shouldBe turnsBefore
+                        client.turnsOf(merged) shouldBe mergedTurnsBefore
+                        client
+                            .turnsOf(merged)
+                            .getValue("hasMerges")
+                            .jsonPrimitive.content shouldBe "true"
+                    }
+                }
+            }
+        }
+
+        given("cycle 8's task with {0, 1} merged into 0, before a reassignment (queue paused)") {
+            `when`("segment 3 is reassigned to a new speaker") {
+                then("the merge is made permanent first in the same write, then segment 3 moves to the new speaker 3") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.merge(id, group = listOf(0, 1), into = 0).status shouldBe HttpStatusCode.OK
+
+                        // Item 73's amendment: the bake-in runs first (segment 2, speaker 1's, stored under 0, and
+                        // speaker 1's row and the merge row gone), and the new speaker's id is read over all rows
+                        // before that (max 2 + 1 = 3), named "Speaker 4" from the survivors' names.
+                        val moved = client.reassign(id, segmentIds = listOf(3), speakerId = null)
+                        moved.status shouldBe HttpStatusCode.OK
+                        val remaining = speakerList(0 to "Speaker 1", 2 to "Speaker 3", 3 to "Speaker 4")
+                        Json.parseToJsonElement(moved.bodyAsText()) shouldBe Json.parseToJsonElement("""{ "speakers": $remaining }""")
+
+                        // Derived by hand: segments 1 and 2 are speaker 0's and adjacent, so one turn; segment 3 is the
+                        // new speaker 3's; segment 4 is speaker 2's; no merge is left to undo.
+                        client.turnsOf(id) shouldBe
+                            turnsJson(
+                                hasMerges = false,
+                                speakers = remaining,
+                                turn(0, "Hello. Hi.", turnSegment(1, 0, 1_000, "Hello."), turnSegment(2, 1_000, 2_000, "Hi.")),
+                                turn(3, "Hey.", turnSegment(3, 2_000, 3_000, "Hey.")),
+                                turn(2, "Bye.", turnSegment(4, 3_000, 4_000, "Bye.")),
+                            )
+                    }
+
+                    // In the database: the bake-in's rows are gone and the moved segment is stored under speaker 3.
+                    Database.open(dataDir).use { db ->
+                        val segments = SegmentRepository(db)
+                        mergeRows(dataDir, id) shouldBe emptyList()
+                        segments.findByTask(id).withoutIds() shouldBe
+                            fourSegments.zip(listOf(0, 0, 3, 2)) { segment, speakerId -> segment.copy(speakerId = speakerId) }
+                        segments.findSpeakers(id) shouldBe
+                            listOf(Speaker(0, "Speaker 1"), Speaker(2, "Speaker 3"), Speaker(3, "Speaker 4"))
+                    }
+                }
+            }
+        }
+
+        given("cycle 8's task with speakers 0, 1 and 2 and an SSE client watching a reassignment (queue paused, real server)") {
+            `when`("an invalid reassignment is attempted, then segment 3 is moved to a new speaker") {
+                then("the stored move emits speakers-reassigned with the effective speakers; the refused one emits nothing") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedSpeakers0102(dataDir)
+
+                    SseServer({ sttApp(stt.config.testConfig(dataDir)) }).use { server ->
+                        val events = server.connectEvents()
+                        events.readEvent().first shouldBe "snapshot"
+
+                        // Refused (an empty selection): nothing stored, nothing emitted; the next frame is the stored
+                        // move's, whose new speaker 3 can only come from reading after the write.
+                        server.command("POST", "/api/tasks/$id/speakers/reassign", """{ "segmentIds": [], "speakerId": null }""") shouldBe
+                            400
+                        server.command("POST", "/api/tasks/$id/speakers/reassign", """{ "segmentIds": [3], "speakerId": null }""") shouldBe
+                            200
+                        val (name, data) = events.readEvent()
+                        name shouldBe "speakers-reassigned"
+                        val payload = Json.parseToJsonElement(data).jsonObject
+                        payload shouldHaveShapeOf apiExample("speakers-reassigned.json")
+                        payload shouldBe
+                            Json.parseToJsonElement(
+                                """{ "id": $id, "speakers": ${speakerList(
+                                    0 to "Speaker 1",
+                                    1 to "Speaker 2",
+                                    2 to "Speaker 3",
+                                    3 to "Speaker 4",
+                                )} }""",
+                            )
+                    }
+                }
+            }
+        }
+
+        given("a COMPLETED task with speakers 0 and 1 (queue paused)") {
+            `when`("the removed split endpoint is called") {
+                then("no route answers it: an empty 404") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), twoSegments, speakerIds = listOf(0, 1))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        // Item 73's amendment: the turn-level split is gone, replaced by one task-scoped reassignment.
+                        val response =
+                            client.post("/api/tasks/$id/speakers/0/split") {
+                                contentType(ContentType.Application.Json)
+                                setBody("""{ "segmentIds": [1] }""")
+                            }
+                        response.status shouldBe HttpStatusCode.NotFound
+                        response.bodyAsText() shouldBe ""
+                    }
+                }
+            }
+        }
+
+        given("a COMPLETED task whose segments are spoken by speakers 0, 0, 1, 2, speaker 0 renamed Alice and 2 Carol (queue paused)") {
+            `when`("segment 3 is moved to a new speaker, renamed, and merged back into Alice") {
+                then("the move keeps the renamed speakers' names, a later merge works, and its reset restores the move's turns") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, completed("memo.wav"), fourSegments, speakerIds = listOf(0, 0, 1, 2))
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        client.rename(id, speakerId = 0, "Alice").status shouldBe HttpStatusCode.OK
+                        client.rename(id, speakerId = 2, "Carol").status shouldBe HttpStatusCode.OK
+
+                        // The move adds a speaker and leaves every other row's name alone.
+                        val moved = client.reassign(id, segmentIds = listOf(3), speakerId = null)
+                        moved.status shouldBe HttpStatusCode.OK
+                        // Segment 3 was speaker 1's only segment, so its row goes and the new speaker takes 3.
+                        val afterMove = speakerList(0 to "Alice", 2 to "Carol", 3 to "Speaker 4")
+                        Json.parseToJsonElement(moved.bodyAsText()) shouldBe Json.parseToJsonElement("""{ "speakers": $afterMove }""")
+
+                        // The new speaker renames like any other.
+                        val renamed = client.rename(id, speakerId = 3, "Bob")
+                        renamed.status shouldBe HttpStatusCode.OK
+                        val named = speakerList(0 to "Alice", 2 to "Carol", 3 to "Bob")
+                        client.speakersOf(id) shouldBe named
+
+                        // A move's segments merge like any other: Bob into Alice, then reset restores the move's turns.
+                        val turnsAfterRename = client.turnsOf(id)
+                        val merged = client.merge(id, group = listOf(0, 3), into = 0)
+                        merged.status shouldBe HttpStatusCode.OK
+                        Json.parseToJsonElement(merged.bodyAsText()) shouldBe
+                            Json.parseToJsonElement(
+                                """{ "speakers": ${speakerList(0 to "Alice", 2 to "Carol")} }""",
+                            )
+                        client.delete("/api/tasks/$id/speakers/merges").status shouldBe HttpStatusCode.OK
+                        client.turnsOf(id) shouldBe turnsAfterRename
+                    }
+                }
+            }
+        }
     })
+
+/** The task's stored merge mapping as (merged id, survivor id) pairs, ordered by merged id. */
+private suspend fun mergeRows(
+    dataDir: Path,
+    taskId: Long,
+): List<Pair<Int, Int>> {
+    val rows = ArrayList<Pair<Int, Int>>()
+    Database.open(dataDir).use { db ->
+        val query = "SELECT merged_id, into_id FROM speaker_merge WHERE task_id = $taskId ORDER BY merged_id"
+        db.connection.createStatement().use { statement ->
+            statement.executeQuery(query).use { while (it.next()) rows += it.getInt(1) to it.getInt(2) }
+        }
+    }
+    return rows
+}
 
 /** Cycle 8's task: a COMPLETED task whose four segments are spoken by speakers 0, 1, 0, 2. */
 private suspend fun seedSpeakers0102(dataDir: Path): Long =
@@ -655,6 +970,25 @@ private suspend fun HttpClient.merge(
         )
     }
 
+/**
+ * `POST /api/tasks/{id}/speakers/reassign` with `{ "segmentIds": segmentIds, "speakerId": speakerId }` (item 73's
+ * amendment); a null [speakerId] is a new speaker.
+ */
+private suspend fun HttpClient.reassign(
+    id: Long,
+    segmentIds: List<Long>,
+    speakerId: Int?,
+): HttpResponse =
+    post("/api/tasks/$id/speakers/reassign") {
+        contentType(ContentType.Application.Json)
+        setBody(
+            buildJsonObject {
+                putJsonArray("segmentIds") { segmentIds.forEach { add(it) } }
+                put("speakerId", speakerId)
+            }.toString(),
+        )
+    }
+
 /** The task's speakers as `/turns` reports them. */
 private suspend fun HttpClient.speakersOf(id: Long): JsonElement = turnsOf(id).getValue("speakers")
 
@@ -669,3 +1003,67 @@ private fun speakers(vararg names: String): JsonElement =
                 }
             }.toString(),
     )
+
+/** The JSON speakers list of the (id, name) pairs given, for ids that are not 0, 1, … in order. */
+private fun speakerList(vararg speakers: Pair<Int, String>): JsonElement =
+    JsonArray(
+        speakers.map { (speakerId, name) ->
+            buildJsonObject {
+                put("speakerId", speakerId)
+                put("speaker", name)
+            }
+        },
+    )
+
+/** One segment as `/turns` reports it: its stored row id, span, trimmed text and edit flag. */
+private fun turnSegment(
+    id: Int,
+    startMs: Int,
+    endMs: Int,
+    text: String,
+): JsonObject =
+    buildJsonObject {
+        put("id", id)
+        put("startMs", startMs)
+        put("endMs", endMs)
+        put("text", text)
+        put("edited", false)
+    }
+
+/** One turn as `/turns` reports it; its span is the contract's: its first segment's start to its last segment's end. */
+private fun turn(
+    speakerId: Int,
+    text: String,
+    vararg segments: JsonObject,
+): JsonObject =
+    buildJsonObject {
+        put("speakerId", speakerId)
+        put(
+            "startMs",
+            segments
+                .first()
+                .getValue("startMs")
+                .jsonPrimitive.int,
+        )
+        put(
+            "endMs",
+            segments
+                .last()
+                .getValue("endMs")
+                .jsonPrimitive.int,
+        )
+        put("text", text)
+        put("segments", JsonArray(segments.toList()))
+    }
+
+/** A `/turns` body (`docs/api/turns.json`) of [speakers] and [turns], their values derived by hand per scenario. */
+private fun turnsJson(
+    hasMerges: Boolean,
+    speakers: JsonElement,
+    vararg turns: JsonObject,
+): JsonElement =
+    buildJsonObject {
+        put("hasMerges", hasMerges)
+        put("speakers", speakers)
+        put("turns", JsonArray(turns.toList()))
+    }

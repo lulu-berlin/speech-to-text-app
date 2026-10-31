@@ -9,7 +9,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { FIXTURE_CLIPS, MERGE_CLIP } from './backend.ts';
+import { FIXTURE_CLIPS, MERGE_CLIP, REASSIGN_CLIP } from './backend.ts';
 import { writeFixtures } from './fixtures.ts';
 
 interface Wav {
@@ -109,6 +109,11 @@ test('the fixture generator writes 16 kHz mono PCM WAV clips with the app ffmpeg
     assert.deepEqual(clip(MERGE_CLIP), {
       ...PCM_16K_MONO_16,
       samples: 106000 + 119200 + 123760,
+    });
+    // Item 73's reassignment recording: reader 1089 twice, then 1188.
+    assert.deepEqual(clip(REASSIGN_CLIP), {
+      ...PCM_16K_MONO_16,
+      samples: 106000 + 123760 + 119200,
     });
 
     // The backend deduplicates uploads by content sha256, so every fixture needs its own bytes.

@@ -188,6 +188,23 @@ export const handlers = [
   // (item 22): the examples unchanged; GET /turns stays turns.json, so dev:mock shows the
   // flow but not joined turns (that needs the backend, item 21).
   http.post('/api/tasks/:id/speakers/merge', () => HttpResponse.json(speakersFixture)),
+
+  // Reassign segments: POST /api/tasks/{id}/speakers/reassign -> 200 speakers.json (item 73's
+  // amendment). Mock addition: the example, plus the new speaker appended when `speakerId` is null;
+  // GET /turns keeps serving turns.json, so dev:mock shows the flow but not the moved segments.
+  http.post('/api/tasks/:id/speakers/reassign', async ({ request }) => {
+    const body = (await request.json()) as { speakerId: number | null };
+    if (body.speakerId !== null) {
+      return HttpResponse.json(speakersFixture);
+    }
+    const nextId = Math.max(...speakersFixture.speakers.map((speaker) => speaker.speakerId)) + 1;
+    return HttpResponse.json({
+      speakers: [
+        ...speakersFixture.speakers,
+        { speakerId: nextId, speaker: `Speaker ${nextId + 1}` },
+      ],
+    });
+  }),
   http.delete('/api/tasks/:id/speakers/merges', () => HttpResponse.json(speakersFixture)),
 
   // Settings: GET /api/settings -> 200 settings.json (item 32). The mock stores nothing, so

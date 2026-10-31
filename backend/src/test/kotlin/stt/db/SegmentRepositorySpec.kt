@@ -372,6 +372,26 @@ class SegmentRepositorySpec :
             }
         }
 
+        given("a task with three segments spoken by speakers 0, 1, 0 (queue paused)") {
+            `when`("the move names a speaker id the task does not have") {
+                then("the repository answers UnknownSpeaker and stores nothing, so no foreign-key failure can follow") {
+                    withDatabase { db ->
+                        val segments = SegmentRepository(db)
+                        val taskId = TaskRepository(db).insert(queuedTask("talk.wav", createdAt = 1L))
+                        segments.insertAll(taskId, threeSegments)
+                        segments.storeSpeakers(taskId, speakerIds = listOf(0, 1, 0))
+                        val first = segments.findByTask(taskId).first().id!!
+
+                        // Item 73's amendment: the target is checked against the stored speakers inside the same
+                        // write transaction, so a merge that lands in between can only refuse the move, never fail it.
+                        segments.reassignSegments(taskId, listOf(first), speakerId = 7) shouldBe ReassignOutcome.UnknownSpeaker
+                        segments.findByTask(taskId).map { it.speakerId } shouldBe listOf(0, 1, 0)
+                        segments.findSpeakers(taskId) shouldBe speakers1And2
+                    }
+                }
+            }
+        }
+
         given("a task with three segments whose speakers were stored as [0, 1, 0], and another task with speaker 1") {
             `when`("speaker 1 of the first task is renamed to Alice") {
                 then("only that speaker's name changes: the segments and every other speaker are untouched") {

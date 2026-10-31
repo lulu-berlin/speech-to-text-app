@@ -7,7 +7,7 @@ import { ConnectionContext } from '../../app/ConnectionContext';
 import { editSegment, revertSegment } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { errorMessage } from '../../shared/api/types';
-import type { Segment, Task, TaskPhase, Turns } from '../../shared/api/types';
+import type { Segment, Task, TaskPhase, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { MetaText, PageHeading, Text } from '../../shared/ui/typography';
 import { Button } from '../../shared/ui/Button';
@@ -30,6 +30,7 @@ import { AudioPlayer, playheadMs } from './AudioPlayer';
 import { playbackMachine } from './playbackMachine';
 import { followModeMachine } from './followModeMachine';
 import { SpeakersPanel } from './SpeakersPanel';
+import { speakerReassignMachine } from './speakerReassignMachine';
 
 // The plain-word form of a running phase, for "Failed/Canceled while <phase>".
 const PHASE_WORDS: Record<Exclude<TaskPhase, null>, string> = {
@@ -99,6 +100,26 @@ const Title = styled(PageHeading)`
 const NoAudioNote = styled(Text)`
   color: ${(props) => props.theme.colors.textMuted};
   font-size: ${(props) => props.theme.fontSizes.small};
+`;
+
+// The reassignment mode's bar (item 73's amendment): pinned to the top of the transcript, under the
+// app header, so it stays in reach while scrolling a long transcript.
+const BarError = styled(Text)`
+  color: ${(props) => props.theme.colors.danger};
+  margin: 0;
+`;
+
+const ReassignBar = styled.section`
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.sm};
+  padding: ${(props) => props.theme.spacing.sm};
+  border: ${(props) => props.theme.borderWidths.thin} solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.radii.card};
+  background: ${(props) => props.theme.colors.surfaceRaised};
 `;
 
 const TranscriptRegion = styled.div`
@@ -183,9 +204,90 @@ export function TaskTranscriptView() {
     if (completed && (turnsState.matches('idle') || turnsState.context.taskId !== id)) {
       turnsSend({ type: 'LOAD', taskId: id });
     }
-  }, [completed, id, turnsState, turnsSend]);
+  }, [completed, id, turnsState]);
   const turns = turnsState.context.turns;
+  // Item 73's amendment: the reassignment mode. It starts in the speakers panel and, while it is on,
+  // the transcript shows a selection box beside every segment and turn (the next items add them).
+  const [reassigning, setReassigning] = useState(false);
+  // The segments ticked for the move, by id, so a reload cannot make them address another segment.
+  const [selectedSegments, setSelectedSegments] = useState<ReadonlySet<number>>(new Set());
+  // The target picker is open (plain input state).
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [chosenTarget, setChosenTarget] = useState<string>('');
+  const [reassignState, reassignSend] = useMachine(
+    speakerReassignMachine.provide({
+      actions: {
+        reassigned: () => {
+          setReassigning(false);
+          setSelectedSegments(new Set());
+          setPickerOpen(false);
+          turnsSend({ type: 'RELOAD' });
+        },
+      },
+    }),
+    { input: { taskId: id } },
+  );
+  const endReassign = () => {
+    setReassigning(false);
+    setSelectedSegments(new Set());
+    setPickerOpen(false);
+  };
+  const toggleSegment = (segment: Segment) =>
+    setSelectedSegments((current) => {
+      const next = new Set(current);
+      if (next.has(segment.id)) {
+        next.delete(segment.id);
+      } else {
+        next.add(segment.id);
+      }
+      return next;
+    });
+  // A turn's box: all of its segments, or none when all are already ticked.
+  const toggleTurn = (turn: Turn) =>
+    setSelectedSegments((current) => {
+      const all = turn.segments.every((segment) => current.has(segment.id));
+      const next = new Set(current);
+      for (const segment of turn.segments) {
+        if (all) {
+          next.delete(segment.id);
+        } else {
+          next.add(segment.id);
+        }
+      }
+      return next;
+    });
+  // Escape leaves the mode with nothing changed; while the picker is open it closes that first
+  // (user decision 2026-10-31).
+  useEffect(() => {
+    if (!reassigning) {
+      return;
+    }
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      if (pickerOpen) {
+        setPickerOpen(false);
+        return;
+      }
+      if (reassignState.matches('confirming')) {
+        reassignSend({ type: 'CANCEL' });
+        return;
+      }
+      endReassign();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [reassigning, pickerOpen, reassignState, reassignSend]);
 
+  const sendReassign = () =>
+    reassignSend({
+      type: 'SEND',
+      segmentIds: [...selectedSegments],
+      speakerId: chosenTarget === '' ? null : Number(chosenTarget),
+      // A move makes the task's merges permanent (user decision 2026-10-31), so it asks first then.
+      confirm: turns?.hasMerges ?? false,
+    });
   // Item 22: the latest speakers event of this task. A rename brings the names (the turns
   // stay as they are); a merge or a reset can join or split turns, so /turns is read again.
   const speakerChange = ConnectionContext.useSelector((state) => state.context.speakerChanges[id]);
@@ -199,7 +301,7 @@ export function TaskTranscriptView() {
     }
     // A failed reload lands on the turns error callout, like the initial load.
     turnsSend({ type: 'RELOAD' });
-  }, [id, speakerChange, turnsSend]);
+  }, [id, speakerChange]);
 
   // Item 52: the latest edit of each edited segment of this task replaces that segment in
   // place; a text edit changes no turn boundary, so /turns is not read again. The edits are
@@ -669,7 +771,7 @@ export function TaskTranscriptView() {
       onDrag={(ms) => playbackSend({ type: 'DRAG', ms })}
       onPlayingChange={(playing) => playbackSend({ type: playing ? 'PLAYING' : 'IDLE' })}
       onToggle={toggleFromButton}
-      disabled={editingSegmentId !== null}
+      disabled={reassigning || editingSegmentId !== null}
     />
   ) : (
     <NoAudioNote>This task has no audio because it ended before chunking.</NoAudioNote>
@@ -693,7 +795,13 @@ export function TaskTranscriptView() {
           <Row gap="sm">
             <RetryButton task={task} />
             <DropdownMenu
-              trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
+              trigger={
+                <IconButton
+                  icon={MoreVertical}
+                  label={`Actions for ${task.filename}`}
+                  disabled={reassigning}
+                />
+              }
               align="end"
               items={transcriptMenuItems}
             />
@@ -726,7 +834,13 @@ export function TaskTranscriptView() {
             </DownloadLink>
           ))}
           <DropdownMenu
-            trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
+            trigger={
+              <IconButton
+                icon={MoreVertical}
+                label={`Actions for ${task.filename}`}
+                disabled={reassigning}
+              />
+            }
             align="end"
             items={transcriptMenuItems}
           />
@@ -742,6 +856,13 @@ export function TaskTranscriptView() {
             // A merge or a reset joins or splits turns, so the turns are read again; a
             // failed reload shows the turns error callout, like the initial load.
             onMergesChanged={() => turnsSend({ type: 'RELOAD' })}
+            reassigning={reassigning}
+            onStartReassign={() => {
+              setSelectedSegments(new Set());
+              setPickerOpen(false);
+              pauseToIdle(audioRef.current);
+              setReassigning(true);
+            }}
           />
         ) : null}
         {turnsState.matches('failed') ? (
@@ -761,52 +882,120 @@ export function TaskTranscriptView() {
         ) : turnsBySpeaker === null ? (
           <LoadingState label="Loading transcript…" />
         ) : (
-          <TranscriptRegion
-            ref={transcriptRegionRef}
-            role="region"
-            aria-label="Transcript"
-            // Item 74: the task's language (whisper's detected one, the requested one as
-            // fallback) marks the transcript, so fontconfig picks that script's glyph forms
-            // — Japanese kanji and kana in their JP forms, not the SC fallback's. The app
-            // shell keeps its own lang="en" (index.html). The contract's auto default
-            // (requested auto, nothing detected) is a request, not a language tag, so the
-            // transcript carries none.
-            lang={task.language === languages.default ? undefined : task.language}
-            onWheel={sendScrolled}
-            onTouchMove={sendScrolled}
-            onKeyDown={handleKeyDown}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerEnd}
-            onPointerCancel={handlePointerEnd}
-          >
-            <TranscriptTurns
-              turnsBySpeaker={turnsBySpeaker}
-              currentSegment={currentSegment}
-              playing={playing}
-              playingOnItsOwnId={playing ? (windowSegment?.id ?? null) : null}
-              onStopSegment={stopPlaying}
-              onSegmentSeek={(segment) => {
-                seek(segment.startMs);
-                setChosenSegmentId(segment.id);
-              }}
-              onSegmentPlay={(segment) => {
-                playFrom(segment.startMs);
-                setChosenSegmentId(segment.id);
-              }}
-              onCurrentToggle={togglePlayback}
-              onPlaySegment={playSegmentWindow}
-              editingSegmentId={editingSegmentId}
-              onEdit={openEditor}
-              onSaveEdit={saveEdit}
-              onDiscardEdit={() => {
-                setEditError(null);
-                setEditingSegmentId(null);
-              }}
-              onRevertEdit={revertEdit}
-              editError={editError}
-            />
-          </TranscriptRegion>
+          <>
+            {reassigning ? (
+              <ReassignBar aria-label="Reassign speakers">
+                <Text>Select segments to move to a different speaker</Text>
+                <Text>
+                  {selectedSegments.size} segment{selectedSegments.size === 1 ? '' : 's'} selected
+                </Text>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={selectedSegments.size === 0}
+                  onClick={() => {
+                    setChosenTarget('');
+                    setPickerOpen(true);
+                  }}
+                >
+                  Move to…
+                </Button>
+                {pickerOpen ? (
+                  <Row gap="sm">
+                    <label>
+                      Move to
+                      <select
+                        aria-label="Move to speaker"
+                        value={chosenTarget}
+                        onChange={(event) => setChosenTarget(event.target.value)}
+                      >
+                        <option value="">New speaker</option>
+                        {(turns?.speakers ?? []).map((speaker) => (
+                          <option key={speaker.speakerId} value={String(speaker.speakerId)}>
+                            {speaker.speaker}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <Button
+                      type="button"
+                      disabled={reassignState.matches('sending')}
+                      onClick={sendReassign}
+                    >
+                      Move
+                    </Button>
+                  </Row>
+                ) : null}
+                <Button type="button" variant="secondary" onClick={endReassign}>
+                  Cancel
+                </Button>
+                {reassignState.context.error !== null ? (
+                  <BarError>{reassignState.context.error.message}</BarError>
+                ) : null}
+                <ConfirmDialog
+                  open={reassignState.matches('confirming')}
+                  title="Reassign speakers?"
+                  confirmLabel="Move"
+                  onConfirm={() => reassignSend({ type: 'CONFIRM' })}
+                  onCancel={() => reassignSend({ type: 'CANCEL' })}
+                >
+                  {
+                    'This task has merged speakers. Reassigning makes those merges permanent: "Reset all merges" will no longer be available.'
+                  }
+                </ConfirmDialog>
+              </ReassignBar>
+            ) : null}
+            <TranscriptRegion
+              ref={transcriptRegionRef}
+              role="region"
+              aria-label="Transcript"
+              // Item 74: the task's language (whisper's detected one, the requested one as
+              // fallback) marks the transcript, so fontconfig picks that script's glyph forms
+              // — Japanese kanji and kana in their JP forms, not the SC fallback's. The app
+              // shell keeps its own lang="en" (index.html). The contract's auto default
+              // (requested auto, nothing detected) is a request, not a language tag, so the
+              // transcript carries none.
+              lang={task.language === languages.default ? undefined : task.language}
+              onWheel={sendScrolled}
+              onTouchMove={sendScrolled}
+              onKeyDown={handleKeyDown}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerEnd}
+              onPointerCancel={handlePointerEnd}
+            >
+              <TranscriptTurns
+                turnsBySpeaker={turnsBySpeaker}
+                reassigning={reassigning}
+                selectedSegments={selectedSegments}
+                onToggleSegment={toggleSegment}
+                onToggleTurn={toggleTurn}
+                currentSegment={currentSegment}
+                playing={playing}
+                playingOnItsOwnId={playing ? (windowSegment?.id ?? null) : null}
+                onStopSegment={stopPlaying}
+                onSegmentSeek={(segment) => {
+                  seek(segment.startMs);
+                  setChosenSegmentId(segment.id);
+                }}
+                onSegmentPlay={(segment) => {
+                  playFrom(segment.startMs);
+                  setChosenSegmentId(segment.id);
+                }}
+                onCurrentToggle={togglePlayback}
+                onPlaySegment={playSegmentWindow}
+                editingSegmentId={editingSegmentId}
+                onEdit={openEditor}
+                onSaveEdit={saveEdit}
+                onDiscardEdit={() => {
+                  setEditError(null);
+                  setEditingSegmentId(null);
+                }}
+                onRevertEdit={revertEdit}
+                editError={editError}
+              />
+            </TranscriptRegion>
+          </>
         )}
       </Stack>
       {!following ? (

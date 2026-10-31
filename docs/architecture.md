@@ -183,12 +183,12 @@ The browser and the backend talk over a small JSON API under `/api`. Commands ar
 | `GET /api/tasks/{id}/turns` | the transcript by speaker turns |
 | `GET /api/tasks/{id}/transcript?format=txt\|srt\|vtt` | download the transcript |
 | `GET /api/tasks/{id}/audio` | the recording for playback (FLAC, with range requests) |
-| `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge`, `DELETE /api/tasks/{id}/speakers/merges` | rename, merge, undo merges |
+| `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge`, `DELETE /api/tasks/{id}/speakers/merges`, `POST /api/tasks/{id}/speakers/reassign` | rename, merge, undo merges, reassign segments |
 | `GET /api/settings`, `PUT /api/settings`, `DELETE /api/settings`, `DELETE /api/settings/device-fallback` | read and change the settings, restore their defaults, dismiss the CPU-fallback notice |
 | `GET /api/health` | health check |
 | `GET /api/events` | the live event stream |
 
-**Live updates** use server-sent events ([ADR 0007](decisions/0007-sse-live-updates.md)). A new connection first receives a `snapshot` of all tasks and the queue; after that, one event per change: `task-updated`, `task-progress`, `task-deleted`, `queue-updated`, `speakers-renamed`, `speakers-merged` and `settings-updated`. A `heartbeat` follows any 5 seconds of silence, and the browser reconnects if it hears nothing for 15 seconds ([ADR 0044](decisions/0044-sse-heartbeat-and-client-watchdog.md)). The stream is written by hand, without a Ktor plugin ([ADR 0041](decisions/0041-sse-without-ktor-plugin.md)).
+**Live updates** use server-sent events ([ADR 0007](decisions/0007-sse-live-updates.md)). A new connection first receives a `snapshot` of all tasks and the queue; after that, one event per change: `task-updated`, `task-progress`, `task-deleted`, `queue-updated`, `speakers-renamed`, `speakers-merged`, `speakers-reassigned` and `settings-updated`. A `heartbeat` follows any 5 seconds of silence, and the browser reconnects if it hears nothing for 15 seconds ([ADR 0044](decisions/0044-sse-heartbeat-and-client-watchdog.md)). The stream is written by hand, without a Ktor plugin ([ADR 0041](decisions/0041-sse-without-ktor-plugin.md)).
 
 **The contract comes first.** [`docs/api/`](api/README.md) holds an example of every response and event. The frontend's mock server serves exactly these files, and backend tests check every real response against them, so the two sides cannot drift apart ([ADR 0029](decisions/0029-contract-first-frontend-shared-api-examples.md)). The allowed status transitions ([`docs/api/task-transitions.json`](api/task-transitions.json)), the languages and the accepted file extensions live there too and are read by both sides.
 
@@ -212,7 +212,7 @@ The frontend is a React app written in TypeScript, styled with styled-components
 
 **Live state.** One connection machine owns the event stream: it loads the snapshot, applies every event, and shows "Connecting…" or "Reconnecting…" while the stream is down. The pages read tasks and the queue from it, so they always show the backend's state.
 
-**State machines.** Every UI flow with steps — a command being sent, a confirmation dialog, an upload batch, drag-and-drop reordering, playback, follow mode, renaming or merging speakers — is an XState machine; plain input values stay in React state ([ADR 0038](decisions/0038-ui-state-transitions-are-machines.md)). A command button is offered only when the task's status allows it, read from the shared transition table.
+**State machines.** Every UI flow with steps — a command being sent, a confirmation dialog, an upload batch, drag-and-drop reordering, playback, follow mode, renaming, merging or splitting speakers — is an XState machine; plain input values stay in React state ([ADR 0038](decisions/0038-ui-state-transitions-are-machines.md)). A command button is offered only when the task's status allows it, read from the shared transition table.
 
 **Design system.** Colors, spacing, sizes, motion and typography are tokens in one theme, with a light and a dark variant; components never use literal values. A small set of primitives (buttons, cards, lists, badges, progress bars, dialogs, menus, sliders, switches) builds on Radix UI, and the type is IBM Plex Sans ([ADR 0033](decisions/0033-design-system-tokens-radix-plex.md), [docs/specs/design-system.md](specs/design-system.md)). The stenographer mascot in the header types while a task runs ([docs/specs/branding-stenographer-animation.md](specs/branding-stenographer-animation.md)).
 

@@ -12,6 +12,7 @@ import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 import stt.db.MergeOutcome
+import stt.db.ReassignOutcome
 import stt.db.RenameOutcome
 import stt.db.SegmentRepository
 import stt.db.Speaker
@@ -41,15 +42,8 @@ fun Application.speakerRoutes() {
     routing {
         put("/api/tasks/{id}/speakers/{speakerId}") {
             val id = call.completedTaskOrError(tasks, "speakers to rename")?.id ?: return@put
-            val speakerId = call.parameters["speakerId"]?.toIntOrNull()
             // Only a shown speaker can be renamed: one hidden by a merge answers 404 too (user decision 2026-10-10).
-            if (speakerId == null || segments.findDiarized(id).speakers.none { it.speakerId == speakerId }) {
-                return@put call.respondError(
-                    HttpStatusCode.NotFound,
-                    "not-found",
-                    "Task $id has no speaker ${call.parameters["speakerId"]}",
-                )
-            }
+            val speakerId = call.shownSpeakerIdOrNotFound(segments, id) ?: return@put
             val requested = call.receive<RenameSpeakerRequest>().speaker
             if (requested != null && !isValidSpeakerName(requested)) {
                 return@put call.respondError(
@@ -97,6 +91,30 @@ fun Application.speakerRoutes() {
             engine.resetMerges(id)
             call.respondSpeakers(segments, id)
         }
+
+        post("/api/tasks/{id}/speakers/reassign") {
+            val id = call.completedTaskOrError(tasks, "speakers to reassign")?.id ?: return@post
+            val request = call.receive<ReassignRequest>()
+            when (val outcome = engine.reassignSegments(id, request.segmentIds, request.speakerId)) {
+                ReassignOutcome.Reassigned -> {
+                    call.respondSpeakers(segments, id)
+                }
+
+                // The repository checks the target in the write transaction: a speaker that is unknown or merged
+                // away by the time the move runs answers 404, exactly as the earlier look did.
+                ReassignOutcome.UnknownSpeaker -> {
+                    call.respondError(
+                        HttpStatusCode.NotFound,
+                        "not-found",
+                        "Task $id has no speaker ${request.speakerId}",
+                    )
+                }
+
+                is ReassignOutcome.Invalid -> {
+                    call.respondError(HttpStatusCode.BadRequest, "invalid-reassignment", outcome.reason)
+                }
+            }
+        }
     }
 }
 
@@ -105,6 +123,20 @@ private suspend fun RoutingCall.respondSpeakers(
     segments: SegmentRepository,
     id: Long,
 ) = respond(SpeakersJson(segments.findDiarized(id).speakers.map { it.toJson() }))
+
+/**
+ * The call's `{speakerId}` when it is one of task [id]'s shown speakers; otherwise answers `404 not-found` and returns
+ * null. A speaker hidden by a merge is not shown, so it answers 404 too, and so does a non-numeric id.
+ */
+private suspend fun RoutingCall.shownSpeakerIdOrNotFound(
+    segments: SegmentRepository,
+    id: Long,
+): Int? {
+    val speakerId = parameters["speakerId"]?.toIntOrNull()
+    if (speakerId != null && segments.findDiarized(id).speakers.any { it.speakerId == speakerId }) return speakerId
+    respondError(HttpStatusCode.NotFound, "not-found", "Task $id has no speaker ${parameters["speakerId"]}")
+    return null
+}
 
 /** The longest speaker name (item 22). */
 private const val MAX_SPEAKER_NAME = 40
@@ -124,6 +156,13 @@ private data class RenameSpeakerRequest(
 private data class MergeSpeakersRequest(
     val group: List<Int>,
     val into: Int,
+)
+
+/** The body of `POST /api/tasks/{id}/speakers/reassign` (item 73's amendment): the segments and their target, null for new. */
+@Serializable
+private data class ReassignRequest(
+    val segmentIds: List<Long>,
+    val speakerId: Int?,
 )
 
 /** The body of the speaker endpoints' `200` (item 22, `docs/api/speakers.json`): the task's speakers by `speakerId`. */

@@ -141,6 +141,16 @@ export const connectionMachine = setup({
             }),
           }),
         },
+        // Item 73's amendment: a move changes the turn boundaries along the moved segments, so an
+        // open view reads /turns again, as on a merge.
+        'speakers-reassigned': {
+          actions: assign({
+            speakerChanges: ({ context, event }) => ({
+              ...context.speakerChanges,
+              [event.id]: { speakers: event.speakers, merged: true },
+            }),
+          }),
+        },
         'segment-edited': {
           actions: assign({
             segmentEdits: ({ context, event }) => ({

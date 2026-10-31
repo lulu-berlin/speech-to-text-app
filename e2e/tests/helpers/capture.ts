@@ -37,6 +37,7 @@ export async function installSseCapture(page: Page): Promise<void> {
       'task-deleted',
       'speakers-renamed',
       'speakers-merged',
+      'speakers-reassigned',
       'heartbeat',
     ];
     globalThis.EventSource = new Proxy(realEventSource, {
