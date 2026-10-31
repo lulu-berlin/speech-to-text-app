@@ -69,7 +69,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 77 Upload spec shared temp dir | in progress | **yes** | a `macOS (gradle check)` flake undermines release verification |
 | 79 Full e2e journey on Windows | done | **yes** | 1.0 claims Windows support; the journey is the only suite not run there (item 49 covers the packaged specs only) |
 | 83 Diarization accuracy | spec-approved | after 1.0 | detection quality, measured on the user's recordings (decided 2026-10-30) |
-| 84 e2e reliability | spec-approved | **yes** | the Windows journey must gate again and the suites must not depend on clocks, sleeps or a stale UI (decided 2026-10-30) |
+| 84 e2e reliability | in progress | **yes** | the Windows journey must gate again and the suites must not depend on clocks, sleeps or a stale UI (decided 2026-10-30) |
 | 85 CI wall time | spec-approved | after 1.0 | CI speed, not release quality; item 84 covers reliability (decided 2026-10-31) |
 | 86 Mobile feasibility | spec-approved | after 1.0 | research into an Android/iOS port; the 1.0 support matrix is desktop only (decided 2026-10-31) |
 | 87 Writes wait for the connection | spec-approved | **yes** | a live write control while the app cannot write, and a browser's error text on screen, are release quality issues (decided 2026-10-31) |
