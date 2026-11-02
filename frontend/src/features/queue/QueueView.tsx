@@ -16,7 +16,7 @@ import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError, finishedStatus, pendingStatus } from '../../shared/api/types';
 import type { Settings, Task, TaskStatus } from '../../shared/api/types';
-import { ConnectionContext } from '../../app/ConnectionContext';
+import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
 import { finishNoticeMachine } from './finishNoticeMachine';
 import { dropZoneMachine } from './dropZoneMachine';
 import { DeviceFallbackBanner } from './DeviceFallbackBanner';
@@ -159,8 +159,17 @@ function FinishNoticeLine({ notice }: { notice: FinishNotice }) {
 }
 
 // The trailing side of an upload row: the progress bar while uploading, the duplicate
-// notice or the error message on a failed upload, and the status text otherwise.
-function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
+// notice or the error message on a failed upload, and the status text otherwise. A row the
+// batch is holding for the connection says so, not the internal "queued" (item 87).
+function UploadRowTrailing({
+  row,
+  tasks,
+  waiting,
+}: {
+  row: UploadRow;
+  tasks: Task[];
+  waiting: boolean;
+}) {
   if (row.status === 'uploading') {
     return (
       <UploadProgress>
@@ -175,7 +184,11 @@ function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
       <RowError>{row.error}</RowError>
     );
   }
-  return <RowStatus>{row.status}</RowStatus>;
+  return (
+    <RowStatus>
+      {waiting && row.status === 'queued' ? 'Waiting for the connection…' : row.status}
+    </RowStatus>
+  );
 }
 
 /** One upload option a batch carries; the prefill remembers which ones the user has changed. */
@@ -184,12 +197,14 @@ type BatchOption = 'language' | 'speakersMode' | 'speakersCount' | 'maxSpeakers'
 export function QueueView() {
   const connection = ConnectionContext.useActorRef();
   const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
-  const live = ConnectionContext.useSelector((state) => state.value === 'live');
+  const writes = useWriteControl();
   const [language, setLanguage] = useState(languages.default);
   const [speakers, setSpeakers] = useState<SpeakersChoice>('auto');
   const [speakerCount, setSpeakerCount] = useState(2);
   const [maxSpeakers, setMaxSpeakers] = useState(8);
-  const [upload, sendToUploader] = useMachine(uploadBatchMachine);
+  const [upload, sendToUploader] = useMachine(uploadBatchMachine, {
+    input: { live: !writes.disabled },
+  });
   const settings = SettingsContext.useSelector((state) => state);
   const [reorder, sendReorder] = useMachine(reorderMachine, {
     input: { order: queue?.taskIds ?? [] },
@@ -234,6 +249,11 @@ export function QueueView() {
       setMaxSpeakers(stored.maxSpeakers);
     }
   }, [stored]);
+
+  // The batch starts, stops and resends only as the live stream allows (item 87).
+  useEffect(() => {
+    sendToUploader({ type: 'CONNECTION', live: !writes.disabled });
+  }, [sendToUploader, writes.disabled]);
 
   // The pause POST answered: apply its queue to the live state (the server's own
   // queue-updated carries the same queue, so applying it twice is harmless).
@@ -284,6 +304,9 @@ export function QueueView() {
   }, [queue, pendingKey, sendReorder]);
 
   const enqueue = (files: File[]) => {
+    if (writes.disabled) {
+      return;
+    }
     const options: UploadOptions = {
       language,
       speakers: speakers === 'fixed' ? String(speakerCount) : speakers,
@@ -342,7 +365,7 @@ export function QueueView() {
 
   // The queue is empty once the snapshot has landed and nothing is pending or uploading;
   // before that the shell's connecting region is the loading state (item 25).
-  const empty = live && pendingTasks.length === 0 && visibleRows.length === 0;
+  const empty = !writes.disabled && pendingTasks.length === 0 && visibleRows.length === 0;
 
   return (
     <Page>
@@ -359,6 +382,8 @@ export function QueueView() {
         <DropZone
           type="button"
           $over={dragOver}
+          disabled={writes.disabled}
+          title={writes.title}
           onClick={() => inputRef.current?.click()}
           onDrop={onDrop}
           onDragOver={onDragOver}
@@ -367,7 +392,14 @@ export function QueueView() {
         >
           <DropZoneContent empty={empty} over={dragOver} />
         </DropZone>
-        <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          hidden
+          disabled={writes.disabled}
+          onChange={onPick}
+        />
         <UploadOptionsPanel
           language={language}
           onLanguageChange={(next) => {
@@ -396,7 +428,7 @@ export function QueueView() {
               <ListRow key={row.id}>
                 <RowContent>
                   <RowName>{row.file.name}</RowName>
-                  <UploadRowTrailing row={row} tasks={tasks} />
+                  <UploadRowTrailing row={row} tasks={tasks} waiting={upload.matches('waiting')} />
                 </RowContent>
               </ListRow>
             ))}
@@ -408,7 +440,8 @@ export function QueueView() {
             checked={queue?.paused ?? false}
             onCheckedChange={() => sendPause({ type: 'TOGGLE', paused: !(queue?.paused ?? false) })}
             label="Pause the queue"
-            disabled={pause.matches('sending')}
+            disabled={pause.matches('sending') || writes.disabled}
+            title={writes.title}
           />
         </Row>
         {pause.context.error !== null ? (

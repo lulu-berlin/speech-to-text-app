@@ -138,6 +138,42 @@ Line numbers are `main` after item 82.
    store nothing (the segments precedent). Validation stays the server's job — the page shows its
    rejection on the field.
 
+## Writes and the connection (roadmap item 87, 2026-10-31)
+
+Two rules govern every visible write, on every page:
+
+1. **A control that writes is offered only while the connection is live.** One selector,
+   `useWriteControl()` in `frontend/src/app/ConnectionContext.tsx`, is true only in the
+   connection machine's `live` state, and every write control reads it: the settings fields and
+   restore, the fallback dismissal, speaker rename, reset name, merge and reset merges, the
+   reassign mode's entry button, Move and confirmation, segment save and revert, the upload zone
+   and file input, the queue's pause, reorder, pause/resume/cancel and task delete, and History's
+   retry and delete (a merge, reassign, cancel or delete confirmation's confirm button too). A
+   control disabled for this reason carries the title "Can't reach the app's service.
+   Reconnecting…" — the word "service", never "backend", in what a user reads — and the header's
+   "Reconnecting" stays the one banner. Reading,
+   scrolling, playback of already-loaded audio and page switching are not gated, and a control
+   with nothing to do is not offered either: "Reset name" is disabled while the stored name
+   already is the server's default (`"Speaker " + (speakerId + 1)`).
+2. **A request that never reaches the service says so in the app's words.** Every request goes
+   through the boundary in `frontend/src/shared/api/client.ts`: a rejected `fetch` (the service
+   is unreachable) becomes an `ApiError`. A write's message is "Not saved: can't reach the app's
+   service. Reconnecting…"; a read's is "Can't reach the app's service. Reconnecting…" (nothing
+   was being saved). The upload path's `xhr.onerror` carries the write message. A server answer
+   (400/404/409 with its message) still shows the server's message, and a row's own prefix
+   ("Retry failed:", "Delete failed:") is not added to the app's transport message, so no view
+   prints the browser's transport text. A failed write is not retried; the user retries once the
+   connection is live again. The one exception is an upload: a batch row the drop cut off goes back
+   to queued with its progress cleared, is sent again in full from the start when the live stream
+   returns, and the rows behind it wait too; there is no per-request timeout, the stream's reconnect
+   decides. The wait ends when the stream stays live: a request that failed at the transport while
+   the stream never dropped becomes an error row with the app's message after a short grace
+   (2–3 s), and the batch behind it continues; a real drop keeps waiting and is re-sent. A resend
+   the service answers `409 duplicate-audio` shows the usual duplicate notice,
+   and a real refusal keeps its server message and is never re-sent. Every other write is never
+   retried. The e2e journey for this exception is skipped on Windows, because freezing the backend
+   needs POSIX signals; the Windows e2e still gates merges, so the skip is a recorded coverage gap.
+
 ## Decisions (consultation 2026-10-27)
 
 - **Shared actor's shape**: one `createActorContext` provider owned by the app shell, exactly like

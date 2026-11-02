@@ -1,3 +1,4 @@
+import { useWriteControl } from '../../app/ConnectionContext';
 import { SettingsContext } from '../../app/SettingsContext';
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
 import { TextButton } from '../../shared/ui/TextButton';
@@ -22,6 +23,7 @@ export function DeviceFallbackBanner() {
       state.matches({ loaded: 'dismissing' }),
   );
   const settingsActor = SettingsContext.useActorRef();
+  const writes = useWriteControl();
   if (stored?.deviceFallback == null) {
     return null;
   }
@@ -31,7 +33,11 @@ export function DeviceFallbackBanner() {
         title={`${deviceLabel(stored.deviceFallback, stored.gpuNames)} was unavailable`}
         detail="Transcription switched to the CPU. The device setting is now CPU; to use it again, choose it on the Settings page."
         action={
-          <TextButton disabled={busy} onClick={() => settingsActor.send({ type: 'DISMISS' })}>
+          <TextButton
+            disabled={busy || writes.disabled}
+            title={writes.title}
+            onClick={() => settingsActor.send({ type: 'DISMISS' })}
+          >
             Dismiss
           </TextButton>
         }

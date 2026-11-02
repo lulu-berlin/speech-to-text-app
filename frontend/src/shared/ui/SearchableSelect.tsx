@@ -25,6 +25,8 @@ export interface SearchableSelectProps {
   describedBy?: string;
   // Set while the field must not change, e.g. before the stored settings are known.
   disabled?: boolean;
+  // Why the control is disabled, when the reason is not obvious (item 87).
+  title?: string;
   // The field's own focus, for a form that keeps a focused draft (the settings page).
   onFocus?: () => void;
   onBlur?: () => void;
@@ -82,6 +84,7 @@ export function SearchableSelect({
   invalid,
   describedBy,
   disabled,
+  title,
   onFocus,
   onBlur,
 }: SearchableSelectProps) {
@@ -155,6 +158,7 @@ export function SearchableSelect({
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         disabled={disabled}
+        title={title}
         aria-expanded={open}
         aria-controls={listboxId}
         aria-activedescendant={

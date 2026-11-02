@@ -9,6 +9,10 @@ export interface ConfirmDialogProps {
   confirmLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  // The confirm action itself writes (item 87): while the connection is not live it is
+  // disabled and `confirmTitle` says why; Cancel still closes the dialog.
+  confirmDisabled?: boolean;
+  confirmTitle?: string;
   children: ReactNode;
 }
 
@@ -55,6 +59,8 @@ export function ConfirmDialog({
   confirmLabel,
   onConfirm,
   onCancel,
+  confirmDisabled = false,
+  confirmTitle,
   children,
 }: ConfirmDialogProps) {
   return (
@@ -75,7 +81,9 @@ export function ConfirmDialog({
             <Button variant="secondary" onClick={onCancel}>
               Cancel
             </Button>
-            <Button onClick={onConfirm}>{confirmLabel}</Button>
+            <Button disabled={confirmDisabled} title={confirmTitle} onClick={onConfirm}>
+              {confirmLabel}
+            </Button>
           </Actions>
         </Panel>
       </Dialog.Portal>

@@ -39,6 +39,9 @@ export const speakerRenameMachine = setup({
   },
   guards: {
     changed: ({ context }) => context.draft.trim() !== context.stored,
+    // A reset writes the default name ("Speaker N", N = speakerId + 1); a stored name that
+    // already is the default has nothing to reset, so RESET is not offered.
+    notDefault: ({ context }) => context.stored !== `Speaker ${context.speakerId + 1}`,
   },
   actors: {
     rename: fromPromise<Speakers, RenameInput>(({ input }) =>
@@ -65,7 +68,11 @@ export const speakerRenameMachine = setup({
           },
           { actions: assign({ draft: ({ context }) => context.stored }) },
         ],
-        RESET: { target: 'sending', actions: assign({ request: null }) },
+        RESET: {
+          guard: 'notDefault',
+          target: 'sending',
+          actions: assign({ request: null }),
+        },
       },
     },
     sending: {

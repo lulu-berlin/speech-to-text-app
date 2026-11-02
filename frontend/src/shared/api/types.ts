@@ -204,3 +204,20 @@ export class ApiError extends Error {
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+// The code of a request that never reached the service (item 87): `0` stands in for the absent
+// HTTP status.
+export const TRANSPORT_ERROR_CODE = '0';
+
+// Whether a thrown value is the app's "never reached the service" error (item 87): the one
+// predicate the upload batch and the message helpers share.
+export function isTransportError(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.code === TRANSPORT_ERROR_CODE;
+}
+
+// The line a row shows for a failed write: the app's transport message already says "Not saved",
+// so the row's own "Retry failed:"/"Delete failed:" prefix would double it; a server answer keeps
+// the row's prefix.
+export function failureMessage(prefix: string, error: unknown): string {
+  return isTransportError(error) ? errorMessage(error) : `${prefix}: ${errorMessage(error)}`;
+}

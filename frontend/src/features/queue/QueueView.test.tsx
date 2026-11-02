@@ -82,6 +82,37 @@ function openUploadOptions() {
   fireEvent.click(screen.getByRole('button', { name: 'Upload options' }));
 }
 
+// Writes wait for the live connection (item 87): dropping or picking files is offered only
+// once the snapshot has landed, so an upload test waits for that before it acts.
+async function waitForUploadsEnabled() {
+  const dropZone = screen.getByRole('button', { name: /drop audio/i });
+  await waitFor(() => expect(dropZone).toBeEnabled());
+}
+
+// A fake XHR for the upload tests: the client reads progress, settles on load/error, and a
+// teardown aborts a request that is still pending — the browser's own sequence. Each scenario
+// supplies only `send`.
+class TestXhr {
+  upload = {
+    onprogress: null as
+      ((event: { lengthComputable: true; loaded: number; total: number }) => void) | null,
+  };
+  responseType = '';
+  status = 0;
+  statusText = '';
+  response: unknown = null;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onabort: (() => void) | null = null;
+  aborted = 0;
+  open(): void {}
+  send(): void {}
+  abort(): void {
+    this.aborted += 1;
+    this.onabort?.();
+  }
+}
+
 describe('the queue view upload options', () => {
   it('offers the languages from docs/api/languages.json with auto as the default, and bounds speakers and max speakers to 1–20', () => {
     renderQueue();
@@ -294,6 +325,7 @@ describe('the queue view upload flow', () => {
     );
 
     renderQueue();
+    await waitForUploadsEnabled();
     openUploadOptions();
 
     // The batch options: language de, speakers fixed 3, max speakers 10.
@@ -368,17 +400,7 @@ describe('the queue view upload flow', () => {
 
     // jsdom + MSW fire no XHR upload progress events, so the test swaps in a fake XHR
     // that simulates the browser: 50% sent, then (once released) 100% and a 201 response.
-    class FakeXhr {
-      upload = {
-        onprogress: null as
-          ((event: { lengthComputable: true; loaded: number; total: number }) => void) | null,
-      };
-      responseType = '';
-      status = 0;
-      response: unknown = null;
-      onload: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      open(): void {}
+    class ProgressXhr extends TestXhr {
       send(): void {
         this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 });
         void proceed.then(() => {
@@ -391,9 +413,10 @@ describe('the queue view upload flow', () => {
         });
       }
     }
-    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    vi.stubGlobal('XMLHttpRequest', ProgressXhr);
     try {
       renderQueue();
+      await waitForUploadsEnabled();
 
       const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
       fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
@@ -426,6 +449,7 @@ describe('the queue view upload flow', () => {
       }),
     );
     renderQueue();
+    await waitForUploadsEnabled();
     const dropZone = screen.getByRole('button', { name: /drop audio/i });
 
     // A browser only permits a drop after a dragOver whose default is prevented (jsdom's
@@ -442,17 +466,7 @@ describe('the queue view upload flow', () => {
 
   it("gives an uploading file's progress bar a fixed width beside the filename, and the full row width on a phone", async () => {
     // A fake XHR that reports 50% sent and never completes, so the row stays uploading.
-    class StalledXhr {
-      upload = {
-        onprogress: null as
-          ((event: { lengthComputable: true; loaded: number; total: number }) => void) | null,
-      };
-      responseType = '';
-      status = 0;
-      response: unknown = null;
-      onload: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      open(): void {}
+    class StalledXhr extends TestXhr {
       send(): void {
         this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 });
       }
@@ -460,6 +474,7 @@ describe('the queue view upload flow', () => {
     vi.stubGlobal('XMLHttpRequest', StalledXhr);
     try {
       renderQueue();
+      await waitForUploadsEnabled();
       const files = [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })];
       fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
       const uploads = screen.getByRole('list', { name: 'Uploads' });
@@ -474,6 +489,34 @@ describe('the queue view upload flow', () => {
       // On a phone (the row stacks below the small breakpoint) the slot spans the row.
       const narrow = mediaRulesFor(slot, `(max-width: ${lightTheme.breakpoints.sm})`);
       expect(narrow.map((rule) => rule.style.width)).toContain('100%');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('aborts the in-flight upload when the queue view unmounts', async () => {
+    // A request that never answers: leaving the view must abort it and swallow the rejection.
+    class HeldXhr extends TestXhr {
+      static last: HeldXhr | undefined;
+      constructor() {
+        super();
+        HeldXhr.last = this;
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', HeldXhr);
+    try {
+      const view = renderQueue();
+      await waitForUploadsEnabled();
+      fireEvent.drop(screen.getByRole('button', { name: /drop/i }), {
+        dataTransfer: { files: [new File(['x'], 'a.mp3', { type: 'audio/mpeg' })] },
+      });
+      const uploads = screen.getByRole('list', { name: 'Uploads' });
+      await within(uploads).findByRole('progressbar', { name: /a\.mp3/i });
+
+      // Unmounting disposes the batch actor, whose cleanup aborts the request; the rejection
+      // is swallowed by the actor, so nothing escapes as an unhandled error.
+      view.unmount();
+      expect(HeldXhr.last?.aborted).toBe(1);
     } finally {
       vi.unstubAllGlobals();
     }
@@ -1328,6 +1371,7 @@ describe('upload errors', () => {
     );
 
     renderQueue();
+    await waitForUploadsEnabled();
 
     const files = [
       new File(['x'], 'a.txt', { type: 'text/plain' }),

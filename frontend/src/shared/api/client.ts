@@ -1,4 +1,4 @@
-import { ApiError } from './types';
+import { ApiError, TRANSPORT_ERROR_CODE } from './types';
 import type {
   ApiErrorBody,
   Queue,
@@ -35,52 +35,71 @@ function apiError(body: ApiErrorBody | null, status: number, statusText: string)
   return new ApiError(code, message, body?.taskId);
 }
 
+// The app's wording for a request that never reached the service (item 87): "Not saved" only
+// when a write was attempted; a read says what happened without claiming a save. Never the
+// browser's TypeError, and the header's reconnect is the answer.
+const WRITE_UNREACHABLE = "Not saved: can't reach the app's service. Reconnecting…";
+const READ_UNREACHABLE = "Can't reach the app's service. Reconnecting…";
+
+// A read is a GET; every other method is a write.
+function transportMessage(method: string | undefined): string {
+  return method === undefined || method === 'GET' ? READ_UNREACHABLE : WRITE_UNREACHABLE;
+}
+
+// Every request goes through here, so no view ever prints the browser's transport text.
+async function request(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    // An unreachable service rejects the fetch; `0` stands in for the absent HTTP status.
+    throw new ApiError(TRANSPORT_ERROR_CODE, transportMessage(init?.method));
+  }
+}
+
+// The typed body of a request: every JSON endpoint is this one call.
+async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
+  return json<T>(await request(input, init));
+}
+
 export async function listTasks(): Promise<TaskList> {
-  const response = await fetch('/api/tasks');
-  return json<TaskList>(response);
+  return requestJson<TaskList>('/api/tasks');
 }
 
 export async function getTask(id: number): Promise<Task> {
-  const response = await fetch(`/api/tasks/${id}`);
-  return json<Task>(response);
+  return requestJson<Task>(`/api/tasks/${id}`);
 }
 
 // Item 12 contract: GET /api/tasks/{id}/turns (docs/api/turns.json).
 export async function getTurns(id: number): Promise<Turns> {
-  const response = await fetch(`/api/tasks/${id}/turns`);
-  return json<Turns>(response);
+  return requestJson<Turns>(`/api/tasks/${id}/turns`);
 }
 
 // Item 32 contract: GET /api/settings (docs/api/settings.json): the stored settings and the
 // devices to choose from.
 export async function getSettings(): Promise<Settings> {
-  const response = await fetch('/api/settings');
-  return json<Settings>(response);
+  return requestJson<Settings>('/api/settings');
 }
 
 // Item 32 contract: DELETE /api/settings/device-fallback -> 200 Settings, the CPU-fallback
 // notice cleared.
 export async function dismissDeviceFallback(): Promise<Settings> {
-  const response = await fetch('/api/settings/device-fallback', { method: 'DELETE' });
-  return json<Settings>(response);
+  return requestJson<Settings>('/api/settings/device-fallback', { method: 'DELETE' });
 }
 
 // Item 72 contract (ADR 0062): DELETE /api/settings -> 200 Settings, the defaults restored in
 // one write that also clears the CPU-fallback notice.
 export async function resetSettings(): Promise<Settings> {
-  const response = await fetch('/api/settings', { method: 'DELETE' });
-  return json<Settings>(response);
+  return requestJson<Settings>('/api/settings', { method: 'DELETE' });
 }
 
 // Item 32 contract: PUT /api/settings with the settings as a whole -> 200 Settings,
 // or 400 with the matching error code for the first invalid field.
 export async function saveSettings(settings: SettingsUpdate): Promise<Settings> {
-  const response = await fetch('/api/settings', {
+  return requestJson<Settings>('/api/settings', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(settings),
   });
-  return json<Settings>(response);
 }
 
 // Item 22 contract: PUT /api/tasks/{id}/speakers/{speakerId} with { speaker } -> 200 Speakers;
@@ -90,49 +109,46 @@ export async function renameSpeaker(
   speakerId: number,
   speaker: string | null,
 ): Promise<Speakers> {
-  const response = await fetch(`/api/tasks/${id}/speakers/${speakerId}`, {
+  return requestJson<Speakers>(`/api/tasks/${id}/speakers/${speakerId}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ speaker }),
   });
-  return json<Speakers>(response);
 }
 
 // Item 52 contract: PUT /api/tasks/{id}/segments/{segmentId} with { text } -> 200 Turns (the
 // same body /turns returns, the edited segment already updated); 409 not-completed and 404
 // not-found are the refusals.
 export async function editSegment(id: number, segmentId: number, text: string): Promise<Turns> {
-  const response = await fetch(`/api/tasks/${id}/segments/${segmentId}`, {
+  return requestJson<Turns>(`/api/tasks/${id}/segments/${segmentId}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ text }),
   });
-  return json<Turns>(response);
 }
 
 // Item 52 / ADR 0061: POST /api/tasks/{id}/segments/{segmentId}/revert puts whisper's original
 // text back and answers 200 Turns, like an edit; 409 not-completed and 404 not-found are the
 // refusals.
 export async function revertSegment(id: number, segmentId: number): Promise<Turns> {
-  const response = await fetch(`/api/tasks/${id}/segments/${segmentId}/revert`, { method: 'POST' });
-  return json<Turns>(response);
+  return requestJson<Turns>(`/api/tasks/${id}/segments/${segmentId}/revert`, {
+    method: 'POST',
+  });
 }
 
 // Item 22 contract: POST /api/tasks/{id}/speakers/merge with { group, into } -> 200 Speakers
 // (the effective speakers); 400 invalid-merge for a group the server refuses.
 export async function mergeSpeakers(id: number, group: number[], into: number): Promise<Speakers> {
-  const response = await fetch(`/api/tasks/${id}/speakers/merge`, {
+  return requestJson<Speakers>(`/api/tasks/${id}/speakers/merge`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ group, into }),
   });
-  return json<Speakers>(response);
 }
 
 // Item 22 contract: DELETE /api/tasks/{id}/speakers/merges ("Reset all merges") -> 200 Speakers.
 export async function resetMerges(id: number): Promise<Speakers> {
-  const response = await fetch(`/api/tasks/${id}/speakers/merges`, { method: 'DELETE' });
-  return json<Speakers>(response);
+  return requestJson<Speakers>(`/api/tasks/${id}/speakers/merges`, { method: 'DELETE' });
 }
 
 // Item 73's amendment: POST /api/tasks/{id}/speakers/reassign with { segmentIds, speakerId }
@@ -165,6 +181,7 @@ export function uploadTask(
   file: File,
   options: UploadOptions,
   onProgress?: (sentBytes: number, totalBytes: number) => void,
+  signal?: AbortSignal,
 ): Promise<Task> {
   const { promise, resolve, reject } = Promise.withResolvers<Task>();
   const form = new FormData();
@@ -180,7 +197,13 @@ export function uploadTask(
       onProgress(event.loaded, event.total);
     }
   };
+  // The batch machine aborts the request when the connection drops; the row then waits. The
+  // listener goes as soon as the request settles, so a later teardown never aborts a finished
+  // request (item 87's CI finding).
+  const abortRequest = () => xhr.abort();
+  const forgetAbort = () => signal?.removeEventListener('abort', abortRequest);
   xhr.onload = () => {
+    forgetAbort();
     if (xhr.status >= 200 && xhr.status < 300) {
       resolve(xhr.response as Task);
     } else {
@@ -188,7 +211,21 @@ export function uploadTask(
       reject(apiError(body, xhr.status, xhr.statusText));
     }
   };
-  xhr.onerror = () => reject(new ApiError(String(xhr.status || 0), 'Network error'));
+  xhr.onerror = () => {
+    forgetAbort();
+    reject(new ApiError(TRANSPORT_ERROR_CODE, WRITE_UNREACHABLE));
+  };
+  xhr.onabort = () => {
+    forgetAbort();
+    reject(new ApiError(TRANSPORT_ERROR_CODE, WRITE_UNREACHABLE));
+  };
+  if (signal !== undefined) {
+    if (signal.aborted) {
+      reject(new ApiError(TRANSPORT_ERROR_CODE, WRITE_UNREACHABLE));
+      return promise;
+    }
+    signal.addEventListener('abort', abortRequest, { once: true });
+  }
   xhr.send(form);
   return promise;
 }
@@ -196,13 +233,12 @@ export function uploadTask(
 // Item 12 contract: POST /api/tasks/{id}/<command> -> 200 Task, or an error (409 for an
 // illegal transition).
 export async function runTaskCommand(id: number, command: string): Promise<Task> {
-  const response = await fetch(`/api/tasks/${id}/${command}`, { method: 'POST' });
-  return json<Task>(response);
+  return requestJson<Task>(`/api/tasks/${id}/${command}`, { method: 'POST' });
 }
 
 // Item 12 contract: DELETE /api/tasks/{id} -> 204 without a body; the task is gone.
 export async function deleteTask(id: number): Promise<void> {
-  const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  const response = await request(`/api/tasks/${id}`, { method: 'DELETE' });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
     throw apiError(body, response.status, response.statusText);
@@ -212,18 +248,16 @@ export async function deleteTask(id: number): Promise<void> {
 // Item 12 contract: PUT /api/queue/order with the full ordered list of pending task
 // ids; 200 Queue, or 409 reorder-mismatch for a different set.
 export async function reorderQueue(taskIds: number[]): Promise<Queue> {
-  const response = await fetch('/api/queue/order', {
+  return requestJson<Queue>('/api/queue/order', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ taskIds }),
   });
-  return json<Queue>(response);
 }
 
 // Item 12 contract: POST /api/queue/pause|resume -> 200 Queue.
 export async function setQueuePaused(paused: boolean): Promise<Queue> {
-  const response = await fetch(`/api/queue/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
-  return json<Queue>(response);
+  return requestJson<Queue>(`/api/queue/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
 }
 
 // Opens GET /api/events and passes each named event to onEvent, plus `disconnected` when

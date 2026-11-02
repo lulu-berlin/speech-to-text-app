@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useMachine } from '@xstate/react';
 import styled from 'styled-components';
 import type { TurnSpeaker } from '../../shared/api/types';
+import { useWriteControl } from '../../app/ConnectionContext';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { controlStyle } from '../../shared/ui/controlStyle';
@@ -64,6 +65,7 @@ export function SpeakersPanel({
     resetMergesMachine.provide({ actions: { reset: () => onMergesChanged() } }),
     { input: { taskId } },
   );
+  const writes = useWriteControl();
   const nameOf = (speakerId: number) =>
     speakers.find((speaker) => speaker.speakerId === speakerId)?.speaker ?? '';
   const { group, into } = merge.context;
@@ -84,7 +86,13 @@ export function SpeakersPanel({
         ))}
         <Row gap="sm">
           {!reassigning ? (
-            <Button type="button" variant="secondary" onClick={onStartReassign}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={writes.disabled}
+              title={writes.title}
+              onClick={onStartReassign}
+            >
               Reassign speakers
             </Button>
           ) : null}
@@ -102,7 +110,8 @@ export function SpeakersPanel({
             <Button
               type="button"
               variant="secondary"
-              disabled={reassigning || reset.matches('sending')}
+              disabled={reassigning || reset.matches('sending') || writes.disabled}
+              title={writes.title}
               onClick={() => resetSend({ type: 'RESET' })}
             >
               Reset all merges
@@ -139,7 +148,12 @@ export function SpeakersPanel({
               </select>
             </label>
             <Row gap="sm">
-              <Button type="button" onClick={() => mergeSend({ type: 'REQUEST' })}>
+              <Button
+                type="button"
+                disabled={writes.disabled}
+                title={writes.title}
+                onClick={() => mergeSend({ type: 'REQUEST' })}
+              >
                 Merge
               </Button>
               <Button
@@ -160,6 +174,8 @@ export function SpeakersPanel({
         open={!reassigning && (merge.matches('confirming') || merge.matches('sending'))}
         title="Merge speakers?"
         confirmLabel="Merge"
+        confirmDisabled={writes.disabled}
+        confirmTitle={writes.title}
         onConfirm={() => mergeSend({ type: 'CONFIRM' })}
         onCancel={() => mergeSend({ type: 'CANCEL' })}
       >
@@ -184,6 +200,7 @@ function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: Spea
     }),
     { input: { taskId, speakerId: speaker.speakerId, stored: speaker.speaker } },
   );
+  const writes = useWriteControl();
 
   // The stored name can change from outside the field (a server event): follow it.
   useEffect(() => {
@@ -197,7 +214,8 @@ function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: Spea
           type="text"
           aria-label={`Name of speaker ${speaker.speakerId + 1}`}
           value={state.context.draft}
-          disabled={disabled || state.matches('sending')}
+          disabled={disabled || state.matches('sending') || writes.disabled}
+          title={writes.title}
           onChange={(event) => send({ type: 'EDIT', value: event.target.value })}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
@@ -210,7 +228,8 @@ function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: Spea
           type="button"
           variant="secondary"
           aria-label={`Reset name of speaker ${speaker.speakerId + 1}`}
-          disabled={disabled || state.matches('sending')}
+          disabled={disabled || !state.can({ type: 'RESET' }) || writes.disabled}
+          title={writes.title}
           onClick={() => send({ type: 'RESET' })}
         >
           Reset name

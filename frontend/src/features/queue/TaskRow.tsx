@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { HTMLAttributes, Ref } from 'react';
 import { useMachine } from '@xstate/react';
 import { css, styled } from 'styled-components';
-import { ConnectionContext } from '../../app/ConnectionContext';
+import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
 import { errorMessage } from '../../shared/api/types';
 import type { Task, TaskPhase } from '../../shared/api/types';
 import type { ThemeTokens } from '../../shared/theme/theme';
@@ -125,6 +125,7 @@ export function TaskRow({
   lifted = false,
 }: TaskRowProps) {
   const connection = ConnectionContext.useActorRef();
+  const writes = useWriteControl();
   const [action, send] = useMachine(rowActionMachine, {
     input: { taskId: task.id, status: task.status },
   });
@@ -195,27 +196,33 @@ export function TaskRow({
   const menuItems: DropdownMenuItem[] = [
     {
       label: 'Move to top',
-      disabled: index === 0,
+      disabled: index === 0 || writes.disabled,
+      title: writes.title,
       onSelect: () => onMoveTask(task.id, 0),
     },
     {
       label: 'Move up',
-      disabled: index === 0,
+      disabled: index === 0 || writes.disabled,
+      title: writes.title,
       onSelect: () => onMoveTask(task.id, index - 1),
     },
     {
       label: 'Move down',
-      disabled: index === count - 1,
+      disabled: index === count - 1 || writes.disabled,
+      title: writes.title,
       onSelect: () => onMoveTask(task.id, index + 1),
     },
     {
       label: 'Move to bottom',
-      disabled: index === count - 1,
+      disabled: index === count - 1 || writes.disabled,
+      title: writes.title,
       onSelect: () => onMoveTask(task.id, count - 1),
     },
     {
       label: 'Delete',
       danger: true,
+      disabled: writes.disabled,
+      title: writes.title,
       onSelect: () => {
         // A failed or done delete machine cannot answer REQUEST from its idle state, so
         // restart it first (the same reset the history flows do).
@@ -250,6 +257,8 @@ export function TaskRow({
                 <IconButton
                   icon={GripVertical}
                   label={`Reorder ${task.filename}`}
+                  disabled={writes.disabled}
+                  title={writes.title}
                   {...dragHandleProps}
                 />
               </Tooltip>
@@ -262,7 +271,8 @@ export function TaskRow({
                     label={`${verb} ${task.filename}`}
                     // Item 81: not offered while the row's own command is in flight; the SSE
                     // status can offer the next command before that request settles.
-                    disabled={action.matches('running')}
+                    disabled={action.matches('running') || writes.disabled}
+                    title={writes.title}
                     onClick={() =>
                       send({
                         type: 'ACTIVATE',
@@ -310,6 +320,8 @@ export function TaskRow({
         open={confirmingAction === 'cancel'}
         title={`Cancel ${task.filename}?`}
         confirmLabel="Cancel task"
+        confirmDisabled={writes.disabled}
+        confirmTitle={writes.title}
         onConfirm={() => send({ type: 'CONFIRM' })}
         onCancel={() => send({ type: 'DISMISS' })}
       >
@@ -319,6 +331,8 @@ export function TaskRow({
         open={deleteState.matches('confirming') || deleteState.matches('running')}
         title={`Delete ${task.filename}?`}
         confirmLabel="Delete task"
+        confirmDisabled={writes.disabled}
+        confirmTitle={writes.title}
         onConfirm={() => deleteSend({ type: 'CONFIRM' })}
         onCancel={() => deleteSend({ type: 'CANCEL' })}
       >

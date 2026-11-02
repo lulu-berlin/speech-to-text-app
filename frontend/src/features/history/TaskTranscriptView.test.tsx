@@ -88,6 +88,25 @@ function countTurnsRequests(body: () => Turns = () => turnsFixture): () => numbe
   return () => requests;
 }
 
+// The rename endpoint as the backend behaves (mock addition of item 22): stores a name like
+// the server, with `null` storing the default "Speaker N" (N = speakerId + 1). Returns the
+// request bodies it received, in order.
+function mockSpeakerRenames(): { speaker: string | null }[] {
+  const sent: { speaker: string | null }[] = [];
+  let stored = turnsFixture.speakers;
+  server.use(
+    http.put('/api/tasks/:id/speakers/:speakerId', async ({ params, request }) => {
+      const speakerId = Number(params.speakerId);
+      const body = (await request.json()) as { speaker: string | null };
+      sent.push(body);
+      const name = body.speaker ?? `Speaker ${speakerId + 1}`;
+      stored = stored.map((s) => (s.speakerId === speakerId ? { ...s, speaker: name } : s));
+      return HttpResponse.json({ speakers: stored });
+    }),
+  );
+  return sent;
+}
+
 // A navigation renders a whole other view; under a loaded test run that can take longer than
 // Testing Library's 1 s default (seen with two suites in parallel), so the waits that follow a
 // navigation get more time. The assertion is unchanged; a view that never arrives still fails.
@@ -2167,20 +2186,7 @@ describe('the transcript view', () => {
   });
 
   it('resets a speaker name from the panel: "Speaker N" comes back in the field and every turn', async () => {
-    // Mock addition (item 22): the rename stores names like the backend; `null` stores the
-    // default "Speaker N" (N = speakerId + 1), which only the server writes.
-    const sent: unknown[] = [];
-    let stored = turnsFixture.speakers;
-    server.use(
-      http.put('/api/tasks/:id/speakers/:speakerId', async ({ params, request }) => {
-        const speakerId = Number(params.speakerId);
-        const body = (await request.json()) as { speaker: string | null };
-        sent.push(body);
-        const name = body.speaker ?? `Speaker ${speakerId + 1}`;
-        stored = stored.map((s) => (s.speakerId === speakerId ? { ...s, speaker: name } : s));
-        return HttpResponse.json({ speakers: stored });
-      }),
-    );
+    const sent = mockSpeakerRenames();
     await renderTranscript('3'); // task 3 is COMPLETED; turns.json: speaker 0 speaks twice.
     const transcript = await screen.findByRole('region', { name: 'Transcript' });
     const panel = screen.getByRole('region', { name: 'Speakers' });
@@ -2195,6 +2201,48 @@ describe('the transcript view', () => {
     expect(within(transcript).queryByText('Alice')).not.toBeInTheDocument();
     expect(field).toHaveValue('Speaker 1');
     expect(sent).toEqual([{ speaker: 'Alice' }, { speaker: null }]);
+  });
+
+  it('offers "Reset name" only while the stored name is not the default, and sends nothing while it is disabled', async () => {
+    const sent = mockSpeakerRenames();
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json: speaker 0 is "Speaker 1".
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    const reset = within(panel).getByRole('button', { name: 'Reset name of speaker 1' });
+    expect(reset).toBeDisabled();
+
+    // Disabled means nothing is sent, even if the click reaches the button.
+    fireEvent.click(reset);
+    expect(sent).toEqual([]);
+
+    const field = within(panel).getByRole('textbox', { name: 'Name of speaker 1' });
+    fireEvent.change(field, { target: { value: 'Alice' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => expect(within(transcript).getAllByText('Alice')).toHaveLength(2));
+    expect(reset).toBeEnabled();
+
+    fireEvent.click(reset);
+    await waitFor(() => expect(field).toHaveValue('Speaker 1'));
+    expect(within(transcript).getAllByText('Speaker 1')).toHaveLength(2);
+    expect(reset).toBeDisabled();
+    expect(sent).toEqual([{ speaker: 'Alice' }, { speaker: null }]);
+  });
+
+  it("shows the app's message, never the browser's, when a write fails at the transport", async () => {
+    // The service is unreachable: the request rejects with the browser's TypeError.
+    server.use(http.put('/api/tasks/:id/speakers/:speakerId', () => HttpResponse.error()));
+    await renderTranscript('3'); // task 3 is COMPLETED; turns.json: speaker 0 is "Speaker 1".
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    const field = within(panel).getByRole('textbox', { name: 'Name of speaker 1' });
+    fireEvent.change(field, { target: { value: 'Alice' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+
+    // The app's message, and the name stays as stored.
+    expect(
+      await within(panel).findByText("Not saved: can't reach the app's service. Reconnecting…"),
+    ).toBeInTheDocument();
+    expect(within(panel).queryByText(/NetworkError/)).not.toBeInTheDocument();
+    expect(field).toHaveValue('Speaker 1');
   });
 });
 

@@ -38,7 +38,7 @@ const boxes: Record<string, Evidence> = {
 // "from->to" → what makes the arrow a real call or event.
 const arrows: Record<string, Evidence> = {
   'UI->Routes': [
-    [CLIENT, /fetch\('\/api\/tasks'\)/],
+    [CLIENT, /requestJson<TaskList>\('\/api\/tasks'\)/],
     [CLIENT, /xhr\.open\('POST', '\/api\/tasks'\)/],
   ],
   'SSE->UI': [

@@ -3,8 +3,8 @@ import { CircleAlert } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { Link } from 'react-router';
 import styled from 'styled-components';
-import { ConnectionContext } from '../../app/ConnectionContext';
-import { errorMessage } from '../../shared/api/types';
+import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
+import { failureMessage } from '../../shared/api/types';
 import type { Task } from '../../shared/api/types';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -76,6 +76,7 @@ const Actions = styled.div`
 // in the machines (ADR 0031), not in React state.
 export function HistoryRow({ task }: { task: Task }) {
   const connection = ConnectionContext.useActorRef();
+  const writes = useWriteControl();
 
   const retry = useMachine(commandMachine, {
     input: { command: 'retry', taskId: task.id, status: task.status },
@@ -116,8 +117,10 @@ export function HistoryRow({ task }: { task: Task }) {
         <Actions>
           {isAllowedCommand('retry', task.status) ? (
             <TextButton
-              // Item 81: not offered again while its request runs.
-              disabled={retryState.matches('sending')}
+              // Item 81: not offered again while its request runs; item 87: not while the
+              // connection is not live.
+              disabled={retryState.matches('sending') || writes.disabled}
+              title={writes.title}
               onClick={() => {
                 if (retryState.matches('failed') || retryState.matches('done')) {
                   retryActor.stop();
@@ -131,6 +134,8 @@ export function HistoryRow({ task }: { task: Task }) {
           ) : null}
           <TextButton
             $tone="quiet"
+            disabled={writes.disabled}
+            title={writes.title}
             onClick={() => {
               if (deleteState.matches('failed') || deleteState.matches('done')) {
                 deleteActor.stop();
@@ -143,16 +148,18 @@ export function HistoryRow({ task }: { task: Task }) {
           </TextButton>
         </Actions>
         {retryError ? (
-          <CardErrorLine>{`Retry failed: ${errorMessage(retryError)}`}</CardErrorLine>
+          <CardErrorLine>{failureMessage('Retry failed', retryError)}</CardErrorLine>
         ) : null}
         {deleteError ? (
-          <CardErrorLine>{`Delete failed: ${errorMessage(deleteError)}`}</CardErrorLine>
+          <CardErrorLine>{failureMessage('Delete failed', deleteError)}</CardErrorLine>
         ) : null}
       </Stack>
       <ConfirmDialog
         open={deleteState.matches('confirming') || deleteState.matches('running')}
         title="Delete task?"
         confirmLabel="Delete"
+        confirmDisabled={writes.disabled}
+        confirmTitle={writes.title}
         onConfirm={() => deleteSend({ type: 'CONFIRM' })}
         onCancel={() => deleteSend({ type: 'CANCEL' })}
       >
