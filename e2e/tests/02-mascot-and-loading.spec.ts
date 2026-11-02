@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
+import { withinDeadline } from '../lib/bounded.ts';
 import { appUrl } from '../lib/backend.ts';
 import { MASCOT, mascotAbove } from './helpers/ui';
 
@@ -22,7 +23,10 @@ test('shell, loading and empty regions show the mascot', async ({ page }) => {
   const firstStream = Promise.withResolvers<void>();
   await page.route('**/api/events', async (route) => {
     try {
-      await firstStream.promise;
+      await withinDeadline(firstStream.promise, {
+        what: 'the first event stream to be released',
+        ms: 60_000,
+      });
       await route.abort();
     } catch {
       // the request died with a navigation; nothing left to handle

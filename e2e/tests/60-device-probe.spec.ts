@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
+import { removeWithRetry } from '../lib/cleanup.ts';
 import { appUrl, choosePort, startBackend, stopBackend } from '../lib/backend.ts';
 import { commandDirectory } from '../lib/executable.ts';
 
@@ -12,7 +13,6 @@ import { commandDirectory } from '../lib/executable.ts';
 test('a backend without whisper-cli reports the failed probe on the Settings page', async ({
   page,
 }) => {
-  test.setTimeout(360_000);
   // PATH lookup, not `which`: Windows has no `which`, separates PATH with ';' and names the binary
   // whisper-cli.exe (roadmap item 79).
   const whisperCliDir = commandDirectory('whisper-cli');
@@ -41,7 +41,11 @@ test('a backend without whisper-cli reports the failed probe on the Settings pag
     await expect(page.getByLabel('Device')).toBeVisible();
   } finally {
     await stopBackend(pid, port, dataDir);
-    rmSync(dataDir, { recursive: true, force: true });
+    // Windows can still hold the data directory for a moment after the port closes (roadmap item 84:
+    // the global teardown's EPERM in run #475); a leftover is reported, not thrown.
+    if (!(await removeWithRetry(dataDir))) {
+      console.warn(`e2e: the temporary directory ${dataDir} could not be removed`);
+    }
   }
 
   // The shared backend ran with whisper-cli: a successful probe shows no notice.

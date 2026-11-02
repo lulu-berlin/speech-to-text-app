@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
+import { withinDeadline } from '../lib/bounded.ts';
 import { appUrl } from '../lib/backend.ts';
 
 // Item 59, finding 7: the connection indicator was the bare word "Live", with no visual
@@ -12,7 +13,10 @@ test('the connection indicator shows connecting, connected and reconnecting dist
   const held = Promise.withResolvers<void>();
   await page.route('**/api/events', async (route) => {
     try {
-      await held.promise;
+      await withinDeadline(held.promise, {
+        what: 'the held event stream to be released',
+        ms: 60_000,
+      });
       await route.abort();
     } catch {
       // the request died with a navigation; nothing left to handle

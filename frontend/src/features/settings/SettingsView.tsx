@@ -203,7 +203,10 @@ export function SettingsView() {
     if (!keepsDraft('language')) {
       setLanguage(stored.defaultLanguage);
     }
-    if (!keepsDraft('speakers')) {
+    // `fixed` is written only by the count's own commit (choosing the mode stores nothing), so
+    // while the count is typed the mode is part of that draft: an earlier field's answer must
+    // not answer with the stored mode and unmount the field under the user (roadmap item 84).
+    if (!keepsDraft('speakers') && focusedField.current !== 'speakerCount') {
       setSpeakers(stored.speakersMode);
     }
     if (!keepsDraft('speakerCount')) {

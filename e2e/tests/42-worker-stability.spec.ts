@@ -1,9 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { STABILITY_BROKEN_CLIP, STABILITY_CLIP, appUrl } from '../lib/backend.ts';
-import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 test('a task that fails mid-run does not stop the queue', async ({ page }) => {
-  test.setTimeout(360_000);
   await appLive(page);
   await uploadClips(page, [STABILITY_BROKEN_CLIP, STABILITY_CLIP]);
 
@@ -24,7 +23,8 @@ test('a task that fails mid-run does not stop the queue', async ({ page }) => {
   // The undecodable file fails in CHUNKING: History shows it FAILED with its stored error.
   await goTo(page, 'History');
   const broken = rowOf(page, STABILITY_BROKEN_CLIP);
-  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 60_000 });
+  await waitForTaskState(page, STABILITY_BROKEN_CLIP, (task) => task.status === 'FAILED');
+  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible();
   const brokenId = await apiTaskIdOf(page, STABILITY_BROKEN_CLIP);
   const stored = await (await page.request.get(appUrl(`/api/tasks/${brokenId}`))).json();
   expect(stored.error).toBeTruthy();
@@ -32,5 +32,6 @@ test('a task that fails mid-run does not stop the queue', async ({ page }) => {
 
   // The task queued behind the failure still runs to completion: the queue survived it.
   const healthy = rowOf(page, STABILITY_CLIP);
-  await expect(healthy.getByText('COMPLETED', { exact: true })).toBeVisible({ timeout: 240_000 });
+  await waitForTaskState(page, STABILITY_CLIP);
+  await expect(healthy.getByText('COMPLETED', { exact: true })).toBeVisible();
 });

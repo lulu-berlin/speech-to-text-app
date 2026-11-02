@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { COMPLETED_PLAYER_CLIP, TRANSCRIBING_BACKGROUND_CLIP, appUrl } from '../lib/backend.ts';
 import {
   apiTaskIdOf,
@@ -9,6 +9,7 @@ import {
   rowOf,
   unlessGone,
   uploadClips,
+  waitForTaskState,
 } from './helpers/ui';
 
 // Item 37 (ADR 0046): a completed transcript's player used to fetch /audio 500 whenever
@@ -20,16 +21,16 @@ import {
 // The file sorts before 17-follow-mode and 17-settings deliberately: 17-settings stops the
 // backend it restarted in its finally block, so no test after it has a live backend.
 test('a completed player has playable audio while another task transcribes', async ({ page }) => {
-  test.setTimeout(360_000);
   await appLive(page);
 
   // A short clip completes quickly; its transcript is checked later, while a long clip
   // keeps the engine transcribing.
   await uploadClips(page, [COMPLETED_PLAYER_CLIP]);
   await goTo(page, 'History');
+  await waitForTaskState(page, COMPLETED_PLAYER_CLIP);
   await expect(
     rowOf(page, COMPLETED_PLAYER_CLIP).getByText('COMPLETED', { exact: true }),
-  ).toBeVisible({ timeout: 240_000 });
+  ).toBeVisible();
   const completedId = await apiTaskIdOf(page, COMPLETED_PLAYER_CLIP);
 
   // The long clip (the queue was idle, so it starts right away) keeps the engine in
@@ -37,7 +38,12 @@ test('a completed player has playable audio while another task transcribes', asy
   await goTo(page, 'Queue');
   await uploadClips(page, [TRANSCRIBING_BACKGROUND_CLIP]);
   const transcribing = rowOf(page, TRANSCRIBING_BACKGROUND_CLIP);
-  await expect(transcribing.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
+  await waitForTaskState(
+    page,
+    TRANSCRIBING_BACKGROUND_CLIP,
+    (task) => task.status === 'RUNNING' && task.phase === 'TRANSCRIBING',
+  );
+  await expect(transcribing.getByText('Transcribing')).toBeVisible();
   const backgroundId = await apiTaskIdOf(page, TRANSCRIBING_BACKGROUND_CLIP);
 
   // The item-37 condition, checked, not assumed: the background clip is transcribing at this very
@@ -80,7 +86,13 @@ test('a completed player has playable audio while another task transcribes', asy
       .getByRole('button', { name: 'Cancel task' })
       .click({ timeout: 5_000 });
   });
-  await expect(transcribing).toHaveCount(0, { timeout: 120_000 });
+  // Either ending is legal here: the cancel was skipped when the clip finished during the poll above.
+  await waitForTaskState(
+    page,
+    TRANSCRIBING_BACKGROUND_CLIP,
+    (task) => task.status === 'CANCELED' || task.status === 'COMPLETED',
+  );
+  await expect(transcribing).toHaveCount(0);
   await goTo(page, 'History');
   await expectCompletedOrCanceled(page, TRANSCRIBING_BACKGROUND_CLIP);
 });

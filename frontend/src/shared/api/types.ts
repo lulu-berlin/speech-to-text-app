@@ -12,6 +12,22 @@ export const taskStatuses = [
 
 export type TaskStatus = (typeof taskStatuses)[number];
 
+/**
+ * Whether the task has left the queue finished (item 16's notice): the statuses the queue
+ * no longer shows. Also narrows the status.
+ */
+export function finishedStatus(status: TaskStatus): status is 'COMPLETED' | 'FAILED' | 'CANCELED' {
+  return status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELED';
+}
+
+/**
+ * Whether the task is in the queue — the set the server's `queue-updated` carries
+ * (`TaskRepository.pendingOrderedIds`, roadmap item 84). Also narrows the status.
+ */
+export function pendingStatus(status: TaskStatus): status is 'QUEUED' | 'RUNNING' | 'PAUSED' {
+  return !finishedStatus(status);
+}
+
 export type TaskPhase = 'CHUNKING' | 'TRANSCRIBING' | 'DIARIZING' | null;
 
 // The running diarization stage; null outside the DIARIZING phase (item 12 contract).

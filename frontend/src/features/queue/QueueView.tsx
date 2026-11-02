@@ -14,8 +14,8 @@ import type { SpeakersChoice } from './UploadOptionsPanel';
 import { TextLink } from '../../shared/ui/TextLink';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
-import { ApiError } from '../../shared/api/types';
-import type { Task, TaskStatus } from '../../shared/api/types';
+import { ApiError, finishedStatus, pendingStatus } from '../../shared/api/types';
+import type { Settings, Task, TaskStatus } from '../../shared/api/types';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { finishNoticeMachine } from './finishNoticeMachine';
 import { dropZoneMachine } from './dropZoneMachine';
@@ -42,16 +42,6 @@ import { isSupportedFormat } from './uploadValidation';
 
 // The statuses the queue list holds (item 14): a task with any other status has left the
 // queue (finished, failed or canceled) and belongs to History.
-const PENDING_STATUSES = ['QUEUED', 'RUNNING', 'PAUSED'] as const;
-
-// A task leaving the queue finished shows a short notice with a link (item 16).
-const FINISHED_STATUSES = ['COMPLETED', 'FAILED', 'CANCELED'] as const;
-
-// Whether a task has left the queue finished (item 16); also narrows the status.
-function finishedStatus(status: TaskStatus): status is 'COMPLETED' | 'FAILED' | 'CANCELED' {
-  return (FINISHED_STATUSES as readonly string[]).includes(status);
-}
-
 // The drop zone: dashed on the surface fill; while files are dragged over it, a solid
 // accent border on the light accent tint (item 25).
 const DropZone = styled.button<{ $over: boolean }>`
@@ -188,6 +178,9 @@ function UploadRowTrailing({ row, tasks }: { row: UploadRow; tasks: Task[] }) {
   return <RowStatus>{row.status}</RowStatus>;
 }
 
+/** One upload option a batch carries; the prefill remembers which ones the user has changed. */
+type BatchOption = 'language' | 'speakersMode' | 'speakersCount' | 'maxSpeakers';
+
 export function QueueView() {
   const connection = ConnectionContext.useActorRef();
   const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
@@ -211,24 +204,35 @@ export function QueueView() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const inputRef = useRef<HTMLInputElement>(null);
+  // The upload options the user has changed: those keep the user's value, the rest are prefilled
+  // from the stored settings when they arrive (roadmap item 84).
+  const batchTouched = useRef(new Set<BatchOption>());
 
   // The upload options start with the stored defaults (item 32): language, speakers mode
-  // and count, max speakers. Applied once, when the settings arrive; the user's later
-  // choices are this batch's, not the settings'. Until then (or if loading fails) the
-  // contract defaults above stand.
+  // and count, max speakers. Each field is prefilled once, when the settings arrive, and only
+  // while the user has not changed it: a choice made while the settings are still loading is
+  // this batch's, not the settings' (roadmap item 84: CI run 471's upload carried the default
+  // language because the prefill landed after the user's pick). Until then (or if loading
+  // fails) the contract defaults above stand.
   const stored = settings.context.settings;
-  const defaultsAppliedRef = useRef(false);
+  const prefilledFor = useRef<Settings | null>(null);
   useEffect(() => {
-    if (stored === null || defaultsAppliedRef.current) {
+    if (stored === null || prefilledFor.current === stored) {
       return;
     }
-    defaultsAppliedRef.current = true;
-    setLanguage(stored.defaultLanguage);
-    setSpeakers(stored.speakersMode);
-    if (stored.speakersCount !== null) {
+    prefilledFor.current = stored;
+    if (!batchTouched.current.has('language')) {
+      setLanguage(stored.defaultLanguage);
+    }
+    if (!batchTouched.current.has('speakersMode')) {
+      setSpeakers(stored.speakersMode);
+    }
+    if (!batchTouched.current.has('speakersCount') && stored.speakersCount !== null) {
       setSpeakerCount(stored.speakersCount);
     }
-    setMaxSpeakers(stored.maxSpeakers);
+    if (!batchTouched.current.has('maxSpeakers')) {
+      setMaxSpeakers(stored.maxSpeakers);
+    }
   }, [stored]);
 
   // The pause POST answered: apply its queue to the live state (the server's own
@@ -261,10 +265,23 @@ export function QueueView() {
   }, [tasks, sendNotice]);
 
   // Follow the live queue while no reorder is in flight: a new upload or a removal
-  // reconciles into the displayed order (the machine ignores SYNC while sending).
+  // reconciles into the displayed order (the machine ignores SYNC while sending). The
+  // tasks still pending go along, so a queue snapshot that arrives out of order cannot
+  // hide a pending row (roadmap item 84). The pending set travels as one string: a
+  // progress tick changes the task objects but not the set, so the sync only re-runs when
+  // the set really changes — a needless one would clear a reorder error the user is
+  // reading.
+  const pendingKey = tasks
+    .filter((task) => pendingStatus(task.status))
+    .map((task) => task.id)
+    .join(',');
   useEffect(() => {
-    sendReorder({ type: 'SYNC', order: queue?.taskIds ?? [] });
-  }, [queue, sendReorder]);
+    sendReorder({
+      type: 'SYNC',
+      order: queue?.taskIds ?? [],
+      pending: pendingKey === '' ? [] : pendingKey.split(',').map(Number),
+    });
+  }, [queue, pendingKey, sendReorder]);
 
   const enqueue = (files: File[]) => {
     const options: UploadOptions = {
@@ -310,10 +327,7 @@ export function QueueView() {
   // so its row leaves at once.
   const pendingTasks = reorder.context.order
     .map((id) => tasks.find((task) => task.id === id))
-    .filter(
-      (task): task is Task =>
-        task !== undefined && (PENDING_STATUSES as readonly string[]).includes(task.status),
-    );
+    .filter((task): task is Task => task !== undefined && pendingStatus(task.status));
 
   // The upload rows the view shows: a successful row leaves once its task is in the
   // live state (the server announces a new upload with task-updated; item 13's machine
@@ -356,13 +370,25 @@ export function QueueView() {
         <input ref={inputRef} type="file" multiple hidden onChange={onPick} />
         <UploadOptionsPanel
           language={language}
-          onLanguageChange={setLanguage}
+          onLanguageChange={(next) => {
+            batchTouched.current.add('language');
+            setLanguage(next);
+          }}
           speakers={speakers}
-          onSpeakersChange={setSpeakers}
+          onSpeakersChange={(next) => {
+            batchTouched.current.add('speakersMode');
+            setSpeakers(next);
+          }}
           speakerCount={speakerCount}
-          onSpeakerCountChange={setSpeakerCount}
+          onSpeakerCountChange={(next) => {
+            batchTouched.current.add('speakersCount');
+            setSpeakerCount(next);
+          }}
           maxSpeakers={maxSpeakers}
-          onMaxSpeakersChange={setMaxSpeakers}
+          onMaxSpeakersChange={(next) => {
+            batchTouched.current.add('maxSpeakers');
+            setMaxSpeakers(next);
+          }}
         />
         {visibleRows.length > 0 ? (
           <List label="Uploads">

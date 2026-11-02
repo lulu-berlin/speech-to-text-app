@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
-import { openTranscript, turnTextOf } from './helpers/ui';
+import { expect, test } from './helpers/test';
+import { apiTaskIdOf, ensureTranscript, openTranscript, turnTextOf } from './helpers/ui';
 
 // The rename runs on task 2 (jfk-b.wav, the queue journey's second clip: one voice → one
 // speaker, default name "Speaker 1"), so task 1 keeps its default name for the transcript
@@ -10,8 +10,9 @@ const NEW_NAME = 'John F. Kennedy';
 test('a renamed speaker shows in the transcript, survives a reload, and labels a fresh download', async ({
   page,
 }) => {
+  await ensureTranscript(page, 'jfk-b.wav');
   await openTranscript(page, 'jfk-b.wav');
-  await expect(page).toHaveURL(/\/history\/2$/);
+  await expect(page).toHaveURL(new RegExp(`/history/${await apiTaskIdOf(page, 'jfk-b.wav')}$`));
   const nameField = page.getByRole('textbox', { name: 'Name of speaker 1' });
   await expect(nameField).toHaveValue('Speaker 1');
 

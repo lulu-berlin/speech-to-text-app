@@ -129,7 +129,7 @@ export function writeFixtures(fixturesDir: string): void {
     { start: 8, seconds: 3, file: FIXTURE_CLIPS[31] }, // 8-11s, item 41's concurrent-upload race
     { start: 2, seconds: 6, file: FIXTURE_CLIPS[32] }, // 2-8s, item 59's favicon typing clip
     { start: 3, seconds: 3, file: FIXTURE_CLIPS[33] }, // 3-6s, item 59's upload-options clip
-    { loops: 16, file: FIXTURE_CLIPS[34] }, // ~176s, item 59's running-row clip
+    { loops: 7, file: FIXTURE_CLIPS[34] }, // ~77s, item 59's running-row clip
     { start: 1, seconds: 2, file: FIXTURE_CLIPS[35] }, // 1-3s, item 59's queued-row clip
     { start: 9, seconds: 2, file: FIXTURE_CLIPS[36] }, // 9-11s, item 59's history-row clip
     { loops: 4, file: FIXTURE_CLIPS[38] }, // ~44s, item 59's row-controls clip

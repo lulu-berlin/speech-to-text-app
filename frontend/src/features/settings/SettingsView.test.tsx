@@ -788,4 +788,44 @@ describe('switching the speakers mode', () => {
     expect(count).toHaveAccessibleDescription(/whole number from 1 to 20/);
     expect(max).toHaveValue(10);
   });
+
+  // Roadmap item 84: the macOS journey's 17-settings lost its count field mid-typing. `fixed` is
+  // stored only with the count, so an earlier field's write still in flight answers with the old
+  // mode; that answer must not reset the mode (or the count) the user is committing.
+  it('keeps the chosen fixed and the typed count when an earlier write answers meanwhile', async () => {
+    const writes: Array<Record<string, unknown>> = [];
+    const settle: Array<(response: Response) => void> = [];
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFixture)),
+      http.put('/api/settings', async ({ request }) => {
+        writes.push((await request.json()) as Record<string, unknown>);
+        const { promise, resolve } = Promise.withResolvers<Response>();
+        settle.push(resolve);
+        return promise;
+      }),
+    );
+    renderSettings();
+    await waitFor(() => expect(screen.getByLabelText('Speakers')).toHaveValue('auto'));
+
+    // An earlier field's write is in flight: max speakers, left for the speakers select.
+    const max = screen.getByLabelText('Max speakers');
+    fireEvent.change(max, { target: { value: '10' } });
+    fireEvent.blur(max);
+    await waitFor(() => expect(writes).toHaveLength(1));
+
+    // The user chooses fixed and types the count, not committed yet.
+    fireEvent.change(screen.getByLabelText('Speakers'), { target: { value: 'fixed' } });
+    const count = screen.getByLabelText('Speaker count');
+    fireEvent.focus(count);
+    fireEvent.change(count, { target: { value: '3' } });
+
+    // The earlier write's answer carries the stored mode, auto.
+    settle[0]?.(HttpResponse.json({ ...settingsFixture, maxSpeakers: 10 }));
+    await waitFor(() => expect(screen.queryByText('Saving…')).not.toBeInTheDocument());
+
+    expect(screen.getByLabelText('Speakers')).toHaveValue('fixed');
+    expect(count).toBeInTheDocument();
+    expect(count).toHaveValue(3);
+    expect(max).toHaveValue(10);
+  });
 });

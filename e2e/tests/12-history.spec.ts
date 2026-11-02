@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { BROKEN2_CLIP, HISTORY_CLIPS, appUrl } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, taskIdOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 // This test's own uploads: two trims no other test uses (the shared run finishes the
 // common clips before this file runs) plus BROKEN2_CLIP, which fails in CHUNKING. The
@@ -12,27 +12,33 @@ const SECOND_CLIP = HISTORY_CLIPS[1]; // 4-11s
 test('the history list shows finished tasks newest first with status, finish date and duration', async ({
   page,
 }) => {
-  test.setTimeout(240_000);
-
   // Two completed cards, in upload order: the second finishes after the first.
   await appLive(page);
   await uploadClips(page, [FIRST_CLIP]);
-  await expect(page.getByText(`${FIRST_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTaskState(page, FIRST_CLIP);
+  await expect(page.getByText(`${FIRST_CLIP} transcribed`)).toBeVisible();
   await uploadClips(page, [SECOND_CLIP]);
-  await expect(page.getByText(`${SECOND_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTaskState(page, SECOND_CLIP);
+  await expect(page.getByText(`${SECOND_CLIP} transcribed`)).toBeVisible();
 
   // A FAILED card with a stored error.
   await uploadClips(page, [BROKEN2_CLIP]);
   await goTo(page, 'History');
   const failed = rowOf(page, BROKEN2_CLIP);
-  await expect(failed.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 60_000 });
+  await waitForTaskState(page, BROKEN2_CLIP, (task) => task.status === 'FAILED');
+  await expect(failed.getByText('FAILED', { exact: true })).toBeVisible();
 
   // The whole list, once: the suite's finished tasks plus this test's three uploads.
   // Every card's meta line reads "<Mon> <d>, <yyyy>" — the fixed-UTC date — and
   // carries the duration "mm:ss" (or "h:mm:ss") exactly when the task knows it.
   const items = page.getByRole('listitem');
   await expect(items).not.toHaveCount(0);
+  // A snapshot: the count settled before the cards are taken, so the read cannot straddle a
+  // re-render (roadmap item 84).
+  const settled = await items.count();
+  await expect.poll(async () => items.count()).toBe(settled);
   const cards = await items.all();
+  expect(cards.length).toBe(settled);
   const names = await Promise.all(cards.map((card) => card.textContent()));
   for (const card of cards) {
     const meta = card

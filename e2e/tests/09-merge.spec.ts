@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers/test';
 import { MERGE_CLIP } from '../lib/backend.ts';
 import { uploadAndOpen } from './helpers/ui';
 
@@ -15,7 +15,6 @@ async function turnSpeakers(page: Page): Promise<string[]> {
 test('merging two speakers joins their turns, the merge is stored, and "Reset all merges" restores them', async ({
   page,
 }) => {
-  test.setTimeout(240_000);
   await uploadAndOpen(page, MERGE_CLIP);
   await expect.poll(() => turnSpeakers(page)).toEqual(['Speaker 1', 'Speaker 2', 'Speaker 1']);
 

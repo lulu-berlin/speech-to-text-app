@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { HEADER_CLIP, appUrl } from '../lib/backend.ts';
 import { ensureTranscript, openTranscript, turnTextOf } from './helpers/ui';
 
@@ -12,8 +12,6 @@ const FORMATS = ['txt', 'srt', 'vtt'] as const;
 test('the transcript exports download their bytes, Delete sits behind the actions menu with its confirmation, and rename still works', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
-
   // A completed transcript to read (the shared journey already has the header clip
   // completed; a run of this file alone uploads it — re-uploading would answer 409).
   await ensureTranscript(page, HEADER_CLIP);
@@ -51,4 +49,10 @@ test('the transcript exports download their bytes, Delete sits behind the action
   await nameField.press('Enter');
   await expect(turnTextOf(page, 'Alice Example')).toHaveCount(1);
   await expect(turnTextOf(page, 'Speaker 1')).toHaveCount(0);
+
+  // Put the default label back: this clip is shared with the specs that follow, and a rename left
+  // behind would fail their "Speaker 1" assertions (roadmap item 84).
+  await page.getByRole('textbox', { name: 'Name of speaker 1' }).fill('Speaker 1');
+  await page.getByRole('textbox', { name: 'Name of speaker 1' }).press('Enter');
+  await expect(turnTextOf(page, 'Speaker 1')).toHaveCount(1);
 });

@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { STATUS_BROKEN_CLIP } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 // Item 59, finding 4 extended to the failed/canceled status page: the completed transcript
 // demoted Delete behind the actions menu, and the status page follows — Retry stays visible
@@ -8,13 +8,14 @@ import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 test('a failed status page keeps Delete behind the actions menu and Retry working', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   await appLive(page);
 
   await uploadClips(page, [STATUS_BROKEN_CLIP]);
+  // The task's own failed state, not a 120 s ceiling on the row (roadmap item 84, load).
+  await waitForTaskState(page, STATUS_BROKEN_CLIP, (task) => task.status === 'FAILED');
   await goTo(page, 'History');
   const card = rowOf(page, STATUS_BROKEN_CLIP);
-  await expect(card.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 120_000 });
+  await expect(card.getByText('FAILED', { exact: true })).toBeVisible();
   await card.getByRole('link', { name: STATUS_BROKEN_CLIP }).click();
   await expect(page.getByRole('heading', { name: STATUS_BROKEN_CLIP })).toBeVisible();
 

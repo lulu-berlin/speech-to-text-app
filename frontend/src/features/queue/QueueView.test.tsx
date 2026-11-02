@@ -140,6 +140,44 @@ describe('the queue view upload defaults', () => {
     fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
     expect(screen.getByLabelText('Max speakers')).toHaveValue(12);
   });
+
+  it('prefills only the options the user has not touched while the settings load', async () => {
+    // The answer arrives after the user picks: the stored language differs from the pick, and the
+    // speakers options are untouched (roadmap item 84: CI run 471's upload carried `en` although the
+    // user had chosen German, because the prefill ran after the click).
+    let answer!: () => void;
+    const arrived = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    server.use(
+      http.get('/api/settings', async () => {
+        await arrived;
+        return HttpResponse.json({
+          ...settingsFallback,
+          defaultLanguage: 'en',
+          speakersMode: 'fixed',
+          speakersCount: 2,
+          maxSpeakers: 12,
+        });
+      }),
+    );
+    renderQueue();
+    openUploadOptions();
+
+    const language = screen.getByRole('combobox', { name: 'Language' });
+    fireEvent.click(language);
+    const listbox = screen.getByRole('listbox', { name: 'Language' });
+    fireEvent.mouseDown(within(listbox).getByRole('option', { name: 'german (de)' }));
+    expect(language).toHaveValue('german');
+
+    answer();
+
+    // The options the user did not touch take the stored defaults …
+    await waitFor(() => expect(screen.getByLabelText('Speakers')).toHaveValue('fixed'));
+    expect(screen.getByLabelText('Speaker count')).toHaveValue(2);
+    // … and the language the user picked stands.
+    expect(screen.getByRole('combobox', { name: 'Language' })).toHaveValue('german');
+  });
 });
 
 describe('the queue view CPU-fallback banner', () => {
@@ -545,6 +583,37 @@ describe('the queue list', () => {
       expect.stringContaining('a.mp3'),
     ]);
     expect(within(rows[2] as HTMLElement).getByText('QUEUED')).toBeInTheDocument();
+  });
+
+  it('keeps the row of a task a queue snapshot omits while that task is still pending', async () => {
+    const events = controllableEventStream();
+    const later = { ...taskQueued, id: 99, filename: 'later.wav' };
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+
+    // Two uploads announce themselves, then a third one: every pending task has a row.
+    events.send('task-updated', later);
+    events.send('queue-updated', { ...queueFixture, taskIds: [...queueFixture.taskIds, 99] });
+    await screen.findByText('later.wav');
+
+    // An earlier snapshot's queue arrives late (the server builds each snapshot before it
+    // emits it, so two uploads' snapshots can cross): it omits the third task, which the
+    // live state still holds as QUEUED. Its pause flag proves the view applied it. The row
+    // stays — dropping it would send a reorder without that task and the server would
+    // refuse it.
+    events.send('queue-updated', { paused: true, taskIds: [...queueFixture.taskIds] });
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: 'Pause the queue' })).toBeChecked(),
+    );
+    const rows = within(screen.getByRole('list', { name: 'Pending tasks' })).getAllByRole(
+      'listitem',
+    );
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining('lecture.m4a'),
+      expect.stringContaining('memo.wav'),
+      expect.stringContaining('later.wav'),
+    ]);
   });
 
   it('shows one status line with the phase and percentage, no RUNNING badge, one bar while transcribing, and stacks the row on a narrow screen', async () => {
@@ -1182,9 +1251,10 @@ describe('finished tasks', () => {
     expect(screen.getByRole('link', { name: 'open' })).toHaveAttribute('href', '/history/5');
 
     // A fresh task, queued -> running -> failed (transitions stay in the table): a
-    // History link.
+    // History link. `memo.wav` (id 7) is still QUEUED, so the server's queue carries it
+    // too (roadmap item 84: the row set is the pending set).
     events.send('task-updated', { ...taskQueued, id: 9, filename: 'notes.mp3' });
-    events.send('queue-updated', { ...queueFixture, taskIds: [9] });
+    events.send('queue-updated', { ...queueFixture, taskIds: [7, 9] });
     await screen.findByText('notes.mp3');
     events.send('task-updated', { ...taskRunning, id: 9, filename: 'notes.mp3' });
     events.send('task-updated', { ...taskFailed, id: 9, filename: 'notes.mp3' });
@@ -1192,7 +1262,7 @@ describe('finished tasks', () => {
 
     // Queued -> canceled (another fresh task): a History link too.
     events.send('task-updated', { ...taskQueued, id: 10, filename: 'draft.wav' });
-    events.send('queue-updated', { ...queueFixture, taskIds: [10] });
+    events.send('queue-updated', { ...queueFixture, taskIds: [7, 10] });
     await screen.findByText('draft.wav');
     events.send('task-updated', { ...taskCanceled, id: 10, filename: 'draft.wav' });
     await screen.findByText(/draft\.wav canceled/);
@@ -1204,8 +1274,9 @@ describe('finished tasks', () => {
       expect(link).toHaveAttribute('href', '/history');
     }
 
-    // The finished rows left the queue list (the notices are not rows).
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    // The finished rows left the queue list (the notices are not rows); the queued one stays.
+    const left = screen.getAllByRole('listitem');
+    expect(left.map((row) => row.textContent)).toEqual([expect.stringContaining('memo.wav')]);
   });
 });
 

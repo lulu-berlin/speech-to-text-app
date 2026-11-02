@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers/test';
 import { MASCOT, appLive } from './helpers/ui';
 
 // Item 59, finding 1: the brand used to carry the illustration's pastel backdrop into the

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { MASCOT, appLive } from './helpers/ui';
 
 // Item 59, decided header follow-up: the typing animation left the header, and the empty

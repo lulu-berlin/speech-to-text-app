@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { REORDER_CLIPS } from '../lib/backend.ts';
-import { appLive, rowOrder, uploadClips } from './helpers/ui';
+import { appLive, moveRowDown, rowOrder, uploadClips } from './helpers/ui';
 
 test('the row menu reorders the queue and the order survives a reload', async ({ page }) => {
   await appLive(page);
@@ -14,8 +14,7 @@ test('the row menu reorders the queue and the order survives a reload', async ({
 
   // Move the first clip down one slot with its row menu: the UI reflects the new order
   // (PUT /api/queue/order round-trip through the live queue state).
-  await page.getByRole('button', { name: 'Actions for jfk-d.wav' }).click();
-  await page.getByRole('menuitem', { name: 'Move down' }).click();
+  await moveRowDown(page, REORDER_CLIPS[0]!);
   await expect.poll(async () => rowOrder(page, REORDER_CLIPS)).toEqual([1, 0, 2]);
 
   // The order survives a reload: the snapshot restores the queue exactly as the server

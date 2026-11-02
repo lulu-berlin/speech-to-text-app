@@ -9,6 +9,8 @@ export default defineConfig({
   // `node --test` and must not be loaded as a Playwright file in the packaged jobs.
   testMatch: '**/*.spec.ts',
   workers: 1,
+  // A packaged spec that fails ends the run; the other packaged specs describe the same app.
+  maxFailures: 1,
   reporter: 'list',
   timeout: 600_000,
   expect: { timeout: 20_000 },

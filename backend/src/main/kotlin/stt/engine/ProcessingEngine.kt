@@ -136,6 +136,13 @@ class ProcessingEngine internal constructor(
     private var running: Running? = null
 
     /**
+     * Serializes the queue snapshot with its publication ([queueUpdated]): a snapshot must reach the events stream in
+     * the order it was read, or two concurrent uploads could publish an older queue after a newer one (roadmap item
+     * 84).
+     */
+    private val queueEventsLock = Mutex()
+
+    /**
      * Called while the worker starts a task: after its job is launched and before the job is registered in [running].
      * Null in production; a spec sets it to hold the worker in that instant (item 42's start race).
      */
@@ -588,9 +595,14 @@ class ProcessingEngine internal constructor(
         block: suspend () -> T,
     ): T = withContext(MDCContext(MDC.getCopyOfContextMap().orEmpty() + (TASK_ID_MDC_KEY to id.toString()))) { block() }
 
-    /** Publishes the queue as it is now; call only after a change that affects it has been persisted. */
+    /**
+     * Publishes the queue as it is now; call only after a change that affects it has been persisted. The read and the
+     * emit are one critical section ([queueEventsLock]), so concurrent callers publish in the order they read.
+     */
     private suspend fun queueUpdated() {
-        _events.emit(Event.QueueUpdated(paused = queueState.isPaused(), taskIds = tasks.pendingOrderedIds()))
+        queueEventsLock.withLock {
+            _events.emit(Event.QueueUpdated(paused = queueState.isPaused(), taskIds = tasks.pendingOrderedIds()))
+        }
     }
 
     /** The job running [id]'s phases, or null when that task is not the one being processed. */

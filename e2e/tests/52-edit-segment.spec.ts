@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers/test';
 import { HEADER_CLIP } from '../lib/backend.ts';
 import { ensureTranscript, openTranscript } from './helpers/ui';
 
@@ -25,7 +25,6 @@ async function transcriptSegments(page: Page) {
 test("the current segment's Edit control is exactly the highlight's height, its icon inside it", async ({
   page,
 }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
   const region = page.getByRole('region', { name: 'Transcript' });
@@ -68,7 +67,6 @@ test("the current segment's Edit control is exactly the highlight's height, its 
 test('the Stop of a segment playing on its own takes the Play control’s box, and a second click there stops it', async ({
   page,
 }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
   const { all, buttons } = await transcriptSegments(page);
@@ -118,7 +116,6 @@ test('the Stop of a segment playing on its own takes the Play control’s box, a
 // on dark gray — a field keeps the browser's own text color unless told otherwise. The field's
 // text must be the theme's text color, the one the turn's own text uses.
 test("the editor field's text uses the theme's text color in the dark theme", async ({ page }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
 
@@ -153,7 +150,6 @@ test("the editor field's text uses the theme's text color in the dark theme", as
 test('the editor’s preview plays and stops the segment without taking the field’s focus', async ({
   page,
 }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
   const region = page.getByRole('region', { name: 'Transcript' });
@@ -192,7 +188,6 @@ test('the editor’s preview plays and stops the segment without taking the fiel
 // Item 52, the user's review 2026-10-23: the dialog's field wraps a long segment over several
 // rows instead of scrolling it sideways, so the whole line can be read while it is edited.
 test('the editor’s field wraps a long segment over several rows', async ({ page }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
   const { all, buttons } = await transcriptSegments(page);
@@ -228,7 +223,6 @@ test('the editor’s field wraps a long segment over several rows', async ({ pag
 test('the editor’s dialog blocks the page under its shade, and the page does not scroll', async ({
   page,
 }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
   const region = page.getByRole('region', { name: 'Transcript' });

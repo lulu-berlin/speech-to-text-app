@@ -18,6 +18,30 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { JFK_QUOTE, turnTextOf } from '../../tests/helpers/ui.ts';
+import { closeWithin } from '../../lib/bounded.ts';
+
+// Roadmap item 84: a wedged app must not keep a packaged spec from failing. Its trace — the
+// evidence — is saved within one deadline and the app closed within another; either one that does
+// not finish ends with the app's process tree killed and named in the run's log.
+const TRACE_DEADLINE_MS = 60_000;
+const CLOSE_DEADLINE_MS = 60_000;
+
+/** Ends the app's whole process tree: on Windows the backend JVM is a child that would survive. */
+function killAppTree(pid: number | undefined): void {
+  if (pid === undefined) return;
+  try {
+    if (process.platform === 'win32') {
+      execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        timeout: 30_000,
+      });
+    } else {
+      process.kill(pid, 'SIGKILL');
+    }
+  } catch {
+    // already gone
+  }
+}
 
 // Shared setup for the desktop tests (roadmap item 50): desktop/run-in-docker.ts runs these specs
 // in a stock container against one packaged app — the installed .deb's `stt-app` command, the
@@ -106,10 +130,20 @@ export async function recordAppTrace(app: ElectronApplication, testInfo: TestInf
     if (exitCode === null && signalCode === null) {
       const ordinal = testInfo.attachments.filter(({ name }) => name === 'app trace').length + 1;
       const path = testInfo.outputPath(`app-trace-${ordinal}.zip`);
-      await app.context().tracing.stop({ path });
-      testInfo.attachments.push({ name: 'app trace', path, contentType: 'application/zip' });
+      const traced = await closeWithin(() => app.context().tracing.stop({ path }), {
+        deadlineMs: TRACE_DEADLINE_MS,
+        what: 'the app trace',
+        kill: () => killAppTree(appProcess.pid),
+      });
+      if (traced === 'closed') {
+        testInfo.attachments.push({ name: 'app trace', path, contentType: 'application/zip' });
+      }
     }
-    await close();
+    await closeWithin(close, {
+      deadlineMs: CLOSE_DEADLINE_MS,
+      what: 'the desktop app',
+      kill: () => killAppTree(appProcess.pid),
+    });
   };
 }
 

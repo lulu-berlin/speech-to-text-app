@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { SETTINGS_CLIP, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
-import { appLive, goTo, uploadClips } from './helpers/ui';
+import { appLive, goTo, uploadClips, waitForTaskState } from './helpers/ui';
 
 // The settings journey (item 32, ADR 0046): change the device, the thread count and the
 // upload defaults on the Settings page; restart the backend on the same data directory —
@@ -11,8 +11,6 @@ import { appLive, goTo, uploadClips } from './helpers/ui';
 test('the settings the user saves survive a restart and the queue runs with them', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
-
   // The Settings page is reached from the navigation.
   await appLive(page);
   await goTo(page, 'Settings');
@@ -72,11 +70,35 @@ test('the settings the user saves survive a restart and the queue runs with them
   await pause.click();
   await expect(pause).toBeChecked();
   await uploadClips(page, [SETTINGS_CLIP]);
+  // The upload must be in the database before the backend is killed: setting the file input returns
+  // at once, and on a slow runner the POST is still in flight when the stop arrives, which aborts it
+  // and leaves a queue with no such task (run #465: the POST answered -1 and the wait for the clip
+  // then ran its whole stall window). Paused means the accepted task waits as QUEUED.
+  await waitForTaskState(page, SETTINGS_CLIP, (task) => task.status === 'QUEUED');
+  // Every write is stored before the backend is killed: the page saves each field separately, and the
+  // last one (the speaker count's own commit) is what the restarted process must read back. Polling
+  // one field would prove only that its own commit landed (roadmap item 84: run #465's class).
   await expect
-    .poll(
-      async () => (await page.evaluate(() => fetch('/api/settings').then((r) => r.json()))).device,
-    )
-    .toBe('cpu');
+    .poll(async () => {
+      const stored = (await page.evaluate(() => fetch('/api/settings').then((r) => r.json()))) as {
+        device: string;
+        threads: number | null;
+        defaultLanguage: string;
+        speakersMode: string;
+        speakersCount: number | null;
+        maxSpeakers: number;
+      };
+      return [
+        stored.device,
+        stored.threads,
+        stored.defaultLanguage,
+        stored.speakersMode,
+        stored.speakersCount,
+        stored.maxSpeakers,
+      ];
+    })
+    // The API stores the language's code ('de'); the form shows its label ('german').
+    .toEqual(['cpu', 2, 'de', 'fixed', 3, 12]);
 
   const { pid, port, dataDir } = loadState();
   await stopBackend(pid, port, dataDir);
@@ -103,7 +125,8 @@ test('the settings the user saves survive a restart and the queue runs with them
     // when it starts it.
     await pause.click();
     await expect(pause).not.toBeChecked();
-    await expect(page.getByText(`${SETTINGS_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+    await waitForTaskState(page, SETTINGS_CLIP);
+    await expect(page.getByText(`${SETTINGS_CLIP} transcribed`)).toBeVisible();
     // The run restored nothing later: the stored device is still the chosen CPU.
     await expect
       .poll(
