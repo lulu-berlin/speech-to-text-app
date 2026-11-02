@@ -1,7 +1,7 @@
 # 67 — A terminal UI frontend
 
 Status: spec-approved
-Depends on: [66](66-local-service-and-frontends.md) (done; the per-user service, frontend
+Depends on: [66](../docs/specs/local-service-and-frontends.md) (done; the per-user service, frontend
 descriptors and launch model — the credential, runtime endpoint and descriptor this item uses are
 built there, as is the Rust pin), [12](../docs/specs/http-api-and-sse.md) (done; the HTTP/SSE
 contract)
@@ -135,6 +135,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [ ] (must not break) Browser, window, API contract and the existing e2e suites stay green; the tray
       still lists and opens the TUI
 
+- [ ] (moved from item 66, 2026-11-02; pending approval) Opening the TUI from the tray opens it in a
+      terminal - PowerShell by default on Windows, Terminal on macOS, the terminal chain on Linux -
+      through its registered descriptor, and several TUI instances run side by side
 ## Acceptance criteria
 
 - A TUI client of the service exists on Linux, macOS and Windows, launched as a registered

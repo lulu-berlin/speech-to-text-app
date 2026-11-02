@@ -31,6 +31,9 @@ export default defineConfig({
     // binary headlessly.
     channel: 'chromium',
     viewport: { width: 1280, height: 800 },
+    // The journey runs against the per-user service (roadmap item 66), whose session cookie global
+    // setup captures through the launch handshake; `E2E_BACKEND_CMD` names a dev-mode server instead.
+    storageState: process.env.E2E_BACKEND_CMD ? undefined : './.e2e-storage.json',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

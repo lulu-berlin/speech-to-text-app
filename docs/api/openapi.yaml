@@ -6,6 +6,11 @@ info:
     The current backend contract. The JSON examples in `docs/api/` are the authoritative
     shapes (the frontend mocks and the backend shape checks use them); this OpenAPI document
     mirrors them for tooling. Errors are `{ "error", "message" }` unless stated otherwise.
+
+    In app mode (the per-user service, roadmap item 66) every route answers `401 unauthorized`
+    (`error.unauthorized.json`) unless the request carries `Authorization: Bearer <per-install
+    secret>`; dev/server mode has no credential. The paths below therefore declare no security
+    requirement of their own.
 servers:
   - url: http://localhost:8080
 tags:
@@ -16,6 +21,16 @@ tags:
   - name: settings
   - name: events
 paths:
+  /api/frontends:
+    get:
+      tags: [settings]
+      summary: The installed frontends (app mode, roadmap item 66)
+      responses:
+        '200':
+          description: One entry per descriptor in the per-user registry; a file that does not parse is skipped.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Frontends"}
   /api/tasks:
     get:
       tags: [tasks]
@@ -600,6 +615,19 @@ components:
         turns:
           type: array
           items: {$ref: "#/components/schemas/Turn"}
+    Frontends:
+      type: object
+      required: [frontends]
+      properties:
+        frontends:
+          type: array
+          items:
+            type: object
+            required: [id, name, kind]
+            properties:
+              id: {type: string}
+              name: {type: string}
+              kind: {type: string, enum: [browser, gui, terminal]}
     SettingsUpdate:
       type: object
       required: [device, threads, defaultLanguage, speakersMode, speakersCount, maxSpeakers]
@@ -610,6 +638,10 @@ components:
         speakersMode: {type: string, enum: [auto, off, fixed]}
         speakersCount: {type: integer, nullable: true, minimum: 1, maximum: 20}
         maxSpeakers: {type: integer, minimum: 1, maximum: 20}
+        # Roadmap item 66: the id of the default frontend in the per-user registry; absent or null means none.
+        defaultFrontend: {type: string, nullable: true}
+        # Roadmap item 66, D10: the terminal the TUI opens in, replacing the OS launcher; null uses the OS launcher.
+        terminalCommand: {type: string, nullable: true}
     Settings:
       allOf:
         - {$ref: "#/components/schemas/SettingsUpdate"}

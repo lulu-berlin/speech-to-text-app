@@ -32,6 +32,10 @@ Example JSON for every response body, SSE event payload and error of the HTTP AP
 | Settings event | `settings-updated.json`, `settings-updated.defaults.json`, `settings-updated.fallback.json` | event `settings-updated` (item 32) |
 | Error | `error.json`, `error.invalid-language.json` (mock addition, item 14), `error.invalid-device.json` (item 32), `error.upload-too-large.json` (item 41), `error.invalid-reassignment.json` (item 73) | every error response except `duplicate-audio` |
 | Error (duplicate) | `error.duplicate-audio.json` | `409 duplicate-audio` of `POST /api/tasks` |
+| Frontends | `frontends.json` | `200` of `GET /api/frontends` in app mode (roadmap item 66): the installed frontend registry — each descriptor's `id`, `name` and `kind` |
+| Launch token | `launch-token.json` | `200` of `POST /api/launch-token` in app mode (roadmap item 66): a single-use token the tray and `stt-app open` open as `GET /open?t=<token>` in the browser |
+| Error (forbidden origin) | `error.forbidden.json` | `403 forbidden-origin` of any route in app mode (roadmap item 66): the request addressed the service by another name (DNS rebinding) or came from another site (`Origin`) |
+| Error (unauthorized) | `error.unauthorized.json` | `401 unauthorized` of any route in app mode, the per-user service (roadmap item 66): the request carried no `Authorization: Bearer <per-install secret>` |
 
 Responses without a body (`204` of `DELETE /api/tasks/{id}`), the transcript downloads (item 10's formats) and `/audio` (FLAC) have no example here.
 

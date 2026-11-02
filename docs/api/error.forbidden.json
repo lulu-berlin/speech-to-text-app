@@ -1,0 +1,4 @@
+{
+  "error": "forbidden-origin",
+  "message": "This service answers this machine's app only"
+}

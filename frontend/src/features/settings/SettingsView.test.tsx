@@ -80,6 +80,8 @@ describe('the settings page', () => {
       speakersMode: 'fixed',
       speakersCount: 3,
       maxSpeakers: 12,
+      defaultFrontend: null,
+      terminalCommand: null,
     });
 
     // The stored answer is what the page shows.
@@ -252,6 +254,8 @@ describe('the settings threads field', () => {
       speakersMode: 'fixed',
       speakersCount: 3,
       maxSpeakers: 12,
+      defaultFrontend: null,
+      terminalCommand: null,
     });
 
     // Enter commits too.
@@ -351,6 +355,8 @@ describe('the settings typed counts', () => {
       speakersMode: 'fixed',
       speakersCount: 5,
       maxSpeakers: 12,
+      defaultFrontend: null,
+      terminalCommand: null,
     });
   });
 });
@@ -400,6 +406,8 @@ describe('the settings writes', () => {
       speakersMode: 'fixed',
       speakersCount: 3,
       maxSpeakers: 12,
+      defaultFrontend: null,
+      terminalCommand: null,
     });
 
     settle[1]?.(HttpResponse.json({ ...settingsFixed, device: 'cpu' }));
@@ -505,6 +513,8 @@ describe('a rejected settings write', () => {
       speakersMode: 'fixed',
       speakersCount: 3,
       maxSpeakers: 12,
+      defaultFrontend: null,
+      terminalCommand: null,
     });
     await waitFor(() => expect(threads).toHaveValue(6));
     await waitFor(() => expect(device).toHaveValue('cpu'));
@@ -779,6 +789,8 @@ describe('switching the speakers mode', () => {
       speakersMode: 'auto',
       speakersCount: null,
       maxSpeakers: 10,
+      defaultFrontend: null,
+      terminalCommand: null,
     });
 
     // The draft mode and count stay, with the count's error; the other field followed the
@@ -827,5 +839,73 @@ describe('switching the speakers mode', () => {
     expect(count).toBeInTheDocument();
     expect(count).toHaveValue(3);
     expect(max).toHaveValue(10);
+  });
+});
+
+describe('the default frontend', () => {
+  it('offers the installed frontends and stores the chosen one', async () => {
+    const writes: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/frontends', () =>
+        HttpResponse.json({
+          frontends: [
+            { id: 'browser', name: 'Browser', kind: 'browser' },
+            { id: 'tui', name: 'Terminal TUI', kind: 'terminal' },
+          ],
+        }),
+      ),
+      http.put('/api/settings', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        writes.push(body);
+        return HttpResponse.json({ ...settingsFixture, ...body });
+      }),
+    );
+    renderSettings();
+    const select = await screen.findByRole('combobox', { name: 'Default frontend' });
+    await waitFor(() =>
+      expect(
+        within(select)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual(['None', 'Browser', 'Terminal TUI']),
+    );
+
+    fireEvent.change(select, { target: { value: 'tui' } });
+
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(writes[0]?.defaultFrontend).toBe('tui');
+    await waitFor(() => expect(select).toHaveValue('tui'));
+  });
+});
+
+describe('the terminal command', () => {
+  it('stores a typed command when the field is left, and an empty field as the OS launcher', async () => {
+    const writes: Record<string, unknown>[] = [];
+    server.use(
+      http.put('/api/settings', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        writes.push(body);
+        return HttpResponse.json({ ...settingsFixture, ...body });
+      }),
+    );
+    renderSettings();
+    const field = await screen.findByRole('textbox', { name: 'Terminal command' });
+    await waitFor(() => expect(field).toHaveValue(''));
+
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: 'wezterm start --' } });
+    expect(writes).toHaveLength(0);
+    fireEvent.blur(field);
+
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(writes[0]?.terminalCommand).toBe('wezterm start --');
+    await waitFor(() => expect(field).toHaveValue('wezterm start --'));
+
+    fireEvent.focus(field);
+    fireEvent.change(field, { target: { value: '' } });
+    fireEvent.blur(field);
+
+    await waitFor(() => expect(writes).toHaveLength(2));
+    expect(writes[1]?.terminalCommand).toBeNull();
   });
 });

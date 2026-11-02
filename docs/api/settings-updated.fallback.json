@@ -5,5 +5,7 @@
   "speakersMode": "auto",
   "speakersCount": null,
   "maxSpeakers": 8,
-  "deviceFallback": "gpu:1"
+  "deviceFallback": "gpu:1",
+  "defaultFrontend": null,
+  "terminalCommand": null
 }

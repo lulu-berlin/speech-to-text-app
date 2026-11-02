@@ -1,0 +1,5 @@
+# The Rust pin (roadmap item 66) for builds without Nix: rustup installs exactly this toolchain.
+# The devenv and the flake use the pinned nixpkgs' Rust, which is the same version.
+[toolchain]
+channel = "1.98.1"
+components = ["clippy", "rustfmt"]

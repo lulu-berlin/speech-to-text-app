@@ -21,6 +21,7 @@ problems; it never goes away and it is not a roadmap item.
 | ----- | --- | -------- | ----- |
 | `STT_DEVICE` / `STT_THREADS` silently ignored (superseded by the settings table, item 32) | LOW | `config/Config.kt:25-62`; `config/Device.kt` | **Decided 2026-10-23**: document as retired (unplanned) |
 | Whisper's consecutive duplicate segments are stored and served verbatim: on music or a repeated phrase whisper.cpp can emit the same line twice in a row (at the same or overlapping times), and nothing drops or flags it — the transcript shows it twice, and the txt/srt/vtt downloads repeat it. The backend passes whisper's segment list through unchanged, so deduplication is a behaviour change, not a bug fix | MED | user report 2026-10-23 (item 52: a transcribed song's refrain appeared twice; the duplicate shares the next segment's start, which is what made it unreachable in the view); `backend/src/main/kotlin/stt/transcribe/ParseSegments.kt:19-25`; `backend/src/main/kotlin/stt/transcribe/ChunkSegments.kt:14-22`; `backend/src/main/kotlin/stt/diarization/SpeakerTurns.kt:11-40` (no dedup) | Decision needed: drop exact consecutive duplicates (same trimmed text and a start at or before the previous end) before storage, or keep them and flag them in the view. Item 52's view work only makes such a segment reachable; it does not remove the duplicate |
+| The three spawn-based `unit_open` tests are ignored on Windows: a stub process (a copy of the test binary) keeps the CLI's captured pipe open and the service stub never settles, so the tests hang instead of failing | MED | `client/stt-client/tests/unit_open.rs` (the three `cfg_attr(windows, ignore = ...)` tests); CI run #477 `Windows (cargo fmt, clippy, test)`: `opening_a_frontend_returns_while_the_frontend_keeps_running` FAILED, two more past 60 s | **Decision needed**: why a Windows stub holds the pipe (the frontend spawn is already `Stdio::null()`); until then Windows' `open` path is proven by `Windows (packaged zip e2e)` |
 
 ## Frontend
 
@@ -32,6 +33,14 @@ problems; it never goes away and it is not a roadmap item.
 | Turn rows keyed by array index; a merge RELOAD replaces the whole array, weakening reconciliation | LOW | `features/history/TranscriptTurns.tsx` | Stable key (startMs + speakerId) |
 | A long filename breaks a queue item line's layout: `RowName` contains it only with `overflow-wrap: anywhere` (no nowrap/ellipsis), so a long name wraps mid-word into a multi-line block and the row grows tall and ragged beside the status/controls — usable, but ugly (same helper renders upload rows) | LOW | user report 2026-10-14; `features/queue/rowParts.ts:20-23`; `TaskRow.tsx:192`; `QueueView.tsx:468` | Single-line truncation with `text-overflow: ellipsis` (`title` for the full name); check the History rows' name rendering for the same pattern |
 | A `speakers-renamed` event that arrives while the open transcript's `/turns` is loading is lost: the view shows the old names until a reload when that read ran before the rename | MED | `features/history/TaskTranscriptView.tsx:172-182` (effect not tied to the loaded state); `features/history/turnsMachine.ts:48` (`SPEAKERS` handled only in `loaded`) | Reproduced 2026-10-23 (item 52, throwaway test: `/turns` pushes the rename, then answers `turns.json`). Item 52 fixed the same gap for segment edits by re-applying them whenever the turns (re)load; `speakers-merged`'s `RELOAD` is likewise handled only in `loaded` (by inspection) |
+
+## Client (Rust)
+
+| Issue | Sev | Evidence | Notes |
+| ----- | --- | -------- | ----- |
+| A frontend descriptor's `version` is parsed and then ignored: `register_descriptor` accepts any version, and `read_registry` never checks it, so a descriptor written for a future layout registers and loads as if it were current | LOW | `client/stt-client/src/lib.rs` (`Descriptor`, `register_descriptor`, `read_registry`); `client/stt-client/tests/cli_register.rs` registers a `version: 1` file but nothing pins the check | **Decision needed, for roadmap item 78**: the first 1.0 release needs one version everywhere; enforcing a descriptor version belongs with it rather than as an ad-hoc check now |
+
+| The tray's menu never marks the default frontend: it passes no default to the menu model, so the "(default)" suffix never appears even though the service stores one | LOW | `client/stt-client/src/tray_menu.rs:140` (`menu_for`); `client/stt-client/src/lib.rs` (`tray_entries`) | The tray would read the stored default from the settings API |
 
 ## Tests
 

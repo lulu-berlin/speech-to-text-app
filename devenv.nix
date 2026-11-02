@@ -78,6 +78,16 @@ in
       pkgs.fpm
       pkgs.xvfb-run
 
+      # The tray's icon and menu (roadmap item 66; ADR 0064): `tray-icon`/`muda` link against GTK 3
+      # and the AppIndicator host library. Only the `stt-tray` binary's `tray-menu` feature needs
+      # them; the rest of the client workspace builds without, which is why they are dev packages
+      # rather than an unconditional dependency.
+      pkgs.gtk3
+      pkgs.libayatana-appindicator
+      pkgs.gobject-introspection
+      # `tray-icon`'s libappindicator backend dlopens the library by name at runtime, so its store
+      # path is on the loader path below.
+
       # Desktop identity (roadmap item 74): xprop reads the packaged app's window class
       # (WM_CLASS) in that same container, so the e2e can compare it with the installed
       # .desktop entry's StartupWMClass.
@@ -99,12 +109,20 @@ in
   # Node + npm for the Vite/React frontend
   languages.javascript.enable = true;
   languages.javascript.npm.enable = true;
+  # Rust (roadmap item 66): the client workspace in client/ (the tray, the `stt-app` CLI, item
+  # 67's TUI) builds with the pinned nixpkgs' rustc, cargo, clippy and rustfmt; rust-toolchain.toml
+  # names the same version for builds without Nix.
+  languages.rust.enable = true;
 
   # UTF-8 file names for the JVM (item 33): Gradle 9's HTML test report writes one
   # directory per test name, and names like "0°, 20°" or "O(n³)" fail to encode when the
   # locale is POSIX (an unset LANG, as in agent shells). LC_CTYPE only sets the charset;
   # the user's LANG (messages, sorting) is left alone.
   env.LC_CTYPE = if pkgs.stdenv.isDarwin then "UTF-8" else "C.UTF-8";
+
+  # The tray's icon backend dlopens its library at runtime (see the tray packages above). An `if`,
+  # not `mkIf`: this is a plain string attribute, and `mkIf` is a module directive.
+  env.LD_LIBRARY_PATH = pkgs.lib.optionalString pkgs.stdenv.isLinux "${pkgs.libayatana-appindicator}/lib";
 
   # Models for the app and integration tests (pinned in nix/models.nix)
   env.STT_WHISPER_MODEL = "${models.whisper}";

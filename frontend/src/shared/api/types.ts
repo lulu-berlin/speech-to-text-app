@@ -158,6 +158,12 @@ export interface Settings {
   speakersCount: number | null;
   maxSpeakers: number;
   deviceFallback: string | null;
+  // The id of the default frontend in the per-user registry (roadmap item 66), null until the
+  // user picks one; the Settings page offers the installed ones.
+  defaultFrontend: string | null;
+  // The command line of the terminal the TUI opens in (roadmap item 66, D10), replacing the OS
+  // launcher; null uses the OS launcher.
+  terminalCommand: string | null;
   availableDevices: string[];
   // The probe's name for each offered GPU, keyed by `gpu:<index>` (`{}` without a GPU); the
   // Settings page labels each GPU with it. Fixed by the startup probe, so it is not in
@@ -172,8 +178,29 @@ export interface Settings {
 // choices and without the fallback notice, which the write clears (item 32's contract).
 export type SettingsUpdate = Omit<
   Settings,
-  'availableDevices' | 'deviceFallback' | 'gpuNames' | 'deviceProbeError'
->;
+  | 'availableDevices'
+  | 'deviceFallback'
+  | 'gpuNames'
+  | 'deviceProbeError'
+  | 'defaultFrontend'
+  | 'terminalCommand'
+> & {
+  // Roadmap item 66: absent means none, as for every other optional part of a settings write.
+  defaultFrontend?: string | null;
+  terminalCommand?: string | null;
+};
+
+// One installed frontend as GET /api/frontends lists it (roadmap item 66); the Settings page
+// offers each by name as the default.
+export interface FrontendEntry {
+  id: string;
+  name: string;
+  kind: 'browser' | 'gui' | 'terminal';
+}
+
+export interface FrontendList {
+  frontends: FrontendEntry[];
+}
 
 // What the settings-updated event carries: every field of the settings except the device
 // choices — the fallback notice can change live, and belongs here.

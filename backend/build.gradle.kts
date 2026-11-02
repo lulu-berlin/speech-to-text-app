@@ -148,6 +148,10 @@ tasks.withType<Test>().configureEach {
     // build with the same Gradle (the devenv's locally, the wrapper's in CI). Not Gradle TestKit:
     // its jars carry Gradle's own SLF4J provider, which displaces logback in every test (item 77).
     gradle.gradleHomeDir?.let { systemProperty("stt.test.gradleHome", it.absolutePath) }
+    // The JDK's HTTP client refuses to send a `Host` header unless the JVM allows that restricted
+    // name. App mode serves loopback names only (roadmap item 66) and a browser always sends `Host`,
+    // so the specs send it too.
+    systemProperty("jdk.httpclient.allowRestrictedHeaders", "host")
     // Each test JVM gets its own java.io.tmpdir under build/, recreated empty before the run. The
     // JDK default is the temp dir every process of the user shares (the Gradle daemon included), so
     // a spec that watches the app's temp dir for spool files (UploadStoredInDatabaseSpec) would

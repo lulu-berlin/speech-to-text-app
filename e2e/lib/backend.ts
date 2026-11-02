@@ -10,14 +10,22 @@
 import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { get } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, dirname, join, posix, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ancestors, findProcess, processes } from './processes.ts';
 import type { ProcessRow } from './processes.ts';
+import { commandDirectory } from './executable.ts';
 import { waitUntil } from './wait.ts';
 
 export const e2eRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,6 +43,9 @@ export interface E2eState {
   dataDir: string;
   fixturesDir: string;
   pid: number | undefined;
+  /** The service's bootstrap directories (roadmap item 66): `stt-app` needs them to launch a frontend. */
+  configDir?: string;
+  runtimeDir?: string;
 }
 
 // The journey's fixture clips, created by global-setup.ts: from TEST_JFK_WAV the full
@@ -335,7 +346,14 @@ export async function waitForHealth(
     down = false,
     timeoutMs = 600_000,
     signal,
-  }: { down?: boolean; timeoutMs?: number; signal?: AbortSignal } = {},
+    authorization,
+  }: {
+    down?: boolean;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    // App mode (roadmap item 66) answers only a client that sends the per-install secret.
+    authorization?: () => string | undefined;
+  } = {},
 ): Promise<void> {
   // node:http, not fetch: Node 24's bundled undici calls `socket.setTypeOfService()` on every
   // request, and macOS can refuse it with an EINVAL thrown outside the fetch promise — a poll during
@@ -343,9 +361,15 @@ export async function waitForHealth(
   // connection per poll (`agent: false`), so no pooled socket outlives the backend it reached.
   const answering = (): Promise<boolean> => {
     const { promise, resolve } = Promise.withResolvers<boolean>();
+    const header = authorization?.();
     const request = get(
       healthUrl(port),
-      { agent: false, signal: AbortSignal.timeout(2_000) },
+      {
+        agent: false,
+        signal: AbortSignal.timeout(2_000),
+        // App mode answers health only to the per-install credential; without it every poll gets 401.
+        headers: header === undefined ? {} : { Authorization: header },
+      },
       (response) => {
         const status = response.statusCode ?? 0;
         response.once('end', () => resolve(status >= 200 && status < 300));
@@ -395,13 +419,23 @@ export async function stopBackend(
   } = {},
 ): Promise<void> {
   const rows = list();
-  const jvm = findProcess(rows, ['stt.MainKt', dataDir]);
+  // App mode (roadmap item 66) passes its data directory in the environment, not argv, so the
+  // argv match below cannot find its JVM; the service advertises that JVM's own pid in runtime.json.
+  const advertised = advertisedAppPid(dataDir);
+  const jvm = advertised === undefined ? findProcess(rows, ['stt.MainKt', dataDir]) : null;
   if (platform === 'win32') {
     // The app JVM's own tree is the narrower kill; the spawn's pid is the fallback when the listing
     // cannot see the JVM, and the target when the failure is still in the caller's hands.
-    const target = spawnTree ? (pid ?? jvm?.pid) : (jvm?.pid ?? pid);
+    const target = spawnTree ? (pid ?? advertised) : (advertised ?? jvm?.pid ?? pid);
     if (target !== undefined) await forceKill(target);
   } else {
+    if (advertised !== undefined) {
+      try {
+        process.kill(advertised, 'SIGKILL');
+      } catch {
+        // already gone
+      }
+    }
     if (jvm !== null) {
       for (const chainPid of ancestors(rows, jvm.pid)) {
         // The caller may have spawned this backend itself (a start failure, specs 13/17/60): the
@@ -422,6 +456,19 @@ export async function stopBackend(
     killGroup(pid);
   }
   await waitForHealth(port, { down: true, timeoutMs: 60_000 });
+}
+
+/** The app JVM pid an app-mode service advertises in its runtime directory, if it left one. */
+function advertisedAppPid(dataDir: string): number | undefined {
+  const file = join(appModeDirs(dataDir).runtimeDir, 'runtime.json');
+  if (!existsSync(file)) return undefined;
+  try {
+    const { pid } = JSON.parse(readFileSync(file, 'utf8')) as { pid?: unknown };
+    return typeof pid === 'number' ? pid : undefined;
+  } catch {
+    // a torn file is not worth failing the stop over
+    return undefined;
+  }
 }
 
 /** `taskkill`'s arguments: the pid and its whole tree, forcefully (Windows has no SIGTERM). */
@@ -475,17 +522,35 @@ export function killGroup(pid: number | undefined): void {
 // probe-failure spec strips whisper-cli from PATH for its own backend (a second one on a free port;
 // the shared backend is untouched).
 /** The Gradle to run the backend with: PATH's gradle when present, else the repository wrapper. */
-function backendGradle(): { command: string; args: string[]; cwd: string } {
-  const hasGradle = (process.env.PATH ?? '')
-    .split(delimiter)
-    .some((dir) => existsSync(join(dir, 'gradle')));
-  return hasGradle
-    ? { command: 'gradle', args: ['--no-daemon', 'run', '--console=plain'], cwd: backendDir }
-    : {
-        command: join(repoRoot, 'gradlew'),
-        args: ['-p', backendDir, '--no-daemon', 'run', '--console=plain'],
-        cwd: repoRoot,
-      };
+/**
+ * How to start the backend with Gradle: `gradle` from the PATH when there is one, else the checkout's
+ * wrapper. Windows cannot spawn a POSIX script, so there it is `gradle.bat` from the PATH - or
+ * `gradlew.bat`, run through cmd.exe, which is how Node must start a `.bat` at all.
+ */
+export function backendGradle({
+  platform = process.platform,
+  pathValue = process.env.PATH ?? '',
+  exists = existsSync,
+  task = 'run',
+}: {
+  platform?: NodeJS.Platform;
+  pathValue?: string;
+  exists?: (file: string) => boolean;
+  task?: string;
+} = {}): { command: string; args: string[]; cwd: string } {
+  const windows = platform === 'win32';
+  const path = windows ? win32 : posix;
+  const args = ['-p', backendDir, '--no-daemon', task, '--console=plain'];
+  // The file the PATH actually holds: Windows' shim need not be named `gradle.bat`, and a hard-coded
+  // name the shell cannot find is exactly how run #482 failed.
+  const directory = commandDirectory('gradle', { platform, pathValue, exists });
+  if (directory !== null) {
+    const names = windows ? ['gradle.bat', 'gradle.cmd', 'gradle.exe'] : ['gradle'];
+    const found = names.map((name) => path.join(directory, name)).find((file) => exists(file));
+    if (found !== undefined) return { command: found, args: args.slice(2), cwd: backendDir };
+  }
+  // `needsShell` runs a `.bat`/`.cmd` through cmd.exe, which Windows requires.
+  return { command: path.join(repoRoot, windows ? 'gradlew.bat' : 'gradlew'), args, cwd: repoRoot };
 }
 
 /**
@@ -503,6 +568,31 @@ function captureBackendOutput(child: ChildProcess): void {
     log.write(chunk);
   });
   child.once('exit', () => log.end());
+}
+
+/**
+ * The port `runtime.json`'s endpoint names, or [fallback] when it names none. A service whose durable port was taken
+ * serves on a free one and advertises that in `runtime.json` (roadmap item 66) - the app and the tray read it, and a
+ * start that polled the port it asked for would sit out its whole health timeout against another program's server.
+ */
+export function runtimePort(runtime: unknown, fallback: number): number {
+  const endpoint = (runtime as { endpoint?: unknown } | null | undefined)?.endpoint;
+  if (typeof endpoint !== 'string') return fallback;
+  try {
+    const port = new URL(endpoint).port;
+    return port === '' ? fallback : Number(port);
+  } catch {
+    return fallback;
+  }
+}
+
+/** `runtime.json`'s advertisement, or null while the service has written none. */
+function readRuntimeOrNull(runtimeDir: string): unknown {
+  try {
+    return JSON.parse(readFileSync(join(runtimeDir, 'runtime.json'), 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /** The environment every backend gets after [env]: a fresh data dir, the tiny model and the port. */
@@ -531,11 +621,16 @@ async function waitForHealthOrExit(
   child: ChildProcess,
   port: number,
   timeoutMs: number,
+  authorization?: () => string | undefined,
+  advertisedPort?: () => number,
 ): Promise<void> {
   const ended = Promise.withResolvers<never>();
   // Ends the health wait with the start: a dead process can never answer, and polling it again would only
   // keep the harness busy for the rest of the timeout.
   const aborted = new AbortController();
+  // The service advertises the port it actually serves on in `runtime.json` (the durable port can be taken);
+  // polls follow it, as the app and the tray do.
+  const servingPort = (): number => advertisedPort?.() ?? port;
   const failed = (reason: string): Error =>
     new Error(
       `the backend ${reason} before answering health on :${port}; its output is in ${BACKEND_LOG_FILE}`,
@@ -553,7 +648,10 @@ async function waitForHealthOrExit(
   child.once('exit', onExit);
   child.once('error', onError);
   try {
-    await Promise.race([waitForHealth(port, { timeoutMs, signal: aborted.signal }), ended.promise]);
+    await Promise.race([
+      waitForHealth(servingPort(), { timeoutMs, signal: aborted.signal, authorization }),
+      ended.promise,
+    ]);
   } finally {
     child.off('exit', onExit);
     child.off('error', onError);
@@ -574,6 +672,8 @@ async function launchBackend({
   env = {},
   staticDir,
   healthTimeoutMs = 600_000,
+  authorization,
+  advertisedPort,
 }: {
   command: string;
   args: string[];
@@ -583,6 +683,9 @@ async function launchBackend({
   env?: NodeJS.ProcessEnv;
   staticDir: string;
   healthTimeoutMs?: number;
+  authorization?: () => string | undefined;
+  /** The port the service advertised when it is up, else the asked one. */
+  advertisedPort?: () => number;
 }): Promise<{ pid: number | undefined }> {
   const child = spawn(command, args, {
     cwd,
@@ -593,7 +696,7 @@ async function launchBackend({
   });
   captureBackendOutput(child);
   try {
-    await waitForHealthOrExit(child, port, healthTimeoutMs);
+    await waitForHealthOrExit(child, port, healthTimeoutMs, authorization, advertisedPort);
   } catch (error) {
     // A start that failed still owns its spawn: the stop ends the whole tree (POSIX finds and
     // SIGKILLs the app JVM even when it ignores SIGTERM; Windows kills the spawn's tree, which
@@ -634,17 +737,100 @@ export async function startBackend({
       healthTimeoutMs,
     });
   }
-  const gradle = backendGradle();
-  return await launchBackend({
-    command: gradle.command,
-    args: gradle.args,
-    cwd: gradle.cwd,
-    port,
-    dataDir,
-    env,
-    staticDir: frontendDist,
-    healthTimeoutMs,
+  // The journey runs against the per-user service (roadmap item 66, e2e line E2): app mode, which
+  // requires the credential, on the same data directory so a restart keeps its database.
+  const dirs = appModeDirs(dataDir);
+  return await startService({ port, dataDir, ...dirs, env, healthTimeoutMs });
+}
+
+/** The service's bootstrap directories for one run's data directory: `config/` and `runtime/` inside it. */
+export function appModeDirs(dataDir: string): { configDir: string; runtimeDir: string } {
+  return { configDir: join(dataDir, 'config'), runtimeDir: join(dataDir, 'runtime') };
+}
+
+/**
+ * `stt-app` built from this checkout with the pinned toolchain — the client the journey's browser
+ * enters through (roadmap item 66). Built once per run.
+ */
+export function sttAppPath(): string {
+  const exe = process.platform === 'win32' ? 'stt-app.exe' : 'stt-app';
+  const path = join(repoRoot, 'client', 'target', 'debug', exe);
+  execFileSync(
+    'cargo',
+    [
+      'build',
+      '--locked',
+      '--manifest-path',
+      join(repoRoot, 'client', 'Cargo.toml'),
+      '--bin',
+      'stt-app',
+    ],
+    { cwd: join(repoRoot, 'client'), stdio: 'inherit' },
+  );
+  return path;
+}
+
+/** The one-time launch URL `stt-app open` prints for the browser frontend of one service. */
+export function appModeLaunchUrl(dirs: { configDir: string; runtimeDir: string }): string {
+  return execFileSync(sttAppPath(), ['open', 'browser', '--print-url'], {
+    env: { ...process.env, STT_CONFIG_DIR: dirs.configDir, STT_RUNTIME_DIR: dirs.runtimeDir },
+    encoding: 'utf8',
+  }).trim();
+}
+
+/** Registers the browser frontend in a service's registry, as its installer would. */
+export function registerBrowserFrontend(configDir: string): void {
+  const descriptor = join(configDir, 'browser.json');
+  writeFileSync(
+    descriptor,
+    JSON.stringify({ version: 1, id: 'browser', kind: 'browser', name: 'Browser', url: '/' }),
+  );
+  execFileSync(sttAppPath(), ['register', descriptor], {
+    env: { ...process.env, STT_CONFIG_DIR: configDir },
   });
+}
+
+/** Where global setup leaves the session cookie every browser context starts with. */
+export const STORAGE_STATE_FILE = join(e2eRoot, '.e2e-storage.json');
+
+/** Writes Playwright's storage state holding [cookie] as the service's session. */
+export function writeStoredSession(cookie: { name: string; value: string }): void {
+  writeFileSync(
+    STORAGE_STATE_FILE,
+    JSON.stringify({
+      cookies: [
+        {
+          name: cookie.name,
+          value: cookie.value,
+          domain: '127.0.0.1',
+          path: '/',
+          expires: -1,
+          httpOnly: true,
+          secure: false,
+          sameSite: 'Strict',
+        },
+      ],
+      origins: [],
+    }),
+  );
+}
+
+/**
+ * Replaces the stored session after the service restarted (roadmap item 66): sessions live in the
+ * service process, so the contexts created by later tests must carry the new one.
+ */
+export async function refreshStoredSession(dirs: {
+  configDir: string;
+  runtimeDir: string;
+}): Promise<void> {
+  // A dev-mode server (`E2E_BACKEND_CMD`) has no credential and no launch handshake, so there is
+  // nothing to carry across its restart - and a stored cookie from an earlier app-mode run would be
+  // wrong for it.
+  if (process.env.E2E_BACKEND_CMD !== undefined) {
+    rmSync(STORAGE_STATE_FILE, { force: true });
+    return;
+  }
+  writeStoredSession(await captureSessionCookie(dirs));
 }
 
 /**
@@ -686,4 +872,102 @@ export async function handOverSharedBackend(
   await stopBackend(pid, port, dataDir);
   const fresh = await startBackend({ port, dataDir });
   saveState({ pid: fresh.pid });
+}
+
+/**
+ * Redeems one launch URL for its session cookie, without a browser: the cookie the journey's browser
+ * contexts start with (Playwright's storage state). The token is spent by this call.
+ */
+export async function captureSessionCookie(dirs: {
+  configDir: string;
+  runtimeDir: string;
+}): Promise<{ name: string; value: string }> {
+  const response = await fetch(appModeLaunchUrl(dirs), { redirect: 'manual' });
+  const setCookie = response.headers.getSetCookie()[0];
+  const pair = setCookie?.split(';')[0] ?? '';
+  const [name, value] = pair.split('=');
+  if (name === undefined || value === undefined) {
+    throw new Error(`the launch URL answered ${response.status} without a session cookie`);
+  }
+  return { name, value };
+}
+
+/**
+ * Starts the backend in app mode — the per-user service of roadmap item 66 — on its own data, config
+ * and runtime directories, and waits until it answers health to the per-install secret it writes to
+ * `config.json`. Always through Gradle: `E2E_BACKEND_CMD` names a dev-mode server.
+ */
+/** Where the backend's installed distribution keeps its launcher (Gradle's `installDist` output). */
+const BACKEND_INSTALL = join(backendDir, 'build', 'install', 'stt-backend');
+
+/**
+ * The backend's installed launcher, building the distribution once per run when it is missing. The
+ * launcher runs the app's JVM directly — no Gradle daemon or wrapper at test time — and Windows gets
+ * Gradle's own `.bat`, which `needsShell` runs through cmd.exe.
+ */
+async function backendLauncher(): Promise<string> {
+  const windows = process.platform === 'win32';
+  const launcher = join(BACKEND_INSTALL, 'bin', `stt-backend${windows ? '.bat' : ''}`);
+  if (!existsSync(launcher)) {
+    console.log(`e2e: no backend launcher at ${launcher}; building the distribution`);
+    const gradle = backendGradle({ task: 'installDist' });
+    execFileSync(gradle.command, gradle.args, { cwd: gradle.cwd, stdio: 'inherit' });
+  }
+  if (!existsSync(launcher)) {
+    throw new Error(`no backend launcher at ${launcher} after installDist`);
+  }
+  return launcher;
+}
+
+export async function startService({
+  port,
+  dataDir,
+  configDir,
+  runtimeDir,
+  env = {},
+  // Below Playwright's 600 s test timeout, so a service that never answers fails with its own output
+  // and the launcher line instead of the test timing out with nothing to go on.
+  healthTimeoutMs = 120_000,
+}: {
+  port: number;
+  dataDir: string;
+  configDir: string;
+  runtimeDir: string;
+  env?: NodeJS.ProcessEnv;
+  healthTimeoutMs?: number;
+}): Promise<{ pid: number | undefined }> {
+  checkPreconditions();
+  for (const dir of [configDir, runtimeDir]) mkdirSync(dir, { recursive: true });
+  // The distribution's launcher, not `gradle run`: Gradle at test time is minutes of daemon and
+  // wrapper work under a loaded runner (CI run #500: the macOS leg sat the whole 600 s health
+  // timeout), while the launcher starts the same JVM directly. `installDist` runs once per run.
+  const launcher = await backendLauncher();
+  console.log(`e2e: starting the service with ${launcher} on :${port}`);
+  // A service whose durable port was taken serves on a free one and advertises that in `runtime.json`;
+  // the wait follows the advertised endpoint, as every client does (CI run #500 polled the asked port
+  // for the whole health timeout while the service answered on another).
+  return await launchBackend({
+    command: launcher,
+    args: ['service'],
+    cwd: backendDir,
+    port,
+    dataDir,
+    env: { ...env, STT_CONFIG_DIR: configDir, STT_RUNTIME_DIR: runtimeDir },
+    staticDir: frontendDist,
+    healthTimeoutMs,
+    authorization: () => serviceAuthorization(configDir),
+    advertisedPort: () => runtimePort(readRuntimeOrNull(runtimeDir), port),
+  });
+}
+
+/** `Bearer <secret>` from the service's `config.json`, or nothing until the service has written it. */
+function serviceAuthorization(configDir: string): string | undefined {
+  try {
+    const { secret } = JSON.parse(readFileSync(join(configDir, 'config.json'), 'utf8')) as {
+      secret?: unknown;
+    };
+    return typeof secret === 'string' ? `Bearer ${secret}` : undefined;
+  } catch {
+    return undefined;
+  }
 }

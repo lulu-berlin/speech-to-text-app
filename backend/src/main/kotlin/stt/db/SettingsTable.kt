@@ -13,6 +13,8 @@ internal object SettingsTable : Table("settings") {
     val speakersCount = integer("speakers_count").nullable()
     val maxSpeakers = integer("max_speakers")
     val deviceFallback = text("device_fallback").nullable()
+    val defaultFrontend = text("default_frontend").nullable()
+    val terminalCommand = text("terminal_command").nullable()
 
     const val ONLY_ROW_ID = 1
 

@@ -359,3 +359,75 @@ test('no state file, or one that cannot be read, does not block the run', () => 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Roadmap item 66, review finding 1: Windows cannot spawn the POSIX `gradlew` script, so the app-mode
+// service must be started through `gradlew.bat` (via cmd.exe) and the PATH probe must look for
+// `gradle.bat`. The lookup and the command are platform-shaped, so the test asks the function for
+// Windows without being on it.
+test('the app-mode service starts Gradle the way Windows needs it', () => {
+  const withoutGradle = backend.backendGradle({
+    platform: 'win32',
+    pathValue: 'C:\\nothing',
+    exists: () => false,
+  });
+  assert.ok(withoutGradle.command.endsWith('gradlew.bat'), withoutGradle.command);
+  assert.ok(backend.needsShell(withoutGradle.command, 'win32'));
+
+  // The PATH shim need not be named `gradle.bat`; the command is the file that is there.
+  const withGradle = backend.backendGradle({
+    platform: 'win32',
+    pathValue: 'C:\\gradle\\bin',
+    exists: (file) => file.toLowerCase() === 'c:\\gradle\\bin\\gradle.bat',
+  });
+  assert.equal(withGradle.command, 'C:\\gradle\\bin\\gradle.bat');
+
+  const linux = backend.backendGradle({
+    platform: 'linux',
+    pathValue: '/none',
+    exists: () => false,
+  });
+  assert.ok(linux.command.endsWith('gradlew'));
+  assert.equal(backend.needsShell(linux.command, 'linux'), false);
+});
+
+// Roadmap item 66: the service may fall back to a free port when the durable one was taken, and every
+// client reads the served port from `runtime.json`; the start must read it too (CI run #500 sat the
+// whole 600 s health timeout polling the port it asked for while the service served on another).
+test('the advertised port is read from runtime.json, with the asked port as the fallback', () => {
+  assert.equal(backend.runtimePort({ endpoint: 'http://127.0.0.1:49852' }, 28763), 49852);
+  assert.equal(backend.runtimePort({ endpoint: 'not a url' }, 28763), 28763);
+  assert.equal(backend.runtimePort({}, 28763), 28763);
+  assert.equal(backend.runtimePort(null, 28763), 28763);
+});
+
+// Roadmap item 66: the app-mode service answers health only to the per-install credential, so the
+// wait must send it (the option was accepted and dropped, so every poll got 401 and the start sat its
+// whole timeout on CI runs #500/#504).
+test('the health wait sends the credential the app-mode service asks for', async () => {
+  const server = createServer((request, response) => {
+    if (request.headers.authorization !== 'Bearer secret') {
+      response.writeHead(401, { 'Content-Type': 'application/json' });
+      response.end('{"error":"unauthorized"}');
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end('{"version":"0"}');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+    const started = Date.now();
+    await assert.rejects(
+      backend.waitForHealth(port, { timeoutMs: 1_000 }),
+      /did not answer within/,
+    );
+    assert.ok(Date.now() - started < 5_000);
+    await backend.waitForHealth(port, {
+      timeoutMs: 5_000,
+      authorization: () => 'Bearer secret',
+    });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});

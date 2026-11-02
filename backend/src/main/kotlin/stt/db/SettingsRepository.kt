@@ -26,6 +26,8 @@ class SettingsRepository(
                 speakersCount = row[SettingsTable.speakersCount],
                 defaultMaxSpeakers = row[SettingsTable.maxSpeakers],
                 deviceFallback = row[SettingsTable.deviceFallback]?.let { parseStoredDevice(it) },
+                defaultFrontend = row[SettingsTable.defaultFrontend],
+                terminalCommand = row[SettingsTable.terminalCommand],
             )
         }
 
@@ -41,6 +43,8 @@ class SettingsRepository(
                 it[SettingsTable.speakersCount] = settings.speakersCount
                 it[SettingsTable.maxSpeakers] = settings.defaultMaxSpeakers
                 it[SettingsTable.deviceFallback] = settings.deviceFallback?.dbValue()
+                it[SettingsTable.defaultFrontend] = settings.defaultFrontend
+                it[SettingsTable.terminalCommand] = settings.terminalCommand
             }
         }
     }

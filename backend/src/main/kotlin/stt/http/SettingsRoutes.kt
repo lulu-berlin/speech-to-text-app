@@ -9,6 +9,8 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import stt.config.Device
 import stt.config.dbValue
@@ -18,6 +20,8 @@ import stt.db.SettingsRepository
 import stt.db.SpeakersMode
 import stt.engine.ProcessingEngine
 import stt.transcribe.GpuDevice
+import java.nio.file.Files
+import java.nio.file.Path
 
 /** The body of `GET /api/settings` and the `200` of the settings writes (items 32 and 45's contract, `docs/api/settings*.json`). */
 @Serializable
@@ -29,6 +33,8 @@ data class SettingsJson(
     val speakersCount: Int?,
     val maxSpeakers: Int,
     val deviceFallback: String?,
+    val defaultFrontend: String?,
+    val terminalCommand: String?,
     val availableDevices: List<String>,
     /** Each offered `gpu:<index>` → the GPU's name from the startup probe (item 45). */
     val gpuNames: Map<String, String>,
@@ -46,6 +52,8 @@ data class SettingsEventJson(
     val speakersCount: Int?,
     val maxSpeakers: Int,
     val deviceFallback: String?,
+    val defaultFrontend: String?,
+    val terminalCommand: String?,
 )
 
 /** The body of `PUT /api/settings` (item 32): the settings the user sets — the fallback notice is not one of them. */
@@ -57,6 +65,10 @@ data class SettingsRequest(
     val speakersMode: String,
     val speakersCount: Int?,
     val maxSpeakers: Int,
+    /** The default frontend (roadmap item 66); absent means none, as for every other field of this whole write. */
+    val defaultFrontend: String? = null,
+    /** The terminal command (roadmap item 66, D10); absent means the OS launcher, as for this whole write. */
+    val terminalCommand: String? = null,
 )
 
 /**
@@ -69,12 +81,13 @@ data class SettingsRequest(
 fun Application.settingsRoutes(
     gpus: List<GpuDevice>,
     deviceProbeError: String? = null,
+    frontendsDir: Path? = null,
 ) {
     val settings: SettingsRepository by dependencies
     val engine: ProcessingEngine by dependencies
     routing {
         get("/api/settings") {
-            call.respond(settings.get().toJson(gpus, deviceProbeError))
+            call.respond(dropStaleDefault(settings.get(), settings, frontendsDir).toJson(gpus, deviceProbeError))
         }
 
         put("/api/settings") {
@@ -117,7 +130,27 @@ private sealed interface Validated {
     ) : Validated
 }
 
+/**
+ * [stored] with a default frontend the registry no longer has dropped (roadmap item 66): an uninstalled frontend is
+ * not offered again, and the dangling id is cleared from the settings with it.
+ */
+private suspend fun dropStaleDefault(
+    stored: Settings,
+    repository: SettingsRepository,
+    frontendsDir: Path?,
+): Settings {
+    val id = stored.defaultFrontend ?: return stored
+    // Without a registry — dev/server mode, or a user who installed no frontend yet — nothing says the id is stale.
+    if (frontendsDir == null || !withContext(Dispatchers.IO) { Files.isDirectory(frontendsDir) }) return stored
+    val installed = withContext(Dispatchers.IO) { readFrontends(frontendsDir) }
+    if (installed.any { it.id == id }) return stored
+    val cleared = stored.copy(defaultFrontend = null)
+    repository.update(cleared)
+    return cleared
+}
+
 /** Validates in contract order: device, threads, language, speakers, max speakers; the first failure wins. */
+
 private fun SettingsRequest.validate(): Validated {
     val parsedDevice =
         try {
@@ -147,7 +180,18 @@ private fun SettingsRequest.validate(): Validated {
     if (maxSpeakers !in 1..MAX_SPEAKERS) {
         return Validated.Rejected("invalid-max-speakers", "maxSpeakers must be a number between 1 and $MAX_SPEAKERS, got $maxSpeakers")
     }
-    return Validated.Valid(Settings(parsedDevice, threads, defaultLanguage, mode, speakersCount, maxSpeakers))
+    return Validated.Valid(
+        Settings(
+            parsedDevice,
+            threads,
+            defaultLanguage,
+            mode,
+            speakersCount,
+            maxSpeakers,
+            defaultFrontend = defaultFrontend,
+            terminalCommand = terminalCommand,
+        ),
+    )
 }
 
 /**
@@ -170,6 +214,8 @@ internal fun Settings.toJson(
         speakersCount = speakersCount,
         maxSpeakers = defaultMaxSpeakers,
         deviceFallback = deviceFallback?.dbValue(),
+        defaultFrontend = defaultFrontend,
+        terminalCommand = terminalCommand,
         availableDevices = listOf(Device.Cpu.dbValue(), Device.Auto.dbValue()) + gpuNames.keys,
         gpuNames = gpuNames,
         deviceProbeError = deviceProbeError,
@@ -186,4 +232,6 @@ internal fun Settings.toEventJson(): SettingsEventJson =
         speakersCount = speakersCount,
         maxSpeakers = defaultMaxSpeakers,
         deviceFallback = deviceFallback?.dbValue(),
+        defaultFrontend = defaultFrontend,
+        terminalCommand = terminalCommand,
     )

@@ -1,0 +1,28 @@
+# The Rust setup the client workspace's jobs need (roadmap item 66). The pinned version comes from
+# the committed versions.json — the flake's nixpkgs rustc — and client/rust-toolchain.toml names the
+# same version (`./gradlew checkVersions` holds the two together), so CI, rustup users and the
+# devenv build with one Rust. The runners' preinstalled rustup installs it.
+name: Rust toolchain
+description: Read versions.json, install the pinned Rust with clippy and rustfmt, and cache Cargo's downloads and build
+
+runs:
+  using: composite
+  steps:
+    - name: Read pinned Rust
+      id: versions
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        echo "rust=$(jq -er '.rust' versions.json)" >> "$GITHUB_OUTPUT"
+    - name: Install Rust ${{ steps.versions.outputs.rust }}
+      shell: bash
+      run: rustup toolchain install "${{ steps.versions.outputs.rust }}" --profile minimal --component clippy,rustfmt
+    - uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          client/target
+        key: cargo-${{ runner.os }}-${{ steps.versions.outputs.rust }}-${{ hashFiles('client/Cargo.lock') }}
+        restore-keys: cargo-${{ runner.os }}-${{ steps.versions.outputs.rust }}-

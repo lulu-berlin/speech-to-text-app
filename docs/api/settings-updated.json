@@ -5,5 +5,7 @@
   "speakersMode": "fixed",
   "speakersCount": 3,
   "maxSpeakers": 12,
-  "deviceFallback": null
+  "deviceFallback": null,
+  "defaultFrontend": null,
+  "terminalCommand": null
 }

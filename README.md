@@ -132,7 +132,7 @@ Each form has its packaged end-to-end suite, run in a clean container from the d
 
 ### Development environment (devenv)
 
-Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell), on Linux x86-64 or macOS Apple Silicon. The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
+Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell), on Linux x86-64 or macOS Apple Silicon. The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, Rust, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
 
 The shell's `ffmpeg` is the app's audio-only build from the pinned `desktop-ffmpeg-v2` asset on both systems (roadmap items 62 and 69): the static build on Linux, and on Apple Silicon the `.tar.gz` build whose only dependencies are the OS's libraries. It has neither `ffplay` nor `ffprobe`, so use another player to listen to a file and another tool to probe media.
 
@@ -224,14 +224,15 @@ cd speech-to-text-app
 Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads about 850 MB (more when Gradle also has to download JDK 21) and builds the frontend and the backend. Later runs reuse the downloads and still check every file's SHA-256.
 
 - `./gradlew dev` — dev mode, like `devenv up`: the Vite dev server on <http://localhost:5173> with hot reload, and the backend rebuilt and restarted when its sources change. Vite is ready first; the API answers once the backend has built and logs `Responding at`. Ctrl-C stops both.
-- `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. On Linux, Chromium also needs system libraries from apt (Debian and Ubuntu only). `./gradlew e2eSystemDeps` installs them when run as root, for example in a container; run as yourself, it only checks them and, if some are missing, fails with the `sudo apt-get install …` line to run (Gradle never asks for your password):
+- `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. One spec also builds `stt-app` with Cargo (roadmap item 66), so Rust must be installed: the development shell has it, otherwise [rustup](https://rustup.rs/), which reads `client/rust-toolchain.toml`. On Linux, Chromium also needs system libraries from apt (Debian and Ubuntu only). `./gradlew e2eSystemDeps` installs them when run as root, for example in a container; run as yourself, it only checks them and, if some are missing, fails with the `sudo apt-get install …` line to run (Gradle never asks for your password):
 
   ```sh
   ./gradlew e2eSystemDeps
   ./gradlew e2e
   ```
 
-- `./gradlew checkVersions` — checks that `versions.json` still matches the Gradle wrapper and the flake's locked nixpkgs.
+- `./gradlew checkVersions` — checks that `versions.json` still matches the Gradle wrapper, the flake's locked nixpkgs and `client/rust-toolchain.toml`.
+- `cd client && cargo test` — the Rust client workspace's tests (roadmap item 66). Gradle does not download Rust: install [rustup](https://rustup.rs/), which reads `client/rust-toolchain.toml` and installs the pinned Rust the first time; `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are CI's other two checks.
 - `./gradlew -p backend check` — the backend's tests. They need a UTF-8 locale, for example `export LANG=C.UTF-8` first; `./gradlew run` does not. A running Gradle daemon keeps the locale it started with, so after changing it run `./gradlew --stop` once.
 
 Where things live:
@@ -268,8 +269,9 @@ Vulkan-capable driver the startup probe finds no GPU and transcription runs on t
 
 `gradlew.bat e2e` runs the same end-to-end suite as `./gradlew e2e` on Windows: the journey in
 [`e2e/`](e2e/) against the app this checkout builds. Gradle downloads Node.js, pnpm, Chromium and the
-test fixtures itself, starts the built backend and drives it with Playwright, so nothing beyond the
-Java 21 above is needed; it runs the same specs as Linux and macOS, minus the macOS-only Metal one,
+test fixtures itself, starts the built backend and drives it with Playwright, so beyond the Java 21
+above only Rust is needed — [rustup](https://rustup.rs/), for the one spec that builds `stt-app`
+(roadmap item 66); it runs the same specs as Linux and macOS, minus the macOS-only Metal one,
 which skips with its reason. A Vulkan driver decides whether the app's tasks use a GPU or the CPU
 (the suite itself needs no GPU). The packaged app's own suite ([`e2e/desktop-tests`](e2e/desktop-tests))
 still runs against the zip and the MSI in CI.
@@ -291,6 +293,31 @@ The backend is configured with environment variables. The Nix package, the devel
 A missing required variable, an invalid port or an invalid upload size stops the app at startup with a message naming it. `whisper-cli` and `ffmpeg` are run from `PATH` ([ADR 0047](docs/decisions/0047-external-tools-resolved-from-path.md)).
 
 The compute device (automatic, CPU or a specific GPU), the number of threads and the defaults for new uploads (language, speakers) are not environment variables: they are set on the app's **Settings** page and stored in the database ([docs/specs/settings-page.md](docs/specs/settings-page.md)).
+
+## Use it as the per-user app: the service and the tray
+
+The packages install the backend as a per-user service plus a tray ([ADR 0064](docs/decisions/0064-service-and-tray-are-one-unit.md)); the service and the tray are both up or both down. The CLI in the same directory drives them:
+
+```sh
+stt-app open browser        # starts the unit if it is down, then opens that frontend
+stt-app open                # the default frontend from the Settings page
+stt-app list                # the installed frontends
+stt-app quit                # stops the service and the tray
+stt-app autostart on|off    # the login entry (the opt-in state)
+```
+
+The service listens on loopback only, at most one instance per user, and every request carries a
+credential: the browser enters through a one-time launch URL that becomes an HttpOnly session cookie,
+the terminal frontend and the tray send the per-install secret. The tray's menu opens any installed
+frontend and quits the unit; on a machine with no tray host it runs without an icon and the CLI and
+the frontends work the same.
+
+| What | Where |
+| --- | --- |
+| Durable state (port, per-install secret) | `$XDG_CONFIG_HOME/stt-app` (macOS: `~/Library/Application Support/stt-app`; Windows: `%APPDATA%\stt-app`) |
+| Runtime state (pid, endpoint) | `$XDG_RUNTIME_DIR/stt-app` (cleared at logout) |
+| Installed frontends | the `frontends` directory beside the config file |
+| Logs of the detached service and tray | `service.log` and `tray.log` in the config directory |
 
 ## Where your data lives
 

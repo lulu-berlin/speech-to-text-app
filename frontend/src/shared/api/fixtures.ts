@@ -24,6 +24,7 @@ export { default as errorInvalidLanguage } from '../../../../docs/api/error.inva
 export { default as errorUploadTooLarge } from '../../../../docs/api/error.upload-too-large.json';
 export { default as taskTransitions } from '../../../../docs/api/task-transitions.json';
 export { default as languages } from '../../../../docs/api/languages.json';
+export { default as frontends } from '../../../../docs/api/frontends.json';
 export { default as settings } from '../../../../docs/api/settings.json';
 export { default as settingsFixed } from '../../../../docs/api/settings.fixed.json';
 export { default as settingsFallback } from '../../../../docs/api/settings.fallback.json';

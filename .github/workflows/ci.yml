@@ -109,6 +109,27 @@ jobs:
       - name: pnpm build
         run: pnpm build
 
+  # The Rust client workspace (roadmap item 66: the client library, the tray, the `stt-app` CLI) on
+  # the pinned Rust from versions.json; the same three steps run on macOS and Windows below.
+  client-check:
+    name: Linux (cargo fmt, clippy, test)
+    runs-on: ubuntu-24.04
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/rust-toolchain
+      - name: cargo fmt --check
+        run: cargo fmt --check
+      - name: cargo clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --locked
+
   docs-check:
     name: Linux (documentation checks)
     runs-on: ubuntu-24.04
@@ -172,6 +193,8 @@ jobs:
         with:
           downloads-cache: 'true'
           system-libs: 'true'
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      - uses: ./.github/actions/rust-toolchain
       # Chromium's system libraries and the e2e package come from the build's own task, which is what
       # the invoke-it-as-root check exists for: it installs `playwright install-deps chromium` when it
       # runs as root and installs the package with the Gradle-managed pnpm, so the pnpm and Playwright
@@ -240,6 +263,25 @@ jobs:
       - name: pnpm build
         run: pnpm build
 
+  macos-client-check:
+    name: macOS (cargo fmt, clippy, test)
+    runs-on: macos-15
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/rust-toolchain
+      - name: cargo fmt --check
+        run: cargo fmt --check
+      - name: cargo clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --locked
+
   macos-backend-integration:
     name: macOS (gradle integrationTest)
     needs: [changes, macos-backend-check, macos-frontend-check]
@@ -265,6 +307,8 @@ jobs:
       - uses: ./.github/actions/jvm-toolchain
         with:
           downloads-cache: 'true'
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      - uses: ./.github/actions/rust-toolchain
       - name: gradle e2e
         run: |
           rm -f e2e/.e2e-backend.log
@@ -609,6 +653,27 @@ jobs:
       - name: pnpm build
         run: pnpm build
 
+  windows-client-check:
+    name: Windows (cargo fmt, clippy, test)
+    runs-on: windows-2025
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    # A cold Windows build of the client, the tray and the CLI does not fit in 30 minutes (run #477 was
+    # cancelled there); the Linux leg takes under a minute warm and macOS's was measured at 13-16.
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/rust-toolchain
+      - name: cargo fmt --check
+        run: cargo fmt --check
+      - name: cargo clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --locked
+
   # The item-21 journey on Windows (roadmap item 79): the Gradle-managed backend and the same specs
   # as Linux (e2e) and macOS (e2e), except the named platform skips (e2e/lib/platform-gates.test.ts).
   # It runs on every push and code-touching pull request like the other journeys. It started
@@ -631,6 +696,8 @@ jobs:
       - uses: ./.github/actions/jvm-toolchain
         with:
           downloads-cache: 'true'
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      - uses: ./.github/actions/rust-toolchain
       - name: gradlew.bat e2e
         shell: cmd
         run: gradlew.bat e2e
@@ -1359,7 +1426,7 @@ jobs:
   # protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
-    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-e2e, windows-desktop-zip]
+    needs: [changes, backend-check, frontend-check, client-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-client-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-client-check, windows-e2e, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

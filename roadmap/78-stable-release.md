@@ -55,7 +55,7 @@ release workflow, checksums, published artifacts and notes — instead of by han
 | 52 Edit transcription | in progress | **yes** | the copy-edit workflow is core to a finished transcript |
 | 54 TypeScript for the remaining scripts | done | after 1.0 | hygiene; no behavior change |
 | 65 `59-row-color` chunking observation flake | done | **yes** | a flaky journey weakens release verification |
-| 66 Local service and frontends | spec-approved | after 1.0 | architecture change; new frontends |
+| 66 Local service and frontends | done | after 1.0 | architecture change; new frontends |
 | 67 TUI frontend | spec-approved | after 1.0 | new frontend |
 | 68 Windows audio-only ffmpeg | done | **yes** | otherwise the Windows deliverable ships bytedeco's full GPL `ffmpeg`+`ffprobe`, unlike Linux/macOS; licensing and size |
 | 69 macOS audio-only ffmpeg | in progress | **yes** | nearly done; darwin artifact consistency |
@@ -217,3 +217,8 @@ the e2e ffmpeg WAV-muxer issue (recorded on branch 52). Both must be closed befo
 - 2026-10-31 (the user): roadmap item 87 — writes wait for the connection, a message for a failed
   write in the app's words, and "Reset name" disabled when there is nothing to reset — is added as a
   1.0 gate and to this item's dependencies.
+
+- [ ] (moved from item 66, 2026-11-02) A launch of a different version replaces the running unit - the
+      old service and tray are stopped and the new ones started - and a loaded frontend page reloads
+      instead of talking to the old service; the version identity is the digest of `versions.json`
+      until this item defines it (ADR 0064)

@@ -1,0 +1,80 @@
+{
+  "about": "Roadmap item 66: where the per-user service keeps config.json (configDir) and runtime.json plus its lock (runtimeDir), per OS and environment. The service (Kotlin, ServiceDirsSpec) and the client (Rust, stt-client tests/dirs.rs) are both checked against every case, so they always look in the same place. An empty variable counts as unset. warns: the runtime directory is a fallback that a logout does not clear, and a warning is logged.",
+  "cases": [
+    {
+      "name": "Linux with the XDG directories set",
+      "os": "linux",
+      "env": {
+        "HOME": "/home/lulu",
+        "XDG_CONFIG_HOME": "/xdg/config",
+        "XDG_RUNTIME_DIR": "/run/user/1000"
+      },
+      "configDir": "/xdg/config/stt-app",
+      "runtimeDir": "/run/user/1000/stt-app",
+      "warns": false
+    },
+    {
+      "name": "Linux without XDG_CONFIG_HOME and XDG_RUNTIME_DIR",
+      "os": "linux",
+      "env": { "HOME": "/home/lulu" },
+      "configDir": "/home/lulu/.config/stt-app",
+      "runtimeDir": "/home/lulu/.cache/stt-app",
+      "warns": true
+    },
+    {
+      "name": "Linux with empty variables, which count as unset",
+      "os": "linux",
+      "env": {
+        "HOME": "/home/lulu",
+        "XDG_CONFIG_HOME": "",
+        "XDG_RUNTIME_DIR": "",
+        "STT_CONFIG_DIR": "",
+        "STT_RUNTIME_DIR": ""
+      },
+      "configDir": "/home/lulu/.config/stt-app",
+      "runtimeDir": "/home/lulu/.cache/stt-app",
+      "warns": true
+    },
+    {
+      "name": "macOS, whose per-user temp dir ends in a slash",
+      "os": "macos",
+      "env": { "HOME": "/Users/lulu", "TMPDIR": "/var/folders/ab/xyz/T/" },
+      "configDir": "/Users/lulu/Library/Application Support/stt-app",
+      "runtimeDir": "/var/folders/ab/xyz/T/stt-app",
+      "warns": false
+    },
+    {
+      "name": "macOS without TMPDIR",
+      "os": "macos",
+      "env": { "HOME": "/Users/lulu" },
+      "configDir": "/Users/lulu/Library/Application Support/stt-app",
+      "runtimeDir": "/Users/lulu/Library/Caches/stt-app",
+      "warns": true
+    },
+    {
+      "name": "Windows",
+      "os": "windows",
+      "env": {
+        "USERPROFILE": "/users/lulu",
+        "APPDATA": "/users/lulu/AppData/Roaming",
+        "LOCALAPPDATA": "/users/lulu/AppData/Local"
+      },
+      "configDir": "/users/lulu/AppData/Roaming/stt-app",
+      "runtimeDir": "/users/lulu/AppData/Local/Temp/stt-app",
+      "warns": false
+    },
+    {
+      "name": "Both overrides, as the specs, the e2e harness and devenv set them: used as they are",
+      "os": "linux",
+      "env": {
+        "HOME": "/home/lulu",
+        "XDG_RUNTIME_DIR": "/run/user/1000",
+        "STT_CONFIG_DIR": "/tmp/cfg",
+        "STT_RUNTIME_DIR": "/tmp/run"
+      },
+      "configDir": "/tmp/cfg",
+      "runtimeDir": "/tmp/run",
+      "warns": false
+    }
+  ]
+}

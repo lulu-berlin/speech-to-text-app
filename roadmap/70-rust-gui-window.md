@@ -1,7 +1,7 @@
 # 70 — Replace Electron with a Rust GUI for the window flavor
 
 Status: spec-approved
-Depends on: [66](66-local-service-and-frontends.md) (the service, descriptors, credential and Rust
+Depends on: [66](../docs/specs/local-service-and-frontends.md) (the service, descriptors, credential and Rust
 pin — spec-approved), [67](67-tui-frontend.md) (the `stt-client` crate and the Rust workspace —
 spec-approved), [49](../docs/specs/windows-support.md) (the Windows packages)
 Blocks: —

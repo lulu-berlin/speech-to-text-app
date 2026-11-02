@@ -6,6 +6,8 @@
   "speakersCount": null,
   "maxSpeakers": 8,
   "deviceFallback": null,
+  "defaultFrontend": null,
+  "terminalCommand": null,
   "availableDevices": ["cpu", "auto"],
   "gpuNames": {},
   "deviceProbeError": "Executable not found: whisper-cli"

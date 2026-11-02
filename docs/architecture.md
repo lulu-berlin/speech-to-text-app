@@ -204,7 +204,41 @@ The full contract — every field and error code — is [docs/specs/http-api-and
 | Frontend client | [`frontend/src/shared/api/client.ts`](../frontend/src/shared/api/client.ts), [`frontend/src/shared/api/types.ts`](../frontend/src/shared/api/types.ts) |
 | Mock server over the examples | [`frontend/src/shared/api/handlers.ts`](../frontend/src/shared/api/handlers.ts), [`frontend/src/shared/api/fixtures.ts`](../frontend/src/shared/api/fixtures.ts) |
 
-## 5. The frontend
+## 5. The per-user service and its frontends
+
+In app mode the backend is a per-user local service: one instance per user, on loopback only, its port
+and per-install secret in the durable config file, its pid and endpoint in the ephemeral runtime file
+(roadmap item 66; the shell choice is [ADR 0059](decisions/0059-os-shell-stays-electron.md), the unit
+[ADR 0064](decisions/0064-service-and-tray-are-one-unit.md)).
+
+- **One unit.** The service and the tray are both up or both down, not necessarily as one process.
+  Either may start the other again when it dies, at most three times within a minute; when that
+  fails, the survivor stops too, so the app is never left half up. Opening a frontend brings the
+  unit up: the CLI starts the service through the service runner beside it, and the tray only if
+  that same launch started the service.
+- **Frontends are clients.** A frontend is a descriptor of kind browser, gui or terminal in the
+  frontend registry under the config directory, written by its installer; the CLI lists it and the
+  tray's menu reads the same registry the service serves on `GET /api/frontends`. The window is a
+  singleton, browser tabs and terminal instances are not, and no frontend has to be open for the
+  app to run.
+- **Trust boundary.** Every request carries the per-install secret or a live session: the terminal
+  frontend and the tray send it as a bearer token, and the browser gets a session through the
+  one-time handshake — `POST /api/launch-token`, then the launch URL answering an HttpOnly,
+  SameSite=Strict cookie and a redirect to the app. The secret itself never reaches a URL or a page;
+  a browser without the cookie gets a page that opens the app from the tray.
+- **The tray registers itself** with `POST /api/tray`, sending its pid and the command that starts
+  it, which is how the service can restart it. Where no tray host exists (a shell session, a
+  headless runner) the tray runs virtually: same supervision, no icon. Built with its menu feature
+  it shows an icon and a menu built from the registry, rebuilt when a frontend is installed or
+  removed.
+- **Output.** The service and the tray are detached, so they log to their own files under the
+  config directory instead of holding the launching command's output open.
+
+**Where in the code:** the client crate is [`client/stt-client`](../client/stt-client) — the library
+plus the CLI and the tray binaries; the service's side is in [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service)
+and [`backend/src/main/kotlin/stt/http/`](../backend/src/main/kotlin/stt/http).
+
+## 6. The frontend
 
 The frontend is a React app written in TypeScript, styled with styled-components, built by Vite and served by the backend ([docs/specs/frontend-foundation.md](specs/frontend-foundation.md)).
 
@@ -230,7 +264,7 @@ The pages are [docs/specs/frontend-queue-ui.md](specs/frontend-queue-ui.md), [do
 | Shared machines and the transition table | [`frontend/src/shared/state/`](../frontend/src/shared/state/) |
 | Theme and primitives | [`frontend/src/shared/theme/theme.ts`](../frontend/src/shared/theme/theme.ts), [`frontend/src/shared/ui/`](../frontend/src/shared/ui/) |
 
-## 6. Building, running and testing
+## 7. Building, running and testing
 
 - **Tools** come from the devenv development shell and nothing is installed by hand ([ADR 0010](decisions/0010-development-toolchain.md), [docs/specs/dev-environment.md](specs/dev-environment.md)). `devenv up` runs the frontend with hot reload and the backend with restart on change ([docs/specs/dev-mode.md](specs/dev-mode.md)).
 - **The deliverable** is a Nix flake package: `nix build .` builds the backend and the frontend and wraps them with Java, whisper.cpp, ffmpeg and the pinned models into one `stt-app` command; `nix run .` starts it ([docs/specs/nix-flake-package.md](specs/nix-flake-package.md)). The flake and the development shell share one nixpkgs pin ([ADR 0036](decisions/0036-shared-nixpkgs-pin.md)).
@@ -247,4 +281,5 @@ The pages are [docs/specs/frontend-queue-ui.md](specs/frontend-queue-ui.md), [do
 | Backend build | [`backend/build.gradle.kts`](../backend/build.gradle.kts) |
 | Frontend build | [`frontend/package.json`](../frontend/package.json), [`frontend/vite.config.ts`](../frontend/vite.config.ts) |
 | End-to-end suite | [`e2e/tests/`](../e2e/tests/), [`e2e/global-setup.ts`](../e2e/global-setup.ts) |
+| Per-user service and frontends | [`client/stt-client/`](../client/stt-client/), [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service/), [`backend/src/main/kotlin/stt/http/TrayRoutes.kt`](../backend/src/main/kotlin/stt/http/TrayRoutes.kt) |
 | Continuous verification | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`.github/actions/`](../.github/actions/) |

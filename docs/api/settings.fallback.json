@@ -6,6 +6,8 @@
   "speakersCount": null,
   "maxSpeakers": 8,
   "deviceFallback": "gpu:1",
+  "defaultFrontend": null,
+  "terminalCommand": null,
   "availableDevices": ["cpu", "auto", "gpu:0"],
   "gpuNames": {
     "gpu:0": "NVIDIA GeForce RTX 3060"
