@@ -99,6 +99,7 @@ export const FIXTURE_CLIPS = [
   'jfk-aj.wav', // the sample looped 15x, ~165s, item 81's held-pause running clip
   'jfk-ak.wav', // 1-5s, item 81's held-pause queued clip
   'librispeech-1089-1089-1188.wav', // item 73's reassign journey: reader 1089 twice, then 1188
+  'jfk-upload-wait.wav', // 4-9s, item 87's mid-upload outage clip (unique bytes)
 ] as const;
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -110,6 +111,9 @@ export const DELETE_CLIP = FIXTURE_CLIPS[10];
 // The contract check's own trim: the history test leaves its completed clips in the
 // shared backend, so re-using HISTORY_CLIPS would answer 409 on the first upload.
 export const CONTRACT_CLIP = FIXTURE_CLIPS[20];
+// Item 87's mid-upload outage clip: unique bytes, so the upload still reaches the service when
+// the journey uploads it after the earlier specs.
+export const UPLOAD_WAIT_CLIP = FIXTURE_CLIPS[49];
 // The history and restart tests' own trims (unique bytes, so they still upload when the
 // shared run's clips are finished tasks) — four trims partition the sample, two per
 // test, so 12's uploads cannot be 13's already-finished tasks.
@@ -641,4 +645,45 @@ export async function startBackend({
     staticDir: frontendDist,
     healthTimeoutMs,
   });
+}
+
+/**
+ * Freezes the backend's process group (SIGSTOP), the app JVM included: its requests hang until the
+ * group is killed, which lets a spec cut an upload off mid-request without racing a response.
+ * POSIX only (Windows has no SIGSTOP). The group is the one `startBackend` spawned detached.
+ */
+export function freezeBackend(pid: number): void {
+  if (process.platform === 'win32') {
+    throw new Error('freezeBackend needs POSIX signals');
+  }
+  try {
+    process.kill(-pid, 'SIGSTOP');
+  } catch {
+    throw new Error(`freezeBackend: no process group ${pid} to freeze`);
+  }
+}
+
+/** Ends a frozen backend's group (SIGKILL; a stopped group ignores SIGTERM) and waits for it. */
+export async function killFrozenBackend(pid: number, port: number): Promise<void> {
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    // already gone
+  }
+  await waitForHealth(port, { down: true, timeoutMs: 60_000 });
+}
+
+/**
+ * Brings the shared backend back after a spec restarted it: stop the process the spec started,
+ * start a fresh one on the same socket and data directory, and save its pid. The global teardown
+ * only knows the run's original pid, so the handover must be explicit.
+ */
+export async function handOverSharedBackend(
+  pid: number | undefined,
+  port: number,
+  dataDir: string,
+): Promise<void> {
+  await stopBackend(pid, port, dataDir);
+  const fresh = await startBackend({ port, dataDir });
+  saveState({ pid: fresh.pid });
 }

@@ -11,6 +11,8 @@ export interface DropdownMenuItem {
   onSelect?: () => void;
   disabled?: boolean;
   danger?: boolean;
+  // Why a disabled item is disabled (item 87).
+  title?: string;
 }
 
 export interface DropdownMenuProps {
@@ -78,6 +80,7 @@ export function DropdownMenu({
               key={item.label}
               $danger={item.danger === true}
               disabled={item.disabled}
+              title={item.title}
               onSelect={item.onSelect}
             >
               {item.label}

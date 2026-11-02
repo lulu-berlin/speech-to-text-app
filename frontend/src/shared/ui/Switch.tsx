@@ -34,18 +34,21 @@ export interface SwitchProps {
   // Accessible name; the queue pause toggle shows "Pause the queue".
   label: string;
   disabled?: boolean;
+  // Why the switch is disabled, when the reason is not obvious (item 87).
+  title?: string;
 }
 
 // The queue pause toggle, on Radix's switch: a real `<button role="switch">` with
 // aria-checked, the shared focus ring and disabled states, and a flex-positioned thumb
 // (so no offsets are computed).
-export function Switch({ checked, onCheckedChange, label, disabled }: SwitchProps) {
+export function Switch({ checked, onCheckedChange, label, disabled, title }: SwitchProps) {
   return (
     <Track
       checked={checked}
       onCheckedChange={onCheckedChange}
       aria-label={label}
       disabled={disabled}
+      title={title}
     >
       <Thumb />
     </Track>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ClipboardEvent } from 'react';
 import styled from 'styled-components';
+import { useWriteControl } from '../../app/ConnectionContext';
 import { SettingsContext } from '../../app/SettingsContext';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
@@ -106,6 +107,7 @@ function guardPaste(
 // settings this view formats — unless a settings-updated arrived while it ran, which is
 // newer and stands. It follows settings-updated events from another tab.
 export function SettingsView() {
+  const writes = useWriteControl();
   // The app's one settings instance (item 72): the form is this view's draft, the stored
   // settings are shared with the queue and the fallback banner.
   const settings = SettingsContext.useSelector((state) => state);
@@ -385,7 +387,8 @@ export function SettingsView() {
             <Select
               id="device"
               value={device}
-              disabled={inert || dismissing}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
               aria-invalid={deviceError !== null || undefined}
               aria-describedby={deviceError !== null ? 'device-error' : undefined}
               onChange={(event) => {
@@ -416,7 +419,8 @@ export function SettingsView() {
               type="number"
               min={1}
               value={threads}
-              disabled={inert || dismissing}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
               aria-invalid={threadsError !== null || undefined}
               aria-describedby={threadsError !== null ? 'threads-error' : undefined}
               onFocus={() => {
@@ -453,7 +457,8 @@ export function SettingsView() {
                 setLanguage(next);
                 commit({ defaultLanguage: next });
               }}
-              disabled={inert || dismissing}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
               invalid={languageError !== null}
               describedBy={languageError !== null ? 'language-error' : undefined}
               onFocus={() => {
@@ -473,7 +478,8 @@ export function SettingsView() {
             <Select
               id="speakers"
               value={speakers}
-              disabled={inert || dismissing}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
               aria-invalid={speakersError !== null || undefined}
               aria-describedby={speakersError !== null ? 'speakers-error' : undefined}
               onFocus={() => {
@@ -520,7 +526,8 @@ export function SettingsView() {
                 min={1}
                 max={20}
                 value={speakerCount}
-                disabled={inert || dismissing}
+                disabled={inert || dismissing || writes.disabled}
+                title={writes.title}
                 aria-invalid={speakerCountError !== null || undefined}
                 aria-describedby={speakerCountError !== null ? 'speaker-count-error' : undefined}
                 onFocus={() => {
@@ -555,7 +562,8 @@ export function SettingsView() {
               min={1}
               max={20}
               value={maxSpeakers}
-              disabled={inert || dismissing}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
               aria-invalid={maxSpeakersError !== null || undefined}
               aria-describedby={maxSpeakersError !== null ? 'max-speakers-error' : undefined}
               onFocus={() => {
@@ -584,7 +592,8 @@ export function SettingsView() {
           </Field>
           <RestoreRow>
             <TextButton
-              disabled={inert || writing || dismissing}
+              disabled={inert || writing || dismissing || writes.disabled}
+              title={writes.title}
               onClick={() => settingsActor.send({ type: 'ASK_RESET' })}
             >
               Restore default settings
@@ -599,6 +608,8 @@ export function SettingsView() {
         open={settings.matches({ loaded: 'confirming' })}
         title="Restore default settings?"
         confirmLabel="Restore"
+        confirmDisabled={writes.disabled}
+        confirmTitle={writes.title}
         onConfirm={() => settingsActor.send({ type: 'CONFIRM_RESET' })}
         onCancel={() => settingsActor.send({ type: 'CANCEL_RESET' })}
       >

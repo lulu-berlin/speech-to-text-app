@@ -3,10 +3,10 @@ import { MoreVertical } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
 import styled, { useTheme } from 'styled-components';
-import { ConnectionContext } from '../../app/ConnectionContext';
+import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
 import { editSegment, revertSegment } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
-import { errorMessage } from '../../shared/api/types';
+import { errorMessage, failureMessage } from '../../shared/api/types';
 import type { Segment, Task, TaskPhase, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { MetaText, PageHeading, Text } from '../../shared/ui/typography';
@@ -133,6 +133,7 @@ const TranscriptRegion = styled.div`
 // parent does not have before the first snapshot (useMachine fixes the input at mount).
 function RetryButton({ task }: { task: Task }) {
   const connection = ConnectionContext.useActorRef();
+  const writes = useWriteControl();
   const navigate = useNavigate();
   const [retryState, retrySend, retryActor] = useMachine(commandMachine, {
     input: { command: 'retry', taskId: task.id, status: task.status },
@@ -148,6 +149,8 @@ function RetryButton({ task }: { task: Task }) {
   return (
     <Button
       type="button"
+      disabled={writes.disabled}
+      title={writes.title}
       onClick={() => {
         if (retryState.matches('failed') || retryState.matches('done')) {
           retryActor.stop();
@@ -167,6 +170,7 @@ export function TaskTranscriptView() {
   const navigate = useNavigate();
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const connection = ConnectionContext.useSelector((state) => state.value);
+  const writes = useWriteControl();
   const task = tasks.find((candidate) => candidate.id === id);
   const completed = task?.status === 'COMPLETED';
 
@@ -193,7 +197,13 @@ export function TaskTranscriptView() {
     deleteSend({ type: 'REQUEST' });
   };
   const transcriptMenuItems: DropdownMenuItem[] = [
-    { label: 'Delete', danger: true, onSelect: requestDelete },
+    {
+      label: 'Delete',
+      danger: true,
+      disabled: writes.disabled,
+      title: writes.title,
+      onSelect: requestDelete,
+    },
   ];
 
   // The turns of a completed task load through turnsMachine (only a completed task has
@@ -727,6 +737,8 @@ export function TaskTranscriptView() {
       open={deleteState.matches('confirming') || deleteState.matches('running')}
       title="Delete task?"
       confirmLabel="Delete"
+      confirmDisabled={writes.disabled}
+      confirmTitle={writes.title}
       onConfirm={() => deleteSend({ type: 'CONFIRM' })}
       onCancel={() => deleteSend({ type: 'CANCEL' })}
     >
@@ -807,7 +819,7 @@ export function TaskTranscriptView() {
             />
           </Row>
           {deleteState.matches('failed') ? (
-            <Text>Delete failed: {errorMessage(deleteState.context.error)}</Text>
+            <Text>{failureMessage('Delete failed', deleteState.context.error)}</Text>
           ) : null}
         </Stack>
         {deleteDialog}
@@ -919,7 +931,8 @@ export function TaskTranscriptView() {
                     </label>
                     <Button
                       type="button"
-                      disabled={reassignState.matches('sending')}
+                      disabled={reassignState.matches('sending') || writes.disabled}
+                      title={writes.title}
                       onClick={sendReassign}
                     >
                       Move
@@ -936,6 +949,8 @@ export function TaskTranscriptView() {
                   open={reassignState.matches('confirming')}
                   title="Reassign speakers?"
                   confirmLabel="Move"
+                  confirmDisabled={writes.disabled}
+                  confirmTitle={writes.title}
                   onConfirm={() => reassignSend({ type: 'CONFIRM' })}
                   onCancel={() => reassignSend({ type: 'CANCEL' })}
                 >

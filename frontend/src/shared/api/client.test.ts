@@ -1,9 +1,9 @@
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { ApiError } from './types';
 import { getTask, listTasks, uploadTask } from './client';
-import { errorDuplicateAudio, taskList } from './fixtures';
+import { errorDuplicateAudio, taskList, taskQueued } from './fixtures';
 
 describe('the typed API client', () => {
   it('returns typed tasks for GET /api/tasks (from docs/api/task-list.json)', async () => {
@@ -48,5 +48,62 @@ describe('the typed API client', () => {
     });
     await expect(request).rejects.toBeInstanceOf(ApiError);
     await expect(request).rejects.toMatchObject({ code: 'duplicate-audio', taskId: 3 });
+  });
+
+  it('aborts a pending upload once and never touches a settled one', async () => {
+    // jsdom's XHR cannot be held mid-request, so a fake records `abort()` and fires onabort.
+    class FakeXhr {
+      static instances: FakeXhr[] = [];
+      upload = { onprogress: null as ((event: ProgressEvent) => void) | null };
+      responseType = '';
+      status = 0;
+      statusText = '';
+      response: unknown = null;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onabort: (() => void) | null = null;
+      aborted = 0;
+      constructor() {
+        FakeXhr.instances.push(this);
+      }
+      open(): void {}
+      send(): void {}
+      abort(): void {
+        this.aborted += 1;
+        this.onabort?.();
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    try {
+      const options = { language: 'auto', speakers: 'auto', maxSpeakers: 8 };
+
+      // A pending request is aborted once and rejects with the app's message.
+      const controller = new AbortController();
+      const pending = uploadTask(new File(['a'], 'a.mp3'), options, undefined, controller.signal);
+      const first = FakeXhr.instances[0]!;
+      controller.abort();
+      await expect(pending).rejects.toMatchObject({
+        message: "Not saved: can't reach the app's service. Reconnecting…",
+      });
+      expect(first.aborted).toBe(1);
+
+      // A settled request is not aborted by a later teardown of the same controller.
+      const settledController = new AbortController();
+      const settled = uploadTask(
+        new File(['b'], 'b.mp3'),
+        options,
+        undefined,
+        settledController.signal,
+      );
+      const second = FakeXhr.instances[1]!;
+      second.status = 201;
+      second.response = taskQueued;
+      second.onload?.();
+      await expect(settled).resolves.toMatchObject({ id: taskQueued.id });
+      settledController.abort();
+      expect(second.aborted).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

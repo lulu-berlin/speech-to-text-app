@@ -8,6 +8,7 @@ import {
 import * as Dialog from '@radix-ui/react-dialog';
 import { Pencil, Play, Square } from 'lucide-react';
 import styled, { useTheme } from 'styled-components';
+import { useWriteControl } from '../../app/ConnectionContext';
 import { Button } from '../../shared/ui/Button';
 import type { Segment, Turn, TurnSpeaker } from '../../shared/api/types';
 import { speakerTint } from '../../shared/theme/speakerPalette';
@@ -270,6 +271,7 @@ function SegmentEditor({
   onDiscard: () => void;
   onRevert: () => void;
 }) {
+  const writes = useWriteControl();
   const [draft, setDraft] = useState(text);
   // Opening the editor is ready to type (the user's review 2026-10-23): the field takes focus
   // with the caret after the last character.
@@ -285,6 +287,9 @@ function SegmentEditor({
   // An unchanged draft is not a save (user rule 2026-10-23): the editor just closes, with no
   // request. Both sides trimmed, as the client trims what it stores.
   const commit = () => {
+    if (writes.disabled) {
+      return;
+    }
     if (draft.trim() === text.trim()) {
       onDiscard();
     } else {
@@ -345,14 +350,28 @@ function SegmentEditor({
       >
         <Icon icon={previewing ? Square : Play} size="sm" />
       </SegmentControl>
-      <Button type="button" size="sm" aria-keyshortcuts="Alt+S Control+S Meta+S" onClick={commit}>
+      <Button
+        type="button"
+        size="sm"
+        aria-keyshortcuts="Alt+S Control+S Meta+S"
+        disabled={writes.disabled}
+        title={writes.title}
+        onClick={commit}
+      >
         <span>
           <u>S</u>ave
         </span>
       </Button>
       {/* ADR 0061: whisper's original is there to go back to only when the text was edited. */}
       {edited ? (
-        <Button type="button" size="sm" variant="secondary" onClick={onRevert}>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={writes.disabled}
+          title={writes.title}
+          onClick={onRevert}
+        >
           Revert
         </Button>
       ) : null}
