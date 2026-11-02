@@ -17,6 +17,7 @@ import {
   speakers as speakersFixture,
   taskTransitions,
   settings as settingsFixture,
+  frontends as frontendsFixture,
 } from './fixtures';
 import type { SettingsUpdate } from './types';
 
@@ -210,6 +211,9 @@ export const handlers = [
   // Settings: GET /api/settings -> 200 settings.json (item 32). The mock stores nothing, so
   // GET keeps serving the example (the segments precedent).
   http.get('/api/settings', () => HttpResponse.json(settingsFixture)),
+
+  // Roadmap item 66: GET /api/frontends -> 200 frontends.json, the installed registry.
+  http.get('/api/frontends', () => HttpResponse.json(frontendsFixture)),
 
   // Mock addition (item 72): PUT /api/settings -> 200 Settings, the sent update over the
   // example's fetch-only fields (the device choices and the probe failure), with the

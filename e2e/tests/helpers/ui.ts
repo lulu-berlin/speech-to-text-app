@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { expect, type Locator, type Page, type Response } from '@playwright/test';
-import { appUrl, loadState } from '../../lib/backend.ts';
+import { appModeLaunchUrl, appUrl, loadState } from '../../lib/backend.ts';
 import { awaitTaskState } from '../../lib/await-task.ts';
 import type { TaskSnapshot } from '../../lib/await-task.ts';
 
@@ -264,4 +264,23 @@ export async function apiTaskIdOf(page: Page, filename: string): Promise<number>
 // Switches view through the header navigation (finish notices carry their own links).
 export async function goTo(page: Page, view: 'Queue' | 'History' | 'Settings') {
   await page.getByRole('navigation').getByRole('link', { name: view }).click();
+}
+
+// Signs a browser context in again after the service restarted (roadmap item 66, line E2): its
+// sessions live in the process, so a restarted service answers the old cookie with 401. The launch
+// URL is the same handshake the tray uses.
+export async function signIn(
+  page: Page,
+  dirs?: { configDir: string; runtimeDir: string },
+): Promise<void> {
+  // A dev-mode server (`E2E_BACKEND_CMD`) has no launch handshake and no credential: the page
+  // simply loads.
+  if (process.env.E2E_BACKEND_CMD !== undefined) {
+    await page.goto(appUrl());
+    return;
+  }
+  const state = loadState();
+  const configDir = dirs?.configDir ?? state.configDir ?? '';
+  const runtimeDir = dirs?.runtimeDir ?? state.runtimeDir ?? '';
+  await page.goto(appModeLaunchUrl({ configDir, runtimeDir }));
 }

@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { mock, test } from 'node:test';
 import {
   backendStdio,
   backendStopEnv,
+  launchUrl,
+  runningService,
   stopBackend,
   taskkillEnded,
   type StoppableChild,
@@ -149,4 +156,66 @@ test('a taskkill exit code says whether the tree was ended', () => {
   assert.equal(taskkillEnded(1), false);
   assert.equal(taskkillEnded(128), false);
   assert.equal(taskkillEnded(null), false);
+});
+
+// Roadmap item 66, ADR 0064: the window attaches to a running service instead of starting a second
+// backend, and enters through the service's one-time launch URL.
+test('runningService is null when no runtime file advertises a service', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'stt-desktop-attach-'));
+  try {
+    assert.equal(await runningService(dir), null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('runningService attaches only to an endpoint that answers health with the secret', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'stt-desktop-attach-'));
+  const server = createServer((request, response) => {
+    const authorized = request.headers.authorization === 'Bearer the-install-secret';
+    response.writeHead(authorized ? 200 : 401, { 'Content-Type': 'application/json' });
+    response.end(authorized ? '{"status":"ok"}' : '{"error":"unauthorized"}');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    await writeFile(
+      join(dir, 'config.json'),
+      JSON.stringify({ port, secret: 'the-install-secret' }),
+    );
+    await writeFile(
+      join(dir, 'runtime.json'),
+      JSON.stringify({ pid: 4242, endpoint: `http://127.0.0.1:${port}` }),
+    );
+    const service = await runningService(dir);
+    assert.notEqual(service, null);
+    assert.equal(service?.endpoint, `http://127.0.0.1:${port}`);
+
+    // A leftover runtime file - the endpoint answers nothing as the service - is no service.
+    await writeFile(join(dir, 'config.json'), JSON.stringify({ port, secret: 'another-secret' }));
+    assert.equal(await runningService(dir), null);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('launchUrl redeems the one-time token the service issues', async () => {
+  const server = createServer((request, response) => {
+    if (request.method === 'POST' && request.url === '/api/launch-token') {
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      response.end('{"token":"one-time"}');
+      return;
+    }
+    response.writeHead(404, {});
+    response.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    const url = await launchUrl({ endpoint: `http://127.0.0.1:${port}`, secret: 's' });
+    assert.equal(url, `http://127.0.0.1:${port}/open?t=one-time`);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

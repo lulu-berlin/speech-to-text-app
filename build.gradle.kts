@@ -26,7 +26,8 @@ val manifest = JsonSlurper().parse(rootProject.file("versions.json")) as Map<*, 
 
 tasks.register("checkVersions") {
     group = "verification"
-    description = "Fail when the committed versions.json drifts from the Gradle wrapper or the locked nixpkgs (roadmap item 33)"
+    description =
+        "Fail when the committed versions.json drifts from the Gradle wrapper, the locked nixpkgs or rust-toolchain.toml (roadmap items 33, 66)"
     doLast {
         // 1. The wrapper's Gradle version must match the manifest (both are committed copies).
         val wrapperProperties = Properties()
@@ -95,9 +96,24 @@ tasks.register("checkVersions") {
 
         verifyWindowsPins()
 
+        // 4. Rust (roadmap item 66): rustup builds the client workspace with the toolchain
+        //    client/rust-toolchain.toml names, Nix with the locked nixpkgs' rustc that versions.json
+        //    records; both must be the same version.
+        val toolchainFile = rootProject.file("client/rust-toolchain.toml")
+        val toolchainRust =
+            Regex("""(?m)^channel\s*=\s*"([^"]+)"""").find(toolchainFile.readText())?.groupValues?.get(1)
+                ?: throw GradleException("Cannot find the toolchain channel in client/rust-toolchain.toml")
+        val manifestRust = manifest["rust"] as String
+        if (toolchainRust != manifestRust) {
+            throw GradleException(
+                "versions.json pins Rust $manifestRust but client/rust-toolchain.toml names $toolchainRust. " +
+                    "Set the toolchain's channel to $manifestRust and commit it.",
+            )
+        }
+
         logger.lifecycle(
             "checkVersions: versions.json is in sync (Gradle $manifestGradle, nixpkgs ${lockRev.take(12)}, " +
-                "Windows pins present)",
+                "Rust $manifestRust, Windows pins present)",
         )
     }
 }

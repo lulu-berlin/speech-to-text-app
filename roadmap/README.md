@@ -120,11 +120,12 @@ graph TD
   63[63 whisper-cpp build time ✓]:::done
   50 --> 64[64 evaluate Tauri ✓]:::done
   65[65 fix the row-color phase observation ✓]:::done
-  64 --> 66[66 local service and frontend flavors]
+  64 --> 66[66 local service and frontend flavors ✓]:::done
   48 --> 66
   49 --> 66
   66 --> 67[67 TUI frontend]
   66 --> 70[70 Rust GUI window]
+  66 --> 89[89 service package]
   67 --> 70
   49 --> 70
   70 --> 76
@@ -241,7 +242,7 @@ graph TD
 | [63 — Stop compiling whisper-cpp on every uncached machine](../docs/specs/whisper-cpp-artifact.md)                                                                   | done          | —                           |
 | [64 — Evaluate Tauri as the desktop shell](../docs/specs/tauri-evaluation.md) | done | 50 |
 | [65 — `59-row-color`'s chunking-phase observation is flaky](../docs/specs/row-color-phase-observation.md)                                                                    | done          | —                           |
-| [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](66-local-service-and-frontends.md)                                   | spec-approved | 48, 49, 64                  |
+| [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](../docs/specs/local-service-and-frontends.md)                                   | done          | 48, 49, 64                  |
 | [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66                          |
 | [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
@@ -264,3 +265,4 @@ graph TD
 | [86 — Mobile feasibility: can the app run on a phone with transcription and diarization fully on the device?](86-mobile-feasibility.md)                                    | spec-approved | —                           |
 | [87 — Writes wait for the connection, and a control with nothing to do says so](../docs/specs/writes-and-the-connection.md)                                                       | done          | —                           |
 | [88 — Localization: the app's own language, in every language whisper transcription supports](88-localization.md)                                                          | spec-approved | 74                          |
+| [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | draft | 66 |

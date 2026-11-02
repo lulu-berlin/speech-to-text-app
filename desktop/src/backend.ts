@@ -9,6 +9,7 @@ import {
   spawn,
 } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createServer, type AddressInfo } from 'node:net';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -254,4 +255,87 @@ export function backendStopEnv(
  */
 export function backendStdio(platform: NodeJS.Platform = process.platform): StdioOptions {
   return platform === 'win32' ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'];
+}
+
+/**
+ * The per-user **config** directory, where app mode keeps `config.json` (the port and the
+ * per-install secret) and `runtime.json` (the live pid and endpoint) — the same table the Nix
+ * package, the CLI and the tray use (roadmap item 66, ADR 0064).
+ */
+export function serviceConfigDir(): string {
+  if (process.env.STT_CONFIG_DIR) return process.env.STT_CONFIG_DIR;
+  if (process.platform === 'darwin') {
+    return join(process.env.HOME ?? homedir(), 'Library', 'Application Support', 'stt-app');
+  }
+  if (process.platform === 'win32') {
+    return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'stt-app');
+  }
+  const base = process.env.XDG_CONFIG_HOME || join(process.env.HOME ?? homedir(), '.config');
+  return join(base, 'stt-app');
+}
+
+/** A service the window found running: its endpoint and the per-install secret. */
+export interface RunningService {
+  endpoint: string;
+  secret: string;
+}
+
+/**
+ * The service that is running for this user, if any (roadmap item 66, ADR 0064): `runtime.json`
+ * advertises an endpoint, `config.json` holds the secret, and the endpoint counts only when
+ * `GET /api/health` answers 200 to that secret. A leftover runtime file, a port another program
+ * took or a hung service is `null`, exactly as for the CLI and the tray.
+ */
+export async function runningService(
+  configDir = serviceConfigDir(),
+): Promise<RunningService | null> {
+  let runtime: { endpoint?: unknown };
+  let config: { secret?: unknown };
+  try {
+    runtime = JSON.parse(await readFile(join(configDir, 'runtime.json'), 'utf8')) as {
+      endpoint?: unknown;
+    };
+    config = JSON.parse(await readFile(join(configDir, 'config.json'), 'utf8')) as {
+      secret?: unknown;
+    };
+  } catch {
+    return null;
+  }
+  if (typeof runtime.endpoint !== 'string' || typeof config.secret !== 'string') return null;
+  const service = { endpoint: runtime.endpoint, secret: config.secret };
+  return (await answersAsTheService(service)) ? service : null;
+}
+
+/** Whether [service] answers `GET /api/health` with 200 to its own secret. */
+export async function answersAsTheService(service: RunningService): Promise<boolean> {
+  try {
+    const response = await fetch(`${service.endpoint}/api/health`, {
+      headers: { Authorization: `Bearer ${service.secret}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The URL that gives the window a session with [service]: the one-time launch token behind
+ * `POST /api/launch-token`, opened as the launch URL. The secret never reaches the URL, and the
+ * service's answer sets the HttpOnly session cookie the window's requests then carry.
+ */
+export async function launchUrl(service: RunningService): Promise<string> {
+  const response = await fetch(`${service.endpoint}/api/launch-token`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${service.secret}` },
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) {
+    throw new Error(`the launch token was refused: ${response.status}`);
+  }
+  const { token } = (await response.json()) as { token?: unknown };
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new Error('the launch token answer carried no token');
+  }
+  return `${service.endpoint}/open?t=${encodeURIComponent(token)}`;
 }

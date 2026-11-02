@@ -6,14 +6,19 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  appModeDirs,
+  captureSessionCookie,
   checkPreconditions,
   choosePort,
+  STORAGE_STATE_FILE,
   loadState,
   refuseLiveRun,
+  registerBrowserFrontend,
   repoRoot,
   saveState,
   startBackend,
   stopBackend,
+  writeStoredSession,
 } from './lib/backend.ts';
 import { writeFixtures } from './lib/fixtures.ts';
 import { buildUi } from './lib/ui-build.ts';
@@ -36,9 +41,18 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   const fixturesDir = mkdtempSync(join(tmpdir(), 'stt-e2e-fixtures-'));
   writeFixtures(fixturesDir);
   const port = await choosePort();
-  saveState({ port, dataDir, fixturesDir });
+  const { configDir, runtimeDir } = appModeDirs(dataDir);
+  saveState({ port, dataDir, fixturesDir, configDir, runtimeDir });
   const { pid } = await startBackend({ port, dataDir });
   saveState({ pid });
+  // The journey's browser enters through the service's launch handshake (roadmap item 66, line E2):
+  // the cookie is captured once here and every test context starts with it. `E2E_BACKEND_CMD` names a
+  // dev-mode server instead (the macOS and Windows jobs run the app that way), which has no launch
+  // handshake and no per-user config directory.
+  if (process.env.E2E_BACKEND_CMD === undefined) {
+    registerBrowserFrontend(configDir);
+    writeStoredSession(await captureSessionCookie({ configDir, runtimeDir }));
+  }
   console.log(`e2e: backend up on http://127.0.0.1:${port} (data dir ${dataDir})`);
 
   return async () => {

@@ -28,6 +28,7 @@ data class Config(
     val staticDir: Path? = null,
     val maxUploadBytes: Long = DEFAULT_MAX_UPLOAD_BYTES,
     val stopOnStdinClose: Boolean = false,
+    val portConfigured: Boolean = false,
 ) {
     companion object {
         private const val PORT_LIMIT_ERROR =
@@ -60,6 +61,7 @@ data class Config(
                 staticDir = env["STT_STATIC_DIR"]?.takeIf { it.isNotEmpty() }?.let { Path.of(it) },
                 maxUploadBytes = maxUploadBytes,
                 stopOnStdinClose = env["STT_STOP_ON_STDIN_CLOSE"] == "1",
+                portConfigured = rawPort != null,
             )
         }
 

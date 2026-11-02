@@ -17,6 +17,13 @@ data class Settings(
     val speakersCount: Int?,
     val defaultMaxSpeakers: Int,
     val deviceFallback: Device? = null,
+    /** The default frontend's id from the registry (roadmap item 66), null until the user picks one. */
+    val defaultFrontend: String? = null,
+    /**
+     * The command line of the terminal the TUI opens in (roadmap item 66, D10), replacing the OS launcher; null uses
+     * the OS launcher.
+     */
+    val terminalCommand: String? = null,
 )
 
 /**

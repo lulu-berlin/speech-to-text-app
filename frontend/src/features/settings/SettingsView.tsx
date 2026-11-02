@@ -3,9 +3,10 @@ import type { ClipboardEvent } from 'react';
 import styled from 'styled-components';
 import { useWriteControl } from '../../app/ConnectionContext';
 import { SettingsContext } from '../../app/SettingsContext';
+import { fetchFrontends } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { ApiError } from '../../shared/api/types';
-import type { SettingsUpdate, SpeakerMode } from '../../shared/api/types';
+import type { FrontendEntry, SettingsUpdate, SpeakerMode } from '../../shared/api/types';
 import { errorMessage } from '../../shared/errorMessage';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
@@ -29,7 +30,14 @@ const SPEAKERS = ['auto', 'off', 'fixed'] as const;
 // that field goes back to its stored value. A code the form has no field for uses the page
 // callout instead.
 type SettingsField =
-  'device' | 'threads' | 'language' | 'speakers' | 'speakerCount' | 'maxSpeakers';
+  | 'device'
+  | 'threads'
+  | 'language'
+  | 'speakers'
+  | 'speakerCount'
+  | 'maxSpeakers'
+  | 'defaultFrontend'
+  | 'terminalCommand';
 
 const FIELD_BY_ERROR_CODE: Record<string, SettingsField | undefined> = {
   'invalid-device': 'device',
@@ -46,6 +54,15 @@ const Select = styled.select`
 const NumberInput = styled.input`
   ${controlStyle}
 `;
+
+const TextInput = styled.input`
+  ${controlStyle}
+`;
+
+/** A typed terminal command as stored: blank means the OS launcher (null). */
+function terminalCommandValue(text: string): string | null {
+  return text.trim() === '' ? null : text;
+}
 
 // The polite live region that says a write is running (ADR 0062): a quieter line than the
 // fields, announced when it appears and when it goes.
@@ -113,6 +130,11 @@ export function SettingsView() {
   const settings = SettingsContext.useSelector((state) => state);
   const settingsActor = SettingsContext.useActorRef();
   const [device, setDevice] = useState<string>('');
+  // The default frontend's id (roadmap item 66) and the installed frontends it can name.
+  const [defaultFrontend, setDefaultFrontend] = useState('');
+  const [frontends, setFrontends] = useState<FrontendEntry[]>([]);
+  // The terminal command's draft (roadmap item 66, D10); empty means the OS launcher.
+  const [terminalCommand, setTerminalCommand] = useState('');
   // The typed fields hold the draft as text; the stored count is only ever what they commit.
   const [threads, setThreads] = useState('');
   const [speakerCount, setSpeakerCount] = useState('');
@@ -127,6 +149,16 @@ export function SettingsView() {
   // Which field the user is in: a settings-updated keeps its draft (ADR 0062). A ref, so
   // entering or leaving a field never re-syncs the form by itself.
   const focusedField = useRef<SettingsField | null>(null);
+
+  // The frontends are a separate read: the settings carry only the chosen id (roadmap item 66).
+  // A failure leaves no choices, so the field then offers only "None".
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchFrontends(controller.signal)
+      .then((list) => setFrontends(list.frontends))
+      .catch(() => setFrontends([]));
+    return () => controller.abort();
+  }, []);
 
   const stored = settings.context.settings;
   const writing = settings.matches({ loaded: 'saving' });
@@ -199,6 +231,12 @@ export function SettingsView() {
     if (!keepsDraft('device')) {
       setDevice(stored.device);
     }
+    if (!keepsDraft('defaultFrontend')) {
+      setDefaultFrontend(stored.defaultFrontend ?? '');
+    }
+    if (!keepsDraft('terminalCommand')) {
+      setTerminalCommand(stored.terminalCommand ?? '');
+    }
     if (!keepsDraft('threads')) {
       setThreads(stored.threads === null ? '' : String(stored.threads));
     }
@@ -228,6 +266,12 @@ export function SettingsView() {
     switch (rejectionField) {
       case 'device':
         setDevice(stored.device);
+        break;
+      case 'defaultFrontend':
+        setDefaultFrontend(stored.defaultFrontend ?? '');
+        break;
+      case 'terminalCommand':
+        setTerminalCommand(stored.terminalCommand ?? '');
         break;
       case 'threads':
         setThreads(stored.threads === null ? '' : String(stored.threads));
@@ -275,6 +319,8 @@ export function SettingsView() {
     }
     const update: SettingsUpdate = {
       device,
+      defaultFrontend: defaultFrontend === '' ? null : defaultFrontend,
+      terminalCommand: terminalCommandValue(terminalCommand),
       threads: threadsValue !== undefined ? threadsValue : stored.threads,
       defaultLanguage: language,
       speakersMode: speakers as SpeakerMode,
@@ -313,6 +359,12 @@ export function SettingsView() {
       case 'device':
         commit({ device: stored.device });
         break;
+      case 'defaultFrontend':
+        commit({ defaultFrontend: stored.defaultFrontend });
+        break;
+      case 'terminalCommand':
+        commit({ terminalCommand: stored.terminalCommand });
+        break;
       case 'threads':
         commit({ threads: stored.threads });
         break;
@@ -346,6 +398,12 @@ export function SettingsView() {
   const commitSpeakerCount = () => {
     if (!speakerCountInvalid && speakerCountValue !== stored?.speakersCount) {
       commit({ speakersCount: speakerCountValue });
+    }
+  };
+  const commitTerminalCommand = () => {
+    const value = terminalCommandValue(terminalCommand);
+    if (value !== stored?.terminalCommand) {
+      commit({ terminalCommand: value });
     }
   };
   const commitMaxSpeakers = () => {
@@ -412,6 +470,49 @@ export function SettingsView() {
               ))}
             </Select>
             {deviceError !== null ? <FieldError id="device-error">{deviceError}</FieldError> : null}
+          </Field>
+          <Field label="Default frontend" htmlFor="defaultFrontend">
+            <Select
+              id="defaultFrontend"
+              value={defaultFrontend}
+              disabled={inert || dismissing}
+              onChange={(event) => {
+                const next = event.target.value;
+                setDefaultFrontend(next);
+                commit({ defaultFrontend: next === '' ? null : next });
+              }}
+            >
+              <option value="">None</option>
+              {frontends.map((frontend) => (
+                <option key={frontend.id} value={frontend.id}>
+                  {frontend.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Terminal command" htmlFor="terminalCommand">
+            <TextInput
+              id="terminalCommand"
+              type="text"
+              value={terminalCommand}
+              placeholder="The OS terminal"
+              disabled={inert || dismissing}
+              onFocus={() => {
+                focusedField.current = 'terminalCommand';
+              }}
+              onChange={(event) => setTerminalCommand(event.target.value)}
+              onBlur={() => {
+                if (focusedField.current === 'terminalCommand') {
+                  focusedField.current = null;
+                }
+                commitTerminalCommand();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  commitTerminalCommand();
+                }
+              }}
+            />
           </Field>
           <Field label="Threads" htmlFor="threads">
             <NumberInput

@@ -1,6 +1,20 @@
 import { expect, test } from './helpers/test';
-import { RESTART_CLIPS, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
-import { appLive, moveRowDown, rowOrder, uploadClips, waitForTaskState } from './helpers/ui';
+import {
+  RESTART_CLIPS,
+  loadState,
+  refreshStoredSession,
+  saveState,
+  startBackend,
+  stopBackend,
+} from '../lib/backend.ts';
+import {
+  appLive,
+  moveRowDown,
+  rowOrder,
+  signIn,
+  uploadClips,
+  waitForTaskState,
+} from './helpers/ui';
 
 test('restarting the backend reconnects the event stream and the state is restored from the snapshot', async ({
   page,
@@ -26,6 +40,9 @@ test('restarting the backend reconnects the event stream and the state is restor
   // Live and the first event of the new stream restores the seeded state.
   const restarted = await startBackend({ port, dataDir });
   try {
+    // The service keeps its sessions in memory, so the restarted one answers the old cookie with
+    // 401: the browser enters again through the launch handshake (roadmap item 66).
+    await signIn(page);
     await expect(page.getByText('Live', { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(pause).toBeChecked();
     await expect.poll(async () => rowOrder(page, RESTART_CLIPS)).toEqual([1, 0]);
@@ -47,5 +64,10 @@ test('restarting the backend reconnects the event stream and the state is restor
     await stopBackend(restarted.pid, port, dataDir);
     const fresh = await startBackend({ port, dataDir });
     saveState({ pid: fresh.pid });
+    await signIn(page);
+    // Later tests' contexts start from the stored session, and this restarted service only knows
+    // the one this page just made (roadmap item 66).
+    const { configDir = '', runtimeDir = '' } = loadState();
+    await refreshStoredSession({ configDir, runtimeDir });
   }
 });

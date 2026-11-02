@@ -10,6 +10,7 @@ import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.request.path
 import io.ktor.server.response.respondFile
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,6 +30,7 @@ import stt.engine.processingEngine
 import stt.process.ProcessRunner
 import stt.transcribe.GpuDevice
 import java.io.File
+import java.nio.file.Path
 
 /**
  * Application composition (ADR 0013): plugins are installed here, services are
@@ -37,14 +39,22 @@ import java.io.File
  * The Database is required, so DI opens it at startup rather than on first use
  * (ADR 0017); DI closes it when the application stops. [gpus] are the GPUs the
  * startup device probe reported (item 32; `main` runs the probe), offered by `GET /api/settings`;
- * [deviceProbeError] is that probe's launch failure when it could not run (item 60).
+ * [deviceProbeError] is that probe's launch failure when it could not run (item 60). [credential] is the service's
+ * per-install secret in app mode (roadmap item 66): every request must then carry it; null (dev/server mode) leaves the
+ * app open.
  */
 fun Application.sttApp(
     config: Config,
     gpus: List<GpuDevice> = emptyList(),
     deviceProbeError: String? = null,
+    credential: String? = null,
+    frontendsDir: Path? = null,
+    quit: CompletableDeferred<Unit>? = null,
+    registerTray: ((pid: Long, command: List<String>) -> Unit)? = null,
 ) {
     install(ContentNegotiation) { json() }
+    val access = BrowserAccess()
+    if (credential != null) requireCredential(credential, access)
     internalErrorHandler()
     // The events bridge runs for the application's lifetime (ADR 0007/0038): a scope under the app's job.
     val eventsScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext[Job]) + Dispatchers.Default)
@@ -63,7 +73,7 @@ fun Application.sttApp(
         provide<EventStream> { NumberedEventStream(resolve(), eventsScope) }
         require(DependencyKey<Database>())
     }
-    settingsRoutes(gpus, deviceProbeError)
+    settingsRoutes(gpus, deviceProbeError, frontendsDir)
     processingEngine(config)
     healthRoutes()
     taskRoutes()
@@ -75,7 +85,13 @@ fun Application.sttApp(
     audioRoutes()
     eventsRoutes()
     uploadRoutes(config)
-    settingsRoutes(gpus)
+    // The browser's way in, app mode only (roadmap item 66): it needs the per-install credential, which is what the
+    // tray and `stt-app open` have.
+    if (credential != null) launchRoutes(credential, access)
+    frontendsRoutes(frontendsDir)
+    if (quit != null) quitRoutes(quit)
+    // The tray registers itself so the service can restart it (ADR 0064); app mode only.
+    if (registerTray != null) trayRoutes(registerTray)
     val staticDir = config.staticDir
     routing {
         if (staticDir != null) {

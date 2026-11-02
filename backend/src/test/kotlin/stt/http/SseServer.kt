@@ -59,8 +59,10 @@ internal class SseServer(
         method: String,
         path: String,
         body: String? = null,
+        headers: Map<String, String> = emptyMap(),
     ): Pair<Int, String> {
         val builder = HttpRequest.newBuilder(URI("$base$path"))
+        headers.forEach { (name, value) -> builder.header(name, value) }
         if (body == null) {
             builder.method(method, HttpRequest.BodyPublishers.noBody())
         } else {
@@ -90,11 +92,13 @@ internal class SseServer(
     }
 
     /** Opens one events stream (one per call, like one browser tab each); every reader is closed with the server. */
-    fun connectEvents(): SseTestReader {
+    fun connectEvents(headers: Map<String, String> = emptyMap()): SseTestReader {
+        val builder = HttpRequest.newBuilder(URI("$base/api/events")).GET()
+        headers.forEach { (name, value) -> builder.header(name, value) }
         val body =
             http
                 .send(
-                    HttpRequest.newBuilder(URI("$base/api/events")).GET().build(),
+                    builder.build(),
                     HttpResponse.BodyHandlers.ofInputStream(),
                 ).body()
         return SseTestReader(body).also { streams += it }

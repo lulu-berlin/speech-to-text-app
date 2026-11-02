@@ -1,0 +1,4 @@
+{
+  "error": "unauthorized",
+  "message": "This request needs the service's credential"
+}

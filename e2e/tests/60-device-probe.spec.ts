@@ -1,10 +1,20 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { expect, test } from './helpers/test';
 import { removeWithRetry } from '../lib/cleanup.ts';
-import { appUrl, choosePort, startBackend, stopBackend } from '../lib/backend.ts';
+import {
+  appModeDirs,
+  appUrl,
+  choosePort,
+  loadState,
+  refreshStoredSession,
+  registerBrowserFrontend,
+  startBackend,
+  stopBackend,
+} from '../lib/backend.ts';
 import { commandDirectory } from '../lib/executable.ts';
+import { signIn } from './helpers/ui';
 
 // Item 60 (ADR 0046): a failed device probe is reported as a failed probe, never as "no GPU". The shared
 // suite backend runs with whisper-cli, so the failure half starts its own backend on a free port with the
@@ -28,12 +38,27 @@ test('a backend without whisper-cli reports the failed probe on the Settings pag
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-probe-'));
   const origin = `http://127.0.0.1:${port}`;
   const { pid } = await startBackend({ port, dataDir, env: { [pathKey]: pathWithoutWhisperCli } });
+  const dirs = appModeDirs(dataDir);
   try {
-    const settings = await (await page.request.get(`${origin}/api/settings`)).json();
+    // App mode (roadmap item 66): the frontend is registered and the browser enters through the
+    // launch handshake, and this client sends the service's secret as the bearer. A dev-mode server
+    // (`E2E_BACKEND_CMD`) has neither, so the page and this request go without a credential.
+    const appMode = process.env.E2E_BACKEND_CMD === undefined;
+    if (appMode) registerBrowserFrontend(dirs.configDir);
+    const headers: Record<string, string> = {};
+    if (appMode) {
+      const { secret } = JSON.parse(readFileSync(join(dirs.configDir, 'config.json'), 'utf8')) as {
+        secret: string;
+      };
+      headers.Authorization = `Bearer ${secret}`;
+    }
+    const settings = await (await page.request.get(`${origin}/api/settings`, { headers })).json();
     expect(settings.deviceProbeError).toBeTruthy();
     expect(settings.availableDevices).toEqual(['cpu', 'auto']);
     expect(settings.gpuNames).toEqual({});
 
+    // The handshake only sets the session cookie; the page it lands on is the shared queue.
+    await signIn(page, dirs);
     await page.goto(`${origin}/settings`);
     const notice = page.getByRole('alert');
     await expect(notice).toContainText('The device probe failed');
@@ -48,7 +73,11 @@ test('a backend without whisper-cli reports the failed probe on the Settings pag
     }
   }
 
-  // The shared backend ran with whisper-cli: a successful probe shows no notice.
+  // The shared backend ran with whisper-cli: a successful probe shows no notice. It is a different
+  // service process, so the browser enters its session again first (roadmap item 66).
+  await signIn(page);
+  // The second instance's restart left the stored session dead with it (roadmap item 66).
+  await refreshStoredSession(appModeDirs(loadState().dataDir));
   await page.goto(appUrl('/settings'));
   await expect(page.getByText('The device probe failed')).toHaveCount(0);
 });

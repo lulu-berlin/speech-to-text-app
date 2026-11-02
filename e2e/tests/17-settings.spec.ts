@@ -1,6 +1,13 @@
 import { expect, test } from './helpers/test';
-import { SETTINGS_CLIP, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
-import { appLive, goTo, uploadClips, waitForTaskState } from './helpers/ui';
+import {
+  SETTINGS_CLIP,
+  loadState,
+  refreshStoredSession,
+  saveState,
+  startBackend,
+  stopBackend,
+} from '../lib/backend.ts';
+import { appLive, goTo, signIn, uploadClips, waitForTaskState } from './helpers/ui';
 
 // The settings journey (item 32, ADR 0046): change the device, the thread count and the
 // upload defaults on the Settings page; restart the backend on the same data directory —
@@ -106,6 +113,8 @@ test('the settings the user saves survive a restart and the queue runs with them
 
   const restarted = await startBackend({ port, dataDir });
   try {
+    // The restarted service has no memory of the old session (roadmap item 66): enter again.
+    await signIn(page);
     await expect(page.getByText('Live', { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(pause).toBeChecked();
     // The restart kept the settings: the page shows them and the upload form starts with them.
@@ -161,5 +170,10 @@ test('the settings the user saves survive a restart and the queue runs with them
     await stopBackend(restarted.pid, port, dataDir);
     const fresh = await startBackend({ port, dataDir });
     saveState({ pid: fresh.pid });
+    await signIn(page);
+    // Later tests' contexts start from the stored session, and this restarted service only knows
+    // the one this page just made (roadmap item 66).
+    const { configDir = '', runtimeDir = '' } = loadState();
+    await refreshStoredSession({ configDir, runtimeDir });
   }
 });

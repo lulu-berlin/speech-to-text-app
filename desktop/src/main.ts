@@ -4,7 +4,14 @@
 // backend and waits — no orphan JVM. All queue and engine logic stays in the backend.
 import { dirname, join } from 'node:path';
 import { app, BrowserWindow, dialog, ipcMain, Menu, session } from 'electron';
-import { freePort, readyUrl, startBackend, waitForBackend } from './backend.js';
+import {
+  freePort,
+  launchUrl,
+  readyUrl,
+  runningService,
+  startBackend,
+  waitForBackend,
+} from './backend.js';
 import { ensureModels } from './models.js';
 import { applySessionPolicy, guardWindow } from './window-policy.js';
 
@@ -59,6 +66,16 @@ async function main(): Promise<void> {
     if (starting) return;
     starting = true;
     try {
+      // Attach instead of starting a second backend (roadmap item 66, ADR 0064): a service that is
+      // already running for this user owns the database and the queue, so the window enters through
+      // its launch URL and never stops it - quitting the window leaves the service running.
+      const service = await runningService();
+      if (service !== null) {
+        appUrl = await launchUrl(service);
+        stopBackend = () => Promise.resolve();
+        await window.loadURL(appUrl);
+        return;
+      }
       const models = await ensureModels({
         resourcesDir,
         onProgress: (progress) => window.webContents.send('models:progress', progress),

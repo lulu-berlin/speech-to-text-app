@@ -171,11 +171,12 @@
 
       # Version manifest for the human Gradle bootstrap (roadmap item 33): the same
       # versions the flake builds with, rendered into the committed versions.json by the
-      # update-versions app below. Node/pnpm/gradle/jdk/ffmpeg come from this nixpkgs
+      # update-versions app below. Node/pnpm/gradle/jdk/ffmpeg/rust come from this nixpkgs
       # rev (ADR 0036), whisper-cpp and the prebuilt tool downloads from
       # nix/versions.nix, the models from nix/models.nix and the e2e test fixtures from
       # nix/test-fixtures.nix (whose derivations are built from the same tables). The
-      # versions-sync check fails when versions.json drifts.
+      # versions-sync check fails when versions.json drifts; `./gradlew checkVersions` holds
+      # client/rust-toolchain.toml to the same Rust (roadmap item 66).
       versions = let
         data = import ./nix/versions.nix;
       in {
@@ -185,6 +186,7 @@
         gradle = gradle.version;
         jdk = pkgs.jre.version;
         ffmpeg = pkgs.lib.versions.majorMinor ffmpegArtifact.source.version;
+        rust = pkgs.rustc.version;
         whisperCpp = data.whisperCppTag;
         models = models.meta;
         downloads = data.downloads;
@@ -206,7 +208,9 @@
       backend = pkgs.stdenv.mkDerivation (finalAttrs: {
         pname = "stt-backend";
         version = "0.1.0-SNAPSHOT";
-        src = sourceOf [./backend ./docs/api ./.editorconfig];
+        # `docs/service-dirs.json` is the shared per-OS directory table `ServiceDirsSpec` checks the
+        # service against (roadmap item 66), so the backend's source set carries it too.
+        src = sourceOf [./backend ./docs/api ./docs/service-dirs.json ./.editorconfig];
 
         # Directory sources unpack to `./source/` (stripHash of the store path);
         # nixpkgs cds into `$sourceRoot` after unpackPhase, so it must include the

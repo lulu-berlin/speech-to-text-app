@@ -1,6 +1,7 @@
 import { ApiError, TRANSPORT_ERROR_CODE } from './types';
 import type {
   ApiErrorBody,
+  FrontendList,
   Queue,
   ServerEvent,
   StreamEvent,
@@ -78,6 +79,13 @@ export async function getTurns(id: number): Promise<Turns> {
 // devices to choose from.
 export async function getSettings(): Promise<Settings> {
   return requestJson<Settings>('/api/settings');
+}
+
+// Roadmap item 66 contract: GET /api/frontends (docs/api/frontends.json) -> the installed
+// frontends, each with its id, name and kind.
+export async function fetchFrontends(signal?: AbortSignal): Promise<FrontendList> {
+  const response = await fetch('/api/frontends', { signal });
+  return json<FrontendList>(response);
 }
 
 // Item 32 contract: DELETE /api/settings/device-fallback -> 200 Settings, the CPU-fallback

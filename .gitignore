@@ -23,6 +23,8 @@ build/
 node_modules/
 dist/
 result
+# Cargo's build output (roadmap item 66: the Rust client workspace in client/)
+/client/target/
 
 # Heap dumps: a test that runs out of memory on purpose (item 71's heap bound) or a crashed worker
 # writes one into the working directory, and it is hundreds of megabytes.
@@ -30,3 +32,4 @@ result
 
 # The e2e backend log (roadmap item 48: the macOS CI greps it for the whisper backend)
 /e2e/.e2e-backend.log
+e2e-test-results-*.zip

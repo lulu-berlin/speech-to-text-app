@@ -89,6 +89,11 @@ Frontend (pnpm — ADR 0012):
 - `pnpm build` — `tsc --noEmit` + `vite build` (output: `frontend/dist/`).
 - `pnpm dev` — Vite dev server; proxies `/api` to `http://localhost:8080`.
 
+Client (the Rust workspace in `client/` — roadmap item 66; Rust from the devenv, pinned in `versions.json` and `client/rust-toolchain.toml`, which `./gradlew checkVersions` holds together). Run from `client/`:
+
+- `cargo test` — the client crates' tests.
+- `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` — the formatting and lint gates; CI runs all three on Linux, macOS and Windows.
+
 Documentation (the `docs/` package — TypeScript run by Node's type stripping, ADR 0054 — plus the individual checks; everything below runs from the repository root, so run it after changing `README.md` or `docs/architecture.md`, code the overview names, backend exception handling, or the CI workflow):
 
 - `pnpm --dir docs install` — install the package's dependencies from `docs/pnpm-lock.yaml`.
