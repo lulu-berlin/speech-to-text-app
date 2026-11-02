@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
-import { BAR_ROW_CLIP, appUrl } from '../lib/backend.ts';
-import { appLive, uploadClips } from './helpers/ui';
+import { expect, test, type Page } from './helpers/test';
+import { BAR_ROW_CLIP } from '../lib/backend.ts';
+import { appLive, uploadClips, waitForTaskState } from './helpers/ui';
 
 // Item 82: the phase line and the bar count belong to one page-side observation. Two separate
 // checks raced the task's end — the `Diarizing…` text was visible, then the row left the queue
@@ -91,35 +91,22 @@ async function stopBarObservation(page: Page): Promise<BarObservation[]> {
 // diarizationProgress 0.0 with a null stage, so the row used to show a second, empty bar through
 // chunking and transcription (queue-running-light-desktop.png).
 test('a running task shows one progress bar until diarizing starts', async ({ page }) => {
-  test.setTimeout(300_000);
   await appLive(page);
-
-  // The journey's earlier uploads may still be finishing; start from an idle queue.
-  await expect
-    .poll(
-      async () => {
-        const body = (await (await page.request.get(appUrl('/api/tasks'))).json()) as {
-          tasks: { status: string }[];
-        };
-        return body.tasks.filter((task) => ['QUEUED', 'RUNNING', 'PAUSED'].includes(task.status))
-          .length;
-      },
-      { timeout: 120_000 },
-    )
-    .toBe(0);
 
   await startBarObservation(page, BAR_ROW_CLIP);
   await uploadClips(page, [BAR_ROW_CLIP]);
 
-  // The task's own finish signal: its row leaves the Pending tasks list once the task ends.
-  // Waiting for the running line's ellipsis first keeps the absence check from passing before
-  // the row exists.
+  // The task's own finish signal: its row leaves the Pending tasks list once the task ends. The
+  // observations below prove the row rendered at all, so nothing here reads the running row's text:
+  // on a fast runner it can be gone between the state wait and the read (roadmap item 84, run
+  // #481's class).
   const row = page
     .getByRole('list', { name: 'Pending tasks' })
     .getByRole('listitem')
     .filter({ hasText: BAR_ROW_CLIP });
-  await expect(row).toContainText('…', { timeout: 120_000 });
-  await expect(row).toHaveCount(0, { timeout: 240_000 });
+  await waitForTaskState(page, BAR_ROW_CLIP, (task) => task.status === 'RUNNING');
+  await waitForTaskState(page, BAR_ROW_CLIP);
+  await expect(row).toHaveCount(0);
   const observed = await stopBarObservation(page);
 
   // One observation per fact: a task finishing between two checks cannot fail it.

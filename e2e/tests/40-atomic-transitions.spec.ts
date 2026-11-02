@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { ATOMIC_NEXT_CLIP, ATOMIC_RACE_CLIP } from '../lib/backend.ts';
 import {
   appLive,
@@ -7,6 +7,7 @@ import {
   rowOf,
   unlessGone,
   uploadClips,
+  waitForTaskState,
 } from './helpers/ui';
 
 // The race (roadmap item 40): task commands used to be a read-check followed by an
@@ -19,13 +20,17 @@ import {
 test('rapid pause/resume/cancel near completion never blocks the queue or sticks a task', async ({
   page,
 }) => {
-  test.setTimeout(600_000);
   const pauseQueue = page.getByRole('switch', { name: 'Pause the queue' });
 
   await appLive(page);
   await uploadClips(page, [ATOMIC_RACE_CLIP]);
   const raced = rowOf(page, ATOMIC_RACE_CLIP);
-  await expect(raced.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
+  await waitForTaskState(
+    page,
+    ATOMIC_RACE_CLIP,
+    (task) => task.status === 'RUNNING' && task.phase === 'TRANSCRIBING',
+  );
+  await expect(raced.getByText('Transcribing')).toBeVisible();
 
   // Pause/resume in quick succession while the worker is mid-run, each confirmed by the row's
   // button flip (the Pause/Resume buttons are mutually exclusive: Resume appears only while the
@@ -65,7 +70,12 @@ test('rapid pause/resume/cancel near completion never blocks the queue or sticks
 
   // The task leaves the queue: exactly one of completion or cancel won — never a stuck
   // PAUSED — and the task-level commands never touched the queue pause.
-  await expect(raced).toHaveCount(0, { timeout: 120_000 });
+  await waitForTaskState(
+    page,
+    ATOMIC_RACE_CLIP,
+    (task) => task.status === 'COMPLETED' || task.status === 'CANCELED',
+  );
+  await expect(raced).toHaveCount(0);
   await expect(pauseQueue).not.toBeChecked();
   await goTo(page, 'History');
   await expectCompletedOrCanceled(page, ATOMIC_RACE_CLIP);
@@ -73,7 +83,8 @@ test('rapid pause/resume/cancel near completion never blocks the queue or sticks
   // The queue kept working: the follow-up upload still transcribes to completion.
   await goTo(page, 'Queue');
   await uploadClips(page, [ATOMIC_NEXT_CLIP]);
-  await expect(rowOf(page, ATOMIC_NEXT_CLIP)).toHaveCount(0, { timeout: 120_000 });
+  await waitForTaskState(page, ATOMIC_NEXT_CLIP);
+  await expect(rowOf(page, ATOMIC_NEXT_CLIP)).toHaveCount(0);
   await goTo(page, 'History');
   await expect(rowOf(page, ATOMIC_NEXT_CLIP).getByText('COMPLETED', { exact: true })).toBeVisible({
     timeout: 120_000,

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { UPLOAD_RACE_CLIP, appUrl, loadState } from '../lib/backend.ts';
 import { appLive, uploadClips } from './helpers/ui';
 
@@ -44,7 +44,7 @@ test('two concurrent identical uploads answer one 201 and one 409, and the queue
 
   // The same file through the queue view is refused with the duplicate notice and its link.
   await appLive(page);
-  await uploadClips(page, [UPLOAD_RACE_CLIP]);
+  await uploadClips(page, [UPLOAD_RACE_CLIP], { expectAcceptance: false });
   const uploads = page.getByRole('list', { name: 'Uploads' });
   const row = uploads.getByRole('listitem').filter({ hasText: UPLOAD_RACE_CLIP });
   await expect(row.getByText(/Already uploaded/)).toBeVisible();

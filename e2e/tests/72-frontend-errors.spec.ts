@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { appLive, goTo } from './helpers/ui';
 
 // Item 72's error surfaces in a journey (ADR 0046): a rejected command and a failed settings

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { appUrl, HEADER_CLIP } from '../lib/backend.ts';
 import { apiTaskIdOf, ensureTranscript, openTranscript } from './helpers/ui';
 
@@ -8,7 +8,6 @@ import { apiTaskIdOf, ensureTranscript, openTranscript } from './helpers/ui';
 test('editing a segment reaches the view and the download, and Revert restores the original', async ({
   page,
 }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
   const region = page.getByRole('region', { name: 'Transcript' });
@@ -18,6 +17,9 @@ test('editing a segment reaches the view and the download, and Revert restores t
 
   const before = await transcript();
   const segments = region.locator('[role="button"]:not([aria-label])');
+  // The heading renders before the turns: a bare `allTextContents` here read an empty list (roadmap
+  // item 84: the only place in the suite that read a locator's texts without waiting for one).
+  await expect(segments.first()).toBeVisible();
   // The segment to edit: its line occurs exactly once in the download, so removing that line
   // is provable and the assertions below cannot be satisfied by another turn's copy.
   const texts = await segments.allTextContents();

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { BROKEN_CLIP, CANCEL_CLIP, appUrl, loadState, scratchDirPath } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, taskIdOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, taskIdOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 // The entries left in a task's scratch directory (the app's OS-temp area, one per data directory); none
 // when the directory is gone — the app removes it when the task ends (item 44).
@@ -13,7 +13,6 @@ function scratchEntries(id: string): string[] {
 test('cancelling a running task, retrying it, and retrying a failed one work through the UI', async ({
   page,
 }) => {
-  test.setTimeout(360_000);
   const pause = page.getByRole('switch', { name: 'Pause the queue' });
 
   // Cancel a running task once it is past chunking (its row says "Transcribing"): the
@@ -22,7 +21,12 @@ test('cancelling a running task, retrying it, and retrying a failed one work thr
   await appLive(page);
   await uploadClips(page, [CANCEL_CLIP]);
   const pending = rowOf(page, CANCEL_CLIP);
-  await expect(pending.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
+  await waitForTaskState(
+    page,
+    CANCEL_CLIP,
+    (task) => task.status === 'RUNNING' && task.phase === 'TRANSCRIBING',
+  );
+  await expect(pending.getByText('Transcribing')).toBeVisible();
   await page.getByRole('button', { name: `Cancel ${CANCEL_CLIP}` }).click();
   await page
     .getByRole('dialog', { name: `Cancel ${CANCEL_CLIP}?` })
@@ -37,10 +41,20 @@ test('cancelling a running task, retrying it, and retrying a failed one work thr
 
   // Retrying the canceled task runs it again, to completion; a completed task's scratch
   // directory is removed too.
+  // The canceled run's finish is the run the retry replaces: the wait must not end on it.
+  const list = (await (await page.request.get(appUrl('/api/tasks'))).json()) as {
+    tasks: { filename: string; finishedAt: number | null }[];
+  };
+  const canceledAt = list.tasks.find((task) => task.filename === CANCEL_CLIP)?.finishedAt ?? null;
+  expect(canceledAt, 'the canceled run has a finish time').not.toBeNull();
+  // The retry's own answer, so a refusal names itself instead of becoming a stall (roadmap item 84).
+  const retriedCanceled = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && response.url().endsWith('/retry'),
+  );
   await canceled.getByRole('button', { name: 'Retry' }).click();
-  await expect(canceled.getByText('COMPLETED', { exact: true })).toBeVisible({
-    timeout: 240_000,
-  });
+  expect((await retriedCanceled).status()).toBe(200);
+  await waitForTaskState(page, CANCEL_CLIP, undefined, { after: canceledAt });
+  await expect(canceled.getByText('COMPLETED', { exact: true })).toBeVisible();
   expect(scratchEntries(canceledId)).toEqual([]);
 
   // A file that cannot be decoded fails in chunking: its card shows the stored error, and
@@ -50,7 +64,8 @@ test('cancelling a running task, retrying it, and retrying a failed one work thr
   await uploadClips(page, [BROKEN_CLIP]);
   await goTo(page, 'History');
   const broken = rowOf(page, BROKEN_CLIP);
-  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 60_000 });
+  await waitForTaskState(page, BROKEN_CLIP, (task) => task.status === 'FAILED');
+  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible();
   const brokenId = await taskIdOf(page, BROKEN_CLIP);
   const stored = await (await page.request.get(appUrl(`/api/tasks/${brokenId}`))).json();
   expect(stored.error).toBeTruthy();
@@ -63,13 +78,20 @@ test('cancelling a running task, retrying it, and retrying a failed one work thr
   await pause.click();
   await expect(pause).toBeChecked();
   await goTo(page, 'History');
+  const retriedBroken = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && response.url().endsWith('/retry'),
+  );
   await broken.getByRole('button', { name: 'Retry' }).click();
+  expect((await retriedBroken).status()).toBe(200);
   await goTo(page, 'Queue');
   const retried = rowOf(page, BROKEN_CLIP);
   await expect(retried.getByText('QUEUED', { exact: true })).toBeVisible();
   await pause.click();
   await expect(pause).not.toBeChecked();
-  await expect(retried).toHaveCount(0, { timeout: 60_000 });
+  // The retried undecodable clip fails again: the task's own state, not a clock, ends the wait
+  // (roadmap item 84, load: a slow runner must not change the outcome).
+  await waitForTaskState(page, BROKEN_CLIP, (task) => task.status === 'FAILED');
+  await expect(retried).toHaveCount(0);
   await goTo(page, 'History');
   await expect(broken.getByText('FAILED', { exact: true })).toBeVisible();
   expect(scratchEntries(brokenId)).toEqual([]);

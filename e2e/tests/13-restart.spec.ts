@@ -1,12 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { RESTART_CLIPS, loadState, saveState, startBackend, stopBackend } from '../lib/backend.ts';
-import { appLive, rowOrder, uploadClips } from './helpers/ui';
+import { appLive, moveRowDown, rowOrder, uploadClips, waitForTaskState } from './helpers/ui';
 
 test('restarting the backend reconnects the event stream and the state is restored from the snapshot', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
-
   // Seed server state that only a fresh process can restore: the queue paused with the
   // clips reordered away from upload order (the engine would otherwise drain them).
   await appLive(page);
@@ -15,8 +13,7 @@ test('restarting the backend reconnects the event stream and the state is restor
   await expect(pause).toBeChecked();
   await uploadClips(page, RESTART_CLIPS);
   await expect.poll(async () => rowOrder(page, RESTART_CLIPS)).toEqual([0, 1]);
-  await page.getByRole('button', { name: `Actions for ${RESTART_CLIPS[0]}` }).click();
-  await page.getByRole('menuitem', { name: 'Move down' }).click();
+  await moveRowDown(page, RESTART_CLIPS[0]!);
   await expect.poll(async () => rowOrder(page, RESTART_CLIPS)).toEqual([1, 0]);
 
   // Kill the backend — its app JVM by its args, not only the gradle group (the daemon
@@ -38,7 +35,8 @@ test('restarting the backend reconnects the event stream and the state is restor
     await pause.click();
     await expect(pause).not.toBeChecked();
     for (const clip of RESTART_CLIPS) {
-      await expect(page.getByText(`${clip} transcribed`)).toBeVisible({ timeout: 240_000 });
+      await waitForTaskState(page, clip);
+      await expect(page.getByText(`${clip} transcribed`)).toBeVisible();
     }
   } finally {
     // The global teardown only knows the run's original pid — stop the restarted

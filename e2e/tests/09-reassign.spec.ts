@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers/test';
 import { REASSIGN_CLIP } from '../lib/backend.ts';
 import { capturedSse, installSseCapture } from './helpers/capture';
 import { mustConform } from './helpers/contract';
@@ -17,7 +17,6 @@ async function turnSpeakers(page: Page): Promise<string[]> {
 test('reassigns a segment to a new speaker and back, from a turn that holds two segments', async ({
   page,
 }) => {
-  test.setTimeout(240_000);
   // Record the app's SSE events, so the move's own event is checked against its docs/api example.
   await installSseCapture(page);
   await uploadAndOpen(page, REASSIGN_CLIP);
@@ -40,9 +39,14 @@ test('reassigns a segment to a new speaker and back, from a turn that holds two 
     .selectOption({ label: 'New speaker' });
   await bar.getByRole('button', { name: 'Move', exact: true }).click();
   await expect.poll(() => turnSpeakers(page)).toEqual(['Speaker 1', 'Speaker 3', 'Speaker 2']);
-  const events = await capturedSse(page);
-  const moves = events.filter((event) => event.name === 'speakers-reassigned');
-  expect(moves).toHaveLength(1);
+  // The event rides the SSE stream, which is not ordered with the command's answer: wait for it
+  // rather than reading the capture once (roadmap item 84).
+  await expect
+    .poll(async () =>
+      (await capturedSse(page)).filter((event) => event.name === 'speakers-reassigned'),
+    )
+    .toHaveLength(1);
+  const moves = (await capturedSse(page)).filter((event) => event.name === 'speakers-reassigned');
   mustConform(['speakers-reassigned'], moves[0]!.data);
 
   // Move the same segment to the other existing speaker: the turns join.

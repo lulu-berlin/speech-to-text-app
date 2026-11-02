@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { HISTORY_BROKEN_CLIP, HISTORY_ROW_CLIP, appUrl } from '../lib/backend.ts';
-import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 // Item 59, finding 5: the filename was the only way into a completed task and read as
 // plain text, while Retry and Delete sat as same-weight text actions. The row's filename
@@ -9,16 +9,14 @@ import { apiTaskIdOf, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 test('a completed history row opens from a visible link, Delete reads quieter than Retry, and both still work', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   await appLive(page);
 
   // This spec's own completed row.
   await uploadClips(page, [HISTORY_ROW_CLIP]);
   await goTo(page, 'History');
   const completed = rowOf(page, HISTORY_ROW_CLIP);
-  await expect(completed.getByText('COMPLETED', { exact: true })).toBeVisible({
-    timeout: 240_000,
-  });
+  await waitForTaskState(page, HISTORY_ROW_CLIP);
+  await expect(completed.getByText('COMPLETED', { exact: true })).toBeVisible();
 
   // The filename is visibly a link, and the keyboard can follow it into the transcript.
   const link = completed.getByRole('link', { name: HISTORY_ROW_CLIP });
@@ -36,7 +34,8 @@ test('a completed history row opens from a visible link, Delete reads quieter th
   await uploadClips(page, [HISTORY_BROKEN_CLIP]);
   await goTo(page, 'History');
   const broken = rowOf(page, HISTORY_BROKEN_CLIP);
-  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 120_000 });
+  await waitForTaskState(page, HISTORY_BROKEN_CLIP, (task) => task.status === 'FAILED');
+  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible();
   const retry = broken.getByRole('button', { name: 'Retry' });
   const remove = broken.getByRole('button', { name: 'Delete' });
   const colorOf = (locator: typeof retry) =>
@@ -68,19 +67,12 @@ test('a completed history row opens from a visible link, Delete reads quieter th
   );
   await retry.click();
   expect((await retried).status()).toBe(200);
-  await expect
-    .poll(
-      async () => {
-        const task = await taskOf();
-        return (
-          task?.status === 'FAILED' && task.finishedAt !== null && task.finishedAt !== failedAt
-        );
-      },
-      { timeout: 120_000 },
-    )
-    .toBe(true);
+  // The retried run fails again: the state, with the old run named as replaced, ends the wait.
+  await waitForTaskState(page, HISTORY_BROKEN_CLIP, (task) => task.status === 'FAILED', {
+    after: failedAt,
+  });
   await goTo(page, 'History');
-  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(broken.getByText('FAILED', { exact: true })).toBeVisible();
 
   // Delete still works from the completed row, through its confirmation.
   await goTo(page, 'History');

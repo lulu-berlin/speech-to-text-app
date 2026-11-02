@@ -11,6 +11,23 @@ export interface ReorderInput {
   order: number[];
 }
 
+/**
+ * The pending ids in the order the queue shows them: the queue's own order first, then the
+ * ids only the current display knows, then anything left over by id. The displayed order
+ * is the pending set, so a snapshot that omits a task cannot hide its row (roadmap item
+ * 84).
+ */
+function rankedOrder(queueOrder: number[], localOrder: number[], pending: number[]): number[] {
+  const rank = new Map<number, number>();
+  queueOrder.forEach((id, index) => rank.set(id, index));
+  const base = queueOrder.length;
+  localOrder.forEach((id, index) => {
+    if (!rank.has(id)) rank.set(id, base + index);
+  });
+  const place = (id: number): number => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
+  return [...pending].sort((a, b) => place(a) - place(b) || a - b);
+}
+
 interface ReorderContext {
   order: number[];
   previousOrder: number[];
@@ -21,7 +38,9 @@ export const reorderMachine = setup({
   types: {
     input: {} as ReorderInput,
     context: {} as ReorderContext,
-    events: {} as { type: 'SYNC'; order: number[] } | { type: 'MOVE'; id: number; to: number },
+    events: {} as
+      | { type: 'SYNC'; order: number[]; pending: number[] }
+      | { type: 'MOVE'; id: number; to: number },
   },
   actors: {
     putOrder: fromPromise<number[], number[]>(({ input }) =>
@@ -29,17 +48,20 @@ export const reorderMachine = setup({
     ),
   },
   actions: {
-    // Follow the server's queue while idle: keep the known ids in their current order,
-    // append new ones, drop removed ones. A fresh queue state also clears a reorder
-    // error (item 14).
+    // Follow the server's queue while idle: the displayed order is exactly the pending
+    // tasks — the server's own set (`TaskRepository.pendingOrderedIds`) — in the queue's
+    // order, and a fresh queue state clears a reorder error (item 14). The server builds
+    // a queue snapshot before it emits it, so two uploads' snapshots can cross and an
+    // older one arrives last (roadmap item 84): a task this snapshot omits but the live
+    // state still holds as pending keeps its row, so a reorder never sends the server a
+    // set it would refuse. A task that finished leaves at once, whatever the snapshot
+    // says: the server announces the task before the queue.
     reconcile: assign({
       order: ({ context, event }) => {
         if (event.type !== 'SYNC') {
           return context.order;
         }
-        const known = context.order.filter((id) => event.order.includes(id));
-        const added = event.order.filter((id) => !context.order.includes(id));
-        return [...known, ...added];
+        return rankedOrder(event.order, context.order, event.pending);
       },
       error: null,
     }),

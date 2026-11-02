@@ -1,13 +1,15 @@
-import { expect, test } from '@playwright/test';
-import { JFK_QUOTE, openTranscript, turnTextOf } from './helpers/ui';
+import { expect, test } from './helpers/test';
+import { JFK_QUOTE, apiTaskIdOf, ensureTranscript, openTranscript, turnTextOf } from './helpers/ui';
 
-// The journey's first completed clip: item 3 uploaded jfk-a.wav first on this run's fresh
-// backend, so it is task 1 — the full 11 s JFK sample, one voice.
+// The journey's first completed clip: item 3 uploads jfk-a.wav first on this run's fresh backend,
+// and a run of this file alone uploads it here — the full 11 s JFK sample, one voice. Its id is
+// read from the task list, never assumed.
 test('a completed clip opens its transcript with the expected turn and speaker label', async ({
   page,
 }) => {
+  await ensureTranscript(page, 'jfk-a.wav');
   await openTranscript(page, 'jfk-a.wav');
-  await expect(page).toHaveURL(/\/history\/1$/);
+  await expect(page).toHaveURL(new RegExp(`/history/${await apiTaskIdOf(page, 'jfk-a.wav')}$`));
 
   // The header block: the task's name (openTranscript checks the heading), and its
   // duration on the meta line. Below an hour formatDuration pads minutes and seconds, so

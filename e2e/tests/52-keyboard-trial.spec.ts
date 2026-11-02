@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { HEADER_CLIP } from '../lib/backend.ts';
 import { ensureTranscript, openTranscript } from './helpers/ui';
 
@@ -6,7 +6,6 @@ import { ensureTranscript, openTranscript } from './helpers/ui';
 // segment, Tab continues from there (never back into the player), Space on a segment plays from
 // it and pauses with focus kept, and Escape lands on the current segment.
 test('the keyboard walks the transcript: Tab, Space and Escape', async ({ page }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
   const player = page.getByRole('group', { name: 'Audio player' });

@@ -1,7 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { join } from 'node:path';
 import { SHOT_CLIP, SHOT_UPLOAD_CLIP, loadState } from '../lib/backend.ts';
-import { DESKTOP_VIEWPORT, PHONE_VIEWPORT, appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import {
+  DESKTOP_VIEWPORT,
+  PHONE_VIEWPORT,
+  appLive,
+  goTo,
+  rowOf,
+  uploadClips,
+  waitForTaskState,
+} from './helpers/ui';
 
 // The acceptance screenshots (roadmap item 21, item 15): the Queue with a running task
 // and an upload in flight, History, the transcript during playback, and a canceled
@@ -15,7 +23,6 @@ const VIEWPORTS: Record<'phone' | 'desktop', { width: number; height: number }> 
 };
 
 test('captures the acceptance screenshots', async ({ page }) => {
-  test.setTimeout(360_000);
   const fixturesDir = loadState().fixturesDir;
 
   const themeButton = page.getByRole('button', { name: /Theme:/ });
@@ -39,7 +46,12 @@ test('captures the acceptance screenshots', async ({ page }) => {
   await appLive(page);
   await uploadClips(page, [SHOT_CLIP]);
   const running = rowOf(page, SHOT_CLIP);
-  await expect(running.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
+  await waitForTaskState(
+    page,
+    SHOT_CLIP,
+    (task) => task.status === 'RUNNING' && task.phase === 'TRANSCRIBING',
+  );
+  await expect(running.getByText('Transcribing')).toBeVisible();
   await expect(running.getByRole('progressbar').first()).toBeVisible();
   // Hold the seed (item 57): a paused queue freezes its whisper process (ADR 0004), so the
   // row stays "Transcribing" however long the shots take — the tiny model can otherwise
@@ -54,13 +66,19 @@ test('captures the acceptance screenshots', async ({ page }) => {
     }
   }
 
-  // An upload in flight while the seed is held; it queues behind the seed.
+  // An upload in flight while the seed is held; it queues behind the seed. The answer is captured so
+  // a refused upload fails here, not after the stall window (roadmap item 84).
+  const answered = page.waitForResponse(
+    (response) => response.request().method() === 'POST' && response.url().endsWith('/api/tasks'),
+  );
   await page.setInputFiles('input[type="file"]', [join(fixturesDir, SHOT_UPLOAD_CLIP)]);
   for (const width of ['desktop', 'phone'] as const) {
     for (const theme of ['light', 'dark'] as const) {
       await shot('queue-uploading', width, theme);
     }
   }
+
+  expect((await answered).status(), 'the in-flight upload was accepted').toBe(201);
 
   // Cancel the held seed: its card lands in History. Resuming the queue then lets the
   // queued mate transcribe on the freed worker.
@@ -73,7 +91,8 @@ test('captures the acceptance screenshots', async ({ page }) => {
   await expect(running).toHaveCount(0);
   await pause.click();
   await expect(pause).not.toBeChecked();
-  await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTaskState(page, SHOT_UPLOAD_CLIP);
+  await expect(page.getByText(`${SHOT_UPLOAD_CLIP} transcribed`)).toBeVisible();
 
   // History with the canceled card.
   await goTo(page, 'History');

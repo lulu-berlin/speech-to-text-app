@@ -1,6 +1,8 @@
 import { join } from 'node:path';
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type Response } from '@playwright/test';
 import { appUrl, loadState } from '../../lib/backend.ts';
+import { awaitTaskState } from '../../lib/await-task.ts';
+import type { TaskSnapshot } from '../../lib/await-task.ts';
 
 // The two widths the spec fixes: phone ~390 px, desktop ~1280 px.
 export const PHONE_VIEWPORT = { width: 390, height: 844 };
@@ -52,13 +54,46 @@ export async function appLive(page: Page) {
   await expect(page.getByText('Live', { exact: true })).toBeVisible();
 }
 
-// Uploads the named fixture clips through the queue's file input (the drop zone).
-export async function uploadClips(page: Page, names: string[]) {
+// Uploads the named fixture clips through the queue's file input (the drop zone), and waits for the
+// server's answer to each one: a spec must not go on to wait for a task the server refused, or for an
+// upload the browser aborted — that is what spent a whole stall window in CI run #465, where the POST
+// answered -1 after the spec had stopped the backend under it. The answer must be a created task
+// unless the spec uploads, on purpose, something the server should refuse.
+export async function uploadClips(
+  page: Page,
+  names: string[],
+  { expectAcceptance = true }: { expectAcceptance?: boolean } = {},
+): Promise<void> {
   const { fixturesDir } = loadState();
-  await page.setInputFiles(
-    'input[type="file"]',
-    names.map((name) => join(fixturesDir, name)),
-  );
+  // One answer per file. Equal `waitForResponse` predicates would not do: every pending waiter
+  // resolves on the first matching answer, so the later files would go unchecked. The collector
+  // counts them, and the helper waits until each file has one before judging them.
+  const answers: Response[] = [];
+  const collect = (response: Response) => {
+    if (response.request().method() === 'POST' && response.url().endsWith('/api/tasks')) {
+      answers.push(response);
+    }
+  };
+  page.on('response', collect);
+  try {
+    await page.setInputFiles(
+      'input[type="file"]',
+      names.map((name) => join(fixturesDir, name)),
+    );
+    await expect
+      .poll(() => answers.length, { timeout: 120_000 })
+      .toBeGreaterThanOrEqual(names.length);
+  } finally {
+    page.off('response', collect);
+  }
+  if (!expectAcceptance) {
+    return;
+  }
+  for (const answer of answers) {
+    if (answer.status() !== 201) {
+      throw new Error(`an upload was refused: ${answer.status()} ${await answer.text()}`);
+    }
+  }
 }
 
 // The quote of the JFK sample, as two phrases (the model's punctuation is not pinned).
@@ -76,37 +111,55 @@ export async function openTranscript(page: Page, filename: string) {
   await expect(page.getByRole('heading', { name: filename })).toBeVisible();
 }
 
-// A completed transcript to read against the shared backend: a full journey usually has
-// the clip completed already (the earlier specs uploaded it), while a run of one file
-// alone starts from the fresh backend with the fixtures — so the clip is uploaded only
-// when History does not have it yet (re-uploading the same content answers 409).
+// A completed transcript to read against the shared backend: a full journey usually has the clip
+// completed already (the earlier specs uploaded it), while a run of one file alone starts from the
+// fresh backend with the fixtures — so the clip is uploaded only when no task of that name exists.
+// The task list is the authority, read over the API: the History page's render lags it, and a task
+// the reset canceled is not a transcript (roadmap item 84 — the old 5 s page probe could miss a
+// completed row on a loaded runner, and the re-upload it then made is refused as a duplicate).
 export async function ensureTranscript(page: Page, clip: string) {
   await appLive(page);
-  await goTo(page, 'History');
-  // The list loads after the navigation, so wait briefly before deciding the clip is absent
-  // (an immediate isVisible() check raced the load in the full journey and triggered a
-  // duplicate upload).
-  const completed = rowOf(page, clip).getByText('COMPLETED', { exact: true });
-  const known = await completed
-    .waitFor({ state: 'visible', timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (known) {
+  const statuses = async () => {
+    const body = (await (await page.request.get(appUrl('/api/tasks'))).json()) as {
+      tasks: { filename: string; status: string }[];
+    };
+    return body.tasks.filter((task) => task.filename === clip).map((task) => task.status);
+  };
+
+  const known = await statuses();
+  if (known.length > 0) {
+    if (!known.includes('COMPLETED')) {
+      throw new Error(`the task ${clip} is ${known.join(', ')}, not a completed transcript`);
+    }
     return;
   }
+
   await goTo(page, 'Queue');
-  await uploadClips(page, [clip]);
-  const transcribed = page.getByText(`${clip} transcribed`);
-  const duplicate = page.getByText(`${clip} Already uploaded`);
-  await expect(transcribed.or(duplicate)).toBeVisible({ timeout: 300_000 });
-  // A duplicate upload proves the task exists; it must be the completed transcript the
-  // caller expects.
-  if (await duplicate.isVisible()) {
-    await goTo(page, 'History');
-    await expect(rowOf(page, clip).getByText('COMPLETED', { exact: true })).toBeVisible({
-      timeout: 30_000,
-    });
-  }
+  // A refusal is tolerated: another spec may hold these bytes, and the wait below then names the
+  // state that task is in.
+  await uploadClips(page, [clip], { expectAcceptance: false });
+  await waitForTaskState(page, clip);
+  await expect(page.getByText(`${clip} transcribed`)).toBeVisible();
+}
+
+// Waits for [clip]'s task to reach [until] (the default is its completion), by the task's own state
+// (roadmap item 84, load): a loaded runner can take minutes, so no 240 s ceiling ends this wait —
+// only the task reaching the state, its failure, or a queue that stops progressing for the stall
+// window does.
+export async function waitForTaskState(
+  page: Page,
+  clip: string,
+  until?: (task: TaskSnapshot) => boolean,
+  options: { after?: number | null; stallMs?: number; intervalMs?: number } = {},
+): Promise<void> {
+  await awaitTaskState(
+    async () => {
+      const response = await page.request.get(appUrl('/api/tasks'));
+      const body = (await response.json()) as { tasks: TaskSnapshot[] };
+      return body.tasks;
+    },
+    { clip, until, ...options },
+  );
 }
 
 // Uploads one clip, waits until its finish notice says it is transcribed, and opens its
@@ -114,8 +167,9 @@ export async function ensureTranscript(page: Page, clip: string) {
 export async function uploadAndOpen(page: Page, clip: string) {
   await appLive(page);
   await uploadClips(page, [clip]);
+  await waitForTaskState(page, clip);
   const notice = page.getByText(`${clip} transcribed`);
-  await expect(notice).toBeVisible({ timeout: 240_000 });
+  await expect(notice).toBeVisible();
   await notice.getByRole('link', { name: 'open' }).click();
   await expect(page.getByRole('heading', { name: clip })).toBeVisible();
 }
@@ -126,12 +180,35 @@ export function turnTextOf(page: Page, speaker: string): Locator {
   return page.locator(`span:text-is("${speaker}") + p`);
 }
 
-// The positions of the first list item containing each name, in DOM order — the pending
-// queue's order (and the upload list's order while uploads are in flight). A missing
-// name is -1, so a poller can distinguish "not yet rendered".
+// The positions of the first pending-queue row containing each name, in DOM order. The list is
+// scoped: the uploads list is a list of list items too, and an upload row survives until its task
+// reaches the live state, so an unscoped scan could read upload order instead of queue order. A
+// missing name is -1, so a poller can distinguish "not yet rendered".
 export async function rowOrder(page: Page, names: string[]): Promise<number[]> {
-  const items = await page.getByRole('listitem').allTextContents();
+  const items = await page
+    .getByRole('list', { name: 'Pending tasks' })
+    .getByRole('listitem')
+    .allTextContents();
   return names.map((name) => items.findIndex((text) => text.includes(name)));
+}
+
+/**
+ * Moves [clip]'s row one place down through its actions menu and waits for the server's answer. The
+ * queue view applies the move optimistically, so a reload or a backend stop right after the click
+ * would abort the PUT and leave the old order behind (roadmap item 84).
+ */
+export async function moveRowDown(page: Page, clip: string): Promise<void> {
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PUT' && response.url().endsWith('/api/queue/order'),
+    { timeout: 30_000 },
+  );
+  await page.getByRole('button', { name: `Actions for ${clip}` }).click();
+  await page.getByRole('menuitem', { name: 'Move down' }).click();
+  const answer = await saved;
+  if (answer.status() !== 200) {
+    throw new Error(`the reorder was refused: ${answer.status()} ${await answer.text()}`);
+  }
 }
 
 // A History card (or queue row) by its filename.

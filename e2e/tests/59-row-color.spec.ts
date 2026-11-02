@@ -1,6 +1,12 @@
-import { expect, test, type Page } from '@playwright/test';
-import { COLOR_ROW_CLIP, appUrl } from '../lib/backend.ts';
-import { appLive, expectCompletedOrCanceled, goTo, uploadClips } from './helpers/ui';
+import { expect, test, type Page } from './helpers/test';
+import { COLOR_ROW_CLIP } from '../lib/backend.ts';
+import {
+  appLive,
+  expectCompletedOrCanceled,
+  goTo,
+  uploadClips,
+  waitForTaskState,
+} from './helpers/ui';
 
 // Item 65: the status line's phase prefixes; the collector records each distinct
 // (prefix, computed color) pair the row shows.
@@ -84,37 +90,23 @@ function phaseColor(observed: PhaseColor[], phase: string): string {
 // transcribing and diarizing each read differently, so the row says what it is doing
 // before the percentage exists.
 test('the running status line reads differently in each phase', async ({ page }) => {
-  test.setTimeout(300_000);
   await appLive(page);
-
-  // The journey's earlier uploads may still be finishing; start from an idle queue.
-  await expect
-    .poll(
-      async () => {
-        const body = (await (await page.request.get(appUrl('/api/tasks'))).json()) as {
-          tasks: { status: string }[];
-        };
-        return body.tasks.filter((task) => ['QUEUED', 'RUNNING', 'PAUSED'].includes(task.status))
-          .length;
-      },
-      { timeout: 120_000 },
-    )
-    .toBe(0);
 
   // Item 65: observe from before the upload, so no phase can fall between two round trips.
   await startPhaseObservation(page, COLOR_ROW_CLIP);
   await uploadClips(page, [COLOR_ROW_CLIP]);
 
-  // The task's own finish signal: its row leaves the Pending tasks list once the task ends
-  // (the list filter already excludes the Uploads row with the same filename). Waiting for
-  // the running line's ellipsis first keeps the count check from passing before the row
-  // exists.
+  // The task's own finish signal: its row leaves the Pending tasks list once the task ends (the
+  // list filter already excludes the Uploads row with the same filename). The phase observations
+  // below prove the row rendered at all, so nothing here reads the running row's text: on a fast
+  // runner it can be gone between the state wait and the read (roadmap item 84, run #481's class).
   const row = page
     .getByRole('list', { name: 'Pending tasks' })
     .getByRole('listitem')
     .filter({ hasText: COLOR_ROW_CLIP });
-  await expect(row).toContainText('…', { timeout: 120_000 });
-  await expect(row).toHaveCount(0, { timeout: 240_000 });
+  await waitForTaskState(page, COLOR_ROW_CLIP, (task) => task.status === 'RUNNING');
+  await waitForTaskState(page, COLOR_ROW_CLIP);
+  await expect(row).toHaveCount(0);
   const observed = await stopPhaseObservation(page);
 
   await goTo(page, 'History');

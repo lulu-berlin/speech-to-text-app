@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { METAL_CLIP } from '../lib/backend.ts';
 import { JFK_QUOTE, appLive, goTo, uploadAndOpen } from './helpers/ui';
 
@@ -7,7 +7,6 @@ import { JFK_QUOTE, appLive, goTo, uploadAndOpen } from './helpers/ui';
 // backend`; this spec proves the choice and the transcript.
 test('gpu:0 transcribes through MTL0 and yields the expected transcript', async ({ page }) => {
   test.skip(process.platform !== 'darwin', 'Metal acceleration is a macOS-runner capability');
-  test.setTimeout(300_000);
 
   await appLive(page);
   await goTo(page, 'Settings');

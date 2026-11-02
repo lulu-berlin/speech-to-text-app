@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { CONTRACT_CLIP, appUrl } from '../lib/backend.ts';
 import type { HttpCapture } from './helpers/capture';
 import { capturedSse, installHttpCapture, installSseCapture } from './helpers/capture';
 import { mustConform } from './helpers/contract';
-import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 // The docs/api shapes, by destination and method (docs/api/README.md): a task's shape
 // is the union of its examples. The upload's `POST /api/tasks` body is one task, while
@@ -66,7 +66,6 @@ const SSE_EXAMPLES: Record<string, string[]> = {
 test('the responses the browser received match the structure of their docs/api examples', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   const http: HttpCapture = [];
   installHttpCapture(page, http);
   await installSseCapture(page);
@@ -85,17 +84,29 @@ test('the responses the browser received match the structure of their docs/api e
   await expect(page.getByRole('listitem').filter({ hasText: clip })).toBeVisible();
   await pause.click();
   await expect(pause).not.toBeChecked();
-  await expect(page.getByText(`${clip} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTaskState(page, clip);
+  await expect(page.getByText(`${clip} transcribed`)).toBeVisible();
   // The duplicate answer (409) exercises the error shape.
-  await uploadClips(page, [clip]);
+  await uploadClips(page, [clip], { expectAcceptance: false });
   await expect(page.getByText(/Already uploaded/)).toBeVisible();
   await goTo(page, 'History');
   await rowOf(page, clip).getByRole('link', { name: clip }).click();
   await expect(page.getByRole('heading', { name: clip })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Transcript' })).toBeVisible();
 
+  // The capture fills asynchronously, one body at a time: wait for the bodies this spec requires
+  // (the turns read and a task event), not merely for the first one (roadmap item 84).
+  await expect
+    .poll(
+      async () => ({
+        turns: http.some((entry) => /\/api\/tasks\/\d+\/turns$/.test(entry.url)),
+        events: (await capturedSse(page)).some((event) => event.name === 'task-updated'),
+      }),
+      { timeout: 30_000 },
+    )
+    .toEqual({ turns: true, events: true });
+
   // Every JSON body the browser received conforms to its docs/api shape...
-  await expect.poll(async () => http.length, { timeout: 10_000 }).toBeGreaterThan(0);
   const seenHttp = new Set<string>();
   for (const { url, method, json, status } of http) {
     const examples = HTTP_SHAPES.filter(

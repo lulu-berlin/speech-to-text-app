@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
-import { JFK_QUOTE, openTranscript } from './helpers/ui';
+import { expect, test } from './helpers/test';
+import { JFK_QUOTE, apiTaskIdOf, ensureTranscript, openTranscript } from './helpers/ui';
 
 // What each format must look like for task 1 (jfk-a.wav: one voice → one speaker named
 // "Speaker 1" → one turn from 0 ms, under a minute). The formats follow item 10's spec
@@ -29,8 +29,9 @@ const FORMATS = [
 test('the txt, srt and vtt downloads have the expected contents and content types', async ({
   page,
 }) => {
+  await ensureTranscript(page, 'jfk-a.wav');
   await openTranscript(page, 'jfk-a.wav');
-  await expect(page).toHaveURL(/\/history\/1$/);
+  await expect(page).toHaveURL(new RegExp(`/history/${await apiTaskIdOf(page, 'jfk-a.wav')}$`));
 
   for (const { format, contentType, shape } of FORMATS) {
     await test.step(format, async () => {

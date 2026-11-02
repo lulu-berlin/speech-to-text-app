@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { DESKTOP_VIEWPORT, PHONE_VIEWPORT, expectLiveQueue, expectShellAt } from './helpers/ui';
 
 test('starts the real backend and loads the built app at phone and desktop widths', async ({

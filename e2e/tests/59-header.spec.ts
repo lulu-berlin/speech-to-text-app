@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './helpers/test';
 import { HEADER_CLIP } from '../lib/backend.ts';
 import { appLive, ensureTranscript, goTo, openTranscript } from './helpers/ui';
 
@@ -53,7 +53,6 @@ async function expectBrandInBand(page: Page, view: string) {
 test('the header brand is a padded ≤ 40 px static icon, text-only once scrolled, and never covers the playing segment', async ({
   page,
 }) => {
-  test.setTimeout(480_000);
   await ensureTranscript(page, HEADER_CLIP);
 
   // Every view: the same compact brand at the top of the page. The queue is reached by the

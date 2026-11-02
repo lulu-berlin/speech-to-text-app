@@ -1,6 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
+import { withinDeadline } from '../lib/bounded.ts';
 import { HELD_PAUSE_CLIP, HELD_PAUSE_NEXT_CLIP } from '../lib/backend.ts';
-import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
+import { appLive, goTo, rowOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 // A row command clicked while another is in flight used to be dropped (roadmap item 81): the
 // event stream shows a paused task's Resume before the Pause request has answered, and a
@@ -12,13 +13,17 @@ import { appLive, goTo, rowOf, uploadClips } from './helpers/ui';
 test('a held Pause response keeps Resume disabled; once it arrives, Resume resumes the task and the queue goes on', async ({
   page,
 }) => {
-  test.setTimeout(600_000);
-
   await appLive(page);
   await uploadClips(page, [HELD_PAUSE_CLIP, HELD_PAUSE_NEXT_CLIP]);
   const running = rowOf(page, HELD_PAUSE_CLIP);
   const next = rowOf(page, HELD_PAUSE_NEXT_CLIP);
-  await expect(running.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
+  // The task's own running phase, not a 120 s ceiling on the row (roadmap item 84, load).
+  await waitForTaskState(
+    page,
+    HELD_PAUSE_CLIP,
+    (task) => task.status === 'RUNNING' && task.phase === 'TRANSCRIBING',
+  );
+  await expect(running.getByText('Transcribing')).toBeVisible();
 
   // The Pause request reaches the real backend; only its response is held in the browser.
   const answered = Promise.withResolvers<void>();
@@ -31,7 +36,10 @@ test('a held Pause response keeps Resume disabled; once it arrives, Resume resum
   });
 
   await running.getByRole('button', { name: `Pause ${HELD_PAUSE_CLIP}` }).click();
-  await answered.promise;
+  await withinDeadline(answered.promise, {
+    what: 'the Pause request to reach the backend',
+    ms: 60_000,
+  });
   const resume = running.getByRole('button', { name: `Resume ${HELD_PAUSE_CLIP}` });
   await expect(resume).toBeVisible();
   await expect(resume).toBeDisabled();
@@ -44,10 +52,10 @@ test('a held Pause response keeps Resume disabled; once it arrives, Resume resum
   await page.unroute('**/api/tasks/*/pause');
 
   // The resumed task completes, and the one queued behind it starts and completes too.
-  await expect(page.getByText(`${HELD_PAUSE_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
-  await expect(page.getByText(`${HELD_PAUSE_NEXT_CLIP} transcribed`)).toBeVisible({
-    timeout: 240_000,
-  });
+  await waitForTaskState(page, HELD_PAUSE_CLIP);
+  await waitForTaskState(page, HELD_PAUSE_NEXT_CLIP);
+  await expect(page.getByText(`${HELD_PAUSE_CLIP} transcribed`)).toBeVisible();
+  await expect(page.getByText(`${HELD_PAUSE_NEXT_CLIP} transcribed`)).toBeVisible();
   await expect(running).toHaveCount(0);
   await expect(next).toHaveCount(0);
   await goTo(page, 'History');

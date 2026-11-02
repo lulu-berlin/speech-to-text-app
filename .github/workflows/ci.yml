@@ -122,7 +122,7 @@ jobs:
       # outage or a cold store can then fail only the type check and Prettier, and the checks' results
       # stay in the log — this job gates a documentation-only pull request, where no code runs.
       - name: The dependency-free checks
-        run: node --test docs/check-exceptions.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/check-action-versions.test.ts
+        run: node --test docs/check-exceptions.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/check-e2e-durations.test.ts docs/check-action-versions.test.ts
       # Tolerated on purpose: with the registry unreachable install cannot resolve, and its failure
       # must not hide the checks above. A real install failure still fails `pnpm test` below on the
       # packages it did not lay down, so the job stays red.
@@ -193,6 +193,15 @@ jobs:
         uses: ./.github/actions/upload-test-results
         with:
           name: e2e-test-results-linux
+      # Roadmap item 84: every spec's duration (Playwright's JSON report), from every run, to compare
+      # with Windows (e2e) on the same commit.
+      - name: Upload the per-spec durations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-durations-linux
+          path: e2e/playwright-report/journey.json
+          retention-days: 30
 
   # macOS (roadmap item 48): Apple Silicon only — Apple and nixpkgs dropped Intel Macs. These jobs
   # run on every push to main, every pull request that touches code, workflow dispatch and the
@@ -434,13 +443,14 @@ jobs:
           path: desktop/dist/*.dmg
           retention-days: 30
       - name: Run the packaged desktop e2e
+        timeout-minutes: 20
         working-directory: e2e
         run: >-
           pnpm exec playwright test -c playwright.desktop.config.ts
           01-journey.spec.ts 02-quit.spec.ts 03-first-run.spec.ts 04-model-download-failure.spec.ts
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
       - name: Upload the failed specs' traces
-        if: failure()
+        if: always()
         uses: ./.github/actions/upload-test-results
         with:
           name: desktop-test-results-macos-dmg
@@ -605,11 +615,11 @@ jobs:
   # nightly; run #389 measured it at 15:54 against macOS's 15:32 (band 13-16 min), the condition the
   # consultation set for joining the every-PR legs. It waits for the Windows checks, as macOS (e2e)
   # waits for macOS's. The runner has no GPU, so the journey runs on the CPU path.
-  # It is NOT in the `ci` aggregator while its load flake is open (2026-10-30): 55 specs on one
-  # worker exhaust their 240 s waits when the runner is loaded, the failing set changes between
-  # runs, and a rerun of the same tree passes. It still runs and reports on every code change; it
-  # rejoins the aggregator once it is reliably green (docs/specs/windows-e2e-journey.md, amended
-  # 2026-10-30).
+  # It gates merges like every other journey: roadmap item 84 returned it to the `ci` aggregator
+  # after five consecutive green runs (17:00, 9:19, 8:40, 15:12 and 11:47 for the e2e step, the
+  # first four before the health wait stopped using global fetch on a backend restart) and fixed
+  # the waits and the harness bugs that made its failures load-dependent
+  # (docs/specs/windows-e2e-journey.md, amendment 2026-10-31).
   windows-e2e:
     name: Windows (e2e)
     needs: [changes, windows-backend-check, windows-frontend-check]
@@ -630,6 +640,15 @@ jobs:
         uses: ./.github/actions/upload-test-results
         with:
           name: e2e-test-results-windows
+      # Roadmap item 84: every spec's duration (Playwright's JSON report), from every run, to compare
+      # with Linux (e2e) on the same commit.
+      - name: Upload the per-spec durations
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-durations-windows
+          path: e2e/playwright-report/journey.json
+          retention-days: 30
 
   # The portable Windows zip, built and tested the way item 49 ships it (roadmap item 49's
   # packaged-zip item): electron-builder packs the staged app, the zip is unpacked like a user's
@@ -733,6 +752,7 @@ jobs:
             "TEST_SPEAKER_SHA256=$($versions.models.speaker.sha256)"
           ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Run the packaged desktop e2e
+        timeout-minutes: 10
         shell: pwsh
         working-directory: e2e
         env:
@@ -746,6 +766,7 @@ jobs:
       # The installer the same staged tree produces (roadmap item 49, test item 12): installed
       # silently, the packaged specs run against the installed app, not the unpacked zip.
       - name: Install the MSI and run the packaged specs against the installed app
+        timeout-minutes: 15
         shell: pwsh
         working-directory: e2e
         env:
@@ -754,7 +775,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $msi = Get-ChildItem ..\desktop\dist\Speech-to-Text-*-win-x64.msi | Select-Object -First 1
           if (-not $msi) { throw 'no MSI was produced: the win target builds only the zip' }
-          $install = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /quiet /norestart" -Wait -PassThru
+          # The installer's own log, kept even when the step times out (roadmap item 84): run #443
+          # hung here and left no evidence at all.
+          $log = Join-Path $env:RUNNER_TEMP 'msi-install.log'
+          $install = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /quiet /norestart /l*v `"$log`"" -Wait -PassThru
           if ($install.ExitCode -ne 0 -and $install.ExitCode -ne 3010) { throw "msiexec /i failed: $($install.ExitCode)" }
           $app = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Filter 'Speech-to-Text.exe' -File |
             Select-Object -First 1
@@ -767,6 +791,7 @@ jobs:
       # And the installer's own lifecycle: a silent install, the app's journey, a silent uninstall
       # by ProductCode, and the per-user data and model cache surviving it.
       - name: Run the MSI installer spec
+        timeout-minutes: 15
         shell: pwsh
         working-directory: e2e
         env:
@@ -775,11 +800,21 @@ jobs:
           $ErrorActionPreference = 'Stop'
           pnpm exec playwright test -c playwright.desktop.config.ts 15-msi-install.spec.ts
           if ($LASTEXITCODE -ne 0) { throw 'the MSI spec failed' }
+      # Roadmap item 84: the installer's own log, kept even when a step times out — run #443 hung
+      # in the MSI spec and left nothing to diagnose.
+      - name: Upload the MSI install log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: msi-install-log-windows
+          path: ${{ runner.temp }}/msi-install.log
+          if-no-files-found: ignore
+          retention-days: 7
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results). Each
       # Playwright step above clears e2e/test-results, and the job stops at the first failing one,
-      # so this holds that step's.
+      # so this holds that step's. `always()` (roadmap item 84): a timeout must still upload it.
       - name: Upload the failed specs' traces
-        if: failure()
+        if: always()
         uses: ./.github/actions/upload-test-results
         with:
           name: desktop-test-results-windows
@@ -1131,11 +1166,12 @@ jobs:
       # The specs run from e2e/, the way the container harness runs them from /e2e: the desktop
       # config's testDir is relative to it.
       - name: Run the packaged desktop e2e
+        timeout-minutes: 20
         working-directory: e2e
         run: xvfb-run -a pnpm exec playwright test -c playwright.desktop.config.ts
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
       - name: Upload the failed specs' traces
-        if: failure()
+        if: always()
         uses: ./.github/actions/upload-test-results
         with:
           name: desktop-test-results-linux-deb
@@ -1159,13 +1195,14 @@ jobs:
       - name: Install the devenv CLI
         run: nix profile install nixpkgs#devenv
       - name: Build the flake package and run the packaged desktop e2e against it
+        timeout-minutes: 60
         run: >-
           devenv shell -- bash -euo pipefail -c
           'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:nix'
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results); the
       # container writes them into the mounted e2e/ (desktop/run-in-docker.ts).
       - name: Upload the failed specs' traces
-        if: failure()
+        if: always()
         uses: ./.github/actions/upload-test-results
         with:
           name: desktop-test-results-linux-flake
@@ -1204,13 +1241,14 @@ jobs:
       - name: Install the devenv CLI
         run: nix profile install nixpkgs#devenv
       - name: Build the bundle and run the packaged desktop e2e against it
+        timeout-minutes: 90
         run: >-
           devenv shell -- bash -euo pipefail -c
           'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:bundle'
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results); the
       # container writes them into the mounted e2e/ (desktop/run-in-docker.ts).
       - name: Upload the failed specs' traces
-        if: failure()
+        if: always()
         uses: ./.github/actions/upload-test-results
         with:
           name: desktop-test-results-linux-bundle
@@ -1315,14 +1353,13 @@ jobs:
   # them did. A *skipped* job does not fail it, so a conditional job cannot break the gate, and
   # renaming a job cannot silently un-gate merges. `changes` is in `needs` so the decision itself is
   # reported; a documentation-only pull request reaches this job with every heavy job skipped and
-  # still goes green (roadmap item 80). `model-hosts` is one deliberate exception (its own comment
-  # says why) and `windows-e2e` the other while its load flake is open (docs/specs/
-  # windows-e2e-journey.md, amended 2026-10-30); a job absent from this list cannot gate merges. Every other job's name starts
+  # still goes green (roadmap item 80). `model-hosts` is the one deliberate exception (its own
+  # comment says why); a job absent from this list cannot gate merges. Every other job's name starts
   # with the platform it targets (Linux, macOS, Windows); this one covers all of them, and branch
   # protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
-    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-desktop-zip]
+    needs: [changes, backend-check, frontend-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-e2e, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

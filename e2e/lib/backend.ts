@@ -11,6 +11,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { get } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
@@ -83,7 +84,7 @@ export const FIXTURE_CLIPS = [
   'jfk-race.wav', // 8-11s, item 41's concurrent-upload race
   'jfk-x.wav', // 2-8s, item 59's favicon typing clip
   'jfk-y.wav', // 3-6s, item 59's upload-options clip
-  'jfk-aa.wav', // the sample looped 16x, ~176s, item 59's running-row clip
+  'jfk-aa.wav', // the sample looped 7x, ~77s, item 59's running-row clip
   'jfk-ab.wav', // 1-3s, item 59's queued-row clip
   'jfk-ac.wav', // 9-11s, item 59's history-row clip
   'broken-59.wav', // item 59's history-row retry fixture
@@ -238,13 +239,52 @@ export function saveState(patch: Partial<E2eState>): void {
   writeFileSync(STATE_FILE, JSON.stringify({ ...state, ...patch }));
 }
 
+/**
+ * Refuses a journey that would share this checkout with a run already in progress (roadmap item 84):
+ * one `.e2e-state.json` per checkout means a second run reads the first's port, starts a backend
+ * over it and kills the first's, and both then fail as a cascade with `ECONNREFUSED`. The state
+ * names the backend's pid — a pid that still exists is a live run, one that is gone is a leftover
+ * the run may overwrite.
+ */
+export function refuseLiveRun(
+  statePath: string = STATE_FILE,
+  alive: (pid: number) => boolean = processAlive,
+): void {
+  if (!existsSync(statePath)) return;
+  let state: unknown;
+  try {
+    state = JSON.parse(readFileSync(statePath, 'utf8'));
+  } catch {
+    return; // a half-written or hand-edited file: this run overwrites it
+  }
+  if (typeof state !== 'object' || state === null || !('pid' in state)) return;
+  const pid = state.pid;
+  if (typeof pid !== 'number' || !alive(pid)) return;
+  throw new Error(
+    `another journey is running from this checkout (${statePath} names pid ${pid}); stop it ` +
+      'and, if the process is a leftover, delete that file before starting another run',
+  );
+}
+
+/** Whether [pid] is a process this user can see: a signal 0 probe answers without sending one. */
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM means the process exists and belongs to someone else, which a shared checkout's run is not.
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
 // The app's origin for this run; the tests reach the backend through it (the app itself
 // talks to same-origin /api, so no port ever appears in frontend code).
 export function appUrl(path = '/'): string {
   return `http://127.0.0.1:${loadState().port}${path}`;
 }
 
-// Without Nix, `./gradlew e2e` sets all of these (roadmap item 33).
+// Without Nix, `./gradlew e2e` sets all of these (roadmap item 33). The built UI is not checked
+// here: global-setup.ts builds it when its inputs changed since the last build (roadmap item 84).
 export function checkPreconditions(): void {
   const setBy = 'run inside the devenv shell (devenv.nix sets it) or use ./gradlew e2e';
   if (!process.env.TEST_WHISPER_TINY_EN_MODEL) {
@@ -255,11 +295,6 @@ export function checkPreconditions(): void {
   }
   if (!process.env.TEST_JFK_WAV) {
     throw new Error(`TEST_JFK_WAV is unset — ${setBy}`);
-  }
-  if (!process.env.E2E_BACKEND_CMD && !existsSync(join(frontendDist, 'index.html'))) {
-    throw new Error(
-      `no built frontend at ${frontendDist} — build it first: pnpm --dir frontend install && pnpm --dir frontend build`,
-    );
   }
 }
 
@@ -298,13 +333,26 @@ export async function waitForHealth(
     signal,
   }: { down?: boolean; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<void> {
-  const answering = async (): Promise<boolean> => {
-    try {
-      const response = await fetch(healthUrl(port), { signal: AbortSignal.timeout(2_000) });
-      return response.ok;
-    } catch {
-      return false;
-    }
+  // node:http, not fetch: Node 24's bundled undici calls `socket.setTypeOfService()` on every
+  // request, and macOS can refuse it with an EINVAL thrown outside the fetch promise — a poll during
+  // a backend restart then killed the Playwright worker (roadmap item 84, nodejs/undici#5544). One
+  // connection per poll (`agent: false`), so no pooled socket outlives the backend it reached.
+  const answering = (): Promise<boolean> => {
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const request = get(
+      healthUrl(port),
+      { agent: false, signal: AbortSignal.timeout(2_000) },
+      (response) => {
+        const status = response.statusCode ?? 0;
+        response.once('end', () => resolve(status >= 200 && status < 300));
+        // A body cut off by a dying backend: `close` without `end`, or an `error`.
+        response.once('error', () => resolve(false));
+        response.once('close', () => resolve(false));
+        response.resume();
+      },
+    );
+    request.once('error', () => resolve(false));
+    return promise;
   };
   const reached = await waitUntil(async () => (down ? !(await answering()) : await answering()), {
     timeoutMs,

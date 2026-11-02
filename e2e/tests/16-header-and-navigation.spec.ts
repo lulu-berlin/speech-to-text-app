@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './helpers/test';
 import { HEADER_CLIP } from '../lib/backend.ts';
 import {
   DESKTOP_VIEWPORT,
@@ -9,6 +9,7 @@ import {
   openTranscript,
   rowOf,
   uploadClips,
+  waitForTaskState,
 } from './helpers/ui';
 
 // The acceptance of the finished shell (roadmap item 31, ADR 0046; item 59 for the brand
@@ -24,8 +25,6 @@ const THEME_STEP = 4;
 test('the finished shell: sticky header, nav pills, brand home link, text-only compact header', async ({
   page,
 }) => {
-  test.setTimeout(420_000);
-
   const themeButton = page.getByRole('button', { name: /Theme:/ });
   const setTheme = async (mode: 'light' | 'dark' | 'system') => {
     // The button's accessible name is the current mode (AppHeader THEME_LABEL); the
@@ -115,7 +114,12 @@ test('the finished shell: sticky header, nav pills, brand home link, text-only c
   // 2026-10-18: the 40 px mark carries the animation).
   await uploadClips(page, [HEADER_CLIP]);
   const running = rowOf(page, HEADER_CLIP);
-  await expect(running.getByText('Transcribing')).toBeVisible({ timeout: 120_000 });
+  await waitForTaskState(
+    page,
+    HEADER_CLIP,
+    (task) => task.status === 'RUNNING' && task.phase === 'TRANSCRIBING',
+  );
+  await expect(running.getByText('Transcribing')).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(headerMascot).toBeVisible();
   expect((await headerMascot.boundingBox())?.height).toBe(px(2.5));
@@ -130,7 +134,8 @@ test('the finished shell: sticky header, nav pills, brand home link, text-only c
       );
     }
   }
-  await expect(page.getByText(`${HEADER_CLIP} transcribed`)).toBeVisible({ timeout: 240_000 });
+  await waitForTaskState(page, HEADER_CLIP);
+  await expect(page.getByText(`${HEADER_CLIP} transcribed`)).toBeVisible();
 
   // The transcript: short viewports so the page itself scrolls (the window scroll
   // drives the header's compact form; the transcript region scrolls internally
