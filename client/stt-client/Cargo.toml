@@ -18,6 +18,11 @@ shlex = "2"
 tray-icon = { version = "0.26.1", optional = true }
 muda = { version = "0.21.2", optional = true }
 tao = { version = "0.37.2", optional = true }
+# These three pin gtk 0.18 on Linux (muda's gtk3 menu backend, tao's GTK event loop), which requires
+# glib ^0.18; glib 0.18.5 carries GHSA-wrw7-89jp-8q8g (an unsound `VariantStrIter` iterator) and the
+# fix is glib 0.20, whose first gtk line (0.19) these crates have not adopted. Both upstreams track
+# the move; bump all three together once a release takes gtk 0.19, run `cargo update`, and the
+# Dependabot alert on glib goes with it.
 
 [dev-dependencies]
 tempfile = "3"
