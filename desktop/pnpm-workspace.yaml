@@ -12,3 +12,7 @@ allowBuilds:
 # overridden to the patch release (GHSA-xjj6-f33q-929c).
 overrides:
   'undici@<6.29.1': 6.29.1
+  # minimatch <11.0.1 has the globparts amplification DoS (GHSA-g3hv-75wg-m249). electron-builder
+  # 26.18's app-builder-lib and @electron/asar still ask for ^10, so the line is overridden to the
+  # patched release; the packaged CI jobs prove the artifacts still build and run.
+  'minimatch@<11.0.1': 11.0.1
