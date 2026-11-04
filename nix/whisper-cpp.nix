@@ -1,24 +1,22 @@
 # whisper-cpp shared by devenv.nix (development) and flake.nix (packaging), like
 # nix/models.nix: one build in both worlds (ADR 0036).
 #
-# Pinned to the v1.8.4 tag by a source override (item 33 consultation, 2026-10-11):
-# the Gradle bootstrap downloads the jiang1997 1.8.4 prebuild, so the Nix build, the
-# devenv and the Gradle path all run one version. Vulkan is the GPU path on any Linux
-# host with a Vulkan driver. The tag comes from nix/versions.nix (one copy).
+# Pinned to the v1.9.5 tag by a source override (roadmap item 90): nixpkgs' recipe is for 1.9.2,
+# so the override moves the tag and keeps our flags. Vulkan is the GPU path on any Linux host with
+# a Vulkan driver, Metal is the GPU path on Apple Silicon. The tag comes from nix/versions.nix
+# (one copy) and is also the release tag's version (`whisper-cpp-1.9.5`, nix/release-asset.nix).
 #
-# nixpkgs' recipe is for 1.9.2, and two of its parts differ at 1.8.4: the install
-# check also runs parakeet-cli, which 1.8.4 does not have, and its WHISPER_COMMON_FFMPEG
-# option is still named WHISPER_FFMPEG there, so the flag is a no-op and whisper-cli is
-# built without ffmpeg libs (it reads the backend's FLAC chunks through its bundled
-# miniaudio). The source hash is the NAR hash of the v1.8.4 tarball.
+# At 1.9.x the nixpkgs recipe's install check covers the binaries that exist, so the 1.8.4-only
+# install-check override is gone; the source hash is the NAR hash of the v1.9.5 tarball.
 #
 # `withFFmpegSupport = false` (roadmap item 62): nixpkgs' recipe otherwise wraps the unused
 # `bin/whisper-server` with nixpkgs' ffmpeg and adds it as a build input; whisper-cli needs
 # neither. With it off, the only ffmpeg in every shipped closure is the app's pinned
 # audio-only artifact.
 #
-# `vulkanSupport` on Linux and `metalSupport` on darwin (roadmap item 48): nixpkgs turns Metal on
-# by default only for aarch64-darwin, so x86_64-darwin needs it explicitly. `withSDL = false` (found
+# `vulkanSupport` on Linux and `metalSupport` on darwin (roadmap item 48): the flake's darwin
+# system is aarch64-darwin, where nixpkgs enables Metal by default; the flag keeps it explicit.
+# `withSDL = false` (found
 # 2026-10-15 by `nix why-depends` on the desktop closure): the default builds whisper.cpp's SDL
 # example too, which alone dragged SDL2 -> sdl2-compat -> sdl3 -> zenity -> libadwaita -> gtk4 ->
 # gstreamer -> gst-plugins-bad -> flite, freepats, chromaprint, python3 and pipewire into the
@@ -47,13 +45,8 @@ let
       owner = "ggml-org";
       repo = "whisper.cpp";
       tag = "v${tag}";
-      hash = "sha256-YCuWKDKlrhbx+t3t2kDpAwuKt4rkipDsOXO6uqIU/W0=";
+      hash = "sha256-Qqqpt+pvCQwSbyaBr1bdb7q+3LbELTcloHdiSikGPc4=";
     };
-    installCheckPhase = ''
-      runHook preInstallCheck
-      "$out/bin/whisper-cli" --help >/dev/null
-      runHook postInstallCheck
-    '';
   };
 
   # The pinned release asset for this system, if any: the shared helper fetches, re-links and

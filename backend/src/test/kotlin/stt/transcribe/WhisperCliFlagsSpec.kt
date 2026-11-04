@@ -9,8 +9,8 @@ import stt.process.ProcessResult
 import stt.process.ProcessRunner
 
 /**
- * Roadmap item 48: the shipped whisper-cli must accept the flags `DeviceArgs` emits — the 1.8.4
- * binary (the Gradle bootstrap's managed tool), not an assumption carried over from 1.9.x docs.
+ * Roadmap item 48: the shipped whisper-cli must accept the flags `DeviceArgs` emits — the 1.9.5
+ * binary (the Gradle bootstrap's managed tool), not an assumption carried over from other docs.
  * `--help` lists them, and a real run accepts both on the tiny model.
  */
 class WhisperCliFlagsSpec :

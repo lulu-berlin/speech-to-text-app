@@ -7,7 +7,7 @@ import java.nio.file.Path
 
 class DeviceProbeMetalSpec :
     BehaviorSpec({
-        given("the pinned 1.8.4 darwin whisper-cli, which enumerates Metal as MTL0") {
+        given("the pinned 1.9.5 darwin whisper-cli, which enumerates Metal as MTL0") {
             `when`("the startup probe reads its stderr") {
                 then("the probe reports gpu:0 named Metal (MTL0)") {
                     probeWith(METAL_STDERR).probe() shouldBe
@@ -32,7 +32,7 @@ private fun probeWith(stderr: List<String>) =
         executable = "whisper-cli",
     )
 
-/** The lines whisper.cpp 1.8.4's Metal build prints while enumerating its GPU (ggml device MTL0). */
+/** The lines whisper.cpp 1.9.5's Metal build prints while enumerating its GPU (ggml device MTL0). */
 private val METAL_STDERR =
     listOf(
         "ggml_metal_init: GPU name:   MTL0",

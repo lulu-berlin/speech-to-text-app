@@ -134,9 +134,9 @@ Each form has its packaged end-to-end suite, run in a clean container from the d
 
 Prerequisites: [Nix](https://nixos.org/download/), [devenv](https://devenv.sh/getting-started/) and, recommended, [direnv](https://direnv.net/) (hooked into your shell), on Linux x86-64 or macOS Apple Silicon. The development shell provides every tool and pins every version — JDK 21, Gradle, Node.js, pnpm, Rust, whisper.cpp, ffmpeg, SQLite, Playwright and the models ([ADR 0010](docs/decisions/0010-development-toolchain.md)); nothing else is installed by hand.
 
-The shell's `ffmpeg` is the app's audio-only build from the pinned `desktop-ffmpeg-v2` asset on both systems (roadmap items 62 and 69): the static build on Linux, and on Apple Silicon the `.tar.gz` build whose only dependencies are the OS's libraries. It has neither `ffplay` nor `ffprobe`, so use another player to listen to a file and another tool to probe media.
+The shell's `ffmpeg` is the app's audio-only build from the pinned `ffmpeg-8.1.3` asset on both systems (roadmap items 62 and 69): the static build on Linux, and on Apple Silicon the `.tar.gz` build whose only dependencies are the OS's libraries. It has neither `ffplay` nor `ffprobe`, so use another player to listen to a file and another tool to probe media.
 
-The shell's `whisper-cli` is the same pinned 1.8.4 build (Vulkan on Linux, Metal on darwin) that `nix build .` and `.#desktop` ship, from the `desktop-whisper-cpp-v1` asset on x86_64-linux (roadmap item 63). Every system the flake declares must pin a whisper-cpp artifact — a flake check enforces it — so no machine compiles it.
+The shell's `whisper-cli` is the same pinned 1.9.5 build (Vulkan on Linux, Metal on Apple Silicon) that `nix build .` and `.#desktop` ship, from the version-named `whisper-cpp-1.9.5` release asset on x86_64-linux and aarch64-darwin (roadmap items 63, 48 and 90). Every system the flake declares must pin a whisper-cpp artifact — a flake check enforces it — so no machine compiles it.
 
 The end-to-end fixture generator (`e2e/lib/fixtures.ts`, run by `e2e/global-setup.ts`) decodes the pinned sample to `f32le` and cuts, loops and concatenates the clips as 16 kHz mono PCM WAV itself. It needs only a decoder and the `f32le` muxer, not the `wav` muxer or the `concat` filter, so `./gradlew e2e` needs no general-purpose ffmpeg: on macOS it runs with the pinned audio-only artifact, on Linux with the bytedeco build `./gradlew` manages. `e2e/lib/fixtures.test.ts` checks the generator with whichever `ffmpeg` is first on `PATH`; on macOS CI that is the pinned slim binary.
 
@@ -194,11 +194,11 @@ The container runs as an unprivileged user (uid 1000) and writes only to its dat
 
 ### Gradle without Nix
 
-For working on the app without Nix: the repository's `./gradlew` downloads everything else itself — Gradle 9.8, JDK 21, Node.js, pnpm, whisper-cli 1.8.4, ffmpeg 8.1 and the models — at the versions the Nix flake pins (the committed [`versions.json`](versions.json), which the flake checks), and verifies every file's SHA-256. Linux x86-64, macOS Apple Silicon and Windows x64 are tested; Intel macOS is unsupported (the pinned darwin-x64 prebuild is broken and nixpkgs has no `x86_64-darwin`). This path is for people; AI agents working on the repository keep to Nix and devenv ([AGENTS.md](AGENTS.md)).
+For working on the app without Nix: the repository's `./gradlew` downloads everything else itself — Gradle 9.8.2, JDK 21, Node.js, pnpm, whisper-cli 1.9.5, ffmpeg 8.1 and the models — at the versions the Nix flake pins (the committed [`versions.json`](versions.json), which the flake checks), and verifies every file's SHA-256. On Linux the whisper-cli is our portable glibc build (static whisper libraries, the system Vulkan loader); the Nix routes use the Nix build of the same version. Linux x86-64, macOS Apple Silicon and Windows x64 are tested; Intel macOS is unsupported (Apple discontinued it and nixpkgs has no `x86_64-darwin`, so the bootstrap fails fast). This path is for people; AI agents working on the repository keep to Nix and devenv ([AGENTS.md](AGENTS.md)).
 
 Prerequisites:
 
-- **Java 21 or newer** (Gradle 9.8 itself runs on Java 17–27, but the backend compiles with `-Xjdk-release=21`, so a 17–20 launcher JVM cannot build it). The app is run with JDK 21, which Gradle downloads when your Java is another version.
+- **Java 21 or newer** (Gradle 9.8.2 itself runs on Java 17–27, but the backend compiles with `-Xjdk-release=21`, so a 17–20 launcher JVM cannot build it). The app is run with JDK 21, which Gradle downloads when your Java is another version.
 - **Linux**: glibc 2.38 or newer (Ubuntu 24.04+, Debian 13+, Fedora 39+) and the system libraries the prebuilt tools are linked against — only this path needs them; Nix, devenv and Docker bring their own:
   - whisper-cli: `libstdc++6`, `libgomp1` and the Vulkan loader `libvulkan1` (needed even without a GPU);
   - ffmpeg: `libasound2` (`libasound2t64` on Ubuntu 24.04+ and Debian 13), `libpulse0`, `libxcb1`, `libxcb-shm0` and `libudev1`.
@@ -213,7 +213,7 @@ Prerequisites:
   ./gradlew runtimeSystemDeps
   ```
 
-- **macOS Apple Silicon**: no extra tools. The bootstrap downloads the pinned static 1.8.4 Metal whisper-cli from the `desktop-whisper-cpp-v1` release; the app signals its direct child, so it needs no `setsid` and no system libraries. Data lives in `~/Library/Application Support/stt-app`. The older upstream darwin prebuilts (no GPU backend) are not used.
+- **macOS Apple Silicon**: no extra tools. The bootstrap downloads the pinned static 1.9.5 Metal whisper-cli from the version-named `whisper-cpp-1.9.5` release; the app signals its direct child, so it needs no `setsid` and no system libraries. Data lives in `~/Library/Application Support/stt-app`. The older upstream darwin prebuilts (no GPU backend) are not used.
 
 ```sh
 git clone https://github.com/lulu-berlin/speech-to-text-app.git

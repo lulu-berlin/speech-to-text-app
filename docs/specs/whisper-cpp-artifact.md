@@ -182,3 +182,26 @@ e2e-exempt (ADR 0046): a packaging item that changes no app feature.
   `nix/ffmpeg.nix` now names the producer app, and the Proposal records the producer-app split.
   Squashed onto `main` (`ba7f3130`) as the item's single commit; the PR CI reruns every job on the
   squashed head.
+
+## Amendment (roadmap item 90, 2026-11-03)
+
+- The pinned version is whisper.cpp **1.9.5**. The source override keeps our flags (Vulkan on
+  Linux, Metal on Apple Silicon, no SDL, no ffmpeg support); the two 1.8.4-only workarounds are
+  gone ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).
+- The release tag is `whisper-cpp-1.9.5`, derived from the manifest's `whisperCppTag`, not an
+  internal `v1`/`v2` counter; a same-version rebuild takes a `-2` suffix. Every asset is
+  `whisper-cpp-1.9.5-<nix system>.tar.gz` — one `.tar.gz` format on every system because the
+  Gradle bootstrap cannot read zstd.
+- No route downloads the jiang1997 prebuild any more. `x86_64-linux`, `aarch64-darwin` and
+  `x86_64-windows` are all our release assets; the download keys are Nix system names, and the
+  Intel macOS entries are gone.
+- The flake check `whisper-asset-version` holds the tag, file names and pin URLs to the manifest
+  version, and rejects a pin on another tag. The producer prints the pin; the user publishes and
+  pastes it.
+- The Nix Linux build is not relocatable: `patchelf --print-interpreter` and `readelf -d` name
+  `/nix/store` paths (the Nix glibc loader and the source/llama/glibc libraries), so a Gradle
+  bootstrap or a `.deb` on a plain Linux host cannot start it. The Nix routes keep the Nix asset;
+  the Gradle bootstrap and the `.deb` use the portable `linux-whisper-asset` CI build
+  (`whisper-cpp-1.9.5-x86_64-linux-glibc.tar.gz`, static whisper libraries, system Vulkan),
+  published under the same tag. `nix/versions.nix`'s Linux whisper download points at it;
+  `desktop/stage.ts` finds and copies the executables rather than assuming the Nix tar layout.

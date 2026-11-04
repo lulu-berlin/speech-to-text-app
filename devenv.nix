@@ -15,16 +15,15 @@ in
     [
       pkgs.git
 
-      # Transcribe CLI: the pinned 1.8.4 build (Vulkan on Linux, static Metal on darwin) from the
-      # desktop-whisper-cpp-v1 asset on x86_64-linux and aarch64-darwin (roadmap items 63 and 48),
-      # the same one `nix build .` and .#desktop ship.
+      # Transcribe CLI: the pinned 1.9.5 build (Vulkan on Linux, static Metal on darwin) from the
+      # version-named whisper-cpp-1.9.5 asset on x86_64-linux and aarch64-darwin (roadmap items 63,
+      # 48 and 90), the same one `nix build .` and .#desktop ship.
       (import ./nix/whisper-cpp.nix { inherit pkgs; }).whisperCpp
 
-      # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks
-      # (from the 1.8.4 pin the WHISPER_FFMPEG build flag is a no-op — see
-      # nix/whisper-cpp.nix); standalone ffmpeg is handy for trimming/merging audio
+      # Audio tooling: whisper-cpp's bundled miniaudio decodes the app's FLAC chunks;
+      # standalone ffmpeg is handy for trimming/merging audio
       # before transcription. The shell ships the app's audio-only ffmpeg from the
-      # pinned desktop-ffmpeg-v2 asset on both systems (roadmap items 62 and 69; item 33's
+      # pinned ffmpeg-8.1.3 asset on both systems (roadmap items 62 and 69; item 33's
       # Gradle bootstrap syncs 8.1 too): only `ffmpeg`, no `ffplay` or `ffprobe`.
       ffmpeg
 
@@ -42,7 +41,7 @@ in
       # found through PLAYWRIGHT_BROWSERS_PATH below. e2e/'s @playwright/test stays
       # pinned to the playwright version THIS devenv provides (devenv's pkgs come from
       # the flake's shared nixpkgs pin — ADR 0036 — currently
-      # playwright 1.63.0, browser revisions 1243;
+      # playwright 1.64.1, browser revisions 1248;
       # e2e/check-playwright.ts verifies comment, package.json and the realized store
       # agree): the npm package and the farm
       # must agree on the browser revisions. Bump both together. Dev only — the flake's

@@ -75,3 +75,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0062 | [Settings save themselves, and a reset restores the server's defaults](0062-settings-auto-save-and-default-reset.md) | accepted, supersedes item 32's Save flow and adds `DELETE /api/settings` | 2026-10-27 |
 | 0063 | [The app is the behavioral reference; the Python oracle is retired](0063-app-is-the-behavioral-reference.md) | accepted, supersedes [0002](0002-no-python-oracle-only.md) | 2026-10-29 |
 | 0064 | [The service and the tray are one unit in app mode](0064-service-and-tray-are-one-unit.md) | accepted, supersedes "the tray is optional" in roadmap item 66 | 2026-10-31 |
+| 0065 | [We publish our own artifacts, their tags name what determines their content, and platform keys are Nix system names](0065-own-artifacts-versioned-tags-nix-platform-keys.md) | accepted | 2026-11-03 |

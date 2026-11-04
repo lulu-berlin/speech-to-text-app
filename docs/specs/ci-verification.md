@@ -192,3 +192,15 @@ a Mac or a Windows machine, and the repo has no CI today.
 - 2026-10-21 (amended by the user's decision in item 48): the six macOS legs run on every pull
   request and every push to main, not only nightly and item 48's PRs; the workflow's `roadmap/48-`
   gate is removed and item 48's spec records the decision. The Windows cadence is unchanged.
+
+## Amendment (roadmap item 90, 2026-11-03)
+
+- The manual `macos-whisper-asset` and `windows-whisper-asset` jobs read the whisper version from
+  `versions.json` and emit `whisper-cpp-<version>-<nix system>.tar.gz`; no tag or version is
+  hardcoded in the workflow. `macos-ffmpeg-asset` and `windows-ffmpeg-asset` emit the 8.1.3 assets
+  for the `ffmpeg-8.1.3` release.
+- The CI matrix has no Intel macOS leg and no `darwin-x64` artifact: Apple Silicon is the only
+  macOS platform, and an Intel Mac fails fast
+  ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).
+- `checkVersions` (run by the Linux/Windows/macOS check jobs) also holds `devenv.yaml` to
+  `flake.lock`'s nixpkgs rev, so the bump's pin pair cannot drift.

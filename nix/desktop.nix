@@ -1,6 +1,6 @@
 # The desktop app as a flake package (roadmap item 50, ADR 0053): `nix build .#desktop`,
 # `nix run .#desktop`. The same app code as the .deb (desktop/src, compiled by tsc) on the flake's
-# own parts: the backend jars, the built UI, whisper-cpp 1.8.4 (Vulkan) and ffmpeg 8.1 — the ones
+# own parts: the backend jars, the built UI, whisper-cpp 1.9.5 (Vulkan) and ffmpeg 8.1 — the ones
 # `nix run .` ships — a jlink JRE, and the pinned upstream Electron. The resources are laid out as
 # electron-builder lays them out for the .deb, so desktop/src/backend.ts finds everything where
 # it looks. The models are NOT referenced: the app downloads them on first start or takes them

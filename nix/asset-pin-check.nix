@@ -9,7 +9,8 @@
 # flake's `apps.<name>` exposes. The script names the check, so running the app builds the check and
 # the source it asserts against, while `nix flake check` only evaluates the check. `pinError` is
 # the pin gates' message (null when they pass) and `verifyAsset` the sha256 gate, so a flake check
-# can exercise both with fixtures.
+# can exercise both with fixtures. `asset.file` is whatever nix/release-asset.nix makes (`.tar.gz`
+# for every whisper asset, roadmap item 90; `.tar.zst` for Linux Mesa, `.tar.gz` for darwin ffmpeg).
 {
   pkgs,
   source,

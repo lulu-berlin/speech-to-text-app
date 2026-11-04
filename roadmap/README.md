@@ -117,7 +117,7 @@ graph TD
   42 --> 60[60 exception-handling policy ✓]:::done
   61[61 headless ffmpeg ✓]:::done --> 62[62 audio-only ffmpeg ✓]:::done
   56 --> 62
-  63[63 whisper-cpp build time ✓]:::done --> 90[90 nixpkgs bump, own whisper artifact, platform keys]
+  63[63 whisper-cpp build time ✓]:::done --> 90[90 own artifacts, versioned tags, platform keys ✓]:::done
   33 --> 90
   49 --> 90
   50 --> 64[64 evaluate Tauri ✓]:::done
@@ -268,4 +268,4 @@ graph TD
 | [87 — Writes wait for the connection, and a control with nothing to do says so](../docs/specs/writes-and-the-connection.md)                                                       | done          | —                           |
 | [88 — Localization: the app's own language, in every language whisper transcription supports](88-localization.md)                                                          | spec-approved | 74                          |
 | [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | draft | 66 |
-| [90 — A nixpkgs bump, our own whisper.cpp 1.9.5 artifact on every route, and one platform vocabulary](90-nixpkgs-bump-whisper-artifact-and-platform-keys.md) | spec-approved | 63, 48, 49, 33 |
+| [90 — A nixpkgs bump, our own whisper.cpp 1.9.5 artifact on every route, and one platform vocabulary](../docs/specs/own-artifacts-and-platform-keys.md) | done | 63, 48, 49, 33 |
