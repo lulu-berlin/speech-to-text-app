@@ -378,3 +378,9 @@ jiang1997 entries and the same-version-rebuild suffix follow from them.
   wrong for Linux: the Nix routes use the Nix source asset and the Gradle bootstrap/`.deb` the
   portable glibc asset, the two toolchain variants of one version (ADR 0065). Reworded to “one
   version, with the two Linux outputs as toolchain variants”; no other test-list item changed.
+- 2026-11-04 (final whole run 41795877201, id 41795877201, head a74d0b6b): the whole matrix
+  passed — docs, Gradle checks and integrationTest, Linux/macOS/Windows e2e, the packaged `.deb`,
+  DMG and Windows zip, Nix build/devenv/flake check, bundle and flake-package e2e, cargo and pnpm;
+  the manual asset jobs skipped on an `assets=false` dispatch. The root agent's squash `8124281b`
+  is the PR preparation after the run; the run's evidence is `a74d0b6b`. Status remains done from
+  the root's step 8; the root handles the final squash and the PR.
