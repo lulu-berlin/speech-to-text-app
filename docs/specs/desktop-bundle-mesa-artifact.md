@@ -282,3 +282,13 @@ bundle needs, and does not reintroduce OpenGL drivers or LLVM into the runtime c
   Nix build's `gradle check`, as they can the already-required `desktop-nix-e2e` and `nix-build`.
   The ffmpeg follow-up is filed as roadmap item 61 (draft). Spec and final test list moved here
   from `roadmap/56-desktop-bundle-mesa-artifact.md`; squashed to one commit (ADR 0050).
+
+## Amendment (roadmap item 90, 2026-11-03)
+
+- The 2026-11 nixpkgs bump moved the bundle Mesa to **26.2.6** and changed the source out path, so
+  the asset was rebuilt and republished under **`mesa-26.2.6`**
+  (`stt-bundle-mesa-vulkan-26.2.6-x86_64-linux.tar.zst`), the tag following the version
+  (`mesa-26.2.6`); a same-version rebuild takes `-2`
+  ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).
+- The pin's store path, references and sha256 are the producer's print after the user's upload;
+  the base OS spellings in the download table and the keys are Nix system names.

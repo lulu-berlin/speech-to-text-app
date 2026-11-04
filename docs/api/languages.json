@@ -1,5 +1,5 @@
 {
-  "whisperVersion": "1.8.4",
+  "whisperVersion": "1.9.5",
   "default": "auto",
   "languages": [
     { "code": "auto", "name": "auto-detect" },

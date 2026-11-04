@@ -379,3 +379,15 @@ are its end-to-end proof.
   and `gradle integrationTest` are green on `06f0df4d`; the user's `nix flake check` is green on
   the same tree. Squashed onto `main` (`d3ebbe19`) as the item's single commit; the PR CI reruns
   the packaged specs and the 40-spec e2e journey on the v2 asset.
+
+## Amendment (roadmap item 90, 2026-11-03)
+
+- The 2026-11 nixpkgs bump moved the source to **8.1.3** and changed every artifact pin, so the
+  audio-only assets were rebuilt and republished under **`ffmpeg-8.1.3`**: Linux
+  `ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.3-x86_64-linux.tar.zst`, macOS
+  `ffmpeg-audio-only-8.1.3-aarch64-darwin.tar.gz`, Windows
+  `ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz`. The enable lists are unchanged; a bump gets
+  the version from the tag (`ffmpeg-8.1.3`), and a rebuild at the same version takes `-2`
+  ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).
+- The Gradle bootstrap's Linux ffmpeg stays bytedeco's 8.1.2 jar; the macOS/Windows bootstrap
+  entries point at the new assets, and the manifest keys are Nix system names.

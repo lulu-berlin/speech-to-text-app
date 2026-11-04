@@ -117,7 +117,7 @@ private fun loadFailureMessage(result: ProcessResult): String? =
 
 /**
  * ggml-vulkan's per-device line, `ggml_vulkan: %zu = %s (%s) | uma: %d | …` (index, device name, driver name;
- * whisper.cpp 1.8.4). A device name may itself end in parentheses (`AMD … (RADV REMBRANDT)`), so the name is
+ * whisper.cpp 1.9.5). A device name may itself end in parentheses (`AMD … (RADV REMBRANDT)`), so the name is
  * everything up to the last parenthesized group before ` | uma: `.
  */
 private val VULKAN_DEVICE_LINE = Regex("""ggml_vulkan: (\d+) = (.+) \([^()]*\) \| uma: """)
@@ -137,7 +137,7 @@ internal fun parseVulkanDeviceLines(stderr: List<String>): List<GpuDevice> =
     }
 
 /**
- * whisper.cpp 1.8.4's Metal enumeration: `whisper_backend_init_gpu: found GPU device <ggml index>: MTL0
+ * whisper.cpp 1.9.5's Metal enumeration: `whisper_backend_init_gpu: found GPU device <ggml index>: MTL0
  * (type: 2, cnt: <gpu ordinal>)`. The human Apple device name is not logged, so the name Settings shows is
  * `Metal (MTL0)`; `cnt` is the GPU ordinal `--device N` selects (0 with one Metal device). Only MTL names
  * match, so libwhisper's Vulkan `found GPU device … Vulkan0` lines are ignored.

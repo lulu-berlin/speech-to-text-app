@@ -57,12 +57,28 @@ tasks.register("checkVersions") {
             )
         }
 
+        // 2b. devenv follows the flake's pin (ADR 0036): devenv.yaml's nixpkgs rev must be the one
+        //     flake.lock pins, so a bump cannot leave the shell invisibly on the old nixpkgs. The
+        //     flake's devenv-pin-sync check holds the same pair (and devenv.lock) for Nix builds.
+        val devenvRev =
+            Regex("""nixpkgs/([0-9a-f]{40})""")
+                .find(rootProject.file("devenv.yaml").readText())
+                ?.groupValues
+                ?.get(1)
+                ?: throw GradleException("devenv.yaml must pin nixpkgs as github:NixOS/nixpkgs/<rev>")
+        if (devenvRev != lockRev) {
+            throw GradleException(
+                "devenv.yaml pins nixpkgs ${devenvRev.take(12)} but flake.lock pins ${lockRev.take(12)}. " +
+                    "Run 'devenv update' (or fix devenv.yaml) and commit devenv.yaml/devenv.lock.",
+            )
+        }
+
         // 3. Windows (roadmap item 49): the platform is supported and every tool the bootstrap
-        //    downloads, plus the desktop's JDK, has a pinned windows-x64 artifact. The download,
+        //    downloads, plus the desktop's JDK, has a pinned x86_64-windows artifact. The download,
         //    sha256 check and .exe resolution run on Windows; this keeps the manifest honest on
         //    any host, since the bootstrap reads the committed versions.json without Nix.
         fun verifyWindowsPins() {
-            val windowsPlatform = "windows-x64"
+            val windowsPlatform = "x86_64-windows"
             if (windowsPlatform !in supportedPlatforms) {
                 throw GradleException(
                     "supportedPlatforms has no $windowsPlatform, so versions.json has no Windows tool pins " +
@@ -70,12 +86,14 @@ tasks.register("checkVersions") {
                 )
             }
             val downloads = manifest["downloads"] as Map<*, *>
+            val whisperVersion = manifest["whisperCpp"] as String
             val windowsAssets =
                 mapOf(
-                    "whisper-cli" to "releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-windows-x64.tar.gz",
+                    "whisper-cli" to
+                        "releases/download/whisper-cpp-$whisperVersion/whisper-cpp-$whisperVersion-x86_64-windows.tar.gz",
                     // The audio-only single binary (roadmap item 68): the release tag and the asset
                     // name, so a pin on another tag or another artifact cannot pass.
-                    "ffmpeg" to "releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-windows-x64.tar.gz",
+                    "ffmpeg" to "releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz",
                     "temurin-jdk" to "windows_hotspot",
                 )
             for ((tool, asset) in windowsAssets) {
@@ -123,24 +141,28 @@ tasks.register("checkVersions") {
 // still run there; a build that would download or start one fails before any task runs.
 val osName = System.getProperty("os.name").lowercase(Locale.ROOT)
 val osArch = System.getProperty("os.arch").lowercase(Locale.ROOT)
-val supportedPlatforms = listOf("linux-x64", "darwin-x64", "darwin-arm64", "windows-x64")
+// The same Nix system names the flake renders (roadmap item 90): one vocabulary for the
+// manifest's keys, the bootstrap's lookup and the error messages. A platform not in the list
+// is unsupported; Intel macOS is not a Nix double at the pinned nixpkgs.
+val supportedPlatforms = (manifest["supportedPlatforms"] as List<*>).map { it as String }
 val platform: String? =
     when {
-        osName.contains("mac") && osArch == "aarch64" -> "darwin-arm64"
-        osName.contains("mac") -> "darwin-x64"
-        osName.contains("windows") && (osArch == "amd64" || osArch == "x86_64") -> "windows-x64"
-        osName.contains("linux") && (osArch == "amd64" || osArch == "x86_64") -> "linux-x64"
+        osName.contains("mac") && osArch == "aarch64" -> "aarch64-darwin"
+        osName.contains("mac") -> "x86_64-darwin"
+        osName.contains("windows") && (osArch == "amd64" || osArch == "x86_64") -> "x86_64-windows"
+        osName.contains("linux") && (osArch == "amd64" || osArch == "x86_64") -> "x86_64-linux"
         else -> null
     }
 
 fun requirePlatform(): String =
-    platform ?: throw GradleException(
+    platform?.takeIf { it in supportedPlatforms } ?: throw GradleException(
         "The Gradle bootstrap does not support this platform: $osName/$osArch. " +
-            "Supported: ${supportedPlatforms.joinToString()} (Linux x64 and Windows x64 tested, macOS best-effort).",
+            "Supported: ${supportedPlatforms.joinToString()} (Linux x64, Windows x64 and Apple Silicon macOS; " +
+            "Intel macOS is unsupported).",
     )
 
 /** A managed tool's file name on this platform: Windows executables carry `.exe` (roadmap item 49). */
-fun platformExecutable(name: String): String = if (requirePlatform().startsWith("windows")) "$name.exe" else name
+fun platformExecutable(name: String): String = if (requirePlatform().endsWith("-windows")) "$name.exe" else name
 
 // Every task that downloads or runs a managed tool: prepareRuntime (whisper-cli, ffmpeg,
 // models; run, dev and e2e depend on it) and e2eInstall (node/pnpm; e2eBrowsers,
@@ -231,7 +253,7 @@ fun findExecutable(
 }
 
 fun defaultDataDir(): String {
-    if (platform == "windows-x64") {
+    if (platform == "x86_64-windows") {
         // %APPDATA%\stt-app (roadmap item 49), the directory the desktop app also uses.
         val appData = System.getenv("APPDATA")
         val base =
@@ -242,7 +264,7 @@ fun defaultDataDir(): String {
             }
         return "$base\\stt-app"
     }
-    if (platform?.startsWith("darwin") == true) {
+    if (platform?.endsWith("-darwin") == true) {
         return (System.getenv("HOME") ?: "") + "/Library/Application Support/stt-app"
     }
     val xdg = System.getenv("XDG_DATA_HOME")
@@ -285,7 +307,7 @@ fun prepareTool(
                 from(project.zipTree(archive))
             }
         } else {
-            // The system tar keeps the archive's symlinks (libwhisper.so.1 -> libwhisper.so.1.8.4);
+            // The system tar keeps the archive's symlinks (libwhisper.so.1 -> libwhisper.so.1.<version>);
             // Gradle's tarTree copy turns them into empty files, which the loader rejects.
             providers
                 .exec { commandLine("tar", "-xzf", archive.absolutePath, "-C", extractDir.absolutePath) }
@@ -355,7 +377,7 @@ tasks.register("prepareRuntime") {
             // findExecutable restores it; the darwin tar.gz keeps its mode.
             val executables = listOf(findExecutable(exe.parentFile, exe.name))
             val binDir =
-                if (label == "ffmpeg" && requirePlatform().startsWith("linux")) {
+                if (label == "ffmpeg" && requirePlatform().endsWith("-linux")) {
                     linuxLibraryPathWrapper(executables)
                 } else {
                     exe.parentFile
@@ -370,7 +392,7 @@ tasks.register("prepareRuntime") {
 val backendInstallDist = gradle.includedBuild("backend").task(":installDist")
 val backendMain =
     rootProject.file(
-        if (platform == "windows-x64") {
+        if (platform == "x86_64-windows") {
             "backend/build/install/stt-backend/bin/stt-backend.bat"
         } else {
             "backend/build/install/stt-backend/bin/stt-backend"
@@ -396,7 +418,7 @@ fun appEnv(): Map<String, String> =
             (
                 runtimeBinDirs.map { it.absolutePath } +
                     listOf(
-                        (if (platform == "windows-x64") pnpmHome else File(pnpmHome, "bin")).absolutePath,
+                        (if (platform == "x86_64-windows") pnpmHome else File(pnpmHome, "bin")).absolutePath,
                         nodeBinDir.absolutePath,
                     ) + System.getenv("PATH")
             ).joinToString(File.pathSeparator),
@@ -404,7 +426,7 @@ fun appEnv(): Map<String, String> =
         // Gradle 9's HTML test report writes one directory per test name, and names like "0°, 20°"
         // or "O(n³)" fail to encode under a POSIX locale: devenv.nix and flake.nix set the same for
         // the same reason, and this no-Nix path needs it too. LC_CTYPE sets the charset only.
-        "LC_CTYPE" to (System.getenv("LC_CTYPE") ?: if (platform?.startsWith("darwin") == true) "UTF-8" else "C.UTF-8"),
+        "LC_CTYPE" to (System.getenv("LC_CTYPE") ?: if (platform?.endsWith("-darwin") == true) "UTF-8" else "C.UTF-8"),
         // The model defaults are the paths the cache *will* hold after prepareRuntime
         // (which both tasks depend on), not a value only set during its execution.
         "STT_WHISPER_MODEL" to (System.getenv("STT_WHISPER_MODEL") ?: modelCacheFile("whisper").absolutePath),
@@ -413,15 +435,14 @@ fun appEnv(): Map<String, String> =
         "STT_STATIC_DIR" to (System.getenv("STT_STATIC_DIR") ?: rootProject.file("frontend/dist").absolutePath),
     )
 
-// The distribution directory name the node plugin uses for this OS/arch: the OS name
-// from the node download (linux-x64, darwin-arm64, darwin-x64), which differs from
-// the Gradle platform string only in the OS portion (macosx-* vs darwin-*).
+// node's own names, translated here and nowhere else (roadmap item 90): the platform is a Nix
+// system name, the node download uses Node's `<os>-<arch>` names (`win-x64` for Windows).
 fun nodePlatform(): String =
-    when {
-        platform == "linux-x64" -> "linux-x64"
-        platform == "windows-x64" -> "win-x64"
-        platform == "darwin-arm64" -> "darwin-arm64"
-        else -> "darwin-x64"
+    when (platform) {
+        "x86_64-linux" -> "linux-x64"
+        "x86_64-windows" -> "win-x64"
+        "aarch64-darwin" -> "darwin-arm64"
+        else -> "unsupported"
     }
 
 tasks.register<Exec>("dev") {
@@ -448,7 +469,7 @@ tasks.register<Exec>("run") {
         applyAppEnv(this as Exec)
         // A .bat is not a Win32 executable; cmd runs it, as the installDist launcher expects.
         setCommandLine(
-            if (platform == "windows-x64") {
+            if (platform == "x86_64-windows") {
                 listOf("cmd", "/c", backendMain.absolutePath)
             } else {
                 listOf(backendMain.absolutePath)
@@ -472,16 +493,16 @@ val e2eDir = rootProject.file("e2e")
 // Node installed on the host — which the no-Nix path promises it does not.
 val nodeBinDir =
     File(nodeInstallDir(), "nodejs/node-v${manifest["node"]}-${nodePlatform()}")
-        .let { if (platform == "windows-x64") it else File(it, "bin") }
-val nodeExe = File(nodeBinDir, if (platform == "windows-x64") "node.exe" else "node")
+        .let { if (platform == "x86_64-windows") it else File(it, "bin") }
+val nodeExe = File(nodeBinDir, if (platform == "x86_64-windows") "node.exe" else "node")
 
 // npm's global bin on Windows is the prefix itself, so pnpm sits in the version directory there and
 // in its `bin/` on POSIX (the same layout node-gradle's own VariantComputer computes).
 val pnpmHome = File(nodeInstallDir(), "pnpm/pnpm-v${manifest["pnpm"]}")
 val pnpmExe =
     File(
-        if (platform == "windows-x64") pnpmHome else File(pnpmHome, "bin"),
-        if (platform == "windows-x64") "pnpm.cmd" else "pnpm",
+        if (platform == "x86_64-windows") pnpmHome else File(pnpmHome, "bin"),
+        if (platform == "x86_64-windows") "pnpm.cmd" else "pnpm",
     )
 val fixtures = manifest["fixtures"] as Map<*, *>
 
@@ -572,7 +593,7 @@ tasks.register<Exec>("e2eSystemDeps") {
     description =
         "Linux: install Chromium's system libraries for the e2e suite when run as root; otherwise check them and print the sudo apt-get line for the missing ones"
     dependsOn("e2eInstall")
-    onlyIf { platform?.startsWith("linux") == true }
+    onlyIf { platform?.endsWith("-linux") == true }
     val dryRunOutput = ByteArrayOutputStream()
     doFirst {
         applyE2eEnv(this as Exec)
@@ -664,9 +685,9 @@ tasks.register<Exec>("integrationTest") {
         workingDir = rootProject.projectDir
         // Windows has no POSIX shell to run `gradlew`: it runs `gradlew.bat`, and a .bat needs cmd
         // (roadmap item 49). The backend launcher follows the same rule in the `run` task.
-        val wrapper = rootProject.file(if (platform == "windows-x64") "gradlew.bat" else "gradlew")
+        val wrapper = rootProject.file(if (platform == "x86_64-windows") "gradlew.bat" else "gradlew")
         setCommandLine(
-            if (platform == "windows-x64") {
+            if (platform == "x86_64-windows") {
                 listOf("cmd", "/c", wrapper.absolutePath, "-p", "backend", "integrationTest")
             } else {
                 listOf(wrapper.absolutePath, "-p", "backend", "integrationTest")
@@ -713,7 +734,7 @@ tasks.register("runtimeSystemDeps") {
     group = "build"
     description =
         "Linux: as root, install the system libraries the prebuilt whisper-cli and ffmpeg link against; otherwise check them and print the apt-get line for the missing ones"
-    onlyIf { platform?.startsWith("linux") == true }
+    onlyIf { platform?.endsWith("-linux") == true }
     doLast {
         if (runningAsRoot) {
             val commands =

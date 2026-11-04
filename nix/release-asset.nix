@@ -4,8 +4,9 @@
 # tar to a release of this repository and records the printed pin; agents never publish.
 #
 # `name` is the printer's derivation name, `tag` the release the asset is uploaded to and `key` the
-# pin's entry in nix/desktop-artifacts.nix. `compression` is `zst` (the Linux artifacts) or `gz`,
-# for a darwin asset that a stock macOS host must be able to untar without zstd (roadmap item 69).
+# pin's entry in nix/desktop-artifacts.nix. `compression` is `zst` (Linux Mesa and ffmpeg) or
+# `gz`: the whisper assets on every system, because the Gradle bootstrap cannot read zstd (roadmap
+# item 90), and darwin's ffmpeg, because a stock macOS host has no zstd (roadmap item 69).
 {
   pkgs,
   source,

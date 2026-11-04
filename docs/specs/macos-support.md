@@ -335,3 +335,10 @@ desktop staging and per-user paths (item 10).
   every push to main, not only nightly and this item's PRs; the workflow's `roadmap/48-` gate is
   removed, the manual whisper-cli asset build stays dispatch-only, and item 51's cadence text is
   amended accordingly.
+- 2026-11-03 (roadmap item 90): Intel macOS is removed from the code, not kept as data. The
+  `darwin-x64` whisper/ffmpeg entries, the platform mapping and the mapping's docs are gone; an
+  Intel Mac fails fast naming the supported platforms. The macOS whisper-cli is the 1.9.5 static
+  Metal build (`whisper-cpp-1.9.5-aarch64-darwin.tar.gz`), built by the manual
+  `macos-whisper-asset` job from the version in `versions.json`; the ffmpeg asset is our 8.1.3
+  build under `ffmpeg-8.1.3`
+  ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).

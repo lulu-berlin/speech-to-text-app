@@ -713,3 +713,9 @@ on a Windows VM or host is recorded in the Approval log as user-verified.)
   node `✓`/`:::done`, items 54/66/68/70/78/79/80 and `docs/specs/{macos-support,ci-verification,electron-desktop-app}.md`
   point at the spec, and the dropped-click MED row left `docs/known-issues.md`: it is item 81's now.
   The `06-playback` row stays, narrowed to the fixed-sleep finding (LOW).
+- 2026-11-03 (roadmap item 90): the manifest key is `x86_64-windows` (a Nix system name), and the
+  whisper-cli is our 1.9.5 self-contained build, `whisper-cpp-1.9.5-x86_64-windows.tar.gz`; the
+  upstream jiang1997 prebuild is no longer downloaded. The ffmpeg asset is our 8.1.3 build under
+  `ffmpeg-8.1.3`. Windows on ARM64 stays unsupported and fails fast naming the supported
+  platforms (`aarch64-windows` is a Nix double, so a later item needs no schema change)
+  ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).

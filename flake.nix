@@ -3,7 +3,7 @@
 # bin/stt-app (bin/speech-to-text-app before item 16): a java wrapper that defaults
 # STT_DATA_DIR to the XDG data home's stt-app directory (ADR 0017 amended), defaults
 # both models from nix/models.nix (a user-set value wins), and puts the pinned
-# whisper-cli 1.8.4 (Vulkan), the audio-only ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
+# whisper-cli 1.9.5 (Vulkan), the audio-only ffmpeg 8.1, setsid and coreutils first on PATH (ADR 0047).
 # `docker-root` is the Docker image's root filesystem (roadmap item 19, see Dockerfile).
 # Nix evaluation happens on the user's machine - this file is unverified here.
 #
@@ -38,7 +38,7 @@
         else ''"$HOME/Library/Application Support/stt-app"'';
       models = import ./nix/models.nix {inherit pkgs;};
 
-      # The app's whisper-cpp (roadmap item 63): the pinned 1.8.4 Vulkan build shipped as the
+      # The app's whisper-cpp (roadmap item 63, 1.9.5 by item 90): the pinned Vulkan build shipped as the
       # prebuilt release asset on x86_64-linux (nix/whisper-cpp.nix); a system without a pin
       # gets the source build.
       whisperCppArtifact = import ./nix/whisper-cpp.nix {inherit pkgs;};
@@ -47,19 +47,27 @@
       # The app's ffmpeg (roadmap item 62): the audio-only build, shipped as the pinned
       # prebuilt artifact on x86_64-linux (nix/ffmpeg.nix) and built from the same recipe on
       # darwin (roadmap item 48); the version manifest reads the source build's version
-      # (8.1.2, rendered as 8.1).
+      # (8.1.3, rendered as 8.1).
       ffmpegArtifact = import ./nix/ffmpeg.nix {inherit pkgs;};
       ffmpeg = ffmpegArtifact.ffmpeg;
 
-      # The release tag of the audio-only ffmpeg asset. The enable list changes the source build's out
-      # path, which invalidates the pinned asset, so a changed build gets a new tag (v2 after the
-      # audio-decoder rework; v1 is the first build).
-      ffmpegAssetTag = "desktop-ffmpeg-v2";
+      # The bundle's Vulkan-only Mesa (roadmap item 56), read here for the artifact's version and
+      # reused by the bundle package.
+      mesaArtifact = import ./nix/desktop-mesa.nix {inherit pkgs;};
 
-      # The release tag of the whisper-cpp asset. A changed recipe or nixpkgs bump changes the source
-      # build's out path, which invalidates the pinned asset, so a changed build gets a new tag (v1 is
-      # the first build).
-      whisperCppAssetTag = "desktop-whisper-cpp-v1";
+      # Release tags name the artifact's upstream version, for every family (roadmap item 90,
+      # ADR 0065): `ffmpeg-8.1.3` and `mesa-26.2.6` like `whisper-cpp-1.9.5`. A same-version rebuild
+      # (a configure-list or recipe change) takes a `-2` suffix; a published release asset is never
+      # replaced. Deriving them from the source version makes a bump move the tag and every URL
+      # together.
+      ffmpegAssetTag = "ffmpeg-${ffmpegArtifact.source.version}";
+      mesaAssetTag = "mesa-${mesaArtifact.source.version}";
+
+      # The release tag of the whisper-cpp asset (roadmap item 90): the tag names the upstream version
+      # that determines the content, `whisper-cpp-${whisperCppTag}`, so bumping the version moves the
+      # tag, the file names and every URL together. A same-version rebuild (a flag or recipe change)
+      # would take a suffix, `whisper-cpp-1.9.5-2`; a published release asset is never replaced.
+      whisperCppAssetTag = "whisper-cpp-${(import ./nix/versions.nix).whisperCppTag}";
 
       # The release assets' producer checks (roadmap items 62, 63 and 69): each builds the source its
       # asset is made from. They are apps the user runs when publishing, not `checks` entries, so
@@ -188,6 +196,7 @@
         ffmpeg = pkgs.lib.versions.majorMinor ffmpegArtifact.source.version;
         rust = pkgs.rustc.version;
         whisperCpp = data.whisperCppTag;
+        supportedPlatforms = data.supportedPlatforms;
         models = models.meta;
         downloads = data.downloads;
         fixtures = (import ./nix/test-fixtures.nix {inherit pkgs;}).meta;
@@ -337,9 +346,9 @@
           # and its direct references, printed with `cat result/pin.nix`.
           desktop-bundle-mesa-asset = import ./nix/release-asset.nix {
             inherit pkgs;
-            source = (import ./nix/desktop-mesa.nix {inherit pkgs;}).source;
+            source = mesaArtifact.source;
             name = "stt-bundle-mesa-asset";
-            tag = "desktop-mesa-v1";
+            tag = mesaAssetTag;
             key = "mesaVulkan";
           };
 
@@ -361,17 +370,19 @@
               else "gz";
           };
 
-          # Roadmap item 63: the release asset for the pinned whisper-cpp on this system, with the pin
-          # to paste into nix/desktop-artifacts.nix. The user builds it and uploads the tar to a
-          # `desktop-whisper-cpp-v1` release of this repository; agents never publish. `pin.nix`
-          # carries the sha256, the source's out path and its direct references, printed with
-          # `cat result/pin.nix`.
+          # Roadmap item 63 (1.9.5 by item 90): the release asset for the whisper-cpp on this system,
+          # with the pin to paste into nix/desktop-artifacts.nix. The user builds it and uploads the
+          # tar to the version-named `whisper-cpp-<version>` release of this repository; agents never
+          # publish. One archive format for every system (`.tar.gz`, the Gradle bootstrap cannot read
+          # zstd); `pin.nix` carries the sha256, the source's out path and its direct references,
+          # printed with `cat result/pin.nix`.
           desktop-whisper-cpp-asset = import ./nix/release-asset.nix {
             inherit pkgs;
             source = (import ./nix/whisper-cpp.nix {inherit pkgs;}).source;
             name = "stt-whisper-cpp-asset";
             tag = whisperCppAssetTag;
             key = "whisperCpp";
+            compression = "gz";
           };
 
           # `nix build .` builds both parts and provides bin/stt-app, which
@@ -407,7 +418,7 @@
               # --prefix PATH: the backend runs whisper-cli, ffmpeg and setsid by name (ADR 0047);
               # the package's own tools come first, so a caller's PATH (e.g. the devenv's
               # whisper-cli) cannot replace them. The audio-only ffmpeg from the pinned
-              # desktop-ffmpeg-v2 asset (roadmap item 62), the branch item 33's Gradle bootstrap
+              # ffmpeg-8.1.3 asset (roadmap item 62), the branch item 33's Gradle bootstrap
               # syncs to (8.1), not nixpkgs' default ffmpeg (9.0 at the locked rev).
               makeWrapper ${pkgs.jre}/bin/java $out/bin/stt-app \
                 --run 'if [ -z "''${STT_DATA_DIR:-}" ]; then export STT_DATA_DIR=${dataDirDefault}; fi; ${pkgs.coreutils}/bin/mkdir -p "$STT_DATA_DIR"' \
@@ -516,12 +527,12 @@
           ffmpeg-asset-pin = {
             type = "app";
             program = "${assetPinChecks.ffmpeg-asset-pin.app}/bin/ffmpeg-asset-pin";
-            meta.description = "Verify the desktop-ffmpeg-v2 asset pin against the built asset";
+            meta.description = "Verify the ffmpeg-8.1.3 asset pin against the built asset";
           };
           whisper-cpp-asset-pin = pkgs.lib.optionalAttrs isLinux {
             type = "app";
             program = "${assetPinChecks.whisper-cpp-asset-pin.app}/bin/whisper-cpp-asset-pin";
-            meta.description = "Verify the desktop-whisper-cpp-v1 asset pin against the built asset";
+            meta.description = "Verify the version-named whisper-cpp asset pin against the built asset";
           };
 
           # Roadmap item 69 (the root review's finding 1): the manual `macos-ffmpeg-asset` job's
@@ -1111,6 +1122,138 @@
                 echo ok > $out
               '';
 
+          # Roadmap item 90 (test-list item 11): the download table and the supported-platform list
+          # use Nix system names, so the Gradle bootstrap, the desktop staging and the flake cannot
+          # drift into two vocabularies. A key that is not a supported platform (or not a Nix double),
+          # a flake system that is not supported, and a supported platform without a pin for every
+          # downloaded tool all fail at evaluation. The fixtures prove each error is rendered; the
+          # real table is asserted too, so `nix flake check` fails here before anything downloads.
+          platform-keys = let
+            lib = pkgs.lib;
+            data = import ./nix/versions.nix;
+            validate = args: import ./nix/platform-keys.nix ({inherit lib;} // args);
+            real = validate {
+              downloads = data.downloads;
+              supportedPlatforms = data.supportedPlatforms;
+              flakeSystems = systems;
+              # Windows has no Nix package: the Gradle bootstrap and the packaged desktop ship it,
+              # the flake's packages do not (roadmap item 90).
+              downloadOnlyPlatforms = ["x86_64-windows"];
+            };
+            badKey = validate {
+              downloads = {
+                "whisper-cli" = {"linux-x64" = {};};
+              };
+              supportedPlatforms = ["x86_64-linux"];
+              flakeSystems = ["x86_64-linux"];
+            };
+            missingPin = validate {
+              downloads = {
+                "whisper-cli" = {"x86_64-linux" = {};};
+              };
+              supportedPlatforms = ["x86_64-linux" "x86_64-windows"];
+              flakeSystems = ["x86_64-linux"];
+              downloadOnlyPlatforms = ["x86_64-windows"];
+            };
+            mentions = errors: needle: lib.any (error: lib.hasInfix needle error) errors;
+          in
+            assert lib.assertMsg (mentions badKey.errors "linux-x64")
+            "platform-keys: a downloads key that is not a Nix system was accepted";
+            assert lib.assertMsg (mentions missingPin.errors "x86_64-windows")
+            "platform-keys: a supported platform without a whisper-cli pin was accepted";
+              if real.ok
+              then
+                pkgs.runCommand "platform-keys" {} ''
+                  echo ok > $out
+                ''
+              else throw "platform-keys: ${lib.concatStringsSep "; " real.errors}";
+
+          # Roadmap item 90 (test-list item 5): the whisper asset's release tag, file names and pin
+          # URLs all carry the manifest's whisper.cpp version. The tag is derived as
+          # whisper-cpp-${whisperCppTag}, so bumping the version moves the tag, every file name and
+          # every URL together; a pin on another tag fails. The fixture pin proves the failure names
+          # the asset and its url. Evaluation only; the assets themselves are built by the user.
+          whisper-asset-version = let
+            lib = pkgs.lib;
+            data = import ./nix/versions.nix;
+            artifacts = import ./nix/desktop-artifacts.nix;
+            validation = import ./nix/whisper-asset-version.nix {
+              inherit lib;
+              tag = whisperCppAssetTag;
+              version = data.whisperCppTag;
+              pins = builtins.filter (pin: pin != null) [
+                (artifacts.whisperCpp.x86_64-linux or null)
+                (artifacts.whisperCpp.aarch64-darwin or null)
+              ];
+              downloads = map (entry: entry.url) (builtins.attrValues data.downloads.whisper-cli);
+            };
+            fixtureSource = (import ./nix/whisper-cpp.nix {inherit pkgs;}).source;
+            fixtureFile = "${fixtureSource.name}-${system}.tar.gz";
+            fixtureAsset = pkgs.writeTextDir fixtureFile "not the release asset" // {file = fixtureFile;};
+            fixturePin = {
+              url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/${fixtureFile}";
+              sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+              storePath = builtins.unsafeDiscardStringContext fixtureSource.outPath;
+              references = [];
+            };
+            fixture = import ./nix/asset-pin-check.nix {
+              inherit pkgs;
+              source = fixtureSource;
+              asset = fixtureAsset;
+              pin = fixturePin;
+              tag = validation.expectedTag;
+              key = "whisperCpp";
+              name = "whisper-cpp-asset-pin";
+            };
+          in
+            assert lib.assertMsg (fixture.pinError != null && lib.hasInfix "not on the ${validation.expectedTag} release" fixture.pinError)
+            "whisper-asset-version: a pin on another tag was accepted";
+              if validation.failures == []
+              then
+                pkgs.runCommand "whisper-asset-version" {} ''
+                  echo ok > $out
+                ''
+              else throw "whisper-asset-version: ${lib.concatStringsSep "; " validation.failures}";
+
+          # Roadmap item 90 (updated 2026-11-03): every artifact tag names its upstream version —
+          # `ffmpeg-8.1.3`, `mesa-26.2.6`, `whisper-cpp-1.9.5` — and every ffmpeg/Mesa pin and
+          # download URL for our assets sits on that tag and names the version. A pin still on an
+          # internal `vN` tag fails at evaluation. Evaluation only; the assets are published by the
+          # user.
+          artifact-tags = let
+            lib = pkgs.lib;
+            data = import ./nix/versions.nix;
+            artifacts = import ./nix/desktop-artifacts.nix;
+            base = url: builtins.baseNameOf url;
+            onTag = tag: url: lib.hasInfix "/releases/download/${tag}/" url;
+            namesVersion = version: url: lib.hasInfix version (base url);
+            ffmpegPins = [artifacts.ffmpeg.x86_64-linux artifacts.ffmpeg.aarch64-darwin];
+            ffmpegDownloads = [
+              data.downloads.ffmpeg.aarch64-darwin.url
+              data.downloads.ffmpeg.x86_64-windows.url
+            ];
+            mesaPin = artifacts.mesaVulkan.x86_64-linux;
+            failures =
+              map (pin: "the ffmpeg pin ${base pin.url} is not on ${ffmpegAssetTag}")
+              (builtins.filter (pin: !(onTag ffmpegAssetTag pin.url)) ffmpegPins)
+              ++ map (url: "the ffmpeg download ${url} is not on ${ffmpegAssetTag}")
+              (builtins.filter (url: !(onTag ffmpegAssetTag url)) ffmpegDownloads)
+              ++ map (pin: "the ffmpeg pin ${base pin.url} does not name ${ffmpegArtifact.source.version}")
+              (builtins.filter (pin: !(namesVersion ffmpegArtifact.source.version pin.url)) ffmpegPins)
+              ++ map (url: "the ffmpeg download ${base url} does not name ${ffmpegArtifact.source.version}")
+              (builtins.filter (url: !(namesVersion ffmpegArtifact.source.version url)) ffmpegDownloads)
+              ++ lib.optional (!(onTag mesaAssetTag mesaPin.url))
+              "the Mesa pin ${base mesaPin.url} is not on ${mesaAssetTag}"
+              ++ lib.optional (!(namesVersion mesaArtifact.source.version mesaPin.url))
+              "the Mesa pin ${base mesaPin.url} does not name ${mesaArtifact.source.version}";
+          in
+            if failures == []
+            then
+              pkgs.runCommand "artifact-tags" {} ''
+                echo ok > $out
+              ''
+            else throw "artifact-tags: ${lib.concatStringsSep "; " failures}";
+
           # Roadmap item 63 (test-list item 3): the shipped prebuilt whisper-cpp's closure holds none of
           # the SDL2 -> sdl2-compat -> sdl3 -> GTK/GStreamer -> flite/pipewire chain the build cut with
           # `withSDL = false`, and no ffmpeg at all — nixpkgs' or the app's: `withFFmpegSupport = false`
@@ -1156,14 +1299,15 @@
               echo ok > $out
             '';
 
-          # Roadmap item 63 (test-list item 2): the shipped whisper-cli is the pinned 1.8.4 build (Vulkan
-          # on Linux, Metal on darwin — roadmap item 48). `--help` succeeds, and it transcribes the
-          # committed FLAC fixture to the committed expected text. Provenance of
-          # nix/fixtures/whisper-cpp-sample-transcript.txt: captured 2026-10-19 from the source build
-          # /nix/store/n2vf0kiskxmm9mfrs5mcla5q1k7zqpmi-whisper-cpp-1.8.4/bin/whisper-cli with
+          # Roadmap item 63 (test-list item 2; 1.9.5 by item 90): the shipped whisper-cli is the pinned
+          # build (Vulkan on Linux, Metal on darwin — roadmap item 48). `--help` succeeds, and it
+          # transcribes the committed FLAC fixture to the committed expected text. Provenance of
+          # nix/fixtures/whisper-cpp-sample-transcript.txt: captured 2026-10-19 from the 1.8.4 source
+          # build /nix/store/n2vf0kiskxmm9mfrs5mcla5q1k7zqpmi-whisper-cpp-1.8.4/bin/whisper-cli with
           # ggml-tiny.en.bin (sha256 921e4cf8…, nix/models.nix) and
           # `-m <model> -f backend/src/test/resources/upload-formats/sample.flac -nt`; the artifact under
-          # test did not produce that file. The check runs the shipped artifact only.
+          # test did not produce that file. Item 90 re-runs the check against 1.9.5 and keeps the text
+          # unless the transcription changed. The check runs the shipped artifact only.
           whisper-cpp-behaves = let
             whisperCpp = (import ./nix/whisper-cpp.nix {inherit pkgs;}).whisperCpp;
             fixture = ./backend/src/test/resources/upload-formats/sample.flac;

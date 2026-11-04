@@ -14,7 +14,7 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Roadmap items 32 and 45: the startup device probe — [DeviceProbe] runs whisper-cli once and parses the physical
  * Vulkan GPUs its ggml backend enumerates on stderr (`ggml_vulkan: N = <name> (<driver>) | uma: …`, whisper.cpp
- * 1.8.4). The stand-ins exit 1, as whisper-cli does after failing to read the probe's `/dev/null` input. CPU-only
+ * 1.9.5). The stand-ins exit 1, as whisper-cli does after failing to read the probe's `/dev/null` input. CPU-only
  * output is a successful zero-GPU probe; a missing executable is a reported launch failure (item 60). Real
  * subprocesses, hence Integration (ADR 0021).
  */

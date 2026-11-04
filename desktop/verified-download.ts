@@ -17,26 +17,37 @@ export interface Pin {
 const desktopRoot = dirname(fileURLToPath(import.meta.url));
 const downloads = join(desktopRoot, 'dist', 'downloads');
 const manifest = JSON.parse(readFileSync(join(desktopRoot, '..', 'versions.json'), 'utf8')) as {
+  supportedPlatforms?: string[];
   downloads: Record<string, Record<string, Pin> | undefined>;
 };
+
+const supportedPlatforms = manifest.supportedPlatforms ?? [];
 
 const fail = (label: string, message: string): never => {
   console.error(`${label}: ${message}`);
   process.exit(1);
 };
 
+/**
+ * This host's Nix system name (roadmap item 90), the manifest's platform vocabulary. The OS/arch
+ * names stay here, translated once; Intel macOS, Windows ARM64 and Linux ARM64 resolve to names the
+ * supported list does not hold, so `pin` refuses them before any download.
+ */
+export function platformKey(
+  platformName: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): string {
+  if (platformName === 'darwin') return arch === 'arm64' ? 'aarch64-darwin' : 'x86_64-darwin';
+  if (platformName === 'win32') return arch === 'arm64' ? 'aarch64-windows' : 'x86_64-windows';
+  if (platformName === 'linux') return arch === 'arm64' ? 'aarch64-linux' : 'x86_64-linux';
+  return `${platformName}-${arch}`;
+}
+
 /** The `{ url, sha256 }` pin of `key` in versions.json for this build host's platform. */
-export function pin(
-  key: string,
-  label: string,
-  platform = process.platform === 'darwin'
-    ? process.arch === 'arm64'
-      ? 'darwin-arm64'
-      : 'darwin-x64'
-    : process.platform === 'win32'
-      ? 'windows-x64'
-      : 'linux-x64',
-): Pin {
+export function pin(key: string, label: string, platform = platformKey()): Pin {
+  if (!supportedPlatforms.includes(platform)) {
+    fail(label, `unsupported platform ${platform} (supported: ${supportedPlatforms.join(', ')})`);
+  }
   return (
     manifest.downloads[key]?.[platform] ?? fail(label, `versions.json has no ${platform} ${key}`)
   );

@@ -5,11 +5,12 @@
 //                       dependency jar, onnxruntime/sqlite natives included — decided
 //                       2026-10-14: no fat-jar plugin)
 //   dist/stage/ui       frontend/dist
-//   dist/stage/tools    the pinned whisper-cli and ffmpeg (versions.json), flat — on Linux
-//                       with their .so libraries, on Apple Silicon and Windows as single
-//                       binaries (whisper-cli static, ffmpeg linking only system libraries);
-//                       backend.ts adds the dir to PATH and LD_LIBRARY_PATH when it spawns
-//                       the backend
+//   dist/stage/tools    the pinned whisper-cli and ffmpeg (versions.json), flat — the Linux
+//                       whisper-cli is the portable glibc build (static whisper libraries,
+//                       system Vulkan), the Linux ffmpeg keeps bytedeco's .so libraries;
+//                       Apple Silicon and Windows get single binaries (whisper-cli static,
+//                       ffmpeg linking only system libraries); backend.ts adds the dir to PATH
+//                       and LD_LIBRARY_PATH when it spawns the backend
 //
 // The tools and the Temurin JDK are fetched once from the versions.json pins into
 // dist/downloads and sha256-verified, like ./gradlew prepareRuntime does for the Gradle
@@ -86,32 +87,26 @@ function stageTools(): void {
   const toolsBin = join(stage, 'tools', 'bin');
   mkdirSync(toolsBin, { recursive: true });
 
-  // whisper-cli: Linux ships the jiang1997 prebuild (Vulkan), a tar.gz of one directory whose
-  // libraries resolve through RUNPATH $ORIGIN and whose relative symlinks (libwhisper.so.1 ->
-  // libwhisper.so.1.8.4) must stay relative — tar preserves them; cpSync would make them absolute
-  // into a temp dir. macOS ships our static Metal build, a tar.gz with bin/whisper-cli (roadmap
-  // item 48), which is extracted and flattened here.
+  // whisper-cli: Linux ships the portable glibc build (roadmap item 90, the manual
+  // `linux-whisper-asset` job), macOS the static Metal build (roadmap item 48) and Windows the
+  // self-contained build (roadmap item 49). Their tars put the executables at the root or under
+  // bin/; find the executable, then copy its directory's files (the server and Windows DLLs)
+  // beside it. No fixed top-level layout is assumed, and tar preserves the executables' bits.
   const whisper = artifact('whisper-cli');
-  if (process.platform === 'linux') {
-    spawnSync('tar', ['-xzf', whisper, '-C', toolsBin, '--strip-components=1'], {
-      stdio: 'inherit',
-    });
-    if (!existsSync(join(toolsBin, 'whisper-cli')))
-      fail('whisper-cli not in the extracted tarball');
-  } else {
-    const whisperTmp = join(toolsBin, 'whisper-tmp');
-    mkdirSync(whisperTmp, { recursive: true });
-    spawnSync('tar', ['-xzf', whisper, '-C', whisperTmp], { stdio: 'inherit' });
-    const whisperExe = findFile(whisperTmp, windows ? 'whisper-cli.exe' : 'whisper-cli');
-    const whisperDir =
-      whisperExe === undefined
-        ? fail('whisper-cli not in the extracted tarball')
-        : dirname(whisperExe);
-    for (const entry of readdirSync(whisperDir)) {
-      copyTo(join(whisperDir, entry), join(toolsBin, entry));
-    }
-    rmSync(whisperTmp, { recursive: true, force: true });
+  const whisperTmp = join(toolsBin, 'whisper-tmp');
+  mkdirSync(whisperTmp, { recursive: true });
+  spawnSync('tar', ['-xzf', whisper, '-C', whisperTmp], { stdio: 'inherit' });
+  const whisperExe = findFile(whisperTmp, windows ? 'whisper-cli.exe' : 'whisper-cli');
+  const whisperDir =
+    whisperExe === undefined
+      ? fail('whisper-cli not in the extracted tarball')
+      : dirname(whisperExe);
+  for (const entry of readdirSync(whisperDir)) {
+    const staged = join(toolsBin, entry);
+    copyTo(join(whisperDir, entry), staged);
+    if (!windows) chmodSync(staged, 0o755);
   }
+  rmSync(whisperTmp, { recursive: true, force: true });
 
   // ffmpeg: Linux keeps bytedeco's jar, a zip carrying the executable and its libav* libraries
   // under one directory, whose flat contents belong next to the binary (the libraries carry no

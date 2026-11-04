@@ -129,3 +129,18 @@ Approved 2026-10-11 with the spec. Behaviors only; discovered scenarios are appe
 - 2026-10-13 (review decision, merged 2026-10-13): the reviewer found the `-Xjdk-release=21` guard contradicts the documented launcher minimum — the backend compiles on the launcher JVM (no toolchain), and Kotlin's jdk-release cannot exceed the compiler's JDK, so a Java 17–20 launcher would fail at `:compileKotlin`. The user chose to **document Java 21+** (README, ADR 0049) instead of adding a JDK-21 toolchain. Doc-only commit; merged with the item.
 - 2026-10-13: merged into `main` (head `664c4e09`). Spec and final test list moved here from `roadmap/33-gradle-bootstrap-without-nix.md`; the flaky item-40 spec found during this item's rebase gate was filed separately as roadmap item 47 and is not part of this item.
 - 2026-10-12 (workspace, rebased onto `main` at the user's request). `git rebase main`: all 53 branch commits replayed without conflicts, HEAD `3e661219`, `main` at `b1d1aac3` (item 40 done). Gates after the rebase: `checkVersions` in sync; link check still only the `roadmap/19` link broken on `main`; `-p backend check integrationTest` fails one unit test: `ProcessingEngineAtomicTransitionsSpec` "a pause racing its completion leaves the next run's gate open" — `expected [1L, 2L] but was [1L]` at `ProcessingEngineAtomicTransitionsSpec.kt:302`. The branch does not touch that area (`git diff main..HEAD` on `ProcessingEngine.kt` and the spec is empty; both are item 40's, merged on `main`). Verified on a detached `main` worktree (`git worktree add /tmp/main-check main`, system `gradle`, `--tests 'stt.engine.ProcessingEngineAtomicTransitionsSpec'`): the identical failure reproduces on plain `main` (6 tests completed, 1 failed). Not this item's; reported to the user, who owns `main` (item 40's spec was merged there).
+
+## Amendment (roadmap item 90, 2026-11-03)
+
+- `versions.json`'s `downloads` keys are Nix system names (`x86_64-linux`, `aarch64-darwin`,
+  `x86_64-windows`); `supportedPlatforms` is rendered by the flake and read by the bootstrap, and
+  the OS/arch names stay inside the translator functions ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).
+- `whisper-cli` 1.9.5 is our own asset on all three systems; the jiang1997 Linux/Intel-macOS
+  entries are gone. On Linux the download is the portable glibc build
+  (`whisper-cpp-1.9.5-x86_64-linux-glibc.tar.gz`, static whisper libraries, system Vulkan) from
+  the manual `linux-whisper-asset` job, because the Nix build names `/nix/store` in its ELF
+  interpreter/RUNPATH. macOS and Windows use their native assets. The Darwin and Windows ffmpeg
+  assets are our 8.1.3 builds under `ffmpeg-8.1.3`; the Linux bootstrap keeps bytedeco's 8.1.2 jar.
+- `checkVersions` also asserts that `devenv.yaml` pins the same nixpkgs rev as `flake.lock`, so the
+  shell cannot drift invisibly on a bump; the bump moved Gradle to 9.8.2, Rust to 1.99.0 and
+  Playwright to 1.64.1 (chromium-1248), all checked by `checkVersions`/`check-playwright.ts`.

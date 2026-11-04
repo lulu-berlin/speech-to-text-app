@@ -23,6 +23,7 @@ const UNGATED: Record<string, true> = { changes: true, 'docs-check': true, ci: t
 // journey started here while it was nightly-only and left once its time matched macOS (roadmap
 // item 79).
 const EVENT_GATED: Record<string, true> = {
+  'linux-whisper-asset': true,
   'macos-whisper-asset': true,
   'macos-ffmpeg-asset': true,
   'windows-whisper-asset': true,
@@ -314,6 +315,7 @@ test('the required check and the jobs it gates keep their names and conditions',
 
   // The manual assets stay dispatch-only and outside the change filter.
   for (const id of [
+    'linux-whisper-asset',
     'macos-whisper-asset',
     'macos-ffmpeg-asset',
     'windows-whisper-asset',

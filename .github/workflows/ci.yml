@@ -24,7 +24,7 @@ on:
     # dispatch does not rebuild them (roadmap items 49 and 69).
     inputs:
       assets:
-        description: 'Also build the manual macOS/Windows whisper-cli and ffmpeg assets'
+        description: 'Also build the manual Linux/macOS/Windows whisper-cli assets and the macOS/Windows ffmpeg assets'
         type: boolean
         default: false
   # Nightly at 03:17 Europe/Berlin (roadmap item 51, discovered): `timezone` is per cron entry. No
@@ -499,14 +499,13 @@ jobs:
         with:
           name: desktop-test-results-macos-dmg
 
-  # Manual tool (roadmap item 48, aligned with item 63's `desktop-whisper-cpp-v1` release): the
-  # pinned jiang1997 darwin prebuild's binaries load libggml-metal/libggml-blas dylibs the tarball
-  # does not ship, so whisper-cli cannot start on macOS. This builds a static 1.8.4 Metal binary
-  # on the runner, checks it has no @rpath dependency, and uploads the tar as a workflow artifact.
-  # The user publishes it as the macOS asset of `desktop-whisper-cpp-v1`
-  # (`whisper-cpp-1.8.4-aarch64-darwin.tar.gz`; .tar.gz because the Gradle bootstrap extracts it
-  # without a zstd dependency, unlike item 63's Nix artifact); the bootstrap pin is then updated
-  # (agents never publish to GitHub).
+  # Manual tool (roadmap items 48 and 90): the pinned darwin prebuild's binaries load
+  # libggml-metal/libggml-blas dylibs the tarball does not ship, so whisper-cli cannot start on
+  # macOS. This builds a static Metal binary for the version versions.json names on the runner,
+  # checks it has no @rpath dependency, and uploads the tar as a workflow artifact. The user
+  # publishes it as the macOS asset of the version-named `whisper-cpp-<version>` release
+  # (`whisper-cpp-<version>-aarch64-darwin.tar.gz`; .tar.gz because the Gradle bootstrap extracts
+  # it without a zstd dependency); the bootstrap pin is then updated (agents never publish).
   macos-whisper-asset:
     name: macOS whisper-cli asset (manual)
     if: github.event_name == 'workflow_dispatch' && inputs.assets
@@ -514,13 +513,14 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - name: Build whisper.cpp 1.8.4 (static, Metal + Accelerate)
+      - name: Build whisper.cpp (static, Metal + Accelerate)
         run: |
           set -euo pipefail
+          version=$(jq -r '.whisperCpp' versions.json)
           cmake --version >/dev/null || brew install cmake
-          curl -fsSL https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.4.tar.gz -o whisper.tar.gz
+          curl -fsSL "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v${version}.tar.gz" -o whisper.tar.gz
           tar xzf whisper.tar.gz
-          cmake -S whisper.cpp-1.8.4 -B build -DCMAKE_BUILD_TYPE=Release \
+          cmake -S "whisper.cpp-${version}" -B build -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF -DGGML_METAL=ON -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple \
             -DWHISPER_COREML=OFF -DWHISPER_SDL2=OFF -DWHISPER_BUILD_TESTS=OFF
           cmake --build build --config Release -j
@@ -533,16 +533,18 @@ jobs:
       - name: Package and print the sha256
         run: |
           set -euo pipefail
+          version=$(jq -r '.whisperCpp' versions.json)
+          asset="whisper-cpp-${version}-aarch64-darwin.tar.gz"
           mkdir -p stage/bin
           cp build/bin/whisper-cli stage/bin/
-          tar -czf whisper-cpp-1.8.4-aarch64-darwin.tar.gz -C stage .
-          shasum -a 256 whisper-cpp-1.8.4-aarch64-darwin.tar.gz | tee sha256.txt
+          tar -czf "$asset" -C stage .
+          shasum -a 256 "$asset" | tee sha256.txt
           echo "### whisper-cpp asset" >> "$GITHUB_STEP_SUMMARY"
           cat sha256.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
-          name: whisper-cpp-1.8.4-aarch64-darwin
-          path: whisper-cpp-1.8.4-aarch64-darwin.tar.gz
+          name: whisper-cpp-aarch64-darwin
+          path: whisper-cpp-*-aarch64-darwin.tar.gz
           retention-days: 90
 
   # Manual tool (roadmap item 69, the macOS counterpart of `macos-whisper-asset`; opt-in like it,
@@ -550,9 +552,9 @@ jobs:
   # proves its surface with `ffmpeg-audio-only` (one binary, no ffprobe/ffplay, `otool -L` names
   # only system libraries, the configure line's exact component sets) and packages it as the
   # `.tar.gz` that the flake pin, `./gradlew prepareRuntime` and the DMG all consume. The user
-  # publishes the tar under the `desktop-ffmpeg-v2` release (a new tag only if the enable list or
-  # the nixpkgs pin changes) and pastes the printed pin into nix/desktop-artifacts.nix; agents
-  # never publish.
+  # publishes the tar under the `ffmpeg-8.1.3` release (the 2026-11 nixpkgs bump moved the
+  # source to 8.1.3; a new tag per enable-list or nixpkgs change) and pastes the printed pin into
+  # nix/desktop-artifacts.nix; agents never publish.
   macos-ffmpeg-asset:
     name: macOS ffmpeg asset (manual)
     if: github.event_name == 'workflow_dispatch' && inputs.assets
@@ -890,17 +892,19 @@ jobs:
   # self-contained: the pinned tarball and ggml-org's own Windows zip both hard-import the MSVC
   # runtime (MSVCP140/VCRUNTIME140/VCOMP140, the last from OpenMP) and the pinned Vulkan build also
   # imports vulkan-1.dll, so a stock Windows install fails with 0xC0000135 before a single word is
-  # transcribed. The prebuilts cannot be fixed without rebuilding, so this job builds whisper.cpp
-  # 1.8.4 with the static MSVC CRT (the top-level project pins CMake 3.5, so the runtime variable is
-  # ignored and the Release flags carry /MT), ggml's own Win32 thread pool instead of OpenMP
-  # (GGML_OPENMP=OFF removes vcomp140.dll; ggml-cpu's threadpool still uses every core), and the
+  # transcribed. The prebuilts cannot be fixed without rebuilding, so this job builds whisper.cpp at
+  # the version versions.json names with the static MSVC CRT (the top-level project pins CMake 3.5,
+  # so the runtime variable is ignored and the Release flags carry /MT), ggml's own Win32 thread
+  # pool instead of OpenMP (GGML_OPENMP=OFF removes vcomp140.dll; ggml-cpu's threadpool still uses
+  # every core), and the
   # pinned LunarG SDK's vulkan-1.dll beside the exes: the loader picks up a driver's ICD when one
   # exists and enumerates zero devices otherwise, which is the CPU fallback. The loader is
   # Apache-2.0 and built with the static CRT. The tarball also carries the four MSVC redistributable
   # runtime DLLs: ONNX Runtime's Windows native (diarization) imports them, and stock Windows has no
   # VC++ runtime. The job fails unless the exes and the loader import no VC runtime and the JFK clip
   # transcribes on CPU through the bundled loader — the packaged-app items extend this asset with
-  # the same staged DLLs.
+  # the same staged DLLs. The version and the asset name come from versions.json (roadmap item 90):
+  # the user publishes it as the Windows asset of the version-named `whisper-cpp-<version>` release.
   windows-whisper-asset:
     name: Windows whisper-cli asset (manual)
     if: github.event_name == 'workflow_dispatch' && inputs.assets
@@ -916,26 +920,48 @@ jobs:
         with:
           version: 1.4.309.0
           cache: true
-      - name: Build whisper.cpp 1.8.4 (static CRT, no OpenMP, Vulkan)
+      - name: Install SPIRV-Headers for the Vulkan backend
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          curl.exe -fsSL https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v1.8.4.tar.gz -o whisper.tar.gz
+          # whisper.cpp 1.9.5's ggml-vulkan asks for SPIRV-Headers as a CMake package; the Vulkan
+          # SDK carries the headers but not its config file, so install the SDK tag's own repo.
+          $tag = 'vulkan-sdk-1.4.309.0'
+          curl.exe -fsSL "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/$tag.tar.gz" -o SPIRV-Headers.tar.gz
+          if ($LASTEXITCODE -ne 0) { throw "downloading SPIRV-Headers failed" }
+          tar xzf SPIRV-Headers.tar.gz
+          if ($LASTEXITCODE -ne 0) { throw "extracting SPIRV-Headers failed" }
+          cmake -S "SPIRV-Headers-$tag" -B spirv-headers-build `
+            -DSPIRV_HEADERS_ENABLE_TESTS=OFF `
+            -DCMAKE_INSTALL_PREFIX="$PWD\spirv-headers" `
+            -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE -ne 0) { throw "configuring SPIRV-Headers failed" }
+          cmake --install spirv-headers-build --config Release
+          if ($LASTEXITCODE -ne 0) { throw "installing SPIRV-Headers failed" }
+      - name: Build whisper.cpp (static CRT, no OpenMP, Vulkan)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content versions.json | ConvertFrom-Json).whisperCpp
+          curl.exe -fsSL "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v$version.tar.gz" -o whisper.tar.gz
           if ($LASTEXITCODE -ne 0) { throw "downloading whisper.cpp failed" }
           tar xzf whisper.tar.gz
           if ($LASTEXITCODE -ne 0) { throw "extracting whisper.cpp failed" }
-          cmake -S whisper.cpp-1.8.4 -B build -DCMAKE_BUILD_TYPE=Release `
+          cmake -S "whisper.cpp-$version" -B build -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_SHARED_LIBS=OFF `
             -DGGML_VULKAN=1 `
             -DGGML_NATIVE=OFF `
             -DGGML_OPENMP=OFF `
             -DWHISPER_SDL2=OFF `
             -DWHISPER_BUILD_TESTS=OFF `
+            -DSPIRV-Headers_DIR="$PWD\spirv-headers\share\cmake\SPIRV-Headers" `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
             -DCMAKE_C_FLAGS_RELEASE='/MT /O2 /Ob2 /DNDEBUG' `
             -DCMAKE_CXX_FLAGS_RELEASE='/MT /O2 /Ob2 /DNDEBUG'
           if ($LASTEXITCODE -ne 0) { throw "configuring whisper.cpp failed" }
-          cmake --build build --config Release -j 4
+          # 1.9.5 adds the parakeet example/quantizer; the asset ships only whisper-cli and
+          # whisper-server, so build those targets rather than every example.
+          cmake --build build --config Release --target whisper-cli whisper-server -j 4
           if ($LASTEXITCODE -ne 0) { throw "building whisper.cpp failed" }
       - name: Build the pinned Vulkan loader
         shell: pwsh
@@ -967,7 +993,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $stage = 'stage\whisper-1.8.4-windows-x64'
+          $version = (Get-Content versions.json | ConvertFrom-Json).whisperCpp
+          $stage = "stage\whisper-$version-x86_64-windows"
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item 'build\bin\Release\whisper-cli.exe', 'build\bin\Release\whisper-server.exe' $stage
           Copy-Item 'loader-build\loader\Release\vulkan-1.dll' $stage
@@ -992,7 +1019,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $stage = 'stage\whisper-1.8.4-windows-x64'
+          $version = (Get-Content versions.json | ConvertFrom-Json).whisperCpp
+          $stage = "stage\whisper-$version-x86_64-windows"
 
           # dumpbin is not on PATH in a plain runner shell: it comes from the VS installation.
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -1016,8 +1044,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $stage = 'stage\whisper-1.8.4-windows-x64'
           $v = Get-Content versions.json | ConvertFrom-Json
+          $stage = "stage\whisper-$($v.whisperCpp)-x86_64-windows"
           Invoke-WebRequest $v.models.whisperTinyEn.url -OutFile tiny.bin
           Invoke-WebRequest $v.fixtures.jfkWav.url -OutFile jfk.wav
           $output = & "$stage\whisper-cli.exe" -m tiny.bin -f jfk.wav -nt 2>&1
@@ -1028,27 +1056,109 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          tar -czf whisper-cpp-1.8.4-windows-x64.tar.gz -C stage whisper-1.8.4-windows-x64
+          $version = (Get-Content versions.json | ConvertFrom-Json).whisperCpp
+          $asset = "whisper-cpp-$version-x86_64-windows.tar.gz"
+          tar -czf $asset -C stage "whisper-$version-x86_64-windows"
           if ($LASTEXITCODE -ne 0) { throw "packaging failed" }
-          $sha = (Get-FileHash whisper-cpp-1.8.4-windows-x64.tar.gz -Algorithm SHA256).Hash.ToLower()
-          "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz"
+          $sha = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
+          "$sha  $asset"
           "### whisper-cpp Windows asset" >> $env:GITHUB_STEP_SUMMARY
-          "$sha  whisper-cpp-1.8.4-windows-x64.tar.gz" >> $env:GITHUB_STEP_SUMMARY
+          "$sha  $asset" >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v7
         with:
-          name: whisper-cpp-1.8.4-windows-x64
-          path: whisper-cpp-1.8.4-windows-x64.tar.gz
+          name: whisper-cpp-x86_64-windows
+          path: whisper-cpp-*-x86_64-windows.tar.gz
+          retention-days: 90
+
+  # Manual tool (roadmap item 90): the portable Linux whisper-cli for the Gradle bootstrap and the
+  # .deb. The Nix source build's ELF interpreter and RUNPATH name /nix/store paths, so it cannot
+  # run without Nix; this job builds the same 1.9.5 with static whisper libraries and the system
+  # Vulkan loader, on the Ubuntu glibc the Gradle path targets. The Nix routes keep the Nix source
+  # asset (nix/desktop-artifacts.nix). The user publishes this tar as another asset of the
+  # version-named `whisper-cpp-<version>` release.
+  linux-whisper-asset:
+    name: Linux portable whisper-cli asset (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.assets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: humbletim/install-vulkan-sdk@30ba978f977e81b72d091fc8888feb1fb26f9aff # v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+      - name: Install SPIRV-Headers and the packaging tools
+        run: |
+          set -euo pipefail
+          tag=vulkan-sdk-1.4.309.0
+          curl -fsSL "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/$tag.tar.gz" -o SPIRV-Headers.tar.gz
+          tar xzf SPIRV-Headers.tar.gz
+          cmake -S "SPIRV-Headers-$tag" -B spirv-headers-build \
+            -DSPIRV_HEADERS_ENABLE_TESTS=OFF -DCMAKE_INSTALL_PREFIX="$PWD/spirv-headers" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --install spirv-headers-build
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq binutils patchelf libvulkan1
+      - name: Build whisper.cpp (static, Vulkan)
+        run: |
+          set -euo pipefail
+          version=$(jq -r '.whisperCpp' versions.json)
+          curl -fsSL "https://github.com/ggml-org/whisper.cpp/archive/refs/tags/v${version}.tar.gz" -o whisper.tar.gz
+          tar xzf whisper.tar.gz
+          cmake -S "whisper.cpp-${version}" -B build -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF -DGGML_VULKAN=ON -DGGML_NATIVE=OFF \
+            -DWHISPER_SDL2=OFF -DWHISPER_BUILD_TESTS=OFF \
+            -DSPIRV-Headers_DIR="$PWD/spirv-headers/share/cmake/SPIRV-Headers"
+          cmake --build build --config Release --target whisper-cli whisper-server -j"$(nproc)"
+          build/bin/whisper-cli --help >/dev/null
+          patchelf --remove-rpath build/bin/whisper-cli build/bin/whisper-server
+          if readelf -d build/bin/whisper-cli | grep -qE 'RPATH|RUNPATH'; then
+            echo "whisper-cli still has an RPATH/RUNPATH" >&2
+            readelf -d build/bin/whisper-cli >&2
+            exit 1
+          fi
+          if ldd build/bin/whisper-cli | grep -q '/nix/store'; then
+            echo "whisper-cli links the Nix store" >&2
+            ldd build/bin/whisper-cli >&2
+            exit 1
+          fi
+      - name: Transcribe the JFK clip
+        run: |
+          set -euo pipefail
+          curl -fsSL "$(jq -r '.models.whisperTinyEn.url' versions.json)" -o tiny.bin
+          curl -fsSL "$(jq -r '.fixtures.jfkWav.url' versions.json)" -o jfk.wav
+          out=$(build/bin/whisper-cli -m tiny.bin -f jfk.wav -nt 2>&1)
+          echo "$out" | tail -5
+          echo "$out" | grep -q 'ask not what your country can do for you'
+      - name: Package and print the sha256
+        run: |
+          set -euo pipefail
+          version=$(jq -r '.whisperCpp' versions.json)
+          mkdir -p stage
+          cp build/bin/whisper-cli build/bin/whisper-server stage/
+          tar -czf "whisper-cpp-${version}-x86_64-linux-glibc.tar.gz" -C stage .
+          sha256sum "whisper-cpp-${version}-x86_64-linux-glibc.tar.gz" | tee sha256.txt
+          {
+            echo "### whisper-cpp Linux portable asset"
+            echo '```'
+            cat sha256.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: whisper-cpp-x86_64-linux-glibc
+          path: whisper-cpp-*-x86_64-linux-glibc.tar.gz
           retention-days: 90
 
   # The Windows audio-only ffmpeg (manual, roadmap item 68): the Windows counterpart of
   # `macos-ffmpeg-asset` and the producer of the asset the Gradle bootstrap, the portable zip, the
   # MSI and the Windows e2e leg all ship. Windows has no Nix, so MSYS2's mingw-w64 gcc builds
-  # ffmpeg 8.1.2 from the same component lists the Linux and macOS recipes read
+  # ffmpeg 8.1.3 from the same component lists the Linux and macOS recipes read
   # (nix/ffmpeg-enable.json), statically, into one ffmpeg.exe. The job proves the configure
   # surface exactly with the same nix/ffmpeg-audio-only.sh the flake checks run (no ffprobe/ffplay,
   # no GPL/version3, no component outside the list) and that the exe imports only Windows system
   # DLLs, then packages the `.tar.gz` and prints its sha256. The user publishes it as another
-  # `desktop-ffmpeg-v2` asset and records the pin; agents never publish.
+  # `ffmpeg-8.1.3` asset and records the pin; agents never publish.
   windows-ffmpeg-asset:
     name: Windows ffmpeg asset (manual)
     if: github.event_name == 'workflow_dispatch' && inputs.assets
@@ -1069,23 +1179,23 @@ jobs:
             mingw-w64-x86_64-binutils
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-nasm
-      - name: Build ffmpeg 8.1.2 (static, audio-only)
+      - name: Build ffmpeg 8.1.3 (static, audio-only)
         shell: msys2 {0}
         run: |
           set -euo pipefail
-          # The release of the nixpkgs pin (ffmpeg 8.1.2); its tarball hash is pinned here, so a
+          # The release of the nixpkgs pin (ffmpeg 8.1.3); its tarball hash is pinned here, so a
           # replaced download fails before configure runs. The retries survive a transient TLS
           # failure (run 2 died with curl's exit 35 before anything was built), and the phase
           # markers put the failing step in a log that carries no other detail.
-          echo "ffmpeg-8.1.2: downloading the source"
+          echo "ffmpeg-8.1.3: downloading the source"
           curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30 \
-            -o ffmpeg-8.1.2.tar.xz https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz
-          echo "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c  ffmpeg-8.1.2.tar.xz" | sha256sum -c -
-          tar xf ffmpeg-8.1.2.tar.xz
+            -o ffmpeg-8.1.3.tar.xz https://ffmpeg.org/releases/ffmpeg-8.1.3.tar.xz
+          echo "7138d28c96d9d3e3af4ee3d8cad72741f8ffb40da90c1112235dea3ecd3178a3  ffmpeg-8.1.3.tar.xz" | sha256sum -c -
+          tar xf ffmpeg-8.1.3.tar.xz
           bash nix/ffmpeg-enable-list.sh expected nix/ffmpeg-enable.json > expected-surface.txt
           mapfile -t enable < <(bash nix/ffmpeg-enable-list.sh configure nix/ffmpeg-enable.json)
-          cd ffmpeg-8.1.2
-          echo "ffmpeg-8.1.2: configuring"
+          cd ffmpeg-8.1.3
+          echo "ffmpeg-8.1.3: configuring"
           # The shared component flags, plus the static single-program recipe: one exe, no ffprobe,
           # no shuffling in libraries from the build host (`-static` links mingw's import libraries).
           # Win32 threads, not pthreads: the native Windows threading carries no extra library, and
@@ -1096,9 +1206,9 @@ jobs:
             --disable-debug --disable-stripping \
             --disable-doc --disable-network --disable-avdevice \
             --extra-cflags=-static --extra-ldflags="-static -static-libgcc"
-          echo "ffmpeg-8.1.2: building"
+          echo "ffmpeg-8.1.3: building"
           make -j"$(nproc)"
-          echo "ffmpeg-8.1.2: installing the program"
+          echo "ffmpeg-8.1.3: installing the program"
           make install-progs
       - name: Prove the surface and the imports
         shell: msys2 {0}
@@ -1120,8 +1230,8 @@ jobs:
         shell: msys2 {0}
         run: |
           set -euo pipefail
-          tar -czf ffmpeg-audio-only-8.1.2-windows-x64.tar.gz -C stage bin
-          sha256sum ffmpeg-audio-only-8.1.2-windows-x64.tar.gz | tee sha256.txt
+          tar -czf ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz -C stage bin
+          sha256sum ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz | tee sha256.txt
           {
             echo "### ffmpeg Windows asset"
             echo '```'
@@ -1130,8 +1240,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
-          name: ffmpeg-audio-only-8.1.2-windows-x64
-          path: ffmpeg-audio-only-8.1.2-windows-x64.tar.gz
+          name: ffmpeg-audio-only-8.1.3-x86_64-windows
+          path: ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz
           retention-days: 90
 
   # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds

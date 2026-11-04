@@ -9,23 +9,23 @@
   # is the out path of the source build the asset was made from, references that output's direct
   # references (`nix-store -q --references`, itself excluded).
   mesaVulkan.x86_64-linux = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-mesa-v1/stt-bundle-mesa-vulkan-26.2.4-x86_64-linux.tar.zst";
-    sha256 = "37f340e0840c0fc7beb62639587a0b475c218450091ae349e87ed0fc650830bc";
-    storePath = "/nix/store/r68qzz1ndp2d7bbhchjb28ixkbakrq3y-stt-bundle-mesa-vulkan-26.2.4";
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/mesa-26.2.6/stt-bundle-mesa-vulkan-26.2.6-x86_64-linux.tar.zst";
+    sha256 = "0b43fa20c75648fa2954d7799f5f6e55b8901219d13fc4e9d4991e457ada7576";
+    storePath = "/nix/store/j0pdncfbs3x9f6kv4hpb24i15c6dlgms-stt-bundle-mesa-vulkan-26.2.6";
     references = [
-      "/nix/store/0yvm79dfl53xg4vi2mg01cljfpnxkcnc-libdrm-2.4.134"
-      "/nix/store/cvr8yyrrqnjxgd7bs6lwgra4qma7kwl9-libxcb-1.17.0"
-      "/nix/store/gvhdvn542cwd3wr2978nh4ydzp89msq7-systemd-minimal-libs-261.3"
-      "/nix/store/h4wfwic161kxrr74jlzla5lsm28hgary-glibc-2.44-25"
-      "/nix/store/j7qx4s4mr17j1wqgvqdzj33lmrnzb387-gcc-16.2.0-lib"
-      "/nix/store/ja1if6cmxwmlhs64w6fxy965sg9n7d8k-libxcb-keysyms-0.4.1"
-      "/nix/store/li1008zymvj7sz8jkdk9brkslfq9jy8w-wayland-1.26.0"
-      "/nix/store/mc33sic07k7an0knwd73sq5xygg2rigg-libdisplay-info-0.4.0"
-      "/nix/store/ph4ib8mxy5yrw40k7a1l03bfd58hq6wj-zstd-1.5.7"
-      "/nix/store/s7306mp3pdbw8xx2gicsqvyganjhsywp-elfutils-0.195"
-      "/nix/store/vv038kwd5p5mlqd5ycbnvr1zmvmvkic4-libxshmfence-1.3.3"
-      "/nix/store/znrm90algr0fvnnnp130am1qfg59nl1f-libx11-1.8.13"
-      "/nix/store/zrkqwk0989k5wa1gn3cjb76jfga3d8i3-expat-2.8.5"
+      "/nix/store/05qiq1wpq0v63fhfsj851jkib1zjdsc1-libdisplay-info-0.4.0"
+      "/nix/store/7a2cjhcgzyym5zaz6m4fksw47qvm150w-gcc-16.2.0-lib"
+      "/nix/store/7rx5im6jbgyfhrl0lc0kyxd9yf14rdxc-expat-2.9.0"
+      "/nix/store/8vz293r6dqfci9p6m955yziz2agxx990-wayland-1.26.0"
+      "/nix/store/bvfkqam1y3zmsb3k41iml0zwx13sknjl-elfutils-0.195"
+      "/nix/store/cgzr5afjdbx30j7g44z2h92i8h3828k2-systemd-minimal-libs-262"
+      "/nix/store/d5dsf0h0r0fpi48rgvi7hmnac3mzj2s8-libxcb-1.17.0"
+      "/nix/store/d6ygipmny4pw7h61b255yafbnvqjbmnx-libx11-1.8.14"
+      "/nix/store/f5bymphw4ci3j34w3iw63v32pqpkxkjf-libdrm-2.4.134"
+      "/nix/store/f5r77q40xh7rj30dfkajv8y6jwbf4xh2-zstd-1.5.7"
+      "/nix/store/hkqzh1vx6kr4mis703ph6gmnl3790x9k-libxcb-keysyms-0.4.1"
+      "/nix/store/pqyiidz5mi73wv5f91d48s9plcqyj5bz-glibc-2.44-57"
+      "/nix/store/v4j317f11g4px2cc4ad7cldqkn0wdbqz-libxshmfence-1.3.3"
     ];
   };
 
@@ -33,9 +33,9 @@
   # reference is its own build path (the `configuration:` line), which the re-link rewrites, so the
   # references list is empty.
   ffmpeg.x86_64-linux = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2-x86_64-linux.tar.zst";
-    sha256 = "945db2902395cfc3a5c002de35fbddc4b3ea14de76ee50d5b3bbfbce98fc184c";
-    storePath = "/nix/store/2pqr6g1ll2dzj7p87cz5a6w8amv2pp22-ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.2";
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.3-x86_64-linux.tar.zst";
+    sha256 = "9c6ffc0611e9d28afd0fa5089cb788850530e5ce82d350a45babe34c872ab734";
+    storePath = "/nix/store/vnhygj96qdxbvrr05f1a3fy5267ydbnd-ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.3";
     references = [];
   };
 
@@ -45,35 +45,37 @@
   # prepareRuntime` and the DMG ship. Its build path is the only store path in the binary, which
   # the re-link rewrites, so the references list is empty.
   ffmpeg.aarch64-darwin = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-ffmpeg-v2/ffmpeg-audio-only-8.1.2-aarch64-darwin.tar.gz";
-    sha256 = "9f0c576d370ed47da5a541f7021e21a8a6916c2949a5546cbab7d08528a2b313";
-    storePath = "/nix/store/2y34dvlvmkxrbiq0kqq3wdx1m5mvkkjk-ffmpeg-audio-only-8.1.2";
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-8.1.3-aarch64-darwin.tar.gz";
+    sha256 = "d65ac745ec9a083bd478b999a4276b07717a4f225762aad3cc3ecb0376780390";
+    storePath = "/nix/store/w5flp0s2b2lymyybdi08145qjpvlnrl1-ffmpeg-audio-only-8.1.3";
     references = [];
   };
 
-  # The pinned whisper-cpp (roadmap item 63): the 1.8.4 Vulkan build (no SDL, no nixpkgs ffmpeg)
-  # whisper-cli ships. Its files name the libraries below and its own build path, which the re-link
-  # rewrites.
+  # The pinned whisper-cpp (roadmap item 63, 1.9.5 by roadmap item 90): the Vulkan build (no SDL, no
+  # nixpkgs ffmpeg) whisper-cli ships, published under the version-named tag whisper-cpp-1.9.5 as
+  # one `.tar.gz` per system. Its files name the libraries below and its own build path, which the
+  # re-link rewrites.
   whisperCpp.x86_64-linux = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-x86_64-linux.tar.zst";
-    sha256 = "33329560d092342ebdf61437413410f6e1f4ab769f6b91164f1f06038a79f1cf";
-    storePath = "/nix/store/n2vf0kiskxmm9mfrs5mcla5q1k7zqpmi-whisper-cpp-1.8.4";
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/whisper-cpp-1.9.5/whisper-cpp-1.9.5-x86_64-linux.tar.gz";
+    sha256 = "9bfb1aec1eacff88c55298c9c8585f754fb044a554f8f6daf12e0caa8ecbbd68";
+    storePath = "/nix/store/mf301gvwz6pva5cfnmv5r973wh026zla-whisper-cpp-1.9.5";
     references = [
-      "/nix/store/10dxp0qxqxxsyiljrh2kp0xqhz6arhcx-bash-5.3p15"
-      "/nix/store/h4wfwic161kxrr74jlzla5lsm28hgary-glibc-2.44-25"
-      "/nix/store/j7qx4s4mr17j1wqgvqdzj33lmrnzb387-gcc-16.2.0-lib"
-      "/nix/store/l60xx259knfbgfr7wzwsw7zg9ajmv3sn-wget-1.25.0"
-      "/nix/store/vjdqsn0bz2llabfqa746zfgk4kmswba5-vulkan-loader-1.4.357.0"
+      "/nix/store/7a2cjhcgzyym5zaz6m4fksw47qvm150w-gcc-16.2.0-lib"
+      "/nix/store/ajixkliv0pkhzlzc7m8p0z8rmxnyfvyc-wget-1.25.0"
+      "/nix/store/nnm9gdr70ihc6zc9298mzz8jpcgaciql-bash-5.3p20"
+      "/nix/store/nxk3gwrrd83pvdl1qvwfgs1ir5cn64mz-llama-cpp-0.8.0"
+      "/nix/store/pqyiidz5mi73wv5f91d48s9plcqyj5bz-glibc-2.44-57"
+      "/nix/store/ss8mlnazqliy7vrr3iga26kbnlrxs7bb-llama-cpp-0.8.0-dev"
     ];
   };
 
-  # Apple Silicon (roadmap item 48's follow-up): the static Metal/BLAS 1.8.4 build the manual
+  # Apple Silicon (roadmap item 48's follow-up): the static Metal/BLAS 1.9.5 build the manual
   # `macos-whisper-asset` CI job compiles and the Gradle bootstrap downloads (nix/versions.nix
-  # darwin-arm64) — one binary, system frameworks only, no store paths. The Nix package and the
+  # aarch64-darwin) — one binary, system frameworks only, no store paths. The Nix package and the
   # devenv run it too, so all three paths ship the same tool.
   whisperCpp.aarch64-darwin = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/desktop-whisper-cpp-v1/whisper-cpp-1.8.4-aarch64-darwin.tar.gz";
-    sha256 = "58ff90b3b693c58c28a3cf50c8dc9fcc6ad355101e9535f234d187bd9651078a";
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/whisper-cpp-1.9.5/whisper-cpp-1.9.5-aarch64-darwin.tar.gz";
+    sha256 = "35c620d2430f4ca766e5771a5101dc4cc9b0785dbe3e1a73c889c2795fba162a";
     storePath = null;
     references = [];
   };
