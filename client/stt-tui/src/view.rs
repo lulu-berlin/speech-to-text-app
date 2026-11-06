@@ -34,6 +34,9 @@ pub struct View<'a> {
     pub download: Option<DownloadView<'a>>,
     /// What the last action reported.
     pub notice: Option<&'a str>,
+    /// Whether the user set `NO_COLOR`: then nothing is coloured or reversed, and the selected row
+    /// is marked with `>` instead.
+    pub no_color: bool,
 }
 
 /// The download dialog's fields: the task it saves, the path, the format, and whether the format
@@ -66,8 +69,8 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     match view.screen {
         Screen::Queue => draw_queue(frame, areas[0], view),
         Screen::History => draw_history(frame, areas[0], view),
-        Screen::Transcript(transcript) => draw_transcript(frame, areas[0], transcript),
-        Screen::Settings(screen) => draw_settings(frame, areas[0], screen),
+        Screen::Transcript(transcript) => draw_transcript(frame, areas[0], view, transcript),
+        Screen::Settings(screen) => draw_settings(frame, areas[0], view, screen),
     }
     if let Some(path) = view.prompt {
         frame.render_widget(
@@ -110,15 +113,22 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
 }
 
 /// The queue in its order - one row per task with its file name, status and transcription progress,
-/// the selected row highlighted.
+/// the selected row highlighted (marked with `>` when `NO_COLOR` is set).
 fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
-    let rows = crate::state::rows(view.snapshot).into_iter().map(|task| {
-        Row::new([
-            task.filename.clone(),
-            task.status.clone(),
-            format!("{}%", (task.transcription_progress * 100.0).round()),
-        ])
-    });
+    let rows = crate::state::rows(view.snapshot)
+        .into_iter()
+        .enumerate()
+        .map(|(index, task)| {
+            Row::new([
+                format!(
+                    "{}{}",
+                    marker(index == view.selected, view.no_color),
+                    task.filename
+                ),
+                task.status.clone(),
+                format!("{}%", (task.transcription_progress * 100.0).round()),
+            ])
+        });
     let paused = view.snapshot.is_some_and(|snapshot| snapshot.queue.paused);
     let title = stt_client::text(
         if paused {
@@ -137,7 +147,7 @@ fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
         ],
     )
     .block(Block::bordered().title(title))
-    .row_highlight_style(Style::new().reversed());
+    .row_highlight_style(highlight(view.no_color));
     let mut state = TableState::default().with_selected(Some(view.selected));
     frame.render_stateful_widget(table, area, &mut state);
 }
@@ -146,29 +156,46 @@ fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
 fn draw_history(frame: &mut Frame, area: Rect, view: &View<'_>) {
     let rows = crate::state::completed(view.history)
         .into_iter()
-        .map(|task| Row::new([task.filename.clone(), task.status.clone()]));
+        .enumerate()
+        .map(|(index, task)| {
+            Row::new([
+                format!(
+                    "{}{}",
+                    marker(index == view.history_selected, view.no_color),
+                    task.filename
+                ),
+                task.status.clone(),
+            ])
+        });
     let table = Table::new(rows, [Constraint::Fill(1), Constraint::Length(12)])
         .block(Block::bordered().title(stt_client::text("history.title", &[])))
-        .row_highlight_style(Style::new().reversed());
+        .row_highlight_style(highlight(view.no_color));
     let mut state = TableState::default().with_selected(Some(view.history_selected));
     frame.render_stateful_widget(table, area, &mut state);
 }
 
 /// The settings, one row per setting with its value, the selected row highlighted.
-fn draw_settings(frame: &mut Frame, area: Rect, screen: &SettingsScreen) {
-    let rows = FIELDS
-        .iter()
-        .map(|field| Row::new([field.label(), field.value(screen)]));
+fn draw_settings(frame: &mut Frame, area: Rect, view: &View<'_>, screen: &SettingsScreen) {
+    let rows = FIELDS.iter().enumerate().map(|(index, field)| {
+        Row::new([
+            format!(
+                "{}{}",
+                marker(index == screen.row, view.no_color),
+                field.label()
+            ),
+            field.value(screen),
+        ])
+    });
     let table = Table::new(rows, [Constraint::Length(16), Constraint::Fill(1)])
         .block(Block::bordered().title(stt_client::text("settings.title", &[])))
-        .row_highlight_style(Style::new().reversed());
+        .row_highlight_style(highlight(view.no_color));
     let mut state = TableState::default().with_selected(Some(screen.row));
     frame.render_stateful_widget(table, area, &mut state);
 }
 
 /// A transcript: its speakers, the selected one highlighted and the one marked for a merge labelled
 /// so, then one line per turn - its speaker's name, its start and its text.
-fn draw_transcript(frame: &mut Frame, area: Rect, transcript: &Transcript) {
+fn draw_transcript(frame: &mut Frame, area: Rect, view: &View<'_>, transcript: &Transcript) {
     let Transcript {
         task,
         turns,
@@ -183,17 +210,21 @@ fn draw_transcript(frame: &mut Frame, area: Rect, transcript: &Transcript) {
     ])
     .split(area);
     let speakers = Table::new(
-        turns.speakers.iter().map(|speaker| {
-            Row::new([if Some(speaker.speaker_id) == *marked {
-                stt_client::text("speakers.merging", &[("name", &speaker.speaker)])
+        turns.speakers.iter().enumerate().map(|(index, entry)| {
+            Row::new([if Some(entry.speaker_id) == *marked {
+                stt_client::text("speakers.merging", &[("name", &entry.speaker)])
             } else {
-                speaker.speaker.clone()
+                format!(
+                    "{}{}",
+                    marker(index == *speaker, view.no_color),
+                    entry.speaker
+                )
             }])
         }),
         [Constraint::Fill(1)],
     )
     .block(Block::bordered().title(stt_client::text("speakers.title", &[])))
-    .row_highlight_style(Style::new().reversed());
+    .row_highlight_style(highlight(view.no_color));
     let mut state = TableState::default().with_selected(Some(*speaker));
     frame.render_stateful_widget(speakers, areas[0], &mut state);
     let title = stt_client::text("transcript.title", &[("filename", &task.filename)]);
@@ -225,4 +256,18 @@ fn draw_transcript(frame: &mut Frame, area: Rect, transcript: &Transcript) {
 /// A turn's start as `mm:ss`.
 fn clock(ms: u64) -> String {
     format!("{:02}:{:02}", ms / 60_000, (ms / 1_000) % 60)
+}
+
+/// The selected row's style: reversed video, or nothing when `NO_COLOR` is set.
+fn highlight(no_color: bool) -> Style {
+    if no_color {
+        Style::new()
+    } else {
+        Style::new().reversed()
+    }
+}
+
+/// The prefix a row carries when it is selected and colors are off - selection must still show.
+fn marker(selected: bool, no_color: bool) -> &'static str {
+    if selected && no_color { "> " } else { "" }
 }

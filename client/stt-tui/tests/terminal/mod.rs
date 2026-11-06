@@ -18,12 +18,26 @@ pub struct Tui {
     master: Box<dyn MasterPty + Send>,
     keyboard: Box<dyn Write + Send>,
     screen: Arc<Mutex<vt100::Parser>>,
+    /// Everything the TUI has written to the terminal, escapes included - a color choice is only
+    /// observable there, since the screen parser consumes them.
+    raw: Arc<Mutex<Vec<u8>>>,
 }
 
 impl Tui {
     /// Starts the TUI at `program` in a `cols` x `rows` terminal with the service directories in
     /// `state` (both `config.json` and `runtime.json`).
     pub fn start(program: &Path, state: &Path, cols: u16, rows: u16) -> Tui {
+        Tui::start_with_env(program, state, cols, rows, &[])
+    }
+
+    /// Starts the TUI as [`Tui::start`] does, with `env` set on top of the inherited environment.
+    pub fn start_with_env(
+        program: &Path,
+        state: &Path,
+        cols: u16,
+        rows: u16,
+        env: &[(&str, &str)],
+    ) -> Tui {
         let pty = native_pty_system()
             .openpty(PtySize {
                 rows,
@@ -35,6 +49,12 @@ impl Tui {
         let mut command = CommandBuilder::new(program);
         command.env("STT_CONFIG_DIR", state);
         command.env("STT_RUNTIME_DIR", state);
+        // The test decides the color choice: a CI or developer shell that exports NO_COLOR must not
+        // decide for it.
+        command.env_remove("NO_COLOR");
+        for (key, value) in env {
+            command.env(key, value);
+        }
         let child = pty.slave.spawn_command(command).unwrap();
         drop(pty.slave);
         let screen = Arc::new(Mutex::new(vt100::Parser::new(
@@ -42,14 +62,17 @@ impl Tui {
             NonZero::new(cols).expect("a terminal has columns"),
             0,
         )));
+        let raw = Arc::new(Mutex::new(Vec::new()));
         let mut output = pty.master.try_clone_reader().unwrap();
         let drawn = Arc::clone(&screen);
+        let written = Arc::clone(&raw);
         thread::spawn(move || {
             let mut bytes = [0u8; 8192];
             while let Ok(read) = output.read(&mut bytes) {
                 if read == 0 {
                     break;
                 }
+                written.lock().unwrap().extend_from_slice(&bytes[..read]);
                 drawn.lock().unwrap().process(&bytes[..read]);
             }
         });
@@ -59,7 +82,30 @@ impl Tui {
             master: pty.master,
             keyboard,
             screen,
+            raw,
         }
+    }
+
+    /// Resizes the terminal to `cols` x `rows` and the screen parser with it, as a window manager
+    /// would hand a resize to the TUI.
+    pub fn resize(&mut self, cols: u16, rows: u16) {
+        self.master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        self.screen.lock().unwrap().screen_mut().set_size(
+            NonZero::new(rows).expect("a terminal has rows"),
+            NonZero::new(cols).expect("a terminal has columns"),
+        );
+    }
+
+    /// Everything the TUI has written to the terminal so far, escapes included.
+    pub fn raw(&self) -> String {
+        String::from_utf8_lossy(&self.raw.lock().unwrap()).into_owned()
     }
 
     /// The screen's text once `shown` holds for it, or a panic with the screen after `timeout`.

@@ -151,6 +151,8 @@ struct Ui {
     download: Option<Download>,
     /// What the last action reported.
     notice: Option<String>,
+    /// Whether `NO_COLOR` is set: then the selected row is marked, and nothing is coloured.
+    no_color: bool,
 }
 
 impl Ui {
@@ -164,6 +166,7 @@ impl Ui {
             prompt: None,
             download: None,
             notice: None,
+            no_color: std::env::var_os("NO_COLOR").is_some(),
         }
     }
 
@@ -185,6 +188,7 @@ impl Ui {
             },
             download: self.download.as_ref().map(Download::view),
             notice: self.notice.as_deref(),
+            no_color: self.no_color,
         };
         terminal.draw(|frame| view::draw(frame, &view))?;
         Ok(())
