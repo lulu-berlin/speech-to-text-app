@@ -1,7 +1,8 @@
 //! `stt-tui`, the terminal frontend of the per-user service (roadmap item 67): a client of the
 //! service's HTTP API, never a second backend - with no service running it says how to start one
 //! and starts nothing itself. It shows the queue as the service's event stream reports it, uploads
-//! a file by the path the user types, and sends the queue's commands.
+//! a file by the path the user types, sends the queue's commands, and opens the history of
+//! completed tasks and their transcripts.
 
 use std::future::Future;
 use std::io;
@@ -13,11 +14,12 @@ use std::time::Duration;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event as terminal_event;
 use stt_client::{
-    Event, Service, ServiceDirs, Snapshot, events, locate, reorder_queue, set_queue_paused,
-    task_command, text, upload,
+    Event, Service, ServiceDirs, Snapshot, Task, Turns, events, history, locate, reorder_queue,
+    set_queue_paused, task_command, text, turns, upload,
 };
 
 use crate::input::Action;
+use crate::state::Screen;
 
 mod input;
 mod state;
@@ -29,6 +31,10 @@ enum Message {
     Service(Event),
     Terminal(terminal_event::Event),
     Notice(String),
+    /// The task list arrived; the history screen shows it.
+    History(Vec<Task>),
+    /// A transcript arrived; the transcript screen shows it.
+    Transcript(Task, Turns),
 }
 
 fn main() -> ExitCode {
@@ -108,9 +114,9 @@ async fn follow(service: Service, sender: mpsc::Sender<Message>) {
     }
 }
 
-/// Draws the queue, again after every event, until the user quits, applying the keys [`input`]
-/// maps: `u` opens the upload prompt, Up/Down select, `p`/`c`/`r` command the selected task,
-/// `J`/`K` move it, Space pauses the queue, and `q`, Escape (with no prompt) and Ctrl-C quit.
+/// Draws the open screen, again after every event, until the user quits, applying the keys
+/// [`input`] maps: `h` opens the history, Enter opens the selected transcript, `b`/Escape go back,
+/// `u` uploads by path, the queue's keys command it, and `q` or Ctrl-C quit.
 fn show(
     terminal: &mut DefaultTerminal,
     messages: &mpsc::Receiver<Message>,
@@ -119,10 +125,22 @@ fn show(
     sender: mpsc::Sender<Message>,
 ) -> io::Result<()> {
     let mut snapshot: Option<Snapshot> = None;
+    let mut screen = Screen::Queue;
     let mut selected = 0;
+    let mut listed: Vec<Task> = Vec::new();
+    let mut history_selected = 0;
     let mut prompt: Option<String> = None;
     let mut notice: Option<String> = None;
-    draw(terminal, &snapshot, selected, &prompt, &notice)?;
+    draw(
+        terminal,
+        &snapshot,
+        &screen,
+        selected,
+        &listed,
+        history_selected,
+        &prompt,
+        &notice,
+    )?;
     while let Ok(message) = messages.recv() {
         match message {
             Message::Service(event) => {
@@ -132,91 +150,199 @@ fn show(
                     selected = selected.min(rows - 1);
                 }
             }
-            Message::Notice(text) => notice = Some(text),
+            Message::Notice(line) => notice = Some(line),
+            Message::History(tasks) => {
+                listed = tasks;
+                history_selected = 0;
+                screen = Screen::History;
+            }
+            Message::Transcript(task, turns) => {
+                screen = Screen::Transcript { task, turns };
+            }
             Message::Terminal(terminal_event::Event::Key(key)) => {
                 let Some(action) = input::action(&key, prompt.is_some()) else {
                     continue;
                 };
-                match action {
-                    Action::Quit => return Ok(()),
-                    Action::OpenPrompt => prompt = Some(String::new()),
-                    Action::CancelPrompt => prompt = None,
-                    Action::PromptBackspace => {
-                        if let Some(path) = prompt.as_mut() {
-                            path.pop();
+                if matches!(screen, Screen::Queue) {
+                    match action {
+                        Action::Quit => return Ok(()),
+                        Action::BackOrQuit => {
+                            if matches!(screen, Screen::Queue) {
+                                return Ok(());
+                            }
                         }
-                    }
-                    Action::PromptChar(character) => {
-                        if let Some(path) = prompt.as_mut() {
-                            path.push(character);
+                        Action::Back => {}
+                        Action::OpenPrompt => prompt = Some(String::new()),
+                        Action::CancelPrompt => prompt = None,
+                        Action::PromptBackspace => {
+                            if let Some(path) = prompt.as_mut() {
+                                path.pop();
+                            }
                         }
-                    }
-                    Action::SubmitPrompt => {
-                        let path = prompt.take().unwrap_or_default().trim().to_string();
-                        if path.is_empty() {
-                            notice = Some(text("upload.no-path", &[]));
-                        } else {
-                            let service = service.clone();
-                            dispatch(&runtime, &sender, "upload.failed", async move {
-                                upload(&service, Path::new(&path)).await.map(|task| {
-                                    text("upload.queued", &[("filename", &task.filename)])
-                                })
-                            });
+                        Action::PromptChar(character) => {
+                            if let Some(path) = prompt.as_mut() {
+                                path.push(character);
+                            }
                         }
-                    }
-                    Action::SelectUp => selected = selected.saturating_sub(1),
-                    Action::SelectDown => {
-                        let rows = state::rows(snapshot.as_ref()).len();
-                        if selected + 1 < rows {
-                            selected += 1;
+                        Action::SubmitPrompt => {
+                            let path = prompt.take().unwrap_or_default().trim().to_string();
+                            if path.is_empty() {
+                                notice = Some(text("upload.no-path", &[]));
+                            } else {
+                                let service = service.clone();
+                                dispatch(&runtime, &sender, "upload.failed", async move {
+                                    upload(&service, Path::new(&path)).await.map(|task| {
+                                        text("upload.queued", &[("filename", &task.filename)])
+                                    })
+                                });
+                            }
                         }
-                    }
-                    Action::MoveSelected(step) => {
-                        move_selected(&runtime, &sender, &service, &snapshot, selected, step)
-                    }
-                    Action::ToggleQueuePause => {
-                        let paused = snapshot.as_ref().is_some_and(|s| s.queue.paused);
-                        let service = service.clone();
-                        dispatch(&runtime, &sender, "command.failed", async move {
-                            set_queue_paused(&service, !paused).await.map(|queue| {
-                                text(
-                                    if queue.paused {
-                                        "queue.paused"
-                                    } else {
-                                        "queue.running"
-                                    },
-                                    &[],
-                                )
-                            })
-                        });
-                    }
-                    Action::TaskKey(character) => {
-                        if let Some(task) = task_at(&snapshot, selected)
-                            && let Some(command) = input::command_for(task, character)
-                        {
-                            let id = task.id;
+                        Action::SelectUp => selected = selected.saturating_sub(1),
+                        Action::SelectDown => {
+                            let rows = state::rows(snapshot.as_ref()).len();
+                            if selected + 1 < rows {
+                                selected += 1;
+                            }
+                        }
+                        Action::MoveSelected(step) => {
+                            move_selected(&runtime, &sender, &service, &snapshot, selected, step)
+                        }
+                        Action::ToggleQueuePause => {
+                            let paused = snapshot.as_ref().is_some_and(|s| s.queue.paused);
                             let service = service.clone();
                             dispatch(&runtime, &sender, "command.failed", async move {
-                                task_command(&service, id, command).await.map(|task| {
+                                set_queue_paused(&service, !paused).await.map(|queue| {
                                     text(
-                                        "task.command-done",
-                                        &[("filename", &task.filename), ("status", &task.status)],
+                                        if queue.paused {
+                                            "queue.paused"
+                                        } else {
+                                            "queue.running"
+                                        },
+                                        &[],
                                     )
                                 })
                             });
                         }
+                        Action::TaskKey(character) => {
+                            if let Some(task) = task_at(&snapshot, selected)
+                                && let Some(command) = input::command_for(task, character)
+                            {
+                                let id = task.id;
+                                let service = service.clone();
+                                dispatch(&runtime, &sender, "command.failed", async move {
+                                    task_command(&service, id, command).await.map(|task| {
+                                        text(
+                                            "task.command-done",
+                                            &[
+                                                ("filename", &task.filename),
+                                                ("status", &task.status),
+                                            ],
+                                        )
+                                    })
+                                });
+                            }
+                        }
+                        Action::OpenHistory => {
+                            let service = service.clone();
+                            let sender = sender.clone();
+                            runtime.spawn(async move {
+                                match history(&service).await {
+                                    Ok(tasks) => {
+                                        let _ = sender.send(Message::History(tasks));
+                                    }
+                                    Err(error) => {
+                                        let _ = sender.send(Message::Notice(text(
+                                            "history.failed",
+                                            &[("error", &error.to_string())],
+                                        )));
+                                    }
+                                }
+                            });
+                        }
+                        Action::OpenSelected => {}
+                    }
+                } else {
+                    // Every other screen: `q` quits, Escape or `b` goes back, and the history opens a
+                    // transcript; the queue's own keys do nothing here.
+                    match action {
+                        Action::Quit => return Ok(()),
+                        Action::BackOrQuit | Action::Back => {
+                            screen = match screen {
+                                Screen::Transcript { .. } => Screen::History,
+                                _ => Screen::Queue,
+                            };
+                        }
+                        Action::OpenHistory => {
+                            let service = service.clone();
+                            let sender = sender.clone();
+                            runtime.spawn(async move {
+                                match history(&service).await {
+                                    Ok(tasks) => {
+                                        let _ = sender.send(Message::History(tasks));
+                                    }
+                                    Err(error) => {
+                                        let _ = sender.send(Message::Notice(text(
+                                            "history.failed",
+                                            &[("error", &error.to_string())],
+                                        )));
+                                    }
+                                }
+                            });
+                        }
+                        Action::SelectUp if matches!(screen, Screen::History) => {
+                            history_selected = history_selected.saturating_sub(1);
+                        }
+                        Action::SelectDown if matches!(screen, Screen::History) => {
+                            let rows = state::completed(&listed).len();
+                            if history_selected + 1 < rows {
+                                history_selected += 1;
+                            }
+                        }
+                        Action::OpenSelected if matches!(screen, Screen::History) => {
+                            let task = state::completed(&listed)
+                                .get(history_selected)
+                                .map(|task| (*task).clone());
+                            if let Some(task) = task {
+                                let id = task.id;
+                                let service = service.clone();
+                                let sender = sender.clone();
+                                runtime.spawn(async move {
+                                    match turns(&service, id).await {
+                                        Ok(turns) => {
+                                            let _ = sender.send(Message::Transcript(task, turns));
+                                        }
+                                        Err(error) => {
+                                            let _ = sender.send(Message::Notice(text(
+                                                "transcript.failed",
+                                                &[("error", &error.to_string())],
+                                            )));
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
             Message::Terminal(_) => {}
         }
-        draw(terminal, &snapshot, selected, &prompt, &notice)?;
+        draw(
+            terminal,
+            &snapshot,
+            &screen,
+            selected,
+            &listed,
+            history_selected,
+            &prompt,
+            &notice,
+        )?;
     }
     Ok(())
 }
 
-/// The task on the row `selected`, if any.
-fn task_at(snapshot: &Option<Snapshot>, selected: usize) -> Option<&stt_client::Task> {
+/// The task on the queue's row `selected`, if any.
+fn task_at(snapshot: &Option<Snapshot>, selected: usize) -> Option<&Task> {
     state::rows(snapshot.as_ref()).get(selected).copied()
 }
 
@@ -275,18 +401,24 @@ fn dispatch<F>(
     });
 }
 
-/// Draws the screen as it is now: the queue with its selection, the prompt if it is open, the last
-/// notice.
+/// Draws the screen as it is now.
+#[allow(clippy::too_many_arguments)]
 fn draw(
     terminal: &mut DefaultTerminal,
     snapshot: &Option<Snapshot>,
+    screen: &Screen,
     selected: usize,
+    history: &[Task],
+    history_selected: usize,
     prompt: &Option<String>,
     notice: &Option<String>,
 ) -> io::Result<()> {
     let view = view::View {
         snapshot: snapshot.as_ref(),
+        screen,
         selected,
+        history,
+        history_selected,
         prompt: prompt.as_deref(),
         notice: notice.as_deref(),
     };

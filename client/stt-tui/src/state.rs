@@ -1,6 +1,14 @@
-//! What the TUI knows of the service: the last snapshot, kept current by the events after it.
+//! What the TUI knows of the service: the last snapshot, kept current by the events after it, and
+//! which screen shows it - the queue, the history of completed tasks, or one transcript.
 
-use stt_client::{Event, Snapshot, Task};
+use stt_client::{Event, Snapshot, Task, Turns};
+
+/// The screen the terminal shows.
+pub enum Screen {
+    Queue,
+    History,
+    Transcript { task: Task, turns: Turns },
+}
 
 /// The service's state after `event`. Every stream starts with a snapshot, so a change before one
 /// has nothing to apply to.
@@ -46,4 +54,12 @@ pub fn rows(snapshot: Option<&Snapshot>) -> Vec<&Task> {
             && !snapshot.queue.task_ids.contains(&task.id)
     }));
     rows
+}
+
+/// The history's rows: the tasks that completed, in the list's order.
+pub fn completed(tasks: &[Task]) -> Vec<&Task> {
+    tasks
+        .iter()
+        .filter(|task| task.status == "COMPLETED")
+        .collect()
 }

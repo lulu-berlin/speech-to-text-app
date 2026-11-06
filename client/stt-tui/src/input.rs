@@ -24,6 +24,14 @@ pub enum Action {
     ToggleQueuePause,
     /// A task command key; [command_for] turns it into the command, if the task allows it.
     TaskKey(char),
+    /// Open the history of completed tasks.
+    OpenHistory,
+    /// Enter: open what the selected row is (the history opens a transcript).
+    OpenSelected,
+    /// `b`: back to the previous screen.
+    Back,
+    /// Escape: back where there is a previous screen, quit at the queue.
+    BackOrQuit,
 }
 
 /// What `key` does: with the prompt open every key is text except Escape, Enter and Backspace; at
@@ -46,7 +54,11 @@ pub fn action(key: &KeyEvent, prompt_open: bool) -> Option<Action> {
     }
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
     match key.code {
-        KeyCode::Esc | KeyCode::Char('q') => Some(Action::Quit),
+        KeyCode::Esc => Some(Action::BackOrQuit),
+        KeyCode::Char('q') => Some(Action::Quit),
+        KeyCode::Char('b') => Some(Action::Back),
+        KeyCode::Char('h') => Some(Action::OpenHistory),
+        KeyCode::Enter => Some(Action::OpenSelected),
         KeyCode::Char('u') => Some(Action::OpenPrompt),
         KeyCode::Up if shift => Some(Action::MoveSelected(-1)),
         KeyCode::Down if shift => Some(Action::MoveSelected(1)),

@@ -133,6 +133,24 @@ pub struct EventService {
     streams: std::sync::mpsc::Receiver<EventStream>,
     uploads: std::sync::mpsc::Receiver<Upload>,
     commands: std::sync::mpsc::Receiver<Command>,
+    gets: std::sync::mpsc::Receiver<Fetch>,
+}
+
+/// One `GET` a client made beyond the health check and the event stream (the task list, a
+/// transcript's turns), its request read whole and its response still to be sent.
+pub struct Fetch {
+    request: crate::support::Request,
+    stream: std::net::TcpStream,
+}
+
+impl Fetch {
+    pub fn request(&self) -> &crate::support::Request {
+        &self.request
+    }
+
+    pub fn answer(mut self, status: &str, body: &str) {
+        crate::support::respond(&mut self.stream, status, body);
+    }
 }
 
 /// One task or queue command a client made (`POST /api/tasks/{id}/…`, `POST /api/queue/…`,
@@ -185,6 +203,7 @@ impl EventService {
         let (handed, streams) = std::sync::mpsc::channel();
         let (uploaded, uploads) = std::sync::mpsc::channel();
         let (commanded, commands) = std::sync::mpsc::channel();
+        let (fetched, gets) = std::sync::mpsc::channel();
         thread::spawn(move || {
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
@@ -217,6 +236,10 @@ impl EventService {
                     if commanded.send(Command { request, stream }).is_err() {
                         return;
                     }
+                } else if request.line.starts_with("GET /api/tasks") {
+                    if fetched.send(Fetch { request, stream }).is_err() {
+                        return;
+                    }
                 } else {
                     let (status, body) = crate::support::healthy();
                     crate::support::respond(&mut stream, status, &body);
@@ -228,7 +251,15 @@ impl EventService {
             streams,
             uploads,
             commands,
+            gets,
         }
+    }
+
+    /// The next read a client made, or a panic after `timeout`.
+    pub fn next_get(&self, timeout: Duration) -> Fetch {
+        self.gets
+            .recv_timeout(timeout)
+            .unwrap_or_else(|_| panic!("no GET arrived within {timeout:?}"))
     }
 
     /// The next command a client made, or a panic after `timeout`.
