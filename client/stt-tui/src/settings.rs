@@ -3,7 +3,7 @@
 
 use std::sync::mpsc;
 
-use stt_client::{Service, Settings, save_settings, text};
+use stt_client::{Service, Settings, languages, save_settings, text};
 
 use crate::Message;
 use crate::input::Action;
@@ -103,11 +103,58 @@ impl SettingsScreen {
     fn changed(&self, step: isize) -> Option<Settings> {
         let mut changed = self.settings.clone();
         match FIELDS[self.row] {
+            Field::Device => {
+                changed.device = step_choice(&changed.available_devices, &changed.device, step)?;
+            }
             Field::Threads => changed.threads = step_threads(changed.threads, step),
-            _ => return None,
+            Field::Language => {
+                let codes: Vec<String> = languages()
+                    .ok()?
+                    .into_iter()
+                    .map(|language| language.code)
+                    .collect();
+                changed.default_language = step_choice(&codes, &changed.default_language, step)?;
+            }
+            Field::Speakers => {
+                let modes = ["auto".to_string(), "off".to_string(), "fixed".to_string()];
+                let mode = step_choice(&modes, &changed.speakers_mode, step)?;
+                // A count belongs to `fixed` only; the browser writes null for the other modes.
+                if mode != "fixed" {
+                    changed.speakers_count = None;
+                }
+                changed.speakers_mode = mode;
+            }
+            Field::SpeakerCount => {
+                if changed.speakers_mode != "fixed" {
+                    return None;
+                }
+                changed.speakers_count = Some(step_between(
+                    changed.speakers_count.unwrap_or(0),
+                    step,
+                    1,
+                    20,
+                ));
+            }
+            Field::MaxSpeakers => {
+                changed.max_speakers = step_between(changed.max_speakers, step, 1, 20);
+            }
         }
         Some(changed)
     }
+}
+
+/// `current` moved `step` places through `choices`, wrapping round; `None` when `current` is not
+/// one of them (the service offers a list the stored value fell out of).
+fn step_choice(choices: &[String], current: &str, step: isize) -> Option<String> {
+    let index = choices.iter().position(|choice| choice == current)? as isize;
+    let next = (index + step).rem_euclid(choices.len() as isize) as usize;
+    Some(choices[next].clone())
+}
+
+/// `value` moved `step` places, kept within `low..=high`.
+fn step_between(value: u32, step: isize, low: u32, high: u32) -> u32 {
+    let next = i64::from(value) + step as i64;
+    next.clamp(i64::from(low), i64::from(high)) as u32
 }
 
 /// The thread count `step` places on from `threads`, `None` (auto) sitting below 1.

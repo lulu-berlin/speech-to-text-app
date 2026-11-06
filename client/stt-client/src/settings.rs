@@ -1,5 +1,6 @@
 //! The service's settings (roadmap item 67): read and saved whole, the calls the browser's Settings
-//! page makes, with the per-install secret (`docs/api/settings.json`).
+//! page makes, with the per-install secret (`docs/api/settings.json`), and the language list its
+//! `defaultLanguage` picks from (`docs/api/languages.json`).
 
 use std::collections::BTreeMap;
 use std::io;
@@ -8,6 +9,28 @@ use serde::{Deserialize, Serialize};
 
 use crate::Service;
 use crate::response_json;
+
+/// One language the service accepts, as `docs/api/languages.json` lists it (item 14).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Language {
+    pub code: String,
+    pub name: String,
+}
+
+/// The browser's own language list, compiled in like the UI text (ADR 0029: the contract is
+/// mirrored by hand).
+const LANGUAGES: &str = include_str!("../../../docs/api/languages.json");
+
+/// Every language `defaultLanguage` accepts, `auto` first.
+pub fn languages() -> io::Result<Vec<Language>> {
+    #[derive(Deserialize)]
+    struct Languages {
+        languages: Vec<Language>,
+    }
+    serde_json::from_str::<Languages>(LANGUAGES)
+        .map(|list| list.languages)
+        .map_err(io::Error::other)
+}
 
 /// The settings as `GET /api/settings` answers them. Serialized, they are the body of a
 /// `PUT /api/settings`: every stored setting, the default frontend and the terminal command

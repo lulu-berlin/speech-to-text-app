@@ -89,3 +89,119 @@ fn a_changed_setting_is_saved_whole_and_the_answer_is_shown() {
     write.answer("200 OK", SAVED);
     tui.wait_for(WAIT, |text| row(text, "Threads", "5"));
 }
+
+/// `base` (the service's settings) with `change`'s fields replaced: the answer to a stored write.
+fn stored(base: &str, change: Value) -> String {
+    let mut settings: Value = serde_json::from_str(base).unwrap();
+    for (key, value) in change.as_object().unwrap() {
+        settings[key] = value.clone();
+    }
+    settings.to_string()
+}
+
+/// The body of a settings write: every stored setting, as the contract takes them.
+fn body(change: Value) -> Value {
+    let mut settings = json!({
+        "device": "auto",
+        "threads": 4,
+        "defaultLanguage": "de",
+        "speakersMode": "fixed",
+        "speakersCount": 3,
+        "maxSpeakers": 12,
+        "defaultFrontend": "browser",
+        "terminalCommand": "kitty -e"
+    });
+    for (key, value) in change.as_object().unwrap() {
+        settings[key] = value.clone();
+    }
+    settings
+}
+
+#[test]
+fn the_device_language_and_speaker_settings_change_within_the_contract() {
+    let service = EventService::start();
+    let dir = tempfile::tempdir().unwrap();
+    support::write_bootstrap(dir.path(), service.port);
+    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
+    tui.press(b"s");
+    service.next_get(WAIT).answer("200 OK", SETTINGS);
+    tui.wait_for(WAIT, |text| row(text, "Threads", "4"));
+
+    // Device: Right takes the next device the service offers after `auto`, `gpu:0`.
+    tui.press(b"\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({ "device": "gpu:0" }))
+    );
+    let mut current = stored(SETTINGS, json!({ "device": "gpu:0" }));
+    write.answer("200 OK", &current);
+    tui.wait_for(WAIT, |text| {
+        row(text, "Device", "gpu:0 (NVIDIA GeForce RTX 3060)")
+    });
+
+    // Language: Right takes the next code after `de`, `es` (the browser's own list).
+    tui.press(b"\x1b[B\x1b[B\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({ "device": "gpu:0", "defaultLanguage": "es" }))
+    );
+    current = stored(&current, json!({ "defaultLanguage": "es" }));
+    write.answer("200 OK", &current);
+    tui.wait_for(WAIT, |text| row(text, "Language", "es"));
+
+    // Speaker count: Right raises it while the mode is `fixed`.
+    tui.press(b"\x1b[B\x1b[B\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({
+            "device": "gpu:0",
+            "defaultLanguage": "es",
+            "speakersCount": 4
+        }))
+    );
+    current = stored(&current, json!({ "speakersCount": 4 }));
+    write.answer("200 OK", &current);
+    tui.wait_for(WAIT, |text| row(text, "Speaker count", "4"));
+
+    // Max speakers: Right raises it, within the contract's 1..20.
+    tui.press(b"\x1b[B\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({
+            "device": "gpu:0",
+            "defaultLanguage": "es",
+            "speakersCount": 4,
+            "maxSpeakers": 13
+        }))
+    );
+    current = stored(&current, json!({ "maxSpeakers": 13 }));
+    write.answer("200 OK", &current);
+    tui.wait_for(WAIT, |text| row(text, "Max speakers", "13"));
+
+    // Speakers: Right wraps `fixed` round to `auto`, and the count is no longer fixed.
+    tui.press(b"\x1b[A\x1b[A\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({
+            "device": "gpu:0",
+            "defaultLanguage": "es",
+            "speakersMode": "auto",
+            "speakersCount": null,
+            "maxSpeakers": 13
+        }))
+    );
+    current = stored(
+        &current,
+        json!({ "speakersMode": "auto", "speakersCount": null }),
+    );
+    write.answer("200 OK", &current);
+    tui.wait_for(WAIT, |text| row(text, "Speakers", "auto"));
+}
