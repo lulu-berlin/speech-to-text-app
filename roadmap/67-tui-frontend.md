@@ -1,6 +1,6 @@
 # 67 — A terminal UI frontend
 
-Status: spec-approved
+Status: in-progress
 Depends on: [66](../docs/specs/local-service-and-frontends.md) (done; the per-user service, frontend
 descriptors and launch model — the credential, runtime endpoint and descriptor this item uses are
 built there, as is the Rust pin), [12](../docs/specs/http-api-and-sse.md) (done; the HTTP/SSE
