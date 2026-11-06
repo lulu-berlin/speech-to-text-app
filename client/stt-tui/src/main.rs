@@ -15,12 +15,14 @@ use ratatui::DefaultTerminal;
 use ratatui::crossterm::event as terminal_event;
 use stt_client::{
     Event, Service, ServiceDirs, Snapshot, Task, Turns, events, history, locate, reorder_queue,
-    set_queue_paused, task_command, text, transcript, turns, upload,
+    set_queue_paused, task_command, text, turns, upload,
 };
 
+use crate::download::Download;
 use crate::input::Action;
 use crate::state::Screen;
 
+mod download;
 mod input;
 mod state;
 mod view;
@@ -138,62 +140,6 @@ struct Ui {
     notice: Option<String>,
 }
 
-/// The download dialog: the transcript's task, the path being typed, the format, and which field has
-/// the focus.
-struct Download {
-    task: Task,
-    path: String,
-    format: Format,
-    focus: Focus,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Format {
-    Txt,
-    Srt,
-    Vtt,
-}
-
-impl Format {
-    fn as_str(self) -> &'static str {
-        match self {
-            Format::Txt => "txt",
-            Format::Srt => "srt",
-            Format::Vtt => "vtt",
-        }
-    }
-
-    /// The format `path`'s extension names, if it names one - so typing `memo.srt` selects srt.
-    fn from_path(path: &str) -> Option<Format> {
-        match Path::new(path)
-            .extension()?
-            .to_str()?
-            .to_ascii_lowercase()
-            .as_str()
-        {
-            "txt" => Some(Format::Txt),
-            "srt" => Some(Format::Srt),
-            "vtt" => Some(Format::Vtt),
-            _ => None,
-        }
-    }
-
-    fn cycle(self, step: isize) -> Format {
-        let formats = [Format::Txt, Format::Srt, Format::Vtt];
-        let index = formats
-            .iter()
-            .position(|format| *format == self)
-            .unwrap_or(0) as isize;
-        formats[(index + step).rem_euclid(formats.len() as isize) as usize]
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Focus {
-    Path,
-    Format,
-}
-
 impl Ui {
     fn new() -> Ui {
         Ui {
@@ -216,12 +162,7 @@ impl Ui {
             history: &self.listed,
             history_selected: self.history_selected,
             prompt: self.prompt.as_deref(),
-            download: self.download.as_ref().map(|download| view::DownloadView {
-                filename: &download.task.filename,
-                path: &download.path,
-                format: download.format.as_str(),
-                focus_format: download.focus == Focus::Format,
-            }),
+            download: self.download.as_ref().map(Download::view),
             notice: self.notice.as_deref(),
         };
         terminal.draw(|frame| view::draw(frame, &view))?;
@@ -395,47 +336,21 @@ impl Ui {
             }
             Action::OpenDownload => {
                 if let Screen::Transcript { task, .. } = &self.screen {
-                    self.download = Some(Download {
-                        task: task.clone(),
-                        path: String::new(),
-                        format: Format::Txt,
-                        focus: Focus::Path,
-                    });
+                    self.download = Some(Download::new(task.clone()));
                 }
             }
-            Action::DownloadChar(character) => {
-                if let Some(download) = self.download.as_mut() {
-                    download.path.push(character);
-                    if let Some(format) = Format::from_path(&download.path) {
-                        download.format = format;
-                    }
-                }
-            }
-            Action::DownloadBackspace => {
-                if let Some(download) = self.download.as_mut() {
-                    download.path.pop();
-                    if let Some(format) = Format::from_path(&download.path) {
-                        download.format = format;
-                    }
-                }
-            }
-            Action::DownloadTab => {
-                if let Some(download) = self.download.as_mut() {
-                    download.focus = match download.focus {
-                        Focus::Path => Focus::Format,
-                        Focus::Format => Focus::Path,
-                    };
-                }
-            }
-            Action::DownloadFormatStep(step) => {
+            Action::DownloadChar(_)
+            | Action::DownloadBackspace
+            | Action::DownloadTab
+            | Action::DownloadFormatStep(_)
+            | Action::CancelDownload
+            | Action::SubmitDownload => {
                 if let Some(download) = self.download.as_mut()
-                    && download.focus == Focus::Format
+                    && download.handle(action, runtime, sender, service)
                 {
-                    download.format = download.format.cycle(step);
+                    self.download = None;
                 }
             }
-            Action::CancelDownload => self.download = None,
-            Action::SubmitDownload => submit_download(runtime, sender, service, self),
             _ => {}
         }
         Outcome::Continue
@@ -510,47 +425,6 @@ fn open_transcript(
             }
         }
     });
-}
-
-/// Saves the dialog's transcript to its path: the destination is opened first, so a path that cannot
-/// be written is reported before anything is fetched, and the body goes into that file.
-fn submit_download(
-    runtime: &tokio::runtime::Handle,
-    sender: &mpsc::Sender<Message>,
-    service: &Service,
-    ui: &mut Ui,
-) {
-    let Some(download) = ui.download.take() else {
-        return;
-    };
-    let path = download.path.trim().to_string();
-    if path.is_empty() {
-        ui.notice = Some(text("download.no-path", &[]));
-        return;
-    }
-    let id = download.task.id;
-    let format = download.format.as_str();
-    let service = service.clone();
-    let sender = sender.clone();
-    runtime.spawn(async move {
-        let notice = match save_transcript(&service, id, format, &path).await {
-            Ok(()) => text("download.saved", &[("path", &path)]),
-            Err(error) => text("download.failed", &[("error", &error.to_string())]),
-        };
-        let _ = sender.send(Message::Notice(notice));
-    });
-}
-
-/// Fetches task `id`'s transcript in `format` into `path`.
-async fn save_transcript(service: &Service, id: i64, format: &str, path: &str) -> io::Result<()> {
-    use tokio::io::AsyncWriteExt;
-    let mut file = tokio::fs::File::create(path)
-        .await
-        .map_err(|error| io::Error::new(error.kind(), format!("{path}: {error}")))?;
-    let body = transcript(service, id, format).await?;
-    file.write_all(body.as_bytes())
-        .await
-        .map_err(io::Error::other)
 }
 
 /// The task on the queue's row `selected`, if any.

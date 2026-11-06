@@ -5,6 +5,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use stt_client::{Task, TaskCommand};
 
 /// What a key asks the TUI to do.
+#[derive(Clone, Copy)]
 pub enum Action {
     Quit,
     /// Open the upload prompt, empty.
