@@ -104,6 +104,8 @@ Unless speakers are switched off, the engine decodes the whole recording from th
 
 The task becomes `COMPLETED` and its scratch directory is removed. The transcript is not stored as a file: the downloads (`.txt`, `.srt`, `.vtt`) are rendered from the segments on request, with the current speaker names ([ADR 0034](decisions/0034-speaker-labels-are-stored-names.md)).
 
+A completed transcript can still be corrected: the user edits one segment's text, or reverts it to the text whisper wrote, which every segment keeps beside its current text ([ADR 0061](decisions/0061-segment-keeps-original-text.md), [docs/specs/edit-transcription.md](specs/edit-transcription.md)); segments can also be moved to another speaker ([docs/specs/speaker-reassignment.md](specs/speaker-reassignment.md)). The downloads render the stored text, so an edit shows there too.
+
 ### Pause, cancel, retry, reorder, delete
 
 - **Pause** a task: the running whisper-cli or ffmpeg process is frozen with the platform's stop signal and continued with its continue signal (macOS sends 17/19 where Linux sends 19/18), and diarization stops at its next checkpoint ([ADR 0020](decisions/0020-process-runner-jna-signals-process-groups.md)). **Pause the queue**: the same, and the worker takes no new task until it is resumed.
@@ -144,11 +146,11 @@ All state is in one SQLite database, `stt.db`, in the data directory (`STT_DATA_
 | `chunks` | chunk of a task | its window into the clip (start and end time), `PENDING` or `DONE` |
 | `audio_header` | task | the canonical clip's FLAC header |
 | `audio_second` | second of a task's clip | that second's FLAC frames (the header plus every row in order is the clip) |
-| `segments` | transcribed sentence | start and end time, text, speaker |
+| `segments` | transcribed sentence | start and end time, text (and whisper's original text), speaker |
 | `speakers` | speaker of a task | the speaker's name |
 | `speaker_merge` | merged speaker | which speaker it was merged into |
 | `queue_state` | — (one row) | whether the queue is paused |
-| `settings` | — (one row) | compute device, threads, defaults for new uploads |
+| `settings` | — (one row) | compute device, threads, defaults for new uploads, the default frontend and the terminal command |
 
 Deleting a task deletes everything it owns (the foreign keys cascade).
 
@@ -164,7 +166,7 @@ The schema is [docs/specs/database-schema.md](specs/database-schema.md) (later c
 
 | Part | Path |
 | --- | --- |
-| Migrations | [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/) (`V1__init.sql` … `V9__canonical_audio.sql`, then `V11__drop_chunk_audio.sql`) and the class migration [`V10__BackfillCanonicalClip.kt`](../backend/src/main/kotlin/stt/db/migration/V10__BackfillCanonicalClip.kt), which `db/Database.kt` registers |
+| Migrations | [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/) (`V1__init.sql` … `V9__canonical_audio.sql`, `V11__drop_chunk_audio.sql`, then `V13__segment_original_text.sql` … `V17__terminal_command.sql`) and the class migrations [`V10__BackfillCanonicalClip.kt`](../backend/src/main/kotlin/stt/db/migration/V10__BackfillCanonicalClip.kt) and [`V12__GiveUpUnmigratedTasks.kt`](../backend/src/main/kotlin/stt/db/migration/V12__GiveUpUnmigratedTasks.kt), which `db/Database.kt` registers |
 | Opening the database, pragmas, migrations | [`db/Database.kt`](../backend/src/main/kotlin/stt/db/Database.kt) |
 | The app's scratch directory and its paths | [`db/ScratchDir.kt`](../backend/src/main/kotlin/stt/db/ScratchDir.kt) |
 | Repositories | [`db/TaskRepository.kt`](../backend/src/main/kotlin/stt/db/TaskRepository.kt), [`db/ChunkRepository.kt`](../backend/src/main/kotlin/stt/db/ChunkRepository.kt), [`db/SegmentRepository.kt`](../backend/src/main/kotlin/stt/db/SegmentRepository.kt), [`db/SettingsRepository.kt`](../backend/src/main/kotlin/stt/db/SettingsRepository.kt) |
@@ -184,11 +186,14 @@ The browser and the backend talk over a small JSON API under `/api`. Commands ar
 | `GET /api/tasks/{id}/transcript?format=txt\|srt\|vtt` | download the transcript |
 | `GET /api/tasks/{id}/audio` | the recording for playback (FLAC, with range requests) |
 | `PUT /api/tasks/{id}/speakers/{speakerId}`, `POST /api/tasks/{id}/speakers/merge`, `DELETE /api/tasks/{id}/speakers/merges`, `POST /api/tasks/{id}/speakers/reassign` | rename, merge, undo merges, reassign segments |
+| `PUT /api/tasks/{id}/segments/{segmentId}`, `POST /api/tasks/{id}/segments/{segmentId}/revert` | edit a segment's text, put whisper's text back |
 | `GET /api/settings`, `PUT /api/settings`, `DELETE /api/settings`, `DELETE /api/settings/device-fallback` | read and change the settings, restore their defaults, dismiss the CPU-fallback notice |
 | `GET /api/health` | health check |
+| `GET /api/frontends` | the installed frontends (app mode; empty otherwise) |
+| `POST /api/launch-token`, `POST /api/tray`, `POST /api/quit` | app mode only: the browser's one-time handshake token, the tray registering itself, stopping the service |
 | `GET /api/events` | the live event stream |
 
-**Live updates** use server-sent events ([ADR 0007](decisions/0007-sse-live-updates.md)). A new connection first receives a `snapshot` of all tasks and the queue; after that, one event per change: `task-updated`, `task-progress`, `task-deleted`, `queue-updated`, `speakers-renamed`, `speakers-merged`, `speakers-reassigned` and `settings-updated`. A `heartbeat` follows any 5 seconds of silence, and the browser reconnects if it hears nothing for 15 seconds ([ADR 0044](decisions/0044-sse-heartbeat-and-client-watchdog.md)). The stream is written by hand, without a Ktor plugin ([ADR 0041](decisions/0041-sse-without-ktor-plugin.md)).
+**Live updates** use server-sent events ([ADR 0007](decisions/0007-sse-live-updates.md)). A new connection first receives a `snapshot` of all tasks and the queue; after that, one event per change: `task-updated`, `task-progress`, `task-deleted`, `queue-updated`, `speakers-renamed`, `speakers-merged`, `speakers-reassigned`, `segment-edited` and `settings-updated`. A `heartbeat` follows any 5 seconds of silence, and the browser reconnects if it hears nothing for 15 seconds ([ADR 0044](decisions/0044-sse-heartbeat-and-client-watchdog.md)). The stream is written by hand, without a Ktor plugin ([ADR 0041](decisions/0041-sse-without-ktor-plugin.md)).
 
 **The contract comes first.** [`docs/api/`](api/README.md) holds an example of every response and event. The frontend's mock server serves exactly these files, and backend tests check every real response against them, so the two sides cannot drift apart ([ADR 0029](decisions/0029-contract-first-frontend-shared-api-examples.md)). The allowed status transitions ([`docs/api/task-transitions.json`](api/task-transitions.json)), the languages and the accepted file extensions live there too and are read by both sides.
 
@@ -198,7 +203,7 @@ The full contract — every field and error code — is [docs/specs/http-api-and
 
 | Part | Path |
 | --- | --- |
-| Routes | [`http/TaskRoutes.kt`](../backend/src/main/kotlin/stt/http/TaskRoutes.kt), [`http/TaskCommandRoutes.kt`](../backend/src/main/kotlin/stt/http/TaskCommandRoutes.kt), [`http/QueueRoutes.kt`](../backend/src/main/kotlin/stt/http/QueueRoutes.kt), [`http/TranscriptRoutes.kt`](../backend/src/main/kotlin/stt/http/TranscriptRoutes.kt), [`http/AudioRoutes.kt`](../backend/src/main/kotlin/stt/http/AudioRoutes.kt), [`http/SpeakerRoutes.kt`](../backend/src/main/kotlin/stt/http/SpeakerRoutes.kt), [`http/SettingsRoutes.kt`](../backend/src/main/kotlin/stt/http/SettingsRoutes.kt), [`http/HealthRoutes.kt`](../backend/src/main/kotlin/stt/http/HealthRoutes.kt) |
+| Routes | [`http/TaskRoutes.kt`](../backend/src/main/kotlin/stt/http/TaskRoutes.kt), [`http/TaskCommandRoutes.kt`](../backend/src/main/kotlin/stt/http/TaskCommandRoutes.kt), [`http/QueueRoutes.kt`](../backend/src/main/kotlin/stt/http/QueueRoutes.kt), [`http/TranscriptRoutes.kt`](../backend/src/main/kotlin/stt/http/TranscriptRoutes.kt), [`http/AudioRoutes.kt`](../backend/src/main/kotlin/stt/http/AudioRoutes.kt), [`http/SpeakerRoutes.kt`](../backend/src/main/kotlin/stt/http/SpeakerRoutes.kt), [`http/SegmentEditRoutes.kt`](../backend/src/main/kotlin/stt/http/SegmentEditRoutes.kt), [`http/SettingsRoutes.kt`](../backend/src/main/kotlin/stt/http/SettingsRoutes.kt), [`http/HealthRoutes.kt`](../backend/src/main/kotlin/stt/http/HealthRoutes.kt) |
 | The event stream | [`http/EventsRoutes.kt`](../backend/src/main/kotlin/stt/http/EventsRoutes.kt), [`http/EventStream.kt`](../backend/src/main/kotlin/stt/http/EventStream.kt), [`engine/Event.kt`](../backend/src/main/kotlin/stt/engine/Event.kt) |
 | Playback (the stored clip) | [`http/AudioRoutes.kt`](../backend/src/main/kotlin/stt/http/AudioRoutes.kt), [`db/CanonicalClipRepository.kt`](../backend/src/main/kotlin/stt/db/CanonicalClipRepository.kt) |
 | Frontend client | [`frontend/src/shared/api/client.ts`](../frontend/src/shared/api/client.ts), [`frontend/src/shared/api/types.ts`](../frontend/src/shared/api/types.ts) |
@@ -269,7 +274,7 @@ The pages are [docs/specs/frontend-queue-ui.md](specs/frontend-queue-ui.md), [do
 - **Tools** come from the devenv development shell and nothing is installed by hand ([ADR 0010](decisions/0010-development-toolchain.md), [docs/specs/dev-environment.md](specs/dev-environment.md)). `devenv up` runs the frontend with hot reload and the backend with restart on change ([docs/specs/dev-mode.md](specs/dev-mode.md)).
 - **The deliverable** is a Nix flake package: `nix build .` builds the backend and the frontend and wraps them with Java, whisper.cpp, ffmpeg and the pinned models into one `stt-app` command; `nix run .` starts it ([docs/specs/nix-flake-package.md](specs/nix-flake-package.md)). The flake and the development shell share one nixpkgs pin ([ADR 0036](decisions/0036-shared-nixpkgs-pin.md)).
 - **Tests**: backend unit tests with Kotest (`gradle check`, which also checks the formatting), integration tests that run the real programs (`gradle integrationTest`), frontend tests with Vitest and Testing Library (`pnpm test`), and an end-to-end suite with Playwright that drives the built app against the real backend ([docs/specs/frontend-backend-end-to-end.md](specs/frontend-backend-end-to-end.md)). Every feature gets an end-to-end test ([ADR 0046](decisions/0046-every-feature-has-an-e2e-test.md)).
-- **Continuous verification**: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs the Linux stack on every push to main and every pull request — the fast gate (`gradle check`, `pnpm test` and the frontend build), the real-program tests (`gradle integrationTest`) and the Playwright end-to-end journey. Every pinned version comes from `versions.json` through the local composite actions in [`.github/actions/`](../.github/actions/), and the Gradle user home, the pnpm store and the downloaded tools, models and browsers are cached, so a warm run downloads nothing. No secrets are used: the repository is public.
+- **Continuous verification**: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push to main and every pull request, with Linux, macOS and Windows legs: each runs the fast gate (`gradle check`, `pnpm test` and the frontend build), the Playwright end-to-end journey and a journey through the packaged app (the Linux Debian package, the macOS DMG, the Windows zip); Linux and macOS also run the real-program tests (`gradle integrationTest`). Every pinned version comes from `versions.json` through the local composite actions in [`.github/actions/`](../.github/actions/), and the Gradle user home, the pnpm store and the downloaded tools, models and browsers are cached, so a warm run downloads nothing. No secrets are used: the repository is public.
 - **How the work is done** — specs approved before code, test-driven development, one git worktree per roadmap item — is [AGENTS.md](../AGENTS.md).
 
 **Where in the code**

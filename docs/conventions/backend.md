@@ -11,6 +11,10 @@ src/main/kotlin/stt/      Main.kt (boot: config, coroutine scope, Ktor app)
   config/                 Config + STT_* env parsing
   http/                   Ktor application composition, routes, static/SPA serving
   queue/  transcribe/  audio/  diarization/  outputs/  db/   (added by later items)
+  engine/                 the processing engine: the one worker that drives tasks through their phases, task commands, events
+  process/                external processes (ffmpeg, whisper-cli): spawning, output, pause/resume/kill per platform
+  pause/                  the cooperative in-JVM pause gate the diarizer and the engine check
+  service/                app mode: the per-user service's config and runtime files, its server, the tray supervisor
 ```
 
 - A feature owns its types, routes, and tests; no cross-feature imports except through explicit interfaces.
