@@ -1,6 +1,7 @@
 //! Roadmap item 66, ADR 0064: opening a frontend through `stt-app` brings up the unit - the
 //! service and the tray - and a second launch attaches without starting either again.
 
+#[path = "../../stt-client/tests/support/mod.rs"]
 mod support;
 
 use std::env;

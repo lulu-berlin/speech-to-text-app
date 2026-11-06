@@ -1,0 +1,28 @@
+[package]
+name = "stt-tray"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+stt-client = { path = "../stt-client" }
+# The tray's icon and menu (roadmap item 66, items 2-3; ADR 0064). Optional: they link against a
+# tray host's C libraries (GTK 3 and AppIndicator on Linux), which devenv.nix and the packages
+# provide, so the client still builds on a machine with no GUI toolkit.
+tray-icon = { version = "0.26.1", optional = true }
+muda = { version = "0.21.2", optional = true }
+tao = { version = "0.37.2", optional = true }
+# These three pin gtk 0.18 on Linux (muda's gtk3 menu backend, tao's GTK event loop), which requires
+# glib ^0.18; glib 0.18.5 carries GHSA-wrw7-89jp-8q8g (an unsound `VariantStrIter` iterator) and the
+# fix is glib 0.20, whose first gtk line (0.19) these crates have not adopted. Both upstreams track
+# the move; bump all three together once a release takes gtk 0.19, run `cargo update`, and the
+# Dependabot alert on glib goes with it.
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+# `stt-tray` shows its icon and menu with this feature; without it the tray runs virtually, which
+# ADR 0064 allows where no tray host exists (a shell session, a headless runner).
+tray-menu = ["dep:tray-icon", "dep:muda", "dep:tao"]

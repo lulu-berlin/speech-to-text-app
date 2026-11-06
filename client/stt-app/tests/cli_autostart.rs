@@ -6,6 +6,7 @@
 
 #![cfg(target_os = "linux")]
 
+#[path = "../../stt-client/tests/support/mod.rs"]
 mod support;
 
 use std::process::Command;

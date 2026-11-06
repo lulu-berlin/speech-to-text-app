@@ -1,24 +1,24 @@
+#[path = "../../stt-client/tests/support/mod.rs"]
 mod support;
 
 use std::net::TcpListener;
 use std::process::Command;
 
-/// A stand-in service that answers the client's health check and one launch-token request, one
-/// connection each, and the directories pointing at it.
+/// A stand-in service that answers the client's health checks, `GET /api/settings` with a default frontend and
+/// launch-token requests, one connection each, for as long as the test runs, and whose directories hold the
+/// registry with that frontend.
 fn stand_in() -> (tempfile::TempDir, u16) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
-    std::thread::spawn(move || {
-        for stream in listener.incoming().take(2) {
-            let mut stream = stream.unwrap();
-            let request = support::read(&mut stream);
-            let body = if request.line.starts_with("GET /api/health") {
-                r#"{"status":"ok"}"#
-            } else {
-                r#"{"token":"one-time"}"#
-            };
-            support::respond(&mut stream, "200 OK", body);
-        }
+    support::answer_forever(listener, |request| {
+        let body = if request.line.starts_with("GET /api/health") {
+            r#"{"status":"ok"}"#
+        } else if request.line.starts_with("GET /api/settings") {
+            r#"{"defaultFrontend":"browser"}"#
+        } else {
+            r#"{"token":"one-time"}"#
+        };
+        ("200 OK", body.to_string())
     });
     let dir = tempfile::tempdir().unwrap();
     support::write(
@@ -42,10 +42,10 @@ fn stand_in() -> (tempfile::TempDir, u16) {
 }
 
 #[test]
-fn open_with_a_frontend_id_opens_that_registered_frontend() {
+fn open_without_an_id_opens_the_default_frontend_from_the_settings() {
     let (dir, port) = stand_in();
     let out = Command::new(env!("CARGO_BIN_EXE_stt-app"))
-        .args(["open", "browser", "--print-url"])
+        .args(["open", "--print-url"])
         .env("STT_CONFIG_DIR", dir.path())
         .env("STT_RUNTIME_DIR", dir.path())
         .output()
@@ -59,23 +59,5 @@ fn open_with_a_frontend_id_opens_that_registered_frontend() {
     assert_eq!(
         String::from_utf8_lossy(&out.stdout).trim(),
         format!("http://127.0.0.1:{port}/open?t=one-time")
-    );
-}
-
-#[test]
-fn open_with_an_unknown_frontend_id_fails_and_names_it() {
-    let (dir, _) = stand_in();
-    let out = Command::new(env!("CARGO_BIN_EXE_stt-app"))
-        .args(["open", "nosuch", "--print-url"])
-        .env("STT_CONFIG_DIR", dir.path())
-        .env("STT_RUNTIME_DIR", dir.path())
-        .output()
-        .unwrap();
-
-    assert!(!out.status.success());
-    assert!(
-        String::from_utf8_lossy(&out.stderr).contains("nosuch"),
-        "stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
     );
 }

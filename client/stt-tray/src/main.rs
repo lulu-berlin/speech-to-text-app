@@ -8,6 +8,9 @@ use std::process::ExitCode;
 
 use stt_client::ServiceDirs;
 
+#[cfg(feature = "tray-menu")]
+mod tray_menu;
+
 fn main() -> ExitCode {
     let dirs = match ServiceDirs::from_env() {
         Ok(dirs) => dirs,
@@ -18,7 +21,7 @@ fn main() -> ExitCode {
     };
     #[cfg(feature = "tray-menu")]
     {
-        stt_client::tray_menu::run(&dirs)
+        tray_menu::run(&dirs)
     }
     #[cfg(not(feature = "tray-menu"))]
     {

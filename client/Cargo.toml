@@ -1,8 +1,9 @@
-# The Rust client workspace (roadmap item 66): the crates that talk to the per-user service from
-# outside the JVM — the client library shared by the tray and the `stt-app` CLI (and item 67's TUI).
+# The Rust client workspace (roadmap items 66 and 67): the crates that talk to the per-user service
+# from outside the JVM — the client library `stt-client`, shared by the tray (`stt-tray`), the CLI
+# (`stt-app`) and item 67's TUI.
 [workspace]
 resolver = "3"
-members = ["stt-client"]
+members = ["stt-app", "stt-client", "stt-tray"]
 
 [workspace.package]
 edition = "2024"

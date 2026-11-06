@@ -14,7 +14,7 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIconBuilder};
 
-use crate::{Registry, ServiceDirs, Supervisor, Watch, quit, tray_entries};
+use stt_client::{Registry, ServiceDirs, Supervisor, Watch, quit, tray_entries};
 
 /// What the tray's event loop listens for: everything arrives as a user event, because both the
 /// menu, the supervision thread and the registry watcher live outside it and must wake it (a menu
@@ -38,7 +38,7 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
     // runs the virtual tray ADR 0064 allows - the state a shell session and a CI runner are in.
     if !has_a_screen() {
         eprintln!("stt-tray: no display; supervising without an icon");
-        return crate::supervise_until_stopped(dirs);
+        return stt_client::supervise_until_stopped(dirs);
     }
     let event_loop = EventLoopBuilder::<TrayEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
@@ -52,7 +52,7 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
     // Kept alive for the life of the process: the icon vanishes when it is dropped. The tray host
     // layer panics rather than returning an error when its native library is missing (libappindicator
     // dlopens it), so both outcomes degrade to the virtual tray ADR 0064 allows.
-    let registry = crate::registry_for(dirs);
+    let registry = stt_client::registry_for(dirs);
     let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         TrayIconBuilder::new()
             .with_menu(Box::new(menu_for(&registry)))
@@ -65,12 +65,12 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
         Ok(Err(error)) => {
             eprintln!("stt-tray: no tray host ({error}); supervising without an icon");
             MenuEvent::set_event_handler::<fn(MenuEvent)>(None);
-            return crate::supervise_until_stopped(dirs);
+            return stt_client::supervise_until_stopped(dirs);
         }
         Err(_) => {
             eprintln!("stt-tray: no tray host library; supervising without an icon");
             MenuEvent::set_event_handler::<fn(MenuEvent)>(None);
-            return crate::supervise_until_stopped(dirs);
+            return stt_client::supervise_until_stopped(dirs);
         }
     };
 
@@ -80,7 +80,7 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
         let mut supervisor = Supervisor::new();
         let mut registered = false;
         loop {
-            match crate::watch_and_register(&mut supervisor, &supervised, &mut registered) {
+            match stt_client::watch_and_register(&mut supervisor, &supervised, &mut registered) {
                 Watch::Stopped => {
                     let _ = stopper.send_event(TrayEvent::UnitStopped);
                     return;
@@ -89,7 +89,7 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
                     let _ = stopper.send_event(TrayEvent::Stopped(error.to_string()));
                     return;
                 }
-                Watch::Alive | Watch::Restarted => thread::sleep(crate::LOOK_INTERVAL),
+                Watch::Alive | Watch::Restarted => thread::sleep(stt_client::LOOK_INTERVAL),
             }
         }
     });
@@ -99,10 +99,10 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
     let watched = dirs.clone();
     let changed = proxy.clone();
     thread::spawn(move || {
-        let mut seen = crate::registry_fingerprint(&watched);
+        let mut seen = stt_client::registry_fingerprint(&watched);
         loop {
-            thread::sleep(crate::LOOK_INTERVAL);
-            let now = crate::registry_fingerprint(&watched);
+            thread::sleep(stt_client::LOOK_INTERVAL);
+            let now = stt_client::registry_fingerprint(&watched);
             if now != seen {
                 seen = now;
                 if changed.send_event(TrayEvent::RegistryChanged).is_err() {
@@ -127,7 +127,7 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
                 }
             }
             Event::UserEvent(TrayEvent::RegistryChanged) => {
-                let registry = crate::registry_for(&owned);
+                let registry = stt_client::registry_for(&owned);
                 tray.set_menu(Some(Box::new(menu_for(&registry))));
             }
             Event::UserEvent(TrayEvent::Stopped(reason)) => {

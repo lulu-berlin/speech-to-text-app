@@ -234,8 +234,9 @@ and per-install secret in the durable config file, its pid and endpoint in the e
 - **Output.** The service and the tray are detached, so they log to their own files under the
   config directory instead of holding the launching command's output open.
 
-**Where in the code:** the client crate is [`client/stt-client`](../client/stt-client) — the library
-plus the CLI and the tray binaries; the service's side is in [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service)
+**Where in the code:** the client is the Cargo workspace [`client/`](../client) — the library
+[`client/stt-client`](../client/stt-client), the CLI [`client/stt-app`](../client/stt-app) and the tray
+[`client/stt-tray`](../client/stt-tray); the service's side is in [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service)
 and [`backend/src/main/kotlin/stt/http/`](../backend/src/main/kotlin/stt/http).
 
 ## 6. The frontend
@@ -281,5 +282,5 @@ The pages are [docs/specs/frontend-queue-ui.md](specs/frontend-queue-ui.md), [do
 | Backend build | [`backend/build.gradle.kts`](../backend/build.gradle.kts) |
 | Frontend build | [`frontend/package.json`](../frontend/package.json), [`frontend/vite.config.ts`](../frontend/vite.config.ts) |
 | End-to-end suite | [`e2e/tests/`](../e2e/tests/), [`e2e/global-setup.ts`](../e2e/global-setup.ts) |
-| Per-user service and frontends | [`client/stt-client/`](../client/stt-client/), [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service/), [`backend/src/main/kotlin/stt/http/TrayRoutes.kt`](../backend/src/main/kotlin/stt/http/TrayRoutes.kt) |
+| Per-user service and frontends | [`client/`](../client/), [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service/), [`backend/src/main/kotlin/stt/http/TrayRoutes.kt`](../backend/src/main/kotlin/stt/http/TrayRoutes.kt) |
 | Continuous verification | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`.github/actions/`](../.github/actions/) |

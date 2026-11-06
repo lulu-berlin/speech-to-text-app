@@ -1561,17 +1561,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
+name = "stt-app"
+version = "0.1.0"
+dependencies = [
+ "stt-client",
+ "tempfile",
+]
+
+[[package]]
 name = "stt-client"
 version = "0.1.0"
 dependencies = [
- "muda",
  "serde",
  "serde_json",
  "shlex",
+ "tempfile",
+ "ureq",
+]
+
+[[package]]
+name = "stt-tray"
+version = "0.1.0"
+dependencies = [
+ "muda",
+ "stt-client",
  "tao",
  "tempfile",
  "tray-icon",
- "ureq",
 ]
 
 [[package]]

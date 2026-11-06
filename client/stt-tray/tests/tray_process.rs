@@ -9,6 +9,7 @@
 //! test filter runs only the `service` stand-in below, which serves the health answer until the
 //! test tells it to stop. Run as a normal test, the stand-in does nothing.
 
+#[path = "../../stt-client/tests/support/mod.rs"]
 mod support;
 
 use std::env;

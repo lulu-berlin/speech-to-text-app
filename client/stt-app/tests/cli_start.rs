@@ -3,6 +3,7 @@
 //! missing, instead of reporting a dead endpoint. This test binary has no sibling runner, which is
 //! exactly the missing case.
 
+#[path = "../../stt-client/tests/support/mod.rs"]
 mod support;
 
 use std::process::Command;

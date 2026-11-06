@@ -1,4 +1,5 @@
-//! The client side of the per-user service (roadmap item 66), shared by the tray and the `stt-app` CLI.
+//! The client side of the per-user service (roadmap item 66), shared by the tray, the `stt-app` CLI
+//! and the TUI.
 
 use std::fs;
 use std::io;
@@ -12,8 +13,6 @@ use serde::de::DeserializeOwned;
 
 mod autostart;
 mod quote;
-#[cfg(feature = "tray-menu")]
-pub mod tray_menu;
 
 pub use autostart::{Autostart, autostart_entry, install, remove};
 

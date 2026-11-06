@@ -2,6 +2,7 @@
 //! service as a descriptor in `frontends/`. `stt-app register <file>` copies one in, so a freshly
 //! installed app can open a frontend at all, and `stt-app list` then shows it.
 
+#[path = "../../stt-client/tests/support/mod.rs"]
 mod support;
 
 use std::process::Command;
