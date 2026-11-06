@@ -178,6 +178,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       queue as it was
 - [ ] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
       too large) shows the service's message and leaves the UI usable
+- [ ] (discovered, 2026-11-06) A speaker rename or merge made in the browser relabels a transcript
+      open in the TUI (the `speakers-renamed` / `speakers-merged` events)
+- [ ] (discovered, 2026-11-06) A rename the service refuses (a duplicate name, an invalid name)
+      shows the service's message and the speaker keeps its name
 - [x] (must not break) The TUI's text and the browser's queue and upload text come from the one
       catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself —
       `client/stt-client/tests/text.rs`, `frontend/src/features/queue/QueueView.test.tsx` (the
@@ -312,3 +316,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   transcript's speakers list, selection and rename prompt; the answer's speakers relabel the turns,
   and Escape closes the prompt with no request. Committed as `85b8ffae` (57 tests; fmt and clippy
   green).
+  At the checkpoint the user approved the refactor: the transcript screen's speakers list,
+  selection, rename prompt and rename call moved into `transcript.rs`, the screen holding a
+  `Transcript` (`2f764e50`, 57 tests green). Two discovered scenarios were confirmed and appended:
+  a browser-made rename or merge relabels an open TUI transcript, and a refused rename shows the
+  service's message.
