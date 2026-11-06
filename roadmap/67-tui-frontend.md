@@ -11,10 +11,10 @@ Blocks: —
 
 The app is usable from a terminal: a Rust TUI that attaches to the local service, shows the queue and
 history, starts and controls uploads and tasks, reads transcripts with their speaker turns, renames
-and merges a task's speakers, merges completed tasks, and changes settings — over the same HTTP/SSE
-API the browser uses, with no second processing path. It installs as a frontend, is launched from the
-tray's descriptor model in the OS terminal, and works on Linux, macOS and Windows terminals. Audio
-playback stays with the browser and window frontends (a terminal cannot play it).
+and merges a task's speakers, and changes settings — over the same HTTP/SSE API the browser uses,
+with no second processing path. It installs as a frontend, is launched from the tray's descriptor
+model in the OS terminal, and works on Linux, macOS and Windows terminals. Audio playback stays with
+the browser and window frontends (a terminal cannot play it).
 
 ## Evidence
 
@@ -42,8 +42,8 @@ playback stays with the browser and window frontends (a terminal cannot play it)
   pty: the e2e package is Node-only and `node-pty` builds through `node-gyp` → Python, which
   ADR 0002 bans and devenv does not provide.
 - Terminal surfaces are text: upload by file path (multipart), queue/history/transcript reading,
-  speaker rename/merge, task merging, downloads to a path, settings; audio playback stays with the
-  graphical frontends.
+  speaker rename/merge, downloads to a path, settings; audio playback stays with the graphical
+  frontends.
 
 ## Decided (consultation, 2026-10-20)
 
@@ -80,9 +80,9 @@ playback stays with the browser and window frontends (a terminal cannot play it)
   deliberate, recorded deviation from ADR 0046's Playwright e2e wording: Playwright cannot drive a
   terminal app; the journey is the feature's end-to-end proof.
 - **Near-full parity** (the user): queue (list, progress, pause/resume/cancel/retry, reorder),
-  upload by path, history, transcript with speaker turns, speaker rename and merge, task merging,
-  transcripts downloads, and settings. Audio playback is excluded and documented; the browser and
-  window keep it.
+  upload by path, history, transcript with speaker turns, speaker rename and merge, transcripts
+  downloads, and settings. Audio playback is excluded and documented; the browser and window keep
+  it.
 - **Types are mirrored by hand** from `docs/api` (no schema exists); the pty journey and the
   existing browser e2e are the contract checks.
 - **Test list** approved as worded below (13 items, the two parity items included).
@@ -117,8 +117,7 @@ playback stays with the browser and window frontends (a terminal cannot play it)
 2. The TUI: ratatui layout for queue, history, transcript (turns and speakers), settings and an
    upload prompt (a path, no file picker); keyboard-driven controls; live updates from SSE; resize
    and `NO_COLOR`; a clear "service not running — run `stt-app open`" state that starts nothing.
-3. Transcript actions: speaker rename/merge and merging completed tasks, with the same API calls the
-   browser uses.
+3. Transcript actions: speaker rename/merge, with the same API calls the browser uses.
 4. Downloads: choose a format and a target path; report a write error without leaving the UI.
 5. Packaging and launch: the static binary per OS, a `terminal` descriptor written by the installer,
    the tray's launch through the configured/default terminal, and the pinned Rust toolchain on every
@@ -149,8 +148,6 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [x] (basic) The transcript view merges and renames a task's speakers, and the browser shows the
       same speakers after a reload - `stt-tui/tests/speakers.rs`: rename `85b8ffae`, merge
       `704673f5` (the requests are the browser's own calls to the shared backend)
-- [ ] (basic) Two completed tasks can be merged from the TUI, and the merged task appears with its
-      transcript
 - [x] (edge) SSE updates the view without a refresh, and a dropped stream reconnects and converges
       — `stt-tui/tests/live.rs`, `0317ab9c`
 - [ ] (edge) A resize across small and large terminals reflows without crashing, and `NO_COLOR`
@@ -192,8 +189,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 
 - A TUI client of the service exists on Linux, macOS and Windows, launched as a registered
   frontend, covering the agreed surfaces — queue and reorder, upload, history, transcripts,
-  speaker rename/merge, task merging, downloads and settings — with live updates and the service
-  credential; audio playback is explicitly out of scope; documented.
+  speaker rename/merge, downloads and settings — with live updates and the service credential;
+  audio playback is explicitly out of scope; documented.
 - Its pty-driven e2e journey passes in CI; the browser/window frontends and the API contract are
   unchanged; the tray still lists and opens it.
 - Every path — `devenv.nix`, `flake.nix` packaging, and the non-Nix CI/bootstrap path, Windows
@@ -331,3 +328,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   speakers relabel the transcript and its turns are read again (a merge joins turns, the
   contract's `speakers-merged` rule). Committed as `704673f5` (58 tests; fmt and clippy green; the
   `stt-tui` suite green in 3 repeats). The rename/merge line is ticked.
+- 2026-11-06 (workspace, amendment by the user): "merging completed tasks" / "task merging" was a
+  wording mistake that came in with #41 (`549566a9`, 2026-10-23): the app merges a task's
+  speakers, never tasks, and has no task-merge route (`docs/api/openapi.yaml`, `SpeakerRoutes.kt`
+  holds the only merge). The Goal, Evidence, Decisions, Proposal and Acceptance wording no longer
+  names it, and the test-list line "Two completed tasks can be merged from the TUI, and the merged
+  task appears with its transcript" is removed; the speaker merge is the ticked rename/merge line.
