@@ -14,8 +14,8 @@ use std::time::Duration;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event as terminal_event;
 use stt_client::{
-    Event, Service, ServiceDirs, Settings, Snapshot, Speaker, Task, Turns, events, history, locate,
-    reorder_queue, set_queue_paused, task_command, text, turns, upload,
+    Event, Frontend, Service, ServiceDirs, Settings, Snapshot, Speaker, Task, Turns, events,
+    history, locate, reorder_queue, set_queue_paused, task_command, text, turns, upload,
 };
 
 use crate::download::Download;
@@ -46,8 +46,8 @@ enum Message {
     Speakers(i64, Vec<Speaker>),
     /// Task `id`'s turns, read again after a merge; an open transcript of it shows them.
     Turns(i64, Turns),
-    /// The settings arrived; the settings screen shows them.
-    Settings(Settings),
+    /// The settings and the installed frontends arrived; the settings screen shows them.
+    Settings(Settings, Vec<Frontend>),
     /// The settings as the service answered a save; an open settings screen shows them.
     SettingsSaved(Settings),
 }
@@ -179,6 +179,10 @@ impl Ui {
                 Screen::Transcript(transcript) => transcript.rename(),
                 _ => None,
             },
+            terminal: match &self.screen {
+                Screen::Settings(screen) => screen.terminal(),
+                _ => None,
+            },
             download: self.download.as_ref().map(Download::view),
             notice: self.notice.as_deref(),
         };
@@ -221,8 +225,8 @@ impl Ui {
                     transcript.set_turns(id, turns);
                 }
             }
-            Message::Settings(settings) => {
-                self.screen = Screen::Settings(SettingsScreen::new(settings));
+            Message::Settings(settings, frontends) => {
+                self.screen = Screen::Settings(SettingsScreen::new(settings, frontends));
             }
             Message::SettingsSaved(settings) => {
                 if let Screen::Settings(screen) = &mut self.screen {
@@ -233,7 +237,9 @@ impl Ui {
                 // The rename prompt takes text as the upload prompt does: every key but Escape,
                 // Enter and Backspace is a character of the name.
                 let renaming = matches!(&self.screen, Screen::Transcript(transcript) if transcript.rename().is_some());
-                let text_open = self.prompt.is_some() || renaming;
+                let terminal =
+                    matches!(&self.screen, Screen::Settings(screen) if screen.terminal().is_some());
+                let text_open = self.prompt.is_some() || renaming || terminal;
                 let Some(action) = input::action(&key, text_open, self.download.is_some()) else {
                     return Outcome::Continue;
                 };
@@ -443,7 +449,7 @@ fn open_history(
     );
 }
 
-/// Fetches the settings and shows them.
+/// Fetches the settings and the installed frontends and shows them.
 fn open_settings(
     runtime: &tokio::runtime::Handle,
     service: &Service,
@@ -454,8 +460,12 @@ fn open_settings(
         runtime,
         sender,
         "settings.failed",
-        async move { stt_client::settings(&service).await },
-        Message::Settings,
+        async move {
+            let settings = stt_client::settings(&service).await?;
+            let frontends = stt_client::frontends(&service).await?;
+            Ok((settings, frontends))
+        },
+        |(settings, frontends)| Message::Settings(settings, frontends),
     );
 }
 

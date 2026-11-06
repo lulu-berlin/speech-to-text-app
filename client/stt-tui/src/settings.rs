@@ -3,7 +3,7 @@
 
 use std::sync::mpsc;
 
-use stt_client::{Service, Settings, languages, save_settings, text};
+use stt_client::{Frontend, Service, Settings, languages, save_settings, text};
 
 use crate::Message;
 use crate::input::Action;
@@ -17,16 +17,20 @@ pub enum Field {
     Speakers,
     SpeakerCount,
     MaxSpeakers,
+    DefaultFrontend,
+    TerminalCommand,
 }
 
 /// The rows, in the order the screen shows them.
-pub const FIELDS: [Field; 6] = [
+pub const FIELDS: [Field; 8] = [
     Field::Device,
     Field::Threads,
     Field::Language,
     Field::Speakers,
     Field::SpeakerCount,
     Field::MaxSpeakers,
+    Field::DefaultFrontend,
+    Field::TerminalCommand,
 ];
 
 impl Field {
@@ -39,6 +43,8 @@ impl Field {
             Field::Speakers => "settings.speakers",
             Field::SpeakerCount => "settings.speaker-count",
             Field::MaxSpeakers => "settings.max-speakers",
+            Field::DefaultFrontend => "settings.default-frontend",
+            Field::TerminalCommand => "settings.terminal-command",
         };
         text(key, &[])
     }
@@ -59,23 +65,45 @@ impl Field {
                 .speakers_count
                 .map_or_else(|| "-".to_string(), |n| n.to_string()),
             Field::MaxSpeakers => settings.max_speakers.to_string(),
+            Field::DefaultFrontend => settings
+                .default_frontend
+                .clone()
+                .unwrap_or_else(|| "-".to_string()),
+            Field::TerminalCommand => settings
+                .terminal_command
+                .clone()
+                .unwrap_or_else(|| "-".to_string()),
         }
     }
 }
 
-/// The open settings screen: the settings as the service last answered them, and the selected row.
+/// The open settings screen: the settings and the frontends as the service last answered them, the
+/// selected row, and the terminal command being typed while its prompt is open.
 pub struct SettingsScreen {
     pub settings: Settings,
+    pub frontends: Vec<Frontend>,
     pub row: usize,
+    terminal: Option<String>,
 }
 
 impl SettingsScreen {
-    pub fn new(settings: Settings) -> SettingsScreen {
-        SettingsScreen { settings, row: 0 }
+    pub fn new(settings: Settings, frontends: Vec<Frontend>) -> SettingsScreen {
+        SettingsScreen {
+            settings,
+            frontends,
+            row: 0,
+            terminal: None,
+        }
+    }
+
+    /// The command in the terminal prompt, while it is open.
+    pub fn terminal(&self) -> Option<&str> {
+        self.terminal.as_deref()
     }
 
     /// Applies one key's action: Up/Down select a row, Left/Right change its setting and save the
-    /// settings at once.
+    /// settings at once, and Enter on the terminal command opens its prompt - whose keys edit, save
+    /// or close it.
     pub fn handle(
         &mut self,
         action: Action,
@@ -92,6 +120,28 @@ impl SettingsScreen {
             }
             Action::Adjust(step) => {
                 if let Some(changed) = self.changed(step) {
+                    save(runtime, service, sender, changed);
+                }
+            }
+            Action::OpenSelected if self.row + 1 == FIELDS.len() => {
+                self.terminal = Some(self.settings.terminal_command.clone().unwrap_or_default());
+            }
+            Action::CancelPrompt => self.terminal = None,
+            Action::PromptBackspace => {
+                if let Some(command) = self.terminal.as_mut() {
+                    command.pop();
+                }
+            }
+            Action::PromptChar(character) => {
+                if let Some(command) = self.terminal.as_mut() {
+                    command.push(character);
+                }
+            }
+            Action::SubmitPrompt => {
+                if let Some(command) = self.terminal.take() {
+                    let command = command.trim();
+                    let mut changed = self.settings.clone();
+                    changed.terminal_command = (!command.is_empty()).then(|| command.to_string());
                     save(runtime, service, sender, changed);
                 }
             }
@@ -138,9 +188,27 @@ impl SettingsScreen {
             Field::MaxSpeakers => {
                 changed.max_speakers = step_between(changed.max_speakers, step, 1, 20);
             }
+            Field::DefaultFrontend => {
+                changed.default_frontend =
+                    step_frontend(&self.frontends, &changed.default_frontend, step)?;
+            }
+            Field::TerminalCommand => return None,
         }
         Some(changed)
     }
+}
+
+/// The default frontend `step` places through none and the installed ones, in the registry's order.
+fn step_frontend(
+    frontends: &[Frontend],
+    current: &Option<String>,
+    step: isize,
+) -> Option<Option<String>> {
+    let mut choices: Vec<Option<String>> = vec![None];
+    choices.extend(frontends.iter().map(|frontend| Some(frontend.id.clone())));
+    let index = choices.iter().position(|choice| *choice == *current)? as isize;
+    let next = (index + step).rem_euclid(choices.len() as isize) as usize;
+    Some(choices[next].clone())
 }
 
 /// `current` moved `step` places through `choices`, wrapping round; `None` when `current` is not

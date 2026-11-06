@@ -28,6 +28,8 @@ pub struct View<'a> {
     pub prompt: Option<&'a str>,
     /// The name being typed for the selected speaker, while the rename prompt is open.
     pub rename: Option<&'a str>,
+    /// The terminal command being typed, while the settings' prompt is open.
+    pub terminal: Option<&'a str>,
     /// The download dialog, while it is open.
     pub download: Option<DownloadView<'a>>,
     /// What the last action reported.
@@ -47,7 +49,7 @@ pub struct DownloadView<'a> {
 pub fn draw(frame: &mut Frame, view: &View<'_>) {
     let middle = match (
         view.download.is_some(),
-        view.prompt.or(view.rename).is_some(),
+        view.prompt.or(view.rename).or(view.terminal).is_some(),
     ) {
         // The dialog's border, its two fields and their spacing.
         (true, _) => 4,
@@ -76,6 +78,15 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     if let Some(name) = view.rename {
         frame.render_widget(
             Paragraph::new(stt_client::text("speakers.rename", &[("name", name)])),
+            areas[1],
+        );
+    }
+    if let Some(command) = view.terminal {
+        frame.render_widget(
+            Paragraph::new(stt_client::text(
+                "settings.terminal-prompt",
+                &[("command", command)],
+            )),
             areas[1],
         );
     }

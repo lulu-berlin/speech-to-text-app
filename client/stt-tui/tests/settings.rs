@@ -51,6 +51,7 @@ fn a_changed_setting_is_saved_whole_and_the_answer_is_shown() {
         Some("Bearer the-install-secret")
     );
     read.answer("200 OK", SETTINGS);
+    service.next_get(WAIT).answer("200 OK", FRONTENDS);
     let screen = tui.wait_for(WAIT, |text| {
         text.contains("Settings") && row(text, "Threads", "4")
     });
@@ -128,6 +129,7 @@ fn the_device_language_and_speaker_settings_change_within_the_contract() {
     tui.wait_for(WAIT, |text| text.contains("memo.wav"));
     tui.press(b"s");
     service.next_get(WAIT).answer("200 OK", SETTINGS);
+    service.next_get(WAIT).answer("200 OK", FRONTENDS);
     tui.wait_for(WAIT, |text| row(text, "Threads", "4"));
 
     // Device: Right takes the next device the service offers after `auto`, `gpu:0`.
@@ -204,4 +206,84 @@ fn the_device_language_and_speaker_settings_change_within_the_contract() {
     );
     write.answer("200 OK", &current);
     tui.wait_for(WAIT, |text| row(text, "Speakers", "auto"));
+}
+
+/// Two frontends installed, as `GET /api/frontends` lists them (roadmap item 66).
+const FRONTENDS: &str = r#"{"frontends":[{"id":"browser","name":"Browser","kind":"browser"},{"id":"window","name":"Window","kind":"gui"}]}"#;
+
+#[test]
+fn the_default_frontend_and_the_terminal_command_are_saved() {
+    let service = EventService::start();
+    let dir = tempfile::tempdir().unwrap();
+    support::write_bootstrap(dir.path(), service.port);
+    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
+
+    // `s`: the settings, then the installed frontends.
+    tui.press(b"s");
+    service.next_get(WAIT).answer("200 OK", SETTINGS);
+    let frontends = service.next_get(WAIT);
+    assert!(
+        frontends.request().line.starts_with("GET /api/frontends "),
+        "{:?}",
+        frontends.request().line
+    );
+    assert_eq!(
+        frontends.request().header("Authorization"),
+        Some("Bearer the-install-secret")
+    );
+    frontends.answer("200 OK", FRONTENDS);
+    tui.wait_for(WAIT, |text| {
+        row(text, "Default frontend", "browser") && row(text, "Terminal command", "kitty -e")
+    });
+
+    // Down to the default frontend, Right takes the next installed one, `window`.
+    tui.press(b"\x1b[B");
+    tui.press(b"\x1b[B");
+    tui.press(b"\x1b[B");
+    tui.press(b"\x1b[B");
+    tui.press(b"\x1b[B");
+    tui.press(b"\x1b[B");
+    tui.press(b"\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({ "defaultFrontend": "window" }))
+    );
+    let mut current = stored(SETTINGS, json!({ "defaultFrontend": "window" }));
+    write.answer("200 OK", &current);
+    tui.wait_for(WAIT, |text| row(text, "Default frontend", "window"));
+
+    // Down to the terminal command; Enter opens a prompt holding it. Typed over, Enter saves it.
+    tui.press(b"\x1b[B");
+    tui.press(b"\r");
+    tui.wait_for(WAIT, |text| text.contains("Terminal: kitty -e"));
+    tui.press(&[0x7f; "kitty -e".len()]);
+    tui.press(b"alacritty -e\r");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({ "defaultFrontend": "window", "terminalCommand": "alacritty -e" }))
+    );
+    current = stored(&current, json!({ "terminalCommand": "alacritty -e" }));
+    write.answer("200 OK", &current);
+    tui.wait_for(WAIT, |text| row(text, "Terminal command", "alacritty -e"));
+
+    // An emptied prompt saves none: the OS launcher is in charge again.
+    tui.press(b"\r");
+    tui.wait_for(WAIT, |text| text.contains("Terminal: alacritty -e"));
+    tui.press(&[0x7f; "alacritty -e".len()]);
+    tui.press(b"\r");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        body(json!({ "defaultFrontend": "window", "terminalCommand": null }))
+    );
+    write.answer(
+        "200 OK",
+        &stored(&current, json!({ "terminalCommand": null })),
+    );
+    tui.wait_for(WAIT, |text| row(text, "Terminal command", "-"));
 }

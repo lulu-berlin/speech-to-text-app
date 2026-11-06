@@ -1,6 +1,7 @@
 //! The service's settings (roadmap item 67): read and saved whole, the calls the browser's Settings
-//! page makes, with the per-install secret (`docs/api/settings.json`), and the language list its
-//! `defaultLanguage` picks from (`docs/api/languages.json`).
+//! page makes, with the per-install secret (`docs/api/settings.json`), the language list its
+//! `defaultLanguage` picks from (`docs/api/languages.json`), and the installed frontends its
+//! `defaultFrontend` picks from (`docs/api/frontends.json`, roadmap item 66).
 
 use std::collections::BTreeMap;
 use std::io;
@@ -74,4 +75,29 @@ pub async fn save_settings(service: &Service, settings: &Settings) -> io::Result
         .await
         .map_err(io::Error::other)?;
     response_json(response).await
+}
+
+/// One installed frontend, as `GET /api/frontends` lists it (`docs/api/frontends.json`).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct Frontend {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+}
+
+/// Every frontend installed on this machine, the ones `defaultFrontend` may pick.
+pub async fn frontends(service: &Service) -> io::Result<Vec<Frontend>> {
+    #[derive(Deserialize)]
+    struct Frontends {
+        frontends: Vec<Frontend>,
+    }
+    let response = reqwest::Client::new()
+        .get(format!("{}/api/frontends", service.endpoint))
+        .bearer_auth(&service.secret)
+        .send()
+        .await
+        .map_err(io::Error::other)?;
+    response_json::<Frontends>(response)
+        .await
+        .map(|list| list.frontends)
 }

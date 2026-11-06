@@ -288,6 +288,7 @@ impl EventService {
                     }
                 } else if request.line.starts_with("GET /api/tasks")
                     || request.line.starts_with("GET /api/settings ")
+                    || request.line.starts_with("GET /api/frontends ")
                 {
                     if fetched.send(Fetch { request, stream }).is_err() {
                         return;
