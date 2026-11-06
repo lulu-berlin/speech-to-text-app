@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { MoreVertical } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
-import styled, { useTheme } from 'styled-components';
+import styled from 'styled-components';
 import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
 import { editSegment, revertSegment } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
@@ -325,8 +325,6 @@ export function TaskTranscriptView() {
     }
   }, [segmentEdits, turnsLoaded, turnsSend]);
 
-  const theme = useTheme();
-  const tints = theme.colors.speakerTints;
   const turnsBySpeaker = useMemo(() => {
     if (turns === null) {
       return null;

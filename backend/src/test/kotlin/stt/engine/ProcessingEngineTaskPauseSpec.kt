@@ -1,9 +1,12 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import stt.db.SpeakersMode

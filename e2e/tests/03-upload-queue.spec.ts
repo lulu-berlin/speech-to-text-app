@@ -26,14 +26,14 @@ declare global {
   }
 }
 
-// Records what the pending rows for `names` show, from before their tasks start until the test
-// reads it: the sampler runs in the page on every DOM change, so it sees each row's whole life. A
+// Records what the pending rows show, from before their tasks start until the test reads it: the
+// sampler runs in the page on every DOM change, so it sees each row's whole life. A
 // check that waits for a state to be on screen can arrive after a short clip has already left it —
 // CI run 38661372993 saw a single transcription percentage that way, and run 38848511391 missed
 // the diarization stage label of a clip diarized in 0.3 s — so the assertions are claims about what
 // the rows showed, not about when the test looked. A bar stuck at 0 or at 100 still records one
 // percentage and still fails.
-async function recordQueue(page: Page, names: string[]): Promise<void> {
+async function recordQueue(page: Page): Promise<void> {
   await page.evaluate((watched) => {
     window.queueStates = [];
     window.transcriptionValues = new Set<string>();
@@ -95,7 +95,7 @@ test('uploads several clips, queues them in order, and shows status, phase and b
   page,
 }) => {
   await appLive(page);
-  await recordQueue(page, QUEUE_CLIPS);
+  await recordQueue(page);
   await uploadClips(page, QUEUE_CLIPS);
 
   // The queue drains in order (the engine runs one task at a time): each finish notice appears

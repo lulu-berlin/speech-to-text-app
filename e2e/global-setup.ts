@@ -10,7 +10,6 @@ import {
   captureSessionCookie,
   checkPreconditions,
   choosePort,
-  STORAGE_STATE_FILE,
   loadState,
   refuseLiveRun,
   registerBrowserFrontend,

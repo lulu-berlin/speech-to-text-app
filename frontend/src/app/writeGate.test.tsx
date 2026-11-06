@@ -427,7 +427,7 @@ describe('writes wait for the connection', () => {
     const stream = openEventStream(snapshotFixture, 1_000);
     renderAt('/queue');
     await screen.findByText('Live');
-    const { list: uploadList, rowOf, rowText } = uploadRows();
+    const { rowText } = uploadRows();
 
     fireEvent.drop(screen.getByRole('button', { name: /drop audio files here/i }), {
       dataTransfer: {
@@ -575,7 +575,7 @@ describe('writes wait for the connection', () => {
         return HttpResponse.json({ ...taskQueued, id: 103, filename: 'b.wav' }, { status: 201 });
       }),
     );
-    const stream = openEventStream(snapshotFixture);
+    openEventStream(snapshotFixture);
     renderAt('/queue');
     await screen.findByText('Live');
     const { rowOf, rowText } = uploadRows();

@@ -106,11 +106,9 @@ fun Application.uploadRoutes(config: Config) {
                             fields[part.name ?: ""] = part.value
                         }
 
-                        else -> {
-                            Unit
-                        }
+                        else -> {}
                     }
-                    part.dispose()
+                    part.release()
                 }
 
                 when (val request = UploadRequest(filename, contentType, fields).build(config)) {

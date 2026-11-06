@@ -11,7 +11,6 @@ import {
   settingsFixed,
   snapshot as snapshotFixture,
   taskCompleted,
-  taskRunning,
 } from '../shared/api/fixtures';
 import { asRgb, mediaRulesFor, px, required, stateRulesFor, styleRules } from '../test/dom';
 import { renderThemed } from '../test/render';

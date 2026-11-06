@@ -14,7 +14,7 @@ import type { SpeakersChoice } from './UploadOptionsPanel';
 import { TextLink } from '../../shared/ui/TextLink';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
-import { ApiError, finishedStatus, pendingStatus } from '../../shared/api/types';
+import { finishedStatus, pendingStatus } from '../../shared/api/types';
 import type { Settings, Task, TaskStatus } from '../../shared/api/types';
 import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
 import { finishNoticeMachine } from './finishNoticeMachine';
@@ -38,7 +38,6 @@ import { RowContent, RowName } from './rowParts';
 import { SortableTaskRow } from './SortableTaskRow';
 import { uploadBatchMachine } from './uploadBatchMachine';
 import type { UploadRow } from './uploadBatchMachine';
-import { isSupportedFormat } from './uploadValidation';
 
 // The statuses the queue list holds (item 14): a task with any other status has left the
 // queue (finished, failed or canceled) and belongs to History.

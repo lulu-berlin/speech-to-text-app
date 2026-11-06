@@ -18,7 +18,7 @@ import { IconButton } from '../../shared/ui/IconButton';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
-import { Row, Stack } from '../../shared/ui/layout';
+import { Stack } from '../../shared/ui/layout';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { rowActionMachine } from './rowActionMachine';
 import { Tooltip } from '../../shared/ui/Tooltip';
