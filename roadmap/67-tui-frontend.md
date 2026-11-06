@@ -155,9 +155,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [ ] (discovered, 2026-11-06) The client reaches the service directly even when an HTTP proxy is
       set in the environment (`HTTP_PROXY`/`ALL_PROXY` without a `NO_PROXY` for the loopback
       address), so the per-install secret is never sent to a proxy and the service stays reachable
-- [ ] (discovered, 2026-11-06) `q`, Escape and Ctrl-C each quit the TUI and leave the terminal as
+- [x] (discovered, 2026-11-06) `q`, Escape and Ctrl-C each quit the TUI and leave the terminal as
       it was (raw mode off, the main screen back), so the user is never trapped (a confirmation may
-      come later)
+      come later) — `stt-tui/tests/quit.rs`, `266cee47`
 
 ## Acceptance criteria
 
@@ -211,3 +211,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   view, committed unchanged as `62fe8f25` (49 tests; fmt and clippy green; the pty test passed 5 of 5
   repeats). No refactoring (the user). Discovered: the TUI cannot be quit; the user asked for `q`,
   Escape and Ctrl-C (appended).
+- 2026-11-06 (workspace, cycle 3): "q, Escape and Ctrl-C quit". Red ran on `d911483f` with the
+  cycle's uncommitted test: `q did not quit the TUI` (`quit.rs:31`), after the raw-mode check had
+  passed. Green on the same tree plus a keyboard thread feeding the terminal loop, committed
+  unchanged as `266cee47` (50 tests; fmt and clippy green; 5 of 5 repeats). Refactor approved and
+  done: `attach.rs` uses the shared event-stream stand-in (`c5745792`, 50 tests green).
