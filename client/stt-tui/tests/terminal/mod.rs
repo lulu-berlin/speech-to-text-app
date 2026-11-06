@@ -132,6 +132,24 @@ pub struct EventService {
     pub port: u16,
     streams: std::sync::mpsc::Receiver<EventStream>,
     uploads: std::sync::mpsc::Receiver<Upload>,
+    commands: std::sync::mpsc::Receiver<Command>,
+}
+
+/// One task or queue command a client made (`POST /api/tasks/{id}/…`, `POST /api/queue/…`,
+/// `PUT /api/queue/order`), its request read whole and its response still to be sent.
+pub struct Command {
+    request: crate::support::Request,
+    stream: std::net::TcpStream,
+}
+
+impl Command {
+    pub fn request(&self) -> &crate::support::Request {
+        &self.request
+    }
+
+    pub fn answer(mut self, status: &str, body: &str) {
+        crate::support::respond(&mut self.stream, status, body);
+    }
 }
 
 /// One `POST /api/tasks` a client made, its request read whole and its response still to be sent.
@@ -166,6 +184,7 @@ impl EventService {
         let port = listener.local_addr().unwrap().port();
         let (handed, streams) = std::sync::mpsc::channel();
         let (uploaded, uploads) = std::sync::mpsc::channel();
+        let (commanded, commands) = std::sync::mpsc::channel();
         thread::spawn(move || {
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
@@ -191,6 +210,13 @@ impl EventService {
                     if uploaded.send(Upload { request, stream }).is_err() {
                         return;
                     }
+                } else if request.line.starts_with("POST /api/tasks/")
+                    || request.line.starts_with("POST /api/queue/")
+                    || request.line.starts_with("PUT /api/queue/order ")
+                {
+                    if commanded.send(Command { request, stream }).is_err() {
+                        return;
+                    }
                 } else {
                     let (status, body) = crate::support::healthy();
                     crate::support::respond(&mut stream, status, &body);
@@ -201,7 +227,20 @@ impl EventService {
             port,
             streams,
             uploads,
+            commands,
         }
+    }
+
+    /// The next command a client made, or a panic after `timeout`.
+    pub fn next_command(&self, timeout: Duration) -> Command {
+        self.commands
+            .recv_timeout(timeout)
+            .unwrap_or_else(|_| panic!("no command arrived within {timeout:?}"))
+    }
+
+    /// Whether a command arrived that the test has not read.
+    pub fn command_arrived(&self) -> bool {
+        self.commands.try_recv().is_ok()
     }
 
     /// The next upload a client made, or a panic after `timeout`.

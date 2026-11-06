@@ -11,11 +11,13 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
 mod autostart;
+mod commands;
 mod events;
 mod quote;
 mod upload;
 
 pub use autostart::{Autostart, autostart_entry, install, remove};
+pub use commands::{TaskCommand, reorder_queue, set_queue_paused, task_command};
 pub use events::{Event, Events, Queue, Snapshot, Task, TaskProgress, events};
 pub use upload::{allowed_extension, upload};
 
@@ -997,4 +999,26 @@ fn read_json<T: DeserializeOwned>(file: &Path) -> io::Result<T> {
 /// `text` as JSON of type `T`; a mismatch is `InvalidData`.
 fn parse_json<T: DeserializeOwned>(text: &str) -> io::Result<T> {
     serde_json::from_str(text).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+/// The service's error body (`error.json`), as far as a client reads it.
+#[derive(Deserialize)]
+pub(crate) struct ApiError {
+    message: String,
+}
+
+/// A response's body as type `T`; a response that is not a success is the service's own `message`
+/// as the error, which is what a client shows.
+pub(crate) async fn response_json<T: DeserializeOwned>(
+    response: reqwest::Response,
+) -> io::Result<T> {
+    let status = response.status();
+    let body = response.text().await.map_err(io::Error::other)?;
+    if status.is_success() {
+        return parse_json(&body);
+    }
+    let message = parse_json::<ApiError>(&body)
+        .map(|error| error.message)
+        .unwrap_or_else(|_| format!("the service answered {status}"));
+    Err(io::Error::other(message))
 }

@@ -10,7 +10,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Async HTTP on tokio (roadmap item 67, decided 2026-10-22). Plain HTTP only: the service listens on
 # loopback, so no TLS stack, no HTTP/2 and no compression - none of reqwest's default features.
-reqwest = { version = "0.13", default-features = false, features = ["multipart", "stream"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "stream"] }
 tokio = { version = "1", features = ["fs", "io-util", "time"] }
 # Streams an upload from the file on disk, so a large recording is never held in memory whole.
 tokio-util = { version = "0.7", features = ["io"] }

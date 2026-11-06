@@ -4,8 +4,6 @@
 use std::io;
 use std::path::Path;
 
-use serde::Deserialize;
-
 use crate::Service;
 use crate::events::Task;
 
@@ -27,12 +25,6 @@ pub fn allowed_extension(path: &Path) -> bool {
                 .iter()
                 .any(|allowed| allowed.eq_ignore_ascii_case(extension))
         })
-}
-
-/// The service's error body (`error.json`).
-#[derive(Deserialize)]
-struct ApiError {
-    message: String,
 }
 
 /// Uploads the file at `path` and returns the task the service created for it (QUEUED at the end of
@@ -69,13 +61,5 @@ pub async fn upload(service: &Service, path: &Path) -> io::Result<Task> {
         .send()
         .await
         .map_err(io::Error::other)?;
-    let status = response.status();
-    let body = response.text().await.map_err(io::Error::other)?;
-    if status.is_success() {
-        return crate::parse_json(&body);
-    }
-    let message = crate::parse_json::<ApiError>(&body)
-        .map(|error| error.message)
-        .unwrap_or_else(|_| format!("the service answered {status}"));
-    Err(io::Error::other(message))
+    crate::response_json(response).await
 }

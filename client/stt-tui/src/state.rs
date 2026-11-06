@@ -1,6 +1,6 @@
 //! What the TUI knows of the service: the last snapshot, kept current by the events after it.
 
-use stt_client::{Event, Snapshot};
+use stt_client::{Event, Snapshot, Task};
 
 /// The service's state after `event`. Every stream starts with a snapshot, so a change before one
 /// has nothing to apply to.
@@ -27,4 +27,23 @@ pub fn apply(state: &mut Option<Snapshot>, event: Event) {
         Event::QueueUpdated(queue) => state.queue = queue,
         Event::Snapshot(_) | Event::Other(_) => {}
     }
+}
+
+/// The rows the queue view shows: the pending tasks in the queue's order, then the tasks that ended
+/// FAILED or CANCELED, which can be retried and so stay reachable from the TUI.
+pub fn rows(snapshot: Option<&Snapshot>) -> Vec<&Task> {
+    let Some(snapshot) = snapshot else {
+        return Vec::new();
+    };
+    let mut rows: Vec<&Task> = snapshot
+        .queue
+        .task_ids
+        .iter()
+        .filter_map(|id| snapshot.tasks.iter().find(|task| task.id == *id))
+        .collect();
+    rows.extend(snapshot.tasks.iter().filter(|task| {
+        matches!(task.status.as_str(), "FAILED" | "CANCELED")
+            && !snapshot.queue.task_ids.contains(&task.id)
+    }));
+    rows
 }

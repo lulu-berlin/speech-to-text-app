@@ -2535,6 +2535,8 @@ dependencies = [
  "mime_guess",
  "percent-encoding",
  "pin-project-lite",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-util",

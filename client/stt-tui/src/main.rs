@@ -1,8 +1,9 @@
 //! `stt-tui`, the terminal frontend of the per-user service (roadmap item 67): a client of the
 //! service's HTTP API, never a second backend - with no service running it says how to start one
-//! and starts nothing itself. It shows the queue as the service's event stream reports it, and
-//! uploads a file by the path the user types.
+//! and starts nothing itself. It shows the queue as the service's event stream reports it, uploads
+//! a file by the path the user types, and sends the queue's commands.
 
+use std::future::Future;
 use std::io;
 use std::path::Path;
 use std::process::ExitCode;
@@ -11,13 +12,16 @@ use std::time::Duration;
 
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self as terminal_event, KeyCode, KeyEventKind, KeyModifiers};
-use stt_client::{Event, Service, ServiceDirs, Snapshot, events, locate, upload};
+use stt_client::{
+    Event, Service, ServiceDirs, Snapshot, Task, TaskCommand, events, locate, reorder_queue,
+    set_queue_paused, task_command, upload,
+};
 
 mod state;
 mod view;
 
 /// What the terminal loop wakes up for: an event from the service, something the user did, or the
-/// outcome of an upload this TUI started.
+/// outcome of a request this TUI made.
 enum Message {
     Service(Event),
     Terminal(terminal_event::Event),
@@ -102,7 +106,9 @@ async fn follow(service: Service, sender: mpsc::Sender<Message>) {
 }
 
 /// Draws the queue, again after every event, until the user quits. `u` opens the upload prompt and
-/// Enter sends the path it holds; `q`, Escape (with no prompt open) and Ctrl-C quit.
+/// Enter sends the path it holds; Up/Down (or `k`/`j`) select a row, `p` pauses or resumes it, `c`
+/// cancels it, `r` retries it, `J`/`K` and Shift-Down/Shift-Up move it in the queue, and Space
+/// pauses or resumes the whole queue. `q`, Escape (with no prompt open) and Ctrl-C quit.
 fn show(
     terminal: &mut DefaultTerminal,
     messages: &mpsc::Receiver<Message>,
@@ -111,12 +117,19 @@ fn show(
     sender: mpsc::Sender<Message>,
 ) -> io::Result<()> {
     let mut snapshot: Option<Snapshot> = None;
+    let mut selected = 0;
     let mut prompt: Option<String> = None;
     let mut notice: Option<String> = None;
-    draw(terminal, &snapshot, &prompt, &notice)?;
+    draw(terminal, &snapshot, selected, &prompt, &notice)?;
     while let Ok(message) = messages.recv() {
         match message {
-            Message::Service(event) => state::apply(&mut snapshot, event),
+            Message::Service(event) => {
+                state::apply(&mut snapshot, event);
+                let rows = state::rows(snapshot.as_ref()).len();
+                if rows > 0 {
+                    selected = selected.min(rows - 1);
+                }
+            }
             Message::Notice(text) => notice = Some(text),
             Message::Terminal(terminal_event::Event::Key(key))
                 if key.kind == KeyEventKind::Press =>
@@ -127,55 +140,180 @@ fn show(
                 }
                 // With the prompt open, Escape cancels it and every other key is text; `q` there is
                 // a letter of a file name. Without it, `u` opens the prompt and `q` or Escape quit.
-                match (prompt.is_some(), key.code) {
-                    (true, KeyCode::Esc) => prompt = None,
-                    (false, KeyCode::Esc | KeyCode::Char('q')) => return Ok(()),
-                    (false, KeyCode::Char('u')) => prompt = Some(String::new()),
-                    (true, KeyCode::Backspace) => {
-                        if let Some(path) = prompt.as_mut() {
-                            path.pop();
+                if prompt.is_some() {
+                    match key.code {
+                        KeyCode::Esc => prompt = None,
+                        KeyCode::Backspace => {
+                            if let Some(path) = prompt.as_mut() {
+                                path.pop();
+                            }
                         }
+                        KeyCode::Enter => {
+                            let path = prompt.take().unwrap_or_default().trim().to_string();
+                            if path.is_empty() {
+                                notice = Some("no file path given".to_string());
+                            } else {
+                                let service = service.clone();
+                                dispatch(&runtime, &sender, "upload failed", async move {
+                                    upload(&service, Path::new(&path))
+                                        .await
+                                        .map(|task| format!("queued {}", task.filename))
+                                });
+                            }
+                        }
+                        KeyCode::Char(character) => {
+                            if let Some(path) = prompt.as_mut() {
+                                path.push(character);
+                            }
+                        }
+                        _ => {}
                     }
-                    (true, KeyCode::Enter) => {
-                        let path = prompt.take().unwrap_or_default().trim().to_string();
-                        if path.is_empty() {
-                            notice = Some("no file path given".to_string());
-                        } else {
+                } else {
+                    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+                    match key.code {
+                        KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Char('u') => prompt = Some(String::new()),
+                        KeyCode::Up if shift => {
+                            move_selected(&runtime, &sender, &service, &snapshot, selected, -1)
+                        }
+                        KeyCode::Down if shift => {
+                            move_selected(&runtime, &sender, &service, &snapshot, selected, 1)
+                        }
+                        KeyCode::Char('K') => {
+                            move_selected(&runtime, &sender, &service, &snapshot, selected, -1)
+                        }
+                        KeyCode::Char('J') => {
+                            move_selected(&runtime, &sender, &service, &snapshot, selected, 1)
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => selected = selected.saturating_sub(1),
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            let rows = state::rows(snapshot.as_ref()).len();
+                            if selected + 1 < rows {
+                                selected += 1;
+                            }
+                        }
+                        KeyCode::Char(' ') => {
+                            let paused = snapshot.as_ref().is_some_and(|s| s.queue.paused);
                             let service = service.clone();
-                            let sender = sender.clone();
-                            runtime.spawn(async move {
-                                let text = match upload(&service, Path::new(&path)).await {
-                                    Ok(task) => format!("queued {}", task.filename),
-                                    Err(error) => format!("upload failed: {error}"),
-                                };
-                                let _ = sender.send(Message::Notice(text));
+                            dispatch(&runtime, &sender, "command failed", async move {
+                                set_queue_paused(&service, !paused).await.map(|queue| {
+                                    if queue.paused {
+                                        "queue paused".to_string()
+                                    } else {
+                                        "queue running".to_string()
+                                    }
+                                })
                             });
                         }
-                    }
-                    (true, KeyCode::Char(character)) => {
-                        if let Some(path) = prompt.as_mut() {
-                            path.push(character);
+                        KeyCode::Char(character @ ('p' | 'c' | 'r')) => {
+                            if let Some(task) = task_at(&snapshot, selected)
+                                && let Some(command) = command_for(task, character)
+                            {
+                                let id = task.id;
+                                let service = service.clone();
+                                dispatch(&runtime, &sender, "command failed", async move {
+                                    task_command(&service, id, command)
+                                        .await
+                                        .map(|task| format!("{} {}", task.filename, task.status))
+                                });
+                            }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
             Message::Terminal(_) => {}
         }
-        draw(terminal, &snapshot, &prompt, &notice)?;
+        draw(terminal, &snapshot, selected, &prompt, &notice)?;
     }
     Ok(())
 }
 
-/// Draws the screen as it is now: the queue, the prompt if it is open, the last notice.
+/// The task on the row `selected`, if any.
+fn task_at(snapshot: &Option<Snapshot>, selected: usize) -> Option<&Task> {
+    state::rows(snapshot.as_ref()).get(selected).copied()
+}
+
+/// The command `key` sends for `task`, when the task's status allows it: the transition table the
+/// browser reads (`docs/api/task-transitions.json`).
+fn command_for(task: &Task, key: char) -> Option<TaskCommand> {
+    let command = match key {
+        'p' if task.status == "PAUSED" => TaskCommand::Resume,
+        'p' => TaskCommand::Pause,
+        'c' => TaskCommand::Cancel,
+        'r' => TaskCommand::Retry,
+        _ => return None,
+    };
+    command.allowed(&task.status).then_some(command)
+}
+
+/// Moves the selected task `step` places through the queue, if it is in the queue and has a
+/// neighbour there; the service's `queue-updated` then shows the new order.
+fn move_selected(
+    runtime: &tokio::runtime::Handle,
+    sender: &mpsc::Sender<Message>,
+    service: &Service,
+    snapshot: &Option<Snapshot>,
+    selected: usize,
+    step: isize,
+) {
+    let Some(task) = task_at(snapshot, selected) else {
+        return;
+    };
+    let Some(queue) = snapshot.as_ref().map(|snapshot| &snapshot.queue) else {
+        return;
+    };
+    let Some(from) = queue.task_ids.iter().position(|id| *id == task.id) else {
+        return;
+    };
+    let Some(to) = from.checked_add_signed(step) else {
+        return;
+    };
+    if to >= queue.task_ids.len() {
+        return;
+    }
+    let mut ids = queue.task_ids.clone();
+    ids.swap(from, to);
+    let service = service.clone();
+    dispatch(runtime, sender, "command failed", async move {
+        reorder_queue(&service, &ids)
+            .await
+            .map(|_| "queue reordered".to_string())
+    });
+}
+
+/// Runs `future` on the runtime and reports its outcome as the notice: the task or queue it
+/// returned, or the error.
+fn dispatch<F>(
+    runtime: &tokio::runtime::Handle,
+    sender: &mpsc::Sender<Message>,
+    failure: &'static str,
+    future: F,
+) where
+    F: Future<Output = io::Result<String>> + Send + 'static,
+{
+    let sender = sender.clone();
+    runtime.spawn(async move {
+        let text = match future.await {
+            Ok(text) => text,
+            Err(error) => format!("{failure}: {error}"),
+        };
+        let _ = sender.send(Message::Notice(text));
+    });
+}
+
+/// Draws the screen as it is now: the queue with its selection, the prompt if it is open, the last
+/// notice.
 fn draw(
     terminal: &mut DefaultTerminal,
     snapshot: &Option<Snapshot>,
+    selected: usize,
     prompt: &Option<String>,
     notice: &Option<String>,
 ) -> io::Result<()> {
     let view = view::View {
         snapshot: snapshot.as_ref(),
+        selected,
         prompt: prompt.as_deref(),
         notice: notice.as_deref(),
     };
