@@ -2824,6 +2824,7 @@ dependencies = [
 name = "stt-tui"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "portable-pty",
  "ratatui",
  "stt-client",

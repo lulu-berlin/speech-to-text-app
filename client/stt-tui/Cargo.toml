@@ -17,3 +17,7 @@ tokio = { version = "1", features = ["rt-multi-thread"] }
 portable-pty = "0.9"
 tempfile = "3"
 vt100 = "0.18"
+
+[target.'cfg(unix)'.dev-dependencies]
+# Reads the pty's termios flags: whether the TUI left the terminal cooked.
+libc = "0.2"
