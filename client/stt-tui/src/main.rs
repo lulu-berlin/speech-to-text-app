@@ -15,16 +15,18 @@ use ratatui::DefaultTerminal;
 use ratatui::crossterm::event as terminal_event;
 use stt_client::{
     Event, Service, ServiceDirs, Snapshot, Speaker, Task, Turns, events, history, locate,
-    rename_speaker, reorder_queue, set_queue_paused, task_command, text, turns, upload,
+    reorder_queue, set_queue_paused, task_command, text, turns, upload,
 };
 
 use crate::download::Download;
 use crate::input::Action;
 use crate::state::Screen;
+use crate::transcript::Transcript;
 
 mod download;
 mod input;
 mod state;
+mod transcript;
 mod view;
 
 /// What the terminal loop wakes up for: an event from the service, something the user did, or the
@@ -136,8 +138,6 @@ struct Ui {
     history_selected: usize,
     /// The upload prompt's path, while it is open.
     prompt: Option<String>,
-    /// The name typed for the transcript's selected speaker, while the rename prompt is open.
-    rename: Option<String>,
     /// The download dialog, while it is open.
     download: Option<Download>,
     /// What the last action reported.
@@ -153,7 +153,6 @@ impl Ui {
             listed: Vec::new(),
             history_selected: 0,
             prompt: None,
-            rename: None,
             download: None,
             notice: None,
         }
@@ -167,7 +166,10 @@ impl Ui {
             history: &self.listed,
             history_selected: self.history_selected,
             prompt: self.prompt.as_deref(),
-            rename: self.rename.as_deref(),
+            rename: match &self.screen {
+                Screen::Transcript(transcript) => transcript.rename(),
+                _ => None,
+            },
             download: self.download.as_ref().map(Download::view),
             notice: self.notice.as_deref(),
         };
@@ -198,28 +200,18 @@ impl Ui {
                 self.screen = Screen::History;
             }
             Message::Transcript(task, turns) => {
-                self.screen = Screen::Transcript {
-                    task,
-                    turns,
-                    speaker: 0,
-                };
+                self.screen = Screen::Transcript(Transcript::new(task, turns));
             }
             Message::Speakers(id, speakers) => {
-                if let Screen::Transcript {
-                    task,
-                    turns,
-                    speaker,
-                } = &mut self.screen
-                    && task.id == id
-                {
-                    *speaker = (*speaker).min(speakers.len().saturating_sub(1));
-                    turns.speakers = speakers;
+                if let Screen::Transcript(transcript) = &mut self.screen {
+                    transcript.set_speakers(id, speakers);
                 }
             }
             Message::Terminal(terminal_event::Event::Key(key)) => {
                 // The rename prompt takes text as the upload prompt does: every key but Escape,
                 // Enter and Backspace is a character of the name.
-                let text_open = self.prompt.is_some() || self.rename.is_some();
+                let renaming = matches!(&self.screen, Screen::Transcript(transcript) if transcript.rename().is_some());
+                let text_open = self.prompt.is_some() || renaming;
                 let Some(action) = input::action(&key, text_open, self.download.is_some()) else {
                     return Outcome::Continue;
                 };
@@ -336,7 +328,7 @@ impl Ui {
             Action::Quit => return Outcome::Quit,
             Action::BackOrQuit | Action::Back => {
                 self.screen = match self.screen {
-                    Screen::Transcript { .. } => Screen::History,
+                    Screen::Transcript(_) => Screen::History,
                     _ => Screen::Queue,
                 };
             }
@@ -350,49 +342,6 @@ impl Ui {
                     self.history_selected += 1;
                 }
             }
-            Action::SelectUp => {
-                if let Screen::Transcript { speaker, .. } = &mut self.screen {
-                    *speaker = speaker.saturating_sub(1);
-                }
-            }
-            Action::SelectDown => {
-                if let Screen::Transcript { turns, speaker, .. } = &mut self.screen
-                    && *speaker + 1 < turns.speakers.len()
-                {
-                    *speaker += 1;
-                }
-            }
-            // `r` in a transcript renames the selected speaker, starting from its name.
-            Action::TaskKey('r') => {
-                if let Screen::Transcript { turns, speaker, .. } = &self.screen
-                    && let Some(selected) = turns.speakers.get(*speaker)
-                {
-                    self.rename = Some(selected.speaker.clone());
-                }
-            }
-            Action::CancelPrompt => self.rename = None,
-            Action::PromptBackspace => {
-                if let Some(name) = self.rename.as_mut() {
-                    name.pop();
-                }
-            }
-            Action::PromptChar(character) => {
-                if let Some(name) = self.rename.as_mut() {
-                    name.push(character);
-                }
-            }
-            Action::SubmitPrompt => {
-                if let Some(name) = self.rename.take()
-                    && let Screen::Transcript {
-                        task,
-                        turns,
-                        speaker,
-                    } = &self.screen
-                    && let Some(selected) = turns.speakers.get(*speaker)
-                {
-                    rename(runtime, service, sender, task.id, selected.speaker_id, name);
-                }
-            }
             Action::OpenSelected if matches!(self.screen, Screen::History) => {
                 if let Some(task) = state::completed(&self.listed)
                     .get(self.history_selected)
@@ -402,8 +351,8 @@ impl Ui {
                 }
             }
             Action::OpenDownload => {
-                if let Screen::Transcript { task, .. } = &self.screen {
-                    self.download = Some(Download::new(task.clone()));
+                if let Screen::Transcript(transcript) = &self.screen {
+                    self.download = Some(Download::new(transcript.task.clone()));
                 }
             }
             Action::DownloadChar(_)
@@ -418,7 +367,11 @@ impl Ui {
                     self.download = None;
                 }
             }
-            _ => {}
+            action => {
+                if let Screen::Transcript(transcript) = &mut self.screen {
+                    transcript.handle(action, runtime, sender, service);
+                }
+            }
         }
         Outcome::Continue
     }
@@ -444,30 +397,6 @@ fn show(
         ui.draw(terminal)?;
     }
     Ok(())
-}
-
-/// Renames speaker `speaker_id` of task `id` to `name`; the service's answer relabels the open
-/// transcript, and a refusal is the notice.
-fn rename(
-    runtime: &tokio::runtime::Handle,
-    service: &Service,
-    sender: &mpsc::Sender<Message>,
-    id: i64,
-    speaker_id: i64,
-    name: String,
-) {
-    let service = service.clone();
-    let sender = sender.clone();
-    runtime.spawn(async move {
-        let message = match rename_speaker(&service, id, speaker_id, &name).await {
-            Ok(speakers) => Message::Speakers(id, speakers),
-            Err(error) => Message::Notice(text(
-                "speakers.rename-failed",
-                &[("error", &error.to_string())],
-            )),
-        };
-        let _ = sender.send(message);
-    });
 }
 
 /// Fetches the task list and shows the history.

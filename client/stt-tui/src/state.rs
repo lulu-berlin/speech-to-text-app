@@ -1,18 +1,16 @@
 //! What the TUI knows of the service: the last snapshot, kept current by the events after it, and
 //! which screen shows it - the queue, the history of completed tasks, or one transcript.
 
-use stt_client::{Event, Snapshot, Task, Turns};
+use stt_client::{Event, Snapshot, Task};
+
+use crate::transcript::Transcript;
 
 /// The screen the terminal shows.
 pub enum Screen {
     Queue,
     History,
-    /// A transcript, with the row of its speakers list that a rename acts on.
-    Transcript {
-        task: Task,
-        turns: Turns,
-        speaker: usize,
-    },
+    /// A transcript, with its speakers list's selection and rename prompt.
+    Transcript(Transcript),
 }
 
 /// The service's state after `event`. Every stream starts with a snapshot, so a change before one

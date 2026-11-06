@@ -62,11 +62,13 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     match view.screen {
         Screen::Queue => draw_queue(frame, areas[0], view),
         Screen::History => draw_history(frame, areas[0], view),
-        Screen::Transcript {
-            task,
-            turns,
-            speaker,
-        } => draw_transcript(frame, areas[0], task, turns, *speaker),
+        Screen::Transcript(transcript) => draw_transcript(
+            frame,
+            areas[0],
+            &transcript.task,
+            &transcript.turns,
+            transcript.speaker,
+        ),
     }
     if let Some(path) = view.prompt {
         frame.render_widget(
