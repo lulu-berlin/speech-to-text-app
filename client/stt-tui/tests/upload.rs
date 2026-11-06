@@ -161,3 +161,52 @@ fn uploading_by_path_queues_the_file_and_reports_a_bad_path_or_format() {
         "the UI stays usable:\n{screen}"
     );
 }
+
+#[test]
+fn escape_cancels_the_upload_prompt_without_quitting() {
+    let service = EventService::start();
+    let dir = tempfile::tempdir().unwrap();
+    support::write_bootstrap(dir.path(), service.port);
+    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    let queue = tui.wait_for(WAIT, |text| text.contains("memo.wav"));
+
+    // A typed path, then Escape: the prompt closes, nothing is sent, the queue is as it was.
+    tui.press(b"u");
+    tui.wait_for(WAIT, |text| text.contains("Upload:"));
+    tui.press(b"/tmp/memo.wav");
+    tui.wait_for(WAIT, |text| text.contains("/tmp/memo.wav"));
+    tui.press(b"\x1b");
+    let screen = tui.wait_for(WAIT, |text| !text.contains("Upload:"));
+    assert_eq!(
+        queue
+            .lines()
+            .filter(|line| line.contains("memo.wav") || line.contains("lecture.m4a"))
+            .count(),
+        screen
+            .lines()
+            .filter(|line| line.contains("memo.wav") || line.contains("lecture.m4a"))
+            .count(),
+        "the queue is unchanged:\n{screen}"
+    );
+    assert!(
+        !service.upload_arrived(),
+        "a cancelled prompt sends nothing:\n{screen}"
+    );
+    assert!(
+        tui.exit_within(Duration::from_millis(200)).is_none(),
+        "Escape at the queue cancels the prompt, it does not quit:\n{screen}"
+    );
+
+    // Still usable: the prompt opens again and `q` quits.
+    tui.press(b"u");
+    tui.wait_for(WAIT, |text| text.contains("Upload:"));
+    tui.press(b"\x1b");
+    tui.wait_for(WAIT, |text| !text.contains("Upload:"));
+    tui.press(b"q");
+    assert!(
+        tui.exit_within(WAIT).is_some(),
+        "`q` at the queue still quits"
+    );
+}
