@@ -178,8 +178,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       queue as it was
 - [ ] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
       too large) shows the service's message and leaves the UI usable
-- [ ] (must not break) The TUI's text and the browser's queue and upload text come from the one
-      catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself
+- [x] (must not break) The TUI's text and the browser's queue and upload text come from the one
+      catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself —
+      `client/stt-client/tests/text.rs`, `frontend/src/features/queue/QueueView.test.tsx` (the
+      "shared UI text" case), `a21afa22`
 
 ## Acceptance criteria
 
@@ -267,3 +269,14 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   `input.rs` (`6fafe1f6`, 53 tests green). The user then asked for one source of truth for UI text
   across the frontends: ADR 0066 and "Decided (workspace, 2026-11-06)" record it, and a test-list
   line was added for it.
+- 2026-11-06 (workspace, shared UI text): ADR 0066 recorded (`b1e9ed9c`, with the conventions line
+  and this item's amendment). `ui-text/en.json` is the one catalog: `stt-client/build.rs` compiles
+  every locale file it finds into constants, `stt_client::text` fills `{name}` placeholders with the
+  fallback chain locale → English → key, and the TUI's titles, prompt and notices use it
+  (`056a1a7c`). The browser's `t()` (`frontend/src/shared/ui/text.ts`) reads the same file; the
+  queue title, uploads and pending lists, pause switch, task verbs and confirmations, upload options
+  fields and the fallback banner use it, pinned by the "shared UI text" test (`a21afa22`). Verified:
+  Rust 54 tests, fmt and clippy green; `tsc --noEmit`, prettier and `vite build` green; QueueView's
+  37 tests green with a 60 s timeout (the default 5 s times out under this sandbox's load, not on
+  CI); the full vitest run's other default-timeout failures were the same sandbox slowness and
+  passed with 60 s. A missing key shows the key itself, which `stt-client/tests/text.rs` pins.
