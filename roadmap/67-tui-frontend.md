@@ -123,8 +123,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 
 ## Test list (approved; behaviors only)
 
-- [ ] (basic) With the service running, the TUI attaches with the credential from `config.json` and
-      shows the live queue (statuses, progress)
+- [x] (basic) With the service running, the TUI attaches with the credential from `config.json` and
+      shows the live queue (statuses, progress) — `stt-tui/tests/attach.rs`, `62fe8f25`
 - [x] (edge) With no service running, it exits with a message naming `stt-app open` and starts no
       second backend — `stt-tui/tests/no_service.rs`, `ddbf00ef`
 - [ ] (basic) Upload by path queues a file and it reaches COMPLETED; an invalid path or unsupported
@@ -155,6 +155,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [ ] (discovered, 2026-11-06) The client reaches the service directly even when an HTTP proxy is
       set in the environment (`HTTP_PROXY`/`ALL_PROXY` without a `NO_PROXY` for the loopback
       address), so the per-install secret is never sent to a proxy and the service stays reachable
+- [ ] (discovered, 2026-11-06) `q`, Escape and Ctrl-C each quit the TUI and leave the terminal as
+      it was (raw mode off, the main screen back), so the user is never trapped (a confirmation may
+      come later)
 
 ## Acceptance criteria
 
@@ -201,3 +204,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   their rebased counterparts are R1 `3467f442`, R2 `e3d91fdf`, cycle 1 `fcfbb78c`. Re-run on the
   rebased head `58df03bb`: `cargo fmt --check`, `cargo clippy --locked --all-targets -D warnings` and
   `cargo test --locked` (48 passed) green.
+- 2026-11-06 (workspace, cycle 2): "attaches and shows the live queue". Red ran on `cb204fb1` with
+  the cycle's uncommitted pty test (`portable-pty` + `vt100`) and cycle 1's `main`: the screen stayed
+  empty for 20 s (`terminal/mod.rs:68`). Green on the same tree plus the event-stream client in
+  `stt-client` (an SSE parser over the response chunks, the `snapshot` types) and the ratatui queue
+  view, committed unchanged as `62fe8f25` (49 tests; fmt and clippy green; the pty test passed 5 of 5
+  repeats). No refactoring (the user). Discovered: the TUI cannot be quit; the user asked for `q`,
+  Escape and Ctrl-C (appended).
