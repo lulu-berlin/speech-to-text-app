@@ -15,6 +15,7 @@ mod commands;
 mod events;
 mod quote;
 mod read;
+mod settings;
 mod speakers;
 mod text;
 mod upload;
@@ -23,6 +24,7 @@ pub use autostart::{Autostart, autostart_entry, install, remove};
 pub use commands::{TaskCommand, reorder_queue, set_queue_paused, task_command};
 pub use events::{Event, Events, Queue, Snapshot, Task, TaskProgress, events};
 pub use read::{Speaker, Turn, Turns, history, transcript, turns};
+pub use settings::{Settings, save_settings, settings};
 pub use speakers::{merge_speakers, rename_speaker};
 pub use text::{DEFAULT_LOCALE, catalog, text, text_in};
 pub use upload::{allowed_extension, upload};
@@ -779,9 +781,9 @@ const LINUX_TERMINALS: [(&str, &[&str]); 5] = [
     ("xterm", &["-e"]),
 ];
 
-/// `GET /api/settings`, as far as a client reads it.
+/// `GET /api/settings`, as far as launching a frontend reads it.
 #[derive(Deserialize)]
-struct Settings {
+struct LaunchSettings {
     #[serde(rename = "defaultFrontend")]
     default_frontend: Option<String>,
     #[serde(rename = "terminalCommand")]
@@ -799,7 +801,7 @@ pub async fn terminal_command_setting(service: &Service) -> io::Result<Option<St
 }
 
 /// `GET /api/settings` with the per-install secret.
-async fn settings_of(service: &Service) -> io::Result<Settings> {
+async fn settings_of(service: &Service) -> io::Result<LaunchSettings> {
     let body = reqwest::Client::new()
         .get(format!("{}/api/settings", service.endpoint))
         .bearer_auth(&service.secret)

@@ -14,17 +14,19 @@ use std::time::Duration;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event as terminal_event;
 use stt_client::{
-    Event, Service, ServiceDirs, Snapshot, Speaker, Task, Turns, events, history, locate,
+    Event, Service, ServiceDirs, Settings, Snapshot, Speaker, Task, Turns, events, history, locate,
     reorder_queue, set_queue_paused, task_command, text, turns, upload,
 };
 
 use crate::download::Download;
 use crate::input::Action;
+use crate::settings::SettingsScreen;
 use crate::state::Screen;
 use crate::transcript::Transcript;
 
 mod download;
 mod input;
+mod settings;
 mod state;
 mod transcript;
 mod view;
@@ -44,6 +46,10 @@ enum Message {
     Speakers(i64, Vec<Speaker>),
     /// Task `id`'s turns, read again after a merge; an open transcript of it shows them.
     Turns(i64, Turns),
+    /// The settings arrived; the settings screen shows them.
+    Settings(Settings),
+    /// The settings as the service answered a save; an open settings screen shows them.
+    SettingsSaved(Settings),
 }
 
 /// Whether the user asked to leave.
@@ -215,6 +221,14 @@ impl Ui {
                     transcript.set_turns(id, turns);
                 }
             }
+            Message::Settings(settings) => {
+                self.screen = Screen::Settings(SettingsScreen::new(settings));
+            }
+            Message::SettingsSaved(settings) => {
+                if let Screen::Settings(screen) = &mut self.screen {
+                    screen.settings = settings;
+                }
+            }
             Message::Terminal(terminal_event::Event::Key(key)) => {
                 // The rename prompt takes text as the upload prompt does: every key but Escape,
                 // Enter and Backspace is a character of the name.
@@ -251,8 +265,10 @@ impl Ui {
             | Action::DownloadFormatStep(_)
             | Action::SubmitDownload
             | Action::CancelDownload
-            | Action::Merge => {}
+            | Action::Merge
+            | Action::Adjust(_) => {}
             Action::OpenHistory => open_history(runtime, service, sender),
+            Action::OpenSettings => open_settings(runtime, service, sender),
             Action::OpenPrompt => self.prompt = Some(String::new()),
             Action::CancelPrompt => self.prompt = None,
             Action::PromptBackspace => {
@@ -342,6 +358,7 @@ impl Ui {
                 };
             }
             Action::OpenHistory => open_history(runtime, service, sender),
+            Action::OpenSettings => open_settings(runtime, service, sender),
             Action::SelectUp if matches!(self.screen, Screen::History) => {
                 self.history_selected = self.history_selected.saturating_sub(1);
             }
@@ -376,11 +393,13 @@ impl Ui {
                     self.download = None;
                 }
             }
-            action => {
-                if let Screen::Transcript(transcript) = &mut self.screen {
+            action => match &mut self.screen {
+                Screen::Transcript(transcript) => {
                     transcript.handle(action, runtime, sender, service);
                 }
-            }
+                Screen::Settings(screen) => screen.handle(action, runtime, sender, service),
+                Screen::Queue | Screen::History => {}
+            },
         }
         Outcome::Continue
     }
@@ -428,6 +447,25 @@ fn open_history(
                 )));
             }
         }
+    });
+}
+
+/// Fetches the settings and shows them.
+fn open_settings(
+    runtime: &tokio::runtime::Handle,
+    service: &Service,
+    sender: &mpsc::Sender<Message>,
+) {
+    let service = service.clone();
+    let sender = sender.clone();
+    runtime.spawn(async move {
+        let message = match stt_client::settings(&service).await {
+            Ok(settings) => Message::Settings(settings),
+            Err(error) => {
+                Message::Notice(text("settings.failed", &[("error", &error.to_string())]))
+            }
+        };
+        let _ = sender.send(message);
     });
 }
 

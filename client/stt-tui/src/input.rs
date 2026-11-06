@@ -46,6 +46,10 @@ pub enum Action {
     /// `m` in a transcript: mark the selected speaker for a merge, unmark it, or merge the marked
     /// speaker into it.
     Merge,
+    /// `s`: open the settings.
+    OpenSettings,
+    /// Left/Right: change the selected setting `step` places.
+    Adjust(isize),
 }
 
 /// What `key` does: with the prompt open every key is text except Escape, Enter and Backspace; at
@@ -86,6 +90,9 @@ pub fn action(key: &KeyEvent, prompt_open: bool, download_open: bool) -> Option<
         KeyCode::Char('h') => Some(Action::OpenHistory),
         KeyCode::Char('d') => Some(Action::OpenDownload),
         KeyCode::Char('m') => Some(Action::Merge),
+        KeyCode::Char('s') => Some(Action::OpenSettings),
+        KeyCode::Left => Some(Action::Adjust(-1)),
+        KeyCode::Right => Some(Action::Adjust(1)),
         KeyCode::Enter => Some(Action::OpenSelected),
         KeyCode::Char('u') => Some(Action::OpenPrompt),
         KeyCode::Up if shift => Some(Action::MoveSelected(-1)),

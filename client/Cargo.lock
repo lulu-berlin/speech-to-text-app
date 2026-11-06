@@ -2859,6 +2859,7 @@ dependencies = [
  "libc",
  "portable-pty",
  "ratatui",
+ "serde_json",
  "stt-client",
  "tempfile",
  "tokio",

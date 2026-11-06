@@ -184,7 +184,7 @@ pub struct EventService {
 }
 
 /// One `GET` a client made beyond the health check and the event stream (the task list, a
-/// transcript's turns), its request read whole and its response still to be sent.
+/// transcript's turns, the settings), its request read whole and its response still to be sent.
 pub struct Fetch {
     request: crate::support::Request,
     stream: std::net::TcpStream,
@@ -281,11 +281,14 @@ impl EventService {
                     || request.line.starts_with("POST /api/queue/")
                     || request.line.starts_with("PUT /api/queue/order ")
                     || request.line.starts_with("PUT /api/tasks/")
+                    || request.line.starts_with("PUT /api/settings ")
                 {
                     if commanded.send(Command { request, stream }).is_err() {
                         return;
                     }
-                } else if request.line.starts_with("GET /api/tasks") {
+                } else if request.line.starts_with("GET /api/tasks")
+                    || request.line.starts_with("GET /api/settings ")
+                {
                     if fetched.send(Fetch { request, stream }).is_err() {
                         return;
                     }

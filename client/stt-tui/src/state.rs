@@ -1,8 +1,10 @@
 //! What the TUI knows of the service: the last snapshot, kept current by the events after it, and
-//! which screen shows it - the queue, the history of completed tasks, or one transcript.
+//! which screen shows it - the queue, the history of completed tasks, one transcript, or the
+//! settings.
 
 use stt_client::{Event, Snapshot, Task};
 
+use crate::settings::SettingsScreen;
 use crate::transcript::Transcript;
 
 /// The screen the terminal shows.
@@ -11,6 +13,8 @@ pub enum Screen {
     History,
     /// A transcript, with its speakers list's selection and rename prompt.
     Transcript(Transcript),
+    /// The settings, with the selected row.
+    Settings(SettingsScreen),
 }
 
 /// The service's state after `event`. Every stream starts with a snapshot, so a change before one

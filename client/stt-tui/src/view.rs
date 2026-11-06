@@ -1,5 +1,5 @@
-//! What the TUI draws: the queue, the history of completed tasks, one transcript, and - under them
-//! - the upload prompt and the last notice.
+//! What the TUI draws: the queue, the history of completed tasks, one transcript, the settings,
+//! and - under them - the prompts and the last notice.
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -8,6 +8,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph, Row, Table, TableState, Wrap};
 use stt_client::{Snapshot, Task};
 
+use crate::settings::{FIELDS, SettingsScreen};
 use crate::state::Screen;
 use crate::transcript::Transcript;
 
@@ -64,6 +65,7 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         Screen::Queue => draw_queue(frame, areas[0], view),
         Screen::History => draw_history(frame, areas[0], view),
         Screen::Transcript(transcript) => draw_transcript(frame, areas[0], transcript),
+        Screen::Settings(screen) => draw_settings(frame, areas[0], screen),
     }
     if let Some(path) = view.prompt {
         frame.render_widget(
@@ -138,6 +140,18 @@ fn draw_history(frame: &mut Frame, area: Rect, view: &View<'_>) {
         .block(Block::bordered().title(stt_client::text("history.title", &[])))
         .row_highlight_style(Style::new().reversed());
     let mut state = TableState::default().with_selected(Some(view.history_selected));
+    frame.render_stateful_widget(table, area, &mut state);
+}
+
+/// The settings, one row per setting with its value, the selected row highlighted.
+fn draw_settings(frame: &mut Frame, area: Rect, screen: &SettingsScreen) {
+    let rows = FIELDS
+        .iter()
+        .map(|field| Row::new([field.label(), field.value(&screen.settings)]));
+    let table = Table::new(rows, [Constraint::Length(16), Constraint::Fill(1)])
+        .block(Block::bordered().title(stt_client::text("settings.title", &[])))
+        .row_highlight_style(Style::new().reversed());
+    let mut state = TableState::default().with_selected(Some(screen.row));
     frame.render_stateful_widget(table, area, &mut state);
 }
 
