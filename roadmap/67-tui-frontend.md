@@ -298,3 +298,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   sends no request), committed as `f73e45b0` (56 tests; fmt and clippy green). Refactor approved
   and done: the download dialog's state, keys and save moved to `download.rs` (`121869cc`, 56
   tests green).
+- 2026-11-06 (workspace): rebased onto `main` `12b07d00` (#108, static-analysis fixes) at the
+  user's request. One conflict: `frontend/src/features/queue/TaskRow.tsx`'s imports (main dropped
+  the unused `Row`, this branch added `t`), resolved by keeping both changes. The hashes cited above
+  are the commits the runs ran on, before the rebase. Gates green on the rebased tree: Rust fmt,
+  clippy, 56 tests; frontend `tsc`, prettier, and the queue, history and app vitest files (179
+  tests).
