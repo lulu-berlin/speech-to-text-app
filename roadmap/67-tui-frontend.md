@@ -125,8 +125,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 
 - [ ] (basic) With the service running, the TUI attaches with the credential from `config.json` and
       shows the live queue (statuses, progress)
-- [ ] (edge) With no service running, it exits with a message naming `stt-app open` and starts no
-      second backend
+- [x] (edge) With no service running, it exits with a message naming `stt-app open` and starts no
+      second backend — `stt-tui/tests/no_service.rs`, `ddbf00ef`
 - [ ] (basic) Upload by path queues a file and it reaches COMPLETED; an invalid path or unsupported
       extension reports an error and the UI stays usable
 - [ ] (basic) Pause/resume/cancel/retry and reorder work, and the browser sees the same state from
@@ -190,3 +190,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   before cycle 1. See "Decided (workspace, 2026-11-06)". The test-list line moved from item 66 is
   approved as worded and enters the order. Evidence corrected: `docs/api/openapi.yaml` exists as a
   companion to the authoritative examples.
+- 2026-11-06 (workspace, cycle 1): refactors R1 (`283e2905`) and R2 (`e02376c7`) done, item 66's 47
+  tests unchanged and green on each. Cycle 1, "no service running": red ran on `fc0b7893` with the
+  cycle's uncommitted test and an empty `stt-tui` `main` (`crashed: false;` - the TUI exited with
+  success, `no_service.rs:59`); green on the same tree plus the `locate` call, committed unchanged as
+  `ddbf00ef` (48 tests, fmt and clippy green). No refactoring (the user). Discovered: the client
+  sends loopback requests and the secret through an environment `HTTP_PROXY` (appended to the list).
