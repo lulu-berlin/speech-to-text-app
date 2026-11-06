@@ -99,6 +99,15 @@ playback stays with the browser and window frontends (a terminal cannot play it)
   `reqwest` (`default-features = false`, plain HTTP on loopback) on tokio, with item 66's tests
   unchanged in what they assert. `stt-tui` is the fourth member and arrives with the first cycle.
   The longer cold build (tokio, hyper, reqwest) is answered by the CI cargo cache (the user).
+- **One UI text catalog for every frontend** (the user, 2026-11-06): the user asked that all
+  frontends share one source of truth for the text they own, prepared for localization (item 88)
+  without assuming English. Recorded as [ADR 0066](../docs/decisions/0066-one-ui-text-catalog-for-every-frontend.md):
+  `ui-text/<locale>.json` at the repository root, flat keys with `{name}` placeholders; the browser
+  reads it through `t()` (`frontend/src/shared/ui/text.ts`), the Rust clients compile it in
+  (`stt-client/build.rs`, `stt_client::text`), with the fallback chain locale → English → key. Item
+  67 migrates the TUI's strings and the browser's queue and upload text; the rest of the browser's
+  text migrates in a follow-up item the root agent files (new browser strings use the catalog in the
+  meantime). Server `message` text stays server-owned and is shown as received.
 
 ## Proposal
 
@@ -169,6 +178,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       queue as it was
 - [ ] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
       too large) shows the service's message and leaves the UI usable
+- [ ] (must not break) The TUI's text and the browser's queue and upload text come from the one
+      catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself
 
 ## Acceptance criteria
 
@@ -252,4 +263,7 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   (`terminal/mod.rs:238`). Green on the same tree plus `stt-client`'s task and queue commands
   (the contract's transition table mirrored, so a disallowed command sends nothing) and the TUI's
   selection, command keys and retryable rows, committed as `79856e65` (53 tests; fmt and clippy
-  green; the pty suite green in 3 repeats). No refactoring at this checkpoint.
+  green; the pty suite green in 3 repeats). Refactor approved and done: the key map moved to
+  `input.rs` (`6fafe1f6`, 53 tests green). The user then asked for one source of truth for UI text
+  across the frontends: ADR 0066 and "Decided (workspace, 2026-11-06)" record it, and a test-list
+  line was added for it.
