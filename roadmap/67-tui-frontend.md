@@ -152,6 +152,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [ ] (moved from item 66, 2026-11-02; approved as worded 2026-11-06) Opening the TUI from the tray
       opens it in a terminal - PowerShell by default on Windows, Terminal on macOS, the terminal
       chain on Linux - through its registered descriptor, and several TUI instances run side by side
+- [ ] (discovered, 2026-11-06) The client reaches the service directly even when an HTTP proxy is
+      set in the environment (`HTTP_PROXY`/`ALL_PROXY` without a `NO_PROXY` for the loopback
+      address), so the per-install secret is never sent to a proxy and the service stays reachable
 
 ## Acceptance criteria
 
