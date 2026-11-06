@@ -1,6 +1,6 @@
 # 93 — Current Maven dependencies: the catalog batch and the regenerated deps.json
 
-Status: draft
+Status: spec-approved
 Depends on: [03](../docs/specs/database-schema.md) (done; the migrations), [08](../docs/specs/speaker-embeddings.md) (done; the ONNX Runtime pin and item 30's regression history)
 Blocks: —
 
@@ -37,13 +37,17 @@ behaviour, `backend/deps.json` regenerated, and Kotlin/kotlinx-serialization sti
 - Filed at the user's request from the dependency scan: the catalog batch in one item, because the
   versions pair (Kotlin/serialization) and `deps.json` make piecemeal bumps more expensive than one.
 - The forced pins (ADR 0042) stay forced; their versions move, not the mechanism.
+- **Exempt from ADR 0046's per-feature e2e test** (the user): no app feature changes; the existing
+  journeys and the Integration suites running on the new versions are the proof.
 
 ## Proposal
 
 1. Bump the catalog entries listed above; leave Kotlin, kotlinx-serialization and ktlint where they
    are. Confirm Ktor 3.6.1's expected Kotlin/serialization pair from its POM before starting.
 2. Fix whatever API changes the minors require (Exposed, Flyway, sqlite-jdbc, JNA), keeping the
-   schema, the migrations and the queries as they are.
+   schema, the migrations and the queries as they are. Two checks first, from the release notes:
+   whether Exposed 1.6.0's changes reach the DSL/DAO surface the backend uses, and whether Flyway
+   13.10–13.12 changes `baseline`/`validate` behaviour for existing `stt.db` files.
 3. Re-run `gradle check`, the integration suites and the e2e journeys; re-run the ONNX Runtime
    regression scenarios item 30 records (the crash and the degraded embeddings).
 4. Regenerate `backend/deps.json`, then verify `nix build .` (user-run) and `checkVersions`.
@@ -51,9 +55,8 @@ behaviour, `backend/deps.json` regenerated, and Kotlin/kotlinx-serialization sti
 
 ## Open questions
 
-To settle in this item's consultation: whether Exposed 1.6.0's API changes are limited to the DAO
-surface the backend uses, and whether Flyway 13.12.0 changes migration behaviour for the existing
-`stt.db` files (baseline/validate).
+None. (Settled 2026-11-04: the Exposed and Flyway questions are facts to check first, proposal step
+2.)
 
 ## Test list
 
@@ -73,4 +76,14 @@ surface the backend uses, and whether Flyway 13.12.0 changes migration behaviour
 - [ ] (must not break) `backend/deps.json` is regenerated, and `nix build .` (user-run),
       `checkVersions` and the e2e journeys are green with it.
 
+## e2e stance
+
+Exempt from ADR 0046's per-feature e2e test (decided 2026-11-04): no app feature changes, and the
+existing journeys and Integration suites running on the new versions are its proof.
+
 ## Approval log
+
+- 2026-11-04: filed as a draft by the root agent from the dependency scan (Maven Central, the eight
+  catalog entries behind their latest release).
+- 2026-11-04: consultation with the user: the Exposed/Flyway questions become checks in proposal
+  step 2; exempt from ADR 0046. Test list approved as written; status set to spec-approved.

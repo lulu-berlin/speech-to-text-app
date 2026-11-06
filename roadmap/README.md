@@ -271,8 +271,8 @@ graph TD
 | [86 — Mobile feasibility: can the app run on a phone with transcription and diarization fully on the device?](86-mobile-feasibility.md)                                    | spec-approved | —                           |
 | [87 — Writes wait for the connection, and a control with nothing to do says so](../docs/specs/writes-and-the-connection.md)                                                       | done          | —                           |
 | [88 — Localization: the app's own language, in every language whisper transcription supports](88-localization.md)                                                          | spec-approved | 74                          |
-| [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | draft | 66 |
+| [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | spec-approved | 66 |
 | [90 — A nixpkgs bump, our own whisper.cpp 1.9.5 artifact on every route, and one platform vocabulary](../docs/specs/own-artifacts-and-platform-keys.md) | done | 63, 48, 49, 33 |
-| [91 — MSW 3: the API mocks, the shared handlers and the dev worker](91-msw-3.md) | draft | 13 |
-| [92 — Electron 45: the desktop window on the next major](92-electron-45.md) | draft | 50 |
-| [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | draft | 03, 08 |
+| [91 — MSW 3: the API mocks, the shared handlers and the dev worker](91-msw-3.md) | spec-approved | 13 |
+| [92 — Electron 45: the desktop window on the next major](92-electron-45.md) | spec-approved | 50 |
+| [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |

@@ -1,6 +1,6 @@
 # 92 — Electron 45: the desktop window on the next major
 
-Status: draft
+Status: spec-approved
 Depends on: [50](../docs/specs/electron-desktop-app.md) (done; the app, its packaging and its e2e suites)
 Blocks: —
 
@@ -22,26 +22,41 @@ three packaged installers built by the same electron-builder.
   (`Linux .deb`, `macOS DMG`, `Windows zip/MSI`), which launch the installed app against the real
   backend; a major may change preload/sandbox defaults or remove an API, so the review is driven by
   Electron 45's breaking-changes notes.
+- **What 45 changes for this code** (Electron 45 release notes, 2026-10-21; Chromium 156, Node
+  24.22.0): sandboxed preload scripts lose the `Buffer`/`setImmediate`/`clearImmediate` globals and
+  the `events`/`timers`/`url` shims, and their `require()` loads only Electron's own modules —
+  `desktop/src/preload.cts` uses none of the removed names (to be confirmed by the build);
+  screen-capture requests now reach `setPermissionRequestHandler` as `display-capture` — the app
+  denies every permission (`window-policy.ts:25-26`), so nothing changes; `window.open()` children
+  of unsandboxed windows get their own process — the app denies every `window.open`
+  (`window-policy.ts:37`); descriptors of files inside ASAR archives are only usable through `fs`;
+  synchronous `safeStorage` is deprecated and `crashReporter` gains a Windows helper DLL — the app
+  uses neither. No new security default applies to this app.
 
 ## Decided (consultation, 2026-11-04)
 
 - Filed at the user's request from the dependency scan; a major, so its own item with the packaged
   verification rather than riding another change.
+- **Exact pin** (the repository's convention for `electron`): `electron` is pinned to an exact 45.x
+  version.
+- **No security-default change**: the release notes bring no new default this app would adopt (see
+  Evidence); the item verifies, it does not redesign the window's security.
+- **Exempt from ADR 0046's per-feature e2e test** (the user): no app feature changes; the existing
+  packaged journeys (`.deb`, DMG, Windows zip/MSI) running on 45 are the proof.
 
 ## Proposal
 
 1. Read Electron 45's breaking-changes notes and inventory every `electron` import, the web
    preferences, the session policy and the packaging configuration.
-2. Bump `electron` to `^45.2.2` and change only what the notes require.
+2. Pin `electron` exactly to 45.2.2 (or the then-current 45.x, exactly) and change only what the
+   notes require; confirm the preload uses none of the removed sandbox globals and shims.
 3. Re-run the desktop tests and type checks, then the three packaged targets and their e2e journeys.
 4. Record any behaviour change (security defaults, window flags, menu handling) in this item's spec
    and its log.
 
 ## Open questions
 
-To settle in this item's consultation: whether to adopt any new security default Electron 45 offers
-(e.g. sandbox/preload isolation), and whether the pinned `electron` takes a caret or an exact
-version.
+None. (Settled 2026-11-04, see "Decided (consultation, 2026-11-04)".)
 
 ## Test list
 
@@ -60,4 +75,15 @@ version.
 - [ ] (must not break) `electron-builder` 26.18.0 keeps producing installers with the same unpacked
       layout.
 
+## e2e stance
+
+Exempt from ADR 0046's per-feature e2e test (decided 2026-11-04): no app feature changes, and the
+existing packaged journeys running on Electron 45 are its proof.
+
 ## Approval log
+
+- 2026-11-04: filed as a draft by the root agent from the dependency scan (electron 44.9.1 → 45.2.2).
+- 2026-11-04: consultation with the user: exact pin; Electron 45's release notes checked against the
+  app (no new default applies, the preload uses none of the removed shims, permissions and
+  `window.open` are already denied); exempt from ADR 0046. Test list approved as written; status set
+  to spec-approved.
