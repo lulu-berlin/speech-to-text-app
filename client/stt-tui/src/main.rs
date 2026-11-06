@@ -434,20 +434,13 @@ fn open_history(
     sender: &mpsc::Sender<Message>,
 ) {
     let service = service.clone();
-    let sender = sender.clone();
-    runtime.spawn(async move {
-        match history(&service).await {
-            Ok(tasks) => {
-                let _ = sender.send(Message::History(tasks));
-            }
-            Err(error) => {
-                let _ = sender.send(Message::Notice(text(
-                    "history.failed",
-                    &[("error", &error.to_string())],
-                )));
-            }
-        }
-    });
+    fetch(
+        runtime,
+        sender,
+        "history.failed",
+        async move { history(&service).await },
+        Message::History,
+    );
 }
 
 /// Fetches the settings and shows them.
@@ -457,16 +450,13 @@ fn open_settings(
     sender: &mpsc::Sender<Message>,
 ) {
     let service = service.clone();
-    let sender = sender.clone();
-    runtime.spawn(async move {
-        let message = match stt_client::settings(&service).await {
-            Ok(settings) => Message::Settings(settings),
-            Err(error) => {
-                Message::Notice(text("settings.failed", &[("error", &error.to_string())]))
-            }
-        };
-        let _ = sender.send(message);
-    });
+    fetch(
+        runtime,
+        sender,
+        "settings.failed",
+        async move { stt_client::settings(&service).await },
+        Message::Settings,
+    );
 }
 
 /// Fetches `task`'s turns and shows the transcript.
@@ -478,19 +468,31 @@ fn open_transcript(
 ) {
     let id = task.id;
     let service = service.clone();
+    fetch(
+        runtime,
+        sender,
+        "transcript.failed",
+        async move { turns(&service, id).await },
+        move |turns| Message::Transcript(task, turns),
+    );
+}
+
+/// Runs `request` off the terminal thread and hands its value to `arrived`; a failure is the
+/// notice `failed` names, with the service's message. The terminal keeps drawing meanwhile.
+fn fetch<T: Send + 'static>(
+    runtime: &tokio::runtime::Handle,
+    sender: &mpsc::Sender<Message>,
+    failed: &'static str,
+    request: impl std::future::Future<Output = io::Result<T>> + Send + 'static,
+    arrived: impl FnOnce(T) -> Message + Send + 'static,
+) {
     let sender = sender.clone();
     runtime.spawn(async move {
-        match turns(&service, id).await {
-            Ok(turns) => {
-                let _ = sender.send(Message::Transcript(task, turns));
-            }
-            Err(error) => {
-                let _ = sender.send(Message::Notice(text(
-                    "transcript.failed",
-                    &[("error", &error.to_string())],
-                )));
-            }
-        }
+        let message = match request.await {
+            Ok(value) => arrived(value),
+            Err(error) => Message::Notice(text(failed, &[("error", &error.to_string())])),
+        };
+        let _ = sender.send(message);
     });
 }
 
