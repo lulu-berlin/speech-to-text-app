@@ -7,7 +7,8 @@ A self-hosted web app that transcribes audio files and tells the speakers apart.
 - **Transcription with speaker diarization** — pick the language or let it auto-detect; let the app find the number of speakers, fix it, or switch speakers off.
 - **History** — every finished transcription stays available, also after a restart.
 - **Playback** — listen to the recording with the transcript highlighted as it plays; the view follows along, and clicking a sentence jumps there.
-- **Speakers** — rename a speaker ("Speaker 1" → "Alice") or merge two speakers into one; a merge can be undone.
+- **Speakers** — rename a speaker ("Speaker 1" → "Alice"), merge two speakers into one (a merge can be undone), or move sentences to another speaker.
+- **Corrections** — edit the text of any sentence of a finished transcript, or revert it to what was transcribed; the downloads use the corrected text.
 - **Downloads** — the transcript as plain text (`.txt`) or subtitles (`.srt`, `.vtt`), labelled with the speaker names.
 - **Settings** — choose the compute device (automatic, CPU or a GPU) and the defaults for new uploads.
 
@@ -282,13 +283,14 @@ The backend is configured with environment variables. The Nix package, the devel
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
-| `STT_DATA_DIR` | yes (the Nix package and `./gradlew` have a default) | Where the database and the stored audio live — see [Where your data lives](#where-your-data-lives). |
+| `STT_DATA_DIR` | yes (the Nix package, the desktop app, `./gradlew` and `gradlew.bat`/`stt.cmd` set a per-user default) | Where the database and the stored audio live — see [Where your data lives](#where-your-data-lives). |
 | `STT_WHISPER_MODEL` | yes | The whisper.cpp model file. The pinned default is `large-v3-turbo-q5_0` ([ADR 0008](docs/decisions/0008-default-whisper-model.md)). |
 | `STT_SPEAKER_MODEL` | yes | The CAM++ speaker-embedding model (ONNX) used for diarization ([ADR 0003](docs/decisions/0003-kotlin-diarization-campplus-onnx.md)). |
 | `STT_PORT` | no | The HTTP port, default `8080`. |
 | `STT_STATIC_DIR` | no | A built frontend (`frontend/dist`) to serve. Unset, the backend serves only the API. |
 | `STT_HOST` | no | The interface the backend listens on, default `0.0.0.0` (every interface). The desktop app sets `127.0.0.1`. |
 | `STT_MAX_UPLOAD_BYTES` | no | The largest upload in bytes, default 1 GiB (`1073741824`). An upload over it is refused with `413` `upload-too-large`; the limit bounds the file part's bytes, and a request that declares a larger body is refused outright. |
+| `STT_STOP_ON_STDIN_CLOSE` | no | `1` stops the service when its standard input closes — how the desktop app quits it on Windows, which has no signal to send. Any other value, or none, leaves standard input unread. |
 
 A missing required variable, an invalid port or an invalid upload size stops the app at startup with a message naming it. `whisper-cli` and `ffmpeg` are run from `PATH` ([ADR 0047](docs/decisions/0047-external-tools-resolved-from-path.md)).
 

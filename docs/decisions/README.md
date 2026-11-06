@@ -46,15 +46,10 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0038 | [UI state transitions and form-submission flows are machines; controlled input values may stay `useState`](0038-ui-state-transitions-are-machines.md) | accepted | 2026-10-10 |
 | 0039 | [The processing engine is created when the application starts](0039-engine-created-at-startup.md) | accepted | 2026-10-10 |
 | 0040 | [Stenographer animation timing lives on the elements (JSX `style`)](0040-stenographer-timing-in-jsx.md) | accepted | 2026-10-10 |
-
 | 0041 | [SSE without the Ktor plugin](0041-sse-without-ktor-plugin.md) | accepted, amends 0007 | 2026-10-10 |
-
 | 0042 | [Catalog versions are authoritative via `resolutionStrategy.force`](0042-catalog-versions-authoritative.md) | accepted, amends 0014 | 2026-10-10 |
-
 | 0043 | [ONNX Runtime is pinned like sqlite-jdbc](0043-onnxruntime-pinned-like-sqlite-jdbc.md) | accepted, applies 0042 to onnxruntime | 2026-10-11 |
-
 | 0044 | [SSE heartbeat event and client inactivity watchdog](0044-sse-heartbeat-and-client-watchdog.md) | accepted, extends item 12's event list | 2026-10-11 |
-
 | 0045 | [The joined playback FLAC is re-encoded (losslessly)](0045-joined-playback-flac-reencoded.md) | superseded by [0052](0052-canonical-clip-in-database-chunks-as-windows.md) | 2026-10-11 |
 | 0046 | [Every app feature has an end-to-end test](0046-every-feature-has-an-e2e-test.md) | accepted | 2026-10-11 |
 | 0047 | [External tools are resolved from PATH; no tool-path variables](0047-external-tools-resolved-from-path.md) | accepted, withdraws item 16's `STT_WHISPER_CLI`/`STT_FFMPEG` | 2026-10-11 |

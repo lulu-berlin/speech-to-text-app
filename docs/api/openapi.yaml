@@ -268,6 +268,11 @@ paths:
             Accept-Ranges: {schema: {type: string}}
           content:
             audio/flac: {schema: {type: string, format: binary}}
+        "416":
+          description: The Range is malformed, has several ranges, or lies outside the file; no body
+          headers:
+            Content-Range: {schema: {type: string}, description: "`bytes */<size>`"}
+            Accept-Ranges: {schema: {type: string}}
         "404": {$ref: "#/components/responses/NotFound"}
   /api/tasks/{id}/speakers/{speakerId}:
     parameters:
@@ -391,7 +396,7 @@ paths:
       - {$ref: "#/components/parameters/SegmentId"}
     post:
       tags: [transcript]
-      summary: Put whisper's original text back on one segment (COMPLETED tasks only; ADR 0060)
+      summary: Put whisper's original text back on one segment (COMPLETED tasks only; ADR 0061)
       responses:
         "200":
           description: The task's updated turns
@@ -444,6 +449,51 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Settings"}
+  /api/launch-token:
+    post:
+      tags: [settings]
+      summary: A single-use token for the browser's handshake (app mode only, roadmap item 66)
+      description: |
+        Needs the per-install secret as `Authorization: Bearer …` (a session cookie is not
+        enough). The token is redeemed once by `GET /open?t=<token>`, which answers `303` to `/`
+        with an `HttpOnly`, `SameSite=Strict` session cookie, or `401` for an unknown token.
+      responses:
+        "200":
+          description: The token (`launch-token.json`)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: {type: string}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /api/tray:
+    post:
+      tags: [settings]
+      summary: The tray registers itself (app mode only, ADR 0064)
+      description: The service watches the pid and runs the command again when the tray died.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pid, command]
+              properties:
+                pid: {type: integer, format: int64}
+                command:
+                  type: array
+                  items: {type: string}
+      responses:
+        "202": {description: Registered; no body}
+  /api/quit:
+    post:
+      tags: [settings]
+      summary: Stop the service cleanly (app mode only, roadmap item 66)
+      description: Answered first, then the service stops and removes its runtime file.
+      responses:
+        "202": {description: The service is stopping; no body}
   /api/health:
     get:
       tags: [tasks]
@@ -516,6 +566,11 @@ components:
           schema: {$ref: "#/components/schemas/Error"}
     Conflict:
       description: Illegal transition, not completed, or reorder mismatch
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    Unauthorized:
+      description: Missing or wrong credential (`error.unauthorized.json`)
       content:
         application/json:
           schema: {$ref: "#/components/schemas/Error"}

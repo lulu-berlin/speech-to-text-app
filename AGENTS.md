@@ -24,6 +24,9 @@ A web app that transcribes uploaded audio files with speaker diarization. Backen
 AGENTS.md  devenv.nix  flake.nix  .editorconfig  .prettierrc
 backend/   Gradle (Kotlin DSL) Ktor app; backend/deps.json = Nix lockfile for Gradle deps
 frontend/  Vite + React + TS + styled-components (pnpm)
+client/    Rust workspace: the stt-client crate (library, `stt-app` CLI and tray binaries; roadmap item 66)
+desktop/   Electron desktop app: starts the bundled backend, packaged with electron-builder
+e2e/       Playwright end-to-end suites: the built app against the real backend, and the packaged desktop app
 nix/       shared Nix expressions (models; more in item 16)
 docs/decisions/  docs/specs/  docs/conventions/  docs/api/ (API contract examples, ADR 0029)  docs/known-issues.md (living backlog of open findings; an issue leaves it the moment a roadmap item plans it)
 roadmap/   pending work, one file per item
@@ -106,6 +109,8 @@ Documentation (the `docs/` package — TypeScript run by Node's type stripping, 
 - `node --test docs/check-ci-gating.test.ts` — `.github/decide-code-change.sh` runs everything off a pull request and on the `ci:full` label, `.github/classify-change.sh` calls only `*.md` and `LICENSE` documentation (everything else code), every heavy job in `ci.yml` carries the `changes` gate, and `docs-check` and `CI (all checks)` stay ungated.
 - `node --test docs/check-e2e-durations.test.ts` — the Linux and Windows journeys keep Playwright's console log, write its JSON report (every spec's duration) and upload it from every run as `e2e-durations-linux` / `e2e-durations-windows`.
 - `node --test docs/check-action-versions.test.ts` — every `actions/upload-artifact` and `actions/cache` step under `.github/`, composite actions included, is at least at the major that runs on Node 24 (upload-artifact v7, cache v6), so a run carries no Node 20 deprecation annotation.
+- `node --test docs/check-packaged-steps.test.ts` — every step that runs the packaged desktop specs carries a step timeout, every packaged job's trace upload runs on any outcome, and the MSI install logs to a file an always-on upload keeps.
+- `node --test docs/type-check.test.ts` — a type error planted in a copied check fails the docs package's `tsc` step under its strict settings (needs `docs/node_modules`).
 
 ## Git
 

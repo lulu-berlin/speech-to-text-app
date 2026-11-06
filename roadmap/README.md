@@ -111,6 +111,9 @@ graph TD
   11 --> 46[46 contextual logging ✓]:::done
   47 --> 55[55 atomic-transitions lock probe ✓]:::done
   55 --> 94[94 atomic-transitions probe clock]
+  47 --> 94
+  58 --> 94
+  11 --> 94
   50 --> 56[56 prebuilt Linux x86_64 bundle Mesa ✓]:::done
   57[57 desktop-nix-e2e container failure ✓]:::done --> 50
   58[58 atomic-transitions completion waits ✓]:::done
@@ -121,21 +124,36 @@ graph TD
   63[63 whisper-cpp build time ✓]:::done --> 90[90 own artifacts, versioned tags, platform keys ✓]:::done
   33 --> 90
   49 --> 90
+  48 --> 90
   13 --> 91[91 msw 3 ✓]:::done
   50 --> 92[92 Electron 45]
   03 --> 93[93 Maven catalog batch]
   08 --> 93
+  11 --> 95[95 audit failure paths]
+  42 --> 95
+  12 --> 95
+  41 --> 95
+  32 --> 95
+  66 --> 95
+  73 --> 95
+  87 --> 95
+  95 --> 96[96 audit cleanup]
+  94 --> 96
+  67 --> 96
+  85 --> 97[97 audit CI and pins]
   50 --> 64[64 evaluate Tauri ✓]:::done
   65[65 fix the row-color phase observation ✓]:::done
   64 --> 66[66 local service and frontend flavors ✓]:::done
   48 --> 66
   49 --> 66
   66 --> 67[67 TUI frontend]
+  12 --> 67
   66 --> 70[70 Rust GUI window]
   66 --> 89[89 service package]
   67 --> 70
   49 --> 70
   70 --> 76
+  74 --> 76
   62 --> 68[68 Windows audio-only ffmpeg ✓]:::done
   49 --> 68
   62 --> 69[69 macOS audio-only ffmpeg ✓]:::done
@@ -154,6 +172,7 @@ graph TD
   86[86 mobile feasibility]
   87[87 writes wait for the connection ✓]:::done
   88[88 localization]
+  74 --> 88
   73 --> 83
   81[81 dropped row command ✓]:::done
   78[78 stable release]
@@ -172,6 +191,7 @@ graph TD
   51 --> 79
   79 --> 78
   84 --> 78
+  87 --> 78
   84 --> 85
   80[80 docs-only CI ✓]:::done
   49 --> 80
@@ -250,7 +270,7 @@ graph TD
 | [64 — Evaluate Tauri as the desktop shell](../docs/specs/tauri-evaluation.md) | done | 50 |
 | [65 — `59-row-color`'s chunking-phase observation is flaky](../docs/specs/row-color-phase-observation.md)                                                                    | done          | —                           |
 | [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](../docs/specs/local-service-and-frontends.md)                                   | done          | 48, 49, 64                  |
-| [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66                          |
+| [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66, 12                      |
 | [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
 | [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
@@ -259,9 +279,9 @@ graph TD
 | [73 — Reassign speakers: move selected segments to an existing or a new speaker](../docs/specs/speaker-reassignment.md)                                            | done          | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](../docs/specs/desktop-presentation.md)                                      | done          | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](../docs/specs/oracle-retirement.md)                                                               | done          | —                           |
-| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70                           |
+| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70, 74                       |
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
-| [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79 |
+| [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79, 84, 87 |
 | [79 — The full e2e journey on Windows](../docs/specs/windows-e2e-journey.md)                                                                                 | done          | 21, 49, 51                  |
 | [80 — Documentation-only pull requests skip the heavy CI jobs](../docs/specs/docs-only-ci.md)                                                                                | done          | 49, 51                      |
 | [82 — A red CI job is diagnosable from CI alone, and a check job does not fail for the network](../docs/specs/ci-diagnosability.md)                                | done          | —                           |
@@ -278,3 +298,6 @@ graph TD
 | [92 — Electron 45: the desktop window on the next major](92-electron-45.md) | spec-approved | 50 |
 | [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |
 | [94 — The atomic-transitions lock probe must not expire on a starved runner](94-atomic-transitions-probe-clock.md) | spec-approved | 55, 47, 58, 11 |
+| [95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests](95-audit-failure-paths.md) | draft | 11, 42, 12, 41, 32, 66, 73, 87 |
+| [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | draft | 95, 94, 67 |
+| [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](97-audit-ci-and-pins.md) | draft | 85 |

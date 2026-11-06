@@ -7,7 +7,7 @@
 -- Opening an existing database file (the Kotlin app's `stt.db`):
 --   * open it unchanged, never create or alter tables;
 --   * validate before writing: `flyway_schema_history` exists and its highest installed
---     version is 12, and every table/column below exists with these names;
+--     version is 17, and every table/column below exists with these names;
 --   * refuse to start (naming the file) when the validation fails.
 -- If the Kotlin app must later reopen a Rust-created database, either populate
 -- `flyway_schema_history` with a proper baseline row for the real migrations, or (the safe
@@ -115,6 +115,9 @@ CREATE TABLE segments (
     end_ms     INTEGER NOT NULL CHECK (end_ms >= 0),
     text       TEXT    NOT NULL,
     speaker_id INTEGER,
+    -- V13 (item 52, ADR 0061): whisper's text as first stored, so Revert can restore an edited
+    -- `text`; rows that predate the column were backfilled with their text then.
+    original_text TEXT,
     UNIQUE (task_id, chunk_idx, seq),
     FOREIGN KEY (task_id, speaker_id) REFERENCES speakers (task_id, speaker_id)
 );
@@ -144,6 +147,10 @@ CREATE TABLE settings (
     speakers_count   INTEGER,
     max_speakers     INTEGER NOT NULL,
     device_fallback  TEXT,
+    -- V16 (item 66): the default frontend's registry id; null until one is chosen.
+    default_frontend TEXT,
+    -- V17 (item 66): the terminal command line the TUI opens in; null uses the OS launcher.
+    terminal_command TEXT,
     PRIMARY KEY (id),
     CHECK (id = 1),
     CHECK (device IN ('auto', 'cpu') OR device LIKE 'gpu:%'),

@@ -56,8 +56,8 @@ One JVM process owns everything:
 The data directory holds only the database (plus SQLite's WAL/SHM files). Transient files live
 under a scratch directory in the OS temp dir, one per data directory, emptied at every start.
 
-The current backend targets Linux x86_64 (the packaged app, CI and the tool pins are Linux); this
-spec describes that behavior. macOS support exists only as a separate, unmerged effort.
+The current backend runs on Linux x86_64, macOS arm64 and Windows x64 (packaged as a `.deb`, a DMG
+and a zip, each checked by its own CI leg); section 17 lists what differs per platform.
 
 ## 2. Configuration (environment)
 
@@ -73,6 +73,7 @@ variable. There is no config file.
 | `STT_HOST` | no | `0.0.0.0` | Bind address. The desktop app sets `127.0.0.1`. |
 | `STT_STATIC_DIR` | no | — | Built frontend directory; unset disables static serving (and logs a warning). |
 | `STT_MAX_UPLOAD_BYTES` | no | 1 GiB (1073741824) | Positive integer; zero/negative/non-numeric fails naming the variable. |
+| `STT_STOP_ON_STDIN_CLOSE` | no | — | `1` stops the service once its stdin closes (the desktop app's quit on Windows); any other value leaves stdin unread. |
 
 The compute device and thread count are **not** environment configuration; they are stored
 settings (section 11). `STT_DEVICE` and `STT_THREADS` are not read.
@@ -130,9 +131,11 @@ the encoded FLAC file byte for byte.
 Chunks are windows into the canonical clip; no per-chunk audio exists.
 
 `segments`: `id PK`, `task_id FK`, `chunk_idx`, `seq`, `start_ms`, `end_ms`, `text`, `speaker_id
-NULL`, UNIQUE `(task_id, chunk_idx, seq)`, FK `(task_id, speaker_id) → speakers(task_id,
-speaker_id)`. `speaker_id` is 0-based; null until diarization and with speakers off. Text is stored
-exactly as whisper-cli wrote it (leading space included); trimming happens on the way out.
+NULL`, `original_text NULL`, UNIQUE `(task_id, chunk_idx, seq)`, FK `(task_id, speaker_id) →
+speakers(task_id, speaker_id)`. `speaker_id` is 0-based; null until diarization and with speakers
+off. Text is stored exactly as whisper-cli wrote it (leading space included); trimming happens on
+the way out. `original_text` keeps whisper's text so a revert can restore an edited `text` (V13,
+ADR 0061).
 
 `speakers`: `task_id FK`, `speaker_id >= 0`, `speaker TEXT NOT NULL`, PK `(task_id, speaker_id)` —
 written by the app as `Speaker N`, N = speaker_id + 1.
@@ -143,7 +146,8 @@ flat: an `into_id` is never itself a `merged_id` of the same task.
 
 `queue_state`: single row (`id = 1`), `paused 0|1`.
 `settings`: single row (`id = 1`), `device`, `threads NULL`, `default_language`, `speakers_mode`,
-`speakers_count NULL`, `max_speakers`, `device_fallback NULL`; see section 11.
+`speakers_count NULL`, `max_speakers`, `device_fallback NULL`, `default_frontend NULL`,
+`terminal_command NULL`; see section 11.
 
 Deleting a task cascades to its audio, original, clip, chunks, segments, speakers and merges,
 freeing its `sha256` for re-upload.
@@ -151,7 +155,7 @@ freeing its `sha256` for re-upload.
 **Fresh database vs an existing file.** `docs/backend-schema.sql` is the consolidated current
 DDL; use it only to create a fresh Rust-owned database. An existing Kotlin/Flyway database is
 opened **unchanged** — never create or alter tables and never use `CREATE TABLE IF NOT EXISTS`
-against it — after validating that `flyway_schema_history` exists with version 12 as the highest
+against it — after validating that `flyway_schema_history` exists with version 17 as the highest
 installed version and that every table and column above exists with these names; otherwise refuse
 to start naming the file. If the Kotlin app must later reopen a Rust-created database, run the real
 Flyway migrations (with a proper baseline row); there is no migration-free shortcut.
@@ -188,10 +192,16 @@ must match it (keys, types, nullability).
 | `POST /api/tasks/{id}/speakers/merge` | `{group:[ids], into:id}` | `200` Speakers | Folds members into `into`; mapping only. |
 | `DELETE /api/tasks/{id}/speakers/merges` | — | `200` Speakers | Reset all merges. |
 | `POST /api/tasks/{id}/speakers/reassign` | `{segmentIds:[ids], speakerId:id|null}` | `200` Speakers | Moves those segments to `speakerId`, or to a new speaker when null; rewrites `speaker_id`. |
+| `PUT /api/tasks/{id}/segments/{segmentId}` | `{text}` | `200` Turns | Stores the text on that segment. COMPLETED only (`409 not-completed`); empty, whitespace-only or control characters → `400 invalid-segment-text`; unknown task or a segment not the task's → `404 not-found`. |
+| `POST /api/tasks/{id}/segments/{segmentId}/revert` | — | `200` Turns | Puts `original_text` back on that segment (ADR 0061); `409`/`404` as for the edit. |
 | `GET /api/settings` | — | `200` Settings | Includes `availableDevices`, `gpuNames` and `deviceProbeError` (null unless the startup probe failed). |
 | `PUT /api/settings` | the settings without `availableDevices`/`gpuNames` | `200` Settings | Validates in order; emits `settings-updated`. |
 | `DELETE /api/settings` | — | `200` Settings | Restores the defaults in one write (`auto`, `null`, `auto`, `auto`, `null`, `8`), clears the notice and emits `settings-updated`; idempotent. |
 | `DELETE /api/settings/device-fallback` | — | `200` Settings | Clears the notice (also when none); emits `settings-updated`. |
+| `GET /api/frontends` | — | `200` `{frontends:[{id,name,kind}]}` | The per-user frontend registry's descriptors in file-name order, `kind` one of `browser`, `gui`, `terminal`; empty when the service has no registry (dev/server mode). |
+| `POST /api/launch-token` | `Authorization: Bearer <credential>` | `200` `{token}` | App mode only. A single-use token for `GET /open?t=<token>`, which answers `303` to `/` with the session cookie; a missing or wrong credential → `401 unauthorized`. |
+| `POST /api/tray` | `{pid, command:[...]}` | `202` | App mode only: the tray registers itself; the service restarts `command` when that pid dies. |
+| `POST /api/quit` | — | `202` | App mode only: answers, then stops the service cleanly. |
 | `GET /api/health` | — | `200` `{status:"ok"}` | — |
 | `GET /api/events` | — | `text/event-stream` | Snapshot first, then events; heartbeat every 5 s of silence. |
 
@@ -523,13 +533,13 @@ the GPU, and `settings-updated` is emitted; the notice persists until dismissed,
 
 ## 12. Process control
 
-- Each command is spawned as `setsid <cmd…>` (own process group; the direct child's pid is the
-group id). Signals target the child pid first (while alive), then the group. The current backend
-targets Linux x86_64; another OS needs its own signal numbers and process-group mechanism.
+- Each command is spawned as `setsid <cmd…>` on Linux (own process group; the direct child's pid
+is the group id). Signals target the child pid first (while alive), then the group. macOS has no
+`setsid` and Windows no signals: there the run is the direct child (section 17).
 - stdout/stderr drained concurrently line by line on the IO dispatcher; callbacks see lines as
 written; the result carries the exit code and both streams; a final line without `\n` is
 delivered; a line longer than the read chunk survives; stdin is `/dev/null`.
-- `pause` = SIGSTOP (19), `resume` = SIGCONT (18) on the current Linux target; no-ops on an exited process;
+- `pause` = SIGSTOP (19), `resume` = SIGCONT (18) on Linux (17/19 on macOS, no-ops on Windows); no-ops on an exited process;
 a pending pause applies right after spawn; a leftover pause never freezes the next run.
 - Cancellation: SIGCONT, SIGTERM, wait grace period (2 s default), SIGKILL; return only once the
 tree is dead (or the grace expires with a warning naming the group); rethrow the cancellation.
@@ -745,29 +755,28 @@ the runtime dependencies above (the shell also exports the `TEST_*` fixture path
 
 ## 17. Platform particularities
 
-The current backend supports **Linux x86_64 only** (packaging, CI and the artifacts above).
-macOS and Windows are separate, unmerged efforts; the notes below are what a cross-platform
-rewrite must handle.
+The current backend runs on Linux x86_64, macOS arm64 and Windows x64 (packaging, CI and the
+artifacts above); the notes below are what a rewrite must handle on each.
 
-**Linux (current target).** `setsid`/util-linux for one process group per run; POSIX signals
+**Linux.** `setsid`/util-linux for one process group per run; POSIX signals
 SIGSTOP 19, SIGCONT 18, SIGTERM 15, SIGKILL 9; group signaling by negated pid; stdin
 `/dev/null`; `PATH` executable resolution; XDG data directory; the Vulkan loader for whisper-cpp
 and the static musl ffmpeg; SQLite WAL on a local filesystem. The backend itself never reads
 `/proc` (only the e2e harness does).
 
-**macOS (not in current main).** No `setsid`: a run is the direct child, so pause/resume/kill
-target one pid and a forked descendant can escape (documented orphan risk). SIGSTOP is 17 and
-SIGCONT 19. The pinned upstream whisper-cli prebuilds are CoreML (arm64) or have no GPU backend
-(x64); a Nix-built whisper-cpp with Metal is the GPU path. ffmpeg comes from Nix/Homebrew (the
-Linux audio-only artifact is Linux-shaped). Per-user paths are `~/Library/Application
-Support/stt-app` (data) and `~/Library/Caches/stt-app/models`; there is no `/proc` (use `ps`);
-GUI-launched processes get a minimal `PATH`; x86_64-darwin is unsupported by the pinned nixpkgs.
+**macOS (arm64).** No `setsid`: a run is the direct child, so pause/resume/kill target one pid
+and a forked descendant can escape (documented orphan risk). SIGSTOP is 17 and SIGCONT 19.
+whisper-cli is the static Metal/BLAS 1.9.5 asset and ffmpeg our audio-only 8.1.3 asset
+(`nix/desktop-artifacts.nix` `aarch64-darwin`). Per-user data is `~/Library/Application
+Support/stt-app`; there is no `/proc` (use `ps`); GUI-launched processes get a minimal `PATH`;
+x86_64-darwin is unsupported by the pinned nixpkgs.
 
-**Windows (not in current main).** No POSIX signals and no `setsid`: pausing a whisper-cli run
-needs thread suspension (`NtSuspendProcess`) or a cooperative pause gate; killing a tree needs
-Job Objects; executable resolution appends `.exe`; stdin is `NUL`; child output has CRLF (strip
-`\r` before parsing); per-user paths are `%APPDATA%`/`%LOCALAPPDATA%`; SQLite locking differs;
-Windows builds of whisper-cli and ffmpeg are required; `/proc` is absent.
+**Windows (x64).** No POSIX signals and no `setsid`: a run is the direct child, killed with
+`Process.destroyForcibly`; pause and resume do not reach it, so a pause takes effect at the
+engine's gate before the next chunk. Executable resolution appends `.exe`; stdin is `NUL`; the
+data directory is `%APPDATA%\stt-app`; the desktop app stops the service by closing its stdin
+(`STT_STOP_ON_STDIN_CLOSE=1`); Windows builds of whisper-cli and ffmpeg are required; `/proc` is
+absent.
 
 **Cross-cutting.** Timestamps are epoch milliseconds UTC; formatting is locale-independent
 (`Locale.ROOT`); the extension check is case-insensitive; filenames are arbitrary Unicode; the
