@@ -6,7 +6,7 @@ import { App } from './app/App';
 import { worker } from './mocks/browser';
 
 async function main() {
-  await worker.start({ onUnhandledRequest: 'error' });
+  await worker.start({ onUnhandledFrame: 'error' });
 
   const root = document.getElementById('root');
   if (root === null) {

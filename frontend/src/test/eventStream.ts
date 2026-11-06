@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { snapshot as snapshotFixture } from '../shared/api/fixtures';
 import { server } from './server';
 

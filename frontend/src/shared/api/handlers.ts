@@ -3,7 +3,7 @@
 // handler changes an example; each such change is marked "Mock addition" and listed in
 // roadmap item 13, "Mock additions to settle with item 12".
 
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import {
   heartbeat as heartbeatFixture,
   snapshot as snapshotFixture,

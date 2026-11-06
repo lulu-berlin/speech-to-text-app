@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { createActor, fromCallback, waitFor } from 'xstate';
 import { describe, expect, it, vi } from 'vitest';
 import { controllableEventStream } from '../../test/eventStream';
