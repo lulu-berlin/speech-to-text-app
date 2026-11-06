@@ -127,10 +127,11 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       shows the live queue (statuses, progress) — `stt-tui/tests/attach.rs`, `62fe8f25`
 - [x] (edge) With no service running, it exits with a message naming `stt-app open` and starts no
       second backend — `stt-tui/tests/no_service.rs`, `ddbf00ef`
-- [ ] (basic) Upload by path queues a file and it reaches COMPLETED; an invalid path or unsupported
-      extension reports an error and the UI stays usable
-- [ ] (basic) Pause/resume/cancel/retry and reorder work, and the browser sees the same state from
-      the shared backend
+- [x] (basic) Upload by path queues a file and it reaches COMPLETED; an invalid path or unsupported
+      extension reports an error and the UI stays usable — `stt-tui/tests/upload.rs`, `75c3aca1`
+      (the run commit; rebased as `98fb54ed`, only main's `roadmap/README.md` differs)
+- [x] (basic) Pause/resume/cancel/retry and reorder work, and the browser sees the same state from
+      the shared backend — `stt-tui/tests/commands.rs`, `79856e65`
 - [ ] (basic) History lists completed tasks; opening one shows the transcript with speaker turns;
       the download command writes the chosen format to the given path, and a bad path reports an
       error
@@ -246,3 +247,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   `98fb54ed`, the refactors `857c9a5a`, `4309dc1c`, `9d30a65e`, and the tick/log commits `96bd3364`,
   `3c297351`, `9fc48707`, `ec0a87b1`, `f4733bcc`. Discovered and appended: Escape cancels the upload
   prompt; a refused upload shows the service's message.
+- 2026-11-06 (workspace, cycle 6): "pause/resume/cancel/retry and reorder". Red ran on `8bb43d04`
+  with the cycle's uncommitted pty test: `no command arrived within 20s`
+  (`terminal/mod.rs:238`). Green on the same tree plus `stt-client`'s task and queue commands
+  (the contract's transition table mirrored, so a disallowed command sends nothing) and the TUI's
+  selection, command keys and retryable rows, committed as `79856e65` (53 tests; fmt and clippy
+  green; the pty suite green in 3 repeats). No refactoring at this checkpoint.
