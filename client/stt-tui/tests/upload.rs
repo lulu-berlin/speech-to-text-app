@@ -210,3 +210,68 @@ fn escape_cancels_the_upload_prompt_without_quitting() {
         "`q` at the queue still quits"
     );
 }
+
+#[test]
+fn a_refused_upload_shows_the_service_message_and_leaves_the_ui_usable() {
+    let service = EventService::start();
+    let state = tempfile::tempdir().unwrap();
+    support::write_bootstrap(state.path(), service.port);
+    let files = tempfile::tempdir().unwrap();
+    fs::write(files.path().join("podcast.mp3"), b"RIFF-FAKE-WAVE").unwrap();
+    fs::write(files.path().join("big.mp3"), b"RIFF-FAKE-WAVE").unwrap();
+    let mut tui = Tui::start(
+        env!("CARGO_BIN_EXE_stt-tui").as_ref(),
+        state.path(),
+        120,
+        24,
+    );
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    let queue = tui.wait_for(WAIT, |text| text.contains("memo.wav"));
+    let rows = |text: &str| text.lines().filter(|line| line.contains('%')).count();
+
+    // A duplicate of an existing task: the service's message, no new row, the queue as it was.
+    tui.press(b"u");
+    tui.wait_for(WAIT, |text| text.contains("Upload:"));
+    let path = files.path().join("podcast.mp3");
+    tui.press(path.to_str().unwrap().as_bytes());
+    tui.press(b"\r");
+    service.next_upload(WAIT).answer(
+        "409 Conflict",
+        include_str!("../../../docs/api/error.duplicate-audio.json"),
+    );
+    let screen = tui.wait_for(WAIT, |text| {
+        text.contains("This file was already uploaded as task 3")
+    });
+    assert_eq!(
+        rows(&queue),
+        rows(&screen),
+        "no task row is added:\n{screen}"
+    );
+
+    // An oversized file: the service's message too, and the prompt still works.
+    tui.press(b"u");
+    tui.wait_for(WAIT, |text| text.contains("Upload:"));
+    let path = files.path().join("big.mp3");
+    tui.press(path.to_str().unwrap().as_bytes());
+    tui.press(b"\r");
+    service.next_upload(WAIT).answer(
+        "413 Content Too Large",
+        include_str!("../../../docs/api/error.upload-too-large.json"),
+    );
+    let screen = tui.wait_for(WAIT, |text| {
+        text.contains("The upload exceeds the maximum size of 1 GiB")
+    });
+    assert_eq!(
+        rows(&queue),
+        rows(&screen),
+        "no task row is added:\n{screen}"
+    );
+    tui.press(b"\x1b");
+    tui.wait_for(WAIT, |text| !text.contains("Upload:"));
+    tui.press(b"q");
+    assert!(
+        tui.exit_within(WAIT).is_some(),
+        "the TUI still quits normally:\n{screen}"
+    );
+}
