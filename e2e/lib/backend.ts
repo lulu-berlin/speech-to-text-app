@@ -21,7 +21,7 @@ import {
 import { get } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { delimiter, dirname, join, posix, win32 } from 'node:path';
+import { dirname, join, posix, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ancestors, findProcess, processes } from './processes.ts';
 import type { ProcessRow } from './processes.ts';

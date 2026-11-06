@@ -9,10 +9,10 @@ import java.nio.file.Path
 class AudioDecoder(
     private val runner: ProcessRunner,
 ) : PcmDecoder {
-    /** Decodes [source] into the PCM file [pcm] and returns the decoded duration in milliseconds (sample count / 16). */
+    /** Decodes [source] into the PCM file [target] and returns the decoded duration in milliseconds (sample count / 16). */
     override suspend fun decode(
         source: Path,
-        pcm: Path,
+        target: Path,
     ): Long {
         val result =
             runner.run(
@@ -30,11 +30,11 @@ class AudioDecoder(
                         "1",
                         "-ar",
                         SAMPLE_RATE.toString(),
-                        pcm.toString(),
+                        target.toString(),
                     ),
             )
         result.expectSuccess("decode $source")
-        val sampleCount = withContext(Dispatchers.IO) { Files.size(pcm) } / BYTES_PER_SAMPLE
+        val sampleCount = withContext(Dispatchers.IO) { Files.size(target) } / BYTES_PER_SAMPLE
         if (sampleCount == 0L) throw AudioDecodeException("no audio decoded from $source")
         return sampleCount / SAMPLES_PER_MS
     }

@@ -52,18 +52,18 @@ internal class FakeChunker : Chunker {
 
     override suspend fun chunk(
         source: Path,
-        workDir: Path,
+        scratchDir: Path,
     ): ChunkedAudio =
         probe.around {
-            val task = taskIdOf(workDir)
-            workDirs.add(workDir)
+            val task = taskIdOf(scratchDir)
+            workDirs.add(scratchDir)
             val planned =
                 (0 until chunkCount).map { idx ->
                     PlannedChunk(startMs = idx * 1_000L, endMs = (idx + 1) * 1_000L)
                 }
             // The real chunker's canonical encode lands in its scratch directory first.
-            Files.writeString(workDir.resolve("canonical.flac"), "fake canonical encode")
-            entered.send(workDir)
+            Files.writeString(scratchDir.resolve("canonical.flac"), "fake canonical encode")
+            entered.send(scratchDir)
             if (workDirs.size >= holdFrom) hold?.await()
             if (task == decodeFailsFor) throw AudioDecodeException("fake decode failure of task $task")
             val clip = if (task == unwritablePlanFor) canonical.copy(rows = canonical.rows + canonical.rows.first()) else canonical

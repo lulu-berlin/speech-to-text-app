@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlin.time.Duration.Companion.hours

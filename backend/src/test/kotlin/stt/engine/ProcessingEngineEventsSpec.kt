@@ -1,8 +1,11 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package stt.engine
 
 import io.kotest.core.spec.style.BehaviorSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import stt.db.DiarizationStage
 import stt.db.SpeakersMode

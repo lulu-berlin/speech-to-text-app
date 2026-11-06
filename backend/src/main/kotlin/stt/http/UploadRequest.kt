@@ -81,7 +81,7 @@ internal class UploadRequest(
 
         return Either.Valid(
             Task(
-                originalFilename = filename ?: "upload",
+                originalFilename = filename,
                 contentType = contentType ?: "application/octet-stream",
                 durationMs = null,
                 status = TaskStatus.QUEUED,
@@ -159,6 +159,7 @@ internal val LANGUAGES: Set<String> =
 
 /** The model name stored on the task (item 12): the whisper model file's stem without a `ggml-` prefix. */
 private fun modelName(whisperModel: Path): String =
-    whisperModel.fileName.toString().let { file ->
-        file.removePrefix("ggml-").substringBeforeLast('.')
-    }
+    whisperModel.fileName
+        .toString()
+        .removePrefix("ggml-")
+        .substringBeforeLast('.')

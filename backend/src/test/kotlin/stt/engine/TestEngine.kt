@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package stt.engine
 
 import io.kotest.matchers.booleans.shouldBeTrue
@@ -8,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -143,9 +146,7 @@ internal fun TestScope.engineUnderTest(
                     progress.send(event)
                 }
 
-                else -> {
-                    Unit
-                }
+                else -> {}
             }
         }
     }
