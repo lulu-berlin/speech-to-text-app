@@ -295,5 +295,6 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   appeared (`terminal/mod.rs:79`). Green on the same tree plus the download dialog (path focused,
   format chosen from the path's extension or cycled with Tab/Left-Right),
   `GET /api/tasks/{id}/transcript?format=…` written to the path after opening it (so a bad path
-  sends no request), committed as `f73e45b0` (56 tests; fmt and clippy green). No refactoring at
-  this checkpoint.
+  sends no request), committed as `f73e45b0` (56 tests; fmt and clippy green). Refactor approved
+  and done: the download dialog's state, keys and save moved to `download.rs` (`121869cc`, 56
+  tests green).
