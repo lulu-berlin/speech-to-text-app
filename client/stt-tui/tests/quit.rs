@@ -8,17 +8,19 @@ mod terminal;
 
 use std::time::Duration;
 
-use terminal::{Tui, service_with_events};
+use terminal::{EventService, Tui};
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
 
 #[test]
 fn q_escape_and_ctrl_c_each_quit_the_tui_and_give_the_terminal_back() {
     for (key, bytes) in [("q", &b"q"[..]), ("Escape", b"\x1b"), ("Ctrl-C", b"\x03")] {
-        let (port, _) = service_with_events(("snapshot", SNAPSHOT));
+        let service = EventService::start();
         let dir = tempfile::tempdir().unwrap();
-        support::write_bootstrap(dir.path(), port);
+        support::write_bootstrap(dir.path(), service.port);
         let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 100, 24);
+        let mut stream = service.next_stream(Duration::from_secs(20));
+        stream.send("snapshot", SNAPSHOT);
         tui.wait_for(Duration::from_secs(20), |text| text.contains("lecture.m4a"));
         tui.wait_for_screen(Duration::from_secs(5), vt100::Screen::alternate_screen);
         #[cfg(unix)]

@@ -126,44 +126,6 @@ impl Drop for Tui {
     }
 }
 
-/// A stand-in service on a fresh port: it answers the health check, and `GET /api/events` with
-/// `first` as the stream's first event (`name`, pretty-printed JSON allowed: it goes out as one
-/// `data:` line per line, which SSE joins back) on a stream it then keeps open, as the service
-/// does. Returns the port and the `Authorization` header the event stream was asked for with.
-pub fn service_with_events(
-    first: (&'static str, &'static str),
-) -> (u16, Arc<Mutex<Option<String>>>) {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
-    let authorization = Arc::new(Mutex::new(None));
-    let seen = Arc::clone(&authorization);
-    thread::spawn(move || {
-        for stream in listener.incoming() {
-            let mut stream = stream.unwrap();
-            let request = crate::support::read(&mut stream);
-            if request.line.starts_with("GET /api/events ") {
-                *seen.lock().unwrap() = request.header("Authorization").map(str::to_owned);
-                let (name, json) = first;
-                let data: String = json.lines().map(|line| format!("data: {line}\n")).collect();
-                write!(
-                    stream,
-                    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n\r\nevent: {name}\n{data}\n"
-                )
-                .unwrap();
-                stream.flush().unwrap();
-                thread::spawn(move || {
-                    let _open = stream;
-                    thread::park();
-                });
-            } else {
-                let (status, body) = crate::support::healthy();
-                crate::support::respond(&mut stream, status, &body);
-            }
-        }
-    });
-    (port, authorization)
-}
-
 /// A stand-in service whose event streams the test writes itself: it answers the health check, and
 /// hands every `GET /api/events` connection, its response head already sent, to the test.
 pub struct EventService {

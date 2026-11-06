@@ -8,7 +8,7 @@ mod terminal;
 
 use std::time::Duration;
 
-use terminal::{Tui, service_with_events};
+use terminal::{EventService, Tui};
 
 /// The contract's own `snapshot` event (ADR 0029): tasks 5 (`lecture.m4a`, RUNNING at 0.42) and 7
 /// (`memo.wav`, QUEUED at 0.0) are the queue, in that order.
@@ -16,11 +16,13 @@ const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
 
 #[test]
 fn with_the_service_running_the_tui_attaches_with_the_secret_and_shows_the_live_queue() {
-    let (port, events_authorization) = service_with_events(("snapshot", SNAPSHOT));
+    let service = EventService::start();
     let dir = tempfile::tempdir().unwrap();
-    support::write_bootstrap(dir.path(), port);
+    support::write_bootstrap(dir.path(), service.port);
 
     let tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 100, 24);
+    let mut stream = service.next_stream(Duration::from_secs(20));
+    stream.send("snapshot", SNAPSHOT);
     let screen = tui.wait_for(Duration::from_secs(20), |text| {
         text.contains("lecture.m4a") && text.contains("memo.wav")
     });
@@ -39,7 +41,7 @@ fn with_the_service_running_the_tui_attaches_with_the_secret_and_shows_the_live_
     assert!(lines[memo].contains("QUEUED"), "{screen}");
     assert!(lines[memo].contains("0%"), "{screen}");
     assert_eq!(
-        events_authorization.lock().unwrap().as_deref(),
+        stream.authorization.as_deref(),
         Some("Bearer the-install-secret"),
         "the event stream is asked for with the secret from config.json"
     );
