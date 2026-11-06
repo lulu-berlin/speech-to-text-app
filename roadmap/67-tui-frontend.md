@@ -31,8 +31,10 @@ playback stays with the browser and window frontends (a terminal cannot play it)
   descriptor, reads the durable credential and the running endpoint, and is opened by the tray in
   the OS terminal (Windows PowerShell, macOS Terminal, the Linux `$TERMINAL`/`xdg-terminal-exec`
   chain).
-- `docs/api` is Markdown examples of the contract (ADR 0029); there is no machine-readable schema,
-  so Rust types are mirrored by hand and the e2e journey is the contract proof.
+- `docs/api` is Markdown and JSON examples of the contract (ADR 0029), and the authoritative wire
+  shapes; `docs/api/openapi.yaml` (OpenAPI 3.0.3) is a machine-readable companion for Swagger UI and
+  client generation (`docs/backend-reimplementation.md:161-163`). Rust types are mirrored by hand
+  from the examples, and the e2e journey is the contract proof.
 - The frontend's SSE handling is `new EventSource('/api/events')` with a visible reconnect state;
   the browser sends the credential as a cookie, the TUI must send it as a header (`EventSource`
   cannot, an HTTP client can).
@@ -85,6 +87,19 @@ playback stays with the browser and window frontends (a terminal cannot play it)
   existing browser e2e are the contract checks.
 - **Test list** approved as worded below (13 items, the two parity items included).
 
+## Decided (workspace, 2026-11-06)
+
+- **The 2026-10-22 client architecture stands, and item 66's client moves onto it** (the user):
+  item 66 built one crate, `client/stt-client`, with the library and the `stt-app` and `stt-tray`
+  binaries on `ureq` 3 (blocking, no TLS). The user chose reqwest + tokio and separate crates over
+  amending this item to the as-built client, so this item migrates it first, as two approved
+  refactors before cycle 1: **R1** splits the workspace into `stt-client` (library only),
+  `stt-tray` (the tray binary, its `tray-menu` feature and menu) and `stt-app` (the CLI, its own
+  crate — the user), moving each binary's tests with it; **R2** replaces `ureq` with async
+  `reqwest` (`default-features = false`, plain HTTP on loopback) on tokio, with item 66's tests
+  unchanged in what they assert. `stt-tui` is the fourth member and arrives with the first cycle.
+  The longer cold build (tokio, hyper, reqwest) is answered by the CI cargo cache (the user).
+
 ## Proposal
 
 1. The `stt-client` crate: discovery from `config.json`/`runtime.json`, authenticated requests
@@ -134,10 +149,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       check is green
 - [ ] (must not break) Browser, window, API contract and the existing e2e suites stay green; the tray
       still lists and opens the TUI
+- [ ] (moved from item 66, 2026-11-02; approved as worded 2026-11-06) Opening the TUI from the tray
+      opens it in a terminal - PowerShell by default on Windows, Terminal on macOS, the terminal
+      chain on Linux - through its registered descriptor, and several TUI instances run side by side
 
-- [ ] (moved from item 66, 2026-11-02; pending approval) Opening the TUI from the tray opens it in a
-      terminal - PowerShell by default on Windows, Terminal on macOS, the terminal chain on Linux -
-      through its registered descriptor, and several TUI instances run side by side
 ## Acceptance criteria
 
 - A TUI client of the service exists on Linux, macOS and Windows, launched as a registered
@@ -165,3 +180,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   near-full parity; the libcaca animation idea is noted as compatible with ratatui. The Rust pin's
   home moved to item 66 (the tray is the first Rust artifact). Test list approved (13 items).
   Status: spec-approved; work starts after item 66 is done.
+- 2026-11-06 (workspace, before cycle 1; amendment): the 2026-10-22 decisions predate item 66's
+  implementation, which built one crate on `ureq`. The user chose (b): keep the three-crate,
+  reqwest + tokio architecture and migrate item 66's client to it, with `stt-app` as its own crate
+  (four members with `stt-tui`); R1 (crate split) and R2 (reqwest + tokio) approved as refactors
+  before cycle 1. See "Decided (workspace, 2026-11-06)". The test-list line moved from item 66 is
+  approved as worded and enters the order. Evidence corrected: `docs/api/openapi.yaml` exists as a
+  companion to the authoritative examples.
