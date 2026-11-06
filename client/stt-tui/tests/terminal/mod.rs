@@ -131,6 +131,25 @@ impl Drop for Tui {
 pub struct EventService {
     pub port: u16,
     streams: std::sync::mpsc::Receiver<EventStream>,
+    uploads: std::sync::mpsc::Receiver<Upload>,
+}
+
+/// One `POST /api/tasks` a client made, its request read whole and its response still to be sent.
+pub struct Upload {
+    request: crate::support::Request,
+    stream: std::net::TcpStream,
+}
+
+impl Upload {
+    /// The request as the client sent it: line, headers and body.
+    pub fn request(&self) -> &crate::support::Request {
+        &self.request
+    }
+
+    /// Answers `status` (for example `201 Created`) with `body`.
+    pub fn answer(mut self, status: &str, body: &str) {
+        crate::support::respond(&mut self.stream, status, body);
+    }
 }
 
 /// One open event stream of an [`EventService`]; dropping it closes the connection, as a service
@@ -146,6 +165,7 @@ impl EventService {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let (handed, streams) = std::sync::mpsc::channel();
+        let (uploaded, uploads) = std::sync::mpsc::channel();
         thread::spawn(move || {
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
@@ -167,13 +187,33 @@ impl EventService {
                     {
                         return;
                     }
+                } else if request.line.starts_with("POST /api/tasks ") {
+                    if uploaded.send(Upload { request, stream }).is_err() {
+                        return;
+                    }
                 } else {
                     let (status, body) = crate::support::healthy();
                     crate::support::respond(&mut stream, status, &body);
                 }
             }
         });
-        EventService { port, streams }
+        EventService {
+            port,
+            streams,
+            uploads,
+        }
+    }
+
+    /// The next upload a client made, or a panic after `timeout`.
+    pub fn next_upload(&self, timeout: Duration) -> Upload {
+        self.uploads
+            .recv_timeout(timeout)
+            .unwrap_or_else(|_| panic!("no upload arrived within {timeout:?}"))
+    }
+
+    /// Whether an upload arrived that the test has not read.
+    pub fn upload_arrived(&self) -> bool {
+        !self.uploads.try_recv().is_err()
     }
 
     /// The next event stream a client opens, or a panic after `timeout`.

@@ -13,9 +13,11 @@ use serde::de::DeserializeOwned;
 mod autostart;
 mod events;
 mod quote;
+mod upload;
 
 pub use autostart::{Autostart, autostart_entry, install, remove};
 pub use events::{Event, Events, Queue, Snapshot, Task, TaskProgress, events};
+pub use upload::{allowed_extension, upload};
 
 /// The per-user directories the service keeps its bootstrap files in: the durable `config.json` in
 /// `config_dir`, the ephemeral `runtime.json` in `runtime_dir`.
@@ -137,7 +139,7 @@ impl ServiceDirs {
 }
 
 /// The running service as a client reaches it: where it answers and the credential it requires.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Service {
     pub endpoint: String,
     pub secret: String,
