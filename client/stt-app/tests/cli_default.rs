@@ -14,7 +14,7 @@ fn stand_in() -> (tempfile::TempDir, u16) {
         let body = if request.line.starts_with("GET /api/health") {
             r#"{"status":"ok"}"#
         } else if request.line.starts_with("GET /api/settings") {
-            r#"{"defaultFrontend":"browser"}"#
+            r#"{"device":"auto","threads":null,"defaultLanguage":"auto","speakersMode":"auto","speakersCount":null,"maxSpeakers":8,"defaultFrontend":"browser","terminalCommand":null,"availableDevices":["cpu","auto"],"gpuNames":{}}"#
         } else {
             r#"{"token":"one-time"}"#
         };

@@ -16,7 +16,9 @@ async fn the_stored_terminal_command_is_read_from_the_service_settings() {
     ] {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
-        let body = format!(r#"{{"defaultFrontend":null,"terminalCommand":{stored}}}"#);
+        let body = format!(
+            r#"{{"device":"auto","threads":null,"defaultLanguage":"auto","speakersMode":"auto","speakersCount":null,"maxSpeakers":8,"defaultFrontend":null,"terminalCommand":{stored},"availableDevices":["cpu","auto"],"gpuNames":{{}}}}"#
+        );
         support::answer_forever(listener, move |_| ("200 OK", body.clone()));
 
         let setting = terminal_command_setting(&Service {

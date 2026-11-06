@@ -781,38 +781,14 @@ const LINUX_TERMINALS: [(&str, &[&str]); 5] = [
     ("xterm", &["-e"]),
 ];
 
-/// `GET /api/settings`, as far as launching a frontend reads it.
-#[derive(Deserialize)]
-struct LaunchSettings {
-    #[serde(rename = "defaultFrontend")]
-    default_frontend: Option<String>,
-    #[serde(rename = "terminalCommand")]
-    terminal_command: Option<String>,
-}
-
 /// The id of the default frontend the user picked in the settings (roadmap item 66), or `None` while none is set.
 pub async fn default_frontend(service: &Service) -> io::Result<Option<String>> {
-    Ok(settings_of(service).await?.default_frontend)
+    Ok(settings(service).await?.default_frontend)
 }
 
 /// The terminal command the user set for the TUI (roadmap item 66, D10), or `None` for the OS launcher.
 pub async fn terminal_command_setting(service: &Service) -> io::Result<Option<String>> {
-    Ok(settings_of(service).await?.terminal_command)
-}
-
-/// `GET /api/settings` with the per-install secret.
-async fn settings_of(service: &Service) -> io::Result<LaunchSettings> {
-    let body = reqwest::Client::new()
-        .get(format!("{}/api/settings", service.endpoint))
-        .bearer_auth(&service.secret)
-        .send()
-        .await
-        .and_then(reqwest::Response::error_for_status)
-        .map_err(io::Error::other)?
-        .text()
-        .await
-        .map_err(io::Error::other)?;
-    parse_json(&body)
+    Ok(settings(service).await?.terminal_command)
 }
 
 /// One installed frontend, as its installer registered it: one JSON file per frontend in the
