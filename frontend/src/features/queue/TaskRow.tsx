@@ -306,7 +306,7 @@ export function TaskRow({
         ) : null}
         <ProgressBar
           value={task.transcriptionProgress}
-          label="Transcription"
+          label={t('task.transcription')}
           indeterminate={running && task.phase === 'CHUNKING'}
           showValue={!running}
         />
@@ -331,7 +331,7 @@ export function TaskRow({
       <ConfirmDialog
         open={deleteState.matches('confirming') || deleteState.matches('running')}
         title={`Delete ${task.filename}?`}
-        confirmLabel="Delete task"
+        confirmLabel={t('task.delete')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
         onConfirm={() => deleteSend({ type: 'CONFIRM' })}

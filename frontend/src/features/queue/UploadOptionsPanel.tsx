@@ -7,6 +7,7 @@ import { Field } from '../../shared/ui/Field';
 import { Stack } from '../../shared/ui/layout';
 import { SearchableSelect } from '../../shared/ui/SearchableSelect';
 import { TextButton } from '../../shared/ui/TextButton';
+import { t } from '../../shared/ui/text';
 
 // The upload options, one set for the whole batch (item 14, regrouped by item 59): the
 // language codes come from docs/api/languages.json (contract data, ADR 0029), speakers is
@@ -72,20 +73,20 @@ export function UploadOptionsPanel({
         aria-expanded={disclosure.matches('open')}
         onClick={() => sendDisclosure({ type: 'TOGGLE' })}
       >
-        Upload options
+        {t('upload.options')}
       </TextButton>
       {disclosure.matches('open') ? (
         <Stack gap="md">
-          <Field label="Language" htmlFor="language">
+          <Field label={t('upload.language')} htmlFor="language">
             <SearchableSelect
               id="language"
-              label="Language"
+              label={t('upload.language')}
               options={LANGUAGE_OPTIONS}
               value={language}
               onChange={onLanguageChange}
             />
           </Field>
-          <Field label="Speakers" htmlFor="speakers">
+          <Field label={t('upload.speakers')} htmlFor="speakers">
             <Select
               id="speakers"
               value={speakers}
@@ -102,7 +103,7 @@ export function UploadOptionsPanel({
             </Select>
           </Field>
           {speakers === 'fixed' ? (
-            <Field label="Speaker count" htmlFor="speaker-count">
+            <Field label={t('upload.speaker-count')} htmlFor="speaker-count">
               <NumberInput
                 id="speaker-count"
                 type="number"
@@ -119,10 +120,10 @@ export function UploadOptionsPanel({
             aria-expanded={advanced.matches('open')}
             onClick={() => sendAdvanced({ type: 'TOGGLE' })}
           >
-            Advanced
+            {t('upload.advanced')}
           </TextButton>
           {advanced.matches('open') ? (
-            <Field label="Max speakers" htmlFor="max-speakers">
+            <Field label={t('upload.max-speakers')} htmlFor="max-speakers">
               <NumberInput
                 id="max-speakers"
                 type="number"

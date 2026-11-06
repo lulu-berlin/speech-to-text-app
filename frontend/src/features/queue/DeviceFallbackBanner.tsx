@@ -4,6 +4,7 @@ import { ErrorCallout } from '../../shared/ui/ErrorCallout';
 import { TextButton } from '../../shared/ui/TextButton';
 import { deviceLabel } from '../../shared/ui/deviceLabel';
 import { errorMessage } from '../../shared/errorMessage';
+import { t } from '../../shared/ui/text';
 
 // The global CPU-fallback banner (item 32): the engine switched the chosen GPU to the CPU
 // because whisper-cli could not use it. The notice survives reloads and restarts until it is
@@ -43,7 +44,7 @@ export function DeviceFallbackBanner() {
         }
       />
       {dismissError !== null ? (
-        <ErrorCallout title="Could not dismiss the notice" detail={errorMessage(dismissError)} />
+        <ErrorCallout title={t('notice.dismiss-failed')} detail={errorMessage(dismissError)} />
       ) : null}
     </>
   );

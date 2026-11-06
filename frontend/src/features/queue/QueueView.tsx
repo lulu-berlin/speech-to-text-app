@@ -457,7 +457,7 @@ export function QueueView() {
         {pendingTasks.length > 0 ? (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <SortableContext items={reorder.context.order} strategy={verticalListSortingStrategy}>
-              <List label="Pending tasks">
+              <List label={t('queue.pending-tasks')}>
                 {pendingTasks.map((task, index) => (
                   <SortableTaskRow
                     key={task.id}

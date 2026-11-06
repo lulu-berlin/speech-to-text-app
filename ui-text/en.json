@@ -2,6 +2,7 @@
   "queue.title": "Queue",
   "queue.title-paused": "Queue (paused)",
   "queue.uploads": "Uploads",
+  "queue.pending-tasks": "Pending tasks",
   "queue.pause": "Pause the queue",
   "queue.paused": "queue paused",
   "queue.running": "queue running",
@@ -10,10 +11,19 @@
   "upload.no-path": "no file path given",
   "upload.queued": "queued {filename}",
   "upload.failed": "upload failed: {error}",
+  "upload.options": "Upload options",
+  "upload.advanced": "Advanced",
+  "upload.language": "Language",
+  "upload.speakers": "Speakers",
+  "upload.speaker-count": "Speaker count",
+  "upload.max-speakers": "Max speakers",
   "command.failed": "command failed: {error}",
   "task.command-done": "{filename} {status}",
   "task.pause": "Pause",
   "task.resume": "Resume",
   "task.cancel": "Cancel",
-  "task.cancel-confirm": "Cancel task"
+  "task.cancel-confirm": "Cancel task",
+  "task.transcription": "Transcription",
+  "task.delete": "Delete task",
+  "notice.dismiss-failed": "Could not dismiss the notice"
 }
