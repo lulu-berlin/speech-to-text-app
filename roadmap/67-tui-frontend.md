@@ -146,8 +146,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       error — `stt-tui/tests/history.rs`, `af491974`; `stt-tui/tests/download.rs`, `f73e45b0`
 - [ ] (basic) Settings edits (device, threads, upload defaults, default frontend, terminal command)
       persist and appear in the browser
-- [ ] (basic) The transcript view merges and renames a task's speakers, and the browser shows the
-      same speakers after a reload
+- [x] (basic) The transcript view merges and renames a task's speakers, and the browser shows the
+      same speakers after a reload - `stt-tui/tests/speakers.rs`: rename `85b8ffae`, merge
+      `704673f5` (the requests are the browser's own calls to the shared backend)
 - [ ] (basic) Two completed tasks can be merged from the TUI, and the merged task appears with its
       transcript
 - [x] (edge) SSE updates the view without a refresh, and a dropped stream reconnects and converges
@@ -321,3 +322,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   `Transcript` (`2f764e50`, 57 tests green). Two discovered scenarios were confirmed and appended:
   a browser-made rename or merge relabels an open TUI transcript, and a refused rename shows the
   service's message.
+- 2026-11-06 (workspace, cycle 10): "merging speakers" (the second half of the rename/merge line).
+  Red ran on `bfea2dc2` with the cycle's uncommitted pty test: `m` marked nothing, so
+  `Speaker 1 (merging)` never appeared (`terminal/mod.rs:79`); the rename test stayed green. Green
+  on the same tree plus `stt-client::merge_speakers` (`POST /api/tasks/{id}/speakers/merge` with
+  `{"group":[marked, selected],"into":selected}`, the bearer secret) and the transcript's mark: `m`
+  marks, `m` on the marked speaker unmarks with no request, `m` on another merges; the answer's
+  speakers relabel the transcript and its turns are read again (a merge joins turns, the
+  contract's `speakers-merged` rule). Committed as `704673f5` (58 tests; fmt and clippy green; the
+  `stt-tui` suite green in 3 repeats). The rename/merge line is ticked.
