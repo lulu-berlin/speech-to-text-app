@@ -110,6 +110,7 @@ graph TD
   12 --> 44
   11 --> 46[46 contextual logging ✓]:::done
   47 --> 55[55 atomic-transitions lock probe ✓]:::done
+  55 --> 94[94 atomic-transitions probe clock]
   50 --> 56[56 prebuilt Linux x86_64 bundle Mesa ✓]:::done
   57[57 desktop-nix-e2e container failure ✓]:::done --> 50
   58[58 atomic-transitions completion waits ✓]:::done
@@ -276,3 +277,4 @@ graph TD
 | [91 — MSW 3: the API mocks, the shared handlers and the dev worker](91-msw-3.md) | spec-approved | 13 |
 | [92 — Electron 45: the desktop window on the next major](92-electron-45.md) | spec-approved | 50 |
 | [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |
+| [94 — The atomic-transitions lock probe must not expire on a starved runner](94-atomic-transitions-probe-clock.md) | spec-approved | 55, 47, 58, 11 |
