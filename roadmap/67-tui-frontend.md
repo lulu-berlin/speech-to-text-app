@@ -182,6 +182,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       an invalid merge) shows the service's message and nothing changes
 - [ ] (discovered, 2026-11-06) A settings change made in the browser (the `settings-updated`
       event) updates a Settings screen open in the TUI
+- [ ] (discovered, 2026-11-06) Choosing `fixed` without a speaker count asks for one first (or
+      keeps the stored mode, as the browser does), so no `invalid-speakers` write is ever sent
 - [x] (must not break) The TUI's text and the browser's queue and upload text come from the one
       catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself —
       `client/stt-client/tests/text.rs`, `frontend/src/features/queue/QueueView.test.tsx` (the
@@ -364,3 +366,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   through auto/off/fixed (a count only with fixed: the other modes write null, as the browser
   does), and speaker count and max speakers within 1..20. Each change is one `PUT /api/settings`;
   committed as `a87db73c` (60 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats).
+- 2026-11-06 (workspace, cycle-12 checkpoint): the user confirmed the discovered line about
+  choosing `fixed` without a count (the TUI would send an `invalid-speakers` body today) — recorded
+  and fixed after the settings line — and approved the refactor: `open_history`, `open_transcript`
+  and `open_settings` share one `fetch` helper (`1673d7ce`, 60 tests green). Next: the default
+  frontend and the terminal command, which completes the settings line.
