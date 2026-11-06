@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { ApiError } from './types';
