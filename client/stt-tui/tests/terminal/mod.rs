@@ -153,8 +153,9 @@ impl Fetch {
     }
 }
 
-/// One task or queue command a client made (`POST /api/tasks/{id}/…`, `POST /api/queue/…`,
-/// `PUT /api/queue/order`), its request read whole and its response still to be sent.
+/// One task or queue command a client made (`POST /api/tasks/{id}/…`, `PUT /api/tasks/{id}/…`,
+/// `POST /api/queue/…`, `PUT /api/queue/order`), its request read whole and its response still to
+/// be sent.
 pub struct Command {
     request: crate::support::Request,
     stream: std::net::TcpStream,
@@ -232,6 +233,7 @@ impl EventService {
                 } else if request.line.starts_with("POST /api/tasks/")
                     || request.line.starts_with("POST /api/queue/")
                     || request.line.starts_with("PUT /api/queue/order ")
+                    || request.line.starts_with("PUT /api/tasks/")
                 {
                     if commanded.send(Command { request, stream }).is_err() {
                         return;

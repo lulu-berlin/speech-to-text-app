@@ -7,7 +7,12 @@ use stt_client::{Event, Snapshot, Task, Turns};
 pub enum Screen {
     Queue,
     History,
-    Transcript { task: Task, turns: Turns },
+    /// A transcript, with the row of its speakers list that a rename acts on.
+    Transcript {
+        task: Task,
+        turns: Turns,
+        speaker: usize,
+    },
 }
 
 /// The service's state after `event`. Every stream starts with a snapshot, so a change before one

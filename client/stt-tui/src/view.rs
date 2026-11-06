@@ -24,6 +24,8 @@ pub struct View<'a> {
     pub history_selected: usize,
     /// The path being typed into the upload prompt, while it is open.
     pub prompt: Option<&'a str>,
+    /// The name being typed for the selected speaker, while the rename prompt is open.
+    pub rename: Option<&'a str>,
     /// The download dialog, while it is open.
     pub download: Option<DownloadView<'a>>,
     /// What the last action reported.
@@ -41,7 +43,10 @@ pub struct DownloadView<'a> {
 
 /// Draws the open screen, with the prompt and the notice under it when there are any.
 pub fn draw(frame: &mut Frame, view: &View<'_>) {
-    let middle = match (view.download.is_some(), view.prompt.is_some()) {
+    let middle = match (
+        view.download.is_some(),
+        view.prompt.or(view.rename).is_some(),
+    ) {
         // The dialog's border, its two fields and their spacing.
         (true, _) => 4,
         (false, true) => 1,
@@ -57,11 +62,21 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     match view.screen {
         Screen::Queue => draw_queue(frame, areas[0], view),
         Screen::History => draw_history(frame, areas[0], view),
-        Screen::Transcript { task, turns } => draw_transcript(frame, areas[0], task, turns),
+        Screen::Transcript {
+            task,
+            turns,
+            speaker,
+        } => draw_transcript(frame, areas[0], task, turns, *speaker),
     }
     if let Some(path) = view.prompt {
         frame.render_widget(
             Paragraph::new(stt_client::text("upload.prompt", &[("path", path)])),
+            areas[1],
+        );
+    }
+    if let Some(name) = view.rename {
+        frame.render_widget(
+            Paragraph::new(stt_client::text("speakers.rename", &[("name", name)])),
             areas[1],
         );
     }
@@ -129,8 +144,26 @@ fn draw_history(frame: &mut Frame, area: Rect, view: &View<'_>) {
     frame.render_stateful_widget(table, area, &mut state);
 }
 
-/// A transcript: one line per turn, its speaker's name, its start and its text.
-fn draw_transcript(frame: &mut Frame, area: Rect, task: &Task, turns: &Turns) {
+/// A transcript: its speakers, the selected one highlighted, then one line per turn - its speaker's
+/// name, its start and its text.
+fn draw_transcript(frame: &mut Frame, area: Rect, task: &Task, turns: &Turns, speaker: usize) {
+    let areas = Layout::vertical([
+        // One row per speaker inside the list's border.
+        Constraint::Length(turns.speakers.len() as u16 + 2),
+        Constraint::Min(3),
+    ])
+    .split(area);
+    let speakers = Table::new(
+        turns
+            .speakers
+            .iter()
+            .map(|speaker| Row::new([speaker.speaker.clone()])),
+        [Constraint::Fill(1)],
+    )
+    .block(Block::bordered().title(stt_client::text("speakers.title", &[])))
+    .row_highlight_style(Style::new().reversed());
+    let mut state = TableState::default().with_selected(Some(speaker));
+    frame.render_stateful_widget(speakers, areas[0], &mut state);
     let title = stt_client::text("transcript.title", &[("filename", &task.filename)]);
     let lines: Vec<Line> = turns
         .turns
@@ -153,7 +186,7 @@ fn draw_transcript(frame: &mut Frame, area: Rect, task: &Task, turns: &Turns) {
         Paragraph::new(lines)
             .block(Block::bordered().title(title))
             .wrap(Wrap { trim: true }),
-        area,
+        areas[1],
     );
 }
 
