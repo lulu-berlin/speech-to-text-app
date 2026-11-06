@@ -177,8 +177,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       reconnecting), and the notice goes once a new stream's snapshot arrives
 - [x] (discovered, 2026-11-06) Escape cancels the open upload prompt without quitting and leaves the
       queue as it was - `stt-tui/tests/upload.rs`, `05857b01`
-- [ ] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
-      too large) shows the service's message and leaves the UI usable
+- [x] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
+      too large) shows the service's message and leaves the UI usable - `stt-tui/tests/upload.rs`,
+      `776aeba4`
 - [ ] (discovered, 2026-11-06) A speaker rename or merge made in the browser relabels a transcript
       open in the TUI (the `speakers-renamed` / `speakers-merged` events)
 - [ ] (discovered, 2026-11-06) A rename or merge the service refuses (a duplicate or invalid name,
@@ -409,3 +410,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   unchanged, the process stays alive, the prompt opens again, and `q` still quits. Committed as
   `05857b01` (64 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats). The line is
   ticked.
+- 2026-11-06 (workspace, cycle 17): "a refused upload" (the discovered line). Coverage of the
+  existing path, so no red: `response_json` surfaces the service's own `message`, and the test drives
+  a duplicate audio (`409`, `error.duplicate-audio.json`) and an oversized file (`413`,
+  `error.upload-too-large.json`). Each message is shown, no task row is added and the queue stays as
+  it was; the TUI still quits normally. Committed as `776aeba4` (65 tests; fmt and clippy green; the
+  `stt-tui` suite green in 3 repeats). The line is ticked.
