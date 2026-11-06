@@ -140,7 +140,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       same speakers after a reload
 - [ ] (basic) Two completed tasks can be merged from the TUI, and the merged task appears with its
       transcript
-- [ ] (edge) SSE updates the view without a refresh, and a dropped stream reconnects and converges
+- [x] (edge) SSE updates the view without a refresh, and a dropped stream reconnects and converges
+      — `stt-tui/tests/live.rs`, `0317ab9c`
 - [ ] (edge) A resize across small and large terminals reflows without crashing, and `NO_COLOR`
       emits no color escapes
 - [ ] (e2e) A pty-driven journey in CI against the real service — upload → COMPLETED → transcript —
@@ -158,6 +159,11 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [x] (discovered, 2026-11-06) `q`, Escape and Ctrl-C each quit the TUI and leave the terminal as
       it was (raw mode off, the main screen back), so the user is never trapped (a confirmation may
       come later) — `stt-tui/tests/quit.rs`, `266cee47`
+- [ ] (discovered, 2026-11-06) An event stream that stays silent for 15 s - no event, not even the
+      service's 5 s heartbeat (ADR 0044) - counts as dropped and is opened anew, as the browser does,
+      so a silent network partition does not freeze the view
+- [ ] (discovered, 2026-11-06) While the event stream is down the TUI says so (disconnected,
+      reconnecting), and the notice goes once a new stream's snapshot arrives
 
 ## Acceptance criteria
 
@@ -216,3 +222,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   passed. Green on the same tree plus a keyboard thread feeding the terminal loop, committed
   unchanged as `266cee47` (50 tests; fmt and clippy green; 5 of 5 repeats). Refactor approved and
   done: `attach.rs` uses the shared event-stream stand-in (`c5745792`, 50 tests green).
+- 2026-11-06 (workspace, cycle 4): "SSE updates and reconnect". Red ran on `7f5963d8` with the
+  cycle's uncommitted test: `lecture.m4a` stayed at 42% after a `task-progress` event
+  (`terminal/mod.rs:79`). Green on the same tree plus the decoding of `task-updated`,
+  `task-progress` and `queue-updated`, their application to the shown snapshot, and a reconnect one
+  second after a stream drops (the browser's delay), committed unchanged as `0317ab9c` (51 tests;
+  fmt and clippy green; the pty suite 5 of 5 repeats). Refactors approved and done, 51 tests green
+  after each: one event-stream stand-in for the TUI tests (`954318f0`), and the TUI's state and view
+  split out of `main.rs` (`19f72165`). Discovered and appended (the user): the silent-stream
+  watchdog and a visible disconnected state, both from the browser's `subscribeToEvents`.
