@@ -138,7 +138,6 @@ graph TD
   73 --> 95
   87 --> 95
   95 --> 96[96 audit cleanup]
-  94 --> 96
   67 --> 96
   85 --> 97[97 audit CI and pins]
   50 --> 64[64 evaluate Tauri ✓]:::done
@@ -299,5 +298,5 @@ graph TD
 | [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |
 | [94 — The atomic-transitions lock probe must not expire on a starved runner](../docs/specs/atomic-transitions-probe-clock.md) | done | 55, 47, 58, 11 |
 | [95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests](95-audit-failure-paths.md) | draft | 11, 42, 12, 41, 32, 66, 73, 87 |
-| [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | draft | 95, 94, 67 |
+| [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | draft | 95, 67 |
 | [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](97-audit-ci-and-pins.md) | draft | 85 |
