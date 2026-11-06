@@ -152,8 +152,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       `704673f5` (the requests are the browser's own calls to the shared backend)
 - [x] (edge) SSE updates the view without a refresh, and a dropped stream reconnects and converges
       — `stt-tui/tests/live.rs`, `0317ab9c`
-- [ ] (edge) A resize across small and large terminals reflows without crashing, and `NO_COLOR`
-      emits no color escapes
+- [x] (edge) A resize across small and large terminals reflows without crashing, and `NO_COLOR`
+      emits no color escapes - `stt-tui/tests/layout.rs`, `bfdf87f8` (with `NO_COLOR` the selected
+      row is marked `>` and no SGR setting a color or attribute is written)
 - [ ] (e2e) A pty-driven journey in CI against the real service — upload → COMPLETED → transcript —
       with the per-OS legs their runners allow
 - [ ] The pinned Rust toolchain builds every path with the committed `Cargo.lock`, and the sync
@@ -392,3 +393,13 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   browser keeps the stored mode, and a step that leaves the body as it was sends no request.
   Committed as `b03733ac` (62 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats;
   `gradle checkVersions` green). The discovered line is ticked.
+- 2026-11-06 (workspace, cycle 15): "resize and NO_COLOR" (the edge line). The harness and the app
+  were developed together this cycle, so its red was recorded afterwards: with the test and its
+  harness in place and `client/stt-tui/src` stashed at `0e1b2dcd`, the test failed with the
+  `NO_COLOR` run never showing `> lecture.m4a` (`terminal/mod.rs:125`) - no colour choice existed.
+  Green with the harness's extra env vars, `resize` and raw byte capture, and the app's `NO_COLOR`:
+  the selected row is marked `>` and no SGR that sets a colour or attribute is written (a reset is
+  not one); the settings screen survives 120x24 → 40x12 → 120x24. The harness removes `NO_COLOR`
+  from the inherited environment, since this sandbox exports it, so the test decides the choice.
+  Committed as `bfdf87f8` (63 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats).
+  The line is ticked. Also run this cycle: `gradle checkVersions` green.
