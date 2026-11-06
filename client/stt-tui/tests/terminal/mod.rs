@@ -120,6 +120,53 @@ impl Tui {
     }
 }
 
+/// A TUI with a completed task's transcript open, where the transcript tests start: a stand-in
+/// service, the TUI attached to it with the queue from `snapshot.json`, then `h` answered with
+/// `task-list.json` and Enter on `interview.mp3` (task 3) answered with `turns.json`. A test binds
+/// every field: the event stream and the bootstrap directory must last as long as it does.
+pub struct OpenTranscript {
+    pub service: EventService,
+    pub tui: Tui,
+    pub stream: EventStream,
+    pub state: tempfile::TempDir,
+}
+
+/// Opens `interview.mp3`'s transcript as a user would; see [`OpenTranscript`].
+pub fn open_transcript() -> OpenTranscript {
+    const SNAPSHOT: &str = include_str!("../../../../docs/api/snapshot.json");
+    const TASK_LIST: &str = include_str!("../../../../docs/api/task-list.json");
+    const TURNS: &str = include_str!("../../../../docs/api/turns.json");
+    const WAIT: Duration = Duration::from_secs(20);
+    let service = EventService::start();
+    let state = tempfile::tempdir().unwrap();
+    crate::support::write_bootstrap(state.path(), service.port);
+    let mut tui = Tui::start(
+        env!("CARGO_BIN_EXE_stt-tui").as_ref(),
+        state.path(),
+        120,
+        24,
+    );
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
+    tui.press(b"h");
+    service.next_get(WAIT).answer("200 OK", TASK_LIST);
+    tui.wait_for(WAIT, |text| {
+        text.contains("interview.mp3") && text.contains("History")
+    });
+    tui.press(b"\r");
+    service.next_get(WAIT).answer("200 OK", TURNS);
+    tui.wait_for(WAIT, |text| {
+        text.contains("Speakers") && text.contains("Happy to be here.")
+    });
+    OpenTranscript {
+        service,
+        tui,
+        stream,
+        state,
+    }
+}
+
 impl Drop for Tui {
     fn drop(&mut self) {
         let _ = self.child.kill();

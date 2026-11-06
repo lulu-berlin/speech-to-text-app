@@ -10,36 +10,20 @@ mod terminal;
 use std::fs;
 use std::time::Duration;
 
-use terminal::{EventService, Tui};
+use terminal::{OpenTranscript, open_transcript};
 
-const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
-const TASK_LIST: &str = include_str!("../../../docs/api/task-list.json");
-const TURNS: &str = include_str!("../../../docs/api/turns.json");
 const TRANSCRIPT: &str = "1\n00:00:00,000 --> 00:00:02,100\nGood morning.\n";
 const WAIT: Duration = Duration::from_secs(20);
 
 #[test]
 fn the_download_dialog_writes_the_chosen_format_and_reports_a_bad_path() {
-    let service = EventService::start();
-    let dir = tempfile::tempdir().unwrap();
-    support::write_bootstrap(dir.path(), service.port);
+    let OpenTranscript {
+        service,
+        mut tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript();
     let files = tempfile::tempdir().unwrap();
-    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
-    let mut stream = service.next_stream(WAIT);
-    stream.send("snapshot", SNAPSHOT);
-    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
-
-    // Into the transcript: history, then the completed task.
-    tui.press(b"h");
-    service.next_get(WAIT).answer("200 OK", TASK_LIST);
-    tui.wait_for(WAIT, |text| {
-        text.contains("interview.mp3") && text.contains("History")
-    });
-    tui.press(b"\r");
-    service.next_get(WAIT).answer("200 OK", TURNS);
-    tui.wait_for(WAIT, |text| {
-        text.contains("Good morning. Thanks for joining us today.")
-    });
 
     // `d` opens the download dialog with the path focused; `.srt` picks the srt format.
     tui.press(b"d");

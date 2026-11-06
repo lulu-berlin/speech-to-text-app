@@ -12,11 +12,8 @@ mod terminal;
 
 use std::time::Duration;
 
-use terminal::{EventService, Tui};
+use terminal::{OpenTranscript, open_transcript};
 
-const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
-const TASK_LIST: &str = include_str!("../../../docs/api/task-list.json");
-const TURNS: &str = include_str!("../../../docs/api/turns.json");
 /// `turns.json`'s speakers after "Speaker 2" (id 1) is renamed to "Bob".
 const RENAMED: &str =
     r#"{"speakers":[{"speakerId":0,"speaker":"Speaker 1"},{"speakerId":1,"speaker":"Bob"}]}"#;
@@ -28,25 +25,12 @@ const WAIT: Duration = Duration::from_secs(20);
 
 #[test]
 fn renaming_the_selected_speaker_relabels_its_turns() {
-    let service = EventService::start();
-    let dir = tempfile::tempdir().unwrap();
-    support::write_bootstrap(dir.path(), service.port);
-    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
-    let mut stream = service.next_stream(WAIT);
-    stream.send("snapshot", SNAPSHOT);
-    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
-
-    // Into the transcript: history, then the completed task.
-    tui.press(b"h");
-    service.next_get(WAIT).answer("200 OK", TASK_LIST);
-    tui.wait_for(WAIT, |text| {
-        text.contains("interview.mp3") && text.contains("History")
-    });
-    tui.press(b"\r");
-    service.next_get(WAIT).answer("200 OK", TURNS);
-    tui.wait_for(WAIT, |text| {
-        text.contains("Speakers") && text.contains("Happy to be here.")
-    });
+    let OpenTranscript {
+        service,
+        mut tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript();
 
     // `r` opens the prompt with the first speaker's name; Escape closes it, nothing is sent, and the
     // transcript stays open.
@@ -97,25 +81,12 @@ fn renaming_the_selected_speaker_relabels_its_turns() {
 
 #[test]
 fn merging_the_marked_speaker_into_the_selected_one_refetches_the_turns() {
-    let service = EventService::start();
-    let dir = tempfile::tempdir().unwrap();
-    support::write_bootstrap(dir.path(), service.port);
-    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
-    let mut stream = service.next_stream(WAIT);
-    stream.send("snapshot", SNAPSHOT);
-    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
-
-    // Into the transcript: history, then the completed task.
-    tui.press(b"h");
-    service.next_get(WAIT).answer("200 OK", TASK_LIST);
-    tui.wait_for(WAIT, |text| {
-        text.contains("interview.mp3") && text.contains("History")
-    });
-    tui.press(b"\r");
-    service.next_get(WAIT).answer("200 OK", TURNS);
-    tui.wait_for(WAIT, |text| {
-        text.contains("Speakers") && text.contains("Happy to be here.")
-    });
+    let OpenTranscript {
+        service,
+        mut tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript();
 
     // `m` marks the selected speaker; `m` on it again unmarks it, and nothing is sent.
     tui.press(b"m");
