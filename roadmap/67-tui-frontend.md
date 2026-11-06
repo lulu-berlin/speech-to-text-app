@@ -184,8 +184,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       an invalid merge) shows the service's message and nothing changes
 - [ ] (discovered, 2026-11-06) A settings change made in the browser (the `settings-updated`
       event) updates a Settings screen open in the TUI
-- [ ] (discovered, 2026-11-06) Choosing `fixed` without a speaker count asks for one first (or
-      keeps the stored mode, as the browser does), so no `invalid-speakers` write is ever sent
+- [x] (discovered, 2026-11-06) Choosing `fixed` without a speaker count asks for one first (or
+      keeps the stored mode, as the browser does), so no `invalid-speakers` write is ever sent -
+      `stt-tui/tests/settings.rs`, `b03733ac`
 - [x] (must not break) The TUI's text and the browser's queue and upload text come from the one
       catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself —
       `client/stt-client/tests/text.rs`, `frontend/src/features/queue/QueueView.test.tsx` (the
@@ -383,3 +384,11 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   command opens a prompt holding it whose Enter saves the trimmed command (an emptied one as null,
   the OS launcher). Each change is one `PUT /api/settings`; committed as `65d155d9` (61 tests; fmt
   and clippy green; the `stt-tui` suite green in 3 repeats). The settings line is ticked.
+- 2026-11-06 (workspace, cycle 14): "fixed needs a speaker count" (the discovered line). Red ran on
+  `a7de980e` with the cycle's uncommitted pty test: stepping to `fixed` with no count sent the
+  invalid body and no notice appeared (`terminal/mod.rs:79`). Green on the same tree plus a draft
+  speaker count the count row always changes (1..20) and the body carries only while the mode is
+  fixed; stepping to fixed without one changes nothing and says "set a speaker count first", as the
+  browser keeps the stored mode, and a step that leaves the body as it was sends no request.
+  Committed as `b03733ac` (62 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats;
+  `gradle checkVersions` green). The discovered line is ticked.
