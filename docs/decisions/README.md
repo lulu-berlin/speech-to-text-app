@@ -76,3 +76,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0063 | [The app is the behavioral reference; the Python oracle is retired](0063-app-is-the-behavioral-reference.md) | accepted, supersedes [0002](0002-no-python-oracle-only.md) | 2026-10-29 |
 | 0064 | [The service and the tray are one unit in app mode](0064-service-and-tray-are-one-unit.md) | accepted, supersedes "the tray is optional" in roadmap item 66 | 2026-10-31 |
 | 0065 | [We publish our own artifacts, their tags name what determines their content, and platform keys are Nix system names](0065-own-artifacts-versioned-tags-nix-platform-keys.md) | accepted | 2026-11-03 |
+| 0066 | [The frontend tests mock the API at the fetch and XHR layer, not at MSW 3's socket layer](0066-frontend-tests-mock-fetch-not-sockets.md) | accepted | 2026-11-06 |

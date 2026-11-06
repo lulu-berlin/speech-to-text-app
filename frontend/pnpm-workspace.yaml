@@ -1,5 +1,6 @@
 minimumReleaseAgeExclude:
   - '@vitejs/plugin-react@6.1.2'
+  - msw@3.0.4
 
 allowBuilds:
   'msw': true

@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { App } from '../../app/App';
@@ -2341,6 +2341,21 @@ describe('the transcript error states', () => {
     expect(await screen.findByText('Good morning.')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(requests).toBe(2);
+  });
+
+  it('shows the callout and its Retry when the turns handler throws', async () => {
+    server.use(
+      http.get('/api/tasks/:id/turns', () => {
+        throw new Error('the mock turns handler failed');
+      }),
+    );
+    await renderTranscript('3');
+
+    const callout = await screen.findByRole('alert');
+    expect(within(callout).getByText("Couldn't load the transcript")).toBeInTheDocument();
+    // The resolver's exception reaches the client as the failure's detail.
+    expect(within(callout).getByText('the mock turns handler failed')).toBeInTheDocument();
+    expect(within(callout).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });
 

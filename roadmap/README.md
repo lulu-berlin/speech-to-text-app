@@ -121,7 +121,7 @@ graph TD
   63[63 whisper-cpp build time ✓]:::done --> 90[90 own artifacts, versioned tags, platform keys ✓]:::done
   33 --> 90
   49 --> 90
-  13 --> 91[91 msw 3]
+  13 --> 91[91 msw 3 ✓]:::done
   50 --> 92[92 Electron 45]
   03 --> 93[93 Maven catalog batch]
   08 --> 93
@@ -274,7 +274,7 @@ graph TD
 | [88 — Localization: the app's own language, in every language whisper transcription supports](88-localization.md)                                                          | spec-approved | 74                          |
 | [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | spec-approved | 66 |
 | [90 — A nixpkgs bump, our own whisper.cpp 1.9.5 artifact on every route, and one platform vocabulary](../docs/specs/own-artifacts-and-platform-keys.md) | done | 63, 48, 49, 33 |
-| [91 — MSW 3: the API mocks, the shared handlers and the dev worker](91-msw-3.md) | spec-approved | 13 |
+| [91 — MSW 3: the API mocks, the shared handlers and the dev worker](../docs/specs/msw-3.md) | done | 13 |
 | [92 — Electron 45: the desktop window on the next major](92-electron-45.md) | spec-approved | 50 |
 | [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |
 | [94 — The atomic-transitions lock probe must not expire on a starved runner](94-atomic-transitions-probe-clock.md) | spec-approved | 55, 47, 58, 11 |
