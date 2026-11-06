@@ -164,9 +164,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [ ] (moved from item 66, 2026-11-02; approved as worded 2026-11-06) Opening the TUI from the tray
       opens it in a terminal - PowerShell by default on Windows, Terminal on macOS, the terminal
       chain on Linux - through its registered descriptor, and several TUI instances run side by side
-- [ ] (discovered, 2026-11-06) The client reaches the service directly even when an HTTP proxy is
+- [x] (discovered, 2026-11-06) The client reaches the service directly even when an HTTP proxy is
       set in the environment (`HTTP_PROXY`/`ALL_PROXY` without a `NO_PROXY` for the loopback
-      address), so the per-install secret is never sent to a proxy and the service stays reachable
+      address), so the per-install secret is never sent to a proxy and the service stays reachable -
+      `stt-tui/tests/proxy.rs`, `54edd99c` (one `no_proxy` client for every call)
 - [x] (discovered, 2026-11-06) `q`, Escape and Ctrl-C each quit the TUI and leave the terminal as
       it was (raw mode off, the main screen back), so the user is never trapped (a confirmation may
       come later) — `stt-tui/tests/quit.rs`, `266cee47`
@@ -416,3 +417,11 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   `error.upload-too-large.json`). Each message is shown, no task row is added and the queue stays as
   it was; the TUI still quits normally. Committed as `776aeba4` (65 tests; fmt and clippy green; the
   `stt-tui` suite green in 3 repeats). The line is ticked.
+- 2026-11-06 (workspace, cycle 18): "direct loopback despite a proxy" (the discovered line). Red ran
+  on `aaab6b33` with the cycle's uncommitted pty test: with `HTTP_PROXY`/`ALL_PROXY` on a closed port
+  and no `NO_PROXY`, no event stream opened (`no event stream was opened within 20s`,
+  `terminal/mod.rs:409`) - reqwest honoured the proxies. Green on the same tree plus one
+  `stt-client::client()` with `.no_proxy()` used by every call (16 call sites, the health probe and
+  the launch token included), so the per-install secret never goes to a proxy. The harness clears
+  inherited proxy variables so the test sets them. Committed as `54edd99c` (66 tests; fmt and
+  clippy green; the `stt-tui` suite green in 3 repeats). The line is ticked.
