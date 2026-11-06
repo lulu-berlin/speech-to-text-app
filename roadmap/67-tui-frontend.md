@@ -180,6 +180,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       open in the TUI (the `speakers-renamed` / `speakers-merged` events)
 - [ ] (discovered, 2026-11-06) A rename or merge the service refuses (a duplicate or invalid name,
       an invalid merge) shows the service's message and nothing changes
+- [ ] (discovered, 2026-11-06) A settings change made in the browser (the `settings-updated`
+      event) updates a Settings screen open in the TUI
 - [x] (must not break) The TUI's text and the browser's queue and upload text come from the one
       catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself —
       `client/stt-client/tests/text.rs`, `frontend/src/features/queue/QueueView.test.tsx` (the
@@ -349,3 +351,16 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   this cycle; the other rows are shown. Item 66's private settings reader was renamed
   `LaunchSettings` to make room for the public type. Committed as `b36a1145` (59 tests; fmt and
   clippy green; the `stt-tui` suite green in 3 repeats).
+- 2026-11-06 (workspace, cycle-11 checkpoint): the user approved the refactor — item 66's
+  `default_frontend` and `terminal_command_setting` read through `settings()`, and
+  `LaunchSettings`/`settings_of` are gone; item 66's two stand-ins serve a full settings body in the
+  contract's shape (`05658b8d`, 59 tests green). The `settings-updated` scenario was confirmed and
+  appended to the test list. Next: the rest of the settings' first half.
+- 2026-11-06 (workspace, cycle 12): "the rest of the settings' first half" (the settings line stays
+  unticked). Red ran on `05658b8d` with the cycle's uncommitted pty test: Right on Device sent
+  nothing (`no command arrived within 20s`, `terminal/mod.rs:326`). Green on the same tree plus the
+  Settings screen stepping the device through the offered devices, the language through the
+  browser's own `docs/api/languages.json` (compiled in like the UI text, ADR 0029), the speaker mode
+  through auto/off/fixed (a count only with fixed: the other modes write null, as the browser
+  does), and speaker count and max speakers within 1..20. Each change is one `PUT /api/settings`;
+  committed as `a87db73c` (60 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats).
