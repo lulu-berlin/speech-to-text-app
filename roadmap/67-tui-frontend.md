@@ -175,8 +175,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       so a silent network partition does not freeze the view
 - [ ] (discovered, 2026-11-06) While the event stream is down the TUI says so (disconnected,
       reconnecting), and the notice goes once a new stream's snapshot arrives
-- [ ] (discovered, 2026-11-06) Escape cancels the open upload prompt without quitting and leaves the
-      queue as it was
+- [x] (discovered, 2026-11-06) Escape cancels the open upload prompt without quitting and leaves the
+      queue as it was - `stt-tui/tests/upload.rs`, `05857b01`
 - [ ] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
       too large) shows the service's message and leaves the UI usable
 - [ ] (discovered, 2026-11-06) A speaker rename or merge made in the browser relabels a transcript
@@ -403,3 +403,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   from the inherited environment, since this sandbox exports it, so the test decides the choice.
   Committed as `bfdf87f8` (63 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats).
   The line is ticked. Also run this cycle: `gradle checkVersions` green.
+- 2026-11-06 (workspace, cycle 16): "Escape cancels the upload prompt" (the discovered line). The
+  behaviour already existed (`CancelPrompt` at the queue, `main.rs`), so there was no red: the new
+  pty test is coverage - `u`, a typed path, Escape closes the prompt with no request and the queue
+  unchanged, the process stays alive, the prompt opens again, and `q` still quits. Committed as
+  `05857b01` (64 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats). The line is
+  ticked.
