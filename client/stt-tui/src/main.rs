@@ -39,8 +39,11 @@ enum Message {
     History(Vec<Task>),
     /// A transcript arrived; the transcript screen shows it.
     Transcript(Task, Turns),
-    /// Task `id`'s speakers as the service answered a rename; an open transcript of it shows them.
+    /// Task `id`'s speakers as the service answered a rename or a merge; an open transcript of it
+    /// shows them.
     Speakers(i64, Vec<Speaker>),
+    /// Task `id`'s turns, read again after a merge; an open transcript of it shows them.
+    Turns(i64, Turns),
 }
 
 /// Whether the user asked to leave.
@@ -207,6 +210,11 @@ impl Ui {
                     transcript.set_speakers(id, speakers);
                 }
             }
+            Message::Turns(id, turns) => {
+                if let Screen::Transcript(transcript) = &mut self.screen {
+                    transcript.set_turns(id, turns);
+                }
+            }
             Message::Terminal(terminal_event::Event::Key(key)) => {
                 // The rename prompt takes text as the upload prompt does: every key but Escape,
                 // Enter and Backspace is a character of the name.
@@ -242,7 +250,8 @@ impl Ui {
             | Action::DownloadTab
             | Action::DownloadFormatStep(_)
             | Action::SubmitDownload
-            | Action::CancelDownload => {}
+            | Action::CancelDownload
+            | Action::Merge => {}
             Action::OpenHistory => open_history(runtime, service, sender),
             Action::OpenPrompt => self.prompt = Some(String::new()),
             Action::CancelPrompt => self.prompt = None,

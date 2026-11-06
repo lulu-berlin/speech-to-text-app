@@ -1,5 +1,6 @@
-//! A task's speakers (roadmap item 67): renaming one, the call the browser's transcript makes, with
-//! the per-install secret. The answer is the task's effective speakers (`docs/api/speakers.json`).
+//! A task's speakers (roadmap item 67): renaming one and merging some, the calls the browser's
+//! transcript makes, with the per-install secret. The answer is the task's effective speakers
+//! (`docs/api/speakers.json`).
 
 use std::io;
 
@@ -31,6 +32,29 @@ pub async fn rename_speaker(
         ))
         .bearer_auth(&service.secret)
         .json(&json!({ "speaker": name.trim() }))
+        .send()
+        .await
+        .map_err(io::Error::other)?;
+    response_json::<Speakers>(response)
+        .await
+        .map(|answer| answer.speakers)
+}
+
+/// Folds every speaker of `group` but `into` into speaker `into` of task `id`; `into` keeps its id
+/// and name, and the service answers with the task's speakers.
+pub async fn merge_speakers(
+    service: &Service,
+    id: i64,
+    group: &[i64],
+    into: i64,
+) -> io::Result<Vec<Speaker>> {
+    let response = reqwest::Client::new()
+        .post(format!(
+            "{}/api/tasks/{id}/speakers/merge",
+            service.endpoint
+        ))
+        .bearer_auth(&service.secret)
+        .json(&json!({ "group": group, "into": into }))
         .send()
         .await
         .map_err(io::Error::other)?;

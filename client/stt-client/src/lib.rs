@@ -23,7 +23,7 @@ pub use autostart::{Autostart, autostart_entry, install, remove};
 pub use commands::{TaskCommand, reorder_queue, set_queue_paused, task_command};
 pub use events::{Event, Events, Queue, Snapshot, Task, TaskProgress, events};
 pub use read::{Speaker, Turn, Turns, history, transcript, turns};
-pub use speakers::rename_speaker;
+pub use speakers::{merge_speakers, rename_speaker};
 pub use text::{DEFAULT_LOCALE, catalog, text, text_in};
 pub use upload::{allowed_extension, upload};
 

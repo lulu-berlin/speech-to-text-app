@@ -6,9 +6,10 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph, Row, Table, TableState, Wrap};
-use stt_client::{Snapshot, Task, Turns};
+use stt_client::{Snapshot, Task};
 
 use crate::state::Screen;
+use crate::transcript::Transcript;
 
 /// Everything the screen shows.
 pub struct View<'a> {
@@ -62,13 +63,7 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     match view.screen {
         Screen::Queue => draw_queue(frame, areas[0], view),
         Screen::History => draw_history(frame, areas[0], view),
-        Screen::Transcript(transcript) => draw_transcript(
-            frame,
-            areas[0],
-            &transcript.task,
-            &transcript.turns,
-            transcript.speaker,
-        ),
+        Screen::Transcript(transcript) => draw_transcript(frame, areas[0], transcript),
     }
     if let Some(path) = view.prompt {
         frame.render_widget(
@@ -146,9 +141,16 @@ fn draw_history(frame: &mut Frame, area: Rect, view: &View<'_>) {
     frame.render_stateful_widget(table, area, &mut state);
 }
 
-/// A transcript: its speakers, the selected one highlighted, then one line per turn - its speaker's
-/// name, its start and its text.
-fn draw_transcript(frame: &mut Frame, area: Rect, task: &Task, turns: &Turns, speaker: usize) {
+/// A transcript: its speakers, the selected one highlighted and the one marked for a merge labelled
+/// so, then one line per turn - its speaker's name, its start and its text.
+fn draw_transcript(frame: &mut Frame, area: Rect, transcript: &Transcript) {
+    let Transcript {
+        task,
+        turns,
+        speaker,
+        marked,
+        ..
+    } = transcript;
     let areas = Layout::vertical([
         // One row per speaker inside the list's border.
         Constraint::Length(turns.speakers.len() as u16 + 2),
@@ -156,15 +158,18 @@ fn draw_transcript(frame: &mut Frame, area: Rect, task: &Task, turns: &Turns, sp
     ])
     .split(area);
     let speakers = Table::new(
-        turns
-            .speakers
-            .iter()
-            .map(|speaker| Row::new([speaker.speaker.clone()])),
+        turns.speakers.iter().map(|speaker| {
+            Row::new([if Some(speaker.speaker_id) == *marked {
+                stt_client::text("speakers.merging", &[("name", &speaker.speaker)])
+            } else {
+                speaker.speaker.clone()
+            }])
+        }),
         [Constraint::Fill(1)],
     )
     .block(Block::bordered().title(stt_client::text("speakers.title", &[])))
     .row_highlight_style(Style::new().reversed());
-    let mut state = TableState::default().with_selected(Some(speaker));
+    let mut state = TableState::default().with_selected(Some(*speaker));
     frame.render_stateful_widget(speakers, areas[0], &mut state);
     let title = stt_client::text("transcript.title", &[("filename", &task.filename)]);
     let lines: Vec<Line> = turns
