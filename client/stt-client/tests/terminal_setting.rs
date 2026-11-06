@@ -8,8 +8,8 @@ use std::net::TcpListener;
 
 use stt_client::{Service, terminal_command_setting};
 
-#[test]
-fn the_stored_terminal_command_is_read_from_the_service_settings() {
+#[tokio::test]
+async fn the_stored_terminal_command_is_read_from_the_service_settings() {
     for (stored, expected) in [
         (r#""wezterm start --""#, Some("wezterm start --")),
         ("null", None),
@@ -23,6 +23,7 @@ fn the_stored_terminal_command_is_read_from_the_service_settings() {
             endpoint: format!("http://127.0.0.1:{port}"),
             secret: "the-install-secret".into(),
         })
+        .await
         .unwrap();
 
         assert_eq!(setting.as_deref(), expected, "stored {stored}");

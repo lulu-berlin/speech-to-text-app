@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 stt-client = { path = "../stt-client" }
+tokio = { version = "1", features = ["rt", "time"] }
 # The tray's icon and menu (roadmap item 66, items 2-3; ADR 0064). Optional: they link against a
 # tray host's C libraries (GTK 3 and AppIndicator on Linux), which devenv.nix and the packages
 # provide, so the client still builds on a machine with no GUI toolkit.

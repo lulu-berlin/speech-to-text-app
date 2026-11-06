@@ -11,11 +11,12 @@ use stt_client::{
     start_tray_beside, terminal_command_setting,
 };
 
-fn main() -> ExitCode {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {
-        Some("open") => open(&std::env::args().skip(2).collect::<Vec<String>>()),
+        Some("open") => open(&std::env::args().skip(2).collect::<Vec<String>>()).await,
         Some("list") => list(),
-        Some("quit") => quit_service(),
+        Some("quit") => quit_service().await,
         Some("register") => register(&std::env::args().skip(2).collect::<Vec<String>>()),
         Some("autostart") => set_autostart(&std::env::args().skip(2).collect::<Vec<String>>()),
         _ => {
@@ -28,20 +29,20 @@ fn main() -> ExitCode {
 }
 
 /// Opens the frontend named by `id`, or says which ones are installed.
-fn open(args: &[String]) -> ExitCode {
+async fn open(args: &[String]) -> ExitCode {
     let Some(dirs) = dirs() else {
         return ExitCode::FAILURE;
     };
     let registry = registry(&dirs.config_dir);
     let mut located = Located::new(&dirs);
-    let Some(descriptor) = select(&mut located, &registry, args) else {
+    let Some(descriptor) = select(&mut located, &registry, args).await else {
         return ExitCode::FAILURE;
     };
     let print_url = args.iter().any(|arg| arg == "--print-url");
     let terminal_var = std::env::var("TERMINAL").ok();
     // Every frontend is served by the service (decision (a)): opening one starts it when none runs,
     // through the runner beside `stt-app`, and waits for it before the frontend is opened.
-    let service = match located.unit_or_start() {
+    let service = match located.unit_or_start().await {
         Ok(service) => service,
         Err(error) => {
             eprintln!("stt-app: {error}");
@@ -51,7 +52,7 @@ fn open(args: &[String]) -> ExitCode {
     // The terminal command the user set on the Settings page replaces the OS launcher (item 66, D10); a read that
     // fails falls back to it with a warning, so a broken settings read never blocks the frontend.
     let terminal_override = if matches!(descriptor.launch, Launch::Terminal { .. }) {
-        match terminal_command_setting(service) {
+        match terminal_command_setting(service).await {
             Ok(command) => command,
             Err(error) => {
                 eprintln!("stt-app: cannot read the terminal command setting: {error}");
@@ -66,7 +67,7 @@ fn open(args: &[String]) -> ExitCode {
         terminal_override: terminal_override.as_deref(),
         on_path: &on_path,
     };
-    let plan = match open_plan(descriptor, Some(service), host_os(), &settings) {
+    let plan = match open_plan(descriptor, Some(service), host_os(), &settings).await {
         Ok(plan) => plan,
         Err(error) => {
             eprintln!("stt-app: {error}");
@@ -157,11 +158,11 @@ fn register(args: &[String]) -> ExitCode {
 }
 
 /// Asks the running service to stop; quit is explicit, so a frontend closing leaves it running.
-fn quit_service() -> ExitCode {
+async fn quit_service() -> ExitCode {
     let Some(dirs) = dirs() else {
         return ExitCode::FAILURE;
     };
-    match quit(&dirs) {
+    match quit(&dirs).await {
         Ok(()) => {
             println!("stt-app: the service is stopping");
             ExitCode::SUCCESS
@@ -241,17 +242,21 @@ fn registry(config_dir: &Path) -> Registry {
 
 /// The descriptor `args` names, with the installed ids in the message when it names none or an
 /// unknown one.
-fn select<'a>(
-    located: &mut Located,
+async fn select<'a>(
+    located: &mut Located<'_>,
     registry: &'a Registry,
     args: &[String],
 ) -> Option<&'a Descriptor> {
     let installed = || registry.ids().join(", ");
     let id = match args.iter().find(|arg| !arg.starts_with("--")) {
         Some(id) => id.to_string(),
-        None => match located
-            .service()
-            .and_then(|service| default_frontend(service).map_err(|error| error.to_string()))
+        None => match async {
+            let service = located.service().await?;
+            default_frontend(service)
+                .await
+                .map_err(|error| error.to_string())
+        }
+        .await
         {
             Ok(Some(id)) => id,
             Ok(None) => {
@@ -297,10 +302,11 @@ impl<'a> Located<'a> {
     }
 
     /// The service, or why it could not be found, as the first call found it.
-    fn service(&mut self) -> Result<&Service, String> {
+    async fn service(&mut self) -> Result<&Service, String> {
         if self.service.is_none() {
             self.service = Some(
                 locate(self.dirs)
+                    .await
                     .map(|service| StartOrAttach {
                         service,
                         started: false,
@@ -314,7 +320,7 @@ impl<'a> Located<'a> {
     /// Like [`service`](Self::service), but brings the unit up (ADR 0064): the service through the
     /// runner beside `stt-app` when none answers (decision (b)), and the tray only when this launch
     /// started the service. A failed tray start stops that service again and fails the open.
-    fn unit_or_start(&mut self) -> Result<&Service, String> {
+    async fn unit_or_start(&mut self) -> Result<&Service, String> {
         if !matches!(self.service, Some(Ok(_))) {
             let dirs = self.dirs;
             self.service = Some(
@@ -323,6 +329,7 @@ impl<'a> Located<'a> {
                     || start_runner_beside(dirs),
                     || start_tray_beside(dirs),
                 )
+                .await
                 .map_err(|error| error.to_string()),
             );
         }

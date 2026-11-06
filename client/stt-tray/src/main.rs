@@ -25,6 +25,24 @@ fn main() -> ExitCode {
     }
     #[cfg(not(feature = "tray-menu"))]
     {
-        stt_client::supervise_until_stopped(&dirs)
+        supervise_virtually(&dirs)
     }
+}
+
+/// The tray without an icon ([`stt_client::supervise_until_stopped`]) until the unit stops.
+fn supervise_virtually(dirs: &ServiceDirs) -> ExitCode {
+    block_on(stt_client::supervise_until_stopped(dirs)).unwrap_or_else(|error| {
+        eprintln!("stt-tray: {error}");
+        ExitCode::FAILURE
+    })
+}
+
+/// Runs `future` to its end on a runtime of its own on the calling thread. The tray's event loop
+/// owns the main thread, so each piece of the tray's async work - the supervision on its thread, a
+/// quit from the menu - drives its own.
+fn block_on<F: Future>(future: F) -> std::io::Result<F::Output> {
+    Ok(tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(future))
 }

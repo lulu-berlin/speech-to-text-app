@@ -38,7 +38,7 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
     // runs the virtual tray ADR 0064 allows - the state a shell session and a CI runner are in.
     if !has_a_screen() {
         eprintln!("stt-tray: no display; supervising without an icon");
-        return stt_client::supervise_until_stopped(dirs);
+        return crate::supervise_virtually(dirs);
     }
     let event_loop = EventLoopBuilder::<TrayEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
@@ -65,33 +65,35 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
         Ok(Err(error)) => {
             eprintln!("stt-tray: no tray host ({error}); supervising without an icon");
             MenuEvent::set_event_handler::<fn(MenuEvent)>(None);
-            return stt_client::supervise_until_stopped(dirs);
+            return crate::supervise_virtually(dirs);
         }
         Err(_) => {
             eprintln!("stt-tray: no tray host library; supervising without an icon");
             MenuEvent::set_event_handler::<fn(MenuEvent)>(None);
-            return stt_client::supervise_until_stopped(dirs);
+            return crate::supervise_virtually(dirs);
         }
     };
 
     let supervised = dirs.clone();
     let stopper = proxy.clone();
     thread::spawn(move || {
-        let mut supervisor = Supervisor::new();
-        let mut registered = false;
-        loop {
-            match stt_client::watch_and_register(&mut supervisor, &supervised, &mut registered) {
-                Watch::Stopped => {
-                    let _ = stopper.send_event(TrayEvent::UnitStopped);
-                    return;
+        let supervision = crate::block_on(async {
+            let mut supervisor = Supervisor::new();
+            let mut registered = false;
+            loop {
+                match stt_client::watch_and_register(&mut supervisor, &supervised, &mut registered)
+                    .await
+                {
+                    Watch::Stopped => return TrayEvent::UnitStopped,
+                    Watch::Stop(error) => return TrayEvent::Stopped(error.to_string()),
+                    Watch::Alive | Watch::Restarted => {
+                        tokio::time::sleep(stt_client::LOOK_INTERVAL).await
+                    }
                 }
-                Watch::Stop(error) => {
-                    let _ = stopper.send_event(TrayEvent::Stopped(error.to_string()));
-                    return;
-                }
-                Watch::Alive | Watch::Restarted => thread::sleep(stt_client::LOOK_INTERVAL),
             }
-        }
+        });
+        let _ = stopper
+            .send_event(supervision.unwrap_or_else(|error| TrayEvent::Stopped(error.to_string())));
     });
 
     // The registry is install-time data: watch it so a frontend installed while the tray runs shows
@@ -118,7 +120,7 @@ pub fn run(dirs: &ServiceDirs) -> ExitCode {
         *control_flow = ControlFlow::Wait;
         match event {
             Event::UserEvent(TrayEvent::Menu(id)) if id == "quit" => {
-                let _ = quit(&owned);
+                let _ = crate::block_on(quit(&owned));
                 *control_flow = ControlFlow::Exit;
             }
             Event::UserEvent(TrayEvent::Menu(id)) => {

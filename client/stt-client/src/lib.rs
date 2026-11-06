@@ -5,7 +5,6 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
-use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
 use serde::Deserialize;
@@ -165,14 +164,14 @@ fn runtime_file(dirs: &ServiceDirs) -> PathBuf {
 /// secret from `config.json`. The endpoint counts only when it answers `GET /api/health` with
 /// `200` to the secret: a `runtime.json` left by a crash, a port another program took, or a
 /// service that hangs is `NotFound`, the same as no `runtime.json` at all.
-pub fn locate(dirs: &ServiceDirs) -> io::Result<Service> {
+pub async fn locate(dirs: &ServiceDirs) -> io::Result<Service> {
     let runtime: Runtime = read_json(&runtime_file(dirs))?;
     let config: Config = read_json(&dirs.config_dir.join("config.json"))?;
     let service = Service {
         endpoint: runtime.endpoint,
         secret: config.secret,
     };
-    if answers_as_the_service(&service) {
+    if answers_as_the_service(&service).await {
         Ok(service)
     } else {
         Err(io::Error::new(
@@ -264,11 +263,11 @@ pub struct StartOrAttach {
 /// `locate`'s result, or - when no service answers - [start] once and its result, polled until the
 /// service answers `HEALTH_TIMEOUT`'s worth of attempts: a client starts the service only when
 /// none runs (roadmap item 66, item 4), and never a second one.
-pub fn ensure_service(
+pub async fn ensure_service(
     dirs: &ServiceDirs,
     start: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<StartOrAttach> {
-    let error = match locate(dirs) {
+    let error = match locate(dirs).await {
         Ok(service) => {
             return Ok(StartOrAttach {
                 service,
@@ -284,7 +283,7 @@ pub fn ensure_service(
     let deadline = Instant::now() + START_TIMEOUT;
     let mut last = error;
     while Instant::now() < deadline {
-        match locate(dirs) {
+        match locate(dirs).await {
             Ok(service) => {
                 return Ok(StartOrAttach {
                     service,
@@ -293,7 +292,7 @@ pub fn ensure_service(
             }
             Err(error) => last = error,
         }
-        thread::sleep(POLL_INTERVAL);
+        tokio::time::sleep(POLL_INTERVAL).await;
     }
     Err(io::Error::new(
         io::ErrorKind::TimedOut,
@@ -306,16 +305,16 @@ pub fn ensure_service(
 /// its tray, so a launch that attached starts nothing. The unit is both up or both down: when the
 /// tray cannot start, the service this launch started is stopped again and the error names the
 /// tray.
-pub fn ensure_unit(
+pub async fn ensure_unit(
     dirs: &ServiceDirs,
     start_service: impl FnOnce() -> io::Result<()>,
     start_tray: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<StartOrAttach> {
-    let run = ensure_service(dirs, start_service)?;
+    let run = ensure_service(dirs, start_service).await?;
     if run.started
         && let Err(error) = start_tray()
     {
-        let message = match quit(dirs) {
+        let message = match quit(dirs).await {
             Ok(()) => format!(
                 "the tray could not start: {error}; the service this launch started was stopped again"
             ),
@@ -331,12 +330,15 @@ pub fn ensure_unit(
 /// Tells the running [service] which tray it is (ADR 0064): the tray's [pid] and the [command] that
 /// starts it again, so the service can restart the tray when it dies. ApiError only; a service that
 /// is not app mode has no such route and answers 404.
-pub fn register_tray(service: &Service, pid: u32, command: &[String]) -> io::Result<()> {
+pub async fn register_tray(service: &Service, pid: u32, command: &[String]) -> io::Result<()> {
     let body = serde_json::json!({ "pid": pid, "command": command }).to_string();
-    let response = ureq::post(format!("{}/api/tray", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
+    let response = reqwest::Client::new()
+        .post(format!("{}/api/tray", service.endpoint))
+        .bearer_auth(&service.secret)
         .header("Content-Type", "application/json")
-        .send(body)
+        .body(body)
+        .send()
+        .await
         .map_err(io::Error::other)?;
     let status = response.status();
     if status.is_success() {
@@ -352,27 +354,27 @@ pub fn register_tray(service: &Service, pid: u32, command: &[String]) -> io::Res
 /// tray's whole body when `stt-tray` is built without the `tray-menu` feature): it watches the
 /// service, restarts it, registers itself so the service can restart it in turn, and ends the
 /// process when the unit stops or cannot be kept up.
-pub fn supervise_until_stopped(dirs: &ServiceDirs) -> ExitCode {
+pub async fn supervise_until_stopped(dirs: &ServiceDirs) -> ExitCode {
     let mut supervisor = Supervisor::new();
     // Whether the service this tray belongs to knows it: every service process needs its own
     // registration, so a restart of the service registers the tray again (ADR 0064).
     let mut registered = false;
     loop {
-        match watch_and_register(&mut supervisor, dirs, &mut registered) {
+        match watch_and_register(&mut supervisor, dirs, &mut registered).await {
             Watch::Stopped => return ExitCode::SUCCESS,
             Watch::Stop(error) => {
                 eprintln!("stt-tray: {error}; the tray stops too");
                 return ExitCode::FAILURE;
             }
             Watch::Restarted => {
-                registered = register_self(dirs);
-                thread::sleep(LOOK_INTERVAL);
+                registered = register_self(dirs).await;
+                tokio::time::sleep(LOOK_INTERVAL).await;
             }
             Watch::Alive => {
                 if !registered {
-                    registered = register_self(dirs);
+                    registered = register_self(dirs).await;
                 }
-                thread::sleep(LOOK_INTERVAL);
+                tokio::time::sleep(LOOK_INTERVAL).await;
             }
         }
     }
@@ -381,15 +383,17 @@ pub fn supervise_until_stopped(dirs: &ServiceDirs) -> ExitCode {
 /// One look at the service, plus the tray's registration (ADR 0064): a tray tells each service
 /// process who it is, so the service can start it again when it dies. Both the virtual tray and the
 /// one with an icon take this step, so the two cannot drift apart.
-pub fn watch_and_register(
+pub async fn watch_and_register(
     supervisor: &mut Supervisor,
     dirs: &ServiceDirs,
     registered: &mut bool,
 ) -> Watch {
-    let watch = supervisor.watch(dirs, Instant::now(), || start_runner_beside(dirs));
+    let watch = supervisor
+        .watch(dirs, Instant::now(), || start_runner_beside(dirs))
+        .await;
     match watch {
-        Watch::Restarted => *registered = register_self(dirs),
-        Watch::Alive if !*registered => *registered = register_self(dirs),
+        Watch::Restarted => *registered = register_self(dirs).await,
+        Watch::Alive if !*registered => *registered = register_self(dirs).await,
         Watch::Alive | Watch::Stopped | Watch::Stop(_) => {}
     }
     watch
@@ -400,11 +404,13 @@ pub const LOOK_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Tells the service who this tray is, so the service can start it again when it dies. False while
 /// no service answers yet or the registration failed; the next look tries again.
-fn register_self(dirs: &ServiceDirs) -> bool {
-    let registered = locate(dirs).and_then(|service| {
+async fn register_self(dirs: &ServiceDirs) -> bool {
+    let registered = async {
+        let service = locate(dirs).await?;
         let command = vec![std::env::current_exe()?.to_string_lossy().into_owned()];
-        register_tray(&service, std::process::id(), &command)
-    });
+        register_tray(&service, std::process::id(), &command).await
+    }
+    .await;
     match registered {
         Ok(()) => true,
         Err(error) => {
@@ -433,11 +439,11 @@ pub enum Watch {
 /// again through [restart] and waited for, and a restart that fails - or a service that never
 /// answers after it - means the tray stops too. A missing `runtime.json` is a clean stop, which the
 /// tray honours rather than undoing.
-pub fn watch_service(dirs: &ServiceDirs, restart: impl FnOnce() -> io::Result<()>) -> Watch {
+pub async fn watch_service(dirs: &ServiceDirs, restart: impl FnOnce() -> io::Result<()>) -> Watch {
     if !runtime_file(dirs).exists() {
         return Watch::Stopped;
     }
-    match ensure_service(dirs, restart) {
+    match ensure_service(dirs, restart).await {
         Ok(StartOrAttach { started: false, .. }) => Watch::Alive,
         Ok(StartOrAttach { started: true, .. }) => Watch::Restarted,
         Err(error) => Watch::Stop(error),
@@ -463,7 +469,7 @@ impl Supervisor {
 
     /// One look at the service at `now`, like [`watch_service`]; a restart beyond
     /// [`RESTART_LIMIT`] within [`RESTART_WINDOW`] is refused and stops the tray.
-    pub fn watch(
+    pub async fn watch(
         &mut self,
         dirs: &ServiceDirs,
         now: Instant,
@@ -482,6 +488,7 @@ impl Supervisor {
             restarts.push(now);
             restart()
         })
+        .await
     }
 }
 
@@ -493,22 +500,22 @@ const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Whether `service`'s endpoint answers `GET /api/health` with `200` to its secret in time.
-fn answers_as_the_service(service: &Service) -> bool {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(HEALTH_TIMEOUT))
-        .build()
-        .into();
-    agent
+async fn answers_as_the_service(service: &Service) -> bool {
+    let Ok(client) = reqwest::Client::builder().timeout(HEALTH_TIMEOUT).build() else {
+        return false;
+    };
+    client
         .get(format!("{}/api/health", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .call()
-        .is_ok_and(|response| response.status() == 200)
+        .bearer_auth(&service.secret)
+        .send()
+        .await
+        .is_ok_and(|response| response.status() == reqwest::StatusCode::OK)
 }
 
 /// Asks the running service to stop (roadmap item 66, item 4): `POST /api/quit` with the per-install
 /// secret, which the service answers `202 Accepted` before it stops. `NotFound` means no service runs.
-pub fn quit(dirs: &ServiceDirs) -> io::Result<()> {
-    let service = locate(dirs).map_err(|error| {
+pub async fn quit(dirs: &ServiceDirs) -> io::Result<()> {
+    let service = locate(dirs).await.map_err(|error| {
         if error.kind() == io::ErrorKind::NotFound {
             io::Error::new(
                 io::ErrorKind::NotFound,
@@ -518,12 +525,14 @@ pub fn quit(dirs: &ServiceDirs) -> io::Result<()> {
             error
         }
     })?;
-    let response = ureq::post(format!("{}/api/quit", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .send_empty()
+    let response = reqwest::Client::new()
+        .post(format!("{}/api/quit", service.endpoint))
+        .bearer_auth(&service.secret)
+        .send()
+        .await
         .map_err(io::Error::other)?;
     let status = response.status();
-    if status == 202 {
+    if status == reqwest::StatusCode::ACCEPTED {
         Ok(())
     } else {
         Err(io::Error::other(format!(
@@ -541,14 +550,16 @@ struct LaunchToken {
 /// The one-time browser URL of the running `service`: a token from `POST /api/launch-token`,
 /// asked for with the per-install secret as `Authorization: Bearer`, opened as
 /// `<endpoint>/open?t=<token>`. The secret itself never appears in the URL.
-pub fn launch_url(service: &Service) -> io::Result<String> {
-    let mut response = ureq::post(format!("{}/api/launch-token", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .send_empty()
-        .map_err(io::Error::other)?;
-    let body = response
-        .body_mut()
-        .read_to_string()
+pub async fn launch_url(service: &Service) -> io::Result<String> {
+    let body = reqwest::Client::new()
+        .post(format!("{}/api/launch-token", service.endpoint))
+        .bearer_auth(&service.secret)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(io::Error::other)?
+        .text()
+        .await
         .map_err(io::Error::other)?;
     let launch: LaunchToken = parse_json(&body)?;
     Ok(format!("{}/open?t={}", service.endpoint, launch.token))
@@ -594,7 +605,7 @@ pub struct OpenPlan {
 /// for its one-time URL and opens the default browser there; a terminal frontend goes through the
 /// OS terminal chain ([terminal_command]); a GUI one runs its own command. `service` is `None` when
 /// none runs, which only the browser needs.
-pub fn open_plan(
+pub async fn open_plan(
     descriptor: &Descriptor,
     service: Option<&Service>,
     os: Os,
@@ -607,7 +618,8 @@ pub fn open_plan(
                     io::ErrorKind::NotFound,
                     "no running service answers, and the browser frontend needs one",
                 )
-            })?)?;
+            })?)
+            .await?;
             Ok(OpenPlan {
                 command: browser_command(&url, os),
                 url: Some(url),
@@ -765,24 +777,26 @@ struct Settings {
 }
 
 /// The id of the default frontend the user picked in the settings (roadmap item 66), or `None` while none is set.
-pub fn default_frontend(service: &Service) -> io::Result<Option<String>> {
-    Ok(settings_of(service)?.default_frontend)
+pub async fn default_frontend(service: &Service) -> io::Result<Option<String>> {
+    Ok(settings_of(service).await?.default_frontend)
 }
 
 /// The terminal command the user set for the TUI (roadmap item 66, D10), or `None` for the OS launcher.
-pub fn terminal_command_setting(service: &Service) -> io::Result<Option<String>> {
-    Ok(settings_of(service)?.terminal_command)
+pub async fn terminal_command_setting(service: &Service) -> io::Result<Option<String>> {
+    Ok(settings_of(service).await?.terminal_command)
 }
 
 /// `GET /api/settings` with the per-install secret.
-fn settings_of(service: &Service) -> io::Result<Settings> {
-    let mut response = ureq::get(format!("{}/api/settings", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .call()
-        .map_err(io::Error::other)?;
-    let body = response
-        .body_mut()
-        .read_to_string()
+async fn settings_of(service: &Service) -> io::Result<Settings> {
+    let body = reqwest::Client::new()
+        .get(format!("{}/api/settings", service.endpoint))
+        .bearer_auth(&service.secret)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(io::Error::other)?
+        .text()
+        .await
         .map_err(io::Error::other)?;
     parse_json(&body)
 }
