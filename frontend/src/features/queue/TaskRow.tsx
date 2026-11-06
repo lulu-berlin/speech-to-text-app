@@ -18,6 +18,7 @@ import { IconButton } from '../../shared/ui/IconButton';
 import { ListRow } from '../../shared/ui/ListRow';
 import { ProgressBar } from '../../shared/ui/ProgressBar';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
+import { t } from '../../shared/ui/text';
 import { Stack } from '../../shared/ui/layout';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { rowActionMachine } from './rowActionMachine';
@@ -86,9 +87,9 @@ const CONTROLS: {
   icon: LucideIcon;
   verb: string;
 }[] = [
-  { command: 'pause', icon: Pause, verb: 'Pause' },
-  { command: 'resume', icon: Play, verb: 'Resume' },
-  { command: 'cancel', icon: X, verb: 'Cancel' },
+  { command: 'pause', icon: Pause, verb: t('task.pause') },
+  { command: 'resume', icon: Play, verb: t('task.resume') },
+  { command: 'cancel', icon: X, verb: t('task.cancel') },
 ];
 
 export interface TaskRowProps {
@@ -319,7 +320,7 @@ export function TaskRow({
       <ConfirmDialog
         open={confirmingAction === 'cancel'}
         title={`Cancel ${task.filename}?`}
-        confirmLabel="Cancel task"
+        confirmLabel={t('task.cancel-confirm')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
         onConfirm={() => send({ type: 'CONFIRM' })}

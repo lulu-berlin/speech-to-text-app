@@ -17,6 +17,10 @@ tokio-util = { version = "0.7", features = ["io"] }
 # Splits the user's `terminalCommand` setting the way a POSIX shell splits a command line.
 shlex = "2"
 
+[build-dependencies]
+# Reads `ui-text/<locale>.json` into the constants the crate compiles in (ADR 0066).
+serde_json = "1"
+
 [dev-dependencies]
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt"] }

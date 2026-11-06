@@ -14,7 +14,7 @@ use ratatui::DefaultTerminal;
 use ratatui::crossterm::event as terminal_event;
 use stt_client::{
     Event, Service, ServiceDirs, Snapshot, events, locate, reorder_queue, set_queue_paused,
-    task_command, upload,
+    task_command, text, upload,
 };
 
 use crate::input::Action;
@@ -154,13 +154,13 @@ fn show(
                     Action::SubmitPrompt => {
                         let path = prompt.take().unwrap_or_default().trim().to_string();
                         if path.is_empty() {
-                            notice = Some("no file path given".to_string());
+                            notice = Some(text("upload.no-path", &[]));
                         } else {
                             let service = service.clone();
-                            dispatch(&runtime, &sender, "upload failed", async move {
-                                upload(&service, Path::new(&path))
-                                    .await
-                                    .map(|task| format!("queued {}", task.filename))
+                            dispatch(&runtime, &sender, "upload.failed", async move {
+                                upload(&service, Path::new(&path)).await.map(|task| {
+                                    text("upload.queued", &[("filename", &task.filename)])
+                                })
                             });
                         }
                     }
@@ -177,13 +177,16 @@ fn show(
                     Action::ToggleQueuePause => {
                         let paused = snapshot.as_ref().is_some_and(|s| s.queue.paused);
                         let service = service.clone();
-                        dispatch(&runtime, &sender, "command failed", async move {
+                        dispatch(&runtime, &sender, "command.failed", async move {
                             set_queue_paused(&service, !paused).await.map(|queue| {
-                                if queue.paused {
-                                    "queue paused".to_string()
-                                } else {
-                                    "queue running".to_string()
-                                }
+                                text(
+                                    if queue.paused {
+                                        "queue.paused"
+                                    } else {
+                                        "queue.running"
+                                    },
+                                    &[],
+                                )
                             })
                         });
                     }
@@ -193,10 +196,13 @@ fn show(
                         {
                             let id = task.id;
                             let service = service.clone();
-                            dispatch(&runtime, &sender, "command failed", async move {
-                                task_command(&service, id, command)
-                                    .await
-                                    .map(|task| format!("{} {}", task.filename, task.status))
+                            dispatch(&runtime, &sender, "command.failed", async move {
+                                task_command(&service, id, command).await.map(|task| {
+                                    text(
+                                        "task.command-done",
+                                        &[("filename", &task.filename), ("status", &task.status)],
+                                    )
+                                })
                             });
                         }
                     }
@@ -242,10 +248,10 @@ fn move_selected(
     let mut ids = queue.task_ids.clone();
     ids.swap(from, to);
     let service = service.clone();
-    dispatch(runtime, sender, "command failed", async move {
+    dispatch(runtime, sender, "command.failed", async move {
         reorder_queue(&service, &ids)
             .await
-            .map(|_| "queue reordered".to_string())
+            .map(|_| text("queue.reordered", &[]))
     });
 }
 
@@ -261,11 +267,11 @@ fn dispatch<F>(
 {
     let sender = sender.clone();
     runtime.spawn(async move {
-        let text = match future.await {
-            Ok(text) => text,
-            Err(error) => format!("{failure}: {error}"),
+        let notice = match future.await {
+            Ok(notice) => notice,
+            Err(error) => text(failure, &[("error", &error.to_string())]),
         };
-        let _ = sender.send(Message::Notice(text));
+        let _ = sender.send(Message::Notice(notice));
     });
 }
 

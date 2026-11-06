@@ -12,6 +12,7 @@ import { styled } from 'styled-components';
 import { UploadOptionsPanel } from './UploadOptionsPanel';
 import type { SpeakersChoice } from './UploadOptionsPanel';
 import { TextLink } from '../../shared/ui/TextLink';
+import { t } from '../../shared/ui/text';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { finishedStatus, pendingStatus } from '../../shared/api/types';
@@ -369,7 +370,7 @@ export function QueueView() {
   return (
     <Page>
       <Stack gap="lg">
-        <PageHeading>Queue</PageHeading>
+        <PageHeading>{t('queue.title')}</PageHeading>
         <DeviceFallbackBanner />
         {notices.context.notices.length > 0 ? (
           <Stack gap="sm">
@@ -422,7 +423,7 @@ export function QueueView() {
           }}
         />
         {visibleRows.length > 0 ? (
-          <List label="Uploads">
+          <List label={t('queue.uploads')}>
             {visibleRows.map((row) => (
               <ListRow key={row.id}>
                 <RowContent>
@@ -434,11 +435,11 @@ export function QueueView() {
           </List>
         ) : null}
         <Row gap="sm">
-          <span>Pause the queue</span>
+          <span>{t('queue.pause')}</span>
           <Switch
             checked={queue?.paused ?? false}
             onCheckedChange={() => sendPause({ type: 'TOGGLE', paused: !(queue?.paused ?? false) })}
-            label="Pause the queue"
+            label={t('queue.pause')}
             disabled={pause.matches('sending') || writes.disabled}
             title={writes.title}
           />

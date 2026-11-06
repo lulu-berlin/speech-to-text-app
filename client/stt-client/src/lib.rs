@@ -14,11 +14,13 @@ mod autostart;
 mod commands;
 mod events;
 mod quote;
+mod text;
 mod upload;
 
 pub use autostart::{Autostart, autostart_entry, install, remove};
 pub use commands::{TaskCommand, reorder_queue, set_queue_paused, task_command};
 pub use events::{Event, Events, Queue, Snapshot, Task, TaskProgress, events};
+pub use text::{DEFAULT_LOCALE, catalog, text, text_in};
 pub use upload::{allowed_extension, upload};
 
 /// The per-user directories the service keeps its bootstrap files in: the durable `config.json` in

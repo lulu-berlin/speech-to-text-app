@@ -34,7 +34,14 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         ])
     });
     let paused = view.snapshot.is_some_and(|snapshot| snapshot.queue.paused);
-    let title = if paused { "Queue (paused)" } else { "Queue" };
+    let title = stt_client::text(
+        if paused {
+            "queue.title-paused"
+        } else {
+            "queue.title"
+        },
+        &[],
+    );
     let table = Table::new(
         rows,
         [
@@ -48,7 +55,10 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     let mut state = TableState::default().with_selected(Some(view.selected));
     frame.render_stateful_widget(table, areas[0], &mut state);
     if let Some(path) = view.prompt {
-        frame.render_widget(Paragraph::new(format!("Upload: {path}")), areas[1]);
+        frame.render_widget(
+            Paragraph::new(stt_client::text("upload.prompt", &[("path", path)])),
+            areas[1],
+        );
     }
     if let Some(notice) = view.notice {
         frame.render_widget(Paragraph::new(notice), areas[2]);

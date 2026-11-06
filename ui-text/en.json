@@ -1,0 +1,19 @@
+{
+  "queue.title": "Queue",
+  "queue.title-paused": "Queue (paused)",
+  "queue.uploads": "Uploads",
+  "queue.pause": "Pause the queue",
+  "queue.paused": "queue paused",
+  "queue.running": "queue running",
+  "queue.reordered": "queue reordered",
+  "upload.prompt": "Upload: {path}",
+  "upload.no-path": "no file path given",
+  "upload.queued": "queued {filename}",
+  "upload.failed": "upload failed: {error}",
+  "command.failed": "command failed: {error}",
+  "task.command-done": "{filename} {status}",
+  "task.pause": "Pause",
+  "task.resume": "Resume",
+  "task.cancel": "Cancel",
+  "task.cancel-confirm": "Cancel task"
+}
