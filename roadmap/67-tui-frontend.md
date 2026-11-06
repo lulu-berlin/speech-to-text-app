@@ -178,8 +178,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       too large) shows the service's message and leaves the UI usable
 - [ ] (discovered, 2026-11-06) A speaker rename or merge made in the browser relabels a transcript
       open in the TUI (the `speakers-renamed` / `speakers-merged` events)
-- [ ] (discovered, 2026-11-06) A rename the service refuses (a duplicate name, an invalid name)
-      shows the service's message and the speaker keeps its name
+- [ ] (discovered, 2026-11-06) A rename or merge the service refuses (a duplicate or invalid name,
+      an invalid merge) shows the service's message and nothing changes
 - [x] (must not break) The TUI's text and the browser's queue and upload text come from the one
       catalog (`ui-text/en.json`): both render its entries, and a missing key shows itself —
       `client/stt-client/tests/text.rs`, `frontend/src/features/queue/QueueView.test.tsx` (the
@@ -334,3 +334,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   holds the only merge). The Goal, Evidence, Decisions, Proposal and Acceptance wording no longer
   names it, and the test-list line "Two completed tasks can be merged from the TUI, and the merged
   task appears with its transcript" is removed; the speaker merge is the ticked rename/merge line.
+- 2026-11-06 (workspace, cycle-10 checkpoint): the user approved the refactor — the pty tests
+  that start in a transcript (`download.rs`, both `speakers.rs` tests) open it through one
+  `terminal::open_transcript` helper; `history.rs`, which tests the opening itself, keeps its own
+  steps (`cbe21b36`, 58 tests green). The refused-rename line now also covers a refused merge
+  (reworded at the user's request). Next: settings, first half (device, threads, upload defaults).
