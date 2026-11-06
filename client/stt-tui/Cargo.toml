@@ -9,7 +9,7 @@ publish.workspace = true
 stt-client = { path = "../stt-client" }
 # The terminal UI (roadmap item 67, decided 2026-10-22): ratatui on its crossterm backend.
 ratatui = "0.30"
-tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 
 [dev-dependencies]
 # The TUI's tests run the real binary in a pseudo-terminal (a Unix pty, a Windows ConPTY) and read

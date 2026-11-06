@@ -15,7 +15,7 @@ mod events;
 mod quote;
 
 pub use autostart::{Autostart, autostart_entry, install, remove};
-pub use events::{Event, Events, Queue, Snapshot, Task, events};
+pub use events::{Event, Events, Queue, Snapshot, Task, TaskProgress, events};
 
 /// The per-user directories the service keeps its bootstrap files in: the durable `config.json` in
 /// `config_dir`, the ephemeral `runtime.json` in `runtime_dir`.

@@ -163,3 +163,76 @@ pub fn service_with_events(
     });
     (port, authorization)
 }
+
+/// A stand-in service whose event streams the test writes itself: it answers the health check, and
+/// hands every `GET /api/events` connection, its response head already sent, to the test.
+pub struct EventService {
+    pub port: u16,
+    streams: std::sync::mpsc::Receiver<EventStream>,
+}
+
+/// One open event stream of an [`EventService`]; dropping it closes the connection, as a service
+/// that went away would.
+pub struct EventStream {
+    stream: std::net::TcpStream,
+    /// The `Authorization` header the stream was asked for with.
+    pub authorization: Option<String>,
+}
+
+impl EventService {
+    pub fn start() -> EventService {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (handed, streams) = std::sync::mpsc::channel();
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let request = crate::support::read(&mut stream);
+                if request.line.starts_with("GET /api/events ") {
+                    write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n\r\n"
+                    )
+                    .unwrap();
+                    stream.flush().unwrap();
+                    let authorization = request.header("Authorization").map(str::to_owned);
+                    if handed
+                        .send(EventStream {
+                            stream,
+                            authorization,
+                        })
+                        .is_err()
+                    {
+                        return;
+                    }
+                } else {
+                    let (status, body) = crate::support::healthy();
+                    crate::support::respond(&mut stream, status, &body);
+                }
+            }
+        });
+        EventService { port, streams }
+    }
+
+    /// The next event stream a client opens, or a panic after `timeout`.
+    pub fn next_stream(&self, timeout: Duration) -> EventStream {
+        self.streams
+            .recv_timeout(timeout)
+            .unwrap_or_else(|_| panic!("no event stream was opened within {timeout:?}"))
+    }
+}
+
+impl EventStream {
+    /// Sends the event `name` with `json` as its data, one `data:` line per JSON line.
+    pub fn send(&mut self, name: &str, json: &str) {
+        let data: String = json.lines().map(|line| format!("data: {line}\n")).collect();
+        write!(self.stream, "event: {name}\n{data}\n").unwrap();
+        self.stream.flush().unwrap();
+    }
+}
+
+impl Drop for EventStream {
+    fn drop(&mut self) {
+        let _ = self.stream.shutdown(std::net::Shutdown::Both);
+    }
+}

@@ -34,10 +34,23 @@ pub struct Snapshot {
     pub queue: Queue,
 }
 
+/// The progress of a running task (`task-progress.json`).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskProgress {
+    pub id: i64,
+    pub transcription_progress: f64,
+}
+
 /// One event of the stream.
 #[derive(Debug)]
 pub enum Event {
     Snapshot(Snapshot),
+    /// A task changed (`task-updated`): the whole task as it is now.
+    TaskUpdated(Task),
+    TaskProgress(TaskProgress),
+    /// The queue changed (`queue-updated`): its order or its pause.
+    QueueUpdated(Queue),
     /// An event this client does not read yet, by its name.
     Other(String),
 }
@@ -84,6 +97,9 @@ impl Events {
 fn decode(frame: Frame) -> io::Result<Event> {
     match frame.name.as_str() {
         "snapshot" => parse_json(&frame.data).map(Event::Snapshot),
+        "task-updated" => parse_json(&frame.data).map(Event::TaskUpdated),
+        "task-progress" => parse_json(&frame.data).map(Event::TaskProgress),
+        "queue-updated" => parse_json(&frame.data).map(Event::QueueUpdated),
         _ => Ok(Event::Other(frame.name)),
     }
 }
