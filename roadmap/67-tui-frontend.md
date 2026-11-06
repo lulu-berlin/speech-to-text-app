@@ -143,8 +143,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [x] (basic) History lists completed tasks; opening one shows the transcript with speaker turns;
       the download command writes the chosen format to the given path, and a bad path reports an
       error — `stt-tui/tests/history.rs`, `af491974`; `stt-tui/tests/download.rs`, `f73e45b0`
-- [ ] (basic) Settings edits (device, threads, upload defaults, default frontend, terminal command)
-      persist and appear in the browser
+- [x] (basic) Settings edits (device, threads, upload defaults, default frontend, terminal command)
+      persist and appear in the browser - `stt-tui/tests/settings.rs`: threads `b36a1145`; device,
+      language and the speaker settings `a87db73c`; default frontend and terminal command `65d155d9`
+      (the requests are the browser's own `PUT /api/settings`)
 - [x] (basic) The transcript view merges and renames a task's speakers, and the browser shows the
       same speakers after a reload - `stt-tui/tests/speakers.rs`: rename `85b8ffae`, merge
       `704673f5` (the requests are the browser's own calls to the shared backend)
@@ -371,3 +373,13 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   and fixed after the settings line — and approved the refactor: `open_history`, `open_transcript`
   and `open_settings` share one `fetch` helper (`1673d7ce`, 60 tests green). Next: the default
   frontend and the terminal command, which completes the settings line.
+- 2026-11-06 (workspace, cycle 13): "the default frontend and the terminal command" (the settings
+  line). Red ran on `a1771fd4` with the cycle's uncommitted pty test: `s` fetched the settings but
+  not `GET /api/frontends` (`no GET arrived within 20s`, `terminal/mod.rs:315`). The first green
+  attempt exposed two test-side faults, both fixed without weakening an assertion: the older
+  settings tests had to answer the frontends read too, and the Down presses were a raw `ESC B`
+  rather than the CSI sequence. Green on the same tree plus `stt-client::frontends` and the two
+  rows: the default frontend steps through none and the installed ids, and Enter on the terminal
+  command opens a prompt holding it whose Enter saves the trimmed command (an emptied one as null,
+  the OS launcher). Each change is one `PUT /api/settings`; committed as `65d155d9` (61 tests; fmt
+  and clippy green; the `stt-tui` suite green in 3 repeats). The settings line is ticked.
