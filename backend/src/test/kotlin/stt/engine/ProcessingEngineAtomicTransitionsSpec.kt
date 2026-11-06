@@ -7,10 +7,13 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.test.runTest
+import stt.db.CountingMutex
 import stt.db.Database
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
 import stt.db.TestDataDir
+import stt.db.holdWriteTransaction
+import stt.db.queueWrite
 import stt.db.queuedTask
 import stt.db.rowCount
 import stt.queue.TaskStatus

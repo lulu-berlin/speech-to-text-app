@@ -2,9 +2,7 @@
 
 package stt.engine
 
-import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.nulls.shouldNotBeNull
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -14,15 +12,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.withContext
@@ -45,7 +39,6 @@ import stt.db.Task
 import stt.db.TaskPhase
 import stt.db.TaskRepository
 import stt.db.TestDataDir
-import stt.db.insertTaskRow
 import stt.db.queuedTask
 import stt.process.ProcessPlatform
 import stt.queue.TaskStatus
@@ -57,10 +50,6 @@ import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import kotlin.coroutines.AbstractCoroutineContextElement
-import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -400,162 +389,8 @@ internal suspend fun storeChunkedPlan(
     fixture.chunker.canonical.toCanonicalRows(),
 )
 
-// Deterministic race machinery (roadmap item 40): the atomic-transition specs interleave two commands by
-// holding the writer lock, queuing the losing write first and the winner's write second, and releasing —
-// the lock grants waiters in FIFO order, so the commit order is the launch order and the test is exact,
-// not probabilistic.
-
-/**
- * Names a coroutine that takes the writer lock: a race spec launches each racing write with its own
- * [LockWriter], so it can wait for exactly that write to queue. A context element, not the coroutine's
- * `Job`: `withContext` replaces the `Job` (the cancel's write runs under `NonCancellable`) but keeps the
- * element, and the engine worker's own writes never carry one.
- */
-internal class LockWriter(
-    private val name: String,
-) : AbstractCoroutineContextElement(Key) {
-    companion object Key : CoroutineContext.Key<LockWriter>
-
-    override fun toString() = name
-}
-
-/**
- * A [Mutex] that records which [LockWriter]s have called lock(), so a test can see a racing write reach it.
- * Each call takes a ticket in the same critical section as its record and is served in ticket order, so a
- * thread preempted right after its record cannot be overtaken by a later writer.
- */
-internal class CountingMutex(
-    private val delegate: Mutex = Mutex(),
-) : Mutex by delegate {
-    /** The writers that have called lock(); it only grows, so a wait for one writer cannot miss it. */
-    val writers = MutableStateFlow<Set<LockWriter>>(emptySet())
-
-    /**
-     * Test-only: suspends a writer after it takes its ticket and before it waits for its turn, so a spec
-     * can preempt it in that gap on purpose.
-     */
-    @Volatile
-    var holdBeforeWait: CompletableDeferred<Unit>? = null
-
-    private val state = Any()
-    private val waiters = ArrayDeque<CompletableDeferred<Unit>>()
-    private var held = false
-
-    override suspend fun lock(owner: Any?) {
-        val writer = currentCoroutineContext()[LockWriter]
-        val turn = CompletableDeferred<Unit>()
-        synchronized(state) {
-            writer?.let { calling -> writers.update { current -> current + calling } }
-            if (held) {
-                waiters.addLast(turn)
-            } else {
-                held = true
-                turn.complete(Unit)
-            }
-        }
-        try {
-            holdBeforeWait?.await()
-            turn.await()
-            delegate.lock(owner)
-        } catch (e: CancellationException) {
-            // A cancelled waiter must not stall the tickets behind it: drop its ticket, or pass on a turn it
-            // was already granted (delegate.lock is cancellation-safe, so it never holds the lock here).
-            synchronized(state) {
-                if (turn.isCompleted) {
-                    releaseTurn()
-                } else {
-                    waiters.remove(turn)
-                }
-            }
-            throw e
-        }
-    }
-
-    override fun unlock(owner: Any?) {
-        delegate.unlock(owner)
-        synchronized(state) {
-            releaseTurn()
-        }
-    }
-
-    /** Releases the held turn and serves the next ticket; the caller holds [state]. */
-    private fun releaseTurn() {
-        held = false
-        serveNext()
-    }
-
-    /** Grants the turn to the next ticket; the caller holds [state]. */
-    private fun serveNext() {
-        val next = waiters.removeFirstOrNull() ?: return
-        held = true
-        next.complete(Unit)
-    }
-}
-
-/** A write transaction held open on the writer connection; once released it fails, so it rolls back. */
-internal class HeldWrite(
-    private val releaseLatch: CountDownLatch,
-    val outcome: Deferred<Result<Unit>>,
-) {
-    fun release() = releaseLatch.countDown()
-}
-
-/**
- * Starts a write transaction that inserts [task] and stays open until released; returns once it is open.
- * The held transaction owns the writer lock, so every write launched after it waits behind it (reads do
- * not: they use their own read-only connections).
- */
-internal suspend fun CoroutineScope.holdWriteTransaction(
-    db: Database,
-    task: Task,
-): HeldWrite {
-    val held = CountDownLatch(1)
-    val release = CountDownLatch(1)
-    val outcome =
-        async {
-            runCatching {
-                db.writeTransaction {
-                    insertTaskRow(task)
-                    held.countDown()
-                    release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                    throw IOException("held transaction failed")
-                }
-            }
-        }
-    withContext(Dispatchers.IO) { held.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
-    return HeldWrite(release, outcome)
-}
-
-/**
- * Waits until [writer] has taken its ticket on the writer lock, so the write it launched is ahead of any
- * write launched after this wait. Fails naming [writer] after [timeout].
- */
-internal suspend fun awaitLockCall(
-    lock: CountingMutex,
-    writer: LockWriter,
-    timeout: Duration = PROBE_TIMEOUT_MS.milliseconds,
-) {
-    withContext(Dispatchers.Default) { withTimeoutOrNull(timeout) { lock.writers.first { writer in it } } }
-        ?: throw AssertionError("writer $writer has not called lock() within $timeout")
-}
-
-/**
- * Launches [write] on Dispatchers.Default as its own [LockWriter] named [name] and returns once that write
- * has called the writer lock, so it commits before any write launched after it (see [awaitLockCall]).
- */
-internal suspend fun <T> CoroutineScope.queueWrite(
-    lock: CountingMutex,
-    name: String,
-    write: suspend CoroutineScope.() -> T,
-): Deferred<T> {
-    val writer = LockWriter(name)
-    return async(Dispatchers.Default + writer, block = write).also { awaitLockCall(lock, writer) }
-}
-
-// The waits above bound the real-time probes: a probe waits for something that must happen, and the held
-// transaction's safety bound outlasts every probe, so a stalled release cannot let a probe pass behind it.
-private const val PROBE_TIMEOUT_MS = 10_000L
-private const val STALL_SAFETY_TIMEOUT_MS = 30_000L
+// Deterministic race machinery (roadmap item 40): the helpers live in stt.db's TestWriterLock.kt, shared
+// with the database specs (roadmap item 94).
 
 // A completion wait outlasts any load an engine test can meet and stays below runTest's own 60 s timeout,
 // so a genuinely stuck task fails naming itself before the framework's anonymous timeout does.
