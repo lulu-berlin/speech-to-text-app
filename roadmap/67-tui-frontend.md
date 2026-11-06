@@ -164,6 +164,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       so a silent network partition does not freeze the view
 - [ ] (discovered, 2026-11-06) While the event stream is down the TUI says so (disconnected,
       reconnecting), and the notice goes once a new stream's snapshot arrives
+- [ ] (discovered, 2026-11-06) Escape cancels the open upload prompt without quitting and leaves the
+      queue as it was
+- [ ] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
+      too large) shows the service's message and leaves the UI usable
 
 ## Acceptance criteria
 
@@ -231,3 +235,14 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   after each: one event-stream stand-in for the TUI tests (`954318f0`), and the TUI's state and view
   split out of `main.rs` (`19f72165`). Discovered and appended (the user): the silent-stream
   watchdog and a visible disconnected state, both from the browser's `subscribeToEvents`.
+- 2026-11-06 (workspace, cycle 5): "upload by path". Red ran on `3faf2a89` with the cycle's
+  uncommitted pty test: `Upload:` never appeared after `u` (`terminal/mod.rs:79`). Green on the same
+  tree plus `stt-client`'s multipart upload (streamed from disk, the contract's extension list
+  checked before any request, the service's errors reported) and the TUI's prompt, notice and view
+  rows, committed as `75c3aca1` (52 tests; fmt and clippy green). Rebased onto `main` `06c304f1` at
+  the user's request (no conflict); re-run on `98fb54ed`: fmt, clippy and 52 tests green. Every hash
+  above is from before the two rebases; the current commits are the rebase's: R1 `e4feef0b`, R2
+  `c03b510b`, cycle 1 `139b6cfd`, cycle 2 `9de6f62c`, cycle 3 `b9411a2e`, cycle 4 `9b052a31`, cycle 5
+  `98fb54ed`, the refactors `857c9a5a`, `4309dc1c`, `9d30a65e`, and the tick/log commits `96bd3364`,
+  `3c297351`, `9fc48707`, `ec0a87b1`, `f4733bcc`. Discovered and appended: Escape cancels the upload
+  prompt; a refused upload shows the service's message.
