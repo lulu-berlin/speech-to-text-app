@@ -339,3 +339,13 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   `terminal::open_transcript` helper; `history.rs`, which tests the opening itself, keeps its own
   steps (`cbe21b36`, 58 tests green). The refused-rename line now also covers a refused merge
   (reworded at the user's request). Next: settings, first half (device, threads, upload defaults).
+- 2026-11-06 (workspace, cycle 11): "settings, first half" (the settings line stays unticked). Red
+  ran on `4580e7f2` with the cycle's uncommitted pty test: `s` sent nothing (`no GET arrived within
+  20s`, `terminal/mod.rs:314`). Green on the same tree plus `stt-client::{settings, save_settings}`
+  (`GET`/`PUT /api/settings`, the bearer secret; the write carries the settings whole, the default
+  frontend and terminal command included, since the contract reads a missing one as none) and a
+  Settings screen: `s` opens it, Up/Down select a row, Left/Right change the threads and save at
+  once as the browser does (ADR 0062), and the answer is what it shows. Only the threads change in
+  this cycle; the other rows are shown. Item 66's private settings reader was renamed
+  `LaunchSettings` to make room for the public type. Committed as `b36a1145` (59 tests; fmt and
+  clippy green; the `stt-tui` suite green in 3 repeats).
