@@ -141,9 +141,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       (the run commit; rebased as `98fb54ed`, only main's `roadmap/README.md` differs)
 - [x] (basic) Pause/resume/cancel/retry and reorder work, and the browser sees the same state from
       the shared backend — `stt-tui/tests/commands.rs`, `79856e65`
-- [ ] (basic) History lists completed tasks; opening one shows the transcript with speaker turns;
+- [x] (basic) History lists completed tasks; opening one shows the transcript with speaker turns;
       the download command writes the chosen format to the given path, and a bad path reports an
-      error
+      error — `stt-tui/tests/history.rs`, `af491974`; `stt-tui/tests/download.rs`, `f73e45b0`
 - [ ] (basic) Settings edits (device, threads, upload defaults, default frontend, terminal command)
       persist and appear in the browser
 - [ ] (basic) The transcript view merges and renames a task's speakers, and the browser shows the
@@ -280,3 +280,20 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   37 tests green with a 60 s timeout (the default 5 s times out under this sandbox's load, not on
   CI); the full vitest run's other default-timeout failures were the same sandbox slowness and
   passed with 60 s. A missing key shows the key itself, which `stt-client/tests/text.rs` pins.
+- 2026-11-06 (workspace, cycle 7): "history and the transcript" (the first half of the history/
+  transcript/download line, split by the user). Red ran on `8ac98f92` with the cycle's uncommitted
+  pty test: `no GET arrived within 20s` (`terminal/mod.rs:262`). Green on the same tree plus
+  `stt-client`'s `history` and `turns` reads (the turns' speakers and turns mirrored from
+  `docs/api`) and the TUI's screens - `h` for the completed tasks, Enter for a transcript with each
+  turn's speaker, start and text, `b`/Escape back, `q` or Ctrl-C anywhere - committed as `af491974`
+  (55 tests; fmt and clippy green). Refactor approved and done: the state and actions moved into
+  `Ui` with `open_history`/`open_transcript` (`1de263e2`, 55 tests green). Cycle 7 exposed one bug,
+  fixed in the cycle: a `continue` skipped the redraw after queue keys, so the upload prompt only
+  appeared with the next event (the upload test caught it).
+- 2026-11-06 (workspace, cycle 8): "downloads" (the second half of the history/transcript/download
+  line). Red ran on `1de263e2` with the cycle's uncommitted pty test: after `d` the dialog never
+  appeared (`terminal/mod.rs:79`). Green on the same tree plus the download dialog (path focused,
+  format chosen from the path's extension or cycled with Tab/Left-Right),
+  `GET /api/tasks/{id}/transcript?format=…` written to the path after opening it (so a bad path
+  sends no request), committed as `f73e45b0` (56 tests; fmt and clippy green). No refactoring at
+  this checkpoint.
