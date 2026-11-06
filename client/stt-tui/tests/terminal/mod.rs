@@ -262,6 +262,11 @@ impl EventService {
             .unwrap_or_else(|_| panic!("no GET arrived within {timeout:?}"))
     }
 
+    /// Whether a read arrived that the test has not read.
+    pub fn get_arrived(&self) -> bool {
+        self.gets.try_recv().is_ok()
+    }
+
     /// The next command a client made, or a panic after `timeout`.
     pub fn next_command(&self, timeout: Duration) -> Command {
         self.commands

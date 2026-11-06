@@ -32,16 +32,38 @@ pub enum Action {
     Back,
     /// Escape: back where there is a previous screen, quit at the queue.
     BackOrQuit,
+    /// `d`: open the download dialog for the open transcript.
+    OpenDownload,
+    DownloadChar(char),
+    DownloadBackspace,
+    /// Move the dialog's focus between its path and its format.
+    DownloadTab,
+    /// Cycle the download format.
+    DownloadFormatStep(isize),
+    SubmitDownload,
+    CancelDownload,
 }
 
 /// What `key` does: with the prompt open every key is text except Escape, Enter and Backspace; at
 /// the queue the keys are commands. Raw mode turns Ctrl-C into a key, so it quits from both.
-pub fn action(key: &KeyEvent, prompt_open: bool) -> Option<Action> {
+pub fn action(key: &KeyEvent, prompt_open: bool, download_open: bool) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
     }
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(Action::Quit);
+    }
+    if download_open {
+        return match key.code {
+            KeyCode::Esc => Some(Action::CancelDownload),
+            KeyCode::Enter => Some(Action::SubmitDownload),
+            KeyCode::Backspace => Some(Action::DownloadBackspace),
+            KeyCode::Tab => Some(Action::DownloadTab),
+            KeyCode::Left => Some(Action::DownloadFormatStep(-1)),
+            KeyCode::Right => Some(Action::DownloadFormatStep(1)),
+            KeyCode::Char(character) => Some(Action::DownloadChar(character)),
+            _ => None,
+        };
     }
     if prompt_open {
         return match key.code {
@@ -58,6 +80,7 @@ pub fn action(key: &KeyEvent, prompt_open: bool) -> Option<Action> {
         KeyCode::Char('q') => Some(Action::Quit),
         KeyCode::Char('b') => Some(Action::Back),
         KeyCode::Char('h') => Some(Action::OpenHistory),
+        KeyCode::Char('d') => Some(Action::OpenDownload),
         KeyCode::Enter => Some(Action::OpenSelected),
         KeyCode::Char('u') => Some(Action::OpenPrompt),
         KeyCode::Up if shift => Some(Action::MoveSelected(-1)),

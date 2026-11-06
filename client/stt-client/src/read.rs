@@ -53,6 +53,21 @@ pub async fn history(service: &Service) -> io::Result<Vec<Task>> {
         .map(|list| list.tasks)
 }
 
+/// Task `id`'s transcript in `format` (`txt`, `srt` or `vtt`), as the service renders it.
+pub async fn transcript(service: &Service, id: i64, format: &str) -> io::Result<String> {
+    let response = reqwest::Client::new()
+        .get(format!(
+            "{}/api/tasks/{id}/transcript?format={format}",
+            service.endpoint
+        ))
+        .bearer_auth(&service.secret)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(io::Error::other)?;
+    response.text().await.map_err(io::Error::other)
+}
+
 /// Task `id`'s transcript turns.
 pub async fn turns(service: &Service, id: i64) -> io::Result<Turns> {
     let response = reqwest::Client::new()

@@ -24,15 +24,36 @@ pub struct View<'a> {
     pub history_selected: usize,
     /// The path being typed into the upload prompt, while it is open.
     pub prompt: Option<&'a str>,
+    /// The download dialog, while it is open.
+    pub download: Option<DownloadView<'a>>,
     /// What the last action reported.
     pub notice: Option<&'a str>,
 }
 
+/// The download dialog's fields: the task it saves, the path, the format, and whether the format
+/// has the focus.
+pub struct DownloadView<'a> {
+    pub filename: &'a str,
+    pub path: &'a str,
+    pub format: &'a str,
+    pub focus_format: bool,
+}
+
 /// Draws the open screen, with the prompt and the notice under it when there are any.
 pub fn draw(frame: &mut Frame, view: &View<'_>) {
-    let line = |text: Option<&str>| Constraint::Length(if text.is_some() { 1 } else { 0 });
-    let areas = Layout::vertical([Constraint::Min(3), line(view.prompt), line(view.notice)])
-        .split(frame.area());
+    let middle = match (view.download.is_some(), view.prompt.is_some()) {
+        // The dialog's border, its two fields and their spacing.
+        (true, _) => 4,
+        (false, true) => 1,
+        (false, false) => 0,
+    };
+    let notice = if view.notice.is_some() { 1 } else { 0 };
+    let areas = Layout::vertical([
+        Constraint::Min(3),
+        Constraint::Length(middle),
+        Constraint::Length(notice),
+    ])
+    .split(frame.area());
     match view.screen {
         Screen::Queue => draw_queue(frame, areas[0], view),
         Screen::History => draw_history(frame, areas[0], view),
@@ -41,6 +62,20 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     if let Some(path) = view.prompt {
         frame.render_widget(
             Paragraph::new(stt_client::text("upload.prompt", &[("path", path)])),
+            areas[1],
+        );
+    }
+    if let Some(download) = &view.download {
+        let title = stt_client::text("download.title", &[("filename", download.filename)]);
+        let path = stt_client::text("download.path", &[("path", download.path)]);
+        let format = stt_client::text("download.format", &[("format", download.format)]);
+        let marker = |focused: bool| if focused { "> " } else { "  " };
+        let lines = vec![
+            Line::from(format!("{}{path}", marker(!download.focus_format))),
+            Line::from(format!("{}{format}", marker(download.focus_format))),
+        ];
+        frame.render_widget(
+            Paragraph::new(lines).block(Block::bordered().title(title)),
             areas[1],
         );
     }
