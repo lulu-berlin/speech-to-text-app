@@ -196,3 +196,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   success, `no_service.rs:59`); green on the same tree plus the `locate` call, committed unchanged as
   `ddbf00ef` (48 tests, fmt and clippy green). No refactoring (the user). Discovered: the client
   sends loopback requests and the secret through an environment `HTTP_PROXY` (appended to the list).
+- 2026-11-06 (workspace): rebased onto `main` `0f670d56` at the user's request (main added only the
+  roadmap files of items 89, 91-93; no conflict). The hashes above are the pre-rebase run commits;
+  their rebased counterparts are R1 `3467f442`, R2 `e3d91fdf`, cycle 1 `fcfbb78c`. Re-run on the
+  rebased head `58df03bb`: `cargo fmt --check`, `cargo clippy --locked --all-targets -D warnings` and
+  `cargo test --locked` (48 passed) green.
