@@ -7,7 +7,13 @@ publish.workspace = true
 
 [dependencies]
 stt-client = { path = "../stt-client" }
-tokio = { version = "1", features = ["macros", "rt"] }
+# The terminal UI (roadmap item 67, decided 2026-10-22): ratatui on its crossterm backend.
+ratatui = "0.30"
+tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
+# The TUI's tests run the real binary in a pseudo-terminal (a Unix pty, a Windows ConPTY) and read
+# what it draws through a terminal-screen parser (roadmap item 67, the portable-pty decision).
+portable-pty = "0.9"
 tempfile = "3"
+vt100 = "0.18"
