@@ -3,7 +3,7 @@
 # (`stt-app`) and item 67's TUI.
 [workspace]
 resolver = "3"
-members = ["stt-app", "stt-client", "stt-tray"]
+members = ["stt-app", "stt-client", "stt-tray", "stt-tui"]
 
 [workspace.package]
 edition = "2024"
