@@ -64,7 +64,7 @@ pub struct Events {
 
 /// Opens the running `service`'s event stream with the per-install secret.
 pub async fn events(service: &Service) -> io::Result<Events> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .get(format!("{}/api/events", service.endpoint))
         .bearer_auth(&service.secret)
         .header("Accept", "text/event-stream")

@@ -49,9 +49,21 @@ impl Tui {
         let mut command = CommandBuilder::new(program);
         command.env("STT_CONFIG_DIR", state);
         command.env("STT_RUNTIME_DIR", state);
-        // The test decides the color choice: a CI or developer shell that exports NO_COLOR must not
-        // decide for it.
+        // The test decides the environment's proxy and colour choices: a CI or developer shell
+        // that exports them must not decide for it.
         command.env_remove("NO_COLOR");
+        for key in [
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "NO_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+            "no_proxy",
+        ] {
+            command.env_remove(key);
+        }
         for (key, value) in env {
             command.env(key, value);
         }

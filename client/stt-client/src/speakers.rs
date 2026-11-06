@@ -25,7 +25,7 @@ pub async fn rename_speaker(
     speaker_id: i64,
     name: &str,
 ) -> io::Result<Vec<Speaker>> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .put(format!(
             "{}/api/tasks/{id}/speakers/{speaker_id}",
             service.endpoint
@@ -48,7 +48,7 @@ pub async fn merge_speakers(
     group: &[i64],
     into: i64,
 ) -> io::Result<Vec<Speaker>> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .post(format!(
             "{}/api/tasks/{id}/speakers/merge",
             service.endpoint

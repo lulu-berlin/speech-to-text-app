@@ -56,7 +56,7 @@ pub struct Settings {
 
 /// The stored settings and the devices the user can choose.
 pub async fn settings(service: &Service) -> io::Result<Settings> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .get(format!("{}/api/settings", service.endpoint))
         .bearer_auth(&service.secret)
         .send()
@@ -67,7 +67,7 @@ pub async fn settings(service: &Service) -> io::Result<Settings> {
 
 /// Stores `settings` as a whole; the service answers with the settings as they now are.
 pub async fn save_settings(service: &Service, settings: &Settings) -> io::Result<Settings> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .put(format!("{}/api/settings", service.endpoint))
         .bearer_auth(&service.secret)
         .json(settings)
@@ -91,7 +91,7 @@ pub async fn frontends(service: &Service) -> io::Result<Vec<Frontend>> {
     struct Frontends {
         frontends: Vec<Frontend>,
     }
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .get(format!("{}/api/frontends", service.endpoint))
         .bearer_auth(&service.secret)
         .send()

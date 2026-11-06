@@ -346,7 +346,7 @@ pub async fn ensure_unit(
 /// is not app mode has no such route and answers 404.
 pub async fn register_tray(service: &Service, pid: u32, command: &[String]) -> io::Result<()> {
     let body = serde_json::json!({ "pid": pid, "command": command }).to_string();
-    let response = reqwest::Client::new()
+    let response = client()
         .post(format!("{}/api/tray", service.endpoint))
         .bearer_auth(&service.secret)
         .header("Content-Type", "application/json")
@@ -515,7 +515,11 @@ const HEALTH_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Whether `service`'s endpoint answers `GET /api/health` with `200` to its secret in time.
 async fn answers_as_the_service(service: &Service) -> bool {
-    let Ok(client) = reqwest::Client::builder().timeout(HEALTH_TIMEOUT).build() else {
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(HEALTH_TIMEOUT)
+        .no_proxy()
+        .build()
+    else {
         return false;
     };
     client
@@ -539,7 +543,7 @@ pub async fn quit(dirs: &ServiceDirs) -> io::Result<()> {
             error
         }
     })?;
-    let response = reqwest::Client::new()
+    let response = client()
         .post(format!("{}/api/quit", service.endpoint))
         .bearer_auth(&service.secret)
         .send()
@@ -565,7 +569,7 @@ struct LaunchToken {
 /// asked for with the per-install secret as `Authorization: Bearer`, opened as
 /// `<endpoint>/open?t=<token>`. The secret itself never appears in the URL.
 pub async fn launch_url(service: &Service) -> io::Result<String> {
-    let body = reqwest::Client::new()
+    let body = client()
         .post(format!("{}/api/launch-token", service.endpoint))
         .bearer_auth(&service.secret)
         .send()
@@ -1005,4 +1009,13 @@ pub(crate) async fn response_json<T: DeserializeOwned>(
         .map(|error| error.message)
         .unwrap_or_else(|_| format!("the service answered {status}"));
     Err(io::Error::other(message))
+}
+
+/// The one HTTP client every call uses: direct, never through a proxy - the service is loopback-only
+/// and the per-install secret must not reach a proxy (roadmap item 67).
+pub(crate) fn client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .expect("an HTTP client builds")
 }

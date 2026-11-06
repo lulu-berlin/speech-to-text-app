@@ -41,7 +41,7 @@ impl TaskCommand {
 
 /// Runs `command` on task `id`; the service answers with the task as it now is.
 pub async fn task_command(service: &Service, id: i64, command: TaskCommand) -> io::Result<Task> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .post(format!(
             "{}/api/tasks/{id}/{}",
             service.endpoint,
@@ -57,7 +57,7 @@ pub async fn task_command(service: &Service, id: i64, command: TaskCommand) -> i
 /// Pauses or resumes the whole queue; the service answers with the queue.
 pub async fn set_queue_paused(service: &Service, paused: bool) -> io::Result<Queue> {
     let name = if paused { "pause" } else { "resume" };
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .post(format!("{}/api/queue/{name}", service.endpoint))
         .bearer_auth(&service.secret)
         .send()
@@ -68,7 +68,7 @@ pub async fn set_queue_paused(service: &Service, paused: bool) -> io::Result<Que
 
 /// Puts the queue in `task_ids`' order (the pending tasks, as `PUT /api/queue/order` takes them).
 pub async fn reorder_queue(service: &Service, task_ids: &[i64]) -> io::Result<Queue> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .put(format!("{}/api/queue/order", service.endpoint))
         .bearer_auth(&service.secret)
         .json(&json!({ "taskIds": task_ids }))

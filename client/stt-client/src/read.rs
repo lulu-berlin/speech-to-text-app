@@ -42,7 +42,7 @@ pub struct Turns {
 
 /// Every task the service knows, completed ones included.
 pub async fn history(service: &Service) -> io::Result<Vec<Task>> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .get(format!("{}/api/tasks", service.endpoint))
         .bearer_auth(&service.secret)
         .send()
@@ -55,7 +55,7 @@ pub async fn history(service: &Service) -> io::Result<Vec<Task>> {
 
 /// Task `id`'s transcript in `format` (`txt`, `srt` or `vtt`), as the service renders it.
 pub async fn transcript(service: &Service, id: i64, format: &str) -> io::Result<String> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .get(format!(
             "{}/api/tasks/{id}/transcript?format={format}",
             service.endpoint
@@ -70,7 +70,7 @@ pub async fn transcript(service: &Service, id: i64, format: &str) -> io::Result<
 
 /// Task `id`'s transcript turns.
 pub async fn turns(service: &Service, id: i64) -> io::Result<Turns> {
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .get(format!("{}/api/tasks/{id}/turns", service.endpoint))
         .bearer_auth(&service.secret)
         .send()

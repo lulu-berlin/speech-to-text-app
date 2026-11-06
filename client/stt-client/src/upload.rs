@@ -54,7 +54,7 @@ pub async fn upload(service: &Service, path: &Path) -> io::Result<Task> {
     )
     .file_name(name);
     let form = reqwest::multipart::Form::new().part("file", part);
-    let response = reqwest::Client::new()
+    let response = crate::client()
         .post(format!("{}/api/tasks", service.endpoint))
         .bearer_auth(&service.secret)
         .multipart(form)
