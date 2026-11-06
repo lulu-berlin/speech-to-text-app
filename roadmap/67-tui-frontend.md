@@ -304,3 +304,11 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   are the commits the runs ran on, before the rebase. Gates green on the rebased tree: Rust fmt,
   clippy, 56 tests; frontend `tsc`, prettier, and the queue, history and app vitest files (179
   tests).
+- 2026-11-06 (workspace, cycle 9): "renaming a speaker" (the first half of the speaker rename/merge
+  line; the user chose a speakers list above the turns, `r` to rename and a two-step `m` merge).
+  Red ran on `134eb1a1` with the cycle's uncommitted pty test: the transcript showed no `Speakers`
+  list (`terminal/mod.rs:79`). Green on the same tree plus `stt-client::rename_speaker`
+  (`PUT /api/tasks/{id}/speakers/{speakerId}`, the name trimmed, the bearer secret) and the
+  transcript's speakers list, selection and rename prompt; the answer's speakers relabel the turns,
+  and Escape closes the prompt with no request. Committed as `85b8ffae` (57 tests; fmt and clippy
+  green).
