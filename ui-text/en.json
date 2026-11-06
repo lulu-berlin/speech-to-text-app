@@ -28,6 +28,7 @@
   "settings.default-frontend": "Default frontend",
   "settings.terminal-command": "Terminal command",
   "settings.terminal-prompt": "Terminal: {command}",
+  "settings.count-first": "set a speaker count first",
   "settings.failed": "cannot load the settings: {error}",
   "settings.save-failed": "settings not saved: {error}",
   "download.title": "Download: {filename}",

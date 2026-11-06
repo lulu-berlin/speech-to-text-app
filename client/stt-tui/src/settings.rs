@@ -49,8 +49,10 @@ impl Field {
         text(key, &[])
     }
 
-    /// The row's value in `settings`, as the screen shows it.
-    pub fn value(self, settings: &Settings) -> String {
+    /// The row's value in the screen's settings (a count row shows the chosen count, saved only
+    /// with `fixed`), as the screen shows it.
+    pub fn value(self, screen: &SettingsScreen) -> String {
+        let settings = &screen.settings;
         match self {
             Field::Device => match settings.gpu_names.get(&settings.device) {
                 Some(name) => format!("{} ({name})", settings.device),
@@ -61,8 +63,8 @@ impl Field {
                 .map_or_else(|| text("settings.threads-auto", &[]), |n| n.to_string()),
             Field::Language => settings.default_language.clone(),
             Field::Speakers => settings.speakers_mode.clone(),
-            Field::SpeakerCount => settings
-                .speakers_count
+            Field::SpeakerCount => screen
+                .count
                 .map_or_else(|| "-".to_string(), |n| n.to_string()),
             Field::MaxSpeakers => settings.max_speakers.to_string(),
             Field::DefaultFrontend => settings
@@ -84,16 +86,25 @@ pub struct SettingsScreen {
     pub frontends: Vec<Frontend>,
     pub row: usize,
     terminal: Option<String>,
+    /// The speaker count the count row holds; written only while the mode is `fixed`.
+    count: Option<u32>,
 }
 
 impl SettingsScreen {
     pub fn new(settings: Settings, frontends: Vec<Frontend>) -> SettingsScreen {
         SettingsScreen {
+            count: settings.speakers_count,
             settings,
             frontends,
             row: 0,
             terminal: None,
         }
+    }
+
+    /// The settings as the service answered a save; the count row follows them.
+    pub fn saved(&mut self, settings: Settings) {
+        self.count = settings.speakers_count;
+        self.settings = settings;
     }
 
     /// The command in the terminal prompt, while it is open.
@@ -119,6 +130,18 @@ impl SettingsScreen {
                 }
             }
             Action::Adjust(step) => {
+                if FIELDS[self.row] == Field::SpeakerCount {
+                    self.count = Some(step_between(self.count.unwrap_or(0), step, 1, 20));
+                }
+                // `fixed` without a count is `invalid-speakers`: the browser keeps the stored mode,
+                // and the screen says why.
+                if FIELDS[self.row] == Field::Speakers
+                    && step_mode(&self.settings.speakers_mode, step).as_deref() == Some("fixed")
+                    && self.count.is_none()
+                {
+                    let _ = sender.send(Message::Notice(text("settings.count-first", &[])));
+                    return;
+                }
                 if let Some(changed) = self.changed(step) {
                     save(runtime, service, sender, changed);
                 }
@@ -166,24 +189,21 @@ impl SettingsScreen {
                 changed.default_language = step_choice(&codes, &changed.default_language, step)?;
             }
             Field::Speakers => {
-                let modes = ["auto".to_string(), "off".to_string(), "fixed".to_string()];
-                let mode = step_choice(&modes, &changed.speakers_mode, step)?;
+                let mode = step_mode(&changed.speakers_mode, step)?;
                 // A count belongs to `fixed` only; the browser writes null for the other modes.
-                if mode != "fixed" {
-                    changed.speakers_count = None;
-                }
+                changed.speakers_count = if mode == "fixed" {
+                    Some(self.count?)
+                } else {
+                    None
+                };
                 changed.speakers_mode = mode;
             }
             Field::SpeakerCount => {
-                if changed.speakers_mode != "fixed" {
-                    return None;
-                }
-                changed.speakers_count = Some(step_between(
-                    changed.speakers_count.unwrap_or(0),
-                    step,
-                    1,
-                    20,
-                ));
+                changed.speakers_count = if changed.speakers_mode == "fixed" {
+                    self.count
+                } else {
+                    None
+                };
             }
             Field::MaxSpeakers => {
                 changed.max_speakers = step_between(changed.max_speakers, step, 1, 20);
@@ -194,8 +214,14 @@ impl SettingsScreen {
             }
             Field::TerminalCommand => return None,
         }
-        Some(changed)
+        (changed != self.settings).then_some(changed)
     }
+}
+
+/// The speaker mode `step` places on from `mode`: auto, off, fixed, round.
+fn step_mode(mode: &str, step: isize) -> Option<String> {
+    let modes = ["auto".to_string(), "off".to_string(), "fixed".to_string()];
+    step_choice(&modes, mode, step)
 }
 
 /// The default frontend `step` places through none and the installed ones, in the registry's order.

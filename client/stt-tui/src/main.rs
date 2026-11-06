@@ -230,7 +230,7 @@ impl Ui {
             }
             Message::SettingsSaved(settings) => {
                 if let Screen::Settings(screen) = &mut self.screen {
-                    screen.settings = settings;
+                    screen.saved(settings);
                 }
             }
             Message::Terminal(terminal_event::Event::Key(key)) => {

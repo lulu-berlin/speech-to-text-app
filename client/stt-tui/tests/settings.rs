@@ -287,3 +287,63 @@ fn the_default_frontend_and_the_terminal_command_are_saved() {
     );
     tui.wait_for(WAIT, |text| row(text, "Terminal command", "-"));
 }
+
+/// Settings with the speaker mode off and no count stored (`speakersCount` null).
+const OFF: &str = r#"{"device":"auto","threads":4,"defaultLanguage":"de","speakersMode":"off","speakersCount":null,"maxSpeakers":12,"deviceFallback":null,"defaultFrontend":"browser","terminalCommand":"kitty -e","availableDevices":["cpu","auto","gpu:0","gpu:1"],"gpuNames":{"gpu:0":"NVIDIA GeForce RTX 3060","gpu:1":"AMD Radeon RX 6600"},"deviceProbeError":null}"#;
+
+#[test]
+fn fixed_needs_a_speaker_count_and_the_count_is_chosen_first() {
+    let service = EventService::start();
+    let dir = tempfile::tempdir().unwrap();
+    support::write_bootstrap(dir.path(), service.port);
+    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
+    tui.press(b"s");
+    service.next_get(WAIT).answer("200 OK", OFF);
+    service.next_get(WAIT).answer("200 OK", FRONTENDS);
+    tui.wait_for(WAIT, |text| row(text, "Speakers", "off"));
+
+    // Down to Speakers, Right asks for `fixed`: with no count it changes nothing and says so.
+    tui.press(b"\x1b[B\x1b[B\x1b[B");
+    tui.press(b"\x1b[C");
+    let screen = tui.wait_for(WAIT, |text| text.contains("set a speaker count first"));
+    assert!(
+        !service.command_arrived(),
+        "an invalid write is never sent:\n{screen}"
+    );
+    assert!(row(&screen, "Speakers", "off"), "{screen}");
+
+    // The count row chooses the count first, without a write of its own (the mode is not fixed).
+    tui.press(b"\x1b[B");
+    tui.press(b"\x1b[C");
+    let screen = tui.wait_for(WAIT, |text| row(text, "Speaker count", "1"));
+    assert!(
+        !service.command_arrived(),
+        "a count means nothing outside fixed:\n{screen}"
+    );
+
+    // Back up, Right now stores `fixed` with the chosen count.
+    tui.press(b"\x1b[A");
+    tui.press(b"\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        json!({
+            "device": "auto",
+            "threads": 4,
+            "defaultLanguage": "de",
+            "speakersMode": "fixed",
+            "speakersCount": 1,
+            "maxSpeakers": 12,
+            "defaultFrontend": "browser",
+            "terminalCommand": "kitty -e"
+        })
+    );
+    write.answer(
+        "200 OK",
+        &stored(OFF, json!({ "speakersMode": "fixed", "speakersCount": 1 })),
+    );
+    tui.wait_for(WAIT, |text| row(text, "Speakers", "fixed"));
+}

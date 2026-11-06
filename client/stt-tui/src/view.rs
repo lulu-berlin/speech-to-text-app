@@ -158,7 +158,7 @@ fn draw_history(frame: &mut Frame, area: Rect, view: &View<'_>) {
 fn draw_settings(frame: &mut Frame, area: Rect, screen: &SettingsScreen) {
     let rows = FIELDS
         .iter()
-        .map(|field| Row::new([field.label(), field.value(&screen.settings)]));
+        .map(|field| Row::new([field.label(), field.value(screen)]));
     let table = Table::new(rows, [Constraint::Length(16), Constraint::Fill(1)])
         .block(Block::bordered().title(stt_client::text("settings.title", &[])))
         .row_highlight_style(Style::new().reversed());
