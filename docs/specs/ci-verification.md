@@ -192,6 +192,15 @@ a Mac or a Windows machine, and the repo has no CI today.
 - 2026-10-21 (amended by the user's decision in item 48): the six macOS legs run on every pull
   request and every push to main, not only nightly and item 48's PRs; the workflow's `roadmap/48-`
   gate is removed and item 48's spec records the decision. The Windows cadence is unchanged.
+- 2026-11-04 (amended by roadmap item 85's no-wait lever): the three journeys (`e2e`, `macos-e2e`,
+  `windows-e2e`) now need only `changes`, so they start as soon as the change classification has
+  run instead of waiting for their platform's two check jobs. This is the only such exception:
+  every other heavy job still carries `needs: [changes, <platform>-backend-check,
+  <platform>-frontend-check]`, and the check jobs stay in `CI (all checks)`'s `needs`, so a red
+  check still fails the required check even when the journeys passed. Both halves are pinned by
+  `docs/check-ci-gating.test.ts` ("the three journeys start with the change classification, and the
+  checks gate every other job"). The change was measured against item 85's five baseline runs,
+  where the checks ended at +2:50…+3:53 of a 21–24-minute run.
 
 ## Amendment (roadmap item 90, 2026-11-03)
 
@@ -204,3 +213,35 @@ a Mac or a Windows machine, and the repo has no CI today.
   ([ADR 0065](../decisions/0065-own-artifacts-versioned-tags-nix-platform-keys.md)).
 - `checkVersions` (run by the Linux/Windows/macOS check jobs) also holds `devenv.yaml` to
   `flake.lock`'s nixpkgs rev, so the bump's pin pair cannot drift.
+
+## Amendment (roadmap item 85, 2026-11-07)
+
+- `desktop-bundle-e2e` caches the built bundle on its own: it evaluates `.#desktop-bundle.drvPath`,
+  restores `stt-bundle-<derivation>` with `actions/cache/restore` (exact key, no prefix fallback),
+  builds the bundle only on a miss, and runs the packaged specs against that one file
+  (`E2E_BUNDLE_FILE`, which `e2e/desktop/run-in-docker.ts` honours instead of building). The key
+  changes exactly when the bundle would, so a change that touches nothing the bundle is built from
+  skips its ~5-minute build (CI run #595's log). The shared Nix store entry cannot carry the bundle:
+  a cache key's contents never change once saved.
+- The bundle cache follows the Gradle cache policy: only `main` saves it (`actions/cache/save` on a
+  miss); a pull request restores a matching entry and writes nothing. Before, this PR's ref held a
+  370 MB `stt-bundle-<derivation>` entry and the repository stood at 10.31 GB against the Free plan's
+  10 GB. A pull request that changes the bundle inputs misses and rebuilds on its own runs (~5
+  minutes), which is exactly the change the key tracks.
+- `jvm-toolchain` writes the Gradle cache on the default branch only
+  (`cache-read-only: ${{ github.ref != 'refs/heads/main' }}`). With every branch writing, one pull
+  request accumulated ten `gradle-dependencies-v2` entries and the repository's caches passed the
+  Free plan's 10 GB, so GitHub evicted entries the whole matrix depends on — in two consecutive runs
+  of one commit the bundle cache hit and then missed (runs #598 and #599). A pull request now
+  restores `main`'s entries, which GitHub allows for the default branch.
+- The journeys do not cache the built UI (roadmap item 85 tried and reverted it): a cache of
+  `frontend/dist` keyed by `hashFiles` of the frontend inputs hit once (`#606`) and missed twice
+  (`#605`, `#607`) on trees whose inputs are identical (verified by re-deriving the matched files and
+  their content hash from git), so it was dead weight and an extra entry in the 10 GB budget.
+  `e2eFrontend`'s `.ui-digest` already reuses a build inside one checkout, and a cold checkout pays
+  the vite build once (~20–40 s), which the journeys' measured setup (~53 s Linux, ~98 s Windows)
+  includes.
+- Playwright's browsers need no cache of their own (roadmap item 85): the build installs them
+  into `~/.gradle/stt-app/ms-playwright` (`PLAYWRIGHT_BROWSERS_PATH`'s default, `build.gradle.kts`),
+  and `jvm-toolchain`'s downloads cache already restores that directory as `stt-downloads-<os>-…`.
+  A separate cache keyed on the browser directory restored nothing (run #607: the step 0:01, no save).

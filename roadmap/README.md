@@ -168,7 +168,7 @@ graph TD
   77[77 private test temp dirs ✓]:::done
   83[83 diarization accuracy]
   84[84 e2e reliability ✓]:::done
-  85[85 CI wall time]
+  85[85 CI wall time ✓]:::done
   86[86 mobile feasibility]
   87[87 writes wait for the connection ✓]:::done
   88[88 localization]
@@ -288,7 +288,7 @@ graph TD
 | [81 — A row command clicked while another one is in flight is dropped](../docs/specs/dropped-row-command.md)                                                                  | done          | —                           |
 | [83 — Diarization accuracy: fewer wrongly merged and wrongly split speakers in automatic detection](83-diarization-accuracy.md)                                    | spec-approved | 73                          |
 | [84 — e2e reliability: a Windows journey that can gate again, no wall-clock or sleep-based assertions, and a journey that tests the current UI](../docs/specs/e2e-reliability.md) | done          | —                           |
-| [85 — CI wall time: a code pull request's checks finish sooner without proving less](85-ci-wall-time.md)                                                                    | spec-approved | 84                          |
+| [85 — CI wall time: a code pull request's checks finish sooner without proving less](../docs/specs/ci-wall-time.md)                                                         | done          | 84                          |
 | [86 — Mobile feasibility: can the app run on a phone with transcription and diarization fully on the device?](86-mobile-feasibility.md)                                    | spec-approved | —                           |
 | [87 — Writes wait for the connection, and a control with nothing to do says so](../docs/specs/writes-and-the-connection.md)                                                       | done          | —                           |
 | [88 — Localization: the app's own language, in every language whisper transcription supports](88-localization.md)                                                          | spec-approved | 74                          |

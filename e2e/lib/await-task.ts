@@ -4,7 +4,7 @@
 // callback reads the backend's task list; progress and failure handling are added by the cycles
 // that prove them.
 
-import { stallWatch } from './wait.ts';
+import { defaultSleep, stallWatch } from './wait.ts';
 
 /** The task fields this wait reads, from `GET /api/tasks`. */
 export interface TaskSnapshot {
@@ -39,12 +39,6 @@ export interface AwaitTaskStateOptions {
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }
-
-const defaultSleep = (ms: number): Promise<void> => {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, ms);
-  return promise;
-};
 
 /** Polls [snapshot] until [until] holds for the task named [clip]; returns that row. */
 export async function awaitTaskState(

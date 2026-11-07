@@ -95,9 +95,13 @@ test('the header brand is a padded ≤ 40 px static icon, text-only once scrolle
     .first()
     .textContent()
     .catch(() => null);
+  // Roadmap item 85: the window is the playback's, not forty 250 ms ticks — the gap is sampled
+  // whenever the playing segment changes, until three changes have been seen. The 60 s deadline is a
+  // stall bound (a segment that never changes ends the wait naming it), not a sampling window.
   const gaps: number[] = [];
   const header = page.locator('header');
-  for (let sample = 0; sample < 40; sample += 1) {
+  const seen = new Set<string>([firstActive ?? '']);
+  const sample = async (): Promise<void> => {
     const activeBox = await active
       .first()
       .boundingBox()
@@ -106,18 +110,24 @@ test('the header brand is a padded ≤ 40 px static icon, text-only once scrolle
     if (activeBox !== null && headerBox !== null) {
       gaps.push(activeBox.y - (headerBox.y + headerBox.height));
     }
-    await page.waitForTimeout(250);
-  }
+  };
+  await sample();
+  await expect(async () => {
+    const text =
+      (await active
+        .first()
+        .textContent()
+        .catch(() => null)) ?? '';
+    if (!seen.has(text)) {
+      seen.add(text);
+      await sample();
+    }
+    expect(seen.size, 'the playing segment changed three times').toBeGreaterThan(3);
+  }).toPass({ timeout: 60_000 });
   expect(gaps.length, 'the playing segment was sampled').toBeGreaterThan(0);
   for (const gap of gaps) {
     expect(gap, 'the playing segment stays below the header').toBeGreaterThanOrEqual(-1);
   }
-  expect(
-    await active
-      .first()
-      .textContent()
-      .catch(() => null),
-  ).not.toBe(firstActive);
 });
 
 // Discovered while checking item 1: the phone header wraps, so its compact form is taller

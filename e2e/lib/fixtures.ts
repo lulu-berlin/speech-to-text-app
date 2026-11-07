@@ -106,7 +106,7 @@ export function writeFixtures(fixturesDir: string): void {
     { start: 2, seconds: 2, file: FIXTURE_CLIPS[4] }, // 2-4s
     { start: 4, seconds: 2, file: FIXTURE_CLIPS[5] }, // 4-6s
     { loops: 12, file: FIXTURE_CLIPS[6] }, // the sample 12 times (~132 s)
-    { loops: 20, file: FIXTURE_CLIPS[8] }, // the sample 20 times (~220 s)
+    { start: 1, seconds: 10, loops: 10, file: FIXTURE_CLIPS[8] }, // ~100 s, the cancel/retry spec's clip (item 10)
     { start: 6, seconds: 5, file: FIXTURE_CLIPS[10] }, // 6-11s
     { seconds: 3, file: FIXTURE_CLIPS[11] }, // 0-3s, item 12
     { start: 7, seconds: 4, file: FIXTURE_CLIPS[12] }, // 7-11s, item 12
@@ -123,7 +123,7 @@ export function writeFixtures(fixturesDir: string): void {
     { loops: 6, file: FIXTURE_CLIPS[24] }, // ~66s, item 37's background transcription
     { loops: 10, file: FIXTURE_CLIPS[25] }, // ~110s, item 40's atomic-transitions race clip
     { start: 6, seconds: 3, file: FIXTURE_CLIPS[26] }, // 6-9s, item 40's queue-is-live follow-up
-    { loops: 11, file: FIXTURE_CLIPS[27] }, // ~121s, item 40's pause-queued running clip
+    { start: 2, seconds: 9, loops: 3, file: FIXTURE_CLIPS[27] }, // ~27 s, item 40's pause-queued running clip
     { start: 2, seconds: 4, file: FIXTURE_CLIPS[28] }, // 2-6s, item 40's pause-queued clip
     { start: 5, seconds: 6, file: FIXTURE_CLIPS[29] }, // 5-11s, item 42's queue-survives-a-failure clip
     { start: 8, seconds: 3, file: FIXTURE_CLIPS[31] }, // 8-11s, item 41's concurrent-upload race
@@ -139,9 +139,10 @@ export function writeFixtures(fixturesDir: string): void {
     { loops: 5, file: FIXTURE_CLIPS[42] }, // ~55s, item 59's phase-color row clip
     { loops: 17, file: FIXTURE_CLIPS[44] }, // ~187s, item 59's header-typing clip
     { loops: 2, file: FIXTURE_CLIPS[45] }, // ~22s, item 48's Metal app e2e
-    { loops: 15, file: FIXTURE_CLIPS[46] }, // ~165s, item 81's held-pause running clip
+    { start: 1, seconds: 10, loops: 3, file: FIXTURE_CLIPS[46] }, // ~30 s, item 81's held-pause running clip
     { start: 1, seconds: 4, file: FIXTURE_CLIPS[47] }, // 1-5s, item 81's held-pause queued clip
     { start: 4, seconds: 5, file: FIXTURE_CLIPS[49] }, // 4-9s, item 87's mid-upload outage clip
+    { start: 3, seconds: 8, file: FIXTURE_CLIPS[50] }, // 3-11s, item 40's pause-queued follow-up (item 85)
   ];
   const jfk = process.env.TEST_JFK_WAV;
   if (!jfk) throw new Error('TEST_JFK_WAV is unset');

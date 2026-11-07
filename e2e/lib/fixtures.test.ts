@@ -59,6 +59,60 @@ type WavFormat = Pick<Wav, 'format' | 'channels' | 'sampleRate' | 'bitsPerSample
 
 const PCM_16K_MONO_16 = { format: 1, channels: 1, sampleRate: 16000, bitsPerSample: 16 };
 
+// Roadmap item 85 (fixtures): the journey's transcription waits were sized by the clip, not by what
+// the spec's state needs. The cancel/retry spec must be transcribing long enough for a cancel to land
+// in the middle — ten copies of a ten-second window (~100 s), not the sample twenty times (~220 s),
+// which doubled the spec's time in every journey (1.0–1.4 min on the healthy runs). The window starts
+// one second in so the bytes stay unique: the backend dedupes uploads by content sha256 and every
+// fixture shares the journey's one backend.
+test('the cancel/retry clip is ten copies of a ten-second window, long enough to cancel mid-way', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'stt-e2e-cancel-clip-'));
+  try {
+    writeFixtures(dir);
+    const clip = readWav(readFileSync(join(dir, FIXTURE_CLIPS[8])));
+    assert.deepEqual(
+      { format: clip.format, channels: clip.channels, sampleRate: clip.sampleRate },
+      { format: PCM_16K_MONO_16.format, channels: 1, sampleRate: 16000 },
+    );
+    assert.equal(clip.samples, 10 * 10 * 16000, 'ten copies of a ten-second window, about 100 s');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the held-pause clip is three copies of a ten-second window, long enough to pause mid-way', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'stt-e2e-held-pause-clip-'));
+  try {
+    writeFixtures(dir);
+    const clip = readWav(readFileSync(join(dir, FIXTURE_CLIPS[46])));
+    assert.equal(clip.samples, 3 * 10 * 16000, 'three copies of a ten-second window, about 30 s');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the pause-queued clip is three copies of a nine-second window, long enough to pause behind it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'stt-e2e-pause-queued-clip-'));
+  try {
+    writeFixtures(dir);
+    const clip = readWav(readFileSync(join(dir, FIXTURE_CLIPS[27])));
+    assert.equal(clip.samples, 3 * 9 * 16000, 'three copies of a nine-second window, about 27 s');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the pause-queued follow-up clip is an eight-second window', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'stt-e2e-pause-signal-clip-'));
+  try {
+    writeFixtures(dir);
+    const clip = readWav(readFileSync(join(dir, FIXTURE_CLIPS[50])));
+    assert.equal(clip.samples, 8 * 16000, 'the 3-11 s trim, about 8 s');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the fixture generator writes 16 kHz mono PCM WAV clips with the app ffmpeg alone', () => {
   const dir = mkdtempSync(join(tmpdir(), 'stt-e2e-fixtures-test-'));
   try {

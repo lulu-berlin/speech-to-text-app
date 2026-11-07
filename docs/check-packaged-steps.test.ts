@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { assertJobOf, parseJobs, stepsOf, workflowPath } from './ci-workflow.ts';
+import { assertJobOf, commandsOf, parseJobs, stepsOf, workflowPath } from './ci-workflow.ts';
 
 const PACKAGED_JOBS = [
   'desktop-e2e',
@@ -19,15 +19,6 @@ const PACKAGED_JOBS = [
 
 function nameOf(step: string): string {
   return /^- name: (.+)$/m.exec(step)?.[1]?.trim() ?? step.split('\n')[0] ?? '';
-}
-
-// The step's own lines without comments: stepsOf folds the next block's comments into the last
-// step, and a comment mentioning the desktop config is not a spec run.
-function commandsOf(step: string): string {
-  return step
-    .split('\n')
-    .filter((line) => !/^\s*#/.test(line))
-    .join('\n');
 }
 
 test('every packaged spec step has a timeout, and its evidence uploads on any outcome', () => {
@@ -62,4 +53,54 @@ test('every packaged spec step has a timeout, and its evidence uploads on any ou
   );
   assert.ok(logUpload, 'the MSI log is uploaded with its traces');
   assert.match(logUpload, /if: always\(\)/, 'the MSI log uploads on a timeout too');
+});
+
+// Roadmap item 85 (the packaged floor): `desktop-bundle-e2e` spent about five of its thirteen minutes
+// building `.#desktop-bundle` (CI run #595), on every run, even when the change touched nothing the
+// bundle is built from. The bundle is one self-contained file, so it is cached on its own, keyed by
+// its derivation: the key changes exactly when the bundle would change, a hit skips the build, and a
+// miss builds it as before. Adding it to the shared Nix store entry did not work — a cache key's
+// contents cannot change, so the store entry never gained the bundle (runs #592 and #595).
+test('the bundle job restores the bundle by its own derivation and builds it only on a miss', () => {
+  const steps = stepsOf(
+    assertJobOf(parseJobs(readFileSync(workflowPath, 'utf8')), 'desktop-bundle-e2e'),
+  );
+  const keyStep = steps.find((step) =>
+    /nix eval --raw \.#desktop-bundle\.drvPath/.test(commandsOf(step)),
+  );
+  assert.ok(keyStep, 'the job evaluates the bundle derivation that keys its cache');
+  const keyId = /^ {8}id: (\S+)$/m.exec(keyStep)?.[1];
+  assert.ok(keyId, 'the derivation step has an id the cache key reads');
+
+  const cacheStep = steps.find((step) => step.includes('uses: actions/cache/restore@'));
+  assert.ok(cacheStep, 'the bundle is restored with actions/cache');
+  assert.match(
+    cacheStep,
+    new RegExp(`key: stt-bundle-\\$\\{\\{ steps\\.${keyId}\\.outputs\\.key \\}\\}`),
+    'the cache key is the bundle derivation',
+  );
+  assert.doesNotMatch(
+    cacheStep,
+    /restore-keys:/,
+    'no prefix fallback: another derivation is another bundle, never a near miss to reuse',
+  );
+  const cacheId = /^ {8}id: (\S+)$/m.exec(cacheStep)?.[1];
+  assert.ok(cacheId, 'the cache step has an id the build condition reads');
+
+  const buildStep = steps.find((step) => /nix build .*\.#desktop-bundle/.test(commandsOf(step)));
+  assert.ok(buildStep, 'the job still builds the bundle when it has to');
+  assert.match(
+    buildStep,
+    new RegExp(`if: steps\\.${cacheId}\\.outputs\\.cache-hit != 'true'`),
+    'it builds only when the cache had no bundle for this derivation',
+  );
+  assert.match(buildStep, /^ {8}timeout-minutes: \d+$/m, 'the build carries a step timeout');
+
+  const specStep = steps.find((step) => /test:desktop:bundle\b/.test(commandsOf(step)));
+  assert.ok(specStep, 'the job runs the bundle specs');
+  assert.match(
+    commandsOf(specStep),
+    /E2E_BUNDLE_FILE=/,
+    'the specs run the restored or freshly built file instead of building again',
+  );
 });

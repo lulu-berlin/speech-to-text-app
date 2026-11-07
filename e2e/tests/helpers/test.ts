@@ -13,6 +13,14 @@ import {
 import type { TaskSnapshot } from '../../lib/await-task.ts';
 import { appUrl } from '../../lib/backend.ts';
 import { BackendUnanswered, resetQueue } from '../../lib/reset-queue.ts';
+import {
+  SLOW_RUNNER_FACTOR,
+  transcriptionRatio,
+  type SpecTiming,
+} from '../../lib/runner-health.ts';
+
+// The journey's specs, timed as they finish, for the runner-health guard below.
+const specTimings: SpecTiming[] = [];
 
 // A request that never gets an answer is BackendUnanswered (the reset steps aside); an answer that
 // is not a 2xx JSON body fails with the request and what came back.
@@ -39,7 +47,25 @@ async function getJson(request: APIRequestContext, path: string): Promise<Record
   }
 }
 
-export const test = base.extend<{ queueReset: void }>({
+export const test = base.extend<{ queueReset: void; runnerHealth: void }>({
+  // Roadmap item 85 (discovered): a pathological runner is recognised by its own spec timings and
+  // the journey aborts, instead of sitting out the job's timeout (runs #544, #570, #576).
+  runnerHealth: [
+    async ({}, use, testInfo) => {
+      await use();
+      specTimings.push({ file: testInfo.file, ms: testInfo.duration });
+      const ratio = transcriptionRatio(specTimings);
+      if (ratio === null || ratio.factor <= SLOW_RUNNER_FACTOR) return;
+      throw new Error(
+        `the runner transcribes ${ratio.factor.toFixed(1)}× slower than it drives the UI ` +
+          `(03-upload-queue ${Math.round(ratio.transcriptionMs / 1000)} s against 01+02+04+05 ` +
+          `${Math.round(ratio.uiMs / 1000)} s); healthy runs measure 0.7–2.4×, the 64-minute VM of ` +
+          `CI run #544 measured 4.7× and run #605's 24.7× — re-run the job instead of waiting out ` +
+          `its timeout`,
+      );
+    },
+    { auto: true },
+  ],
   queueReset: [
     async ({ request }, use) => {
       await resetQueue({

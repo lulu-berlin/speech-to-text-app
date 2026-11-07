@@ -1,7 +1,7 @@
 # The JDK and Gradle setup every JVM job needs (roadmap item 51). The pinned versions come from the
-# committed versions.json (the flake's pins, item 33). `cache-read-only: false` because
-# gradle/actions otherwise only writes the Gradle cache on the default branch, so every pull-request
-# run would resolve the whole dependency graph cold and never populate the cache.
+# committed versions.json (the flake's pins, item 33). The Gradle cache is written on the default
+# branch only (roadmap item 85): pull requests restore main's entries instead of adding their own,
+# which keeps the repository inside its 10 GB cache budget.
 name: JVM toolchain
 description: Read versions.json, set up the pinned JDK and Gradle, and optionally install the runtime tools' libraries and cache their downloads
 
@@ -37,7 +37,11 @@ runs:
         java-version: ${{ steps.versions.outputs.jdk-version }}
     - uses: gradle/actions/setup-gradle@v6
       with:
-        cache-read-only: false
+        # Roadmap item 85: every branch writing its own caches filled the repository's 10 GB budget
+        # (one pull request held ten `gradle-dependencies-v2` entries) and eviction then removed
+        # entries the whole matrix needs. Only `main` writes now; a pull request restores `main`'s
+        # entries, which GitHub allows for the default branch.
+        cache-read-only: ${{ github.ref != 'refs/heads/main' }}
     # The list lives in the build (`./gradlew runtimeSystemDeps`), so this step, the README and the
     # task cannot drift. The task installs as root here; the chown hands back the Gradle home and the
     # project directories it wrote as root.

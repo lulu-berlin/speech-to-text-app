@@ -8,6 +8,7 @@ import {
   startBackend,
   stopBackend,
 } from '../lib/backend.ts';
+import { awaitUploadOutcome } from '../lib/upload-outcome.ts';
 import { appLive, ensureTranscript, openTranscript, turnTextOf } from './helpers/ui';
 import { expect, test } from './helpers/test';
 
@@ -20,7 +21,6 @@ const RECONNECTED_NAME = 'Bob after reconnect';
 test('writes wait for the connection: the transcript stays readable and a rename goes through after the backend returns', async ({
   page,
 }) => {
-  test.setTimeout(300_000);
   await ensureTranscript(page, CLIP);
   await openTranscript(page, CLIP);
   await expect(page.getByText('Live', { exact: true })).toBeVisible();
@@ -77,7 +77,6 @@ test('an upload cut off mid-request waits and finishes after the backend returns
   page,
 }) => {
   test.skip(process.platform === 'win32', 'freezing the backend needs POSIX signals');
-  test.setTimeout(300_000);
   await appLive(page);
   const { pid, port, dataDir, fixturesDir } = loadState();
   if (pid === undefined) {
@@ -112,13 +111,14 @@ test('an upload cut off mid-request waits and finishes after the backend returns
     // service (the usual duplicate notice names the task). Never a transport error.
     restarted = await startBackend({ port, dataDir });
     await expect(page.getByText('Live', { exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(async () => {
-      const text = (await row.isVisible()) ? ((await row.textContent()) ?? '') : '';
-      // The one reading of the row decides both: it is gone (the resend landed) or it carries the
-      // usual duplicate notice, and neither ever shows the app's transport message.
-      expect(text).not.toContain('Not saved');
-      expect(text.includes('Already uploaded') || text === '').toBe(true);
-    }).toPass({ timeout: 120_000 });
+    // The one reading of the row decides both: it is gone (the resend landed) or it carries the
+    // usual duplicate notice, and neither ever shows the app's transport message. Roadmap item 85
+    // (discovered): the row's own text is the state; a fixed 120 s budget was outlasted on a loaded
+    // runner (CI run #555) although this state arrived moments later.
+    await awaitUploadOutcome(async () => {
+      if (!(await row.isVisible())) return null;
+      return row.textContent().catch(() => null);
+    });
   } finally {
     // A failure before the kill leaves the group SIGSTOPped; SIGTERM cannot end a stopped
     // process, so every later spec would hang. End it here, then hand the shared backend over.

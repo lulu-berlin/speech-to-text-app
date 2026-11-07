@@ -183,9 +183,12 @@ jobs:
 
   e2e:
     name: Linux (e2e)
-    runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    # Roadmap item 85: the journey is the run's longest job, so it starts as soon as the change
+    # classification has run instead of waiting ~3 min for the checks; a red check still fails
+    # `CI (all checks)` through the aggregator (docs/check-ci-gating.test.ts pins both halves).
+    needs: [changes]
     if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -298,7 +301,9 @@ jobs:
 
   macos-e2e:
     name: macOS (e2e)
-    needs: [changes, macos-backend-check, macos-frontend-check]
+    # Roadmap item 85: starts with the change classification, like the other two journeys; the
+    # macOS checks still gate every other macOS job and still fail `CI (all checks)`.
+    needs: [changes]
     if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 60
@@ -680,8 +685,10 @@ jobs:
   # as Linux (e2e) and macOS (e2e), except the named platform skips (e2e/lib/platform-gates.test.ts).
   # It runs on every push and code-touching pull request like the other journeys. It started
   # nightly; run #389 measured it at 15:54 against macOS's 15:32 (band 13-16 min), the condition the
-  # consultation set for joining the every-PR legs. It waits for the Windows checks, as macOS (e2e)
-  # waits for macOS's. The runner has no GPU, so the journey runs on the CPU path.
+  # consultation set for joining the every-PR legs. It starts with the change classification
+  # (roadmap item 85: the journeys no longer wait ~3 min for their platform's checks; the checks
+  # still gate every other job and still fail `CI (all checks)`). The runner has no GPU, so the
+  # journey runs on the CPU path.
   # It gates merges like every other journey: roadmap item 84 returned it to the `ci` aggregator
   # after five consecutive green runs (17:00, 9:19, 8:40, 15:12 and 11:47 for the e2e step, the
   # first four before the health wait stopped using global fetch on a backend restart) and fixed
@@ -689,7 +696,7 @@ jobs:
   # (docs/specs/windows-e2e-journey.md, amendment 2026-10-31).
   windows-e2e:
     name: Windows (e2e)
-    needs: [changes, windows-backend-check, windows-frontend-check]
+    needs: [changes]
     if: needs.changes.outputs.code == 'true'
     runs-on: windows-2025
     timeout-minutes: 90
@@ -1417,11 +1424,46 @@ jobs:
       - uses: ./.github/actions/nix-toolchain
       - name: Install the devenv CLI
         run: nix profile install nixpkgs#devenv
-      - name: Build the bundle and run the packaged desktop e2e against it
+      # Roadmap item 85: the bundle is one self-contained file (the launcher with its payload
+      # appended), cached on its own under its derivation, so the key changes exactly when the
+      # bundle would; a hit skips its ~5-minute build. The shared Nix store entry cannot carry it:
+      # a cache key's contents never change once saved (see the Nix jobs below).
+      - name: Key the bundle by its derivation
+        id: bundle-drv
+        run: echo "key=$(basename "$(nix eval --raw .#desktop-bundle.drvPath)" .drv)" >> "$GITHUB_OUTPUT"
+      - name: Restore the bundle built from this derivation
+        id: bundle-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/stt-bundle
+          key: stt-bundle-${{ steps.bundle-drv.outputs.key }}
+      # Roadmap item 85 (the root agent's review): the repository stayed 0.31 GB over the free plan's
+      # 10 GB because this PR's ref held a 370 MB bundle entry — the implicit save wrote one per PR.
+      # The bundle cache follows the Gradle policy: a pull request restores a matching entry and only
+      # `main` saves, so the budget fits; a PR changing the bundle inputs rebuilds only its own runs.
+      - name: Save the bundle on main
+        if: github.ref == 'refs/heads/main' && steps.bundle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/stt-bundle
+          key: stt-bundle-${{ steps.bundle-drv.outputs.key }}
+      - name: Build the bundle (no cached build of this derivation)
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          out=$(nix build --print-build-logs --print-out-paths --no-link .#desktop-bundle)
+          mkdir -p "$RUNNER_TEMP/stt-bundle"
+          cp "$out/bin/stt-app-bundle" "$RUNNER_TEMP/stt-bundle/stt-app-bundle"
+          chmod u+w,a+x "$RUNNER_TEMP/stt-bundle/stt-app-bundle"
+      - name: The bundle's size
+        run: du -h "$RUNNER_TEMP/stt-bundle/stt-app-bundle"
+      - name: Run the packaged desktop e2e against the bundle
         timeout-minutes: 90
         run: >-
           devenv shell -- bash -euo pipefail -c
-          'pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:bundle'
+          'export E2E_BUNDLE_FILE=${{ runner.temp }}/stt-bundle/stt-app-bundle &&
+          pnpm --dir e2e install --frozen-lockfile && pnpm --dir e2e test:desktop:bundle'
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results); the
       # container writes them into the mounted e2e/ (desktop/run-in-docker.ts).
       - name: Upload the failed specs' traces

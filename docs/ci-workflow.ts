@@ -81,3 +81,13 @@ export function stepsOf(job: Job): string[] {
   }
   return steps.map((lines) => lines.join('\n'));
 }
+
+// The step's own lines without comments: `stepsOf` folds the next block's comments into the last
+// step, and a comment that mentions a command is not the command. Shared by the workflow checks that
+// match step text.
+export function commandsOf(step: string): string {
+  return step
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .join('\n');
+}
