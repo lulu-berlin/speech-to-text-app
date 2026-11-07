@@ -119,13 +119,18 @@ fn main() -> ExitCode {
 /// reconnect delay.
 const RECONNECT: Duration = Duration::from_secs(1);
 
-/// Reads the service's event stream and hands every event to the terminal. A stream that drops (or
-/// cannot be opened) is opened again after [`RECONNECT`]; its first event, a fresh snapshot, brings
-/// the view up to date with whatever happened meanwhile.
+/// How long a stream may stay silent before it counts as dropped: the service sends at least a
+/// heartbeat every 5 s (ADR 0044), so 15 s without any event means the connection is gone even if
+/// the socket says otherwise - as the browser decides.
+const SILENCE: Duration = Duration::from_secs(15);
+
+/// Reads the service's event stream and hands every event to the terminal. A stream that drops,
+/// stays silent for [`SILENCE`], or cannot be opened is opened again after [`RECONNECT`]; its first
+/// event, a fresh snapshot, brings the view up to date with whatever happened meanwhile.
 async fn follow(service: Service, sender: mpsc::Sender<Message>) {
     loop {
         if let Ok(mut stream) = events(&service).await {
-            while let Ok(Some(event)) = stream.next().await {
+            while let Ok(Ok(Some(event))) = tokio::time::timeout(SILENCE, stream.next()).await {
                 if sender.send(Message::Service(event)).is_err() {
                     return;
                 }
