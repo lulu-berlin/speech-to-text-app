@@ -110,7 +110,7 @@ graph TD
   12 --> 44
   11 --> 46[46 contextual logging ✓]:::done
   47 --> 55[55 atomic-transitions lock probe ✓]:::done
-  55 --> 94[94 atomic-transitions probe clock]
+  55 --> 94[94 atomic-transitions probe clock ✓]:::done
   47 --> 94
   58 --> 94
   11 --> 94
@@ -297,7 +297,7 @@ graph TD
 | [91 — MSW 3: the API mocks, the shared handlers and the dev worker](../docs/specs/msw-3.md) | done | 13 |
 | [92 — Electron 45: the desktop window on the next major](92-electron-45.md) | spec-approved | 50 |
 | [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |
-| [94 — The atomic-transitions lock probe must not expire on a starved runner](94-atomic-transitions-probe-clock.md) | spec-approved | 55, 47, 58, 11 |
+| [94 — The atomic-transitions lock probe must not expire on a starved runner](../docs/specs/atomic-transitions-probe-clock.md) | done | 55, 47, 58, 11 |
 | [95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests](95-audit-failure-paths.md) | draft | 11, 42, 12, 41, 32, 66, 73, 87 |
 | [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | draft | 95, 94, 67 |
 | [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](97-audit-ci-and-pins.md) | draft | 85 |

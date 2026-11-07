@@ -7,23 +7,20 @@ import io.kotest.matchers.booleans.shouldBeTrue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import stt.audio.PlannedChunk
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 /** The writer lock, read connections, and upload staging under concurrent use (ADR 0017, ADR 0024). */
 class ConcurrencySpec :
@@ -41,10 +38,22 @@ class ConcurrencySpec :
                                 val heldWrite = holdWriteTransaction(db, queuedTask("held.wav", createdAt = 1L))
 
                                 val concurrent = queuedTask("concurrent.wav", createdAt = 2L)
-                                val insert = async { tasks.insert(concurrent) }
-                                // The second lock() call can only come from the insert, while the held transaction
-                                // owns the lock: from here on it waits. Without the lock this times out and fails.
-                                withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { lock.lockCalls.first { it == 2 } } }
+                                // Hold the insert's launch past the probe's old 10 s bound: the probe is tied
+                                // to this insert's own writer, so a write starved that long is still awaited.
+                                val writer = LockWriter("insert")
+                                val insertGate = CompletableDeferred<Unit>()
+                                val insert =
+                                    async(Dispatchers.Default + writer) {
+                                        insertGate.await()
+                                        tasks.insert(concurrent)
+                                    }
+                                backgroundScope.launch(Dispatchers.Default) {
+                                    delay(11.seconds)
+                                    insertGate.complete(Unit)
+                                }
+                                // The insert waits behind the held transaction once it reaches the lock;
+                                // the wait is tied to its own writer, never to a lock-call count or a clock.
+                                awaitLockCall(lock, writer, insert)
                                 insert.isCompleted.shouldBeFalse()
                                 heldWrite.release()
 
@@ -75,27 +84,24 @@ class ConcurrencySpec :
                             val heldWrite = holdWriteTransaction(db, queuedTask("uncommitted.wav", createdAt = 2L))
 
                             try {
-                                // Real time: a read that waits for the writer never finishes inside the bound.
-                                withContext(Dispatchers.Default) {
-                                    withTimeout(PROBE_TIMEOUT_MS) {
-                                        tasks.list().shouldBe(listOf(StoredTask(id, stored)))
-                                        tasks.find(id).shouldBe(StoredTask(id, stored))
-                                        chunks
-                                            .findByTask(id)
-                                            .shouldBe(listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.PENDING)))
-                                        SegmentRepository(db).findByTask(id).shouldBe(emptyList())
-                                        // sha256("abc"): the FIPS 180-2 test vector.
-                                        AudioRepository(db)
-                                            .metadata(id)
-                                            .shouldBe(
-                                                AudioMetadata(
-                                                    sizeBytes = 3L,
-                                                    sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-                                                ),
-                                            )
-                                        QueueStateRepository(db).isPaused().shouldBeFalse()
-                                    }
-                                }
+                                // Reads use their own connections: a read that waited for the writer would
+                                // hang here and fail through runTest's own timeout.
+                                tasks.list().shouldBe(listOf(StoredTask(id, stored)))
+                                tasks.find(id).shouldBe(StoredTask(id, stored))
+                                chunks
+                                    .findByTask(id)
+                                    .shouldBe(listOf(Chunk(idx = 0, startMs = 0L, endMs = 1_000L, status = ChunkStatus.PENDING)))
+                                SegmentRepository(db).findByTask(id).shouldBe(emptyList())
+                                // sha256("abc"): the FIPS 180-2 test vector.
+                                AudioRepository(db)
+                                    .metadata(id)
+                                    .shouldBe(
+                                        AudioMetadata(
+                                            sizeBytes = 3L,
+                                            sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                                        ),
+                                    )
+                                QueueStateRepository(db).isPaused().shouldBeFalse()
                             } finally {
                                 heldWrite.release()
                             }
@@ -127,8 +133,9 @@ class ConcurrencySpec :
                                 val other = queuedTask("other.wav", createdAt = 2L)
                                 val otherId =
                                     try {
-                                        // Real time: an insert that waits for the upload never finishes inside the bound.
-                                        withContext(Dispatchers.Default) { withTimeout(PROBE_TIMEOUT_MS) { tasks.insert(other) } }
+                                        // An insert that waited for the upload would hang here and fail through
+                                        // runTest's own timeout; the insert itself has no clock.
+                                        tasks.insert(other)
                                     } finally {
                                         source.release.countDown()
                                     }
@@ -145,42 +152,11 @@ class ConcurrencySpec :
         }
     })
 
-// Real-time bounds for the concurrency tests. A probe waits for something that must happen;
-// a stall (held write, stalled source) blocks until the test releases it. The stall's safety
-// bound must outlast every probe: otherwise a stall that gives up first would let a probe
-// finish behind it, and a broken lock or a read routed through the writer would pass.
+// The stalled source's waits: the test waits for the stall signal, and the source blocks until released
+// or its safety bound expires. The insert under test has no clock; a wrong block fails through
+// runTest's own timeout, and the stall's safety bound outlasts every wait that must happen first.
 private const val PROBE_TIMEOUT_MS = 10_000L
 private const val STALL_SAFETY_TIMEOUT_MS = 30_000L
-
-/** A write transaction held open on the writer connection; once released it fails, so it rolls back. */
-private class HeldWrite(
-    private val releaseLatch: CountDownLatch,
-    val outcome: Deferred<Result<Unit>>,
-) {
-    fun release() = releaseLatch.countDown()
-}
-
-/** Starts a write transaction that inserts [task] and stays open until released; returns once it is open. */
-private suspend fun CoroutineScope.holdWriteTransaction(
-    db: Database,
-    task: Task,
-): HeldWrite {
-    val held = CountDownLatch(1)
-    val release = CountDownLatch(1)
-    val outcome =
-        async {
-            runCatching {
-                db.writeTransaction {
-                    insertTaskRow(task)
-                    held.countDown()
-                    release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-                    throw IOException("held transaction failed")
-                }
-            }
-        }
-    withContext(Dispatchers.IO) { held.await(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS).shouldBeTrue() }
-    return HeldWrite(release, outcome)
-}
 
 /** An upload source that delivers "abc", then signals [stalled] on its next read, blocks until [release], and fails. */
 private class StallingFailingSource : InputStream() {
@@ -203,17 +179,5 @@ private class StallingFailingSource : InputStream() {
         stalled.countDown()
         release.await(STALL_SAFETY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         throw IOException("audio source failed")
-    }
-}
-
-/** A [Mutex] that counts its lock() calls, so a test can see a caller start waiting for it. */
-private class CountingMutex(
-    private val delegate: Mutex = Mutex(),
-) : Mutex by delegate {
-    val lockCalls = MutableStateFlow(0)
-
-    override suspend fun lock(owner: Any?) {
-        lockCalls.update { it + 1 }
-        delegate.lock(owner)
     }
 }
