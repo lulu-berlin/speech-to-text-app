@@ -183,8 +183,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [x] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
       too large) shows the service's message and leaves the UI usable - `stt-tui/tests/upload.rs`,
       `776aeba4`
-- [ ] (discovered, 2026-11-06) A speaker rename or merge made in the browser relabels a transcript
-      open in the TUI (the `speakers-renamed` / `speakers-merged` events)
+- [x] (discovered, 2026-11-06) A speaker rename or merge made in the browser relabels a transcript
+      open in the TUI (the `speakers-renamed` / `speakers-merged` events) - `stt-tui/tests/speakers.rs`,
+      `96f1cac4`
 - [ ] (discovered, 2026-11-06) A rename or merge the service refuses (a duplicate or invalid name,
       an invalid merge) shows the service's message and nothing changes
 - [ ] (discovered, 2026-11-06) A settings change made in the browser (the `settings-updated`
@@ -445,3 +446,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   moves to the key in ADR 0066's follow-up migration). The last known queue stays on screen and the
   next stream's snapshot ends the line. Committed as `07bab8d4` (68 tests; fmt and clippy green; the
   `stt-tui` suite green in 3 repeats; the catalog prettier-clean). The line is ticked.
+- 2026-11-07 (workspace, cycle 21): "speaker changes made elsewhere" (the discovered line). Red ran
+  on `772c0bf3` with the cycle's uncommitted pty test: a `speakers-renamed` event left "Speaker 1"
+  on screen (`terminal/mod.rs:137`). Green on the same tree plus `stt-client` reading
+  `speakers-renamed` and `speakers-merged` (the task's effective speakers) and the TUI applying them
+  to an open transcript of that task only; after a merge it reads the turns again, as the contract
+  asks of a client showing them. A merge made in the TUI itself now reads the turns twice (once
+  after its own answer, once on the event) - harmless, and kept so a merge still shows while the
+  stream is down. Committed as `96f1cac4` (69 tests; fmt and clippy green; the `stt-tui` suite green
+  in 3 repeats). The line is ticked.
