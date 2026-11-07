@@ -67,5 +67,7 @@
   "help.settings": "Settings keys",
   "help.close": "? or Esc closes",
   "upload.area": "Upload a file — Enter or Space opens the dialog, or press u",
-  "queue.empty": "No tasks yet — press u, or Enter on the upload area, to upload a file"
+  "queue.empty": "No tasks yet — press u, or Enter on the upload area, to upload a file",
+  "upload.title": "Upload: {dir}",
+  "upload.footer": "↑/↓ move · enter open or choose · type a path · esc cancel"
 }

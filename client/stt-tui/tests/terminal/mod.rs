@@ -38,6 +38,22 @@ impl Tui {
         rows: u16,
         env: &[(&str, &str)],
     ) -> Tui {
+        Tui::start_full(program, state, cols, rows, env, None)
+    }
+
+    /// Starts the TUI as [`Tui::start`] does, in `cwd` - the directory the upload dialog opens in.
+    pub fn start_in(program: &Path, state: &Path, cols: u16, rows: u16, cwd: &Path) -> Tui {
+        Tui::start_full(program, state, cols, rows, &[], Some(cwd))
+    }
+
+    fn start_full(
+        program: &Path,
+        state: &Path,
+        cols: u16,
+        rows: u16,
+        env: &[(&str, &str)],
+        cwd: Option<&Path>,
+    ) -> Tui {
         let pty = native_pty_system()
             .openpty(PtySize {
                 rows,
@@ -66,6 +82,9 @@ impl Tui {
         }
         for (key, value) in env {
             command.env(key, value);
+        }
+        if let Some(cwd) = cwd {
+            command.cwd(cwd);
         }
         let child = pty.slave.spawn_command(command).unwrap();
         drop(pty.slave);

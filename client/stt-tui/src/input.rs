@@ -63,7 +63,12 @@ pub enum Action {
 
 /// What `key` does: with the prompt open every key is text except Escape, Enter and Backspace; at
 /// the queue the keys are commands. Raw mode turns Ctrl-C into a key, so it quits from both.
-pub fn action(key: &KeyEvent, prompt_open: bool, download_open: bool) -> Option<Action> {
+pub fn action(
+    key: &KeyEvent,
+    prompt_open: bool,
+    download_open: bool,
+    upload_open: bool,
+) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
     }
@@ -79,6 +84,18 @@ pub fn action(key: &KeyEvent, prompt_open: bool, download_open: bool) -> Option<
             KeyCode::Left => Some(Action::DownloadFormatStep(-1)),
             KeyCode::Right => Some(Action::DownloadFormatStep(1)),
             KeyCode::Char(character) => Some(Action::DownloadChar(character)),
+            _ => None,
+        };
+    }
+    if upload_open {
+        return match key.code {
+            KeyCode::Esc => Some(Action::CancelPrompt),
+            KeyCode::Enter => Some(Action::SubmitPrompt),
+            KeyCode::Backspace => Some(Action::PromptBackspace),
+            // Letters type a path inside the dialog, so only the arrows move the selection.
+            KeyCode::Up => Some(Action::SelectUp),
+            KeyCode::Down => Some(Action::SelectDown),
+            KeyCode::Char(character) => Some(Action::PromptChar(character)),
             _ => None,
         };
     }

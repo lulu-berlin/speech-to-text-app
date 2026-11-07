@@ -11,6 +11,7 @@ use stt_client::{Snapshot, Task};
 use crate::settings::{FIELDS, SettingsScreen};
 use crate::state::{Page, Screen};
 use crate::transcript::Transcript;
+use crate::upload_dialog::UploadDialog;
 
 /// Everything the screen shows.
 pub struct View<'a> {
@@ -24,8 +25,8 @@ pub struct View<'a> {
     pub history: &'a [Task],
     /// The history row Enter opens.
     pub history_selected: usize,
-    /// The path being typed into the upload prompt, while it is open.
-    pub prompt: Option<&'a str>,
+    /// The upload dialog, while it is open.
+    pub upload: Option<&'a UploadDialog>,
     /// The name being typed for the selected speaker, while the rename prompt is open.
     pub rename: Option<&'a str>,
     /// The terminal command being typed, while the settings' prompt is open.
@@ -59,7 +60,7 @@ pub struct DownloadView<'a> {
 pub fn draw(frame: &mut Frame, view: &View<'_>) {
     let middle = match (
         view.download.is_some(),
-        view.prompt.or(view.rename).or(view.terminal).is_some(),
+        view.rename.or(view.terminal).is_some(),
     ) {
         // The dialog's border, its two fields and their spacing.
         (true, _) => 4,
@@ -85,12 +86,6 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         Screen::History => draw_history(frame, areas[1], view),
         Screen::Transcript(transcript) => draw_transcript(frame, areas[1], view, transcript),
         Screen::Settings(screen) => draw_settings(frame, areas[1], view, screen),
-    }
-    if let Some(path) = view.prompt {
-        frame.render_widget(
-            Paragraph::new(stt_client::text("upload.prompt", &[("path", path)])),
-            areas[2],
-        );
     }
     if let Some(name) = view.rename {
         frame.render_widget(
@@ -131,6 +126,9 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         );
     }
     draw_footer(frame, areas[5], view);
+    if let Some(upload) = view.upload {
+        draw_upload(frame, upload);
+    }
     if view.help {
         draw_help(frame, view);
     }
@@ -161,6 +159,43 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
     );
 }
 
+/// The upload dialog: its directory (or the path being typed), then the entries, directories first,
+/// the selected one marked; the list scrolls to keep the selection visible.
+fn draw_upload(frame: &mut Frame, upload: &UploadDialog) {
+    let area = centered(frame.area());
+    let title = stt_client::text(
+        "upload.title",
+        &[("dir", &upload.dir().display().to_string())],
+    );
+    let typed = upload
+        .typed()
+        .map(|path| stt_client::text("upload.prompt", &[("path", path)]));
+    let height = area.height.saturating_sub(2) as usize;
+    let skip = upload.selected().saturating_sub(height.saturating_sub(1));
+    let mut lines: Vec<Line> = Vec::new();
+    if let Some(typed) = typed {
+        lines.push(Line::from(typed));
+    }
+    for (index, entry) in upload.entries().iter().enumerate().skip(skip).take(height) {
+        let marker = if index == upload.selected() {
+            "> "
+        } else {
+            "  "
+        };
+        let name = entry
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let suffix = if entry.is_dir() { "/" } else { "" };
+        lines.push(Line::from(format!("{marker}{name}{suffix}")));
+    }
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(Block::bordered().title(title)),
+        area,
+    );
+}
+
 /// The middle of `area` for the help block: 70% wide and as tall as its text needs, at most all of
 /// it.
 fn centered(area: Rect) -> Rect {
@@ -177,11 +212,15 @@ fn centered(area: Rect) -> Rect {
 /// The page's keys in words: the queue names reorder and upload, a transcript rename and merge,
 /// the settings how to change a value, history how to open a row.
 fn draw_footer(frame: &mut Frame, area: Rect, view: &View<'_>) {
-    let key = match view.screen {
-        Screen::Queue => "footer.queue",
-        Screen::History => "footer.history",
-        Screen::Transcript(_) => "footer.transcript",
-        Screen::Settings(_) => "footer.settings",
+    let key = if view.upload.is_some() {
+        "upload.footer"
+    } else {
+        match view.screen {
+            Screen::Queue => "footer.queue",
+            Screen::History => "footer.history",
+            Screen::Transcript(_) => "footer.transcript",
+            Screen::Settings(_) => "footer.settings",
+        }
     };
     frame.render_widget(Paragraph::new(stt_client::text(key, &[])), area);
 }
