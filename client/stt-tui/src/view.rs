@@ -71,6 +71,8 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         Constraint::Length(middle),
         Constraint::Length(notice),
         Constraint::Length(connection),
+        // The footer: the page's keys in words, so nothing must be guessed.
+        Constraint::Length(1),
     ])
     .split(frame.area());
     draw_tabs(frame, areas[0], view);
@@ -124,6 +126,19 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
             areas[4],
         );
     }
+    draw_footer(frame, areas[5], view);
+}
+
+/// The page's keys in words: the queue names reorder and upload, a transcript rename and merge,
+/// the settings how to change a value, history how to open a row.
+fn draw_footer(frame: &mut Frame, area: Rect, view: &View<'_>) {
+    let key = match view.screen {
+        Screen::Queue => "footer.queue",
+        Screen::History => "footer.history",
+        Screen::Transcript(_) => "footer.transcript",
+        Screen::Settings(_) => "footer.settings",
+    };
+    frame.render_widget(Paragraph::new(stt_client::text(key, &[])), area);
 }
 
 /// The GUI's pages as a tab bar: `1 Queue`, `2 History`, `3 Settings`, the active one bracketed.

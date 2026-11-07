@@ -56,5 +56,9 @@
   "task.cancel-confirm": "Cancel task",
   "task.transcription": "Transcription",
   "task.delete": "Delete task",
-  "notice.dismiss-failed": "Could not dismiss the notice"
+  "notice.dismiss-failed": "Could not dismiss the notice",
+  "footer.queue": "move ↑↓/j/k · reorder J/K or Shift-↑↓ · p pause · c cancel · r retry · space queue pause · u upload · 1/2/3 pages · q quit",
+  "footer.history": "move ↑↓/j/k · enter open · 1/2/3 pages · b back · q quit",
+  "footer.transcript": "speakers ↑↓/j/k · r rename · m merge · d download · b back · 1/2/3 pages · q quit",
+  "footer.settings": "move ↑↓/j/k · ←/→ change · enter edit · b back · 1/2/3 pages · q quit"
 }
