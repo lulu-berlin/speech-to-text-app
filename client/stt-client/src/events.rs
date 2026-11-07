@@ -8,6 +8,7 @@ use std::io;
 use serde::Deserialize;
 
 use crate::read::Speaker;
+use crate::settings::Settings;
 use crate::{Service, parse_json};
 
 /// A task as the service reports it (`task.*.json`).
@@ -64,6 +65,9 @@ pub enum Event {
     /// A task's speakers were merged or the merges reset (`speakers-merged`); its turns can join or
     /// split, so a client showing them reads them again.
     SpeakersMerged(SpeakersChanged),
+    /// The settings were stored (`settings-updated`): all of them but the device list and the GPU
+    /// names, which the event does not carry - those fields come out empty.
+    SettingsUpdated(Settings),
     /// An event this client does not read yet, by its name.
     Other(String),
 }
@@ -115,6 +119,7 @@ fn decode(frame: Frame) -> io::Result<Event> {
         "queue-updated" => parse_json(&frame.data).map(Event::QueueUpdated),
         "speakers-renamed" => parse_json(&frame.data).map(Event::SpeakersRenamed),
         "speakers-merged" => parse_json(&frame.data).map(Event::SpeakersMerged),
+        "settings-updated" => parse_json(&frame.data).map(Event::SettingsUpdated),
         _ => Ok(Event::Other(frame.name)),
     }
 }

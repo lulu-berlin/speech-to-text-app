@@ -223,19 +223,23 @@ impl Ui {
                 if matches!(event, Event::Snapshot(_)) {
                     self.disconnected = false;
                 }
-                // Speakers changed elsewhere (the browser, another TUI): an open transcript of the
-                // task follows them, and after a merge reads its turns again.
-                if let Screen::Transcript(transcript) = &mut self.screen {
-                    match &event {
-                        Event::SpeakersRenamed(change) => {
-                            transcript.set_speakers(change.id, change.speakers.clone());
-                        }
-                        Event::SpeakersMerged(change) if change.id == transcript.task.id => {
-                            transcript.set_speakers(change.id, change.speakers.clone());
-                            reread_turns(runtime, service, sender, change.id);
-                        }
-                        _ => {}
+                // Speakers or settings changed elsewhere (the browser, another TUI): the open screen
+                // follows them - a transcript of the task, which after a merge reads its turns
+                // again, or the settings.
+                match (&mut self.screen, &event) {
+                    (Screen::Transcript(transcript), Event::SpeakersRenamed(change)) => {
+                        transcript.set_speakers(change.id, change.speakers.clone());
                     }
+                    (Screen::Transcript(transcript), Event::SpeakersMerged(change))
+                        if change.id == transcript.task.id =>
+                    {
+                        transcript.set_speakers(change.id, change.speakers.clone());
+                        reread_turns(runtime, service, sender, change.id);
+                    }
+                    (Screen::Settings(screen), Event::SettingsUpdated(settings)) => {
+                        screen.updated(settings.clone());
+                    }
+                    _ => {}
                 }
                 state::apply(&mut self.snapshot, event);
                 let rows = state::rows(self.snapshot.as_ref()).len();

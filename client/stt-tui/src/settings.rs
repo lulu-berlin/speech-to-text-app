@@ -107,6 +107,14 @@ impl SettingsScreen {
         self.settings = settings;
     }
 
+    /// The settings another client stored (`settings-updated`): the event carries no device list or
+    /// GPU names, so the ones this screen read stay.
+    pub fn updated(&mut self, mut settings: Settings) {
+        settings.available_devices = std::mem::take(&mut self.settings.available_devices);
+        settings.gpu_names = std::mem::take(&mut self.settings.gpu_names);
+        self.saved(settings);
+    }
+
     /// The command in the terminal prompt, while it is open.
     pub fn terminal(&self) -> Option<&str> {
         self.terminal.as_deref()

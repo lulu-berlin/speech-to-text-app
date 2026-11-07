@@ -347,3 +347,54 @@ fn fixed_needs_a_speaker_count_and_the_count_is_chosen_first() {
     );
     tui.wait_for(WAIT, |text| row(text, "Speakers", "fixed"));
 }
+
+#[test]
+fn a_settings_change_made_elsewhere_updates_the_open_settings() {
+    let service = EventService::start();
+    let dir = tempfile::tempdir().unwrap();
+    support::write_bootstrap(dir.path(), service.port);
+    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    tui.wait_for(WAIT, |text| text.contains("memo.wav"));
+    tui.press(b"s");
+    service.next_get(WAIT).answer("200 OK", SETTINGS);
+    service.next_get(WAIT).answer("200 OK", FRONTENDS);
+    tui.wait_for(WAIT, |text| row(text, "Threads", "4"));
+
+    // The browser saved other settings: the event carries them, without the device list.
+    stream.send(
+        "settings-updated",
+        include_str!("../../../docs/api/settings-updated.json"),
+    );
+    let screen = tui.wait_for(WAIT, |text| row(text, "Threads", "6"));
+    assert!(
+        row(&screen, "Device", "gpu:1 (AMD Radeon RX 6600)"),
+        "the device list and GPU names the screen read stay:\n{screen}"
+    );
+    assert!(row(&screen, "Language", "de"), "{screen}");
+    assert!(row(&screen, "Default frontend", "-"), "{screen}");
+    assert!(row(&screen, "Terminal command", "-"), "{screen}");
+    assert!(
+        !service.command_arrived(),
+        "following the browser writes nothing:\n{screen}"
+    );
+
+    // A later change starts from what the browser stored, the device list still offered.
+    tui.press(b"\x1b[C");
+    let write = service.next_command(WAIT);
+    assert_eq!(
+        serde_json::from_str::<Value>(&write.request().body).unwrap(),
+        json!({
+            "device": "cpu",
+            "threads": 6,
+            "defaultLanguage": "de",
+            "speakersMode": "fixed",
+            "speakersCount": 3,
+            "maxSpeakers": 12,
+            "defaultFrontend": null,
+            "terminalCommand": null
+        }),
+        "Right on Device wraps gpu:1 round to the first offered device, cpu"
+    );
+}
