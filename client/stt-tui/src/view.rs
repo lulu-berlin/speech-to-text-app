@@ -9,7 +9,7 @@ use ratatui::widgets::{Block, Paragraph, Row, Table, TableState, Wrap};
 use stt_client::{Snapshot, Task};
 
 use crate::settings::{FIELDS, SettingsScreen};
-use crate::state::Screen;
+use crate::state::{Page, Screen};
 use crate::transcript::Transcript;
 
 /// Everything the screen shows.
@@ -65,28 +65,31 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     let notice = if view.notice.is_some() { 1 } else { 0 };
     let connection = if view.disconnected { 1 } else { 0 };
     let areas = Layout::vertical([
+        // The tab bar: the pages, the active one bracketed.
+        Constraint::Length(1),
         Constraint::Min(3),
         Constraint::Length(middle),
         Constraint::Length(notice),
         Constraint::Length(connection),
     ])
     .split(frame.area());
+    draw_tabs(frame, areas[0], view);
     match view.screen {
-        Screen::Queue => draw_queue(frame, areas[0], view),
-        Screen::History => draw_history(frame, areas[0], view),
-        Screen::Transcript(transcript) => draw_transcript(frame, areas[0], view, transcript),
-        Screen::Settings(screen) => draw_settings(frame, areas[0], view, screen),
+        Screen::Queue => draw_queue(frame, areas[1], view),
+        Screen::History => draw_history(frame, areas[1], view),
+        Screen::Transcript(transcript) => draw_transcript(frame, areas[1], view, transcript),
+        Screen::Settings(screen) => draw_settings(frame, areas[1], view, screen),
     }
     if let Some(path) = view.prompt {
         frame.render_widget(
             Paragraph::new(stt_client::text("upload.prompt", &[("path", path)])),
-            areas[1],
+            areas[2],
         );
     }
     if let Some(name) = view.rename {
         frame.render_widget(
             Paragraph::new(stt_client::text("speakers.rename", &[("name", name)])),
-            areas[1],
+            areas[2],
         );
     }
     if let Some(command) = view.terminal {
@@ -95,7 +98,7 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
                 "settings.terminal-prompt",
                 &[("command", command)],
             )),
-            areas[1],
+            areas[2],
         );
     }
     if let Some(download) = &view.download {
@@ -109,18 +112,40 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         ];
         frame.render_widget(
             Paragraph::new(lines).block(Block::bordered().title(title)),
-            areas[1],
+            areas[2],
         );
     }
     if let Some(notice) = view.notice {
-        frame.render_widget(Paragraph::new(notice), areas[2]);
+        frame.render_widget(Paragraph::new(notice), areas[3]);
     }
     if view.disconnected {
         frame.render_widget(
             Paragraph::new(stt_client::text("connection.unreachable", &[])),
-            areas[3],
+            areas[4],
         );
     }
+}
+
+/// The GUI's pages as a tab bar: `1 Queue`, `2 History`, `3 Settings`, the active one bracketed.
+fn draw_tabs(frame: &mut Frame, area: Rect, view: &View<'_>) {
+    let active = view.screen.page();
+    let tabs: Vec<String> = Page::ALL
+        .iter()
+        .map(|page| {
+            let (number, key) = match page {
+                Page::Queue => ("1", "queue.title"),
+                Page::History => ("2", "history.title"),
+                Page::Settings => ("3", "settings.title"),
+            };
+            let title = stt_client::text(key, &[]);
+            if *page == active {
+                format!("[{number} {title}]")
+            } else {
+                format!(" {number} {title} ")
+            }
+        })
+        .collect();
+    frame.render_widget(Paragraph::new(tabs.join("  ")), area);
 }
 
 /// The queue in its order - one row per task with its file name, status and transcription progress,

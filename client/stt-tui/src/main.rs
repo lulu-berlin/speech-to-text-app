@@ -21,7 +21,7 @@ use stt_client::{
 use crate::download::Download;
 use crate::input::Action;
 use crate::settings::SettingsScreen;
-use crate::state::Screen;
+use crate::state::{Page, Screen};
 use crate::transcript::Transcript;
 
 mod download;
@@ -285,6 +285,22 @@ impl Ui {
                 let Some(action) = input::action(&key, text_open, self.download.is_some()) else {
                     return Outcome::Continue;
                 };
+                // The pages switch from anywhere, before any screen acts on the key.
+                match action {
+                    Action::OpenPage(page) => {
+                        self.open_page(page, runtime, service, sender);
+                        return Outcome::Continue;
+                    }
+                    Action::PageNext => {
+                        self.open_page(self.screen.page().next(), runtime, service, sender);
+                        return Outcome::Continue;
+                    }
+                    Action::PagePrev => {
+                        self.open_page(self.screen.page().previous(), runtime, service, sender);
+                        return Outcome::Continue;
+                    }
+                    _ => {}
+                }
                 return match self.screen {
                     Screen::Queue => self.queue_action(action, runtime, service, sender),
                     _ => self.other_action(action, runtime, service, sender),
@@ -293,6 +309,24 @@ impl Ui {
             Message::Terminal(_) => {}
         }
         Outcome::Continue
+    }
+
+    /// Opens `page`, unless it is the page shown; History and Settings read what they show first.
+    fn open_page(
+        &mut self,
+        page: Page,
+        runtime: &tokio::runtime::Handle,
+        service: &Service,
+        sender: &mpsc::Sender<Message>,
+    ) {
+        if self.screen.page() == page {
+            return;
+        }
+        match page {
+            Page::Queue => self.screen = Screen::Queue,
+            Page::History => open_history(runtime, service, sender),
+            Page::Settings => open_settings(runtime, service, sender),
+        }
     }
 
     /// The queue's keys: its commands, selection and reordering, and the upload prompt.
@@ -314,7 +348,10 @@ impl Ui {
             | Action::SubmitDownload
             | Action::CancelDownload
             | Action::Merge
-            | Action::Adjust(_) => {}
+            | Action::Adjust(_)
+            | Action::OpenPage(_)
+            | Action::PageNext
+            | Action::PagePrev => {}
             Action::OpenHistory => open_history(runtime, service, sender),
             Action::OpenSettings => open_settings(runtime, service, sender),
             Action::OpenPrompt => self.prompt = Some(String::new()),

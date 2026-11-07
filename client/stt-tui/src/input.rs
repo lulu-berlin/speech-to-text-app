@@ -4,6 +4,7 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use stt_client::{Task, TaskCommand};
 
+use crate::state::Page;
 /// What a key asks the TUI to do.
 #[derive(Clone, Copy)]
 pub enum Action {
@@ -48,6 +49,12 @@ pub enum Action {
     Merge,
     /// `s`: open the settings.
     OpenSettings,
+    /// `1`/`2`/`3`: open the page.
+    OpenPage(Page),
+    /// `Tab`: the next page.
+    PageNext,
+    /// `Shift-Tab`: the previous page.
+    PagePrev,
     /// Left/Right: change the selected setting `step` places.
     Adjust(isize),
 }
@@ -91,6 +98,12 @@ pub fn action(key: &KeyEvent, prompt_open: bool, download_open: bool) -> Option<
         KeyCode::Char('d') => Some(Action::OpenDownload),
         KeyCode::Char('m') => Some(Action::Merge),
         KeyCode::Char('s') => Some(Action::OpenSettings),
+        KeyCode::Char('1') => Some(Action::OpenPage(Page::Queue)),
+        KeyCode::Char('2') => Some(Action::OpenPage(Page::History)),
+        KeyCode::Char('3') => Some(Action::OpenPage(Page::Settings)),
+        KeyCode::Tab if shift => Some(Action::PagePrev),
+        KeyCode::BackTab => Some(Action::PagePrev),
+        KeyCode::Tab => Some(Action::PageNext),
         KeyCode::Left => Some(Action::Adjust(-1)),
         KeyCode::Right => Some(Action::Adjust(1)),
         KeyCode::Enter => Some(Action::OpenSelected),

@@ -7,6 +7,45 @@ use stt_client::{Event, Snapshot, Task};
 use crate::settings::SettingsScreen;
 use crate::transcript::Transcript;
 
+/// The GUI's pages: the tab bar shows these, and `1`/`2`/`3` (or `Tab`) switch between them. A
+/// transcript is the History page.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Page {
+    Queue,
+    History,
+    Settings,
+}
+
+impl Page {
+    /// Every page, in the tab bar's order.
+    pub const ALL: [Page; 3] = [Page::Queue, Page::History, Page::Settings];
+
+    /// The next page, round.
+    pub fn next(self) -> Page {
+        match self {
+            Page::Queue => Page::History,
+            Page::History => Page::Settings,
+            Page::Settings => Page::Queue,
+        }
+    }
+
+    /// The previous page, round.
+    pub fn previous(self) -> Page {
+        self.next().next()
+    }
+}
+
+impl Screen {
+    /// The page this screen belongs to.
+    pub fn page(&self) -> Page {
+        match self {
+            Screen::Queue => Page::Queue,
+            Screen::History | Screen::Transcript(_) => Page::History,
+            Screen::Settings(_) => Page::Settings,
+        }
+    }
+}
+
 /// The screen the terminal shows.
 pub enum Screen {
     Queue,
