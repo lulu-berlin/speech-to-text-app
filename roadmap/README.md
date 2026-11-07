@@ -126,7 +126,6 @@ graph TD
   49 --> 90
   48 --> 90
   13 --> 91[91 msw 3 ✓]:::done
-  50 --> 92[92 Electron 45]
   03 --> 93[93 Maven catalog batch]
   08 --> 93
   11 --> 95[95 audit failure paths]
@@ -140,6 +139,8 @@ graph TD
   95 --> 96[96 audit cleanup]
   67 --> 96
   85 --> 97[97 audit CI and pins]
+  67 --> 98[98 Rust workspace at root]
+  66 --> 98
   50 --> 64[64 evaluate Tauri ✓]:::done
   65[65 fix the row-color phase observation ✓]:::done
   64 --> 66[66 local service and frontend flavors ✓]:::done
@@ -294,9 +295,9 @@ graph TD
 | [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | spec-approved | 66 |
 | [90 — A nixpkgs bump, our own whisper.cpp 1.9.5 artifact on every route, and one platform vocabulary](../docs/specs/own-artifacts-and-platform-keys.md) | done | 63, 48, 49, 33 |
 | [91 — MSW 3: the API mocks, the shared handlers and the dev worker](../docs/specs/msw-3.md) | done | 13 |
-| [92 — Electron 45: the desktop window on the next major](92-electron-45.md) | spec-approved | 50 |
 | [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |
 | [94 — The atomic-transitions lock probe must not expire on a starved runner](../docs/specs/atomic-transitions-probe-clock.md) | done | 55, 47, 58, 11 |
 | [95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests](95-audit-failure-paths.md) | draft | 11, 42, 12, 41, 32, 66, 73, 87 |
 | [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | draft | 95, 67 |
 | [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](97-audit-ci-and-pins.md) | draft | 85 |
+| [98 — The Rust workspace lives at the repository root, and its crates in `crates/`](98-rust-workspace-at-root.md) | draft | 67, 66 |
