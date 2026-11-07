@@ -223,7 +223,8 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
 - [x] (basic) A footer on every screen states that screen's keys in words — reorder, rename/merge
       speakers, download, pause included — so nothing must be guessed, and it names the help key -
       the words are now on screen (`a82ee330`); naming `? help` comes with the next line.
-- [ ] (basic) `?` opens a full key reference for the current page and closes with `?`/`Esc`.
+- [x] (basic) `?` opens a full key reference for the current page and closes with `?`/`Esc` -
+      `stt-tui/tests/help.rs`, `8210a560` (the footer names it; the reference reuses the footer's words).
 - [ ] (basic) The queue page shows an upload area above the queue; `Up`/`Down`/`k`/`j` move the
       selection between the upload area and the queue rows and the focused area is marked; `Enter` or
       `Space` on the upload area opens the upload dialog, as `u` does.
@@ -650,3 +651,9 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   follow-up if the user wants it. Committed as `a82ee330` (74 tests, the journey ignored; fmt and
   clippy green; the `stt-tui` suite green in 3 repeats). Line ticked except the `? help` mention,
   which lands with the `?` reference itself.
+- 2026-11-07 (workspace, cycle 30): the `?` line. Red ran on `a1a1fb5a` with the cycle's
+  uncommitted pty test: `? help` was not on screen. Green on the same tree plus the `?` action
+  (toggled before any page acts, `?` or Escape closes, nothing else acts while open), the footer
+  naming it, and an overlay whose body is the page's own footer text - one source, so they cannot
+  disagree. Committed as `8210a560` (75 tests, the journey ignored; fmt and clippy green; the
+  `stt-tui` suite green in 3 repeats). Line ticked.
