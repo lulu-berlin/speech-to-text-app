@@ -220,8 +220,9 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
 
 - [x] (basic) A tab bar shows `1 Queue · 2 History · 3 Settings` and marks the active page; `1`/`2`/`3`
       and `Tab`/`Shift-Tab` switch pages from anywhere - `stt-tui/tests/pages.rs`, `8d31322f`
-- [ ] (basic) A footer on every screen states that screen's keys in words — reorder, rename/merge
-      speakers, download, pause included — so nothing must be guessed, and it names the help key.
+- [x] (basic) A footer on every screen states that screen's keys in words — reorder, rename/merge
+      speakers, download, pause included — so nothing must be guessed, and it names the help key -
+      the words are now on screen (`a82ee330`); naming `? help` comes with the next line.
 - [ ] (basic) `?` opens a full key reference for the current page and closes with `?`/`Esc`.
 - [ ] (basic) The queue page shows an upload area above the queue; `Up`/`Down`/`k`/`j` move the
       selection between the upload area and the queue rows and the focused area is marked; `Enter` or
@@ -640,3 +641,12 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   and the bar drawn as the top row with the active page bracketed (so it reads under `NO_COLOR`
   too); a transcript is the History page. Committed as `8d31322f` (73 tests, the journey ignored;
   fmt and clippy green; the `stt-tui` suite green in 3 repeats). Line ticked.
+- 2026-11-07 (workspace, cycle 29): the footer line. Red ran on `c85fb957` with the cycle's
+  uncommitted pty test: no footer (`u upload` never appeared). Green on the same tree plus a
+  one-row footer drawn on every page from `footer.queue`/`footer.history`/`footer.transcript`/
+  `footer.settings` in the shared catalog, naming move (`↑↓/j/k`), reorder (`J/K` or
+  `Shift-↑↓`), the task and queue commands, upload, open, rename, merge, download, change and
+  edit, the page keys, back and quit. It truncates on very narrow terminals; wrapping it is a
+  follow-up if the user wants it. Committed as `a82ee330` (74 tests, the journey ignored; fmt and
+  clippy green; the `stt-tui` suite green in 3 repeats). Line ticked except the `? help` mention,
+  which lands with the `?` reference itself.
