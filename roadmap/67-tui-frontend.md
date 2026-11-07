@@ -1,6 +1,6 @@
 # 67 — A terminal UI frontend
 
-Status: in-progress
+Status: in-review
 Depends on: [66](../docs/specs/local-service-and-frontends.md) (done; the per-user service, frontend
 descriptors and launch model — the credential, runtime endpoint and descriptor this item uses are
 built there, as is the Rust pin), [12](../docs/specs/http-api-and-sse.md) (done; the HTTP/SSE
@@ -164,8 +164,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       which depends on the service package, belongs to item 89) - `cargo build --locked
       --workspace --all-targets` with the devenv's Rust 1.99.0, the CI jobs' rust-toolchain action
       from `versions.json` with `--locked`, `gradle checkVersions` green (Rust 1.99.0)
-- [ ] (must not break) Browser, window, API contract and the existing e2e suites stay green; the tray
-      still lists and opens the TUI
+- [x] (must not break) Browser, window, API contract and the existing e2e suites stay green; the tray
+      still lists and opens the TUI - run on the branch: the frontend suite (300 tests), `tsc`, the
+      Vite build and prettier; `gradle -p backend check` (ktlint + all backend tests); the docs
+      checks (33 tests); the tray's own tests in `cargo test` (`stt-client/tests/tray.rs`); the API
+      contract (`docs/api`) is untouched. The Playwright e2e and the window/desktop suites have no
+      runner here: the pull request's CI run is their verification.
 - [x] (moved from item 66, 2026-11-02; approved as worded 2026-11-06) Opening the TUI from the tray
       opens it in a terminal - PowerShell by default on Windows, Terminal on macOS, the terminal
       chain on Linux - through its registered descriptor, and several TUI instances run side by side -
@@ -532,3 +536,16 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   are item 66's tests; writing the descriptor on install is item 89's package. Committed as
   `f9cf9b55` (72 tests, the journey ignored; fmt and clippy green; the `stt-tui` suite green in 3
   repeats). The tray line is ticked with those two caveats.
+- 2026-11-07 (workspace, cycle 27): "must not break" (the last line). Run on the branch: the
+  frontend suite (38 files, 300 tests), `tsc --noEmit`, the Vite build and prettier; `gradle -p
+  backend check` (ktlint + all backend tests, BUILD SUCCESSFUL); the docs checks (tsc, prettier,
+  links, Windows, architecture names and diagram, exceptions, oracle, 33 node tests); the tray's
+  own tests in `cargo test`. `docs/api` is untouched. The Playwright e2e and the window/desktop
+  suites have no runner in this environment: the pull request's CI run is their verification, as it
+  is for the macOS and Windows journey legs. The line is ticked.
+- 2026-11-07 (workspace): every test-list line is ticked; `Status: in-review`. Handed to the user
+  with the TDD history intact. Left for the root agent / other items: (1) item 89 gains the TUI's
+  Nix package depending on the service package, the descriptor written on install and the musl
+  static binary; (2) a new roadmap item for the stenographer animation in the TUI; (3) the user's
+  verifications: the real OS terminal windows from the tray on each OS, and the pull request's CI
+  run (all three journey legs, e2e, desktop).
