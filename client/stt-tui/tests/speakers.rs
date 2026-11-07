@@ -192,3 +192,53 @@ fn a_rename_or_merge_made_elsewhere_relabels_the_open_transcript() {
         "the merged speaker is gone:\n{screen}"
     );
 }
+
+#[test]
+fn a_refused_rename_or_merge_shows_the_service_message_and_changes_nothing() {
+    let OpenTranscript {
+        service,
+        mut tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript();
+
+    // Renaming Speaker 2 to Speaker 1's name: the service refuses it, and the name stays.
+    tui.press(b"\x1b[B");
+    tui.press(b"r");
+    tui.wait_for(WAIT, |text| text.contains("Rename: Speaker 2"));
+    tui.press(&[0x7f; "Speaker 2".len()]);
+    tui.press(b"Speaker 1\r");
+    service.next_command(WAIT).answer(
+        "409 Conflict",
+        r#"{"error":"duplicate-speaker-name","message":"Another speaker of this task is called Speaker 1"}"#,
+    );
+    let screen = tui.wait_for(WAIT, |text| {
+        text.contains("Another speaker of this task is called Speaker 1")
+    });
+    assert!(
+        screen.contains("Speaker 2  00:05  Happy to be here."),
+        "the refused name is not applied:\n{screen}"
+    );
+
+    // Merging Speaker 2 into Speaker 1: refused too, the speakers stay and nothing is re-read.
+    tui.press(b"m");
+    tui.wait_for(WAIT, |text| text.contains("Speaker 2 (merging)"));
+    tui.press(b"\x1b[A");
+    tui.press(b"m");
+    service.next_command(WAIT).answer(
+        "400 Bad Request",
+        r#"{"error":"invalid-merge","message":"Speaker 2 is already merged into another speaker"}"#,
+    );
+    let screen = tui.wait_for(WAIT, |text| {
+        text.contains("Speaker 2 is already merged into another speaker")
+    });
+    assert!(
+        screen.contains("Speaker 1  00:00  Good morning.")
+            && screen.contains("Speaker 2  00:05  Happy to be here."),
+        "both speakers stay:\n{screen}"
+    );
+    assert!(
+        !service.get_arrived(),
+        "a refused merge reads no turns:\n{screen}"
+    );
+}
