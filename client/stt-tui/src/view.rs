@@ -5,7 +5,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Paragraph, Row, Table, TableState, Wrap};
+use ratatui::widgets::{Block, Clear, Paragraph, Row, Table, TableState, Wrap};
 use stt_client::{Snapshot, Task};
 
 use crate::settings::{FIELDS, SettingsScreen};
@@ -39,6 +39,8 @@ pub struct View<'a> {
     pub no_color: bool,
     /// Whether the event stream is down: the screen then says the service cannot be reached.
     pub disconnected: bool,
+    /// Whether the key reference is open, over the page it belongs to.
+    pub help: bool,
 }
 
 /// The download dialog's fields: the task it saves, the path, the format, and whether the format
@@ -127,6 +129,47 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         );
     }
     draw_footer(frame, areas[5], view);
+    if view.help {
+        draw_help(frame, view);
+    }
+}
+
+/// The page's full key reference, over the screen: a block whose body is the same text the footer
+/// shows, wrapped, so the two can never disagree, and how to close it.
+fn draw_help(frame: &mut Frame, view: &View<'_>) {
+    let (title_key, footer_key) = match view.screen {
+        Screen::Queue => ("help.queue", "footer.queue"),
+        Screen::History => ("help.history", "footer.history"),
+        Screen::Transcript(_) => ("help.transcript", "footer.transcript"),
+        Screen::Settings(_) => ("help.settings", "footer.settings"),
+    };
+    let title = stt_client::text(title_key, &[]);
+    let body = format!(
+        "{}\n\n{}",
+        stt_client::text(footer_key, &[]),
+        stt_client::text("help.close", &[])
+    );
+    let area = centered(frame.area());
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(body)
+            .block(Block::bordered().title(title))
+            .wrap(Wrap { trim: true }),
+        area,
+    );
+}
+
+/// The middle of `area` for the help block: 70% wide and as tall as its text needs, at most all of
+/// it.
+fn centered(area: Rect) -> Rect {
+    let width = (area.width * 7 / 10).clamp(20, area.width);
+    let height = (area.height * 2 / 3).clamp(6, area.height);
+    Rect {
+        x: area.x + (area.width - width) / 2,
+        y: area.y + (area.height - height) / 2,
+        width,
+        height,
+    }
 }
 
 /// The page's keys in words: the queue names reorder and upload, a transcript rename and merge,

@@ -166,6 +166,8 @@ struct Ui {
     no_color: bool,
     /// Whether the event stream is down: from its drop until a new stream's snapshot arrives.
     disconnected: bool,
+    /// Whether the key reference is open.
+    help: bool,
 }
 
 impl Ui {
@@ -181,6 +183,7 @@ impl Ui {
             notice: None,
             no_color: std::env::var_os("NO_COLOR").is_some(),
             disconnected: false,
+            help: false,
         }
     }
 
@@ -204,6 +207,7 @@ impl Ui {
             notice: self.notice.as_deref(),
             no_color: self.no_color,
             disconnected: self.disconnected,
+            help: self.help,
         };
         terminal.draw(|frame| view::draw(frame, &view))?;
         Ok(())
@@ -285,6 +289,18 @@ impl Ui {
                 let Some(action) = input::action(&key, text_open, self.download.is_some()) else {
                     return Outcome::Continue;
                 };
+                // The key reference: `?` opens it, `?` or Escape closes it, and while it is open
+                // nothing else acts.
+                if self.help {
+                    if matches!(action, Action::Help | Action::BackOrQuit) {
+                        self.help = false;
+                    }
+                    return Outcome::Continue;
+                }
+                if matches!(action, Action::Help) {
+                    self.help = true;
+                    return Outcome::Continue;
+                }
                 // The pages switch from anywhere, before any screen acts on the key.
                 match action {
                     Action::OpenPage(page) => {
@@ -351,7 +367,8 @@ impl Ui {
             | Action::Adjust(_)
             | Action::OpenPage(_)
             | Action::PageNext
-            | Action::PagePrev => {}
+            | Action::PagePrev
+            | Action::Help => {}
             Action::OpenHistory => open_history(runtime, service, sender),
             Action::OpenSettings => open_settings(runtime, service, sender),
             Action::OpenPrompt => self.prompt = Some(String::new()),

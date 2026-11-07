@@ -55,6 +55,8 @@ pub enum Action {
     PageNext,
     /// `Shift-Tab`: the previous page.
     PagePrev,
+    /// `?`: the current page's key reference.
+    Help,
     /// Left/Right: change the selected setting `step` places.
     Adjust(isize),
 }
@@ -98,6 +100,7 @@ pub fn action(key: &KeyEvent, prompt_open: bool, download_open: bool) -> Option<
         KeyCode::Char('d') => Some(Action::OpenDownload),
         KeyCode::Char('m') => Some(Action::Merge),
         KeyCode::Char('s') => Some(Action::OpenSettings),
+        KeyCode::Char('?') => Some(Action::Help),
         KeyCode::Char('1') => Some(Action::OpenPage(Page::Queue)),
         KeyCode::Char('2') => Some(Action::OpenPage(Page::History)),
         KeyCode::Char('3') => Some(Action::OpenPage(Page::Settings)),
