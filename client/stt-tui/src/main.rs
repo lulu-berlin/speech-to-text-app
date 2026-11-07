@@ -6,7 +6,6 @@
 
 use std::future::Future;
 use std::io;
-use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -15,7 +14,7 @@ use ratatui::DefaultTerminal;
 use ratatui::crossterm::event as terminal_event;
 use stt_client::{
     Event, Frontend, Service, ServiceDirs, Settings, Snapshot, Speaker, Task, Turns, events,
-    history, locate, reorder_queue, set_queue_paused, task_command, text, turns, upload,
+    history, locate, reorder_queue, set_queue_paused, task_command, text, turns,
 };
 
 use crate::download::Download;
@@ -23,7 +22,7 @@ use crate::input::Action;
 use crate::settings::SettingsScreen;
 use crate::state::{Page, Screen};
 use crate::transcript::Transcript;
-use crate::upload_dialog::{Submit, UploadDialog};
+use crate::upload_dialog::UploadDialog;
 
 mod download;
 mod input;
@@ -364,6 +363,16 @@ impl Ui {
         service: &Service,
         sender: &mpsc::Sender<Message>,
     ) -> Outcome {
+        // While the upload dialog is open it takes every key but quit, so no page or queue command
+        // acts behind it.
+        if !matches!(action, Action::Quit)
+            && let Some(upload) = self.upload.as_mut()
+        {
+            if upload.handle(action, runtime, sender, service) {
+                self.upload = None;
+            }
+            return Outcome::Continue;
+        }
         match action {
             Action::Quit | Action::BackOrQuit => return Outcome::Quit,
             Action::Back => {}
@@ -388,29 +397,12 @@ impl Ui {
             Action::OpenHistory => open_history(runtime, service, sender),
             Action::OpenSettings => open_settings(runtime, service, sender),
             Action::OpenPrompt => self.upload = Some(UploadDialog::open()),
-            Action::CancelPrompt => self.upload = None,
-            Action::PromptBackspace => {
-                if let Some(upload) = self.upload.as_mut() {
-                    upload.backspace();
-                }
-            }
-            Action::PromptChar(character) => {
-                if let Some(upload) = self.upload.as_mut() {
-                    upload.push(character);
-                }
-            }
-            Action::SubmitPrompt => {
-                if let Some(upload) = self.upload.as_mut()
-                    && let Submit::Choose(path) = upload.submit()
-                {
-                    self.upload = None;
-                    begin_upload(runtime, sender, service, path);
-                }
-            }
+            Action::CancelPrompt
+            | Action::PromptBackspace
+            | Action::PromptChar(_)
+            | Action::SubmitPrompt => {}
             Action::SelectUp => {
-                if let Some(upload) = self.upload.as_mut() {
-                    upload.up();
-                } else if !self.upload_focused {
+                if !self.upload_focused {
                     if self.selected == 0 {
                         self.upload_focused = true;
                     } else {
@@ -419,9 +411,7 @@ impl Ui {
                 }
             }
             Action::SelectDown => {
-                if let Some(upload) = self.upload.as_mut() {
-                    upload.down();
-                } else if self.upload_focused {
+                if self.upload_focused {
                     self.upload_focused = false;
                 } else {
                     let rows = state::rows(self.snapshot.as_ref()).len();
@@ -559,21 +549,6 @@ fn show(
         ui.draw(terminal)?;
     }
     Ok(())
-}
-
-/// Sends the file at `path`; the notice reports the queued task or the refusal.
-fn begin_upload(
-    runtime: &tokio::runtime::Handle,
-    sender: &mpsc::Sender<Message>,
-    service: &Service,
-    path: PathBuf,
-) {
-    let service = service.clone();
-    dispatch(runtime, sender, "upload.failed", async move {
-        upload(&service, &path)
-            .await
-            .map(|task| text("upload.queued", &[("filename", &task.filename)]))
-    });
 }
 
 /// Fetches the task list and shows the history.

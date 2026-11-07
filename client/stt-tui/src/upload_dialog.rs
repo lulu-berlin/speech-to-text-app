@@ -5,6 +5,12 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+
+use stt_client::{Service, text, upload};
+
+use crate::Message;
+use crate::input::Action;
 
 /// The upload dialog as it is shown: the directory it browses, its entries, the selected one, and
 /// the path being typed instead (`None` while only browsing).
@@ -86,6 +92,39 @@ impl UploadDialog {
                 self.typed = None;
             }
         }
+    }
+
+    /// Applies one dialog key; true when the dialog closes (cancelled, or a chosen file sent).
+    pub fn handle(
+        &mut self,
+        action: Action,
+        runtime: &tokio::runtime::Handle,
+        sender: &mpsc::Sender<Message>,
+        service: &Service,
+    ) -> bool {
+        match action {
+            Action::CancelPrompt => return true,
+            Action::SubmitPrompt => {
+                if let Submit::Choose(path) = self.submit() {
+                    let service = service.clone();
+                    let sender = sender.clone();
+                    runtime.spawn(async move {
+                        let notice = match upload(&service, &path).await {
+                            Ok(task) => text("upload.queued", &[("filename", &task.filename)]),
+                            Err(error) => text("upload.failed", &[("error", &error.to_string())]),
+                        };
+                        let _ = sender.send(Message::Notice(notice));
+                    });
+                    return true;
+                }
+            }
+            Action::PromptBackspace => self.backspace(),
+            Action::PromptChar(character) => self.push(character),
+            Action::SelectUp => self.up(),
+            Action::SelectDown => self.down(),
+            _ => {}
+        }
+        false
     }
 
     /// Enter: a typed path is resolved (a directory to browse, anything else to upload, so the
