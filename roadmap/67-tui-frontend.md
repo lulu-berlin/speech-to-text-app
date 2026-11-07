@@ -225,9 +225,10 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
       the words are now on screen (`a82ee330`); naming `? help` comes with the next line.
 - [x] (basic) `?` opens a full key reference for the current page and closes with `?`/`Esc` -
       `stt-tui/tests/help.rs`, `8210a560` (the footer names it; the reference reuses the footer's words).
-- [ ] (basic) The queue page shows an upload area above the queue; `Up`/`Down`/`k`/`j` move the
+- [x] (basic) The queue page shows an upload area above the queue; `Up`/`Down`/`k`/`j` move the
       selection between the upload area and the queue rows and the focused area is marked; `Enter` or
-      `Space` on the upload area opens the upload dialog, as `u` does.
+      `Space` on the upload area opens the upload dialog, as `u` does - `stt-tui/tests/upload_area.rs`,
+      `8c5664e7` (it opens the existing path prompt; the file browser lands with its own line).
 - [ ] (basic) Empty states say what to do: the queue says how to upload, history says there are no
       completed tasks, and their keys keep working.
 - [ ] (basic) `u` (or Enter/Space on the upload area) opens a file browser starting in the current
@@ -657,3 +658,9 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   naming it, and an overlay whose body is the page's own footer text - one source, so they cannot
   disagree. Committed as `8210a560` (75 tests, the journey ignored; fmt and clippy green; the
   `stt-tui` suite green in 3 repeats). Line ticked.
+- 2026-11-07 (workspace, cycle 31): the upload-area line. Red ran on `8210a560` with the cycle's
+  uncommitted pty test: no upload area. Green on the same tree plus a three-row upload area above
+  the queue's table, focus moving between it and the rows (`Up`/`k`, `Down`/`j`), Enter or Space
+  opening the prompt while it is focused, and task/reorder keys ignored and the row highlight off
+  then. Committed as `8c5664e7` (76 tests, the journey ignored; fmt and clippy green; the `stt-tui`
+  suite green in 3 repeats). Line ticked for the focus part; the file browser is next.
