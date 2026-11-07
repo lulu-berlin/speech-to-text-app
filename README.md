@@ -231,6 +231,8 @@ Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads abo
   ./gradlew e2e
   ```
 
+- `./gradlew tuiJourney` — the terminal UI's end-to-end journey (roadmap item 67): the real `stt-tui` in a pseudo-terminal against the installed service uploads Gradle's `jfk.wav` fixture, waits for the task to complete and reads its transcript back. It builds with Cargo, so Rust must be installed as for `./gradlew e2e`; a plain `cargo test` skips it.
+
 - `./gradlew checkVersions` — checks that `versions.json` still matches the Gradle wrapper, the flake's locked nixpkgs and `client/rust-toolchain.toml`.
 - `cd client && cargo test` — the Rust client workspace's tests (roadmap item 66). Gradle does not download Rust: install [rustup](https://rustup.rs/), which reads `client/rust-toolchain.toml` and installs the pinned Rust the first time; `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are CI's other two checks.
 - `./gradlew -p backend check` — the backend's tests. They need a UTF-8 locale, for example `export LANG=C.UTF-8` first; `./gradlew run` does not. A running Gradle daemon keeps the locale it started with, so after changing it run `./gradlew --stop` once.

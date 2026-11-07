@@ -697,6 +697,26 @@ tasks.register<Exec>("integrationTest") {
     }
 }
 
+// ---- tuiJourney: the TUI's end-to-end journey against the real service (roadmap item 67) ----
+// The Rust pty test client/stt-tui/tests/journey.rs, which a plain `cargo test` skips, starts the
+// installed service with `service` and the tiny model, uploads jfk.wav through the real `stt-tui`
+// and reads its transcript back. Gradle provides what the devenv otherwise sets, as for `e2e`: the
+// managed tools on PATH, the speaker model and the fixtures. `cargo` is the pinned Rust's (the
+// rust-toolchain action in CI, the devenv locally); a user-set STT_JOURNEY_SERVICE wins.
+tasks.register<Exec>("tuiJourney") {
+    group = "verification"
+    description =
+        "Run the TUI's end-to-end journey (roadmap item 67) against the installed service with the Gradle-managed tools, models and fixtures"
+    dependsOn("prepareRuntime", "prepareE2eFixtures", backendInstallDist)
+    doFirst {
+        applyAppEnv(this as Exec)
+        applyFixtureEnv(this as Exec)
+        environment("STT_JOURNEY_SERVICE", System.getenv("STT_JOURNEY_SERVICE") ?: backendMain.absolutePath)
+        workingDir = rootProject.file("client")
+        setCommandLine("cargo", "test", "--locked", "-p", "stt-tui", "--test", "journey", "--", "--ignored")
+    }
+}
+
 // ---- runtimeSystemDeps: the prebuilt runtime tools' Linux system libraries (roadmap item 51) ----
 // whisper-cli and ffmpeg link against system libraries that Nix, devenv and the Docker image bring
 // themselves, but a plain Linux host must install. This list is their single owner: README § "Gradle

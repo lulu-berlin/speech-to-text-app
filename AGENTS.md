@@ -91,7 +91,7 @@ Frontend (pnpm — ADR 0012):
 
 Client (the Rust workspace in `client/` — roadmap item 66; Rust from the devenv, pinned in `versions.json` and `client/rust-toolchain.toml`, which `./gradlew checkVersions` holds together). Run from `client/`:
 
-- `cargo test` — the client crates' tests.
+- `cargo test` — the client crates' tests. The TUI's end-to-end journey (`stt-tui/tests/journey.rs`, roadmap item 67) is ignored there: it needs the real service, and `./gradlew tuiJourney` (from the repository root) runs it with the installed backend, the managed tools and the fixtures.
 - `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` — the formatting and lint gates; CI runs all three on Linux, macOS and Windows.
 
 Documentation (the `docs/` package — TypeScript run by Node's type stripping, ADR 0054 — plus the individual checks; everything below runs from the repository root, so run it after changing `README.md` or `docs/architecture.md`, code the overview names, backend exception handling, or the CI workflow):

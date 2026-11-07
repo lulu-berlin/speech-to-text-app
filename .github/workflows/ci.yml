@@ -193,7 +193,8 @@ jobs:
         with:
           downloads-cache: 'true'
           system-libs: 'true'
-      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) and the item-67 TUI
+      # journey are built with the pinned Rust.
       - uses: ./.github/actions/rust-toolchain
       # Chromium's system libraries and the e2e package come from the build's own task, which is what
       # the invoke-it-as-root check exists for: it installs `playwright install-deps chromium` when it
@@ -210,6 +211,11 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" "$gradle_home" "$GITHUB_WORKSPACE"
       - name: gradle e2e
         run: ./gradlew e2e
+      # Roadmap item 67: the TUI's journey against the real service - upload, COMPLETED, transcript -
+      # in a pseudo-terminal (client/stt-tui/tests/journey.rs). Linux only for now; macOS and
+      # Windows follow once this leg is green.
+      - name: gradle tuiJourney
+        run: ./gradlew tuiJourney
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
       - name: Upload the failed specs' traces
         if: failure()
