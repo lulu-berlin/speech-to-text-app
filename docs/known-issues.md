@@ -74,6 +74,7 @@ problems; it never goes away and it is not a roadmap item.
 
 | Issue | Sev | Evidence | Notes |
 |---|---|---|---|
+| The e2e package's type-check self-test asserts tsc's plain diagnostic text (`03-upload-queue.spec.ts(155,7): error TS2322: …`), but TypeScript 7.0.2 prints its pretty, ANSI-coloured form when the caller's terminal makes colour available (`tests/03-upload-queue.spec.ts:155:7 - error TS2322: …`, with the source line and carets), so `pnpm --dir e2e test` reds in an interactive shell before Playwright starts while the same suite is green with piped output — the journey never runs, and the failure is reported as a type-check flake (seen 2026-11-07 in item 93's worktree on the user's shell; 43/43 green in a non-interactive session of the same tree, `git diff main...HEAD -- e2e` empty, `e2e/pnpm-lock.yaml` pinning `typescript` 7.0.2) | MED | `e2e/lib/type-check.test.ts:89` (the regex); `e2e/lib/type-check.test.ts:76-81` (`spawnSync(process.execPath, [tsc, '-p', …])`, no `--pretty false`); `e2e/package.json` (`typescript: ^7.0.2`) | Pass `--pretty false` in the test's tsc invocation (or match either form); found by item 93's e2e run |
 | `60-device-probe` starts a second backend and never registers its pid in the harness state, and both backends append to one log path: a force-killed worker leaves the second backend running, and the Metal CI grep reads a log that two processes share. | LOW | `e2e/tests/60-device-probe.spec.ts:29,42-46`; `e2e/lib/backend.ts` (`BACKEND_LOG_FILE`); `e2e/global-setup.ts:39-45` | Recorded by item 84's audit (2026-11-02) |
 
 ---
@@ -82,3 +83,4 @@ problems; it never goes away and it is not a roadmap item.
 support/migrations, backend tests, frontend app, frontend shared/config, build/Nix/Docker/e2e/docs);
 top findings re-verified against the source before filing. Add: when a review, failure, or report
 finds a real problem. Remove: when a roadmap item is created that handles the issue.*
+

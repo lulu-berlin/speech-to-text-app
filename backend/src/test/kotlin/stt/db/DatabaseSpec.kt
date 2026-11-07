@@ -88,6 +88,20 @@ class DatabaseSpec :
                         }
                     }
                 }
+                then("every version keeps the checksum an existing stt.db recorded before the Flyway bump") {
+                    // A database written before Flyway 13.12.0 stores these checksums; if the new engine
+                    // computed or compared them differently, opening that database would fail validation
+                    // instead of applying nothing. The values are the ones the pre-bump database in
+                    // .devenv/state/stt holds (V1-V12) and the same algorithm gives for V13-V17:
+                    // CRC32 over the migration file's lines without their terminators.
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+
+                        Database.open(dataDir).use { db ->
+                            migrationChecksums(db).shouldBe(storedChecksumsBeforeTheBump)
+                        }
+                    }
+                }
             }
         }
 
@@ -434,3 +448,49 @@ private fun insertAudio(
     st.setString(3, sha256)
     st.executeUpdate()
 }
+
+/**
+ * The `flyway_schema_history` checksums a `stt.db` written before Flyway 13.12.0 carries, by version.
+ * V1-V12 are read off the pre-bump database in `.devenv/state/stt`; V13-V17 use the same algorithm it
+ * proves: CRC32 over the migration file's lines, without their terminators. V10 and V12 are Java
+ * migrations, which Flyway stores with no checksum.
+ */
+private val storedChecksumsBeforeTheBump =
+    listOf(
+        "1" to 1474296966,
+        "2" to 463302301,
+        "3" to -1476966796,
+        "4" to 13873143,
+        "5" to -1065028080,
+        "6" to -1466901140,
+        "7" to -21839249,
+        "8" to -2428781,
+        "9" to -984034994,
+        "10" to null,
+        "11" to -2094623219,
+        "12" to null,
+        "13" to -689950440,
+        "14" to 1484995137,
+        "15" to -103637689,
+        "16" to 129474160,
+        "17" to 384228314,
+    )
+
+/** Every applied migration's version and stored checksum, in the order Flyway applied them. */
+private fun migrationChecksums(db: Database): List<Pair<String, Int?>> =
+    db.connection.createStatement().use { statement ->
+        statement
+            .executeQuery(
+                "SELECT version, checksum FROM flyway_schema_history " +
+                    "WHERE version IS NOT NULL ORDER BY installed_rank",
+            ).use { rows ->
+                val applied = ArrayList<Pair<String, Int?>>()
+                while (rows.next()) {
+                    // wasNull() belongs to the last getter, so read the version only after it.
+                    val checksum = rows.getInt("checksum")
+                    val checksumPresent = !rows.wasNull()
+                    applied.add(rows.getString("version") to if (checksumPresent) checksum else null)
+                }
+                applied
+            }
+    }

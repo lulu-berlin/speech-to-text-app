@@ -1,23 +1,24 @@
-# Dependency versions, one place (ADR 0014). Ktor 3.6.0 is built against
+# Dependency versions, one place (ADR 0014). Ktor 3.6.1 is built against
 # Kotlin 2.3.21 and kotlinx-serialization 1.11.0; keep the pair when bumping.
 
 [versions]
 kotlin = "2.3.21"
-ktor = "3.6.0"
-kotest = "6.2.5"
-logback = "1.6.5"
+ktor = "3.6.1"
+kotest = "6.2.6"
+logback = "1.6.6"
 ktlint = "1.8.0"
 kotlinx-coroutines = "1.11.0"
-exposed = "1.5.0"
-flyway = "13.9.0"
-sqlite-jdbc = "3.50.3.0"
-jna = "5.14.0"
-# ONNX Runtime pinned at 1.31.0 (roadmap item 30): 1.29.0 and 1.30.0 both segfault on one machine
+exposed = "1.6.0"
+flyway = "13.12.0"
+sqlite-jdbc = "3.54.1.0"
+jna = "5.19.1"
+# ONNX Runtime pinned at 1.31.1 (roadmap item 30): 1.29.0 and 1.30.0 both segfault on one machine
 # with a native stack-overflow recursion (CPU-dispatched; survived sequential execution, 1 inter-op
 # thread, STT_THREADS=1, -Xint, -Xmx1g); 1.26.0-1.28.0 are rejected because their CAM++ embeddings
-# degrade everywhere (integration suite red). 1.31.0 is the next release after the crashing line,
-# with the same embedding computation. Forced in build.gradle.kts per ADR 0042, like sqlite-jdbc.
-onnxruntime = "1.31.0"
+# degrade everywhere (integration suite red). 1.31.0 is the embedding-green release after the crashing
+# line; 1.31.1 is the patch on it (roadmap item 93). Forced in build.gradle.kts per ADR 0042, like
+# sqlite-jdbc.
+onnxruntime = "1.31.1"
 
 [libraries]
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
