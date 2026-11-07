@@ -475,3 +475,20 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   that adds it to the TUI, consulted before it starts (where it shows, `Canvas` or pre-rendered
   frames, a frame timer's cost, reduced motion and `NO_COLOR`, pty tests plus a visual sign-off) -
   for the root agent to file.
+- 2026-11-07 (workspace, cycle 24): "the pty e2e journey, Linux leg" (the user chose Linux now,
+  macOS and Windows in their own cycle). `client/stt-tui/tests/journey.rs` (ignored by a plain
+  `cargo test`) starts the backend's `installDist` launcher with `service` and the tiny model, as
+  the Playwright app-mode specs do, uploads `TEST_JFK_WAV` through the real `stt-tui`, waits for
+  COMPLETED and reads JFK's words from the transcript. The TUI already did all of it, so there was
+  no red: the first runs failed only on the harness (this sandbox has no `/bin/sh`, so the POSIX
+  launcher runs through the `sh` on `PATH`). `./gradlew tuiJourney` (root `build.gradle.kts`,
+  shaped like `integrationTest`) runs it: green here with `-x prepareRuntime -x
+  prepareE2eFixtures` (the devenv provides those), about 6 s. The Linux e2e job runs it after
+  `gradlew e2e`; README and AGENTS.md list the task; the docs checks are green (33 tests).
+  Committed as `c8e75cf2` (71 tests and the journey ignored; fmt and clippy green). Not ticked:
+  the macOS and Windows legs are pending, and the CI run is the user's.
+- 2026-11-07 (workspace, the user asked the TUI's minimum size): a throwaway pty probe (not
+  committed) drew the queue, the settings and a transcript at 1x1 up to 60x12 - no crash at any
+  size, the content clipped below roughly 40x10 (filenames truncated first, since the status and
+  progress columns are fixed). No minimum is enforced or announced; that would be a new
+  behaviour for the user to decide.
