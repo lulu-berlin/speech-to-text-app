@@ -1,7 +1,7 @@
 # 97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once
 
 Status: draft
-Depends on: [85](85-ci-wall-time.md) (it changes `ci.yml`'s job graph)
+Depends on: [85](../docs/specs/ci-wall-time.md) (it changes `ci.yml`'s job graph)
 Blocks: —
 
 ## Goal

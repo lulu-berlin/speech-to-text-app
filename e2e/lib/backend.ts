@@ -88,7 +88,7 @@ export const FIXTURE_CLIPS = [
   'jfk-r.wav', // the sample 6 times, ~66s, item 37's background transcription
   'jfk-s.wav', // the sample 10 times, ~110s, item 40's atomic-transitions race clip
   'jfk-u.wav', // 6-9s, item 40's queue-is-live follow-up
-  'jfk-v.wav', // the sample looped 11x, ~121s, item 40's pause-queued running clip
+  'jfk-v.wav', // a 30 s window (3 × 10 s from 2 s in), item 40's pause-queued running clip
   'jfk-w.wav', // 2-6s, item 40's pause-queued clip
   'jfk-stability.wav', // 5-11s, item 42's queue-survives-a-failure clip
   'broken-stability.wav', // item 42's undecodable fixture
@@ -107,10 +107,11 @@ export const FIXTURE_CLIPS = [
   'broken-59-status.wav', // item 59's status-page delete fixture
   'jfk-ai.wav', // the sample looped 17x, ~187s, item 59's header-typing clip
   'jfk-metal.wav', // the sample twice (~22s), item 48's Metal app e2e
-  'jfk-aj.wav', // the sample looped 15x, ~165s, item 81's held-pause running clip
+  'jfk-aj.wav', // a 30 s window (3 × 10 s from 1 s in), item 81's held-pause running clip
   'jfk-ak.wav', // 1-5s, item 81's held-pause queued clip
   'librispeech-1089-1089-1188.wav', // item 73's reassign journey: reader 1089 twice, then 1188
   'jfk-upload-wait.wav', // 4-9s, item 87's mid-upload outage clip (unique bytes)
+  'jfk-pause-signal.wav', // 3-11s, item 40's pause-queued follow-up clip (roadmap item 85)
 ] as const;
 export const QUEUE_CLIPS = FIXTURE_CLIPS.slice(0, 3);
 export const REORDER_CLIPS = FIXTURE_CLIPS.slice(3, 6);
@@ -165,6 +166,9 @@ export const ATOMIC_NEXT_CLIP = FIXTURE_CLIPS[26]; // 6-9s
 // other test loops the sample 11x, and 2-6s is no existing trim.
 export const PAUSE_QUEUED_RUNNING_CLIP = FIXTURE_CLIPS[27]; // the sample looped 11x, ~121s
 export const PAUSE_QUEUED_CLIP = FIXTURE_CLIPS[28]; // 2-6s
+// The clip uploaded behind the paused one: the worker starting it is the signal that it looked at
+// the queue and skipped the paused task (roadmap item 85 replaced the spec's 3 s window with it).
+export const PAUSE_QUEUED_SIGNAL_CLIP = FIXTURE_CLIPS[50]; // 3-11s
 
 // Item 42's queue-survives-a-failure journey (ADR 0046): the sample's 5-11s trim, which is no other
 // test's clip, and its own undecodable fixture (a second upload of broken.wav or broken-2.wav would be

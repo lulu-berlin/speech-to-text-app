@@ -18,6 +18,13 @@ export function stallWatch(now: () => number): (signature: string) => number {
   };
 }
 
+/** The sleep the polling waits use; a unit test passes its own to drive the loop on a fake clock. */
+export const defaultSleep = (ms: number): Promise<void> => {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, ms);
+  return promise;
+};
+
 export async function waitUntil(
   predicate: () => boolean | Promise<boolean>,
   {

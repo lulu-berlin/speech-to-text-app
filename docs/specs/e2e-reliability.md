@@ -204,7 +204,7 @@ frontend unit test of the race.
   not a second gate — run #464 (2026-11-02) was 43 of 56 specs green after 57 min on a runner whose
   whisper-cli was ~10× slower than #462's, at the same speed as #462 on every DOM-only spec, because
   every wait follows task state rather than a clock. Wall time itself is
-  [item 85](../../roadmap/85-ci-wall-time.md)'s subject.
+  [item 85](ci-wall-time.md)'s subject.
 - No e2e assertion whose outcome depends on how long work takes: every wait for the app to reach a
   state ends on that state, and a stall window names the task when the queue stops changing. Three
   `page.waitForTimeout` calls remain as named exceptions, each proving that something did *not*

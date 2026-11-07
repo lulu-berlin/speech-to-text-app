@@ -258,6 +258,14 @@ test('the editor’s dialog blocks the page under its shade, and the page does n
     }));
   await page.mouse.move(under.x, under.y);
   await page.mouse.wheel(0, 600);
-  await page.waitForTimeout(200);
+  // Roadmap item 85: the wheel's effect, if the page were scrollable under the shade, happens in the
+  // frame that dispatches it (nothing in the app sets `scroll-behavior: smooth`), so two animation
+  // frames bound the check — a signal, not a 200 ms timer.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
   expect(await scrolled()).toEqual({ window: 0, main: 0 });
 });

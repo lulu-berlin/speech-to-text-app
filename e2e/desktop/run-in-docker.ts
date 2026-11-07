@@ -248,14 +248,22 @@ function nixApp(): PackagedApp {
 // by default; with a GPU on Ubuntu with the host's device nodes: --amd-gpu passes /dev/dri and
 // installs no driver (the bundle's own Vulkan driver must find it); --nvidia-gpu adds /dev/nvidia*
 // and NVIDIA's user-space driver of the host's version (the bundle has to borrow it).
+// E2E_BUNDLE_FILE names an already built bundle file to run instead (roadmap item 85: CI restores it
+// by its derivation, or builds it once before this script); a direct run builds it here.
 function bundleApp(gpu: string, nvidia: NvidiaDriver | undefined): PackagedApp {
-  const out = nixBuild('.#desktop-bundle');
+  const file = process.env.E2E_BUNDLE_FILE;
+  if (file !== undefined && !existsSync(file)) fail(`E2E_BUNDLE_FILE names no file: ${file}`);
+  const source = file ?? nixBuild('.#desktop-bundle');
+  const command = file === undefined ? `${source}/bin/stt-app-bundle` : '/opt/stt-app-bundle';
   const devices = nvidia ? [...nvidiaDevices(), '/dev/dri'] : ['/dev/dri'];
   return {
     kind: 'bundle',
-    label: gpu ? `${out} (${gpu} GPU)` : out,
+    label: gpu ? `${source} (${gpu} GPU)` : source,
     machine: gpu ? ubuntuWithGpu(devices) : alpine,
-    mounts: nvidia ? ['-v', `${nvidia.installer}:/opt/nvidia-driver.run:ro`] : [],
+    mounts: [
+      ...(file === undefined ? [] : ['-v', `${file}:${command}:ro`]),
+      ...(nvidia ? ['-v', `${nvidia.installer}:/opt/nvidia-driver.run:ro`] : []),
+    ],
     // The launcher's own host requirements (README): sh, tar and zstd (xz only unpacks NVIDIA's
     // installer). NVIDIA's driver goes where Ubuntu's driver packages put it: the libraries in the
     // multiarch directory with their soname links (ldconfig), the installer's own Vulkan manifest,
@@ -286,7 +294,7 @@ function bundleApp(gpu: string, nvidia: NvidiaDriver | undefined): PackagedApp {
       'export TEST_WHISPER_TINY_EN_MODEL="/tmp/stt-fixtures/$(basename "$TEST_WHISPER_TINY_EN_MODEL")"',
       'export STT_SPEAKER_MODEL="/tmp/stt-fixtures/$(basename "$STT_SPEAKER_MODEL")"',
     ].join('\n'),
-    command: `${out}/bin/stt-app-bundle`,
+    command,
   };
 }
 

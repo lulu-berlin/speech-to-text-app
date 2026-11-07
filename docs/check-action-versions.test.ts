@@ -1,5 +1,5 @@
 // The action versions check (roadmap item 82): a step at actions/upload-artifact@v4 or
-// actions/cache@v4 still targets Node 20, which every runner now forces onto Node 24 with a
+// actions/cache@v4 (its `restore` and `save` sub-actions included, roadmap item 85) still targets Node 20, which every runner now forces onto Node 24 with a
 // deprecation annotation on the run. Every workflow and composite action under `.github/` is
 // scanned, not only ci.yml, because a composite action's step annotates the same run. The floors
 // are the majors the repository uses now — upload-artifact v7 and cache v6 — and a lower major
@@ -23,7 +23,7 @@ const NODE_24_MAJORS: Record<string, number> = {
 };
 
 // A step's action and its whole ref (`v7`, `main`, …).
-const USES = /uses:\s+(actions\/upload-artifact|actions\/cache)@(\S+)/;
+const USES = /uses:\s+(actions\/upload-artifact|actions\/cache(?:\/(?:restore|save))?)@(\S+)/;
 
 interface Scan {
   counts: Record<string, number>;
@@ -40,8 +40,11 @@ export function scanActionVersions(file: string, text: string): Scan {
     const step = USES.exec(line);
     if (step === null) continue;
     const [, action = '', ref = ''] = step;
-    const floor = NODE_24_MAJORS[action] ?? 0;
-    counts[action] = (counts[action] ?? 0) + 1;
+    // The `restore` and `save` sub-actions run the same action's code and share its majors, so the
+    // floor and the count are read from the action they belong to.
+    const base = action.startsWith('actions/cache/') ? 'actions/cache' : action;
+    const floor = NODE_24_MAJORS[base] ?? 0;
+    counts[base] = (counts[base] ?? 0) + 1;
     const major = /^v(\d+)$/.exec(ref);
     if (major === null) {
       problems.push(
@@ -93,13 +96,17 @@ test('the check reads the whole ref and ignores commented steps', () => {
       '      - uses: actions/upload-artifact@main',
       '      - uses: actions/cache@v4',
       '      - uses: actions/upload-artifact@v7',
+      '      - uses: actions/cache/save@v4',
+      '      - uses: actions/cache/restore@v6',
     ].join('\n'),
   );
 
-  assert.deepEqual(scan.counts, { 'actions/upload-artifact': 2, 'actions/cache': 1 });
+  assert.deepEqual(scan.counts, { 'actions/upload-artifact': 2, 'actions/cache': 3 });
   assert.deepEqual(scan.problems, [
     'workflow.yml:2: actions/upload-artifact@main is not a pinned major (@v7 or later)',
     'workflow.yml:3: actions/cache@v4 is older than @v6, whose step carries no Node 20 ' +
+      'deprecation annotation',
+    'workflow.yml:5: actions/cache/save@v4 is older than @v6, whose step carries no Node 20 ' +
       'deprecation annotation',
   ]);
 });

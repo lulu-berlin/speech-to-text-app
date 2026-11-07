@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { assertJobOf, parseJobs, workflowPath } from './ci-workflow.ts';
+import { assertJobOf, parseJobs, stepsOf, workflowPath } from './ci-workflow.ts';
 import { repoRoot } from './run-check.ts';
 
 const classifierPath = join(repoRoot, '.github/classify-change.sh');
@@ -30,6 +30,9 @@ const EVENT_GATED: Record<string, true> = {
   'windows-ffmpeg-asset': true,
   'model-hosts': true,
 };
+// The three journeys: the longest jobs of a run, and since roadmap item 85 the only heavy jobs that
+// start with the change classification instead of waiting for their platform's checks.
+const JOURNEYS = ['e2e', 'macos-e2e', 'windows-e2e'];
 
 // The `code` value the `changes` job reads, from the classifier the job pipes its diff into.
 function classify(paths: string[]): string {
@@ -330,8 +333,10 @@ test('the required check and the jobs it gates keep their names and conditions',
     assert.deepEqual(job.needs, [], `${id} does not wait for the change filter`);
   }
 
-  // The macOS jobs keep their own dependencies: the change gate is added, not swapped in.
-  for (const id of ['macos-backend-integration', 'macos-e2e', 'macos-nix', 'macos-dmg']) {
+  // The macOS jobs keep their own dependencies: the change gate is added, not swapped in. The macOS
+  // journey is the one exception (roadmap item 85): it starts with the change classification, which
+  // the journey test below pins.
+  for (const id of ['macos-backend-integration', 'macos-nix', 'macos-dmg']) {
     const job = assertJobOf(jobs, id);
     assert.ok(job.needs.includes('changes'), `${id} carries the change gate`);
     assert.ok(
@@ -366,6 +371,55 @@ test('the required check and the jobs it gates keep their names and conditions',
     !ci.needs.includes('model-hosts'),
     'a weekly network probe does not gate pull requests',
   );
+});
+
+// Roadmap item 85: the journeys are the run's longest jobs, and waiting for their platform's checks
+// cost about three minutes of a ~21-minute run (the checks end at +2:50…+3:53). So only the three
+// journeys start with the change classification; every other heavy job keeps its platform's checks,
+// and the checks stay in the aggregator, so a red check still reddens `CI (all checks)` even when
+// the journeys passed.
+test('the three journeys start with the change classification, and the checks gate every other job', () => {
+  const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
+  const ci = assertJobOf(jobs, 'ci');
+
+  for (const id of JOURNEYS) {
+    assert.deepEqual(
+      assertJobOf(jobs, id).needs,
+      ['changes'],
+      `${id} starts as soon as the change classification has run`,
+    );
+    assert.ok(ci.needs.includes(id), `${id} still reports through CI (all checks)`);
+  }
+
+  // Every other heavy job still waits for its platform's checks; the journeys' early start is the
+  // exception this item decided, not a rule that spreads. The check jobs themselves (ids ending
+  // `-check`) are what the others wait for, so they are not asked to wait for each other.
+  const platformChecks: Record<string, string[]> = {
+    Linux: ['backend-check', 'frontend-check'],
+    macOS: ['macos-backend-check', 'macos-frontend-check'],
+    Windows: ['windows-backend-check', 'windows-frontend-check'],
+  };
+  for (const id of ci.needs) {
+    if (id.endsWith('-check') || id === 'changes' || JOURNEYS.includes(id)) continue;
+    const job = assertJobOf(jobs, id);
+    const platform = job.name?.split(' ')[0] ?? '';
+    const checks = platformChecks[platform];
+    assert.ok(checks, `${id} names its platform in its display name: ${job.name}`);
+    for (const check of checks) {
+      assert.ok(job.needs.includes(check), `${id} still waits for ${check}`);
+    }
+  }
+
+  // A check job that fails must still fail the required check: the checks are in the aggregator's
+  // needs, not only in the heavy jobs' needs, so a green journey cannot carry a red check through.
+  for (const id of [
+    ...Object.values(platformChecks).flat(),
+    'client-check',
+    'macos-client-check',
+    'windows-client-check',
+  ]) {
+    assert.ok(ci.needs.includes(id), `${id} still fails CI (all checks)`);
+  }
 });
 
 // Roadmap item 84: `Windows (e2e)` left the aggregator while its load flake was open; after five
@@ -423,5 +477,47 @@ test('a skipped job does not make CI (all checks) red, and a failing job still d
     aggregatorFails(failureCondition, ['cancelled', 'skipped']),
     true,
     'a cancelled job reddens it',
+  );
+});
+
+// Roadmap item 85 (discovered): with `cache-read-only: false` on every branch, each pull request
+// wrote its own Gradle caches — one PR held ten `gradle-dependencies-v2` entries — and the
+// repository's 10 GB cache budget was exceeded, so GitHub evicted entries the whole matrix needs
+// (runs #598 and #599: the same bundle derivation hit, then missed). Only `main` writes now; a pull
+// request restores `main`'s entries, which GitHub allows for the default branch.
+test('only main writes the Gradle cache; pull requests restore it', () => {
+  const action = readFileSync(join(repoRoot, '.github/actions/jvm-toolchain/action.yml'), 'utf8');
+  assert.match(
+    action,
+    /^\s*cache-read-only: \$\{\{ github\.ref != 'refs\/heads\/main' \}\}$/m,
+    'the JVM toolchain writes the Gradle cache on main only',
+  );
+});
+
+// Roadmap item 85 (discovered, the root agent's review): the repository stayed 0.31 GB over the free
+// plan's 10 GB because a pull request still wrote its own 370 MB `stt-bundle-<derivation>` entry —
+// `desktop-bundle-e2e`'s implicit `actions/cache` save. The bundle cache now follows the Gradle
+// policy: `desktop-bundle-e2e` restores with the derivation key and only `main` saves, so a pull
+// request restores a matching bundle and writes nothing.
+test('the bundle cache is saved on main only; pull requests restore it', () => {
+  const steps = stepsOf(
+    assertJobOf(parseJobs(readFileSync(workflowPath, 'utf8')), 'desktop-bundle-e2e'),
+  );
+  const cache = (action: string): string | undefined =>
+    steps.find(
+      (step) =>
+        step.includes(action) && step.includes('stt-bundle-${{ steps.bundle-drv.outputs.key }}'),
+    );
+  assert.ok(
+    cache('actions/cache/restore@'),
+    'desktop-bundle-e2e restores the bundle cache with actions/cache/restore, keyed by its derivation',
+  );
+  const save = cache('actions/cache/save@');
+  assert.ok(save, 'desktop-bundle-e2e saves the bundle cache on a miss');
+  // The condition's wording may change; that it saves on `main` and only on a miss may not.
+  assert.match(
+    save ?? '',
+    /if: .*github\.ref == 'refs\/heads\/main'/,
+    'only main saves the bundle cache; a pull request restores it and writes nothing',
   );
 });
