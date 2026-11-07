@@ -235,6 +235,15 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
 - [ ] (basic) The upload dialog carries the GUI's fields — language, speakers `auto`/`off`/`fixed`
       with a count, max speakers — starting from the stored defaults (`GET /api/settings`); `Enter`
       sends `file`, `language`, `speakers`, `maxSpeakers`.
+- [ ] (edge) A path pasted onto the queue page — a terminal's drag-and-drop — opens the upload
+      dialog with it: shell-quoted paths and `file://` URIs are recognised, several at once are
+      accepted, and text that is not a path is ignored.
+- [ ] (basic) The mouse does what the keyboard does: clicking a tab switches pages, clicking a
+      queue, history or settings row selects it, double-clicking a history row opens its
+      transcript, and clicking the queue's upload area opens the upload dialog.
+- [ ] (basic) The wheel scrolls the focused list — the selection in queue, history and settings,
+      the turns in a transcript — and a transcript longer than the terminal also scrolls with
+      `Up`/`Down`, `PgUp`/`PgDn` and `Home`/`End`; the footer states it.
 - [ ] (edge) `fixed` needs a count in 1–20 before Enter sends, and leaving `fixed` sends `auto`; a
       path that cannot be opened is reported with no request.
 - [ ] (basic) Queue rows show what the GUI's rows show: filename, status, phase while processing,
@@ -618,3 +627,10 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   it; queue reorder must be reachable and visible; the pages mirror the GUI as tabs. The "Parity
   amendment (approved 2026-11-07)" test list (15 lines) records this; work restarts at slice A
   (pages, footer, `?`, upload area focus, empty states).
+- 2026-11-07 (workspace, the user): two more amendment lines — **drag-and-drop via bracketed
+  paste** (a terminal's file drop arrives as pasted path text: quoted paths and `file://` URIs,
+  several at once, anything else ignored; per-terminal, so macOS Terminal.app pastes nothing on a
+  drop) and **mouse support** on the same actions (tabs, row selection, the upload area,
+  double-click to open a transcript, wheel to scroll), which also requires transcripts to scroll
+  at all (keyboard and wheel). Mouse capture is on by default, so terminal text selection needs
+  the terminal's own bypass (usually Shift-drag) — to be documented when implemented.
