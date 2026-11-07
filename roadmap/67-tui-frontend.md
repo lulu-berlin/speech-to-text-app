@@ -159,8 +159,11 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       with the per-OS legs their runners allow - `stt-tui/tests/journey.rs` via `./gradlew
       tuiJourney`, in the Linux, macOS and Windows e2e jobs (`c8e75cf2`, `6afc4fe9`); green locally on
       Linux, the three CI legs are verified by the pull request's run
-- [ ] The pinned Rust toolchain builds every path with the committed `Cargo.lock`, and the sync
-      check is green
+- [x] The pinned Rust toolchain builds the client on the devenv and the non-Nix/CI paths with the
+      committed `Cargo.lock`, and the sync check is green (reworded 2026-11-07: the TUI's Nix package,
+      which depends on the service package, belongs to item 89) - `cargo build --locked
+      --workspace --all-targets` with the devenv's Rust 1.99.0, the CI jobs' rust-toolchain action
+      from `versions.json` with `--locked`, `gradle checkVersions` green (Rust 1.99.0)
 - [ ] (must not break) Browser, window, API contract and the existing e2e suites stay green; the tray
       still lists and opens the TUI
 - [ ] (moved from item 66, 2026-11-02; approved as worded 2026-11-06) Opening the TUI from the tray
@@ -503,3 +506,15 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   (14 tests) are green, and the macOS and Windows legs are the pull request's run to show.
   Committed as `6afc4fe9` (71 tests, the journey ignored; fmt and clippy green). The e2e line is
   ticked with that caveat.
+- 2026-11-07 (workspace, the user): **the TUI's Nix package moves to item 89.** The user had chosen
+  a flake package here, then pointed out that it needs the service as a dependency. The flake has
+  no service package (its `default` is the backend server wrapper; the Rust `stt-app` CLI, the
+  `stt-service` runner and the tray are not packaged by Nix), and that package is item 89's
+  deliverable (spec-approved; its Nix side splits into a service package and frontend packages
+  depending on it). So item 89 builds the TUI package beside the window package - for the root
+  agent to amend item 89 - and the pin line here is reworded to the devenv and non-Nix/CI paths.
+  Checked on the branch's committed `Cargo.lock`: `cargo build --locked --workspace --all-targets`
+  with the devenv's Rust 1.99.0, `client/rust-toolchain.toml` and `versions.json` both 1.99.0,
+  `gradle checkVersions` green; the CI client and e2e jobs install that version and build with
+  `--locked`. The pin line is ticked. The 2026-10-22 "static musl on Linux" binary is packaging and
+  goes with the package to item 89.
