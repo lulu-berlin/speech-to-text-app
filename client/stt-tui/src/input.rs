@@ -61,52 +61,61 @@ pub enum Action {
     Adjust(isize),
 }
 
-/// What `key` does: with the prompt open every key is text except Escape, Enter and Backspace; at
-/// the queue the keys are commands. Raw mode turns Ctrl-C into a key, so it quits from both.
-pub fn action(
-    key: &KeyEvent,
-    prompt_open: bool,
-    download_open: bool,
-    upload_open: bool,
-) -> Option<Action> {
+/// What the keyboard is for: the page's commands, a text prompt (a speaker rename, the terminal
+/// command), the download dialog, or the upload dialog. One mode, never a set of flags.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    Normal,
+    Text,
+    Download,
+    Upload,
+}
+
+/// What `key` does in `mode`: with a text prompt open every key is text except Escape, Enter and
+/// Backspace; in a dialog the dialog's keys; at the queue the keys are commands. Raw mode turns
+/// Ctrl-C into a key, so it quits from all of them.
+pub fn action(key: &KeyEvent, mode: Mode) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
     }
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(Action::Quit);
     }
-    if download_open {
-        return match key.code {
-            KeyCode::Esc => Some(Action::CancelDownload),
-            KeyCode::Enter => Some(Action::SubmitDownload),
-            KeyCode::Backspace => Some(Action::DownloadBackspace),
-            KeyCode::Tab => Some(Action::DownloadTab),
-            KeyCode::Left => Some(Action::DownloadFormatStep(-1)),
-            KeyCode::Right => Some(Action::DownloadFormatStep(1)),
-            KeyCode::Char(character) => Some(Action::DownloadChar(character)),
-            _ => None,
-        };
-    }
-    if upload_open {
-        return match key.code {
-            KeyCode::Esc => Some(Action::CancelPrompt),
-            KeyCode::Enter => Some(Action::SubmitPrompt),
-            KeyCode::Backspace => Some(Action::PromptBackspace),
-            // Letters type a path inside the dialog, so only the arrows move the selection.
-            KeyCode::Up => Some(Action::SelectUp),
-            KeyCode::Down => Some(Action::SelectDown),
-            KeyCode::Char(character) => Some(Action::PromptChar(character)),
-            _ => None,
-        };
-    }
-    if prompt_open {
-        return match key.code {
-            KeyCode::Esc => Some(Action::CancelPrompt),
-            KeyCode::Backspace => Some(Action::PromptBackspace),
-            KeyCode::Enter => Some(Action::SubmitPrompt),
-            KeyCode::Char(character) => Some(Action::PromptChar(character)),
-            _ => None,
-        };
+    match mode {
+        Mode::Download => {
+            return match key.code {
+                KeyCode::Esc => Some(Action::CancelDownload),
+                KeyCode::Enter => Some(Action::SubmitDownload),
+                KeyCode::Backspace => Some(Action::DownloadBackspace),
+                KeyCode::Tab => Some(Action::DownloadTab),
+                KeyCode::Left => Some(Action::DownloadFormatStep(-1)),
+                KeyCode::Right => Some(Action::DownloadFormatStep(1)),
+                KeyCode::Char(character) => Some(Action::DownloadChar(character)),
+                _ => None,
+            };
+        }
+        Mode::Upload => {
+            return match key.code {
+                KeyCode::Esc => Some(Action::CancelPrompt),
+                KeyCode::Enter => Some(Action::SubmitPrompt),
+                KeyCode::Backspace => Some(Action::PromptBackspace),
+                // Letters type a path inside the dialog, so only the arrows move the selection.
+                KeyCode::Up => Some(Action::SelectUp),
+                KeyCode::Down => Some(Action::SelectDown),
+                KeyCode::Char(character) => Some(Action::PromptChar(character)),
+                _ => None,
+            };
+        }
+        Mode::Text => {
+            return match key.code {
+                KeyCode::Esc => Some(Action::CancelPrompt),
+                KeyCode::Backspace => Some(Action::PromptBackspace),
+                KeyCode::Enter => Some(Action::SubmitPrompt),
+                KeyCode::Char(character) => Some(Action::PromptChar(character)),
+                _ => None,
+            };
+        }
+        Mode::Normal => {}
     }
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
     match key.code {

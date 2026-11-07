@@ -290,13 +290,16 @@ impl Ui {
                 let renaming = matches!(&self.screen, Screen::Transcript(transcript) if transcript.rename().is_some());
                 let terminal =
                     matches!(&self.screen, Screen::Settings(screen) if screen.terminal().is_some());
-                let text_open = renaming || terminal;
-                let Some(action) = input::action(
-                    &key,
-                    text_open,
-                    self.download.is_some(),
-                    self.upload.is_some(),
-                ) else {
+                let mode = if self.download.is_some() {
+                    input::Mode::Download
+                } else if self.upload.is_some() {
+                    input::Mode::Upload
+                } else if renaming || terminal {
+                    input::Mode::Text
+                } else {
+                    input::Mode::Normal
+                };
+                let Some(action) = input::action(&key, mode) else {
                     return Outcome::Continue;
                 };
                 // The key reference: `?` opens it, `?` or Escape closes it, and while it is open
