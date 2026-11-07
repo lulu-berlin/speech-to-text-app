@@ -4,7 +4,7 @@
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
-use ratatui::text::Line;
+use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Clear, Paragraph, Row, Table, TableState, Wrap};
 use stt_client::{Snapshot, Task};
 
@@ -149,14 +149,21 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
         stt_client::text(footer_key, &[]),
         stt_client::text("help.close", &[])
     );
+    modal(frame, title, body, true);
+}
+
+/// Draws a centred modal over the screen - cleared beneath, a bordered title, the body, wrapped
+/// when `wrap` - the shape the help reference and the upload dialog share.
+fn modal(frame: &mut Frame, title: String, body: impl Into<Text<'static>>, wrap: bool) {
     let area = centered(frame.area());
+    let paragraph = Paragraph::new(body).block(Block::bordered().title(title));
+    let paragraph = if wrap {
+        paragraph.wrap(Wrap { trim: true })
+    } else {
+        paragraph
+    };
     frame.render_widget(Clear, area);
-    frame.render_widget(
-        Paragraph::new(body)
-            .block(Block::bordered().title(title))
-            .wrap(Wrap { trim: true }),
-        area,
-    );
+    frame.render_widget(paragraph, area);
 }
 
 /// The upload dialog: its directory (or the path being typed), then the entries, directories first,
@@ -189,11 +196,7 @@ fn draw_upload(frame: &mut Frame, upload: &UploadDialog) {
         let suffix = if entry.is_dir() { "/" } else { "" };
         lines.push(Line::from(format!("{marker}{name}{suffix}")));
     }
-    frame.render_widget(Clear, area);
-    frame.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title(title)),
-        area,
-    );
+    modal(frame, title, lines, false);
 }
 
 /// The middle of `area` for the help block: 70% wide and as tall as its text needs, at most all of
