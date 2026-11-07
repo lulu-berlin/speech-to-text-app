@@ -681,3 +681,12 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   green in 3 repeats). The amendment's browser line stays unticked for its two remaining parts:
   unsupported files marked as unpickable, and the `/` typed-path affordance spelled out; the
   option fields (language, speakers, max speakers) are the next line.
+- 2026-11-07 (workspace, refactor checkpoint after the upload dialog's browser): the user approved all
+  three suggestions, each its own commit with the suite unchanged (78 tests, fmt and clippy green):
+  `fcae2414` lets `UploadDialog::handle` take its own keys (the `Download::handle` shape), leaving
+  `main::queue_action` one early branch and no upload arms; `f2bf17f3` replaces
+  `input::action`'s three booleans with one `Mode { Normal, Text, Download, Upload }`, so an
+  impossible combination cannot be expressed (an arm-ordering bug came from exactly that); and
+  `7bc146f5` draws the help reference and the upload dialog through one `modal` helper. Not
+  suggested: a `terminal::session()` test helper (would touch ~20 passing tests for no behavioural
+  gain). Next: the dialog's option fields.
