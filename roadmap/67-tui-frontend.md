@@ -155,8 +155,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [x] (edge) A resize across small and large terminals reflows without crashing, and `NO_COLOR`
       emits no color escapes - `stt-tui/tests/layout.rs`, `bfdf87f8` (with `NO_COLOR` the selected
       row is marked `>` and no SGR setting a color or attribute is written)
-- [ ] (e2e) A pty-driven journey in CI against the real service — upload → COMPLETED → transcript —
-      with the per-OS legs their runners allow
+- [x] (e2e) A pty-driven journey in CI against the real service — upload → COMPLETED → transcript —
+      with the per-OS legs their runners allow - `stt-tui/tests/journey.rs` via `./gradlew
+      tuiJourney`, in the Linux, macOS and Windows e2e jobs (`c8e75cf2`, `6afc4fe9`); green locally on
+      Linux, the three CI legs are verified by the pull request's run
 - [ ] The pinned Rust toolchain builds every path with the committed `Cargo.lock`, and the sync
       check is green
 - [ ] (must not break) Browser, window, API contract and the existing e2e suites stay green; the tray
@@ -492,3 +494,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   size, the content clipped below roughly 40x10 (filenames truncated first, since the status and
   progress columns are fixed). No minimum is enforced or announced; that would be a new
   behaviour for the user to decide.
+- 2026-11-07 (workspace, cycle 25): "the journey on macOS and Windows". The macOS and Windows e2e
+  jobs run `gradlew tuiJourney` after their e2e suites, as Linux does (both already set up the
+  pinned Rust for item 66's `stt-app` spec). On Windows the launcher is a `.bat` under `cmd`, which
+  starts the JVM as its child, so the journey's cleanup kills the whole process tree (`taskkill
+  /T`). Nothing here runs on macOS or Windows, so there was no red and no local proof for those
+  legs: the journey is green locally on Linux again (6 s), `actionlint` and the CI docs checks
+  (14 tests) are green, and the macOS and Windows legs are the pull request's run to show.
+  Committed as `6afc4fe9` (71 tests, the journey ignored; fmt and clippy green). The e2e line is
+  ticked with that caveat.
