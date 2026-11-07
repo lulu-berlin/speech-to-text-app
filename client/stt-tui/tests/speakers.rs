@@ -144,3 +144,51 @@ fn merging_the_marked_speaker_into_the_selected_one_refetches_the_turns() {
         "only the surviving speaker is left:\n{screen}"
     );
 }
+
+#[test]
+fn a_rename_or_merge_made_elsewhere_relabels_the_open_transcript() {
+    let OpenTranscript {
+        service,
+        tui,
+        mut stream,
+        state: _state,
+    } = open_transcript();
+
+    // Another task's rename changes nothing here; this task's renames its speaker in the turns.
+    stream.send(
+        "speakers-renamed",
+        r#"{"id":7,"speakers":[{"speakerId":0,"speaker":"Zed"}]}"#,
+    );
+    stream.send(
+        "speakers-renamed",
+        include_str!("../../../docs/api/speakers-renamed.json"),
+    );
+    let screen = tui.wait_for(WAIT, |text| text.contains("Alice  00:00  Good morning."));
+    assert!(
+        !screen.contains("Zed"),
+        "another task's speakers are not this transcript's:\n{screen}"
+    );
+
+    // A merge: the speakers change and the turns, which a merge joins, are read again.
+    stream.send(
+        "speakers-merged",
+        r#"{"id":3,"speakers":[{"speakerId":1,"speaker":"Speaker 2"}]}"#,
+    );
+    let refetch = service.next_get(WAIT);
+    assert!(
+        refetch
+            .request()
+            .line
+            .starts_with("GET /api/tasks/3/turns "),
+        "{:?}",
+        refetch.request().line
+    );
+    refetch.answer("200 OK", MERGED_TURNS);
+    let screen = tui.wait_for(WAIT, |text| {
+        text.contains("Speaker 2  00:00  Good morning. Thanks for joining us today.")
+    });
+    assert!(
+        !screen.contains("Alice"),
+        "the merged speaker is gone:\n{screen}"
+    );
+}

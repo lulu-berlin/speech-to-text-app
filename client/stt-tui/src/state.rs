@@ -40,7 +40,11 @@ pub fn apply(state: &mut Option<Snapshot>, event: Event) {
             }
         }
         Event::QueueUpdated(queue) => state.queue = queue,
-        Event::Snapshot(_) | Event::Other(_) => {}
+        // The queue holds no speakers: an open transcript takes these (`main.rs`).
+        Event::Snapshot(_)
+        | Event::SpeakersRenamed(_)
+        | Event::SpeakersMerged(_)
+        | Event::Other(_) => {}
     }
 }
 

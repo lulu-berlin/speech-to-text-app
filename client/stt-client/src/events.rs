@@ -7,6 +7,7 @@ use std::io;
 
 use serde::Deserialize;
 
+use crate::read::Speaker;
 use crate::{Service, parse_json};
 
 /// A task as the service reports it (`task.*.json`).
@@ -42,6 +43,13 @@ pub struct TaskProgress {
     pub transcription_progress: f64,
 }
 
+/// A task's effective speakers after a change (`speakers-renamed.json`, `speakers-merged.json`).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct SpeakersChanged {
+    pub id: i64,
+    pub speakers: Vec<Speaker>,
+}
+
 /// One event of the stream.
 #[derive(Debug)]
 pub enum Event {
@@ -51,6 +59,11 @@ pub enum Event {
     TaskProgress(TaskProgress),
     /// The queue changed (`queue-updated`): its order or its pause.
     QueueUpdated(Queue),
+    /// A task's speakers were renamed (`speakers-renamed`); its turns are unchanged.
+    SpeakersRenamed(SpeakersChanged),
+    /// A task's speakers were merged or the merges reset (`speakers-merged`); its turns can join or
+    /// split, so a client showing them reads them again.
+    SpeakersMerged(SpeakersChanged),
     /// An event this client does not read yet, by its name.
     Other(String),
 }
@@ -100,6 +113,8 @@ fn decode(frame: Frame) -> io::Result<Event> {
         "task-updated" => parse_json(&frame.data).map(Event::TaskUpdated),
         "task-progress" => parse_json(&frame.data).map(Event::TaskProgress),
         "queue-updated" => parse_json(&frame.data).map(Event::QueueUpdated),
+        "speakers-renamed" => parse_json(&frame.data).map(Event::SpeakersRenamed),
+        "speakers-merged" => parse_json(&frame.data).map(Event::SpeakersMerged),
         _ => Ok(Event::Other(frame.name)),
     }
 }

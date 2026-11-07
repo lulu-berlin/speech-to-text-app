@@ -223,6 +223,20 @@ impl Ui {
                 if matches!(event, Event::Snapshot(_)) {
                     self.disconnected = false;
                 }
+                // Speakers changed elsewhere (the browser, another TUI): an open transcript of the
+                // task follows them, and after a merge reads its turns again.
+                if let Screen::Transcript(transcript) = &mut self.screen {
+                    match &event {
+                        Event::SpeakersRenamed(change) => {
+                            transcript.set_speakers(change.id, change.speakers.clone());
+                        }
+                        Event::SpeakersMerged(change) if change.id == transcript.task.id => {
+                            transcript.set_speakers(change.id, change.speakers.clone());
+                            reread_turns(runtime, service, sender, change.id);
+                        }
+                        _ => {}
+                    }
+                }
                 state::apply(&mut self.snapshot, event);
                 let rows = state::rows(self.snapshot.as_ref()).len();
                 if rows > 0 {
@@ -490,6 +504,23 @@ fn open_settings(
             Ok((settings, frontends))
         },
         |(settings, frontends)| Message::Settings(settings, frontends),
+    );
+}
+
+/// Reads task `id`'s turns again; an open transcript of it shows them.
+fn reread_turns(
+    runtime: &tokio::runtime::Handle,
+    service: &Service,
+    sender: &mpsc::Sender<Message>,
+    id: i64,
+) {
+    let service = service.clone();
+    fetch(
+        runtime,
+        sender,
+        "transcript.failed",
+        async move { turns(&service, id).await },
+        move |turns| Message::Turns(id, turns),
     );
 }
 
