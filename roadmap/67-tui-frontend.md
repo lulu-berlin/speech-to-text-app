@@ -171,9 +171,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [x] (discovered, 2026-11-06) `q`, Escape and Ctrl-C each quit the TUI and leave the terminal as
       it was (raw mode off, the main screen back), so the user is never trapped (a confirmation may
       come later) — `stt-tui/tests/quit.rs`, `266cee47`
-- [ ] (discovered, 2026-11-06) An event stream that stays silent for 15 s - no event, not even the
+- [x] (discovered, 2026-11-06) An event stream that stays silent for 15 s - no event, not even the
       service's 5 s heartbeat (ADR 0044) - counts as dropped and is opened anew, as the browser does,
-      so a silent network partition does not freeze the view
+      so a silent network partition does not freeze the view - `stt-tui/tests/silence.rs`,
+      `4dc738a3`
 - [ ] (discovered, 2026-11-06) While the event stream is down the TUI says so (disconnected,
       reconnecting), and the notice goes once a new stream's snapshot arrives
 - [x] (discovered, 2026-11-06) Escape cancels the open upload prompt without quitting and leaves the
@@ -425,3 +426,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   the launch token included), so the per-install secret never goes to a proxy. The harness clears
   inherited proxy variables so the test sets them. Committed as `54edd99c` (66 tests; fmt and
   clippy green; the `stt-tui` suite green in 3 repeats). The line is ticked.
+- 2026-11-07 (workspace, cycle 19): "the silent-stream watchdog" (the discovered line; watchdog
+  only, the disconnected notice is its own cycle). Red ran on `a32ef7e8` with the cycle's
+  uncommitted pty test: the first stream stayed open and silent, and no second `GET /api/events`
+  came (`no event stream was opened within 30s`, `terminal/mod.rs:409`). Green on the same tree
+  plus a 15 s timeout around each `next()` of the stream (heartbeats arrive as events, so a live
+  stream never trips it); the new stream carries the credential and its snapshot is what the view
+  shows. Committed as `4dc738a3` (67 tests; fmt and clippy green; the `stt-tui` suite green in 3
+  repeats). The line is ticked. The user asked about mouse support: not in the approved scope (the
+  Proposal says keyboard-driven controls); it would need its own spec amendment and test lines.
