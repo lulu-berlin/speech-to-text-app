@@ -39,6 +39,14 @@ impl RunningService {
 
 impl Drop for RunningService {
     fn drop(&mut self) {
+        // On Windows the launcher is a .bat under cmd, which starts the JVM as its child: killing
+        // cmd alone would leave the service running, so the whole tree goes. On Unix the start
+        // script `exec`s Java, so the child is the JVM itself.
+        if cfg!(windows) {
+            let _ = Command::new("taskkill")
+                .args(["/T", "/F", "/PID", &self.child.id().to_string()])
+                .output();
+        }
         let _ = self.child.kill();
         let _ = self.child.wait();
     }

@@ -212,8 +212,7 @@ jobs:
       - name: gradle e2e
         run: ./gradlew e2e
       # Roadmap item 67: the TUI's journey against the real service - upload, COMPLETED, transcript -
-      # in a pseudo-terminal (client/stt-tui/tests/journey.rs). Linux only for now; macOS and
-      # Windows follow once this leg is green.
+      # in a pseudo-terminal (client/stt-tui/tests/journey.rs). macOS and Windows run it too.
       - name: gradle tuiJourney
         run: ./gradlew tuiJourney
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
@@ -313,7 +312,8 @@ jobs:
       - uses: ./.github/actions/jvm-toolchain
         with:
           downloads-cache: 'true'
-      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) and the item-67 TUI
+      # journey are built with the pinned Rust.
       - uses: ./.github/actions/rust-toolchain
       - name: gradle e2e
         run: |
@@ -333,6 +333,9 @@ jobs:
             tail -100 e2e/.e2e-backend.log
             exit 1
           }
+      # Roadmap item 67: the TUI's journey against the real service, as on Linux.
+      - name: gradle tuiJourney
+        run: ./gradlew tuiJourney
 
   macos-nix:
     name: macOS (Nix build + devenv)
@@ -704,11 +707,16 @@ jobs:
       - uses: ./.github/actions/jvm-toolchain
         with:
           downloads-cache: 'true'
-      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) and the item-67 TUI
+      # journey are built with the pinned Rust.
       - uses: ./.github/actions/rust-toolchain
       - name: gradlew.bat e2e
         shell: cmd
         run: gradlew.bat e2e
+      # Roadmap item 67: the TUI's journey against the real service, as on Linux - in a ConPTY.
+      - name: gradlew.bat tuiJourney
+        shell: cmd
+        run: gradlew.bat tuiJourney
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
       - name: Upload the failed specs' traces
         if: failure()
