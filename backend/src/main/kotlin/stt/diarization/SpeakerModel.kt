@@ -16,7 +16,7 @@ internal class SpeakerModel private constructor(
 
     companion object {
         /**
-         * Session options. ONNX Runtime is force-pinned to 1.31.0 (roadmap item 30, ADR 0043): the 1.29.0 and 1.30.0
+         * Session options. ONNX Runtime is force-pinned to 1.31.1 (roadmap item 30, ADR 0043): the 1.29.0 and 1.30.0
          * bundled natives both segfault on one user's machine (AMD Ryzen, 16 threads; SIGSEGV from a native
          * stack-overflow recursion in CPU-dispatched ORT code, no JVM hs_err — reproduced with every threading
          * and execution combination, so the crash cannot be configured away; 1.26.0-1.28.0 are rejected because

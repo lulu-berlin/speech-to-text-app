@@ -108,7 +108,16 @@ export async function startBackend(
   if (!existsSync(java)) throw new Error(`no bundled JRE at ${jre}`);
   if (!existsSync(backendJar)) throw new Error(`no bundled backend at ${backendLib}`);
   if (!existsSync(join(staticDir, 'index.html'))) throw new Error(`no bundled UI at ${staticDir}`);
-  const child = spawn(java, ['-cp', join(backendLib, '*'), 'stt.MainKt'], {
+  // sqlite-jdbc picks its native by the host's libc, and on a musl host it would extract the musl
+  // build into this glibc JVM and log a failed load before falling back (roadmap item 93). The
+  // desktop package ships the jar's glibc build in tools/bin, so point the loader at it: with both
+  // properties set it loads that file first and never touches the jar's extraction.
+  const sqliteNative = join(toolsBin, 'libsqlitejdbc.so');
+  const nativeArgs =
+    process.platform === 'linux' && existsSync(sqliteNative)
+      ? [`-Dorg.sqlite.lib.path=${toolsBin}`, '-Dorg.sqlite.lib.name=libsqlitejdbc.so']
+      : [];
+  const child = spawn(java, [...nativeArgs, '-cp', join(backendLib, '*'), 'stt.MainKt'], {
     cwd: backendLib,
     env: {
       ...process.env,

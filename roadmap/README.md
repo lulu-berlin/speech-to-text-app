@@ -126,7 +126,7 @@ graph TD
   49 --> 90
   48 --> 90
   13 --> 91[91 msw 3 ✓]:::done
-  03 --> 93[93 Maven catalog batch]
+  03 --> 93[93 Maven catalog batch ✓]:::done
   08 --> 93
   11 --> 95[95 audit failure paths]
   42 --> 95
@@ -295,7 +295,7 @@ graph TD
 | [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | spec-approved | 66 |
 | [90 — A nixpkgs bump, our own whisper.cpp 1.9.5 artifact on every route, and one platform vocabulary](../docs/specs/own-artifacts-and-platform-keys.md) | done | 63, 48, 49, 33 |
 | [91 — MSW 3: the API mocks, the shared handlers and the dev worker](../docs/specs/msw-3.md) | done | 13 |
-| [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](93-maven-catalog-batch.md) | spec-approved | 03, 08 |
+| [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](../docs/specs/maven-catalog-batch.md) | done | 03, 08 |
 | [94 — The atomic-transitions lock probe must not expire on a starved runner](../docs/specs/atomic-transitions-probe-clock.md) | done | 55, 47, 58, 11 |
 | [95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests](95-audit-failure-paths.md) | draft | 11, 42, 12, 41, 32, 66, 73, 87 |
 | [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | draft | 95, 67 |

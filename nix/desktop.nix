@@ -118,10 +118,21 @@
   # `ffmpeg` is the flake's audio-only prebuilt artifact (roadmap item 62), the same binary the
   # server package and the devenv shell ship; the backend runs its CLI only: decode to mono f32
   # PCM, `silencedetect`/`atrim`, FLAC out, and the V10 concat backfill.
-  tools = pkgs.runCommand "stt-desktop-tools" {} ''
+  tools = pkgs.runCommand "stt-desktop-tools" {
+    nativeBuildInputs = pkgs.lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.unzip;
+  } ''
     mkdir -p $out/bin
     ln -s ${whisperCpp}/bin/whisper-cli $out/bin/whisper-cli
     ln -s ${ffmpeg}/bin/ffmpeg $out/bin/ffmpeg
+    ${pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+      # sqlite-jdbc 3.54 picks its native by the *host's* libc (roadmap item 93): on a musl host it
+      # extracts the musl build, which cannot load into this glibc JVM (no libc.musl-* there). The
+      # loader then falls back to System.loadLibrary on java.library.path, and backend.ts puts this
+      # bin directory there (LD_LIBRARY_PATH), so the jar's glibc build sits beside the tools. The
+      # unzip fails loudly if a sqlite-jdbc bump moves the entry, instead of leaving the bundle to
+      # break at the first database open.
+      unzip -j -q ${backend}/lib/sqlite-jdbc-*.jar org/sqlite/native/Linux/x86_64/libsqlitejdbc.so -d $out/bin
+    ''}
   '';
 in
   pkgs.stdenv.mkDerivation {
