@@ -549,3 +549,15 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   static binary; (2) a new roadmap item for the stenographer animation in the TUI; (3) the user's
   verifications: the real OS terminal windows from the tray on each OS, and the pull request's CI
   run (all three journey legs, e2e, desktop).
+- 2026-11-07 (workspace, after the user's report): `./gradlew tuiJourney` on the user's NixOS laptop
+  failed: the journey's service could not exec Gradle's bytedeco ffmpeg ("Could not start
+  dynamically linked executable", NixOS's stub-ld) and the task failed with the transcription. Root
+  cause: `appEnv()` puts the managed tools first on the task's PATH (ADR 0047), so the managed
+  ffmpeg wins over the devenv's Nix one - the same host limit README documents for `./gradlew e2e`,
+  which `tuiJourney` had inherited unhandled. Not a TUI defect: the service and the TUI were
+  correct; only the tool it was handed could not run. Fix: the task probes the managed ffmpeg and,
+  when it cannot run and PATH has both `ffmpeg` and `whisper-cli` (the devenv's, as the packaged
+  app uses on NixOS), runs with those instead; CI's runners run the managed, pinned tools, and
+  without a usable PATH pair the task keeps them and warns. Committed as `1c047c14`; README's
+  `tuiJourney` bullet says so. Checked here with the fallback path (the sandbox has no managed
+  tools): green in 6 s.
