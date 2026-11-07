@@ -213,12 +213,52 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       `client/stt-client/tests/text.rs`, `frontend/src/features/queue/QueueView.test.tsx` (the
       "shared UI text" case), `a21afa22`
 
+### Parity amendment (approved 2026-11-07)
+
+The user: the TUI must have functionality and UX parity with the GUI, and the screen itself must
+teach its use — "the user is not meant to guess what to do". Audio playback stays out of scope.
+
+- [ ] (basic) A tab bar shows `1 Queue · 2 History · 3 Settings` and marks the active page; `1`/`2`/`3`
+      and `Tab`/`Shift-Tab` switch pages from anywhere.
+- [ ] (basic) A footer on every screen states that screen's keys in words — reorder, rename/merge
+      speakers, download, pause included — so nothing must be guessed, and it names the help key.
+- [ ] (basic) `?` opens a full key reference for the current page and closes with `?`/`Esc`.
+- [ ] (basic) The queue page shows an upload area above the queue; `Up`/`Down`/`k`/`j` move the
+      selection between the upload area and the queue rows and the focused area is marked; `Enter` or
+      `Space` on the upload area opens the upload dialog, as `u` does.
+- [ ] (basic) Empty states say what to do: the queue says how to upload, history says there are no
+      completed tasks, and their keys keep working.
+- [ ] (basic) `u` (or Enter/Space on the upload area) opens a file browser starting in the current
+      directory (or `$HOME` when that cannot be read): directories and audio/video files are listed,
+      `Up`/`Down` move, `Enter` descends or picks, `Backspace`/`..` goes up, and typing `/` edits a
+      path directly; a file the service would refuse by extension is marked and cannot be picked.
+- [ ] (basic) The upload dialog carries the GUI's fields — language, speakers `auto`/`off`/`fixed`
+      with a count, max speakers — starting from the stored defaults (`GET /api/settings`); `Enter`
+      sends `file`, `language`, `speakers`, `maxSpeakers`.
+- [ ] (edge) `fixed` needs a count in 1–20 before Enter sends, and leaving `fixed` sends `auto`; a
+      path that cannot be opened is reported with no request.
+- [ ] (basic) Queue rows show what the GUI's rows show: filename, status, phase while processing,
+      detected language, size and progress; FAILED/CANCELED stay reachable.
+- [ ] (basic) `d` deletes the selected task after a confirmation (`DELETE /api/tasks/{id}`) and the
+      row disappears.
+- [ ] (edge) The device-fallback banner shows above the queue and `x` dismisses it
+      (`DELETE /api/settings/device-fallback`), also when there is no fallback.
+- [ ] (basic) `R` resets all merges (`DELETE /api/tasks/{id}/speakers/merges`); names and turns
+      return to unmerged.
+- [ ] (basic) Reassigning marks segments and moves them to the selected speaker, `null` giving a new
+      speaker; the turns are read again.
+- [ ] (basic) Editing a segment's text (`PATCH /api/tasks/{id}/segments/{segmentId}`) and reverting it
+      (`POST …/revert`) update the transcript.
+- [ ] (edge) `segment-edited` and `speakers-reassigned` refresh an open transcript, as the GUI does.
+
 ## Acceptance criteria
 
 - A TUI client of the service exists on Linux, macOS and Windows, launched as a registered
-  frontend, covering the agreed surfaces — queue and reorder, upload, history, transcripts,
-  speaker rename/merge, downloads and settings — with live updates and the service credential;
-  audio playback is explicitly out of scope; documented.
+  frontend, with the GUI's functionality and UX parity: a tabbed queue/history/settings layout whose
+  screens state their own keys (a footer and a `?` reference), a navigable upload dialog with the
+  GUI's upload options, queue rows with the GUI's detail, reorder, delete, the device-fallback
+  notice, transcripts with speaker rename/merge/reset, segment reassignment and editing, downloads,
+  live updates and the service credential; audio playback is explicitly out of scope; documented.
 - Its pty-driven e2e journey passes in CI; the browser/window frontends and the API contract are
   unchanged; the tray still lists and opens it.
 - Every path — `devenv.nix`, `flake.nix` packaging, and the non-Nix CI/bootstrap path, Windows
@@ -566,3 +606,15 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   upload → COMPLETED → transcript passed in 6.4 s, `BUILD SUCCESSFUL`. That is the Linux leg's
   journey proven on a real NixOS desktop host, not only in the sandbox; the pull request's CI run
   still covers its own Linux runners, macOS and Windows.
+- 2026-11-07 (workspace, amendment approved by the user): the item was **reopened** (`in-review` →
+  `in-progress`). The user found the TUI below the minimal standard of a usable app on a real host:
+  an empty queue with no instructions, no on-screen key map, an upload that is only an empty input
+  box, and undiscoverable behaviour (reorder existed but nothing said so). The user's requirement:
+  **functionality and UX parity with the GUI**, and the screen itself must teach its use — "the user
+  is not meant to guess what to do" — with `?` itself written on screen. Their corrections to the
+  first draft: the upload is the TUI's own file browser (type a path **or** navigate directories,
+  starting in the current directory, `$HOME` as the fallback), not a GUI; the arrows or `j`/`k` move
+  between the queue page's upload area and the queue, and `Enter`/`Space` on the upload area opens
+  it; queue reorder must be reachable and visible; the pages mirror the GUI as tabs. The "Parity
+  amendment (approved 2026-11-07)" test list (15 lines) records this; work restarts at slice A
+  (pages, footer, `?`, upload area focus, empty states).
