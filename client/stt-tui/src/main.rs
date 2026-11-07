@@ -168,6 +168,8 @@ struct Ui {
     disconnected: bool,
     /// Whether the key reference is open.
     help: bool,
+    /// Whether the queue page's upload area has the focus instead of the queue's rows.
+    upload_focused: bool,
 }
 
 impl Ui {
@@ -184,6 +186,7 @@ impl Ui {
             no_color: std::env::var_os("NO_COLOR").is_some(),
             disconnected: false,
             help: false,
+            upload_focused: false,
         }
     }
 
@@ -208,6 +211,7 @@ impl Ui {
             no_color: self.no_color,
             disconnected: self.disconnected,
             help: self.help,
+            upload_focused: self.upload_focused,
         };
         terminal.draw(|frame| view::draw(frame, &view))?;
         Ok(())
@@ -355,7 +359,12 @@ impl Ui {
     ) -> Outcome {
         match action {
             Action::Quit | Action::BackOrQuit => return Outcome::Quit,
-            Action::Back | Action::OpenSelected => {}
+            Action::Back => {}
+            Action::OpenSelected => {
+                if self.upload_focused {
+                    self.prompt = Some(String::new());
+                }
+            }
             Action::OpenDownload
             | Action::DownloadChar(_)
             | Action::DownloadBackspace
@@ -396,15 +405,31 @@ impl Ui {
                     });
                 }
             }
-            Action::SelectUp => self.selected = self.selected.saturating_sub(1),
-            Action::SelectDown => {
-                let rows = state::rows(self.snapshot.as_ref()).len();
-                if self.selected + 1 < rows {
-                    self.selected += 1;
+            Action::SelectUp => {
+                if !self.upload_focused {
+                    if self.selected == 0 {
+                        self.upload_focused = true;
+                    } else {
+                        self.selected -= 1;
+                    }
                 }
             }
-            Action::MoveSelected(step) => {
+            Action::SelectDown => {
+                if self.upload_focused {
+                    self.upload_focused = false;
+                } else {
+                    let rows = state::rows(self.snapshot.as_ref()).len();
+                    if self.selected + 1 < rows {
+                        self.selected += 1;
+                    }
+                }
+            }
+            Action::MoveSelected(step) if !self.upload_focused => {
                 move_selected(runtime, sender, service, self, step);
+            }
+            Action::MoveSelected(_) => {}
+            Action::ToggleQueuePause if self.upload_focused => {
+                self.prompt = Some(String::new());
             }
             Action::ToggleQueuePause => {
                 let paused = self.snapshot.as_ref().is_some_and(|s| s.queue.paused);
@@ -422,7 +447,7 @@ impl Ui {
                     })
                 });
             }
-            Action::TaskKey(character) => {
+            Action::TaskKey(character) if !self.upload_focused => {
                 if let Some(task) = task_at(self.snapshot.as_ref(), self.selected)
                     && let Some(command) = input::command_for(task, character)
                 {
@@ -438,6 +463,7 @@ impl Ui {
                     });
                 }
             }
+            Action::TaskKey(_) => {}
         }
         Outcome::Continue
     }

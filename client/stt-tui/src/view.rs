@@ -41,6 +41,8 @@ pub struct View<'a> {
     pub disconnected: bool,
     /// Whether the key reference is open, over the page it belongs to.
     pub help: bool,
+    /// Whether the queue page's upload area has the focus.
+    pub upload_focused: bool,
 }
 
 /// The download dialog's fields: the task it saves, the path, the format, and whether the format
@@ -209,6 +211,22 @@ fn draw_tabs(frame: &mut Frame, area: Rect, view: &View<'_>) {
 /// The queue in its order - one row per task with its file name, status and transcription progress,
 /// the selected row highlighted (marked with `>` when `NO_COLOR` is set).
 fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
+    let areas = Layout::vertical([
+        // The upload area above the queue: reachable with Up/k, Enter or Space opens the prompt.
+        Constraint::Length(3),
+        Constraint::Min(3),
+    ])
+    .split(area);
+    let upload_marker = if view.upload_focused { "> " } else { "  " };
+    frame.render_widget(
+        Paragraph::new(format!(
+            "{upload_marker}{}",
+            stt_client::text("upload.area", &[])
+        ))
+        .wrap(Wrap { trim: true })
+        .block(Block::bordered()),
+        areas[0],
+    );
     let rows = crate::state::rows(view.snapshot)
         .into_iter()
         .enumerate()
@@ -241,9 +259,13 @@ fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
         ],
     )
     .block(Block::bordered().title(title))
-    .row_highlight_style(highlight(view.no_color));
+    .row_highlight_style(if view.upload_focused {
+        Style::new()
+    } else {
+        highlight(view.no_color)
+    });
     let mut state = TableState::default().with_selected(Some(view.selected));
-    frame.render_stateful_widget(table, area, &mut state);
+    frame.render_stateful_widget(table, areas[1], &mut state);
 }
 
 /// The completed tasks, the selected row highlighted.
