@@ -561,3 +561,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   without a usable PATH pair the task keeps them and warns. Committed as `1c047c14`; README's
   `tuiJourney` bullet says so. Checked here with the fallback path (the sandbox has no managed
   tools): green in 6 s.
+- 2026-11-07 (user, NixOS laptop, devenv shell): `./gradlew tuiJourney` green after the fix -
+  "the Gradle-managed tools cannot run on this host; using the tools on PATH", the journey's
+  upload → COMPLETED → transcript passed in 6.4 s, `BUILD SUCCESSFUL`. That is the Linux leg's
+  journey proven on a real NixOS desktop host, not only in the sandbox; the pull request's CI run
+  still covers its own Linux runners, macOS and Windows.
