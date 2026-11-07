@@ -227,20 +227,6 @@ fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
         .block(Block::bordered()),
         areas[0],
     );
-    let rows = crate::state::rows(view.snapshot)
-        .into_iter()
-        .enumerate()
-        .map(|(index, task)| {
-            Row::new([
-                format!(
-                    "{}{}",
-                    marker(index == view.selected, view.no_color),
-                    task.filename
-                ),
-                task.status.clone(),
-                format!("{}%", (task.transcription_progress * 100.0).round()),
-            ])
-        });
     let paused = view.snapshot.is_some_and(|snapshot| snapshot.queue.paused);
     let title = stt_client::text(
         if paused {
@@ -250,6 +236,27 @@ fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
         },
         &[],
     );
+    let tasks = crate::state::rows(view.snapshot);
+    if tasks.is_empty() {
+        frame.render_widget(
+            Paragraph::new(stt_client::text("queue.empty", &[]))
+                .wrap(Wrap { trim: true })
+                .block(Block::bordered().title(title)),
+            areas[1],
+        );
+        return;
+    }
+    let rows = tasks.into_iter().enumerate().map(|(index, task)| {
+        Row::new([
+            format!(
+                "{}{}",
+                marker(index == view.selected, view.no_color),
+                task.filename
+            ),
+            task.status.clone(),
+            format!("{}%", (task.transcription_progress * 100.0).round()),
+        ])
+    });
     let table = Table::new(
         rows,
         [
@@ -270,21 +277,29 @@ fn draw_queue(frame: &mut Frame, area: Rect, view: &View<'_>) {
 
 /// The completed tasks, the selected row highlighted.
 fn draw_history(frame: &mut Frame, area: Rect, view: &View<'_>) {
-    let rows = crate::state::completed(view.history)
-        .into_iter()
-        .enumerate()
-        .map(|(index, task)| {
-            Row::new([
-                format!(
-                    "{}{}",
-                    marker(index == view.history_selected, view.no_color),
-                    task.filename
-                ),
-                task.status.clone(),
-            ])
-        });
+    let title = stt_client::text("history.title", &[]);
+    let tasks = crate::state::completed(view.history);
+    if tasks.is_empty() {
+        frame.render_widget(
+            Paragraph::new(stt_client::text("history.empty", &[]))
+                .wrap(Wrap { trim: true })
+                .block(Block::bordered().title(title)),
+            area,
+        );
+        return;
+    }
+    let rows = tasks.into_iter().enumerate().map(|(index, task)| {
+        Row::new([
+            format!(
+                "{}{}",
+                marker(index == view.history_selected, view.no_color),
+                task.filename
+            ),
+            task.status.clone(),
+        ])
+    });
     let table = Table::new(rows, [Constraint::Fill(1), Constraint::Length(12)])
-        .block(Block::bordered().title(stt_client::text("history.title", &[])))
+        .block(Block::bordered().title(title))
         .row_highlight_style(highlight(view.no_color));
     let mut state = TableState::default().with_selected(Some(view.history_selected));
     frame.render_stateful_widget(table, area, &mut state);

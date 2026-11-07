@@ -66,5 +66,6 @@
   "help.transcript": "Transcript keys",
   "help.settings": "Settings keys",
   "help.close": "? or Esc closes",
-  "upload.area": "Upload a file — Enter or Space opens the dialog, or press u"
+  "upload.area": "Upload a file — Enter or Space opens the dialog, or press u",
+  "queue.empty": "No tasks yet — press u, or Enter on the upload area, to upload a file"
 }
