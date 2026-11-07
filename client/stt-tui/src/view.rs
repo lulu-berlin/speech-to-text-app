@@ -37,6 +37,8 @@ pub struct View<'a> {
     /// Whether the user set `NO_COLOR`: then nothing is coloured or reversed, and the selected row
     /// is marked with `>` instead.
     pub no_color: bool,
+    /// Whether the event stream is down: the screen then says the service cannot be reached.
+    pub disconnected: bool,
 }
 
 /// The download dialog's fields: the task it saves, the path, the format, and whether the format
@@ -48,7 +50,8 @@ pub struct DownloadView<'a> {
     pub focus_format: bool,
 }
 
-/// Draws the open screen, with the prompt and the notice under it when there are any.
+/// Draws the open screen, with the prompt, the notice and - while the stream is down - the
+/// connection line under it.
 pub fn draw(frame: &mut Frame, view: &View<'_>) {
     let middle = match (
         view.download.is_some(),
@@ -60,10 +63,12 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
         (false, false) => 0,
     };
     let notice = if view.notice.is_some() { 1 } else { 0 };
+    let connection = if view.disconnected { 1 } else { 0 };
     let areas = Layout::vertical([
         Constraint::Min(3),
         Constraint::Length(middle),
         Constraint::Length(notice),
+        Constraint::Length(connection),
     ])
     .split(frame.area());
     match view.screen {
@@ -109,6 +114,12 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) {
     }
     if let Some(notice) = view.notice {
         frame.render_widget(Paragraph::new(notice), areas[2]);
+    }
+    if view.disconnected {
+        frame.render_widget(
+            Paragraph::new(stt_client::text("connection.unreachable", &[])),
+            areas[3],
+        );
     }
 }
 

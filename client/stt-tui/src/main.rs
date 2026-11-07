@@ -50,6 +50,8 @@ enum Message {
     Settings(Settings, Vec<Frontend>),
     /// The settings as the service answered a save; an open settings screen shows them.
     SettingsSaved(Settings),
+    /// The event stream dropped, went silent or could not be opened; a new one is on its way.
+    Disconnected,
 }
 
 /// Whether the user asked to leave.
@@ -125,8 +127,9 @@ const RECONNECT: Duration = Duration::from_secs(1);
 const SILENCE: Duration = Duration::from_secs(15);
 
 /// Reads the service's event stream and hands every event to the terminal. A stream that drops,
-/// stays silent for [`SILENCE`], or cannot be opened is opened again after [`RECONNECT`]; its first
-/// event, a fresh snapshot, brings the view up to date with whatever happened meanwhile.
+/// stays silent for [`SILENCE`], or cannot be opened is announced and opened again after
+/// [`RECONNECT`]; its first event, a fresh snapshot, brings the view up to date with whatever
+/// happened meanwhile.
 async fn follow(service: Service, sender: mpsc::Sender<Message>) {
     loop {
         if let Ok(mut stream) = events(&service).await {
@@ -135,6 +138,9 @@ async fn follow(service: Service, sender: mpsc::Sender<Message>) {
                     return;
                 }
             }
+        }
+        if sender.send(Message::Disconnected).is_err() {
+            return;
         }
         tokio::time::sleep(RECONNECT).await;
     }
@@ -158,6 +164,8 @@ struct Ui {
     notice: Option<String>,
     /// Whether `NO_COLOR` is set: then the selected row is marked, and nothing is coloured.
     no_color: bool,
+    /// Whether the event stream is down: from its drop until a new stream's snapshot arrives.
+    disconnected: bool,
 }
 
 impl Ui {
@@ -172,6 +180,7 @@ impl Ui {
             download: None,
             notice: None,
             no_color: std::env::var_os("NO_COLOR").is_some(),
+            disconnected: false,
         }
     }
 
@@ -194,6 +203,7 @@ impl Ui {
             download: self.download.as_ref().map(Download::view),
             notice: self.notice.as_deref(),
             no_color: self.no_color,
+            disconnected: self.disconnected,
         };
         terminal.draw(|frame| view::draw(frame, &view))?;
         Ok(())
@@ -209,6 +219,10 @@ impl Ui {
     ) -> Outcome {
         match message {
             Message::Service(event) => {
+                // A snapshot opens every stream: the view is current again.
+                if matches!(event, Event::Snapshot(_)) {
+                    self.disconnected = false;
+                }
                 state::apply(&mut self.snapshot, event);
                 let rows = state::rows(self.snapshot.as_ref()).len();
                 if rows > 0 {
@@ -216,6 +230,7 @@ impl Ui {
                 }
             }
             Message::Notice(line) => self.notice = Some(line),
+            Message::Disconnected => self.disconnected = true,
             Message::History(tasks) => {
                 self.listed = tasks;
                 self.history_selected = 0;

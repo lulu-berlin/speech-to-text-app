@@ -1,4 +1,5 @@
 {
+  "connection.unreachable": "Can't reach the app's service. Reconnecting…",
   "queue.title": "Queue",
   "queue.title-paused": "Queue (paused)",
   "queue.uploads": "Uploads",
