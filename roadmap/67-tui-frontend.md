@@ -166,9 +166,14 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       from `versions.json` with `--locked`, `gradle checkVersions` green (Rust 1.99.0)
 - [ ] (must not break) Browser, window, API contract and the existing e2e suites stay green; the tray
       still lists and opens the TUI
-- [ ] (moved from item 66, 2026-11-02; approved as worded 2026-11-06) Opening the TUI from the tray
+- [x] (moved from item 66, 2026-11-02; approved as worded 2026-11-06) Opening the TUI from the tray
       opens it in a terminal - PowerShell by default on Windows, Terminal on macOS, the terminal
-      chain on Linux - through its registered descriptor, and several TUI instances run side by side
+      chain on Linux - through its registered descriptor, and several TUI instances run side by side -
+      the descriptor in the tray's list, the OS-terminal launch from it and `stt-app` starting it are
+      item 66's tests (`stt-client/tests/tray.rs`, `open_plan.rs`, `terminal.rs`,
+      `stt-app/tests/cli_start.rs`); side by side is `stt-tui/tests/instances.rs`, `f9cf9b55`. The
+      real terminal windows of each OS are the user's check on machine with a desktop (CI has no
+      display), and writing the descriptor on install is item 89's package.
 - [x] (discovered, 2026-11-06) The client reaches the service directly even when an HTTP proxy is
       set in the environment (`HTTP_PROXY`/`ALL_PROXY` without a `NO_PROXY` for the loopback
       address), so the per-install secret is never sent to a proxy and the service stays reachable -
@@ -518,3 +523,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   `gradle checkVersions` green; the CI client and e2e jobs install that version and build with
   `--locked`. The pin line is ticked. The 2026-10-22 "static musl on Linux" binary is packaging and
   goes with the package to item 89.
+- 2026-11-07 (workspace, cycle 26): "several TUIs side by side" (the tray line's automatable half;
+  the user approved automating the descriptor, the launch command and the instances here, and
+  leaving the real OS windows to their per-OS check). Coverage, so no red:
+  `stt-tui/tests/instances.rs` runs two real `stt-tui` processes against one stand-in service - each
+  opens its own event stream with the credential, both follow a change, and quitting one leaves the
+  other running and answering keys. The descriptor, its OS-terminal launch and `stt-app` starting it
+  are item 66's tests; writing the descriptor on install is item 89's package. Committed as
+  `f9cf9b55` (72 tests, the journey ignored; fmt and clippy green; the `stt-tui` suite green in 3
+  repeats). The tray line is ticked with those two caveats.
