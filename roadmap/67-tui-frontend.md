@@ -229,8 +229,8 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
       selection between the upload area and the queue rows and the focused area is marked; `Enter` or
       `Space` on the upload area opens the upload dialog, as `u` does - `stt-tui/tests/upload_area.rs`,
       `8c5664e7` (it opens the existing path prompt; the file browser lands with its own line).
-- [ ] (basic) Empty states say what to do: the queue says how to upload, history says there are no
-      completed tasks, and their keys keep working.
+- [x] (basic) Empty states say what to do: the queue says how to upload, history says there are no
+      completed tasks, and their keys keep working - `stt-tui/tests/empty.rs`, `24aed003`
 - [ ] (basic) `u` (or Enter/Space on the upload area) opens a file browser starting in the current
       directory (or `$HOME` when that cannot be read): directories and audio/video files are listed,
       `Up`/`Down` move, `Enter` descends or picks, `Backspace`/`..` goes up, and typing `/` edits a
@@ -664,3 +664,8 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   opening the prompt while it is focused, and task/reorder keys ignored and the row highlight off
   then. Committed as `8c5664e7` (76 tests, the journey ignored; fmt and clippy green; the `stt-tui`
   suite green in 3 repeats). Line ticked for the focus part; the file browser is next.
+- 2026-11-07 (workspace, cycle 32): the empty-state line. Red ran on `30bb04ab` with the cycle's
+  uncommitted pty test: an empty frame (`No tasks yet` never appeared). Green on the same tree plus
+  `queue.empty` in the catalog and an empty-state paragraph in place of the queue and history
+  tables, naming the key and the upload area. Committed as `24aed003` (77 tests, the journey
+  ignored; fmt and clippy green; the `stt-tui` suite green in 3 repeats). Line ticked.
