@@ -669,3 +669,15 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   `queue.empty` in the catalog and an empty-state paragraph in place of the queue and history
   tables, naming the key and the upload area. Committed as `24aed003` (77 tests, the journey
   ignored; fmt and clippy green; the `stt-tui` suite green in 3 repeats). Line ticked.
+- 2026-11-07 (workspace, cycle 33): the upload dialog's browser. The user chose our own
+  implementation over `tui-file-explorer`/`ratatui-explorer` (kept as reference only). Red was
+  recorded against the pre-cycle source (`git stash` of `client/stt-tui/src`, run on `9dae893f`):
+  the test waited for the browser's `clips/` and timed out - the old bare prompt had no list.
+  Green with `client/stt-tui/src/upload_dialog.rs` (browse, dirs first, hidden skipped, typed
+  path), the harness's `start_in` working directory, the dialog mode in `input.rs` (Up/Down move,
+  letters type - a path containing j/k must not jump), the modal list and its own footer, and the
+  old prompt replaced by it; `stt-tui/tests/upload.rs` still passes unchanged through the dialog.
+  Committed as `d1d1b10b` (78 tests, the journey ignored; fmt and clippy green; the `stt-tui` suite
+  green in 3 repeats). The amendment's browser line stays unticked for its two remaining parts:
+  unsupported files marked as unpickable, and the `/` typed-path affordance spelled out; the
+  option fields (language, speakers, max speakers) are the next line.
