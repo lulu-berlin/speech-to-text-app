@@ -15,6 +15,7 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.Properties
+import java.util.concurrent.TimeUnit
 
 plugins {
     // java-base only: gives the root build the javaToolchains service (the JDK-21
@@ -703,14 +704,48 @@ tasks.register<Exec>("integrationTest") {
 // and reads its transcript back. Gradle provides what the devenv otherwise sets, as for `e2e`: the
 // managed tools on PATH, the speaker model and the fixtures. `cargo` is the pinned Rust's (the
 // rust-toolchain action in CI, the devenv locally); a user-set STT_JOURNEY_SERVICE wins.
+// The Gradle-managed tools are generic-Linux binaries (bytedeco's ffmpeg, whisper-cli): a NixOS
+// host's stub-ld refuses to exec them, which README documents for `./gradlew e2e`. The journey
+// starts a real service that runs those tools, so a host that cannot run them gets the tools on
+// PATH instead (the devenv's, as the packaged app uses there); CI's Ubuntu runners can run the
+// managed ones and keep the pinned set.
+fun managedToolsRun(): Boolean {
+    val name = if (platform == "x86_64-windows") "ffmpeg.exe" else "ffmpeg"
+    val ffmpeg = runtimeBinDirs.map { File(it, name) }.firstOrNull { it.isFile } ?: return false
+    return try {
+        val probe = ProcessBuilder(ffmpeg.absolutePath, "-version").redirectErrorStream(true).start()
+        probe.inputStream.readAllBytes()
+        probe.waitFor(10, TimeUnit.SECONDS) && probe.exitValue() == 0
+    } catch (_: Exception) {
+        false
+    }
+}
+
+/// Whether `name` is an executable on this host's PATH - both tools must be there before the journey
+/// replaces the managed set with it.
+fun exeOnPath(name: String): Boolean =
+    (System.getenv("PATH") ?: "")
+        .split(File.pathSeparator)
+        .filter { it.isNotBlank() }
+        .any { dir -> File(dir, name).let { it.isFile && it.canExecute() } }
+
 tasks.register<Exec>("tuiJourney") {
     group = "verification"
     description =
-        "Run the TUI's end-to-end journey (roadmap item 67) against the installed service with the Gradle-managed tools, models and fixtures"
+        "Run the TUI's end-to-end journey (roadmap item 67) against the installed service with the Gradle-managed tools, models and fixtures (or the tools on PATH where those cannot run, as on NixOS)"
     dependsOn("prepareRuntime", "prepareE2eFixtures", backendInstallDist)
     doFirst {
         applyAppEnv(this as Exec)
         applyFixtureEnv(this as Exec)
+        val suffix = if (platform == "x86_64-windows") ".exe" else ""
+        if (!managedToolsRun()) {
+            if (exeOnPath("ffmpeg$suffix") && exeOnPath("whisper-cli$suffix")) {
+                logger.lifecycle("tuiJourney: the Gradle-managed tools cannot run on this host; using the tools on PATH")
+                environment("PATH", System.getenv("PATH") ?: "")
+            } else {
+                logger.warn("tuiJourney: the Gradle-managed tools cannot run here and PATH has no ffmpeg and whisper-cli; keeping the managed tools")
+            }
+        }
         environment("STT_JOURNEY_SERVICE", System.getenv("STT_JOURNEY_SERVICE") ?: backendMain.absolutePath)
         workingDir = rootProject.file("client")
         setCommandLine("cargo", "test", "--locked", "-p", "stt-tui", "--test", "journey", "--", "--ignored")
