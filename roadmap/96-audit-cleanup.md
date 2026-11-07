@@ -1,7 +1,7 @@
 # 96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it
 
 Status: draft
-Depends on: [95](95-audit-failure-paths.md) (same engine and route files), [94](94-atomic-transitions-probe-clock.md) (the writer-lock helpers in `TestEngine.kt`), [67](67-tui-frontend.md) (the `client/stt-client` rows only)
+Depends on: [95](95-audit-failure-paths.md) (same engine and route files), [67](67-tui-frontend.md) (the `client/stt-client` rows only)
 Blocks: —
 
 ## Goal
@@ -82,9 +82,9 @@ which corrected some counts and paths; the corrected findings are below. Paths a
   - Task lookup → 404 written in several routes.
   - `pendingStatuses` restates the complement of `terminalStatuses`.
 - **Backend tests.**
-  - Two diverged writer-lock race helpers: `db/ConcurrencySpec.kt:180-217`, which decides by an
-    exact call count (`lockCalls.first { it == 2 }`), and `engine/TestEngine.kt:409-557`, which is
-    writer-keyed. Item 94 is changing the second.
+  - The two diverged writer-lock race helpers (`db/ConcurrencySpec.kt:180-217`, decided by an
+    exact call count, vs `engine/TestEngine.kt:409-557`, writer-keyed) moved to item 94 at the
+    user's direction (2026-11-06).
   - `pumpUntil(200.milliseconds) { false }` used as a sleep or "nothing happened" proof in eight
     places, against the virtual-time convention (AGENTS.md § Testing,
     `docs/conventions/backend.md:60`): `ProcessingEngineDiarizationSpec.kt:110,259`,
@@ -168,12 +168,10 @@ which corrected some counts and paths; the corrected findings are below. Paths a
    - The test helpers live once.
    - `sttAppPath()` builds once per run.
    - The desktop helper waits on the task's state, item 84's pattern.
-3. **The writer-lock helpers**: `ConcurrencySpec` uses `TestEngine`'s writer-keyed helper after
-   item 94 lands.
-4. **The real-clock waits** become virtual-time waits, or event-keyed waits where a "nothing
+3. **The real-clock waits** become virtual-time waits, or event-keyed waits where a "nothing
    happened" claim needs one, as items 47 and 58 did.
-5. **Fix the comments.**
-6. **Conventions**:
+4. **Fix the comments.**
+5. **Conventions**:
    - The classpath lists load once at wiring, on `Dispatchers.IO`.
    - `STT_CONFIG_DIR` and `STT_RUNTIME_DIR` move into `Config`, and `ServiceDirs` takes them as
      parameters (or an ADR permits the second reader; open question).
@@ -217,8 +215,6 @@ and each line below names the behaviour that must hold after a removal or fold.
       (proven with a test-only field or the existing fields' round trips).
 - [ ] (basic) The engine resolves its repositories from the application's DI registrations; the
       diarizer and the engine share one `SegmentRepository`.
-- [ ] (basic) `ConcurrencySpec`'s races are decided by the writer-keyed helper, and its scenarios
-      pass 20 consecutive runs under load.
 - [ ] (basic) The eight real-clock waits are gone: the specs' "nothing happened" claims hold on
       virtual time or an event, and the specs stay green.
 - [ ] (basic) `sttAppPath()` runs `cargo build` at most once per e2e run.
