@@ -188,8 +188,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       `96f1cac4`
 - [ ] (discovered, 2026-11-06) A rename or merge the service refuses (a duplicate or invalid name,
       an invalid merge) shows the service's message and nothing changes
-- [ ] (discovered, 2026-11-06) A settings change made in the browser (the `settings-updated`
-      event) updates a Settings screen open in the TUI
+- [x] (discovered, 2026-11-06) A settings change made in the browser (the `settings-updated`
+      event) updates a Settings screen open in the TUI - `stt-tui/tests/settings.rs`, `b060a6f5`
 - [x] (discovered, 2026-11-06) Choosing `fixed` without a speaker count asks for one first (or
       keeps the stored mode, as the browser does), so no `invalid-speakers` write is ever sent -
       `stt-tui/tests/settings.rs`, `b03733ac`
@@ -455,3 +455,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   after its own answer, once on the event) - harmless, and kept so a merge still shows while the
   stream is down. Committed as `96f1cac4` (69 tests; fmt and clippy green; the `stt-tui` suite green
   in 3 repeats). The line is ticked.
+- 2026-11-07 (workspace, cycle 22): "settings changed elsewhere" (the discovered line). Red ran on
+  `b4d04614` with the cycle's uncommitted pty test: a `settings-updated` event left Threads at 4
+  (`terminal/mod.rs:137`). Green on the same tree plus `stt-client` reading `settings-updated` and an
+  open Settings screen taking it while keeping the device list and GPU names it read (the event
+  carries neither); a later change starts from what the browser stored. Committed as `b060a6f5`
+  (70 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats). The line is ticked.
