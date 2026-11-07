@@ -218,8 +218,8 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 The user: the TUI must have functionality and UX parity with the GUI, and the screen itself must
 teach its use — "the user is not meant to guess what to do". Audio playback stays out of scope.
 
-- [ ] (basic) A tab bar shows `1 Queue · 2 History · 3 Settings` and marks the active page; `1`/`2`/`3`
-      and `Tab`/`Shift-Tab` switch pages from anywhere.
+- [x] (basic) A tab bar shows `1 Queue · 2 History · 3 Settings` and marks the active page; `1`/`2`/`3`
+      and `Tab`/`Shift-Tab` switch pages from anywhere - `stt-tui/tests/pages.rs`, `8d31322f`
 - [ ] (basic) A footer on every screen states that screen's keys in words — reorder, rename/merge
       speakers, download, pause included — so nothing must be guessed, and it names the help key.
 - [ ] (basic) `?` opens a full key reference for the current page and closes with `?`/`Esc`.
@@ -634,3 +634,9 @@ teach its use — "the user is not meant to guess what to do". Audio playback st
   double-click to open a transcript, wheel to scroll), which also requires transcripts to scroll
   at all (keyboard and wheel). Mouse capture is on by default, so terminal text selection needs
   the terminal's own bypass (usually Shift-drag) — to be documented when implemented.
+- 2026-11-07 (workspace, cycle 28): the parity amendment's first line, the tab bar. Red ran on
+  `080e9e39` with the cycle's uncommitted pty test: no tab bar (`[1 Queue]` never appeared).
+  Green on the same tree plus a `Page` enum, page actions handled before any screen sees the key,
+  and the bar drawn as the top row with the active page bracketed (so it reads under `NO_COLOR`
+  too); a transcript is the History page. Committed as `8d31322f` (73 tests, the journey ignored;
+  fmt and clippy green; the `stt-tui` suite green in 3 repeats). Line ticked.
