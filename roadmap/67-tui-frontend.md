@@ -469,3 +469,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   both speakers keep their names and turns, and a refused merge reads no turns. Committed as
   `0db6387c` (71 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats). The line is
   ticked; every behavioural and discovered line is now done.
+- 2026-11-07 (workspace, the user): the stenographer animation is **not part of item 67**. The
+  2026-10-22 note only recorded that the idea is compatible with ratatui; it has no Proposal step,
+  test line or acceptance criterion here. The user asked for a **separate follow-up roadmap item**
+  that adds it to the TUI, consulted before it starts (where it shows, `Canvas` or pre-rendered
+  frames, a frame timer's cost, reduced motion and `NO_COLOR`, pty tests plus a visual sign-off) -
+  for the root agent to file.
