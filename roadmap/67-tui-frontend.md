@@ -186,8 +186,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
 - [x] (discovered, 2026-11-06) A speaker rename or merge made in the browser relabels a transcript
       open in the TUI (the `speakers-renamed` / `speakers-merged` events) - `stt-tui/tests/speakers.rs`,
       `96f1cac4`
-- [ ] (discovered, 2026-11-06) A rename or merge the service refuses (a duplicate or invalid name,
-      an invalid merge) shows the service's message and nothing changes
+- [x] (discovered, 2026-11-06) A rename or merge the service refuses (a duplicate or invalid name,
+      an invalid merge) shows the service's message and nothing changes - `stt-tui/tests/speakers.rs`,
+      `0db6387c`
 - [x] (discovered, 2026-11-06) A settings change made in the browser (the `settings-updated`
       event) updates a Settings screen open in the TUI - `stt-tui/tests/settings.rs`, `b060a6f5`
 - [x] (discovered, 2026-11-06) Choosing `fixed` without a speaker count asks for one first (or
@@ -461,3 +462,10 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   open Settings screen taking it while keeping the device list and GPU names it read (the event
   carries neither); a later change starts from what the browser stored. Committed as `b060a6f5`
   (70 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats). The line is ticked.
+- 2026-11-07 (workspace, cycle 23): "a refused rename or merge" (the discovered line). Coverage of
+  the existing error path, so no red: a rename to another speaker's name answered `409
+  duplicate-speaker-name` and an invalid merge `400 invalid-merge` (bodies written by hand in the
+  contract's error shape; `docs/api` has no example for either). Each shows the service's message,
+  both speakers keep their names and turns, and a refused merge reads no turns. Committed as
+  `0db6387c` (71 tests; fmt and clippy green; the `stt-tui` suite green in 3 repeats). The line is
+  ticked; every behavioural and discovered line is now done.
