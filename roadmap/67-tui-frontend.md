@@ -175,8 +175,9 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
       service's 5 s heartbeat (ADR 0044) - counts as dropped and is opened anew, as the browser does,
       so a silent network partition does not freeze the view - `stt-tui/tests/silence.rs`,
       `4dc738a3`
-- [ ] (discovered, 2026-11-06) While the event stream is down the TUI says so (disconnected,
-      reconnecting), and the notice goes once a new stream's snapshot arrives
+- [x] (discovered, 2026-11-06) While the event stream is down the TUI says so (disconnected,
+      reconnecting), and the notice goes once a new stream's snapshot arrives -
+      `stt-tui/tests/connection.rs`, `07bab8d4`
 - [x] (discovered, 2026-11-06) Escape cancels the open upload prompt without quitting and leaves the
       queue as it was - `stt-tui/tests/upload.rs`, `05857b01`
 - [x] (discovered, 2026-11-06) An upload the service refuses (duplicate audio, unsupported format,
@@ -435,3 +436,12 @@ None. (All settled 2026-10-22, see "Decided (consultation, 2026-10-22)".)
   shows. Committed as `4dc738a3` (67 tests; fmt and clippy green; the `stt-tui` suite green in 3
   repeats). The line is ticked. The user asked about mouse support: not in the approved scope (the
   Proposal says keyboard-driven controls); it would need its own spec amendment and test lines.
+- 2026-11-07 (workspace, cycle 20): "the disconnected notice" (the discovered line). Red ran on
+  `ad1504ec` with the cycle's uncommitted pty test: after the stream dropped nothing was announced
+  (`terminal/mod.rs:137`). Green on the same tree plus a `Disconnected` message from the stream
+  reader whenever a stream drops, goes silent or cannot be opened, and a line under the screen in
+  the browser's words, "Can't reach the app's service. Reconnecting…", added to `ui-text/en.json`
+  as `connection.unreachable` (the browser's own literal, `frontend/src/shared/api/client.ts:43`,
+  moves to the key in ADR 0066's follow-up migration). The last known queue stays on screen and the
+  next stream's snapshot ends the line. Committed as `07bab8d4` (68 tests; fmt and clippy green; the
+  `stt-tui` suite green in 3 repeats; the catalog prettier-clean). The line is ticked.
