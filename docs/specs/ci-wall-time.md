@@ -687,8 +687,11 @@ harness, not an app feature, and the existing journeys running unchanged are its
   derivation restore it; every pull request until that point rebuilds (~5 minutes).
 - 2026-11-07 (workspace, the bundle cache policy's run, green after the re-run): run #612
   (`pull_request`, head `e5399d5a`, attempt 2 of 2) completed success — 32 jobs, all success or
-  skipped, aggregate success at +9:52. Its first attempt failed only `Windows (e2e)` after 5:45, the
-  guard firing on the starved VM (`docs/known-issues.md`'s row, not a run that counts against the
+  skipped, aggregate success 26:10 after the run started at 08:23:00. The run object's
+  `run_started_at` reports only the latest attempt (the re-run alone took 9:52; the attempt-1 jobs,
+  `Linux (e2e)` 11:52 and `macOS (e2e)` 15:47 among them, belong to the first attempt, which ran for
+  about sixteen minutes of the run's 26:10). Its first attempt failed only `Windows (e2e)` after 5:45,
+  the guard firing on the starved VM (`docs/known-issues.md`'s row, not a run that counts against the
   change); the re-run of the failed job went green (9:42) and the whole run is green. The bundle job
   ran green (8:11). The cache API shows `refs/pull/115/merge` holding 7 entries — **0** `gradle-*` and
   the single 387 MB `stt-bundle-<derivation>` that run #611 saved at 08:19 under the old implicit
