@@ -23,6 +23,9 @@ build/
 node_modules/
 dist/
 result
+# Vite's dependency cache when Vite runs with the repository root as its root (a tool's one-off
+# run created one; it is never tracked, like node_modules/.vite inside a package).
+.vite/
 # Cargo's build output (roadmap item 66: the Rust client workspace in client/)
 /client/target/
 
