@@ -141,6 +141,8 @@ graph TD
   85 --> 97[97 audit CI and pins]
   67 --> 98[98 Rust workspace at root]
   66 --> 98
+  07 --> 99[99 Rust-native whisper]
+  98 --> 99
   50 --> 64[64 evaluate Tauri ✓]:::done
   65[65 fix the row-color phase observation ✓]:::done
   64 --> 66[66 local service and frontend flavors ✓]:::done
@@ -301,3 +303,4 @@ graph TD
 | [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | draft | 95, 67 |
 | [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](97-audit-ci-and-pins.md) | draft | 85 |
 | [98 — The Rust workspace lives at the repository root, and its crates in `crates/`](98-rust-workspace-at-root.md) | draft | 67, 66 |
+| [99 — A Rust-native whisper that matches whisper.cpp in speed and accuracy, with no bindings and no spawned process](99-rust-native-whisper.md) | spec-approved | 07, 05, 32, 84, 98 |
