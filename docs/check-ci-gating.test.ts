@@ -5,11 +5,19 @@
 // `node --test docs/check-ci-gating.test.ts` from the repository root.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { assertJobOf, parseJobs, stepsOf, workflowPath } from './ci-workflow.ts';
+import { assertJobOf, commandsOf, parseJobs, stepsOf, workflowPath } from './ci-workflow.ts';
 import { repoRoot } from './run-check.ts';
 
 const classifierPath = join(repoRoot, '.github/classify-change.sh');
@@ -333,33 +341,14 @@ test('the required check and the jobs it gates keep their names and conditions',
     assert.deepEqual(job.needs, [], `${id} does not wait for the change filter`);
   }
 
-  // The macOS jobs keep their own dependencies: the change gate is added, not swapped in. The macOS
-  // journey is the one exception (roadmap item 85): it starts with the change classification, which
-  // the journey test below pins.
-  for (const id of ['macos-backend-integration', 'macos-nix', 'macos-dmg']) {
+  // Roadmap item 97: the nine per-OS check jobs are one matrix job, so a platform job waits for
+  // `check` (all its legs) instead of naming its platform's backend and frontend check ids. The
+  // journeys are the one exception (roadmap item 85), pinned in the next test.
+  for (const id of ['macos-backend-integration', 'macos-nix', 'macos-dmg', 'windows-desktop-zip']) {
     const job = assertJobOf(jobs, id);
     assert.ok(job.needs.includes('changes'), `${id} carries the change gate`);
-    assert.ok(
-      job.needs.includes('macos-backend-check'),
-      `${id} still waits for macOS (gradle check)`,
-    );
-    assert.ok(
-      job.needs.includes('macos-frontend-check'),
-      `${id} still waits for macOS (pnpm test, pnpm build)`,
-    );
+    assert.ok(job.needs.includes('check'), `${id} still waits for the platform checks`);
   }
-
-  // The Windows jobs keep their own dependencies too (item 49's package runs on its checks).
-  const zip = assertJobOf(jobs, 'windows-desktop-zip');
-  assert.ok(zip.needs.includes('changes'), 'windows-desktop-zip carries the change gate');
-  assert.ok(
-    zip.needs.includes('windows-backend-check'),
-    'windows-desktop-zip still waits for Windows (gradle check)',
-  );
-  assert.ok(
-    zip.needs.includes('windows-frontend-check'),
-    'windows-desktop-zip still waits for Windows (pnpm test, pnpm build)',
-  );
 
   // The weekly model-host probe stays outside the aggregator on its own cron.
   const modelHosts = assertJobOf(jobs, 'model-hosts');
@@ -391,34 +380,65 @@ test('the three journeys start with the change classification, and the checks ga
     assert.ok(ci.needs.includes(id), `${id} still reports through CI (all checks)`);
   }
 
-  // Every other heavy job still waits for its platform's checks; the journeys' early start is the
-  // exception this item decided, not a rule that spreads. The check jobs themselves (ids ending
-  // `-check`) are what the others wait for, so they are not asked to wait for each other.
-  const platformChecks: Record<string, string[]> = {
-    Linux: ['backend-check', 'frontend-check'],
-    macOS: ['macos-backend-check', 'macos-frontend-check'],
-    Windows: ['windows-backend-check', 'windows-frontend-check'],
-  };
+  // Every other heavy job waits for the one matrix job, which carries all three platforms' checks;
+  // the journeys' early start is the exception roadmap item 85 decided, not a rule that spreads.
   for (const id of ci.needs) {
-    if (id.endsWith('-check') || id === 'changes' || JOURNEYS.includes(id)) continue;
-    const job = assertJobOf(jobs, id);
-    const platform = job.name?.split(' ')[0] ?? '';
-    const checks = platformChecks[platform];
-    assert.ok(checks, `${id} names its platform in its display name: ${job.name}`);
-    for (const check of checks) {
-      assert.ok(job.needs.includes(check), `${id} still waits for ${check}`);
+    if (id === 'changes' || id === 'docs-check' || id === 'check' || JOURNEYS.includes(id)) {
+      continue;
     }
+    assert.ok(
+      assertJobOf(jobs, id).needs.includes('check'),
+      `${id} still waits for the platform checks`,
+    );
   }
 
-  // A check job that fails must still fail the required check: the checks are in the aggregator's
-  // needs, not only in the heavy jobs' needs, so a green journey cannot carry a red check through.
-  for (const id of [
-    ...Object.values(platformChecks).flat(),
+  // The check matrix is in the aggregator's needs, not only in the heavy jobs' needs, so a green
+  // journey cannot carry a red check leg through.
+  assert.ok(ci.needs.includes('check'), 'a failed check leg still fails CI (all checks)');
+});
+
+// Roadmap item 97: nine per-OS check jobs become one matrix job. The three platform legs and the
+// three checks each stay; only the written-once shape and the display names change, so branch
+// protection's required `CI (all checks)` needs `check`, and the docs tests follow the new names.
+test('the platform checks are one matrix job on all three platforms', () => {
+  const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
+  const check = assertJobOf(jobs, 'check');
+  assert.equal(check.name, 'check (${{ matrix.os }})', 'the matrix leg names its platform');
+  assert.deepEqual(check.needs, ['changes'], 'the checks start with the change classification');
+  assert.equal(check.if, "needs.changes.outputs.code == 'true'", 'a docs-only PR skips them');
+  const raw = check.raw.join('\n');
+  assert.match(raw, /^\s*strategy:$/m, 'the job is a matrix');
+  assert.match(raw, /os: \[ubuntu-24\.04, macos-15, windows-2025\]/, 'all three platforms run');
+  assert.match(raw, /runs-on: \$\{\{ matrix\.os \}\}/, 'each leg picks its runner');
+
+  const commands = stepsOf(check).map(commandsOf).join('\n');
+  for (const command of [
+    'gradlew.bat checkVersions',
+    './gradlew checkVersions',
+    '-p backend check',
+    'pnpm install --frozen-lockfile',
+    'pnpm test',
+    'pnpm build',
+    'cargo fmt --check',
+    'cargo clippy',
+    'cargo test',
+  ]) {
+    assert.ok(commands.includes(command), `the matrix job runs ${command}`);
+  }
+
+  // The nine per-OS job ids are gone; the aggregator and every other job name the matrix job.
+  for (const old of [
+    'backend-check',
+    'frontend-check',
     'client-check',
+    'macos-backend-check',
+    'macos-frontend-check',
     'macos-client-check',
+    'windows-backend-check',
+    'windows-frontend-check',
     'windows-client-check',
   ]) {
-    assert.ok(ci.needs.includes(id), `${id} still fails CI (all checks)`);
+    assert.equal(jobs.has(old), false, `${old} folded into check`);
   }
 });
 
@@ -520,4 +540,65 @@ test('the bundle cache is saved on main only; pull requests restore it', () => {
     /if: .*github\.ref == 'refs\/heads\/main'/,
     'only main saves the bundle cache; a pull request restores it and writes nothing',
   );
+});
+
+// Roadmap item 97: the CI spec's sentence is that every platform's check job runs the version-pin
+// gate, but only Windows did. The guard reads whatever job carries the backend build, so it holds
+// over the per-OS jobs and over the matrix job that replaces them.
+test('every job that runs the backend build also runs checkVersions', () => {
+  const jobs = parseJobs(readFileSync(workflowPath, 'utf8'));
+  const builds = [...jobs.values()].filter((job) =>
+    stepsOf(job).some((step) => /\bgradlew(?:\.bat)?\s+-p backend check\b/.test(commandsOf(step))),
+  );
+  assert.ok(builds.length > 0, 'a job runs the backend build');
+  for (const job of builds) {
+    assert.ok(
+      stepsOf(job).some((step) => /\bgradlew(?:\.bat)?\s+checkVersions\b/.test(commandsOf(step))),
+      `${job.id} runs the backend build, so it runs checkVersions too`,
+    );
+  }
+});
+
+// Roadmap item 97: the cache-key computation was copied into both toolchain actions. One composite
+// action and one script now compute it, and a pin change still invalidates the caches it did
+// before: the downloads cache on versions.json's pin set, the Nix store cache on the pins plus the
+// lock, devenv and nix files.
+test('the pins hash is computed by one script, and a pin change changes it', (t) => {
+  for (const action of ['jvm-toolchain', 'nix-toolchain']) {
+    const text = readFileSync(join(repoRoot, `.github/actions/${action}/action.yml`), 'utf8');
+    assert.match(
+      text,
+      /uses: \.\/\.github\/actions\/pins-hash/,
+      `${action} computes its key through the pins-hash action`,
+    );
+  }
+
+  const dir = mkdtempSync(join(tmpdir(), 'stt-pins-hash-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  for (const path of ['versions.json', 'flake.lock', 'devenv.lock', 'devenv.yaml', 'devenv.nix']) {
+    writeFileSync(join(dir, path), readFileSync(join(repoRoot, path)));
+  }
+  cpSync(join(repoRoot, 'nix'), join(dir, 'nix'), { recursive: true });
+
+  // Run the script the composite action runs, in a tree whose pins can be changed.
+  const hash = (...args: string[]): string =>
+    execFileSync('bash', [join(repoRoot, '.github/pins-hash.sh'), ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    }).trim();
+  const downloads = hash();
+  const nixStore = hash('--nix');
+  assert.match(downloads, /^[0-9a-f]{64}$/, 'the downloads key is a sha256');
+  assert.match(nixStore, /^[0-9a-f]{64}$/, 'the Nix key is a sha256');
+  assert.notEqual(nixStore, downloads, 'the Nix key covers the lock and nix files too');
+
+  const manifest = JSON.parse(readFileSync(join(dir, 'versions.json'), 'utf8')) as {
+    downloads: Record<string, Record<string, { sha256: string }>>;
+  };
+  const ffmpeg = manifest.downloads.ffmpeg?.['x86_64-linux'];
+  assert.ok(ffmpeg, 'the manifest pins the Linux ffmpeg');
+  ffmpeg.sha256 = '0'.repeat(64);
+  writeFileSync(join(dir, 'versions.json'), JSON.stringify(manifest));
+  assert.notEqual(hash(), downloads, 'a pin change invalidates the downloads cache');
+  assert.notEqual(hash('--nix'), nixStore, 'a pin change invalidates the Nix store cache');
 });

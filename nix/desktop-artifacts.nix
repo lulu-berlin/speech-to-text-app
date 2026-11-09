@@ -4,7 +4,11 @@
 # the artifact from source. Pure data, read by nix/desktop-mesa.nix, nix/ffmpeg.nix and
 # nix/whisper-cpp.nix. A static asset that names no store path (the darwin whisper-cli) records
 # `storePath = null` and no references: there is no build path to rewrite and no stale-pin to catch.
-{
+let
+  # The darwin pins are also the Gradle bootstrap's downloads (roadmap item 97): one declaration
+  # in nix/versions.nix, read here instead of restated (docs/check-pins.ts holds it).
+  versions = import ./versions.nix;
+in {
   # The bundle's Vulkan-only Mesa, per system: { url; sha256; storePath; references; } — storePath
   # is the out path of the source build the asset was made from, references that output's direct
   # references (`nix-store -q --references`, itself excluded).
@@ -33,7 +37,7 @@
   # reference is its own build path (the `configuration:` line), which the re-link rewrites, so the
   # references list is empty.
   ffmpeg.x86_64-linux = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.3-x86_64-linux.tar.zst";
+    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-${versions.ffmpegAsset}/ffmpeg-audio-only-static-x86_64-unknown-linux-musl-${versions.ffmpegAsset}-x86_64-linux.tar.zst";
     sha256 = "9c6ffc0611e9d28afd0fa5089cb788850530e5ce82d350a45babe34c872ab734";
     storePath = "/nix/store/vnhygj96qdxbvrr05f1a3fy5267ydbnd-ffmpeg-audio-only-static-x86_64-unknown-linux-musl-8.1.3";
     references = [];
@@ -45,8 +49,8 @@
   # prepareRuntime` and the DMG ship. Its build path is the only store path in the binary, which
   # the re-link rewrites, so the references list is empty.
   ffmpeg.aarch64-darwin = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-8.1.3-aarch64-darwin.tar.gz";
-    sha256 = "d65ac745ec9a083bd478b999a4276b07717a4f225762aad3cc3ecb0376780390";
+    inherit (versions.downloads.ffmpeg."aarch64-darwin") url sha256;
+    # (the URL and sha256 come from nix/versions.nix; the version is its ffmpegAsset)
     storePath = "/nix/store/w5flp0s2b2lymyybdi08145qjpvlnrl1-ffmpeg-audio-only-8.1.3";
     references = [];
   };
@@ -74,8 +78,7 @@
   # aarch64-darwin) — one binary, system frameworks only, no store paths. The Nix package and the
   # devenv run it too, so all three paths ship the same tool.
   whisperCpp.aarch64-darwin = {
-    url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/whisper-cpp-1.9.5/whisper-cpp-1.9.5-aarch64-darwin.tar.gz";
-    sha256 = "35c620d2430f4ca766e5771a5101dc4cc9b0785dbe3e1a73c889c2795fba162a";
+    inherit (versions.downloads."whisper-cli"."aarch64-darwin") url sha256;
     storePath = null;
     references = [];
   };

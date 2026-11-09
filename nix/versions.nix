@@ -5,6 +5,10 @@
 # `./gradlew checkVersions` fail on drift; regenerate with `nix run .#update-versions`.
 let
   wcTag = "1.9.5";
+  # The audio-only ffmpeg release version (roadmap items 62, 68 and 69): the release tag and the
+  # asset names. It is declared here once (roadmap item 97); nix/desktop-artifacts.nix, the Gradle
+  # bootstrap and the Windows asset job read it from this file or the rendered versions.json.
+  ffmpegAsset = "8.1.3";
   # FFmpeg as published by bytedeco on Maven Central: <ffmpeg version>-<javacpp version>.
   ffmpegJar = "8.1.2-1.5.14";
   ffmpegUrl = classifier: "https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/${ffmpegJar}/ffmpeg-${ffmpegJar}-${classifier}-gpl.jar";
@@ -20,6 +24,10 @@ in {
   # Windows has no Nix package (it is outside the flake) but is a supported download-only platform;
   # Intel macOS is unsupported. A check holds every download key to this list.
   supportedPlatforms = ["x86_64-linux" "aarch64-darwin" "x86_64-windows"];
+
+  # The audio-only ffmpeg's release version (the `let` binding above), read off this attrset by the
+  # flake's versions render and by nix/desktop-artifacts.nix (roadmap item 97).
+  inherit ffmpegAsset;
 
   # Prebuilt tools for machines without Nix (user decisions 2026-10-11/12), each pinned
   # by URL and sha256:
@@ -70,14 +78,14 @@ in {
       "aarch64-darwin" = {
         # Our own audio-only build (roadmap item 69): the same `.tar.gz` the flake pin, the DMG
         # and this bootstrap ship — one binary, system libraries only, no ffprobe.
-        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-8.1.3-aarch64-darwin.tar.gz";
+        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-${ffmpegAsset}/ffmpeg-audio-only-${ffmpegAsset}-aarch64-darwin.tar.gz";
         sha256 = "d65ac745ec9a083bd478b999a4276b07717a4f225762aad3cc3ecb0376780390";
       };
       # Windows x64: our own audio-only build (roadmap item 68), one static ffmpeg.exe with only
       # system DLL imports and no ffprobe — the same enable list as Linux and macOS, built by the
       # manual `windows-ffmpeg-asset` job and published under ffmpeg-8.1.3.
       "x86_64-windows" = {
-        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz";
+        url = "https://github.com/lulu-berlin/speech-to-text-app/releases/download/ffmpeg-${ffmpegAsset}/ffmpeg-audio-only-${ffmpegAsset}-x86_64-windows.tar.gz";
         sha256 = "6dc1e8536a2fb3ad5accee09fe3d0b0b6fb9af0a61221a8cde3be8da70b468bb";
       };
     };

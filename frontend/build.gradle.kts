@@ -19,7 +19,9 @@ node {
     // Installed under the Gradle user home, beside the other downloaded tools, not in
     // frontend/.gradle: frontend/ is the pnpm project the devenv's tools scan (`pnpm test`'s
     // `prettier --check .` failed on node's CHANGELOG.md there), and a second clone reuses it.
-    val nodeHome = File(gradle.gradleUserHomeDir, "stt-app/node")
+    // Roadmap item 97: the root build defines the path once; reading it here keeps this build's
+    // node.workDir equal to the PATH the root hands the app.
+    val nodeHome = rootProject.extra["sttNodeHome"] as File
     workDir.set(File(nodeHome, "nodejs"))
     pnpmWorkDir.set(File(nodeHome, "pnpm"))
 }

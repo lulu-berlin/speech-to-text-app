@@ -1,0 +1,101 @@
+# The desktop staging tree the three packaged jobs share (roadmap item 97): the desktop downloads
+# cache, the backend/UI/tools/fixtures build, the desktop and e2e installs, the desktop and spec
+# checks, and the installer build. The caller keeps its job-specific steps: the Linux .deb install,
+# the macOS DMG mount, the Windows zip/MSI, the environment exports and the packaged specs.
+#
+# The shell of each block is the platform's: bash on Linux/macOS, pwsh on Windows, where the old
+# per-OS copies used them. `dist` names the electron-builder script (dist, dist:mac, dist:win).
+name: Desktop stage
+description: Cache, build and check the desktop staging tree, then build the platform installer
+
+inputs:
+  dist:
+    description: The desktop package script that builds the installer (dist, dist:mac, dist:win)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron, fpm)
+      uses: actions/cache@v6
+      with:
+        path: |
+          desktop/dist/downloads
+          ${{ runner.os == 'Windows' && '~/AppData/Local/electron/Cache' || '~/.cache/electron' }}
+          ${{ runner.os == 'Windows' && '~/AppData/Local/electron-builder/Cache' || '~/.cache/electron-builder' }}
+        key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
+        restore-keys: desktop-downloads-${{ runner.os }}-
+    - name: Build the backend, the UI, the tools and the fixtures (POSIX)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        ./gradlew -p backend installDist
+        pnpm --dir frontend install --frozen-lockfile
+        pnpm --dir frontend build
+        ./gradlew prepareRuntime prepareE2eFixtures
+    - name: Build the backend, the UI, the tools and the fixtures (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        .\gradlew.bat -p backend installDist
+        if ($LASTEXITCODE -ne 0) { throw 'backend installDist failed' }
+        pnpm --dir frontend install --frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw 'frontend install failed' }
+        pnpm --dir frontend build
+        if ($LASTEXITCODE -ne 0) { throw 'frontend build failed' }
+        .\gradlew.bat prepareRuntime prepareE2eFixtures
+        if ($LASTEXITCODE -ne 0) { throw 'prepareRuntime failed' }
+    - name: Install the desktop and e2e packages (POSIX)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        pnpm --dir desktop install --frozen-lockfile
+        pnpm --dir e2e install --frozen-lockfile
+    - name: Install the desktop and e2e packages (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        pnpm --dir desktop install --frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw 'desktop install failed' }
+        pnpm --dir e2e install --frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw 'e2e install failed' }
+    - name: Check the desktop package and specs (format, types) (POSIX)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        set -euo pipefail
+        pnpm --dir desktop test
+        pnpm --dir e2e exec tsc -p tsconfig.json
+    - name: Check the desktop package and specs (format, types) (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        pnpm --dir desktop test
+        if ($LASTEXITCODE -ne 0) { throw 'desktop checks failed' }
+        pnpm --dir e2e exec tsc -p tsconfig.json
+        if ($LASTEXITCODE -ne 0) { throw 'spec type check failed' }
+    - name: Build the desktop installer (POSIX)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        DIST: ${{ inputs.dist }}
+      run: |
+        set -euo pipefail
+        pnpm --dir desktop fetch:jdk
+        pnpm --dir desktop "$DIST"
+    - name: Build the desktop installer (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        DIST: ${{ inputs.dist }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        pnpm --dir desktop fetch:jdk
+        if ($LASTEXITCODE -ne 0) { throw 'fetch:jdk failed' }
+        pnpm --dir desktop $env:DIST
+        if ($LASTEXITCODE -ne 0) { throw 'electron-builder failed' }

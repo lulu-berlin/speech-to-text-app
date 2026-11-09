@@ -44,6 +44,7 @@
     }
   },
   "ffmpeg": "8.1",
+  "ffmpegAsset": "8.1.3",
   "fixtures": {
     "jfkWav": {
       "sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",

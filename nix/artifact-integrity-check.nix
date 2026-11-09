@@ -8,11 +8,14 @@
 #
 # `importWith` imports the artifact's module with an overridden `artifacts` argument, `attr` is the
 # module's result attribute, `name` the check's derivation name (also the message prefix) and
-# `fixtureName` the bogus asset's file name.
+# `fixtureName` the bogus asset's file name. `artifactsKey` names the pin table in
+# nix/desktop-artifacts.nix when it differs from `attr` (Mesa's result is `mesa`, its pins
+# `mesaVulkan`); it defaults to `attr` (roadmap item 97).
 {
   pkgs,
   importWith,
   attr,
+  artifactsKey ? attr,
   pin,
   name,
   fixtureName,
@@ -29,7 +32,7 @@ let
   fixture = pkgs.writeText fixtureName "not the release asset";
   registered = url:
     importWith {
-      ${attr}.${system} = {
+      ${artifactsKey}.${system} = {
         inherit url;
         sha256 = zeros;
         storePath = builtins.unsafeDiscardStringContext source.outPath;
@@ -57,7 +60,7 @@ let
     references = [];
   };
   stale = importWith {
-    ${attr}.${system} = stalePin;
+    ${artifactsKey}.${system} = stalePin;
   };
   evaluated = builtins.tryEval stale.${attr}.outPath;
   message = stale.pinError or "";

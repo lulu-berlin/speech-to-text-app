@@ -74,60 +74,68 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash .github/decide-code-change.sh >> "$GITHUB_OUTPUT"
 
-  backend-check:
-    name: Linux (gradle check)
-    runs-on: ubuntu-24.04
+  # Roadmap item 97: the per-OS check jobs, written once. One matrix leg per platform runs the
+  # backend gate (with checkVersions), the frontend gate and the client gate. The display name is
+  # `check (<runner>)`, so the nine old job names are gone; `CI (all checks)` needs `check`, and
+  # every platform job waits for it. The Windows leg keeps cmd for the Gradle wrapper, where the
+  # POSIX launcher would change the shell the check ran under.
+  check:
+    name: check (${{ matrix.os }})
+    strategy:
+      # One platform's red must not cancel the other two: the aggregator reports every leg.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 20
+    # The Windows client build alone does not fit in 30 cold minutes (run #477); the other checks
+    # add little to it.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/jvm-toolchain
+      # Roadmap item 97: the root build's version-pin gate, on every platform (the CI spec's
+      # sentence); the Windows leg runs the same task through gradlew.bat.
+      - name: gradle checkVersions
+        if: runner.os != 'Windows'
+        run: ./gradlew checkVersions
+      - name: gradlew.bat checkVersions
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: gradlew.bat checkVersions
       # The root wrapper pins Gradle 9.8.0; -p backend runs the standalone backend build,
       # the same build the devenv's `cd backend && gradle check` runs.
       - name: gradle check
+        if: runner.os != 'Windows'
         run: ./gradlew -p backend check
-
-  frontend-check:
-    name: Linux (pnpm test, pnpm build)
-    runs-on: ubuntu-24.04
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v7
+      - name: gradlew.bat -p backend check
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: gradlew.bat -p backend check
       - uses: ./.github/actions/node-toolchain
         with:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: pnpm install
+        working-directory: frontend
         run: pnpm install --frozen-lockfile
       - name: pnpm test
+        working-directory: frontend
         run: pnpm test
       - name: pnpm build
+        working-directory: frontend
         run: pnpm build
-
-  # The Rust client workspace (roadmap item 66: the client library, the tray, the `stt-app` CLI) on
-  # the pinned Rust from versions.json; the same three steps run on macOS and Windows below.
-  client-check:
-    name: Linux (cargo fmt, clippy, test)
-    runs-on: ubuntu-24.04
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: client
-    steps:
-      - uses: actions/checkout@v7
+      # The Rust client workspace (roadmap item 66: the client library, the tray, the `stt-app` CLI)
+      # on the pinned Rust from versions.json.
       - uses: ./.github/actions/rust-toolchain
       - name: cargo fmt --check
+        working-directory: client
         run: cargo fmt --check
       - name: cargo clippy
+        working-directory: client
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: cargo test
+        working-directory: client
         run: cargo test --locked
 
   docs-check:
@@ -143,7 +151,7 @@ jobs:
       # outage or a cold store can then fail only the type check and Prettier, and the checks' results
       # stay in the log — this job gates a documentation-only pull request, where no code runs.
       - name: The dependency-free checks
-        run: node --test docs/check-exceptions.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/check-e2e-durations.test.ts docs/check-action-versions.test.ts
+        run: node --test docs/check-exceptions.test.ts docs/checks.test.ts docs/checks-failures.test.ts docs/check-ci-gating.test.ts docs/check-e2e-durations.test.ts docs/check-action-versions.test.ts docs/check-pins.test.ts
       # Tolerated on purpose: with the registry unreachable install cannot resolve, and its failure
       # must not hide the checks above. A real install failure still fails `pnpm test` below on the
       # packages it did not lay down, so the job stays red.
@@ -165,7 +173,7 @@ jobs:
   backend-integration:
     name: Linux (gradle integrationTest)
     runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
@@ -233,61 +241,9 @@ jobs:
   # run on every push to main, every pull request that touches code, workflow dispatch and the
   # nightly schedule; the `changes` gate skips them on a documentation-only pull request (item 80).
   # The Gradle tree is the human path (./gradlew); the Nix job is the flake/devenv verification.
-  macos-backend-check:
-    name: macOS (gradle check)
-    runs-on: macos-15
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/jvm-toolchain
-      - name: gradle check
-        run: ./gradlew -p backend check
-
-  macos-frontend-check:
-    name: macOS (pnpm test, pnpm build)
-    runs-on: macos-15
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/node-toolchain
-        with:
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: pnpm install
-        run: pnpm install --frozen-lockfile
-      - name: pnpm test
-        run: pnpm test
-      - name: pnpm build
-        run: pnpm build
-
-  macos-client-check:
-    name: macOS (cargo fmt, clippy, test)
-    runs-on: macos-15
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: client
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/rust-toolchain
-      - name: cargo fmt --check
-        run: cargo fmt --check
-      - name: cargo clippy
-        run: cargo clippy --locked --all-targets -- -D warnings
-      - name: cargo test
-        run: cargo test --locked
-
   macos-backend-integration:
     name: macOS (gradle integrationTest)
-    needs: [changes, macos-backend-check, macos-frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 60
@@ -302,7 +258,7 @@ jobs:
   macos-e2e:
     name: macOS (e2e)
     # Roadmap item 85: starts with the change classification, like the other two journeys; the
-    # macOS checks still gate every other macOS job and still fail `CI (all checks)`.
+    # check matrix still gates every other macOS job and still fails `CI (all checks)`.
     needs: [changes]
     if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
@@ -335,7 +291,7 @@ jobs:
 
   macos-nix:
     name: macOS (Nix build + devenv)
-    needs: [changes, macos-backend-check, macos-frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 90
@@ -372,7 +328,7 @@ jobs:
   # against the app installed from that DMG. No Docker/Xvfb: macOS runs the window itself.
   macos-dmg:
     name: macOS (DMG + packaged e2e)
-    needs: [changes, macos-backend-check, macos-frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     runs-on: macos-15
     timeout-minutes: 60
@@ -386,37 +342,10 @@ jobs:
           cache-dependency-path: |
             desktop/pnpm-lock.yaml
             e2e/pnpm-lock.yaml
-      - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron)
-        uses: actions/cache@v6
+      # Roadmap item 97: the staging block the three packaged jobs shared, written once.
+      - uses: ./.github/actions/desktop-stage
         with:
-          path: |
-            desktop/dist/downloads
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
-          restore-keys: desktop-downloads-${{ runner.os }}-
-      - name: Build the backend, the UI, the tools and the fixtures
-        run: |
-          set -euo pipefail
-          ./gradlew -p backend installDist
-          pnpm --dir frontend install --frozen-lockfile
-          pnpm --dir frontend build
-          ./gradlew prepareRuntime prepareE2eFixtures
-      - name: Install the desktop and e2e packages
-        run: |
-          set -euo pipefail
-          pnpm --dir desktop install --frozen-lockfile
-          pnpm --dir e2e install --frozen-lockfile
-      - name: Check the desktop package and specs (format, types)
-        run: |
-          set -euo pipefail
-          pnpm --dir desktop test
-          pnpm --dir e2e exec tsc -p tsconfig.json
-      - name: Build the DMG
-        run: |
-          set -euo pipefail
-          pnpm --dir desktop fetch:jdk
-          pnpm --dir desktop dist:mac
+          dist: dist:mac
       # Roadmap item 74: the DMG's app must carry the app's mark as its icon, not Electron's default
       # (desktop/check-mac-icon.ts reads the mounted app's CFBundleIconFile and the .icns it names).
       - name: Check the app icon
@@ -623,64 +552,6 @@ jobs:
   # the automated runs of the spawn seam, the probe parsing, the queue and the frontend on a Windows
   # host. The runner has no GPU; the startup probe therefore reports zero GPUs (the CPU fallback is
   # the tested path), and a real-GPU run stays user-verified (item 49's approval log).
-  windows-backend-check:
-    name: Windows (gradle check)
-    runs-on: windows-2025
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/jvm-toolchain
-      - name: gradlew.bat checkVersions
-        shell: cmd
-        run: gradlew.bat checkVersions
-      - name: gradlew.bat -p backend check
-        shell: cmd
-        run: gradlew.bat -p backend check
-
-  windows-frontend-check:
-    name: Windows (pnpm test, pnpm build)
-    runs-on: windows-2025
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/node-toolchain
-        with:
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: pnpm install
-        run: pnpm install --frozen-lockfile
-      - name: pnpm test
-        run: pnpm test
-      - name: pnpm build
-        run: pnpm build
-
-  windows-client-check:
-    name: Windows (cargo fmt, clippy, test)
-    runs-on: windows-2025
-    needs: [changes]
-    if: needs.changes.outputs.code == 'true'
-    # A cold Windows build of the client, the tray and the CLI does not fit in 30 minutes (run #477 was
-    # cancelled there); the Linux leg takes under a minute warm and macOS's was measured at 13-16.
-    timeout-minutes: 60
-    defaults:
-      run:
-        working-directory: client
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/rust-toolchain
-      - name: cargo fmt --check
-        run: cargo fmt --check
-      - name: cargo clippy
-        run: cargo clippy --locked --all-targets -- -D warnings
-      - name: cargo test
-        run: cargo test --locked
-
   # The item-21 journey on Windows (roadmap item 79): the Gradle-managed backend and the same specs
   # as Linux (e2e) and macOS (e2e), except the named platform skips (e2e/lib/platform-gates.test.ts).
   # It runs on every push and code-touching pull request like the other journeys. It started
@@ -730,12 +601,12 @@ jobs:
   # packaged-zip item): electron-builder packs the staged app, the zip is unpacked like a user's
   # download, and items 50's packaged specs 01-04 run against it in the unpacked directory. No
   # Xvfb and no Nix: Windows runs the window itself, and everything comes from the package. It is
-  # gated on the Windows checks, as the macOS jobs are on theirs: the package is built from the
-  # Windows build, so a Windows check failure must not start it.
+  # gated on the check matrix, whose Windows leg builds the same tree: a failed check must not
+  # start it.
   windows-desktop-zip:
     name: Windows (packaged zip e2e)
     runs-on: windows-2025
-    needs: [changes, windows-backend-check, windows-frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 90
     steps:
@@ -748,55 +619,10 @@ jobs:
           cache-dependency-path: |
             desktop/pnpm-lock.yaml
             e2e/pnpm-lock.yaml
-      - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron)
-        uses: actions/cache@v6
+      # Roadmap item 97: the shared staging block, on the Windows shell.
+      - uses: ./.github/actions/desktop-stage
         with:
-          path: |
-            desktop/dist/downloads
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
-          key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
-          restore-keys: desktop-downloads-${{ runner.os }}-
-      - name: Build the backend and the UI
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          .\gradlew.bat -p backend installDist
-          if ($LASTEXITCODE -ne 0) { throw 'backend installDist failed' }
-          pnpm --dir frontend install --frozen-lockfile
-          if ($LASTEXITCODE -ne 0) { throw 'frontend install failed' }
-          pnpm --dir frontend build
-          if ($LASTEXITCODE -ne 0) { throw 'frontend build failed' }
-      - name: Fetch the runtime tools, models and fixtures
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          .\gradlew.bat prepareRuntime prepareE2eFixtures
-          if ($LASTEXITCODE -ne 0) { throw 'prepareRuntime failed' }
-      - name: Install the desktop and e2e packages
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          pnpm --dir desktop install --frozen-lockfile
-          if ($LASTEXITCODE -ne 0) { throw 'desktop install failed' }
-          pnpm --dir e2e install --frozen-lockfile
-          if ($LASTEXITCODE -ne 0) { throw 'e2e install failed' }
-      - name: Check the desktop package and specs (format, types)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          pnpm --dir desktop test
-          if ($LASTEXITCODE -ne 0) { throw 'desktop checks failed' }
-          pnpm --dir e2e exec tsc -p tsconfig.json
-          if ($LASTEXITCODE -ne 0) { throw 'spec type check failed' }
-      - name: Build the portable zip
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          pnpm --dir desktop fetch:jdk
-          if ($LASTEXITCODE -ne 0) { throw 'fetch:jdk failed' }
-          pnpm --dir desktop dist:win
-          if ($LASTEXITCODE -ne 0) { throw 'electron-builder failed' }
+          dist: dist:win
       - name: Unpack the zip like a user's download
         shell: pwsh
         run: |
@@ -1186,23 +1012,31 @@ jobs:
             mingw-w64-x86_64-binutils
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-nasm
-      - name: Build ffmpeg 8.1.3 (static, audio-only)
+      # Roadmap item 97: the audio-only asset version is declared once, in nix/versions.nix and
+      # rendered into versions.json; this job (like the Gradle bootstrap) reads it there.
+      - name: Read the audio-only ffmpeg version
+        id: asset
         shell: msys2 {0}
+        run: echo "version=$(jq -r '.ffmpegAsset' versions.json)" >> "$GITHUB_OUTPUT"
+      - name: Build the audio-only ffmpeg (static)
+        shell: msys2 {0}
+        env:
+          VERSION: ${{ steps.asset.outputs.version }}
         run: |
           set -euo pipefail
-          # The release of the nixpkgs pin (ffmpeg 8.1.3); its tarball hash is pinned here, so a
-          # replaced download fails before configure runs. The retries survive a transient TLS
-          # failure (run 2 died with curl's exit 35 before anything was built), and the phase
-          # markers put the failing step in a log that carries no other detail.
-          echo "ffmpeg-8.1.3: downloading the source"
+          # The release of the nixpkgs pin; its tarball hash is pinned here, so a replaced download
+          # fails before configure runs. The retries survive a transient TLS failure (run 2 died
+          # with curl's exit 35 before anything was built), and the phase markers put the failing
+          # step in a log that carries no other detail.
+          echo "ffmpeg-$VERSION: downloading the source"
           curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30 \
-            -o ffmpeg-8.1.3.tar.xz https://ffmpeg.org/releases/ffmpeg-8.1.3.tar.xz
-          echo "7138d28c96d9d3e3af4ee3d8cad72741f8ffb40da90c1112235dea3ecd3178a3  ffmpeg-8.1.3.tar.xz" | sha256sum -c -
-          tar xf ffmpeg-8.1.3.tar.xz
+            -o "ffmpeg-$VERSION.tar.xz" "https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.xz"
+          echo "7138d28c96d9d3e3af4ee3d8cad72741f8ffb40da90c1112235dea3ecd3178a3  ffmpeg-$VERSION.tar.xz" | sha256sum -c -
+          tar xf "ffmpeg-$VERSION.tar.xz"
           bash nix/ffmpeg-enable-list.sh expected nix/ffmpeg-enable.json > expected-surface.txt
           mapfile -t enable < <(bash nix/ffmpeg-enable-list.sh configure nix/ffmpeg-enable.json)
-          cd ffmpeg-8.1.3
-          echo "ffmpeg-8.1.3: configuring"
+          cd "ffmpeg-$VERSION"
+          echo "ffmpeg-$VERSION: configuring"
           # The shared component flags, plus the static single-program recipe: one exe, no ffprobe,
           # no shuffling in libraries from the build host (`-static` links mingw's import libraries).
           # Win32 threads, not pthreads: the native Windows threading carries no extra library, and
@@ -1213,9 +1047,9 @@ jobs:
             --disable-debug --disable-stripping \
             --disable-doc --disable-network --disable-avdevice \
             --extra-cflags=-static --extra-ldflags="-static -static-libgcc"
-          echo "ffmpeg-8.1.3: building"
+          echo "ffmpeg-$VERSION: building"
           make -j"$(nproc)"
-          echo "ffmpeg-8.1.3: installing the program"
+          echo "ffmpeg-$VERSION: installing the program"
           make install-progs
       - name: Prove the surface and the imports
         shell: msys2 {0}
@@ -1235,10 +1069,12 @@ jobs:
           bash nix/windows-ffmpeg-fixtures.sh stage/bin/ffmpeg.exe .
       - name: Package the asset and print the sha256
         shell: msys2 {0}
+        env:
+          VERSION: ${{ steps.asset.outputs.version }}
         run: |
           set -euo pipefail
-          tar -czf ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz -C stage bin
-          sha256sum ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz | tee sha256.txt
+          tar -czf "ffmpeg-audio-only-$VERSION-x86_64-windows.tar.gz" -C stage bin
+          sha256sum "ffmpeg-audio-only-$VERSION-x86_64-windows.tar.gz" | tee sha256.txt
           {
             echo "### ffmpeg Windows asset"
             echo '```'
@@ -1247,8 +1083,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
-          name: ffmpeg-audio-only-8.1.3-x86_64-windows
-          path: ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz
+          name: ffmpeg-audio-only-${{ steps.asset.outputs.version }}-x86_64-windows
+          path: ffmpeg-audio-only-${{ steps.asset.outputs.version }}-x86_64-windows.tar.gz
           retention-days: 90
 
   # The Linux desktop artifact, built and tested the way item 50 ships it: electron-builder builds
@@ -1260,7 +1096,7 @@ jobs:
   desktop-e2e:
     name: Linux (packaged .deb e2e)
     runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
@@ -1276,41 +1112,12 @@ jobs:
           cache-dependency-path: |
             desktop/pnpm-lock.yaml
             e2e/pnpm-lock.yaml
-      - name: Cache the desktop downloads (Temurin, whisper-cli, ffmpeg, Electron, fpm)
-        uses: actions/cache@v6
+      # Roadmap item 97: the shared staging block. It runs fetch:jdk and the dist script;
+      # electron-builder fetches its own fpm and Electron there (USE_SYSTEM_FPM is the devenv's
+      # Nix-shell workaround, ADR 0010, and is deliberately not set in CI).
+      - uses: ./.github/actions/desktop-stage
         with:
-          path: |
-            desktop/dist/downloads
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: desktop-downloads-${{ runner.os }}-${{ hashFiles('versions.json', 'desktop/package.json') }}
-          restore-keys: desktop-downloads-${{ runner.os }}-
-      - name: Build the backend, the UI, the tools and the fixtures
-        run: |
-          set -euo pipefail
-          ./gradlew -p backend installDist
-          pnpm --dir frontend install --frozen-lockfile
-          pnpm --dir frontend build
-          ./gradlew prepareRuntime prepareE2eFixtures
-      - name: Install the desktop and e2e packages
-        run: |
-          set -euo pipefail
-          pnpm --dir desktop install --frozen-lockfile
-          pnpm --dir e2e install --frozen-lockfile
-      # ADR 0054: the desktop package's own gate (prettier + tsc over the app and its scripts) and
-      # the type check of the desktop harness and specs, before anything is built from them.
-      - name: Check the desktop package and specs (format, types)
-        run: |
-          set -euo pipefail
-          pnpm --dir desktop test
-          pnpm --dir e2e exec tsc -p tsconfig.json
-      # electron-builder fetches its own fpm and Electron here: USE_SYSTEM_FPM is the devenv's
-      # Nix-shell workaround (ADR 0010) and is deliberately not set in CI.
-      - name: Build the .deb
-        run: |
-          set -euo pipefail
-          pnpm --dir desktop fetch:jdk
-          pnpm --dir desktop dist
+          dist: dist
       # The .deb's glibc floor (2.38): apt in a stock ubuntu:22.04 container (glibc 2.35) must
       # refuse it naming libc6. The 24.04 half is this runner's install and the specs below.
       - name: Check that apt refuses the .deb below its glibc floor
@@ -1370,7 +1177,7 @@ jobs:
   desktop-nix-e2e:
     name: Linux (flake package e2e)
     runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 90
     steps:
@@ -1409,7 +1216,7 @@ jobs:
   desktop-bundle-e2e:
     name: Linux (bundle e2e)
     runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 120
     steps:
@@ -1481,7 +1288,7 @@ jobs:
   nix-devenv:
     name: Linux (Nix devenv shell)
     runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
@@ -1523,7 +1330,7 @@ jobs:
   nix-flake-check:
     name: Linux (Nix flake check)
     runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
@@ -1535,7 +1342,7 @@ jobs:
   nix-build:
     name: Linux (Nix build)
     runs-on: ubuntu-24.04
-    needs: [changes, backend-check, frontend-check]
+    needs: [changes, check]
     if: needs.changes.outputs.code == 'true'
     timeout-minutes: 60
     steps:
@@ -1578,7 +1385,7 @@ jobs:
   # protection requires it by this exact name, so it keeps it.
   ci:
     name: CI (all checks)
-    needs: [changes, backend-check, frontend-check, client-check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-check, macos-frontend-check, macos-client-check, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-backend-check, windows-frontend-check, windows-client-check, windows-e2e, windows-desktop-zip]
+    needs: [changes, check, docs-check, backend-integration, e2e, desktop-e2e, desktop-nix-e2e, desktop-bundle-e2e, nix-devenv, nix-flake-check, nix-build, macos-backend-integration, macos-e2e, macos-nix, macos-dmg, windows-e2e, windows-desktop-zip]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
