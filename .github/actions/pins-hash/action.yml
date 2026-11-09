@@ -1,0 +1,32 @@
+# The cache key's digest (roadmap item 97): both toolchain actions call this one, so the pin set is
+# hashed once. The caller prefixes the digest with its platform and namespace.
+name: Pins hash
+description: sha256 over versions.json's pin set, and for Nix over the lock and nix files too
+
+inputs:
+  nix:
+    description: Also hash flake.lock, devenv.lock, devenv.yaml, devenv.nix and nix/
+    required: false
+    default: 'false'
+
+outputs:
+  hash:
+    description: The 64-hex digest the caller prefixes
+    value: ${{ steps.hash.outputs.hash }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute the pins hash
+      id: hash
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        INCLUDE_NIX: ${{ inputs.nix }}
+      run: |
+        set -euo pipefail
+        if [ "$INCLUDE_NIX" = 'true' ]; then
+          echo "hash=$(bash .github/pins-hash.sh --nix)" >> "$GITHUB_OUTPUT"
+        else
+          echo "hash=$(bash .github/pins-hash.sh)" >> "$GITHUB_OUTPUT"
+        fi

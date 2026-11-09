@@ -87,13 +87,15 @@ tasks.register("checkVersions") {
             }
             val downloads = manifest["downloads"] as Map<*, *>
             val whisperVersion = manifest["whisperCpp"] as String
+            val ffmpegAsset = manifest["ffmpegAsset"] as String
             val windowsAssets =
                 mapOf(
                     "whisper-cli" to
                         "releases/download/whisper-cpp-$whisperVersion/whisper-cpp-$whisperVersion-x86_64-windows.tar.gz",
                     // The audio-only single binary (roadmap item 68): the release tag and the asset
                     // name, so a pin on another tag or another artifact cannot pass.
-                    "ffmpeg" to "releases/download/ffmpeg-8.1.3/ffmpeg-audio-only-8.1.3-x86_64-windows.tar.gz",
+                    "ffmpeg" to
+                        "releases/download/ffmpeg-$ffmpegAsset/ffmpeg-audio-only-$ffmpegAsset-x86_64-windows.tar.gz",
                     "temurin-jdk" to "windows_hotspot",
                 )
             for ((tool, asset) in windowsAssets) {
@@ -406,9 +408,13 @@ val runtimeJavaHome =
         .launcherFor { languageVersion.set(JavaLanguageVersion.of(jdkMajor)) }
         .map { it.metadata.installationPath.asFile.absolutePath }
 
-// The node-gradle plugin's install location, set in frontend/build.gradle.kts:
-// node/pnpm live under $GRADLE_USER_HOME/stt-app/node, shared across clones.
-fun nodeInstallDir(): File = File(sttCache, "node")
+// The node-gradle plugin's install location, read by frontend/build.gradle.kts: node/pnpm live
+// under $GRADLE_USER_HOME/stt-app/node, shared across clones. Roadmap item 97: the path is built
+// once here, so the PATH this build hands the app and the frontend's node.workDir cannot drift.
+val sttNodeHome = File(sttCache, "node")
+extra["sttNodeHome"] = sttNodeHome
+
+fun nodeInstallDir(): File = sttNodeHome
 
 fun appEnv(): Map<String, String> =
     mapOf(

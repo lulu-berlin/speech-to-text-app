@@ -194,6 +194,7 @@
         gradle = gradle.version;
         jdk = pkgs.jre.version;
         ffmpeg = pkgs.lib.versions.majorMinor ffmpegArtifact.source.version;
+        ffmpegAsset = data.ffmpegAsset;
         rust = pkgs.rustc.version;
         whisperCpp = data.whisperCppTag;
         supportedPlatforms = data.supportedPlatforms;
@@ -901,96 +902,42 @@
 
           # Roadmap item 56: a registered Mesa artifact that is missing or does not match its sha256 pin
           # fails, naming the asset and its pin (url and sha256), and the registered Mesa never builds the
-          # source derivation. Offline and deterministic: the asset's own fetch step runs against a
-          # `file://` fixture in the store, once under a deliberately wrong sha256 and once at a URL with
-          # no file behind it; both must fail and name the pin. And, checked at evaluation, the source
+          # source derivation. The gates come from nix/artifact-integrity-check.nix (roadmap item 97), the
+          # module the ffmpeg and whisper-cpp checks use; it also carries the stale-pin gate that was a
+          # second Mesa check. Only the extra assertion stays here: checked at evaluation, the source
           # Mesa's .drv is a direct input of none of the registered Mesa's own derivations (the unpack,
           # the asset, its fetch script). Not the whole build graph: exporting a .drv's closure makes Nix
           # build every output in it, the source Mesa's included.
           desktop-mesa-artifact-integrity = let
             fixture = pkgs.writeText "stt-bundle-mesa-vulkan-fixture.tar.zst" "not the release asset";
-            registered = url: let
-              mesas = import ./nix/desktop-mesa.nix {
-                inherit pkgs;
-                artifacts.mesaVulkan.${system} = {
-                  inherit url;
-                  # Deliberately wrong: no file hashes to all zeros.
-                  sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
-                  # A pin is a literal (as in nix/desktop-artifacts.nix), so no context on the path.
-                  storePath = builtins.unsafeDiscardStringContext mesas.source.outPath;
-                  references = [];
-                };
+            source = (import ./nix/desktop-mesa.nix {inherit pkgs;}).source;
+            # The fixture-pinned Mesa whose own derivations the extra assertion inspects.
+            mesas = import ./nix/desktop-mesa.nix {
+              inherit pkgs;
+              artifacts.mesaVulkan.${system} = {
+                url = "file://${fixture}";
+                # Deliberately wrong: no file hashes to all zeros.
+                sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+                # A pin is a literal (as in nix/desktop-artifacts.nix), so no context on the path.
+                storePath = builtins.unsafeDiscardStringContext source.outPath;
+                references = [];
               };
-            in
-              mesas;
-            cases = {
-              mismatched = registered "file://${fixture}";
-              missing = registered "file://${fixture}.missing";
             };
-            expectFailure = label: mesas: let
-              asset = mesas.mesa.asset;
-            in ''
-              if out=$TMPDIR/${label} ${asset.fetch} 2> ${label}.err; then
-                echo "desktop-mesa-artifact-integrity: the ${label} artifact was accepted" >&2
-                exit 1
-              fi
-              for expected in ${pkgs.lib.escapeShellArgs [asset.name asset.url asset.sha256]}; do
-                if ! grep -qF -- "$expected" ${label}.err; then
-                  echo "desktop-mesa-artifact-integrity: the ${label} artifact's error does not name '$expected':" >&2
-                  cat ${label}.err >&2
-                  exit 1
-                fi
-              done
-            '';
             directInputs = drv: builtins.attrNames (builtins.getContext (builtins.toJSON drv.drvAttrs));
-            sourceDrv = builtins.unsafeDiscardStringContext cases.mismatched.source.drvPath;
-            registeredMesa = cases.mismatched.mesa;
-            ownDerivations = [registeredMesa registeredMesa.asset registeredMesa.asset.fetch];
+            sourceDrv = builtins.unsafeDiscardStringContext mesas.source.drvPath;
+            ownDerivations = [mesas.mesa mesas.mesa.asset mesas.mesa.asset.fetch];
           in
             assert pkgs.lib.assertMsg (!pkgs.lib.any (drv: pkgs.lib.elem sourceDrv (directInputs drv)) ownDerivations)
             "desktop-mesa-artifact-integrity: a registered Mesa's own derivations depend on the source Mesa ${sourceDrv}";
-              pkgs.runCommand "desktop-mesa-artifact-integrity" {} ''
-                ${pkgs.lib.concatStrings (pkgs.lib.mapAttrsToList expectFailure cases)}
-                echo ok > $out
-              '';
-
-          # Roadmap item 56: a registered Mesa artifact made from another source build than this flake's —
-          # its pinned storePath is not the source Mesa's out path, as after a nixpkgs bump or an edit of
-          # the override — fails at evaluation, so nothing is fetched or compiled. Nix cannot read an
-          # evaluation error's text, so nix/desktop-mesa.nix also exposes the text it throws (`pinError`),
-          # which must name the asset, its url, sha256 and storePath, and the source's out path.
-          desktop-mesa-stale-pin = let
-            lib = pkgs.lib;
-            fixture = pkgs.writeText "stt-bundle-mesa-vulkan-fixture.tar.zst" "not the release asset";
-            pin = {
-              url = "file://${fixture}";
-              sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
-              # Deliberately not the source Mesa's out path.
-              storePath = "/nix/store/00000000000000000000000000000000-stt-bundle-mesa-vulkan-26.2.4";
-              references = [];
-            };
-            mesas = import ./nix/desktop-mesa.nix {
-              inherit pkgs;
-              artifacts.mesaVulkan.${system} = pin;
-            };
-            evaluated = builtins.tryEval mesas.mesa.outPath;
-            message = mesas.pinError or "";
-            named = map builtins.unsafeDiscardStringContext [
-              (baseNameOf pin.url)
-              pin.url
-              pin.sha256
-              pin.storePath
-              mesas.source.outPath
-            ];
-            unnamed = lib.filter (expected: !lib.hasInfix expected message) named;
-          in
-            assert lib.assertMsg (!evaluated.success)
-            "desktop-mesa-stale-pin: a pin made from ${pin.storePath} evaluated to ${toString evaluated.value}";
-            assert lib.assertMsg (unnamed == [])
-            "desktop-mesa-stale-pin: the stale pin's error does not name ${lib.concatStringsSep ", " unnamed}; it reads: ${message}";
-              pkgs.runCommand "desktop-mesa-stale-pin" {} ''
-                echo ok > $out
-              '';
+              import ./nix/artifact-integrity-check.nix {
+                inherit pkgs;
+                importWith = artifacts: import ./nix/desktop-mesa.nix {inherit pkgs artifacts;};
+                attr = "mesa";
+                artifactsKey = "mesaVulkan";
+                pin = (import ./nix/desktop-artifacts.nix).mesaVulkan.${system};
+                fixtureName = "stt-bundle-mesa-vulkan-fixture.tar.zst";
+                name = "desktop-mesa-artifact-integrity";
+              };
 
           # Roadmap item 56: on x86_64-linux the bundle's Vulkan-only Mesa is the pinned release asset, not
           # the source build, and only that system is registered; a system with no entry builds from
@@ -1410,7 +1357,7 @@
         } (
           if isLinux
           then []
-          else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-stale-pin" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-closure-size" "font-coverage" "font-forms" "desktop-entries"]
+          else ["versions-sync" "desktop-model-free" "ffmpeg-no-gstreamer-gtk" "ffmpeg-closure-slim" "desktop-mesa-unregistered-system" "desktop-mesa-artifact-integrity" "desktop-mesa-prebuilt" "whisper-cpp-unregistered-system" "whisper-cpp-closure-size" "font-coverage" "font-forms" "desktop-entries"]
         );
     };
   in {

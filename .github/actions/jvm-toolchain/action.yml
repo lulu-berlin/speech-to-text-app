@@ -59,19 +59,15 @@ runs:
     # pins, not the nixpkgs-derived versions — so a nixpkgs bump does not throw away the ~1 GB of
     # models; the node/pnpm/gradle installs live in version-suffixed directories and re-download on
     # their own. The restore-key keeps whatever an older key downloaded.
+    # Roadmap item 97: the digest is computed by .github/actions/pins-hash, the same action the Nix
+    # toolchain uses, so the pin set is hashed once.
     - name: Compute the downloads cache key
       if: inputs.downloads-cache == 'true'
       id: downloads
-      shell: bash
-      working-directory: ${{ github.workspace }}
-      run: |
-        set -euo pipefail
-        pins=$(jq -Sec '{downloads, models, fixtures, whisperCpp, ffmpeg}' versions.json)
-        if command -v sha256sum >/dev/null; then hash=$(printf '%s' "$pins" | sha256sum); else hash=$(printf '%s' "$pins" | shasum -a 256); fi
-        echo "key=stt-downloads-${{ runner.os }}-$(cut -d' ' -f1 <<<"$hash")" >> "$GITHUB_OUTPUT"
+      uses: ./.github/actions/pins-hash
     - uses: actions/cache@v6
       if: inputs.downloads-cache == 'true'
       with:
         path: ~/.gradle/stt-app
-        key: ${{ steps.downloads.outputs.key }}
+        key: stt-downloads-${{ runner.os }}-${{ steps.downloads.outputs.hash }}
         restore-keys: stt-downloads-${{ runner.os }}-
