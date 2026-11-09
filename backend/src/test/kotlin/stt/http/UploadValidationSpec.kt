@@ -13,12 +13,14 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
 import stt.db.QueueStateRepository
+import stt.db.rowCount
 
 class UploadValidationSpec :
     BehaviorSpec({
@@ -27,15 +29,27 @@ class UploadValidationSpec :
             bytes: ByteArray = "FAKE WAV CONTENT".repeat(30).toByteArray(),
             filename: String = "memo.wav",
             fields: List<Pair<String, String>> = emptyList(),
+            fileField: String = "file",
+            extraFileField: String? = null,
         ) = formData {
             append(
-                "file",
+                fileField,
                 bytes,
                 Headers.build {
                     append(HttpHeaders.ContentType, "audio/x-wav")
                     append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
                 },
             )
+            if (extraFileField != null) {
+                append(
+                    extraFileField,
+                    bytes,
+                    Headers.build {
+                        append(HttpHeaders.ContentType, "audio/x-wav")
+                        append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
+                    },
+                )
+            }
             fields.forEach { (name, value) -> append(name, value) }
         }
 
@@ -44,10 +58,19 @@ class UploadValidationSpec :
             vararg fields: Pair<String, String>,
             filename: String = "memo.wav",
             bytes: ByteArray = "FAKE WAV CONTENT".repeat(30).toByteArray(),
+            fileField: String = "file",
+            extraFileField: String? = null,
         ): HttpResponse =
             client.submitFormWithBinaryData(
                 url = "/api/tasks",
-                formData = formBody(bytes = bytes, filename = filename, fields = fields.toList()),
+                formData =
+                    formBody(
+                        bytes = bytes,
+                        filename = filename,
+                        fields = fields.toList(),
+                        fileField = fileField,
+                        extraFileField = extraFileField,
+                    ),
             )
 
         suspend fun HttpResponse.expectBadRequest(error: String) {
@@ -93,6 +116,28 @@ class UploadValidationSpec :
                         upload(client, "maxSpeakers" to "8", bytes = "three.wav".toByteArray()).let {
                             it.status shouldBe HttpStatusCode.Created
                         }
+                    }
+                }
+            }
+        }
+
+        given("an upload whose file part is not named file") {
+            `when`("the bytes are sent under recording, or under a value field's name") {
+                then("each is rejected with 400 missing-file, and nothing is stored") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    Database.open(dataDir).use { db -> QueueStateRepository(db).setPaused(true) }
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+
+                        // Any file part that is not `file` is not this API's file field: rejected, never ignored.
+                        upload(client, fileField = "recording").expectBadRequest("missing-file")
+                        upload(client, fileField = "language").expectBadRequest("missing-file")
+                        // A valid file part plus one under a value field's name is rejected too.
+                        upload(client, extraFileField = "language").expectBadRequest("missing-file")
+
+                        val db = application.dependencies.resolve<Database>()
+                        rowCount(db, "tasks") shouldBe 0
+                        rowCount(db, "original_audio") shouldBe 0
                     }
                 }
             }

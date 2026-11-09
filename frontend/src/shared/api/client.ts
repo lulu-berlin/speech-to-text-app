@@ -84,8 +84,7 @@ export async function getSettings(): Promise<Settings> {
 // Roadmap item 66 contract: GET /api/frontends (docs/api/frontends.json) -> the installed
 // frontends, each with its id, name and kind.
 export async function fetchFrontends(signal?: AbortSignal): Promise<FrontendList> {
-  const response = await fetch('/api/frontends', { signal });
-  return json<FrontendList>(response);
+  return requestJson<FrontendList>('/api/frontends', { signal });
 }
 
 // Item 32 contract: DELETE /api/settings/device-fallback -> 200 Settings, the CPU-fallback
@@ -166,12 +165,11 @@ export async function reassignSegments(
   segmentIds: number[],
   speakerId: number | null,
 ): Promise<Speakers> {
-  const response = await fetch(`/api/tasks/${id}/speakers/reassign`, {
+  return requestJson<Speakers>(`/api/tasks/${id}/speakers/reassign`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ segmentIds, speakerId }),
   });
-  return json<Speakers>(response);
 }
 
 // The upload options of one file (item 12 contract): language from docs/api/languages.json,

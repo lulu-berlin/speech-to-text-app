@@ -18,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import org.jetbrains.exposed.v1.jdbc.update
 import stt.db.Database
+import stt.db.ScratchDir
 import stt.db.SettingsTable
 import stt.db.SpeakersMode
 import stt.db.TaskPhase
@@ -28,7 +29,9 @@ import stt.transcribe.WhisperSegment
 import stt.withCapturedLogs
 import stt.withLoggedErrors
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
+import kotlin.time.Duration.Companion.seconds
 
 class ProcessingEngineFailureSpec :
     BehaviorSpec({
@@ -358,29 +361,56 @@ class ProcessingEngineFailureSpec :
                             val dir = fixture.scratchDir.taskDirPath(task)
 
                             val events =
-                                withCapturedLogs(ProcessingEngine::class.java.name, Level.WARN) { logs ->
+                                withCapturedLogs(ScratchDir::class.java.name, Level.WARN) { logs ->
                                     fixture.engine.start()
                                     nextChunkEntered(fixture.transcriber) shouldBe "chunk-0.flac"
                                     nextChunkEntered(fixture.transcriber) shouldBe "chunk-1.flac"
                                     // A file in a directory the run may read but not write: deletion is refused.
                                     Files.createDirectories(dir)
                                     Files.writeString(dir.resolve("kept.txt"), "kept")
-                                    Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("r-xr-xr-x"))
-                                    secondChunk.complete(Unit)
-
-                                    fixture.completed.receive() shouldBe task
+                                    withPosixMode(dir, "r-xr-xr-x") {
+                                        secondChunk.complete(Unit)
+                                        fixture.completed.receive() shouldBe task
+                                    }
                                     logs
                                 }
-                            // Restore the directory so the fixture's own cleanup can remove it.
-                            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"))
 
-                            events shouldHaveSize 1
-                            val logged = events.single()
-                            logged.formattedMessage shouldContain "Could not remove task $task's scratch directory"
-                            val failure = logged.throwableProxy.shouldNotBeNull()
-                            failure.className shouldContain "AccessDeniedException"
+                            // Each refused delete is logged with its path and its IOException, and the run still ends.
+                            events.shouldNotBeEmpty()
+                            events.forEach { logged ->
+                                logged.formattedMessage shouldContain "Could not delete"
+                                logged.throwableProxy.shouldNotBeNull()
+                            }
+                            events
+                                .mapNotNull { it.throwableProxy?.className }
+                                .any { it.contains("AccessDeniedException") } shouldBe true
                             storedTaskOf(fixture, task).status shouldBe TaskStatus.COMPLETED
                             Files.exists(dir.resolve("kept.txt")).shouldBeTrue()
+                        }
+                    }
+                }
+            }
+        given("a task whose chunking is killed by SIGTERM while a scratch subdirectory cannot be listed")
+            .config(enabled = !ProcessPlatform.current().windows) {
+                `when`("the cleanup walks it") {
+                    then("the task still goes back to QUEUED, never FAILED") {
+                        withEngineDatabase { dataDir, db ->
+                            val fixture = engineUnderTest(dataDir, db)
+                            val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+                            // A directory the walk can see but not list: Files.walk surfaces it as an unchecked failure.
+                            val locked = fixture.scratchDir.taskDirPath(task).resolve("chunking/locked")
+                            Files.createDirectories(locked)
+                            Files.writeString(locked.resolve("kept.txt"), "kept")
+                            withPosixMode(locked, "---------") {
+                                fixture.chunker.cancelFor = task
+                                fixture.engine.start()
+                                awaitCompleted(fixture.completed, setOf(task), bound = 5.seconds)
+
+                                statusesOf(fixture, task) shouldBe
+                                    listOf(TaskStatus.RUNNING, TaskStatus.QUEUED, TaskStatus.RUNNING, TaskStatus.COMPLETED)
+                                drain(fixture.failed).isEmpty().shouldBeTrue()
+                                storedTaskOf(fixture, task).error.shouldBeNull()
+                            }
                         }
                     }
                 }
@@ -402,6 +432,20 @@ private suspend fun refuseStatusWrite(
                 "WHEN NEW.status = '${status.name}' AND OLD.id = $task " +
                 "BEGIN SELECT RAISE(ABORT, 'disk I/O error'); END",
         )
+    }
+}
+
+/** Runs [block] with [path]'s POSIX mode set to [mode], restoring owner-writable access so cleanup can remove it. */
+private inline fun <T> withPosixMode(
+    path: Path,
+    mode: String,
+    block: () -> T,
+): T {
+    Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(mode))
+    try {
+        return block()
+    } finally {
+        Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwxr-xr-x"))
     }
 }
 

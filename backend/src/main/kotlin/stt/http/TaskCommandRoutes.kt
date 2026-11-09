@@ -13,6 +13,13 @@ import stt.engine.ProcessingEngine
 import stt.engine.TaskCommandOutcome
 
 /**
+ * Test-only seam (item 95): runs after a command's outcome is [TaskCommandOutcome.Accepted] and before the
+ * response re-reads the task — where a spec deletes it to make the racing-delete answer deterministic.
+ * Unset in production.
+ */
+internal var afterTaskCommand: (suspend (id: Long) -> Unit)? = null
+
+/**
  * The task command endpoints (item 12): each POST delegates to the engine's command (item 11), which checks
  * the transition table, and maps the outcome onto the contract: `Accepted` → `200` with the updated task,
  * `Unknown` → `404 not-found`, `Illegal` → `409 illegal-transition`.
@@ -76,7 +83,15 @@ private suspend fun RoutingCall.respondTaskCommand(
     when (outcome) {
         is TaskCommandOutcome.Accepted -> {
             val id = requireNotNull(parameters["id"]?.toLongOrNull())
-            respond(HttpStatusCode.OK, tasks.details(id)!!.toJson())
+            afterTaskCommand?.invoke(id)
+            // The command took effect, but a delete may have removed the task before its answer: a gone
+            // task is 404, never the 500 the `!!` answered (item 95).
+            val task = tasks.details(id)
+            if (task == null) {
+                respondError(HttpStatusCode.NotFound, "not-found", "Task $id does not exist")
+            } else {
+                respond(HttpStatusCode.OK, task.toJson())
+            }
         }
 
         is TaskCommandOutcome.Unknown -> {

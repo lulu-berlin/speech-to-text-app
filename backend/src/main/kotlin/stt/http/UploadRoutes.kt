@@ -79,6 +79,15 @@ fun Application.uploadRoutes(config: Config) {
                     val part = multipart.readPart() ?: break
                     when (part) {
                         is PartData.FileItem -> {
+                            // The contract's file field is named `file`; a file part under any other name (a value
+                            // field's included) is rejected, never ignored (item 95).
+                            if (part.name != "file") {
+                                return@post call.respondError(
+                                    HttpStatusCode.BadRequest,
+                                    "missing-file",
+                                    "No file part named \"file\" in the multipart body",
+                                )
+                            }
                             if (staged != null) {
                                 // One file per upload (item 41): the first staged upload is discarded, never kept.
                                 db.discardStaged(staged)
@@ -140,7 +149,18 @@ fun Application.uploadRoutes(config: Config) {
                                     // stream, and the worker suspends while the queue is empty, so it must be woken
                                     // here (item 29).
                                     engine.taskCreated(outcome.id)
-                                    call.respond(HttpStatusCode.Created, tasks.details(outcome.id)!!.toJson())
+                                    // A racing delete may have removed it before this answer: a gone task is 404,
+                                    // never the 500 the `!!` answered (item 95).
+                                    val created = tasks.details(outcome.id)
+                                    if (created == null) {
+                                        call.respondError(
+                                            HttpStatusCode.NotFound,
+                                            "not-found",
+                                            "Task ${outcome.id} does not exist",
+                                        )
+                                    } else {
+                                        call.respond(HttpStatusCode.Created, created.toJson())
+                                    }
                                 }
 
                                 is UploadOutcome.Duplicate -> {

@@ -42,13 +42,17 @@ internal suspend fun embeddingWindow(
         return window
     }
     if (dur > CAP_WINDOW_SAMPLES) { // center-capped long window
-        val mid = (t0 + t1) / 2
-        val st = maxOf(t0, mid - CAP_WINDOW_SAMPLES / 2)
-        val en = minOf(t1, total, st + CAP_WINDOW_SAMPLES)
-        return pcm.samples(st, en)
+        // In Long: past 18.6 h, the two positions' sum overflows an Int and the window would start at the segment.
+        val mid = (t0.toLong() + t1) / 2
+        val st = maxOf(t0.toLong(), mid - CAP_WINDOW_SAMPLES / 2)
+        val en = minOf(t1.toLong(), total.toLong(), st + CAP_WINDOW_SAMPLES)
+        return pcm.samples(st.toInt(), en.toInt())
     }
     return pcm.samples(t0, t0 + dur)
 }
 
-/** Whole milliseconds to samples at 16 kHz: `int(seconds * 16000)` = `ms * 16` exactly. */
-private fun msToSamples(ms: Long): Int = (ms * 16).toInt()
+/**
+ * Whole milliseconds to samples at 16 kHz: `int(seconds * 16000)` = `ms * 16`, capped at the largest sample position
+ * an `Int` can hold — a segment starting beyond a representable clip is past its end (item 95).
+ */
+private fun msToSamples(ms: Long): Int = (ms * 16).coerceIn(0, Int.MAX_VALUE.toLong()).toInt()

@@ -85,8 +85,8 @@ internal fun TestScope.engineUnderTest(
     dataDir: TestDataDir,
     db: Database,
     scope: CoroutineScope = backgroundScope,
+    scratchDir: ScratchDir = ScratchDir(dataDir.dataDir),
 ): EngineFixture {
-    val scratchDir = ScratchDir(dataDir.dataDir)
     val tasks = TaskRepository(db)
     val chunker = FakeChunker()
     val transcriber = FakeTranscriber()

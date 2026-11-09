@@ -1,7 +1,7 @@
 # 96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it
 
 Status: spec-approved
-Depends on: [95](95-audit-failure-paths.md) (same engine and route files), [67](67-tui-frontend.md) (the `client/stt-client` rows only)
+Depends on: [95](../docs/specs/failure-paths.md) (same engine and route files), [67](67-tui-frontend.md) (the `client/stt-client` rows only)
 Blocks: —
 
 ## Goal

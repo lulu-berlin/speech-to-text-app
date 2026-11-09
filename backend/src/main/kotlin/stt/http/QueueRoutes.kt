@@ -50,13 +50,14 @@ fun Application.queueRoutes() {
 
         put("/api/queue/order") {
             val ids = call.receive<QueueOrderRequest>().taskIds
-            // The contract: the body must carry exactly the pending task ids, in any order; anything else is
-            // a mismatch and nothing changes.
-            if (ids.toSet() != tasks.pendingOrderedIds().toSet()) {
+            // The contract: exactly the pending task ids, each once, in any order (item 12); a repeated id, a
+            // missing one or an unknown one is a mismatch and nothing changes (item 95).
+            val pending = tasks.pendingOrderedIds()
+            if (ids.size != pending.size || ids.toSet() != pending.toSet()) {
                 call.respondError(
                     HttpStatusCode.Conflict,
                     "reorder-mismatch",
-                    "taskIds must be exactly the pending tasks (${tasks.pendingOrderedIds()})",
+                    "taskIds must be exactly the pending tasks ($pending)",
                 )
             } else {
                 engine.reorderQueue(ids)

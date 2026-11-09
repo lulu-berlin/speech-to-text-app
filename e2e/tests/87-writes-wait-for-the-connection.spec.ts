@@ -128,3 +128,39 @@ test('an upload cut off mid-request waits and finishes after the backend returns
     await handOverSharedBackend(restarted?.pid ?? pid, port, dataDir);
   }
 });
+
+// Item 95: the Settings page's two frontend fields were the only write controls without item
+// 87's gate. With the service frozen they wait with the others, in the app's words.
+test('the settings write fields wait for the connection while the service is frozen', async ({
+  page,
+}) => {
+  test.skip(process.platform === 'win32', 'freezing the backend needs POSIX signals');
+  await appLive(page);
+  await page.getByRole('navigation').getByRole('link', { name: 'Settings' }).click();
+
+  const frontend = page.getByRole('combobox', { name: 'Default frontend' });
+  const terminal = page.getByRole('textbox', { name: 'Terminal command' });
+  await expect(frontend).toBeEnabled();
+  await expect(terminal).toBeEnabled();
+
+  const { pid, port, dataDir } = loadState();
+  if (pid === undefined) {
+    throw new Error('the shared backend has no pid');
+  }
+  try {
+    // Freezing stops the heartbeat: after the idle window the app is not live, and the two
+    // settings fields wait for the service like every other write control.
+    freezeBackend(pid);
+    await expect(page.getByText('Reconnecting…')).toBeVisible({ timeout: 30_000 });
+
+    await expect(frontend).toBeDisabled();
+    await expect(frontend).toHaveAttribute('title', /Can't reach the app's service/);
+    await expect(terminal).toBeDisabled();
+    await expect(terminal).toHaveAttribute('title', /Can't reach the app's service/);
+  } finally {
+    // End the frozen group, then hand the shared backend over fresh on the same socket and
+    // data directory (a SIGSTOPped group ignores SIGTERM).
+    await killFrozenBackend(pid, port);
+    await handOverSharedBackend(pid, port, dataDir);
+  }
+});

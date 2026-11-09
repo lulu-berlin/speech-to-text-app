@@ -1,5 +1,6 @@
 package stt.diarization
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.Logger
@@ -55,20 +56,39 @@ internal class SpeakerDiarizer(
         segments.storeSpeakers(task.id, ids)
     }
 
-    private suspend fun embeddings(threads: Int?): Embeddings =
+    /** The embeddings for [threads], loading or reloading the model; internal so the reload spec can drive it (item 95). */
+    internal suspend fun embeddings(threads: Int?): Embeddings =
         loadLock.withLock {
             embeddings?.takeIf { loadedThreads == threads } ?: run {
-                model?.close()
+                // Load before closing the old model (item 95): a failed load must leave the working session cached,
+                // so the next task at the old thread count diarizes instead of touching a closed session.
                 val loaded = SpeakerModel.load(modelPath, threads)
-                logger.info("Loaded speaker model {} (intra-op threads: {})", modelPath, threads ?: "default")
+                val ready =
+                    try {
+                        Embeddings(loaded)
+                    } catch (e: Exception) {
+                        loaded.close()
+                        throw e
+                    }
+                model?.close()
                 model = loaded
                 loadedThreads = threads
-                Embeddings(loaded).also { embeddings = it }
+                embeddings = ready
+                logger.info("Loaded speaker model {} (intra-op threads: {})", modelPath, threads ?: "default")
+                ready
             }
         }
 
     override fun close() {
-        model?.close()
+        // The application's cleanup may race a load or an embedding; the lock serializes it (item 95).
+        runBlocking {
+            loadLock.withLock {
+                model?.close()
+                model = null
+                embeddings = null
+                loadedThreads = null
+            }
+        }
     }
 
     private companion object {

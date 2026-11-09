@@ -24,6 +24,7 @@ import stt.db.Database
 import stt.db.QueueStateRepository
 import stt.db.rowCount
 import stt.db.singleValue
+import stt.executeSql
 
 /**
  * Item 41's two size-limit test-list items: an upload over the configured limit is refused with `413
@@ -139,6 +140,32 @@ class UploadSizeLimitSpec :
                         rowCount(db, "audio") shouldBe 1
                         singleValue(db, "SELECT task_id FROM original_audio").toLong() shouldBe createdId
                         singleValue(db, "SELECT count(*) FROM original_audio WHERE task_id IS NULL").toInt() shouldBe 0
+                    }
+                }
+            }
+        }
+
+        given("an oversized upload whose staged original cannot be deleted") {
+            `when`("the part outgrows the limit and the cleanup's delete is refused") {
+                then("the answer is still 413 upload-too-large, not a 500") {
+                    val bytes = ByteArray(65) { it.toByte() }
+                    val dataDir = tempdir("stt-data").toPath()
+                    Database.open(dataDir).use { db -> QueueStateRepository(db).setPaused(true) }
+                    // A trigger that refuses the cleanup's delete.
+                    executeSql(
+                        dataDir,
+                        "CREATE TRIGGER refuse_staged_delete BEFORE DELETE ON original_audio " +
+                            "BEGIN SELECT RAISE(ABORT, 'staged delete refused'); END",
+                    )
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir, maxUploadBytes = 64)) }
+                        assertTooLarge(uploadChunked(client, "big.wav", bytes))
+
+                        // The refused delete left the staged original behind; the answer did not become a 500.
+                        val db = application.dependencies.resolve<Database>()
+                        rowCount(db, "tasks") shouldBe 0
+                        rowCount(db, "original_audio") shouldBe 1
                     }
                 }
             }

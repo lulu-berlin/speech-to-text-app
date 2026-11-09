@@ -1,6 +1,7 @@
 package stt.audio
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import stt.db.CanonicalAudio
 import stt.process.ProcessRunner
@@ -20,6 +21,11 @@ private const val SILENCE_MIN_SECONDS = "0.5"
 internal class CanonicalClip(
     private val layout: FlacLayout,
     private val file: Path,
+    /**
+     * Opens [file]'s channel for [useRows]; a spec replaces it to keep hold of the channel, so it can see it closed
+     * when the run is cancelled (item 95).
+     */
+    private val openChannel: suspend (Path) -> FileChannel = { path -> withContext(Dispatchers.IO) { FileChannel.open(path) } },
 ) : CanonicalRows {
     override val header: ByteArray get() = layout.header
 
@@ -27,11 +33,12 @@ internal class CanonicalClip(
     val totalSamples: Long get() = layout.totalSamples
 
     override suspend fun <T> useRows(block: suspend (Sequence<CanonicalAudio>) -> T): T {
-        val channel = withContext(Dispatchers.IO) { FileChannel.open(file) }
+        val channel = openChannel(file)
         try {
             return block(layout.rows(FileFlacBytes(channel)))
         } finally {
-            withContext(Dispatchers.IO) { channel.close() }
+            // The run may already be cancelled; the channel must still be released (item 95).
+            withContext(NonCancellable + Dispatchers.IO) { channel.close() }
         }
     }
 }

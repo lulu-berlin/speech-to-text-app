@@ -177,6 +177,8 @@ describe('writes wait for the connection', () => {
       await screen.findByLabelText('Device'),
       screen.getByLabelText('Threads'),
       screen.getByRole('combobox', { name: 'Language' }),
+      screen.getByRole('combobox', { name: 'Default frontend' }),
+      screen.getByRole('textbox', { name: 'Terminal command' }),
       screen.getByLabelText('Speakers'),
       screen.getByLabelText('Max speakers'),
     ]) {

@@ -1,10 +1,16 @@
 package stt.db
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.io.IOException
+import java.io.UncheckedIOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.Comparator
 import java.util.HexFormat
 
 /**
@@ -16,7 +22,7 @@ import java.util.HexFormat
  * files, and it is emptied at startup so a crash's leftovers never survive. Every method that touches the disk
  * suspends and runs on [Dispatchers.IO] (AGENTS.md: blocking I/O only there).
  */
-internal class ScratchDir(
+internal open class ScratchDir(
     dataDir: Path,
 ) {
     /** The scratch directory itself; it exists only once a write has run. */
@@ -40,20 +46,67 @@ internal class ScratchDir(
     /** The PCM [diarizeWindow] decodes to. */
     suspend fun diarizePcm(id: Long): Path = taskDir(id).resolve("diarize-window.f32")
 
+    /**
+     * Deletes [path] if it exists. Every cleanup deletes through here, so a spec can make one fail (item 95).
+     */
+    open suspend fun delete(path: Path) {
+        withContext(Dispatchers.IO) { Files.deleteIfExists(path) }
+    }
+
+    /**
+     * Deletes [path] best effort (item 95): an [IOException] is logged with the path and swallowed, so a cleanup
+     * never replaces the error in flight; cancellation is not absorbed.
+     */
+    suspend fun deleteBestEffort(path: Path) {
+        try {
+            delete(path)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            logger.warn("Could not delete {}; leaving it for the next startup", path, e)
+        }
+    }
+
+    /** Removes [dir] and everything in it, best effort, once its run has ended (item 95). */
+    suspend fun deleteTreeBestEffort(dir: Path) {
+        deleteTree(dir, keepRoot = false)
+    }
+
     /** Removes everything in the scratch directory best-effort, so a crash's leftovers never survive a restart. */
-    suspend fun clear() {
-        withContext(Dispatchers.IO) {
-            if (!Files.isDirectory(dir)) return@withContext
-            Files.walk(dir).use { paths ->
-                paths
-                    .sorted(Comparator.reverseOrder())
-                    .filter { it != dir }
-                    .forEach { Files.deleteIfExists(it) }
+    open suspend fun clear() {
+        deleteTree(dir, keepRoot = true)
+    }
+
+    /**
+     * Removes [root] and everything in it, best effort (item 95): [keepRoot] leaves [root] itself. A failed delete
+     * is logged with its path by [deleteBestEffort], and a tree that cannot be listed at all is logged here and
+     * left for the next startup. Cancellation is not absorbed.
+     */
+    private suspend fun deleteTree(
+        root: Path,
+        keepRoot: Boolean,
+    ) {
+        try {
+            withContext(Dispatchers.IO) {
+                if (!Files.isDirectory(root)) return@withContext
+                Files.walk(root).use { paths ->
+                    for (path in paths.sorted(Comparator.reverseOrder()).toList()) {
+                        if (keepRoot && path == root) continue
+                        deleteBestEffort(path)
+                    }
+                }
             }
+        } catch (e: UncheckedIOException) {
+            // Files.walk reports a directory it cannot list as unchecked, not as an IOException.
+            logger.warn("Could not list {} for removal; leaving it for the next startup", root, e.cause ?: e)
+        } catch (e: IOException) {
+            logger.warn("Could not list {} for removal; leaving it for the next startup", root, e)
         }
     }
 
     private companion object {
+        val logger: Logger = LoggerFactory.getLogger(ScratchDir::class.java)
+
         /** A stable, short fingerprint of [dataDir]'s absolute path, so the scratch directory is per data directory. */
         fun fingerprint(dataDir: Path): String {
             val digest =

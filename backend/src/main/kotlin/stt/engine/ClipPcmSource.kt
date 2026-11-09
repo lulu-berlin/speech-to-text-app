@@ -57,9 +57,9 @@ internal class ClipPcmSource(
             val count = toSample - fromSample
             return withContext(Dispatchers.IO) { readFloats(pcm, offset, count) }
         } finally {
-            withContext(NonCancellable + Dispatchers.IO) {
-                Files.deleteIfExists(window)
-                Files.deleteIfExists(pcm)
+            withContext(NonCancellable) {
+                scratchDir.deleteBestEffort(window)
+                scratchDir.deleteBestEffort(pcm)
             }
         }
     }

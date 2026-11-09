@@ -51,6 +51,8 @@ fun Application.sttApp(
     frontendsDir: Path? = null,
     quit: CompletableDeferred<Unit>? = null,
     registerTray: ((pid: Long, command: List<String>) -> Unit)? = null,
+    /** The stream the events route reads; a spec passes its own to deliver an exact frame sequence (item 95). */
+    eventStream: EventStream? = null,
 ) {
     install(ContentNegotiation) { json() }
     val access = BrowserAccess()
@@ -70,7 +72,7 @@ fun Application.sttApp(
         provide<SegmentRepository> { SegmentRepository(resolve()) }
         provide<ChunkRepository> { ChunkRepository(resolve()) }
         provide<CanonicalClipRepository> { CanonicalClipRepository(resolve()) }
-        provide<EventStream> { NumberedEventStream(resolve(), eventsScope) }
+        provide<EventStream> { eventStream ?: NumberedEventStream(resolve(), eventsScope) }
         require(DependencyKey<Database>())
     }
     settingsRoutes(gpus, deviceProbeError, frontendsDir)

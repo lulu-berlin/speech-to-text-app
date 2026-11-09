@@ -30,9 +30,16 @@ import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Path
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 private val bootLogger: Logger = LoggerFactory.getLogger("stt.Main")
+
+/**
+ * Test-only seam (item 95): runs once the service has chosen [port] and before its first bind. Unset in production.
+ */
+@Volatile
+internal var afterPortChosen: ((port: Int) -> Unit)? = null
 
 /** The program argument that starts the app mode, the per-user service (roadmap item 66); without it the app runs in dev/server mode. */
 private const val SERVICE_MODE = "service"
@@ -59,9 +66,11 @@ fun main(args: Array<String>) {
  * a free port when another program holds that one, advertising itself in `runtime.json` once it answers. When another
  * process already holds the instance, this launch defers to it and ends without starting a server.
  */
-private fun runService(config: Config) {
+internal fun runService(
+    config: Config,
+    dirs: ServiceDirs = ServiceDirs.fromEnv(),
+) {
     val firstPort = if (config.portConfigured) config.port else DEFAULT_SERVICE_PORT
-    val dirs = ServiceDirs.fromEnv()
     val instance = runBlocking { ServiceInstance.claim(dirs, firstPort) }
     if (instance == null) {
         bootLogger.info("The service already runs for this user; not starting another")
@@ -71,6 +80,9 @@ private fun runService(config: Config) {
         // The check spares the common case - the port has been taken for a while - a start of the whole app that the
         // bind then refuses; the bind's own fallback covers a program taking the port after the check (D5).
         val port = runBlocking { instance.portToServe(SERVICE_HOST) }
+        // Test-only seam (item 95): after the pre-check chose [port] and before the first bind — the window in which
+        // another program takes the port and forces the fallback that only the bind can catch.
+        afterPortChosen?.invoke(port)
         // Probed once: a bind that falls back builds a second server, and whisper-cli runs once either way.
         val probed = probeGpus(config)
         // `POST /api/quit` completes this, and the watcher stops the server: the same clean stop a SIGTERM performs,
@@ -90,9 +102,12 @@ private fun runService(config: Config) {
                 },
             )
         val serverRef = AtomicReference<EmbeddedServer<*, *>?>(null)
+        // Whether the server raising a stop is the one that serves: the bind-failed first server is stopped before
+        // the fallback exists, and its stop must not cancel the quit watcher or tray supervision (item 95).
+        val serving = AtomicBoolean(false)
         // One scope for the service's lifetime (AGENTS.md, coroutines): the quit watcher and the tray's
-        // supervision clock. It is cancelled when the server stops, so the fallback bind, which builds a
-        // second server, does not leave a second clock behind.
+        // supervision clock. Only the serving server's stop cancels it (see `serving`): the bind-failed
+        // first server's stop must not, and the fallback server reuses this same clock.
         val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         serviceScope.launch {
             quit.await()
@@ -116,6 +131,7 @@ private fun runService(config: Config) {
                 )
             serverRef.set(server)
             server.monitor.subscribe(ServerReady) {
+                serving.set(true)
                 runBlocking {
                     val actualPort =
                         server.engine
@@ -128,8 +144,10 @@ private fun runService(config: Config) {
             // The stop's first event: the shutdown hook of a SIGTERM (a logout, `stt-app quit`) runs it too, where
             // the code after `start` would not get to run.
             server.monitor.subscribe(ApplicationStopPreparing) {
-                serviceScope.cancel()
-                runBlocking { instance.withdraw() }
+                if (serving.get()) {
+                    serviceScope.cancel()
+                    runBlocking { instance.withdraw() }
+                }
             }
             server
         }

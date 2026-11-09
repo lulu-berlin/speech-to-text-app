@@ -128,7 +128,7 @@ graph TD
   13 --> 91[91 msw 3 ✓]:::done
   03 --> 93[93 Maven catalog batch ✓]:::done
   08 --> 93
-  11 --> 95[95 audit failure paths]
+  11 --> 95[95 audit failure paths ✓]:::done
   42 --> 95
   12 --> 95
   41 --> 95
@@ -299,7 +299,7 @@ graph TD
 | [91 — MSW 3: the API mocks, the shared handlers and the dev worker](../docs/specs/msw-3.md) | done | 13 |
 | [93 — Current Maven dependencies: the catalog batch and the regenerated deps.json](../docs/specs/maven-catalog-batch.md) | done | 03, 08 |
 | [94 — The atomic-transitions lock probe must not expire on a starved runner](../docs/specs/atomic-transitions-probe-clock.md) | done | 55, 47, 58, 11 |
-| [95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests](95-audit-failure-paths.md) | spec-approved | 11, 42, 12, 41, 32, 66, 73, 87 |
+| [95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests](../docs/specs/failure-paths.md) | done | 11, 42, 12, 41, 32, 66, 73, 87 |
 | [96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it](96-audit-cleanup.md) | spec-approved | 95, 67 |
 | [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](../docs/specs/ci-and-pins.md) | done | 85 |
 | [98 — The Rust workspace lives at the repository root, and its crates in `crates/`](98-rust-workspace-at-root.md) | spec-approved | 67, 66 |

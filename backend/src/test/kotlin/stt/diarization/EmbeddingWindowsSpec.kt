@@ -103,4 +103,36 @@ class EmbeddingWindowsSpec :
                 }
             }
         }
+        given("21 h of audio, with a 60 s segment starting at 20 h") {
+            `when`("its embedding window is computed") {
+                then("the window is the segment's centre, not its first 20 s") {
+                    val pcm = RecordingPcm(totalSamples = 21 * 3_600 * 16_000)
+                    val startMs = 20L * 3_600 * 1_000
+                    val endMs = startMs + 60_000
+
+                    val window = embeddingWindow(pcm, startMs, endMs)
+
+                    window.size.shouldBe(CAP_WINDOW_SAMPLES)
+                    val first = (startMs * 16).toInt()
+                    val last = (endMs * 16).toInt()
+                    val mid = ((first.toLong() + last) / 2).toInt()
+                    pcm.ranges.single() shouldBe ((mid - CAP_WINDOW_SAMPLES / 2) until (mid + CAP_WINDOW_SAMPLES / 2))
+                }
+            }
+        }
     })
+
+/** A [PcmSource] of silence that records the range every read asks for. */
+private class RecordingPcm(
+    override val totalSamples: Int,
+) : PcmSource {
+    val ranges = mutableListOf<IntRange>()
+
+    override suspend fun samples(
+        fromSample: Int,
+        toSample: Int,
+    ): FloatArray {
+        ranges += fromSample until toSample
+        return FloatArray(toSample - fromSample)
+    }
+}

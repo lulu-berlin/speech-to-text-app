@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import stt.db.AudioRepository
 import stt.db.ChunkRepository
 import stt.db.ChunkStatus
+import stt.db.Database
 import stt.db.Segment
 import stt.db.SegmentRepository
 import stt.db.SpeakersMode
@@ -122,22 +123,7 @@ class ProcessingEngineRestartSpec :
                                 createdAt = 2,
                                 speakersMode = SpeakersMode.AUTO,
                             )
-                        // The crash state of a started, mid-transcription pause: plan and clip stored, chunk 0 DONE,
-                        // original gone, status PAUSED with its phase and start time.
-                        val chunks = ChunkRepository(db)
-                        storeChunkedPlan(fixture, chunks, started, chunkCount = 2)
-                        SegmentRepository(db).completeChunk(
-                            started,
-                            chunkIdx = 0,
-                            segments =
-                                listOf(
-                                    Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
-                                ),
-                        )
-                        AudioRepository(db).deleteOriginal(started)
-                        fixture.tasks.setRunningIfQueued(started, startedAt = 1_000L)
-                        fixture.tasks.setStatus(started, TaskStatus.PAUSED)
-                        fixture.tasks.setPhase(started, TaskPhase.TRANSCRIBING)
+                        storePausedAcrossRestart(fixture, db, started)
 
                         fixture.engine.start()
                         pumpUntil(200.milliseconds) { fixture.chunker.workDirs.isNotEmpty() }
@@ -164,20 +150,8 @@ class ProcessingEngineRestartSpec :
                     withEngineDatabase { dataDir, db ->
                         val fixture = engineUnderTest(dataDir, db)
                         val task = enqueueTask(fixture.tasks, "task.wav", queuePosition = 0, createdAt = 1)
+                        storePausedAcrossRestart(fixture, db, task)
                         val chunks = ChunkRepository(db)
-                        storeChunkedPlan(fixture, chunks, task, chunkCount = 2)
-                        SegmentRepository(db).completeChunk(
-                            task,
-                            chunkIdx = 0,
-                            segments =
-                                listOf(
-                                    Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
-                                ),
-                        )
-                        AudioRepository(db).deleteOriginal(task)
-                        fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L)
-                        fixture.tasks.setStatus(task, TaskStatus.PAUSED)
-                        fixture.tasks.setPhase(task, TaskPhase.TRANSCRIBING)
 
                         fixture.engine.start()
                         pumpUntil(200.milliseconds) { statusOf(fixture, task) == TaskStatus.RUNNING }
@@ -196,4 +170,70 @@ class ProcessingEngineRestartSpec :
                 }
             }
         }
+        given("a started task paused across a restart, with another task queued ahead of it, that is canceled") {
+            `when`("a new engine is waiting on the paused task") {
+                then("the queued task behind it starts without any other command") {
+                    withEngineDatabase { dataDir, db ->
+                        val fixture = engineUnderTest(dataDir, db)
+                        val started =
+                            enqueueTask(
+                                fixture.tasks,
+                                "started.wav",
+                                queuePosition = 1,
+                                createdAt = 1,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        val ahead =
+                            enqueueTask(
+                                fixture.tasks,
+                                "ahead.wav",
+                                queuePosition = 0,
+                                createdAt = 2,
+                                speakersMode = SpeakersMode.AUTO,
+                            )
+                        storePausedAcrossRestart(fixture, db, started)
+
+                        fixture.engine.start()
+                        // The worker is parked on the paused task: the queued one is ahead in the queue but
+                        // starts nothing.
+                        pumpUntil(200.milliseconds) { fixture.chunker.workDirs.isNotEmpty() }
+                        fixture.chunker.workDirs.shouldBeEmpty()
+                        statusOf(fixture, started) shouldBe TaskStatus.PAUSED
+                        statusOf(fixture, ahead) shouldBe TaskStatus.QUEUED
+
+                        // Canceling it leaves no started PAUSED task to wait on, so the worker must look again
+                        // without a wake from another command.
+                        fixture.engine.cancelTask(started) shouldBe TaskCommandOutcome.Accepted
+                        statusOf(fixture, started) shouldBe TaskStatus.CANCELED
+                        awaitCompleted(fixture.completed, setOf(ahead), bound = 5.seconds)
+                        statusOf(fixture, ahead) shouldBe TaskStatus.COMPLETED
+                    }
+                }
+            }
+        }
     })
+
+/**
+ * The crash state of a started, mid-transcription pause (item 42): a stored two-chunk plan with its clip, chunk 0
+ * DONE with its segments, the original already deleted, and the task PAUSED with its phase and start time.
+ */
+private suspend fun storePausedAcrossRestart(
+    fixture: EngineFixture,
+    db: Database,
+    task: Long,
+) {
+    val chunks = ChunkRepository(db)
+    storeChunkedPlan(fixture, chunks, task, chunkCount = 2)
+    SegmentRepository(db).completeChunk(
+        task,
+        chunkIdx = 0,
+        segments =
+            listOf(
+                Segment(chunkIdx = 0, seq = 0, startMs = 0, endMs = 1_000, text = " hello ", speakerId = null),
+            ),
+    )
+    AudioRepository(db).deleteOriginal(task)
+    fixture.tasks.setRunningIfQueued(task, startedAt = 1_000L)
+    fixture.tasks.setStatus(task, TaskStatus.PAUSED)
+    fixture.tasks.setPhase(task, TaskPhase.TRANSCRIBING)
+}

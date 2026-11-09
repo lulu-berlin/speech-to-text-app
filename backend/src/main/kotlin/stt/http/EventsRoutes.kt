@@ -60,8 +60,10 @@ fun Application.eventsRoutes() {
                         sendEvents(
                             stream.events,
                             writeFrame = { engineEvent ->
-                                writeEvent(engineEvent.sseName(), engineEvent.sseData(tasks))
-                                flush()
+                                engineEvent.sseData(tasks)?.let { data ->
+                                    writeEvent(engineEvent.sseName(), data)
+                                    flush()
+                                }
                             },
                             writeHeartbeat = {
                                 writeEvent("heartbeat", "{}")
@@ -167,11 +169,15 @@ private suspend fun Event.sseName(): String =
         is Event.SettingsUpdated -> "settings-updated"
     }
 
-/** The event's `data:` JSON; the update event re-reads the task so its derived fields are current. */
-private suspend fun Event.sseData(tasks: TaskRepository): String =
+/**
+ * The event's `data:` JSON; the update event re-reads the task so its derived fields are current. Null when that
+ * task is gone — a buffered update delivered after its delete is skipped, and `task-deleted` tells the client
+ * (item 95).
+ */
+private suspend fun Event.sseData(tasks: TaskRepository): String? =
     when (this) {
         is Event.TaskUpdated -> {
-            SseJson.encodeToString(tasks.details(task.id)!!.toJson())
+            tasks.details(task.id)?.let { SseJson.encodeToString(it.toJson()) }
         }
 
         is Event.TaskProgress -> {
