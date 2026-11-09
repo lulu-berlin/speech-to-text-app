@@ -2,6 +2,7 @@ package stt.db
 
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readBuffer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -12,12 +13,16 @@ import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.HexFormat
 
 /** At most this many upload bytes are held in memory while staging; each window becomes one stored part. */
 private const val STAGE_WINDOW_BYTES = 1_048_576
+
+private val logger: Logger = LoggerFactory.getLogger("stt.db.StagedUpload")
 
 /**
  * An upload written into the database as a staged original ([OriginalAudioTable], item 44), with its size and
@@ -42,7 +47,7 @@ internal suspend fun <T> Database.withStagedUpload(
     try {
         return block(stage(originalId, source))
     } finally {
-        deleteUnclaimedOriginal(originalId)
+        deleteUnclaimedOriginalBestEffort(originalId)
     }
 }
 
@@ -61,13 +66,16 @@ internal suspend fun Database.stageChannel(
     try {
         return stage(originalId, source, maxBytes)
     } catch (e: Throwable) {
-        deleteUnclaimedOriginal(originalId)
+        deleteUnclaimedOriginalBestEffort(originalId)
         throw e
     }
 }
 
-/** Deletes [upload]'s staged original and its bytes, unless a task has claimed it; a canceled caller still deletes. */
-internal suspend fun Database.discardStaged(upload: StagedUpload) = deleteUnclaimedOriginal(upload.originalId)
+/**
+ * Deletes [upload]'s staged original and its bytes, unless a task has claimed it; a canceled caller still deletes.
+ * Best effort (item 95): a failed delete is logged and swallowed, so it never replaces the error or answer in flight.
+ */
+internal suspend fun Database.discardStaged(upload: StagedUpload) = deleteUnclaimedOriginalBestEffort(upload.originalId)
 
 /**
  * Deletes every staged original no task has claimed, with its parts (they cascade): what a crash mid-upload leaves.
@@ -86,6 +94,20 @@ private suspend fun Database.deleteUnclaimedOriginal(originalId: Long) {
         writeTransaction {
             OriginalAudioTable.deleteWhere { (OriginalAudioTable.id eq originalId) and OriginalAudioTable.taskId.isNull() }
         }
+    }
+}
+
+/**
+ * Deletes a staged original best effort (item 95): a failed delete is logged and swallowed, so a cleanup never
+ * replaces the upload's error; cancellation is not absorbed. A leftover is swept by the next startup.
+ */
+private suspend fun Database.deleteUnclaimedOriginalBestEffort(originalId: Long) {
+    try {
+        deleteUnclaimedOriginal(originalId)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        logger.warn("Could not delete staged original {}; the next startup sweeps it", originalId, e)
     }
 }
 

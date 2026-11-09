@@ -63,6 +63,7 @@ import stt.transcribe.Transcriber
 import stt.transcribe.WhisperSettings
 import stt.transcribe.resumePrompt
 import stt.transcribe.taskProgress
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -155,16 +156,28 @@ class ProcessingEngine internal constructor(
     internal var beforeNextTaskLookup: (suspend () -> Unit)? = null
 
     /**
-     * Starts the single worker coroutine, named `engine-worker` (item 46); it runs until [scope] is cancelled.
-     * Before it picks anything up, tasks whose crash left them RUNNING are queued again (ADR 0004), so the
-     * worker resumes them from their stored plans instead of leaving them stuck.
+     * Recovers what a crash left RUNNING and starts the single worker coroutine, named `engine-worker` (item 46);
+     * it runs until [scope] is cancelled. The recovery is part of the caller's startup (item 95): when it cannot
+     * run, its error is logged and rethrown, so the service fails to start instead of serving a database it
+     * cannot recover. The worker resumes recovered tasks from their stored plans instead of leaving them stuck.
      */
-    fun start() {
-        scope.launch(CoroutineName("engine-worker")) {
+    suspend fun start() {
+        // Recovery is part of startup (item 95): a database the engine cannot recover must fail the service's
+        // startup, not leave a worker that never runs. The error is logged, then it propagates to the caller.
+        try {
             tasks.recoverRunning()
-            scratchDir.clear()
-            workerLoop()
+        } catch (e: Throwable) {
+            logger.error("Could not recover tasks left RUNNING by a crash; the service will not start", e)
+            throw e
         }
+        // The scratch directory is best effort (item 44): leftovers cost disk, not correctness, so a clear that
+        // fails is logged and the worker still takes the queue.
+        try {
+            scratchDir.clear()
+        } catch (e: IOException) {
+            logger.warn("Could not clear the scratch directory {}; starting anyway", scratchDir.dir, e)
+        }
+        scope.launch(CoroutineName("engine-worker")) { workerLoop() }
     }
 
     /**
@@ -423,8 +436,13 @@ class ProcessingEngine internal constructor(
                 runningJob(id)?.cancelAndJoin()
                 val canceled = tasks.cancelIfPossible(id, now())
                 removeScratch(id)
-                if (canceled) publish(id)
-                if (canceled) queueUpdated()
+                if (canceled) {
+                    publish(id)
+                    queueUpdated()
+                    // A cancel frees the queue like the other commands: the canceled task may have been the
+                    // started PAUSED one the worker was waiting on across a restart, so it must look again (item 95).
+                    wake()
+                }
             }
             val after = tasks.find(id)?.task?.status ?: return@command TaskCommandOutcome.Unknown
             if (after == TaskStatus.CANCELED) {
@@ -579,7 +597,8 @@ class ProcessingEngine internal constructor(
             job.start()
             job.join()
         } finally {
-            runningLock.withLock { running = null }
+            // The worker may be cancelled at shutdown; the slot must still be cleared (item 95).
+            withContext(NonCancellable) { runningLock.withLock { running = null } }
         }
     }
 
@@ -730,8 +749,8 @@ class ProcessingEngine internal constructor(
             audio.deleteOriginal(id)
         } finally {
             withContext(NonCancellable) {
-                deleteTree(chunkerDir)
-                withContext(Dispatchers.IO) { Files.deleteIfExists(source) }
+                scratchDir.deleteTreeBestEffort(chunkerDir)
+                scratchDir.deleteBestEffort(source)
             }
         }
     }
@@ -753,7 +772,7 @@ class ProcessingEngine internal constructor(
             } catch (e: NoSuchElementException) {
                 throw IllegalStateException("the task's original audio is missing at $source", e)
             } finally {
-                Files.deleteIfExists(partial)
+                scratchDir.deleteBestEffort(partial)
             }
         }
     }
@@ -932,29 +951,14 @@ class ProcessingEngine internal constructor(
         )
     }
 
-    /** Removes [dir] and everything in it, including [dir] itself; a directory that is not there is left alone. */
-    private suspend fun deleteTree(dir: Path) {
-        withContext(Dispatchers.IO) {
-            if (!Files.isDirectory(dir)) return@withContext
-            Files.walk(dir).use { paths ->
-                paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
-            }
-        }
-    }
-
     /**
      * Removes the task's scratch directory — the chunker's scratch, the materialized original, the whisper
      * inputs and any decoded clip — once the task has ended: COMPLETED, FAILED, CANCELED or deleted. Best
      * effort, like every cleanup here: a failure only leaves files the startup [ScratchDir.clear] sweeps, and is
-     * logged with its throwable (item 60).
+     * logged with its throwable (items 60/95).
      */
     private suspend fun removeScratch(id: Long) {
-        val dir = scratchDir.taskDirPath(id)
-        try {
-            deleteTree(dir)
-        } catch (e: Exception) {
-            logger.warn("Could not remove task {}'s scratch directory {}", id, dir, e)
-        }
+        scratchDir.deleteTreeBestEffort(scratchDir.taskDirPath(id))
     }
 
     /**
@@ -982,7 +986,7 @@ class ProcessingEngine internal constructor(
                 target = target,
             )
         } finally {
-            withContext(NonCancellable + Dispatchers.IO) { Files.deleteIfExists(window) }
+            withContext(NonCancellable) { scratchDir.deleteBestEffort(window) }
         }
     }
 

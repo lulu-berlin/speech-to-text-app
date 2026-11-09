@@ -128,4 +128,29 @@ class TaskCommandsSpec :
                 }
             }
         }
+
+        given("a QUEUED task whose delete races its accepted pause command") {
+            `when`("the task is deleted before the command's answer is read") {
+                then("the answer is 404 not-found, never 500") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seed(dataDir, "racing.wav", TaskStatus.QUEUED)
+                    // The seam stands in for a second client's DELETE landing between the command's write and
+                    // the response's re-read.
+                    afterTaskCommand = { commandId ->
+                        Database.open(dataDir).use { db -> TaskRepository(db).delete(commandId) }
+                    }
+                    try {
+                        testApplication {
+                            application { sttApp(stt.config.testConfig(dataDir)) }
+                            val response = client.post("/api/tasks/$id/pause")
+                            response.status shouldBe HttpStatusCode.NotFound
+                            val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                            body.getValue("error").jsonPrimitive.content shouldBe "not-found"
+                        }
+                    } finally {
+                        afterTaskCommand = null
+                    }
+                }
+            }
+        }
     })

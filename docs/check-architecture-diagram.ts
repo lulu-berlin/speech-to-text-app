@@ -26,7 +26,7 @@ const boxes: Record<string, Evidence> = {
   SSE: [[`${STT}/http/EventsRoutes.kt`, /get\("\/api\/events"\)/]],
   Engine: [
     [ENGINE, /class ProcessingEngine/],
-    [ENGINE_MODULE, /launch \{ engine\.start\(\) \}/],
+    [ENGINE_MODULE, /runBlocking \{ engine\.start\(\) \}/],
   ],
   DB: [[`${STT}/db/Database.kt`, /resolve\("stt\.db"\)/]],
   Speaker: [[`${STT}/diarization/SpeakerModel.kt`, /OrtEnvironment\.getEnvironment\(\)/]],

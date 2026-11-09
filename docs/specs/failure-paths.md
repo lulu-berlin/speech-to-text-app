@@ -1,8 +1,8 @@
 # 95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests
 
-Status: spec-approved
-Depends on: [11](../docs/specs/processing-engine.md), [42](../docs/specs/worker-stability.md), [12](../docs/specs/http-api-and-sse.md), [41](../docs/specs/upload-hardening.md), [32](../docs/specs/settings-page.md), [66](../docs/specs/local-service-and-frontends.md), [73](../docs/specs/speaker-reassignment.md), [87](../docs/specs/writes-and-the-connection.md) (all done)
-Blocks: [96](96-audit-cleanup.md) (the cleanup edits the same engine and route files)
+Status: done (roadmap item 95, approved 2026-11-09)
+Depends on: [11](processing-engine.md), [42](worker-stability.md), [12](http-api-and-sse.md), [41](upload-hardening.md), [32](settings-page.md), [66](local-service-and-frontends.md), [73](speaker-reassignment.md), [87](writes-and-the-connection.md) (all done)
+Blocks: [96](../../roadmap/96-audit-cleanup.md) (the cleanup edits the same engine and route files)
 
 ## Goal
 
@@ -210,41 +210,43 @@ None. (Settled 2026-11-09, see "Decided".)
 
 Draft, to settle with the user.
 
-- [ ] (basic) A started task paused across a restart is canceled, and the QUEUED task behind it
+- [x] (basic) A started task paused across a restart is canceled, and the QUEUED task behind it
       starts without any other command.
-- [ ] (failure) A recovery failure at startup fails the service's startup, naming the logged error:
+- [x] (failure) A recovery failure at startup fails the service's startup, naming the logged error:
       no worker serves with a database it cannot recover.
-- [ ] (edge) A scratch clear that throws at startup is logged, and the worker still runs the next
+- [x] (edge) A scratch clear that throws at startup is logged, and the worker still runs the next
       queued task.
-- [ ] (failure) A chunker, chunk-window or diarization-clip cleanup that throws does not replace
+- [x] (failure) A chunker, chunk-window or diarization-clip cleanup that throws does not replace
       the run's error: the task fails with the original error, and the delete failure is logged.
-- [ ] (failure) A process interruption whose cleanup then throws still requeues the task (QUEUED,
+- [x] (failure) A process interruption whose cleanup then throws still requeues the task (QUEUED,
       not FAILED).
-- [ ] (failure) An oversized upload whose staged original cannot be deleted still answers 413.
-- [ ] (edge) A cancelled run's chunker channel is closed.
-- [ ] (failure) A speaker-model load that fails after a thread-count change does not leave a
+- [x] (failure) An oversized upload whose staged original cannot be deleted still answers 413.
+- [x] (edge) A cancelled run's chunker channel is closed.
+- [x] (failure) A speaker-model load that fails after a thread-count change does not leave a
       closed model in use: the next task at the old thread count diarizes.
-- [ ] (failure) With the durable port taken, the fallback service still stops on `POST
+- [x] (failure) With the durable port taken, the fallback service still stops on `POST
       /api/quit`, and its tray supervision still restarts a dead tray.
-- [ ] (edge) An unreadable `config.json` and one with an out-of-range port are replaced at start,
+- [x] (edge) An unreadable `config.json` and one with an out-of-range port are replaced at start,
       with the default port and a new secret.
-- [ ] (edge) An embedding window on a segment past 18.6 h of audio is centred on the segment.
-- [ ] (basic) Reassigning segments to a new speaker on a task with no speakers creates speaker 0,
+- [x] (edge) An embedding window on a segment past 18.6 h of audio is centred on the segment.
+- [x] (basic) Reassigning segments to a new speaker on a task with no speakers creates speaker 0,
       moves them (200), and the transcript shows the new speaker.
-- [ ] (failure) An upload whose file part is not named `file` is rejected with 400
+- [x] (failure) An upload whose file part is not named `file` is rejected with 400
       `missing-file`; a file part under a value field's name is rejected.
-- [ ] (failure) A reorder naming a pending id twice is rejected with 409, and the stored order is
+- [x] (failure) A reorder naming a pending id twice is rejected with 409, and the stored order is
       unchanged.
-- [ ] (edge) A `task-updated` delivered after its task was deleted is skipped: the stream stays
+- [x] (edge) A `task-updated` delivered after its task was deleted is skipped: the stream stays
       open, and `task-deleted` follows.
-- [ ] (edge) An unknown-kind frontend descriptor is skipped with a logged warning.
-- [ ] (failure) With the service unreachable, moving segments shows "Not saved: can't reach the
+- [x] (edge) An unknown-kind frontend descriptor is skipped with a logged warning.
+- [x] (failure) With the service unreachable, moving segments shows "Not saved: can't reach the
       app's service. Reconnecting…", not the browser's text.
-- [ ] (failure) With the service unreachable, Settings says the frontends list could not be
+- [x] (failure) With the service unreachable, Settings says the frontends list could not be
       loaded instead of offering only "None"; leaving the page during the load shows no error.
-- [ ] (ui) With the connection not live, "Default frontend" and "Terminal command" are disabled
+- [x] (ui) With the connection not live, "Default frontend" and "Terminal command" are disabled
       with the reconnecting title, like the other settings fields.
-- [ ] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test` and the e2e journeys
+- [x] (discovered) (failure) A command whose task a racing delete removed before its answer is
+      404 not-found, never 500.
+- [x] (must not break) `gradle check`, `gradle integrationTest`, `pnpm test` and the e2e journeys
       stay green.
 
 ## e2e stance
@@ -262,3 +264,33 @@ and quit-after-fallback are proven at route and engine level, where their trigge
   Settings fields. Status stays `draft` until the updated test list is approved.
 - 2026-11-09: approved by the user: the decisions recorded above and the 20-line test list as
   updated. Status set to spec-approved.
+- 2026-11-09: in-review (workspace agent): every test-list line and the one e2e test are done and
+  ticked. Gates, with the commit each ran on: `gradle check` green on `eb21ba1f` (ktlint and every
+  unit test); `gradle integrationTest` green on `e7c8ec76` (the full suite, with the new diarizer
+  reload and service specs); frontend `vitest run` (313 tests) and `prettier --check` green on
+  `eb21ba1f`; `tsc --noEmit` + `vite build` green on `e7c8ec76`; the docs package (tsc, prettier,
+  links, Windows README, architecture names and diagram, exceptions, the retirement guard, and their
+  node tests) green on `e7c8ec76`; the e2e spec `87-writes-wait-for-the-connection.spec.ts` green on
+  `e7c8ec76` (3 tests, the new Settings freeze test included). Two LOW findings from the Proposal
+  have no test-list line and are fixed as hardening without a dedicated test: the worker's
+  `running` slot is cleared under `NonCancellable`, and a command or upload whose task a racing
+  delete removed answers 404, never the 500 its re-read `!!` answered.
+- 2026-11-09: in-review after the root agent's review (workspace agent): the docs log line now
+  describes the retirement guard by role (`6e04bf15`), and `serviceScope`'s comment says only the
+  serving server's stop cancels it (`feb6a19e`). The racing-delete 404 is tested as a discovered
+  line (`40d2f632`): a command whose task a delete removed before its answer answers 404, never
+  500, driven through the `afterTaskCommand` test seam; the upload branch uses the same null-safe
+  read. The worker's `running` slot under `NonCancellable` stays untested on purpose: the race
+  needs a contended lock exactly while the worker is cancelled, which is not reachable
+  deterministically; the reset is two lines under the standard pattern. Gates on `40d2f632`:
+  `gradle check` green; `gradle integrationTest` green; frontend `vitest run` (313 tests),
+  `tsc --noEmit` and `prettier --check` green; the docs package (tsc, prettier, links, Windows
+  README, architecture names and diagram, exceptions, the retirement guard, and their node tests)
+  rerun green on this log's tree. `runBlocking` at `engine.start()` and `SpeakerDiarizer.close()`
+  was considered and kept: both are non-suspend wiring callbacks, as `ServiceInstance.claim`
+  already bridges.
+- 2026-11-09: reviewed by the root agent twice and approved by the user. The second review's findings
+  are fixed and recorded above; gates on the fixed head: `gradle check` green with 0 compiler
+  warnings, `TaskCommandsSpec` 5/5 and `ProcessingEngineStartupSpec` 1/1 (rerun), frontend `vitest`
+  313 tests with `tsc` and `prettier` clean, the docs package 18/18 with the retirement guard green.
+  Squashed for the PR. Status: done.

@@ -312,7 +312,8 @@ class SegmentRepository(
                 }
             }
             // The new speaker's id is read over all rows before the bake-in and any removal (user decision 2026-10-31).
-            val target = speakerId ?: selectSpeakers(taskId).maxOf { it.speakerId } + 1
+            // A task transcribed with speakers off has no speaker rows; a new speaker there is 0 (item 95).
+            val target = speakerId ?: (selectSpeakers(taskId).maxOfOrNull { it.speakerId } ?: -1) + 1
             bakeMerges(taskId, intoOf)
             if (speakerId == null) insertNewSpeaker(taskId, target)
             SegmentsTable.update({ (SegmentsTable.taskId eq taskId) and (SegmentsTable.id inList segmentIds) }) {

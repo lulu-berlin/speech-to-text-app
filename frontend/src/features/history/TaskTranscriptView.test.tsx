@@ -2644,6 +2644,29 @@ describe('the themed player', () => {
     expect(within(transcript).queryAllByRole('checkbox')).toHaveLength(0);
   });
 
+  it("shows the app's message, never the browser's, when the move fails at the transport", async () => {
+    // The service is unreachable: the request rejects with the browser's TypeError.
+    server.use(http.post('/api/tasks/:id/speakers/reassign', () => HttpResponse.error()));
+    await renderTranscript('3');
+    const transcript = await screen.findByRole('region', { name: 'Transcript' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+    fireEvent.click(await within(panel).findByRole('button', { name: 'Reassign speakers' }));
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    fireEvent.click(
+      within(transcript).getByRole('checkbox', { name: 'Select segment starting 00:02' }),
+    );
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move to…' }));
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move' }));
+
+    // The bar's message is the app's; the browser's TypeError never reaches the view.
+    expect(
+      await within(bar).findByText("Not saved: can't reach the app's service. Reconnecting…"),
+    ).toBeInTheDocument();
+    expect(within(bar).queryByText(/Failed to fetch/)).not.toBeInTheDocument();
+    // The mode stays, with the selection intact, so the move can be retried.
+    expect(bar).toHaveTextContent('1 segment selected');
+  });
+
   it("ticks all of a turn's segments from its box, and clears them when all are ticked", async () => {
     await renderTranscript('3');
     const transcript = await screen.findByRole('region', { name: 'Transcript' });

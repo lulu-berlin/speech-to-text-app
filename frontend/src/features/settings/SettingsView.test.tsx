@@ -878,6 +878,40 @@ describe('the default frontend', () => {
   });
 });
 
+describe('the default frontend load failure', () => {
+  it('says the frontends list could not be loaded when the service is unreachable', async () => {
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFixed)),
+      http.get('/api/frontends', () => HttpResponse.error()),
+    );
+    renderSettings();
+    await settingsLoaded();
+
+    // The app's own words, never the browser's, and not a silent "None" list.
+    expect(await screen.findByText("Couldn't load the frontends list.")).toBeInTheDocument();
+    expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
+  });
+
+  it('shows no error when the page is left while the frontends are still loading', async () => {
+    const held = Promise.withResolvers<void>();
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFixed)),
+      http.get('/api/frontends', async () => {
+        await held.promise;
+        return HttpResponse.json({ frontends: [] });
+      }),
+    );
+    const view = renderSettings();
+    await settingsLoaded();
+    view.unmount();
+    held.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // Leaving aborts the read; its abort is not a load failure to report.
+    expect(screen.queryByText("Couldn't load the frontends list.")).not.toBeInTheDocument();
+  });
+});
+
 describe('the terminal command', () => {
   it('stores a typed command when the field is left, and an empty field as the OS launcher', async () => {
     const writes: Record<string, unknown>[] = [];

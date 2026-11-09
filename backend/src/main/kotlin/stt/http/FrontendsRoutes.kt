@@ -59,7 +59,7 @@ internal fun readFrontends(dir: Path?): List<FrontendEntry> {
     return files.mapNotNull { file ->
         try {
             val json = Json.parseToJsonElement(Files.readString(file)).jsonObject
-            entryOf(json)
+            entryOf(file, json)
         } catch (e: Exception) {
             frontendsLogger.warn("Skipping unreadable frontend descriptor $file", e)
             null
@@ -67,11 +67,17 @@ internal fun readFrontends(dir: Path?): List<FrontendEntry> {
     }
 }
 
-/** [json] as an entry, or null when it is not a descriptor this API offers. */
-private fun entryOf(json: JsonObject): FrontendEntry? {
+/** [json] as an entry, or null when it is not a descriptor this API offers; an unknown kind is logged. */
+private fun entryOf(
+    file: Path,
+    json: JsonObject,
+): FrontendEntry? {
     val id = json["id"]?.jsonPrimitive?.contentOrNull ?: return null
     val name = json["name"]?.jsonPrimitive?.contentOrNull ?: return null
     val kind = json["kind"]?.jsonPrimitive?.contentOrNull ?: return null
-    if (kind !in FRONTEND_KINDS) return null
+    if (kind !in FRONTEND_KINDS) {
+        frontendsLogger.warn("Skipping frontend descriptor {}: unknown kind \"{}\"", file, kind)
+        return null
+    }
     return FrontendEntry(id, name, kind)
 }

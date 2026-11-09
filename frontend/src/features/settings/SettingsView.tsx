@@ -151,12 +151,21 @@ export function SettingsView() {
   const focusedField = useRef<SettingsField | null>(null);
 
   // The frontends are a separate read: the settings carry only the chosen id (roadmap item 66).
-  // A failure leaves no choices, so the field then offers only "None".
+  // A failure is said, in the app's words, instead of silently leaving only "None" (items 87/95);
+  // the abort that leaving the page performs is not a failure.
+  const [frontendsError, setFrontendsError] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     fetchFrontends(controller.signal)
-      .then((list) => setFrontends(list.frontends))
-      .catch(() => setFrontends([]));
+      .then((list) => {
+        setFrontends(list.frontends);
+        setFrontendsError(false);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setFrontends([]);
+        setFrontendsError(true);
+      });
     return () => controller.abort();
   }, []);
 
@@ -475,7 +484,8 @@ export function SettingsView() {
             <Select
               id="defaultFrontend"
               value={defaultFrontend}
-              disabled={inert || dismissing}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
               onChange={(event) => {
                 const next = event.target.value;
                 setDefaultFrontend(next);
@@ -489,6 +499,9 @@ export function SettingsView() {
                 </option>
               ))}
             </Select>
+            {frontendsError ? (
+              <FieldError id="frontends-error">Couldn't load the frontends list.</FieldError>
+            ) : null}
           </Field>
           <Field label="Terminal command" htmlFor="terminalCommand">
             <TextInput
@@ -496,7 +509,8 @@ export function SettingsView() {
               type="text"
               value={terminalCommand}
               placeholder="The OS terminal"
-              disabled={inert || dismissing}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
               onFocus={() => {
                 focusedField.current = 'terminalCommand';
               }}

@@ -1,5 +1,6 @@
 package stt.engine
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import stt.audio.AudioDecodeException
@@ -40,6 +41,12 @@ internal class FakeChunker : Chunker {
         )
 
     /**
+     * The task whose chunking is killed, as a SIGTERM to the decoder would: its scratch is written and then a
+     * cancellation is thrown, once; null for every task.
+     */
+    var cancelFor: Long? = null
+
+    /**
      * The task whose result cannot be stored: its clip names second 0 twice, so storing it breaks part-way on
      * `audio_second`'s key; null for every task. Lets a test see that a chunking result is stored all-or-nothing.
      */
@@ -65,6 +72,10 @@ internal class FakeChunker : Chunker {
             Files.writeString(scratchDir.resolve("canonical.flac"), "fake canonical encode")
             entered.send(scratchDir)
             if (workDirs.size >= holdFrom) hold?.await()
+            if (task == cancelFor) {
+                cancelFor = null
+                throw CancellationException("process was terminated by SIGTERM (exit 143)")
+            }
             if (task == decodeFailsFor) throw AudioDecodeException("fake decode failure of task $task")
             val clip = if (task == unwritablePlanFor) canonical.copy(rows = canonical.rows + canonical.rows.first()) else canonical
             ChunkedAudio(durationMs = planned.last().endMs, chunks = planned, canonical = InMemoryClip(clip))

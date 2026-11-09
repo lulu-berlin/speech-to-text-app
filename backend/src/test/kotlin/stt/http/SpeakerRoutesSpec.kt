@@ -682,6 +682,38 @@ class SpeakerRoutesSpec :
             }
         }
 
+        given("a COMPLETED task transcribed with speakers off: four segments and no speaker rows (queue paused)") {
+            `when`("all its segments are reassigned to a new speaker") {
+                then("speaker 0 \"Speaker 1\" is created, and /turns shows the task under the new speaker") {
+                    val dataDir = tempdir("stt-data").toPath()
+                    val id = seedWithoutSpeakers(dataDir, completed("memo.wav"), fourSegments)
+                    val oneSpeaker = speakers("Speaker 1")
+
+                    testApplication {
+                        application { sttApp(stt.config.testConfig(dataDir)) }
+                        val moved = client.reassign(id, segmentIds = listOf(1, 2, 3, 4), speakerId = null)
+                        moved.status shouldBe HttpStatusCode.OK
+                        Json.parseToJsonElement(moved.bodyAsText()) shouldBe
+                            Json.parseToJsonElement("""{ "speakers": $oneSpeaker }""")
+
+                        client.turnsOf(id) shouldBe
+                            turnsJson(
+                                hasMerges = false,
+                                speakers = oneSpeaker,
+                                turn(
+                                    0,
+                                    "Hello. Hi. Hey. Bye.",
+                                    turnSegment(1, 0, 1_000, "Hello."),
+                                    turnSegment(2, 1_000, 2_000, "Hi."),
+                                    turnSegment(3, 2_000, 3_000, "Hey."),
+                                    turnSegment(4, 3_000, 4_000, "Bye."),
+                                ),
+                            )
+                    }
+                }
+            }
+        }
+
         given("a QUEUED and a FAILED task, cycle 8's COMPLETED task and a copy with {0, 1} merged into 0 (queue paused)") {
             `when`("reassignments are asked there, on unknown tasks and targets, and with selections that change nothing") {
                 then("409 not-completed, 404 not-found and 400 invalid-reassignment, and nothing changes") {
@@ -940,6 +972,21 @@ private suspend fun seed(
             insertAll(id, segments)
             storeSpeakers(id, speakerIds)
         }
+        id
+    }
+
+/** Stores [task] with [segments] and no speaker rows, as a task transcribed with speakers off leaves it. */
+private suspend fun seedWithoutSpeakers(
+    dataDir: Path,
+    task: Task,
+    segments: List<Segment>,
+): Long =
+    Database.open(dataDir).use { db ->
+        QueueStateRepository(db).setPaused(true)
+        val id =
+            TaskRepository(db)
+                .createFromUpload(task, "${task.originalFilename} bytes".toByteArray().inputStream())
+        SegmentRepository(db).insertAll(id, segments)
         id
     }
 

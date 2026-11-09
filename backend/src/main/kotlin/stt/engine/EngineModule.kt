@@ -47,7 +47,9 @@ fun Application.processingEngine(config: Config) {
     dependencies {
         // One runner for every external process: it is single-flight (ADR 0020) and is the engine's pause control.
         provide<ProcessRunner> { ProcessRunner(stopping = stopping::get) }
-        provide<SpeakerDiarizer> { SpeakerDiarizer(config.speakerModel, SegmentRepository(resolve())) }
+        provide<SpeakerDiarizer> { SpeakerDiarizer(config.speakerModel, SegmentRepository(resolve())) } cleanup {
+            it.close()
+        }
         provide<ProcessingEngine> {
             val db: Database = resolve()
             val runner: ProcessRunner = resolve()
@@ -81,8 +83,9 @@ fun Application.processingEngine(config: Config) {
     // its cleanup exists before any stop can close the Database. DI's resolve is suspend; module loading
     // is not a coroutine, hence the same runBlocking bridge the cleanup uses.
     val engine: ProcessingEngine = runBlocking { dependencies.resolve<ProcessingEngine>() }
-    // The worker starts on that same engine: it recovers what a crash left RUNNING, then takes the queue.
-    launch { engine.start() }
+    // The worker starts on that same engine: it recovers what a crash left RUNNING, then takes the queue. That
+    // recovery runs before the service serves (item 95), so a database it cannot recover fails the startup.
+    runBlocking { engine.start() }
 }
 
 /**

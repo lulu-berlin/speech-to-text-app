@@ -165,8 +165,20 @@ class ServiceInstance private constructor(
         private fun readConfig(file: Path): ServiceConfig? {
             if (!file.exists()) return null
             return try {
-                Json.decodeFromString<ServiceConfig>(file.readText())
+                val config = Json.decodeFromString<ServiceConfig>(file.readText())
+                if (config.port !in 1..65535) {
+                    logger.warn(
+                        "{} names port {}, outside 1..65535; replacing it with the default port and a new secret",
+                        file,
+                        config.port,
+                    )
+                    return null
+                }
+                config
             } catch (e: SerializationException) {
+                logger.warn("{} cannot be read; replacing it with the default port and a new secret", file, e)
+                null
+            } catch (e: IOException) {
                 logger.warn("{} cannot be read; replacing it with the default port and a new secret", file, e)
                 null
             }
