@@ -17,7 +17,7 @@ the backend's shape checks use these bytes. Treat them as the wire contract.
 - `docs/backend-schema.sql` — the consolidated current schema DDL (fresh databases only; see
   section 3 for opening an existing file).
 
-**Baseline:** the current `main` at `52e99c3b` (2026-10-20). **This document is a derived catalog,
+**Baseline:** the current `main` at `222d3206` (2026-11-09). **This document is a derived catalog,
 not a competing contract:** where it and an authority disagree, the authority wins.
 
 **Traceability** (area → current authority → tests/fixtures):
@@ -62,7 +62,8 @@ and a zip, each checked by its own CI leg); section 17 lists what differs per pl
 ## 2. Configuration (environment)
 
 Read once at startup; invalid or missing required values fail startup with a message naming the
-variable. There is no config file.
+variable. The server itself takes no config file; app mode additionally keeps `config.json` and
+`runtime.json` in its service directories (section 4, App mode).
 
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
@@ -74,6 +75,8 @@ variable. There is no config file.
 | `STT_STATIC_DIR` | no | — | Built frontend directory; unset disables static serving (and logs a warning). |
 | `STT_MAX_UPLOAD_BYTES` | no | 1 GiB (1073741824) | Positive integer; zero/negative/non-numeric fails naming the variable. |
 | `STT_STOP_ON_STDIN_CLOSE` | no | — | `1` stops the service once its stdin closes (the desktop app's quit on Windows); any other value leaves stdin unread. |
+| `STT_CONFIG_DIR` | no | per-user config directory | App mode only: where the durable `config.json` lives. |
+| `STT_RUNTIME_DIR` | no | per-user runtime directory | App mode only: where the ephemeral `runtime.json` lives. |
 
 The compute device and thread count are **not** environment configuration; they are stored
 settings (section 11). `STT_DEVICE` and `STT_THREADS` are not read.
@@ -248,7 +251,8 @@ not-completed`. Merge: `group` of ≥ 2 ids, `into` in the group, no member alre
 `400 invalid-merge`; merged members bring along their own merges. Reset removes all merges. Both
 emit `speakers-merged`/`speakers-renamed` and answers the effective speakers.
 
-Reassign: `speakerId: null` creates a new speaker, its id the highest over all the task's speaker
+Reassign: `speakerId: null` creates a new speaker, its id 0 when the task has no speaker rows
+(transcribed with speakers off; item 95) and otherwise the highest over all the task's speaker
 rows + 1 and its name the first free `Speaker N` from N = id + 1; the listed segments get the
 target's id in one write transaction, and a speaker left without segments loses its row. A task with
 merges bakes them in first, in the same write, its new speaker's id read over all rows before that.
@@ -266,10 +270,29 @@ does not have, or every selected segment already the target's).
 - `speakers-renamed`/`speakers-merged`/`speakers-reassigned` → `{id, speakers:[{speakerId,speaker}]}`.
 - `heartbeat` → `{}` every 5 s of silence; a client silent for 15 s reconnects and re-snapshots.
 - `settings-updated` → the settings without `availableDevices`/`gpuNames`.
+- A `task-updated` whose task was deleted before the frame is written is skipped; the delete's
+  `task-deleted` follows (item 95).
 
 A subscriber slower than the event buffer is disconnected (not silently fed a lossy stream), so
 the client reconnects and takes a fresh snapshot. Events are emitted after the corresponding
 write commits.
+
+### App mode (service)
+
+`<binary> service` runs the per-user service instead of a plain server (item 66): it binds
+`127.0.0.1` only, requires the per-install secret on every request (`401 forbidden` without it),
+and keeps two files in the service directories (`STT_CONFIG_DIR`, `STT_RUNTIME_DIR`, else the
+per-user defaults):
+
+- `config.json` — durable: the port and the secret, owner-readable. One instance claims it; a file
+  that cannot be read, does not parse, or names a port outside 1..65535 is replaced at startup with
+  the default port and a new secret (item 95).
+- `runtime.json` — ephemeral: the running pid and port, withdrawn on a clean stop.
+
+The durable port is tried first; when another program holds it, the server binds any free port and
+makes it the new durable port in `config.json`. `POST /api/launch-token`, `/api/tray` and
+`/api/quit` exist only in this mode. The quit watcher and the tray supervision belong to the
+server that serves: the stop of a bind-failed first server must not end them (item 95).
 
 ### Error codes
 
@@ -282,7 +305,8 @@ names the limit). `500`: `internal`.
 
 ## 5. Upload
 
-`POST /api/tasks` multipart, one file part:
+`POST /api/tasks` multipart, one file part **named `file`** — a file part under any other name,
+a value field's included, is refused with `400 missing-file` (item 95):
 
 1. Reject a declared `Content-Length` above `STT_MAX_UPLOAD_BYTES` before staging (`413`), and
    enforce the limit while streaming (chunked bodies too); an upload of exactly the limit is
@@ -323,7 +347,8 @@ one is a no-op. `QUEUED → RUNNING` is the only transition gated by whole-queue
 
 ## 7. Processing engine
 
-One worker (concurrency 1), woken by enqueue, resume, reorder, queue resume and task completion;
+One worker (concurrency 1), woken by enqueue, resume, reorder, queue resume, cancel and task
+completion (a cancelled started PAUSED task must not leave the queue waiting; item 95);
 no polling. It picks the QUEUED task with the lowest `queue_position` when the queue is not
 paused; a started PAUSED task blocks the worker until resumed or cancelled.
 
@@ -359,7 +384,9 @@ Keep stored chunks and the segments of DONE chunks; keep the original until chun
 Failure: any non-cancellation exception (non-zero exit, unparsable JSON, model error) → FAILED
 with a readable message; the worker moves on. A process killed by SIGTERM while the app keeps
 running is **not** a failure: the task goes back to QUEUED at once and is rerun from its
-interrupted chunk (RUNNING → QUEUED). A cancel is never a failure.
+interrupted chunk (RUNNING → QUEUED). A cancel is never a failure. Cleanup is best effort (item
+95): a failed delete is logged and never replaces the run's error or the answer in flight, and it
+runs under a non-cancellable scope, so a cancel still closes what it opened.
 
 Start race: the worker's start write is conditional (`QUEUED → RUNNING`); cancel, pause, delete
 that arrive while the task is starting act on the run (process stopped/frozen) and the stored
@@ -369,7 +396,9 @@ landing while the last process exits loses to the completion.
 Restart recovery: on startup, RUNNING tasks become QUEUED at their existing positions and resume
 from the last DONE chunk (an unfinished chunk is rerun; its segments were never committed);
 PAUSED tasks stay PAUSED. A started PAUSED task still blocks the worker after restart. The
-scratch directory is emptied; unclaimed staged uploads are deleted.
+scratch directory is emptied; unclaimed staged uploads are deleted. The recovery is part of
+startup (item 95): if it cannot run, the service does not start and the error is logged; the
+scratch clear alone is best effort — logged, and the worker starts anyway.
 
 Every state change is persisted before its event is emitted.
 
@@ -553,7 +582,11 @@ the task and means interruption (section 7), not failure.
 reports whether it wrote.
 - Events are emitted after the write; `queue-updated` follows every membership change.
 - No broad catch swallows a throwable: rethrow, log it, or mark the task; `CancellationException`
-  is always rethrown.
+is always rethrown.
+- Cleanup never masks the failure it follows: deletes are best effort, logged, and never replace
+the run's error or the response in flight; cleanup runs under a non-cancellable scope.
+- Startup recovery is part of startup: failing it fails the service, naming the logged error; only
+leftovers (scratch, staged uploads) are swept best effort.
 - Logging carries the task id (MDC) on every line that concerns a task; named coroutines.
 - Scratch and staged uploads are cleaned on every path and at startup; the database is the only
   retained state after a clean stop. A backup is `stt.db` alone (plus WAL/SHM after an unclean
@@ -706,10 +739,14 @@ fixtures and the current behavior in `docs/specs/*.md` and `backend/src/` for ex
 - **Wire contract**: every response/event/error must match its `docs/api/*.json` example. Reuse the
   examples as golden shapes, and the frontend (already built) against the Rust backend as the
   end-to-end check: serve the built UI and drive the existing e2e journey.
-- **Fixtures** (already in the repo): `backend/src/test/resources/librispeech/` (three CC BY 4.0
-  clips), `backend/src/test/resources/upload-formats/` (19 per-extension fixtures + 0.5 s
-  `sample.flac`), `e2e` clips, and the pinned models (`ggml-tiny.en` for tests, CAM++ for
-  embeddings). Reuse them byte-for-byte so expected values transfer.
+- **Fixtures** (already in the repo): `backend/src/test/resources/librispeech/` (18 CC BY 4.0
+  clips plus their license), `backend/src/test/resources/upload-formats/` (19 per-extension
+  fixtures plus 4 variant encodings), `e2e` clips, and the pinned models (`ggml-tiny.en` for
+  tests, CAM++ for embeddings). Reuse them byte-for-byte so expected values transfer.
+- **Test inventory**: [`docs/backend-parity-tests.md`](backend-parity-tests.md) lists every test
+the port must carry over, area by area, with its scenario count. A behavior is migrated when its
+listed scenarios run against the Rust backend; the Kotlin suite stays the reference until the
+switch.
 - **Real-tool tests**: decode/chunk/transcribe/diarize with the real ffmpeg, whisper-cli and
   CAM++ model on the fixtures; the frontend journey (queue → upload → completed → transcript) is
   the end-to-end proof of the API contract.
