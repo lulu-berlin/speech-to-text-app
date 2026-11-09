@@ -1,6 +1,6 @@
 # 96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it
 
-Status: draft
+Status: spec-approved
 Depends on: [95](95-audit-failure-paths.md) (same engine and route files), [67](67-tui-frontend.md) (the `client/stt-client` rows only)
 Blocks: —
 
@@ -158,8 +158,8 @@ which corrected some counts and paths; the corrected findings are below. Paths a
 ## Proposal
 
 1. **Delete** the dead code above, and fix the KDocs and docs that present it as live
-   (`docs/architecture.md`, `docs/backend-reimplementation.md` for `TaskQueue`). Drop or expose
-   `contentType` and `model` per the open question.
+   (`docs/architecture.md`, `docs/backend-reimplementation.md` for `TaskQueue`). **Drop
+   `contentType` and `model` with a migration.**
 2. **Fold each duplicate into one definition**, the existing shared module where one exists
    (`shared/errorMessage.ts`, `shared/api/types.ts`'s status sets, `e2e/lib/processes.ts`,
    `lib/wait.ts`):
@@ -174,32 +174,31 @@ which corrected some counts and paths; the corrected findings are below. Paths a
 5. **Conventions**:
    - The classpath lists load once at wiring, on `Dispatchers.IO`.
    - `STT_CONFIG_DIR` and `STT_RUNTIME_DIR` move into `Config`, and `ServiceDirs` takes them as
-     parameters (or an ADR permits the second reader; open question).
+     parameters.
+6. **Turn the unused-locals guard on**: `noUnusedLocals` and `noUnusedParameters` in the frontend
+   and e2e `tsconfig`s.
+7. **Take the three named backlog rows**: the two `segment(...)` test builders, `TestTransitions`'
+   copy of `allowedTransitions`, and turn rows keyed by array index.
 
 ## Open questions
 
-- **`contentType` and `model`**: drop them (a migration removes the columns), or expose them on
-  the task's JSON and in History's details? Dropping is the boring choice unless a view wants
-  them.
-- **Item 75's two guards** check disjoint things: the docs package's source-comment test (with
-  its own hand-written tokenizer) reads comments in backend and e2e sources, and the tree check
-  reads the tree and the live documents. Keep both, or retire the comments test now that item 75
-  is done?
-- **`ServiceDirs`' variables**: move them into `Config` (convention kept), or record an ADR for a
-  second reader? Moving lets `docs/architecture.md` document them.
-- **The unused-locals guard**: turn `noUnusedLocals` and `noUnusedParameters` on in the frontend
-  and e2e `tsconfig`s, so a dead local fails `pnpm build` and the type checks? Proposed: yes.
-- **The settings field list**: how far to go is a design choice — one table per side, or one
-  shared contract the frontend's switches derive from. Settle at the first checkpoint, with the
-  workspace agent's concrete proposal.
-- **Rows from `docs/known-issues.md`** that sit beside this item's scope and could join it:
-  - the two `segment(...)` test builders (Tests);
-  - `TestTransitions.kt`'s copy of `allowedTransitions` (Tests);
-  - turn rows keyed by array index (Frontend).
+None. (Settled 2026-11-09, see "Decided".)
 
-  This draft leaves them in the backlog.
-- **The `client/stt-client` rows** wait for item 67. Split them into a follow-up instead, if 67
-  is still running when the rest is done?
+## Decided (consultation, 2026-11-09)
+
+- **`contentType` and `model` are dropped**, with a migration; no view or client wants them.
+- **Item 75's two guards stay**: the source-comment scan and the tree/live-document check cover
+  disjoint things.
+- **`STT_CONFIG_DIR` / `STT_RUNTIME_DIR` move into `Config`**; `ServiceDirs` takes them as parameters
+  and `docs/architecture.md` can name them.
+- **The unused-locals guard is on**: `noUnusedLocals` and `noUnusedParameters` in the frontend and
+  e2e `tsconfig`s, so a dead local fails `pnpm build` and the type checks.
+- **The settings fields get one list per side**, which the per-field code derives from; not a
+  generated shared contract.
+- **Three backlog rows join the item**: the two `segment(...)` test builders, `TestTransitions.kt`'s
+  copy of `allowedTransitions`, and turn rows keyed by array index.
+- **The `client/stt-client` rows stay in this item**; if item 67 is still running when the rest is
+  done, they split into a small follow-up.
 
 ## Test list
 
@@ -208,8 +207,8 @@ and each line below names the behaviour that must hold after a removal or fold.
 
 - [ ] (must not break) After the dead code is removed, `gradle check`, `gradle integrationTest`,
       `pnpm test`, the docs checks, `cargo test`, `cargo clippy` and the e2e journeys stay green.
-- [ ] (basic) If `contentType` and `model` are dropped: a database at the previous version
-      migrates, and its tasks keep every other field; their JSON is unchanged.
+- [ ] (basic) `contentType` and `model` are gone: a database at the previous version migrates, its
+      tasks keep every other field, and their JSON is unchanged.
 - [ ] (basic) A settings field is declared once per side: adding a field to the list is enough to
       carry it through GET, PUT, the event and the Settings page's save, revert and recommit
       (proven with a test-only field or the existing fields' round trips).
@@ -224,6 +223,8 @@ and each line below names the behaviour that must hold after a removal or fold.
       fails the service's start rather than the first upload.
 - [ ] (basic) `STT_CONFIG_DIR` and `STT_RUNTIME_DIR` are read by `Config` only, and the
       service-dirs case table (`docs/service-dirs.json`) still holds for Kotlin and Rust.
+- [ ] (basic) A dead local in the frontend or e2e sources fails the type check (proven with one
+      planted, then removed), and the trees pass with both flags on.
 - [ ] (must not break) The client's registry is read by one function; `stt-app` and the tray print
       their own warning prefix.
 
@@ -237,3 +238,10 @@ e2e journeys running unchanged are part of its must-not-break proof.
 - 2026-11-06: filed as a draft by the root agent at the user's request, from the 2026-11-06 code
   audit after a verification pass. The user chose one item for all of the audit's cleanup. The
   known-issues rows "Dead exports" and "Duplicated helpers" (Frontend) were merged into it.
+- 2026-11-09: consultation (user): drop `contentType`/`model` with a migration; keep both of item
+  75's guards; move the two `STT_` variables into `Config`; turn the unused-locals flags on; one
+  settings list per side; absorb the three named backlog rows; the client rows stay here and split
+  into a follow-up if item 67 is still running. Status stays `draft` until the updated test list is
+  approved.
+- 2026-11-09: approved by the user: the decisions recorded above and the 11-line test list as
+  updated. Status set to spec-approved.

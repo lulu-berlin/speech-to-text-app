@@ -1,6 +1,6 @@
 # 95 — Failure paths that stop work or hide the error: the worker, the service, the API and the frontend's requests
 
-Status: draft
+Status: spec-approved
 Depends on: [11](../docs/specs/processing-engine.md), [42](../docs/specs/worker-stability.md), [12](../docs/specs/http-api-and-sse.md), [41](../docs/specs/upload-hardening.md), [32](../docs/specs/settings-page.md), [66](../docs/specs/local-service-and-frontends.md), [73](../docs/specs/speaker-reassignment.md), [87](../docs/specs/writes-and-the-connection.md) (all done)
 Blocks: [96](96-audit-cleanup.md) (the cleanup edits the same engine and route files)
 
@@ -160,9 +160,9 @@ by read-only passes, which corrected some of the audit's claims; the corrected v
 
 ## Proposal
 
-1. **Worker start**: recovery and the scratch clear run so that a failure is logged and the worker
-   loop still starts. If recovery itself cannot run, the failure is logged and made visible (open
-   question); it never silently ends the worker.
+1. **Worker start**: recovery runs before the loop. If recovery itself cannot run, the service's
+   startup fails, naming the error and logging it — the service never serves with a database it
+   cannot recover. A failure in the scratch clear alone is logged and the loop starts.
 2. **Cancel wakes the worker** like the other commands.
 3. **One best-effort delete helper** for every cleanup on the run and upload paths. It logs an
    IOException with the path, rethrows cancellation, and never replaces the exception in flight.
@@ -178,8 +178,8 @@ by read-only passes, which corrected some of the audit's claims; the corrected v
    malformed one, as item 66 already states.
 7. **`EmbeddingWindows`** computes in `Long`.
 8. **The API**:
-   - Reassign to a new speaker on a task with no speaker rows answers what the spec decides (open
-     question).
+   - Reassign to a new speaker on a task with no speaker rows creates speaker 0 and moves the
+     segments (200), instead of throwing.
    - The upload's file part must be named `file`, and a file part under a value field's name is
      rejected.
    - Reorder rejects duplicate ids with 409 and reads the pending ids once.
@@ -194,16 +194,17 @@ by read-only passes, which corrected some of the audit's claims; the corrected v
 
 ## Open questions
 
-- **Reassign to a new speaker on a task without speakers**: 409 with a reason (a task transcribed
-  without speakers has none to move between), or create speaker 0 and accept? The first keeps
-  "speakers off" meaning no speakers.
-- **Worker start when recovery fails** (for example, the database is unreadable): fail the service's
-  startup loudly, or start the loop and retry recovery on the next wake? Failing startup is the
-  boring choice: the service is unusable either way.
-- **e2e (ADR 0046)**: the app's behaviour changes in visible places (the write gate on two Settings
-  fields, the reassign error text, quit after a port fallback). Proposed: one e2e test for the two
-  gated Settings fields with the service frozen (the item 87 journey's pattern, skipped on Windows
-  like it), and the rest proven at the route and engine level. Or name an exemption.
+None. (Settled 2026-11-09, see "Decided".)
+
+## Decided (consultation, 2026-11-09)
+
+- Reassigning segments to a new speaker on a task transcribed with speakers off **creates speaker 0**
+  and moves them; it is not an error.
+- A recovery failure at worker start **fails the service's startup**, naming the logged error; only
+  a failure of the scratch clear alone is survived.
+- e2e: **one** test covers the two Settings fields that must be write-gated, with the service frozen
+  (item 87's journey pattern, skipped on Windows); the reassign path and quit-after-fallback are
+  proven at route and engine level.
 
 ## Test list
 
@@ -211,6 +212,8 @@ Draft, to settle with the user.
 
 - [ ] (basic) A started task paused across a restart is canceled, and the QUEUED task behind it
       starts without any other command.
+- [ ] (failure) A recovery failure at startup fails the service's startup, naming the logged error:
+      no worker serves with a database it cannot recover.
 - [ ] (edge) A scratch clear that throws at startup is logged, and the worker still runs the next
       queued task.
 - [ ] (failure) A chunker, chunk-window or diarization-clip cleanup that throws does not replace
@@ -226,8 +229,8 @@ Draft, to settle with the user.
 - [ ] (edge) An unreadable `config.json` and one with an out-of-range port are replaced at start,
       with the default port and a new secret.
 - [ ] (edge) An embedding window on a segment past 18.6 h of audio is centred on the segment.
-- [ ] (failure) Reassigning segments to a new speaker on a task with no speakers answers the
-      decided status, not 500.
+- [ ] (basic) Reassigning segments to a new speaker on a task with no speakers creates speaker 0,
+      moves them (200), and the transcript shows the new speaker.
 - [ ] (failure) An upload whose file part is not named `file` is rejected with 400
       `missing-file`; a file part under a value field's name is rejected.
 - [ ] (failure) A reorder naming a pending id twice is rejected with 409, and the stored order is
@@ -246,9 +249,16 @@ Draft, to settle with the user.
 
 ## e2e stance
 
-To be settled (see Open questions). Proposed: one e2e test for the two gated Settings fields.
+One e2e test, per ADR 0046: the two Settings fields that must be write-gated are disabled with the
+service frozen (item 87's journey pattern, skipped on Windows as item 87's is). The reassign path
+and quit-after-fallback are proven at route and engine level, where their triggers are exact.
 
 ## Approval log
 
 - 2026-11-06: filed as a draft by the root agent at the user's request, from the 2026-11-06 code
   audit after a verification pass. The user chose one item for all of the audit's bugs.
+- 2026-11-09: consultation (user): a new speaker is created on a task transcribed with speakers off;
+  a recovery failure at startup fails the service, naming the error; one e2e test for the two gated
+  Settings fields. Status stays `draft` until the updated test list is approved.
+- 2026-11-09: approved by the user: the decisions recorded above and the 20-line test list as
+  updated. Status set to spec-approved.
