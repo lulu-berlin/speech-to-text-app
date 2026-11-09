@@ -1,6 +1,6 @@
 # 98 — The Rust workspace lives at the repository root, and its crates in `crates/`
 
-Status: draft
+Status: spec-approved
 Depends on: [67](67-tui-frontend.md) (it splits `client/` into four crates on its own branch), [66](../docs/specs/local-service-and-frontends.md) (done; the workspace, the toolchain file and the version pin)
 Blocks: —
 
@@ -66,6 +66,13 @@ No behaviour changes; this is a layout move with a short list of references, all
 - **Approved items keep their scope while their stack exists**: 89 (the service package, JVM), 78
   (release gates, JVM and Electron) and 95/96 (Kotlin and frontend fixes) are not cancelled. They
   are retargeted by the rule above if their area moves first; nothing else is cancelled except 92.
+- **`rust-toolchain.toml` moves to the root**, beside `Cargo.toml`, where it governs every `cargo`
+  invocation; its comment says it applies to `cargo`, not to the JVM or Node consumers.
+- **`Cargo.lock` moves to the root**, beside `flake.lock`; the release tooling (ADR 0065, item 89)
+  reads it there.
+- **The CI job ids stay `client-check`, `macos-client-check` and `windows-client-check`**, so the
+  branch-protection required checks are untouched; only their `working-directory` and cache paths
+  change.
 
 ## Proposal
 
@@ -97,11 +104,7 @@ No behaviour changes; this is a layout move with a short list of references, all
 
 ## Open questions
 
-- **`rust-toolchain.toml` at the root**: it applies to the whole repository, including the JVM and
-  Node consumers. That is what a root workspace needs, but it does mean the file's comment must say
-  it governs `cargo` invocations only.
-- **`Cargo.lock` at the root**: it becomes a root file beside `flake.lock` and `pnpm-lock.yaml`
-  (frontend's). Confirm the release tooling (ADR 0065, item 89) reads it from the root.
+None. (Settled 2026-11-09, see "Decided".)
 
 ## Test list
 
@@ -143,3 +146,8 @@ the app-mode ones) running from the new paths are part of its proof.
   TypeScript code but planned after the move to Rust, unless an urgent feature overrules it; and any
   roadmap item that would change Kotlin or TypeScript code targets the migrated Rust code when the
   migration lands before it. Approved items keep their scope while their stack exists.
+- 2026-11-09: consultation, third round (user): `rust-toolchain.toml` and `Cargo.lock` live at the
+  root; the CI job ids keep their `client-*` names so the required checks are untouched. Status
+  stays `draft` until the test list is approved.
+- 2026-11-09: approved by the user: the decisions above and the 8-line test list as written. Status
+  set to spec-approved.

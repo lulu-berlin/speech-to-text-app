@@ -1,6 +1,6 @@
 # 97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once
 
-Status: draft
+Status: spec-approved
 Depends on: [85](../docs/specs/ci-wall-time.md) (it changes `ci.yml`'s job graph)
 Blocks: —
 
@@ -54,30 +54,32 @@ files, which corrected two claims (noted below).
 ## Proposal
 
 1. Run `checkVersions` in the Linux and macOS check jobs too, so the spec's sentence is true.
-2. Fold the per-OS check jobs into one matrix job, or into composite actions where a matrix would
-   change required job names. Move the desktop staging block and the pins-hash snippet into
-   composite actions. Keep `docs/check-ci-gating.test.ts` and `docs/check-packaged-steps.test.ts`
-   asserting the same guarantees over the new shape.
+2. Fold the per-OS check jobs into **matrix jobs** (the names change; the aggregator and the docs
+   tests follow), and move the desktop staging block and the pins-hash snippet into composite
+   actions. Keep `docs/check-ci-gating.test.ts` and `docs/check-packaged-steps.test.ts` asserting
+   the same guarantees over the new shape.
 3. Make the Mesa checks call `nix/artifact-integrity-check.nix` and keep only their extra
    assertion.
 4. Give the darwin pins one source that both `nix/versions.nix` and `nix/desktop-artifacts.nix`
    read, or a flake check that holds their URLs and sha256s equal. Read the ffmpeg asset version
-   in `build.gradle.kts` and `ci.yml` from one declared pin.
+   in `build.gradle.kts` and `ci.yml` from one declared pin. The same treatment for the three
+   joined rows: derive the `devenv.nix enterTest` model sha256s from `nix/models.nix`, share the
+   node/pnpm home path between the two `build.gradle.kts`, and assert the manifest's `jdk` appears
+   in every Temurin URL (or derive those URLs from it).
 
 ## Open questions
 
-- **Matrix or composite actions** for the check jobs: a matrix renames the jobs (`check
-  (ubuntu-latest)` …), which changes what `CI (all checks)` `needs` and what the docs tests look
-  for; composite actions keep the names. The workspace agent proposes, and the user decides at the
-  first checkpoint.
-- **Rows from `docs/known-issues.md`** of the same "pins declared twice" class could join this
-  item:
-  - the model sha256s duplicated in `devenv.nix` `enterTest`;
-  - the node/pnpm home path built twice in the root and frontend `build.gradle.kts`;
-  - the Temurin `jdk` pin never compared with `versions.json`;
-  - the bytedeco ffmpeg 8.1.2 bootstrap skew.
+None. (Settled 2026-11-09, see "Decided".)
 
-  This draft leaves them in the backlog until the consultation.
+## Decided (consultation, 2026-11-09)
+
+- **The per-OS check jobs fold into matrix jobs**, accepting that the job names change (`check
+  (ubuntu-latest)` …). The aggregator's `needs` and the docs tests are updated in the same change,
+  and the user updates the branch-protection required checks when the PR merges.
+- **Three "pin declared twice" backlog rows join the item**: the model sha256s duplicated in
+  `devenv.nix enterTest`, the node/pnpm home path built in both `build.gradle.kts`, and the Temurin
+  `jdk` pin never compared with `versions.json`. **The bytedeco ffmpeg 8.1.2 skew stays in the
+  backlog**: swapping the Linux bootstrap artifact is a packaging change, not a duplicated check.
 
 ## Test list
 
@@ -92,8 +94,12 @@ Draft, to settle with the user.
 - [ ] (basic) The Mesa artifact checks use the shared integrity module and still fail on a
       mismatched, missing or stale pin, and on a direct source-Mesa input.
 - [ ] (must not break) After the fold, every check, integration, e2e and packaged job still runs
-      on the platforms it ran on, with the same steps. `docs/check-ci-gating.test.ts` and
-      `docs/check-packaged-steps.test.ts` hold over the new shape, and the PR's CI run is green.
+      on the platforms it ran on, with the same steps; the matrix jobs' new names are what
+      `CI (all checks)` needs, the required checks are updated, and `docs/check-ci-gating.test.ts`
+      and `docs/check-packaged-steps.test.ts` hold over the new shape. The PR's CI run is green.
+- [ ] (basic) The three joined pin pairs hold: the model sha256s come from `nix/models.nix`, the
+      node/pnpm home path has one definition, and a Temurin URL whose patch differs from the
+      manifest's `jdk` fails a check.
 - [ ] (must not break) The pins hash that keys the caches is computed by one script, and a pin
       change still invalidates the caches it did before.
 
@@ -106,3 +112,9 @@ and packaged journeys running unchanged in the PR's run are part of its proof.
 
 - 2026-11-06: filed as a draft by the root agent at the user's request, from the 2026-11-06 code
   audit after a verification pass. The user chose one item for the audit's CI and build findings.
+- 2026-11-09: consultation (user): the check jobs fold into matrices, with the job names changing
+  and the aggregator and required checks updated in the same change; three pin rows join the item
+  (model sha256s, the node/pnpm home path, the Temurin `jdk`); the bytedeco skew stays in the
+  backlog. Status stays `draft` until the updated test list is approved.
+- 2026-11-09: approved by the user: the matrix fold, the three joined pin rows and the 7-line test
+  list as updated. Status set to spec-approved.
