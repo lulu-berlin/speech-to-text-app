@@ -15,7 +15,8 @@ machines, the localization layer and keys, and the user-facing features as abstr
 frontend and mobile frontends reuse the same core for their own layouts. The core stops at
 **interactions, not pages**: queueing an audio file, transcribe-and-diarize, editing a segment,
 playback, merging and reassigning speakers — not tabs or screens, because a mobile layout may
-group the same interactions differently.
+group the same interactions differently. Shortcut keys and their hints are uniform across the
+frontends: one command set, one binding table, hints generated from it.
 
 ## Evidence
 
@@ -30,6 +31,11 @@ group the same interactions differently.
 - **The client transport is already shared** (`stt-client`: discovery, credential, tasks, queue,
   transcripts, speakers, merges, settings, SSE with reconnect), so the next shared layer is the one
   above it — state and features, not HTTP.
+- **Shortcuts and their hints are triplicated**: the TUI marks keys inside catalog texts
+  (`client/stt-tui/src/hints.rs`: `[p]ause`, `re[v]ert`, `[Enter] open`), and its texts already come
+  from a shared lookup (`stt_client::text(key, …)`); the browser binds its own `keydown` handlers
+  and exposes `aria-keyshortcuts` (`frontend/src/features/history/TaskTranscriptView.tsx`,
+  `TranscriptTurns.tsx`); nothing checks that the two agree, and item 70 would add a third.
 - **Localization is a frontend-wide concern** (item 88): catalogs, ICU messages, plural
   categories, RTL, error-by-code, review pages. A Rust frontend needs exactly the same data, so
   the catalog is a single source, not one per language of implementation.
@@ -49,12 +55,16 @@ group the same interactions differently.
 - **It stops at interactions, not pages** (the user): "queue audio file", "transcribe + diarize",
   "edit segment", "playback", "merge/reassign speakers" — no tabs or page structure, since a mobile
   split may differ.
+- **Shortcut keys and shortcut hints are uniform across the frontends** (the user, 2026-11-12):
+  one command set and one binding table, adapted only where a platform cannot express a binding
+  (Cmd vs Ctrl, a terminal's sequences), and every hint is generated from that table and localized.
 
 ## Proposal
 
 1. **The crate** `crates/stt-ui`, framework-agnostic and renderer-free: no terminal, window or
    browser types, no I/O beyond what the feature needs, one entry point per feature.
-2. **Modules**:
+2. **Modules inside the crate** — directories under `crates/stt-ui/src/`, not separate crates;
+   `stt-ui` is the only crate this item adds:
    - `flow` — the finite state machines (app/queue/upload/transcript/playback/settings/speakers),
      with explicit states, events and commands, and illegal transitions rejected by construction;
    - `feature` — the interaction abstractions, each a small API over `stt-client` plus a state
@@ -62,10 +72,15 @@ group the same interactions differently.
      (transcribe + diarize: phases, progress, pause/resume/cancel/retry), `edit_segment` (select,
      edit text, save, revert), `playback` (play/pause/seek/follow, sink behind a trait),
      `speakers` (rename, merge, reassign, new speaker);
+   - `keys` — the command registry and the shortcut table: every user action is a command, and the
+     same command is what a click or a key produces; per-platform defaults (Cmd on macOS, Ctrl
+     elsewhere), sequences where a terminal or a text field needs them, and the localized hint
+     text generated from the table — the TUI's `[p]ause` hints and the browser's
+     `aria-keyshortcuts` both read it;
    - `i18n` — the message keys, the catalogs and the lookup/format rules (ICU, plurals, dates,
      numbers, RTL direction), shared by every frontend;
-   - `model` — the view models the renderers draw (rows, phases, badges, footer hints), still free
-     of widgets.
+   - `model` — the view models the renderers draw (rows, phases, badges, footer hints from
+     `keys`), still free of widgets.
 3. **The localization single source**: the catalogs move from the React app (item 88's work) into
    `i18n` as the canonical data; the React frontend consumes them generated (JSON compiled into
    its bundle), so item 88's review pages, glossary and checks keep working over the same files.
@@ -96,6 +111,14 @@ group the same interactions differently.
   a mobile target cannot host; item 86's outcome decides.
 - **The catalog's location**: `crates/stt-ui/i18n/<locale>.json` (shared file format with the
   frontend) versus a Rust-native message format with a generated JSON for the browser.
+- **The binding table's authority**: which keys become canonical (today's browser bindings, the
+  TUI's letters, or a reviewed list), how a conflict is resolved, and whether a user may remap them
+  (the proposal is no remapping at first).
+- **Platform limits**: Cmd vs Ctrl, terminal sequences a text field would swallow, and no keyboard
+  on mobile — a binding the target cannot express is marked unavailable rather than replaced by an
+  invented key, and its hint is omitted.
+- **The browser's shortcut adoption**: does the React frontend read the generated binding table and
+  hint texts now (keeping its `aria-keyshortcuts` in sync), or only when it moves to Rust?
 
 ## Test list (proposed; behaviors only, to approve at the consultation)
 
@@ -119,6 +142,12 @@ group the same interactions differently.
       catalog's message by code and falls back to the service's English text.
 - [ ] (i18n) Dates, numbers, times and plurals format through the library per locale, and an RTL
       locale reports a right-to-left direction the renderers use.
+- [ ] (keys) Every user action is a command with at most one binding per platform: a check fails on
+      a duplicate or conflicting binding, and a key event dispatches the same command a click does
+      in each frontend.
+- [ ] (keys) The hints a frontend shows are generated from the binding table and localized: the
+      TUI's `[p]ause`-style footer hints and the browser's `aria-keyshortcuts` list the same
+      bindings, and a binding with no hint, or a hint with no binding, fails a check.
 - [ ] (tui) The TUI draws from the core's view models and sends only commands: its existing tests
       move onto the core and stay green, with no behavior change.
 - [ ] (window) The Slint window reaches its item-70 parity through the same core: upload, queue,
