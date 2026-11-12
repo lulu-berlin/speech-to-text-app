@@ -91,6 +91,11 @@ in
       # (WM_CLASS) in that same container, so the e2e can compare it with the installed
       # .desktop entry's StartupWMClass.
       pkgs.xorg.xprop
+
+      # The TUI's audio playback (roadmap item 67): `cpal`'s Linux backend links ALSA (PulseAudio
+      # and PipeWire serve it through their ALSA plugins); `alsa-lib`'s dev output puts `alsa.pc`
+      # on PKG_CONFIG_PATH for `alsa-sys`. macOS (CoreAudio) and Windows (WASAPI) need nothing extra.
+      pkgs.alsa-lib
     ];
 
   # https://devenv.sh/languages/
