@@ -1,0 +1,188 @@
+# 109 — One UI core for every frontend: the `stt-ui` crate
+
+Status: spec-approved
+Depends on: [67](67-tui-frontend.md) (the TUI's flows, state and playback modules), [70](70-rust-gui-window.md) (the Slint window reaches the same feature set), [88](88-localization.md) (the catalogs, glossary and review records), [98](98-rust-workspace-at-root.md) (the crate lives in `crates/`)
+Blocks: — (the Rust browser frontend and the mobile frontends are later items built on it)
+
+> Numbering note: items 100–108 (the Rust backend rewrite) are filed on the unmerged
+> `docs/rust-backend-phase-1` branch, so this item takes 109 to avoid a collision.
+
+## Goal
+
+Every frontend is built from one shared Rust core instead of reimplementing the app: state
+machines, the localization layer and keys, and the user-facing features as abstractions. The TUI
+(item 67) and the Slint window (item 70) become thin renderers over it, and a future Rust browser
+frontend and mobile frontends reuse the same core for their own layouts. The core stops at
+**interactions, not pages**: queueing an audio file, transcribe-and-diarize, editing a segment,
+playback, merging and reassigning speakers — not tabs or screens, because a mobile layout may
+group the same interactions differently. Shortcut keys and their hints are uniform across the
+frontends: one command set, one binding table, hints generated from it.
+
+## Evidence
+
+- **Two frontends already duplicate the same logic.** Item 67's branch carries
+  `client/stt-tui/src/state.rs`, `player.rs`, `transcript.rs`, `writes.rs`, `upload_options.rs` and
+  `footer.rs`: queue and task state, playback state, transcript navigation, write-in-flight rules
+  and the upload options — all of it would be written a second time in Slint's Rust for item 70,
+  which promises "parity with the browser UI" including playback and drag-and-drop upload.
+- **The browser is the third copy**: the React app holds the same flows (`frontend/src/`), and item
+  70's evidence already records that the terminal and the window must reach the same parity. A
+  fourth and fifth frontend (WASM browser, mobile) would multiply the drift.
+- **The client transport is already shared** (`stt-client`: discovery, credential, tasks, queue,
+  transcripts, speakers, merges, settings, SSE with reconnect), so the next shared layer is the one
+  above it — state and features, not HTTP.
+- **Shortcuts and their hints are triplicated**: the TUI marks keys inside catalog texts
+  (`client/stt-tui/src/hints.rs`: `[p]ause`, `re[v]ert`, `[Enter] open`), and its texts already come
+  from a shared lookup (`stt_client::text(key, …)`); the browser binds its own `keydown` handlers
+  and exposes `aria-keyshortcuts` (`frontend/src/features/history/TaskTranscriptView.tsx`,
+  `TranscriptTurns.tsx`); nothing checks that the two agree, and item 70 would add a third.
+- **Localization is a frontend-wide concern** (item 88): catalogs, ICU messages, plural
+  categories, RTL, error-by-code, review pages. A Rust frontend needs exactly the same data, so
+  the catalog is a single source, not one per language of implementation.
+- **The workspace layout is item 98's**: `crates/stt-client`, `crates/stt-app`, `crates/stt-tray`,
+  `crates/stt-tui`; this crate joins them as `crates/stt-ui` with the same pinned toolchain and
+  committed `Cargo.lock`.
+- **Mobile is a feasibility question** (item 86): it decides whether a phone target exists, not
+  whether the core is frontend-agnostic — the abstraction is worth it for the four frontends
+  already planned.
+
+## Decided (consultation, 2026-11-12)
+
+- **All frontends become Rust** (the user): the TUI, the window, eventually the browser; the core
+  exists so each target implements rendering and platform input, not the app's behavior.
+- **The core holds**: the finite state machines, the texts as localization keys, the localization
+  library, and the UI features as abstractions.
+- **It stops at interactions, not pages** (the user): "queue audio file", "transcribe + diarize",
+  "edit segment", "playback", "merge/reassign speakers" — no tabs or page structure, since a mobile
+  split may differ.
+- **Shortcut keys and shortcut hints are uniform across the frontends** (the user, 2026-11-12):
+  one command set and one binding table, adapted only where a platform cannot express a binding
+  (Cmd vs Ctrl, a terminal's sequences), and every hint is generated from that table and localized.
+- **The name**: `stt-ui`, beside `stt-client`, `stt-tui` and the later `stt-window`.
+- **The service seam**: the core defines a `Service` trait and uses the client's DTOs;
+  `stt-client`'s types are split from its HTTP client (a types module or feature) so no reqwest or
+  tokio enters the core, and tests, a WASM target or a mobile target inject their own transport.
+- **The machines**: one machine per feature in `flow`, plus a small app-level router the renderer
+  owns — never a single machine that encodes page structure.
+- **Localization in Rust**: the catalogs stay ICU MessageFormat; `formatjs_icu_messageformat`
+  (the formatjs project's Rust runtime) is spiked first, with ICU4X for dates, numbers and plural
+  categories; if the spike disappoints, a small ICU MF1 subset implementation over ICU4X replaces
+  it, and the outcome is recorded here.
+- **Both frontends migrate in this item** (the user): the core is built from the TUI's modules, the
+  TUI moves onto it, then the Slint window.
+- **The catalogs are one shared ICU JSON per locale**, embedded in the crate **compressed** (the
+  user's size concern) and generated into the React app, so item 88's review pages, glossary and
+  checks keep reading one source; the embedded size is measured and budgeted.
+- **The canonical bindings are the TUI's where it has one**, the browser's elsewhere; no user
+  remapping at first; a duplicate or conflicting binding fails a check; a target that cannot
+  express a binding marks it unavailable and omits its hint.
+- **The browser adopts the generated table now** for its `aria-keyshortcuts` and hint strings; its
+  event handlers stay until its Rust port.
+- **The audio sink is a trait per target** (cpal, Slint's audio, WebAudio), and the core assumes no
+  global runtime; no `no_std` promise until item 86's outcome.
+
+## Proposal
+
+1. **The crate** `crates/stt-ui`, framework-agnostic and renderer-free: no terminal, window or
+   browser types, no I/O beyond what the feature needs, one entry point per feature. It talks to
+   the service through its own `Service` trait (implemented by `stt-client` today, by a fetch-based
+   transport in a browser target later), so the features can be driven by a fake in tests.
+2. **Modules inside the crate** — directories under `crates/stt-ui/src/`, not separate crates;
+   `stt-ui` is the only crate this item adds:
+   - `flow` — the finite state machines (app/queue/upload/transcript/playback/settings/speakers),
+     with explicit states, events and commands, and illegal transitions rejected by construction;
+   - `feature` — the interaction abstractions, each a small API over `stt-client` plus a state
+     machine: `queue_audio` (pick, options, upload, duplicate/rejection by code), `run_task`
+     (transcribe + diarize: phases, progress, pause/resume/cancel/retry), `edit_segment` (select,
+     edit text, save, revert), `playback` (play/pause/seek/follow, sink behind a trait),
+     `speakers` (rename, merge, reassign, new speaker);
+   - `keys` — the command registry and the shortcut table: every user action is a command, and the
+     same command is what a click or a key produces; per-platform defaults (Cmd on macOS, Ctrl
+     elsewhere), sequences where a terminal or a text field needs them, and the localized hint
+     text generated from the table — the TUI's `[p]ause` hints and the browser's
+     `aria-keyshortcuts` both read it;
+   - `i18n` — the message keys, the catalogs and the lookup/format rules (ICU, plurals, dates,
+     numbers, RTL direction), shared by every frontend;
+   - `model` — the view models the renderers draw (rows, phases, badges, footer hints from
+     `keys`), still free of widgets.
+3. **The localization single source**: the catalogs move from the React app (item 88's work) into
+   `crates/stt-ui/catalogs/<locale>.json` as the canonical ICU data; the crate embeds them
+   compressed — a build step compresses each locale at compile time and the crate decompresses a
+   locale when it becomes active, so the binary carries one codec, not the JSON — and the React
+   frontend consumes them generated (JSON compiled into its bundle), so item 88's review pages,
+   glossary and checks keep working over the same files. The embedded size is measured once the
+   first wave is in and budgeted in the item's log.
+4. **Migration in one item, in order**: build the core from the TUI's modules (they are the newest
+   and least entangled), move the TUI onto it, then move the Slint window onto it; both frontends
+   finish this item. The browser keeps its current implementation until its Rust port; from this
+   item it reads the generated catalogs and shortcut hints.
+5. **Testing at the core**: the FSMs and features are tested headlessly — a fake service (the
+   `stt-client` trait) and a fake sink/clock — so a behavior proves once for every frontend; each
+   renderer keeps its own rendering tests and the journeys.
+
+## Open questions
+
+- **The compression's mechanism and budget**: a build script compressing the catalogs at compile
+  time (zstd, decompressed lazily when a locale becomes active) versus committed precompressed
+  blobs that a check regenerates. The budget is set from the measured first wave — the aim is well
+  under 250 KB compressed for the 24 codes — and revisited as the rest land.
+- **The i18n spike's exit criteria**: every shipped locale's messages render with the same text and
+  the same plural choice as the React app for the same arguments, dates and numbers match `Intl`,
+  and malformed input never panics; if `formatjs_icu_messageformat` fails any of these, the ICU MF1
+  subset implementation over ICU4X replaces it and the reason is recorded in this item.
+
+## Test list (approved 2026-11-12; behaviors only)
+
+- [ ] (queue) Picking audio files and uploading them from the core yields the uploading state, the
+      progress, the created tasks and a duplicate or rejected file answered by its error code — with
+      a fake service and no renderer.
+- [ ] (task) A task's transcribe-and-diarize phases and progress reach the core's state in order,
+      and pause, resume, cancel and retry are commands the core accepts only in the states that
+      allow them.
+- [ ] (transcript) Loading a transcript, selecting segments, following the playhead and leaving
+      follow mode are core states; an edit and its save/revert produce the same write outcomes as
+      today, and a write in flight rejects a second one.
+- [ ] (playback) Play, pause, seek and position derive from the core's clock and the sink trait,
+      tested with a fake sink and clock, with the same behavior the TUI's footer and the browser
+      player have today.
+- [ ] (speakers) Rename, merge, reassign to an existing speaker and reassign to a new speaker are
+      core commands whose outcomes match the API's, including the "no merge with nothing to merge"
+      footer state.
+- [ ] (i18n) Every shipped locale's catalog has the same keys, valid ICU messages, the plural
+      categories its language requires and intact placeholders; a refused action resolves to the
+      catalog's message by code and falls back to the service's English text.
+- [ ] (i18n) Dates, numbers, times and plurals format through the library per locale, and an RTL
+      locale reports a right-to-left direction the renderers use.
+- [ ] (keys) Every user action is a command with at most one binding per platform: a check fails on
+      a duplicate or conflicting binding, and a key event dispatches the same command a click does
+      in each frontend.
+- [ ] (keys) The hints a frontend shows are generated from the binding table and localized: the
+      TUI's `[p]ause`-style footer hints and the browser's `aria-keyshortcuts` list the same
+      bindings, and a binding with no hint, or a hint with no binding, fails a check.
+- [ ] (tui) The TUI draws from the core's view models and sends only commands: its existing tests
+      move onto the core and stay green, with no behavior change.
+- [ ] (window) The Slint window reaches its item-70 parity through the same core: upload, queue,
+      transcript, playback, speakers and settings, proven at the core seam plus its own tests.
+- [ ] (browser) The React frontend's catalogs are generated from the shared source, and its
+      existing suite stays green with unchanged English text.
+- [ ] (must not break) Both frontends' journeys stay green and no screen's behavior changes; the
+      core's tests run without a terminal, window or browser.
+
+## e2e stance
+
+Exempt from ADR 0046's per-feature e2e test as a refactor-only item: no app behavior changes, and
+the TUI's and window's existing journeys are the proof; the items that add frontends (WASM browser,
+mobile) owe their own.
+
+## Approval log
+
+- 2026-11-12: filed as a draft by the root agent at the user's request: a `stt-ui` crate with the
+  shared state machines, localization keys and library, and the UI features as abstractions for
+  every Rust frontend, stopping at interactions rather than pages; to be started after 67 and 70.
+- 2026-11-12: consultation with the user: the name `stt-ui`; the `Service` trait seam with
+  `stt-client`'s types split from its HTTP client; per-feature machines under `flow` plus an app
+  router; ICU MessageFormat catalogs with a `formatjs_icu_messageformat` spike (ICU4X for formats,
+  the MF1 subset implementation as the fallback); both frontends migrate in this item; the shared
+  ICU JSON catalogs are embedded compressed (the user's size concern) and generated into the
+  React app; the TUI's bindings are canonical where it has one; the browser reads the generated
+  hints now. Test list approved as filed; `spec-approved`.
