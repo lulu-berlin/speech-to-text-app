@@ -1,6 +1,6 @@
 # 109 — One UI core for every frontend: the `stt-ui` crate
 
-Status: draft
+Status: spec-approved
 Depends on: [67](67-tui-frontend.md) (the TUI's flows, state and playback modules), [70](70-rust-gui-window.md) (the Slint window reaches the same feature set), [88](88-localization.md) (the catalogs, glossary and review records), [98](98-rust-workspace-at-root.md) (the crate lives in `crates/`)
 Blocks: — (the Rust browser frontend and the mobile frontends are later items built on it)
 
@@ -46,7 +46,7 @@ frontends: one command set, one binding table, hints generated from it.
   whether the core is frontend-agnostic — the abstraction is worth it for the four frontends
   already planned.
 
-## Decided (draft, 2026-11-12)
+## Decided (consultation, 2026-11-12)
 
 - **All frontends become Rust** (the user): the TUI, the window, eventually the browser; the core
   exists so each target implements rendering and platform input, not the app's behavior.
@@ -58,11 +58,35 @@ frontends: one command set, one binding table, hints generated from it.
 - **Shortcut keys and shortcut hints are uniform across the frontends** (the user, 2026-11-12):
   one command set and one binding table, adapted only where a platform cannot express a binding
   (Cmd vs Ctrl, a terminal's sequences), and every hint is generated from that table and localized.
+- **The name**: `stt-ui`, beside `stt-client`, `stt-tui` and the later `stt-window`.
+- **The service seam**: the core defines a `Service` trait and uses the client's DTOs;
+  `stt-client`'s types are split from its HTTP client (a types module or feature) so no reqwest or
+  tokio enters the core, and tests, a WASM target or a mobile target inject their own transport.
+- **The machines**: one machine per feature in `flow`, plus a small app-level router the renderer
+  owns — never a single machine that encodes page structure.
+- **Localization in Rust**: the catalogs stay ICU MessageFormat; `formatjs_icu_messageformat`
+  (the formatjs project's Rust runtime) is spiked first, with ICU4X for dates, numbers and plural
+  categories; if the spike disappoints, a small ICU MF1 subset implementation over ICU4X replaces
+  it, and the outcome is recorded here.
+- **Both frontends migrate in this item** (the user): the core is built from the TUI's modules, the
+  TUI moves onto it, then the Slint window.
+- **The catalogs are one shared ICU JSON per locale**, embedded in the crate **compressed** (the
+  user's size concern) and generated into the React app, so item 88's review pages, glossary and
+  checks keep reading one source; the embedded size is measured and budgeted.
+- **The canonical bindings are the TUI's where it has one**, the browser's elsewhere; no user
+  remapping at first; a duplicate or conflicting binding fails a check; a target that cannot
+  express a binding marks it unavailable and omits its hint.
+- **The browser adopts the generated table now** for its `aria-keyshortcuts` and hint strings; its
+  event handlers stay until its Rust port.
+- **The audio sink is a trait per target** (cpal, Slint's audio, WebAudio), and the core assumes no
+  global runtime; no `no_std` promise until item 86's outcome.
 
 ## Proposal
 
 1. **The crate** `crates/stt-ui`, framework-agnostic and renderer-free: no terminal, window or
-   browser types, no I/O beyond what the feature needs, one entry point per feature.
+   browser types, no I/O beyond what the feature needs, one entry point per feature. It talks to
+   the service through its own `Service` trait (implemented by `stt-client` today, by a fetch-based
+   transport in a browser target later), so the features can be driven by a fake in tests.
 2. **Modules inside the crate** — directories under `crates/stt-ui/src/`, not separate crates;
    `stt-ui` is the only crate this item adds:
    - `flow` — the finite state machines (app/queue/upload/transcript/playback/settings/speakers),
@@ -82,45 +106,32 @@ frontends: one command set, one binding table, hints generated from it.
    - `model` — the view models the renderers draw (rows, phases, badges, footer hints from
      `keys`), still free of widgets.
 3. **The localization single source**: the catalogs move from the React app (item 88's work) into
-   `i18n` as the canonical data; the React frontend consumes them generated (JSON compiled into
-   its bundle), so item 88's review pages, glossary and checks keep working over the same files.
+   `crates/stt-ui/catalogs/<locale>.json` as the canonical ICU data; the crate embeds them
+   compressed — a build step compresses each locale at compile time and the crate decompresses a
+   locale when it becomes active, so the binary carries one codec, not the JSON — and the React
+   frontend consumes them generated (JSON compiled into its bundle), so item 88's review pages,
+   glossary and checks keep working over the same files. The embedded size is measured once the
+   first wave is in and budgeted in the item's log.
 4. **Migration in one item, in order**: build the core from the TUI's modules (they are the newest
-   and least entangled), move the TUI onto it, then build the window on it. The browser keeps its
-   current implementation until its Rust port; only the catalogs are shared with it now.
+   and least entangled), move the TUI onto it, then move the Slint window onto it; both frontends
+   finish this item. The browser keeps its current implementation until its Rust port; from this
+   item it reads the generated catalogs and shortcut hints.
 5. **Testing at the core**: the FSMs and features are tested headlessly — a fake service (the
    `stt-client` trait) and a fake sink/clock — so a behavior proves once for every frontend; each
    renderer keeps its own rendering tests and the journeys.
 
 ## Open questions
 
-- **The name**: `stt-ui` (with `stt-client`, `stt-tui`), `stt-core`, or plain `ui` in `crates/`?
-- **The client seam**: does the core depend on `stt-client` directly, or on a trait it defines so
-  tests and the future WASM target inject their own transport?
-- **How far the state machines go**: one top-level machine with sub-machines, or one machine per
-  feature composed by the renderer? The user's "no pages" rule suggests per-feature machines plus a
-  small app-level router the renderer owns.
-- **Platform audio**: the `playback` feature owns the state and the position derivation, but the
-  sink is a trait implemented per target (cpal in the TUI, Slint's audio in the window, WebAudio in
-  the browser). Confirm that boundary rather than a single backend in the core.
-- **i18n in Rust**: `fluent`/`unic-langid` versus `rust-i18n`/ICU4X, and whether the React side keeps
-  formatjs while reading the same ICU data. The key set and plural rules must match item 88's
-  checks exactly.
-- **Scope of the migration**: both frontends in this item (the proposal) or the TUI first with the
-  window as its own follow-up item? The TUI is unmerged work in flight, which argues for TUI-first.
-- **Mobile constraints**: whether the core must stay `no_std`-friendly or avoid async runtimes that
-  a mobile target cannot host; item 86's outcome decides.
-- **The catalog's location**: `crates/stt-ui/i18n/<locale>.json` (shared file format with the
-  frontend) versus a Rust-native message format with a generated JSON for the browser.
-- **The binding table's authority**: which keys become canonical (today's browser bindings, the
-  TUI's letters, or a reviewed list), how a conflict is resolved, and whether a user may remap them
-  (the proposal is no remapping at first).
-- **Platform limits**: Cmd vs Ctrl, terminal sequences a text field would swallow, and no keyboard
-  on mobile — a binding the target cannot express is marked unavailable rather than replaced by an
-  invented key, and its hint is omitted.
-- **The browser's shortcut adoption**: does the React frontend read the generated binding table and
-  hint texts now (keeping its `aria-keyshortcuts` in sync), or only when it moves to Rust?
+- **The compression's mechanism and budget**: a build script compressing the catalogs at compile
+  time (zstd, decompressed lazily when a locale becomes active) versus committed precompressed
+  blobs that a check regenerates. The budget is set from the measured first wave — the aim is well
+  under 250 KB compressed for the 24 codes — and revisited as the rest land.
+- **The i18n spike's exit criteria**: every shipped locale's messages render with the same text and
+  the same plural choice as the React app for the same arguments, dates and numbers match `Intl`,
+  and malformed input never panics; if `formatjs_icu_messageformat` fails any of these, the ICU MF1
+  subset implementation over ICU4X replaces it and the reason is recorded in this item.
 
-## Test list (proposed; behaviors only, to approve at the consultation)
+## Test list (approved 2026-11-12; behaviors only)
 
 - [ ] (queue) Picking audio files and uploading them from the core yields the uploading state, the
       progress, the created tasks and a duplicate or rejected file answered by its error code — with
@@ -168,3 +179,10 @@ mobile) owe their own.
 - 2026-11-12: filed as a draft by the root agent at the user's request: a `stt-ui` crate with the
   shared state machines, localization keys and library, and the UI features as abstractions for
   every Rust frontend, stopping at interactions rather than pages; to be started after 67 and 70.
+- 2026-11-12: consultation with the user: the name `stt-ui`; the `Service` trait seam with
+  `stt-client`'s types split from its HTTP client; per-feature machines under `flow` plus an app
+  router; ICU MessageFormat catalogs with a `formatjs_icu_messageformat` spike (ICU4X for formats,
+  the MF1 subset implementation as the fallback); both frontends migrate in this item; the shared
+  ICU JSON catalogs are embedded compressed (the user's size concern) and generated into the
+  React app; the TUI's bindings are canonical where it has one; the browser reads the generated
+  hints now. Test list approved as filed; `spec-approved`.

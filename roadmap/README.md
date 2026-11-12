@@ -308,4 +308,4 @@ graph TD
 | [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](../docs/specs/ci-and-pins.md) | done | 85 |
 | [98 — The Rust workspace lives at the repository root, and its crates in `crates/`](98-rust-workspace-at-root.md) | spec-approved | 67, 66 |
 | [99 — A Rust-native whisper that matches whisper.cpp in speed and accuracy, with no bindings and no spawned process](99-rust-native-whisper.md) | spec-approved | 07, 05, 32, 84, 98 |
-| [109 — One UI core for every frontend: the `stt-ui` crate](109-shared-ui-crate.md) | draft | 67, 70, 88, 98 |
+| [109 — One UI core for every frontend: the `stt-ui` crate](109-shared-ui-crate.md) | spec-approved | 67, 70, 88, 98 |
