@@ -143,6 +143,16 @@ graph TD
   66 --> 98
   07 --> 99[99 Rust-native whisper]
   98 --> 99
+  98 --> 100[100 Rust backend phase 1]
+  100 --> 101[101 process control]
+  100 --> 102[102 uploads and audio]
+  101 --> 103[103 transcription]
+  102 --> 103
+  103 --> 104[104 diarization]
+  104 --> 105[105 engine and events]
+  105 --> 106[106 HTTP and outputs]
+  106 --> 107[107 app mode]
+  107 --> 108[108 the switch]
   67 --> 109[109 shared UI core]
   70 --> 109
   88 --> 109
@@ -308,4 +318,13 @@ graph TD
 | [97 — CI and pins from the 2026-11-06 audit: every leg checks the pins, every pin has one source, every CI block is written once](../docs/specs/ci-and-pins.md) | done | 85 |
 | [98 — The Rust workspace lives at the repository root, and its crates in `crates/`](98-rust-workspace-at-root.md) | spec-approved | 67, 66 |
 | [99 — A Rust-native whisper that matches whisper.cpp in speed and accuracy, with no bindings and no spawned process](99-rust-native-whisper.md) | spec-approved | 07, 05, 32, 84, 98 |
+| [100 — The backend rewritten in Rust, phase 1: the crate, configuration, the database and the queue domain](100-rust-backend-phase-1-foundation.md) | spec-approved | 98, 03, 04, 18 |
+| [101 — The backend rewritten in Rust, phase 2: process control](101-rust-backend-process-control.md) | spec-approved | 100 |
+| [102 — The backend rewritten in Rust, phase 3: uploads and the audio pipeline](102-rust-backend-uploads-and-audio.md) | spec-approved | 100 |
+| [103 — The backend rewritten in Rust, phase 4: transcription](103-rust-backend-transcription.md) | spec-approved | 101, 102 |
+| [104 — The backend rewritten in Rust, phase 5: diarization](104-rust-backend-diarization.md) | spec-approved | 102, 103 |
+| [105 — The backend rewritten in Rust, phase 6: the engine, pause and the event stream](105-rust-backend-engine-and-events.md) | spec-approved | 101, 103, 104 |
+| [106 — The backend rewritten in Rust, phase 7: the remaining HTTP surface and the outputs](106-rust-backend-http-and-outputs.md) | spec-approved | 105 |
+| [107 — The backend rewritten in Rust, phase 8: app mode](107-rust-backend-app-mode.md) | spec-approved | 106 |
+| [108 — The backend rewritten in Rust, phase 9: the switch](108-rust-backend-switch.md) | spec-approved | 107 |
 | [109 — One UI core for every frontend: the `stt-ui` crate](109-shared-ui-crate.md) | spec-approved | 67, 70, 88, 98 |
