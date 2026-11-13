@@ -35,6 +35,20 @@ The switch itself and the packaging change are outside this document.
 - Where a Kotlin suite exists only to pin a framework detail (for example `KotlinVersionSpec`,
   `LogFormatSpec`, `TestLoggingProbe`), the port pins its Rust equivalent (the MSRV, the log
   pattern, the logging shape) — the behavior it protects, not the library.
+- **Two exceptions, agreed with the user on 2026-11-10 (roadmap item 100).** The Rust service
+  starts its schema afresh: it validates `flyway_schema_history`'s highest installed version (17)
+  and the schema's shape instead of replaying the Kotlin migrations, and refuses anything older,
+  so the scenarios that upgrade an existing installation
+  (`stt/http/AudioMigrationSpec.kt` and `stt/db/DatabaseSpec.kt`'s upgrade ones) are replaced by
+  the version-17 validation and fresh-baseline behavior of those suites. And `stt/queue/TaskQueueSpec.kt`'s
+  aggregate (16 scenarios) is excluded: item 96 deletes it as unused, so the port keeps
+  `TaskStatus`, the transition contract and the repository operations instead.
+- **Native replacements** (user's direction, 2026-11-10): wherever a spawned app can be replaced
+  by a Rust implementation — the audio pipeline's decode and encode, and item 99's whisper — the
+  suites keep their observable assertions (durations, sample counts, transcripts, speaker ids),
+  and fixtures the spawned app produced are regenerated once with the native implementation and
+  pinned as regression snapshots — with those independent assertions, derived from the input,
+  kept alongside them.
 
 ## 3. What is not a test but still gates parity
 

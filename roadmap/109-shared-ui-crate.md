@@ -4,9 +4,6 @@ Status: spec-approved
 Depends on: [67](67-tui-frontend.md) (the TUI's flows, state and playback modules), [70](70-rust-gui-window.md) (the Slint window reaches the same feature set), [88](88-localization.md) (the catalogs, glossary and review records), [98](98-rust-workspace-at-root.md) (the crate lives in `crates/`)
 Blocks: — (the Rust browser frontend and the mobile frontends are later items built on it)
 
-> Numbering note: items 100–108 (the Rust backend rewrite) are filed on the unmerged
-> `docs/rust-backend-phase-1` branch, so this item takes 109 to avoid a collision.
-
 ## Goal
 
 Every frontend is built from one shared Rust core instead of reimplementing the app: state
