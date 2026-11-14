@@ -6,12 +6,12 @@ Blocks: line 4 of item 66's test list (the window attaching to a running service
 
 ## Goal
 
-Per OS, a **service package** that installs everything a `stt-app` command needs to run the unit —
-the `stt-service` runner (the backend in app mode), the `stt-app` CLI, the `stt-tray` binary built
-with its `tray-menu` feature, the backend's installDist, the JRE and the built UI, all beside each
-other, so `stt-app open browser` starts the service and the tray with no environment variable
-pointing at anything else ([ADR 0064](../docs/decisions/0064-service-and-tray-are-one-unit.md)) —
-and a separate **window package** that depends on it, so the window stays optional.
+Per OS, **one package** that installs everything the app is — the `stt-service` runner (the backend
+in app mode), the `stt-app` CLI, the `stt-tray` binary built with its `tray-menu` feature, the
+backend's installDist, the JRE, the built UI and the `stt-window` GUI — all beside each other, so
+`stt-app open browser` starts the service and the tray with no environment variable pointing at
+anything else ([ADR 0064](../docs/decisions/0064-service-and-tray-are-one-unit.md)) and the window
+needs no separate install. The window is bundled, not optional.
 
 ## Evidence
 
@@ -24,83 +24,92 @@ and a separate **window package** that depends on it, so the window stays option
   (`stt-client/src/autostart.rs`), so a checkout's entry is inert.
 - **The desktop e2e harness installs one app**: `e2e/desktop-tests/helpers/app.ts` launches
   `STT_DESKTOP_APP` alone, so a spec cannot start a service for the window to attach to
-  (`e2e/desktop-tests` has no such spec because there is no service to start).
+  (`e2e/desktop-tests` has no such spec because there is no service to start). With one package, that
+  harness starts the unit and the window from one install.
 - **Item 66's line 4 is written against this**: "the window attaches to a running service … and
   closing the window leaves the service running" needs this package in the CI job that runs the
   packaged specs (`.github/workflows/ci.yml`: `desktop-e2e`, `macos-dmg`, `windows-desktop-zip`).
+- **The window's size was the reason for two artifacts, and it is gone**: item 66's consultation
+  (2026-11-04) split the app because "the window is optional and nobody downloads what they do not
+  use", and the window then was Electron, 281 MB of a 628 MB payload (ADR 0059). Item 70 replaces it
+  with a native Slint window: 13.8 MB of binary in Tauri's comparable payload, plus the carried
+  fonts — a rounding error beside the backend, the JRE and the tools (269 MB), and smaller still once
+  items 103–106 move the backend to Rust (item 108).
 
 ## Decided (consultation, 2026-11-04)
 
 - **The unit is one singleton, and every frontend goes through it** (the user): the service and the
   tray behave as one unit (ADR 0064); the browser, the window and the TUI talk to that unit and never
   around it.
-- **The window is optional, and nobody downloads what they do not use** (the user): installing the
-  unit without the GUI window must be possible, and a user who wants only the browser (or the TUI)
-  does not download the window. So each OS gets **two artifacts** — the service package (runner,
-  CLI, tray, backend, JRE, UI) and the window package, which depends on the service package — not
-  one installer with a selector, which would still ship everything.
-- **Linux: two `.deb`s with `Depends`** (the user): `stt-service` and the window package depending on
-  it; the Nix side mirrors the split (a service package, and the desktop package depending on it).
 - **No systemd unit; XDG autostart only** (the user): item 66's model stays — the autostart entry
   (off until `stt-app autostart on`) starts the unit and the tray supervises the service.
 - **Future extension, not this item** (the user): a systemd mode in which systemd alone supervises
   the service, instead of the tray.
-- **macOS: two DMGs, the window checks** (the user): the service DMG holds the service's app bundle
-  (the tray is its visible app; the CLI is linked onto `PATH` on first run), and the window DMG's app
-  refuses to start without the service and says how to install it. Same drag-to-Applications install
-  as today's DMG; no `.pkg` (it would need an installer signing identity ADR 0060 does not have).
-- **Both in one go, when the user chooses** (the user, accepting the root agent's recommendation):
-  the two artifacts stay the base, and each OS also offers installing both from one action without
-  downloading the window unless it is chosen. Linux needs no new artifact: one `apt install` of both
-  `.deb`s (or `apt install` of the window package from an APT repository, which pulls the service
-  through `Depends`), documented. Windows gets a small WiX Burn bootstrapper (`stt-setup.exe`) with
-  an "also install the window" choice, whose packages download on demand from the same release as
-  both MSIs. macOS gets a "Get the window…" action in the tray that downloads and installs the
-  window DMG of the same release version as the running service.
 - **One installed version at a time** (the user): a newer installer replaces the installed version
-  in place — stable package names (`.deb`), stable UpgradeCodes with a major upgrade (both MSIs and
-  the Burn bootstrapper), the same app-bundle paths (the two macOS apps) — and the user's data
-  directory is left alone, so settings and the database survive and the new backend migrates them on
-  its first start. Out of scope: the Windows portable zips (not installers) and copies of a macOS app
-  kept outside its install location.
+  in place — the stable package name (`.deb`), the stable UpgradeCode with a major upgrade (the
+  MSI), the same app-bundle path (the macOS app) — and the user's data directory is left alone, so
+  settings and the database survive and the new backend migrates them on its first start. Out of
+  scope: the Windows portable zips (not installers) and copies of a macOS app kept outside its
+  install location.
 - **Downgrades are refused** (the user): an older installer stops with a message naming the
   installed version and changes nothing; going back means uninstalling first. A database a newer
   version has migrated is never handed to an older backend.
 - **An upgrade quits the running unit and starts nothing** (the user): the installer runs a clean
   `stt-app quit` (no backend, whisper or ffmpeg left behind) before replacing files — Windows locks
   running files anyway — and the next `stt-app open` starts the new version.
-- **The two artifacts are locked to one release** (the user): the window requires the service at
-  exactly its own version (Linux `Depends: stt-service (= X.Y.Z)`, the window MSI's launch condition,
-  the macOS window's check, the bootstrapper installing one release of both), so upgrading one
-  upgrades both; and **a frontend refuses to start when its version and the service's differ**,
-  naming both versions.
+- **A frontend refuses to start when its version and the service's differ** (the user), naming both
+  versions: with one package they are installed together, but a binary built from source or copied
+  in by hand can still skew, and the check costs nothing.
+
+## Decided (consultation, 2026-11-14, supersedes the 2026-11-04 split)
+
+- **One package per OS, everything in it** (the user): the split into a service package and a window
+  package existed because the window was Electron (281 MB of a 628 MB payload, ADR 0059), and the
+  reason was "nobody downloads what they do not use". With item 70's native window (13.8 MB of
+  binary plus the carried fonts, ADR 0059's measurement table), that saving no longer pays for two
+  packages, two version locks and a bootstrapper: the window is bundled, and no per-user choice to
+  omit it is offered — installing the app installs all of it.
+- **Linux: one `.deb`** (the user): a single package with the unit and the window, its window
+  dependencies declared, no `Depends` on a second package. Browser-only users install the same
+  package and never launch the window; the Nix side mirrors it with one package.
+- **Windows: one MSI, no features** (the user): one product, one UpgradeCode, no feature tree to
+  untick and no WiX Burn bootstrapper — nothing is downloaded on demand, everything is in the MSI;
+  the portable zips stay as they are.
+- **macOS: one DMG, one app** (the user): the app bundle holds the unit and the window together (the
+  tray is its visible UI; the CLI is linked onto `PATH` on first run), dragged to Applications once.
+  No second app to install, no "Get the window…" action, and no `.pkg` (it would need an installer
+  signing identity ADR 0060 does not have).
+- **The split's other decisions stay**: the singleton unit, XDG autostart only, one installed version
+  at a time, refused downgrades, the clean quit before replacing files, and the frontend's
+  version-mismatch refusal.
 
 ## Proposal
 
-1. **Contents of the service package**: `bin/stt-service` (a small runner that execs the backend
-   with the packaged JRE in app mode), `bin/stt-app`, `bin/stt-tray` (with `tray-menu`),
-   `backend/lib` (Gradle `installDist`), `jre`, `ui` (the built frontend). **The window package**
-   carries the Electron window only and depends on the service package: Linux `stt-service.deb` +
-   the window `.deb` (`Depends: stt-service`) and the matching Nix packages; Windows two MSIs, the
-   window's with a launch condition requiring the service product, plus the portable zips; macOS two
-   DMGs, the window app refusing to start without the service.
-2. **Registration**: the package registers its installed frontends' descriptors (browser always
-   needs none) and ships the autostart entry, off until `stt-app autostart on`.
-3. **CI**: a job per OS that installs this package beside the window package, runs
-   `stt-app open browser --print-url` to bring the unit up and then the packaged desktop spec that
-   asserts the window attaches, one backend runs, and closing the window leaves the service up.
-4. **Not in this item**: the tray's icon on a headless runner (proven virtual), and the TUI (item 67).
-5. **Both in one go**: the documented single `apt install` on Linux; the Burn bootstrapper on
-   Windows, downloading only the chosen MSIs from the pinned release; the tray's "Get the window…"
-   action on macOS, fetching the window DMG of the service's own release version.
-6. **Upgrades**: in-place replacement on every installer, refused downgrades, the clean quit before
-   replacing files, and the exact version lock between the two artifacts with the mismatch refusal.
-   The release version itself comes from item 78 (`VERSION`); the tests build two versions of the
-   artifacts to prove the upgrade and the refusal.
+1. **Contents of the one package**: `bin/stt-service` (a small runner that execs the backend with
+   the packaged JRE in app mode), `bin/stt-app`, `bin/stt-tray` (with `tray-menu`), `stt-window`
+   (item 70), `backend/lib` (Gradle `installDist`), `jre`, `ui` (the built frontend). Per OS it is
+   one `.deb` (window dependencies declared, no second package), one MSI (one product, no feature
+   tree, the portable zips unchanged) and one macOS app bundle with the window inside it, shipped in
+   one DMG.
+2. **Registration**: the package registers the frontends it ships (browser needs no descriptor; the
+   window and the TUI are registered) and ships the autostart entry, off until
+   `stt-app autostart on`.
+3. **CI**: a job per OS that installs the single package, runs `stt-app open browser --print-url`
+   to bring the unit up and then the packaged desktop spec that asserts the window attaches, one
+   backend runs, and closing the window leaves the service up.
+4. **Not in this item**: the tray's icon on a headless runner (proven virtual), and the TUI
+   (item 67).
+5. **Upgrades**: in-place replacement on every installer, refused downgrades, the clean quit before
+   replacing files, and the frontend's version-mismatch refusal. The release version itself comes
+   from item 78 (`VERSION`); the tests build two versions of the package to prove the upgrade and
+   the refusal.
+6. **An ADR records the one-package model** — the reversed split, the Electron size it rested on and
+   the per-OS forms — when this item is worked.
 
 ## Open questions
 
-None. (Settled 2026-11-04, see "Decided (consultation, 2026-11-04)".)
+None. (The one-package model settled 2026-11-14; everything else 2026-11-04 — see "Decided"
+above.)
 
 ## Approval log
 
@@ -125,14 +134,22 @@ None. (Settled 2026-11-04, see "Decided (consultation, 2026-11-04)".)
   five test-list lines added. Cross-item note: item 78's line moved from item 66 ("a launch of a
   different version replaces the running unit") overlaps this item's mismatch refusal; reconcile it
   when item 78 is worked. Still spec-approved.
+- 2026-11-14 (amendment reversing the split, at the user's request): the window package is dropped
+  because item 70 removes Electron (281 MB of a 628 MB payload) for a native window of 13.8 MB, so
+  there is nothing left for "nobody downloads what they do not use" to save. One package per OS with
+  everything in it: one `.deb`, one MSI with no feature tree and no Burn bootstrapper, one DMG with
+  one app bundle — package deal, no per-user choice to omit the window. The singleton unit,
+  XDG-only autostart, one installed version, refused downgrades, the clean quit, and the frontend's
+  version-mismatch refusal stay. The three split lines and the three "both in one go" lines leave
+  the test list; four single-artifact lines take their place, and the upgrade and mismatch lines now
+  name one artifact. Still spec-approved.
 
-## Test list (approved 2026-11-04; behaviors only)
+## Test list (approved 2026-11-04, amended 2026-11-14; behaviors only)
 
 - [ ] Opening the browser frontend from the tray opens the OS default browser at the app, through the
       frontend's registered descriptor
 - [ ] The tray lists exactly the installed frontends' descriptors and opens each; "Open" uses the
-      user's default frontend; uninstalling a frontend removes it from the tray; the tray works in an
-      install with no GUI flavor (browser and/or TUI only)
+      user's default frontend; the browser, the window and the TUI are the three it lists
 - [ ] The window frontend attaches to the running service (no second backend) and starts it when it is
       not running; closing the window leaves the service running; quitting the service is explicit and
       stops the engine cleanly
@@ -149,33 +166,27 @@ None. (Settled 2026-11-04, see "Decided (consultation, 2026-11-04)".)
       stops the tray (ADR 0064)
 - [ ] The window is a singleton: opening it again (tray, or a second `stt-app open gui`) attaches to
       the running window and raises it instead of starting a second (ADR 0064)
-- [ ] (basic) Installing only the service package gives a working unit:
-      `stt-app open browser` starts the service and the tray, no window is downloaded or installed,
-      and the tray lists only the installed frontends
-- [ ] (basic) Installing the window package requires the service package (Linux `Depends`, the
-      Windows MSI's launch condition; on macOS the window app refuses to start without the service and
-      says how to install it) and the window attaches to the unit
-- [ ] (edge) Removing the window package leaves the unit working; removing the
-      service package is blocked by, or removes, the window package
-- [ ] (must not break) The existing packaged suites stay green on the split
-      artifacts, and the browser and TUI paths are unchanged
-- [ ] (basic) Linux: one documented `apt install` installs both packages together, and installing
-      only the service package installs no window
-- [ ] (basic) Windows: the bootstrapper installs the service, and the window too when chosen; when
-      the window is not chosen it is neither downloaded nor installed, and both come from the same
-      release
-- [ ] (basic) macOS: the tray's "Get the window…" downloads and installs the window of the running
-      service's release version, and the window then attaches to the unit; without that action no
-      window is downloaded
-- [ ] (basic) Installing a newer version replaces the installed one in place on each OS (the `.deb`s,
-      both MSIs and the bootstrapper, the two DMG apps): exactly one version is installed afterwards,
-      and the user's settings and database survive, migrated by the new version
+- [ ] (basic) Each OS has one installer and it installs the whole app: the runner, the CLI, the
+      tray, the backend, the JRE, the UI and the window, nothing left to download or add; after it,
+      `stt-app open browser` starts the service and the tray, and `stt-app open gui` opens the
+      window attaching to that service
+- [ ] (basic) Linux: one `.deb` installs the app, a browser-only use launches nothing else, and
+      removing the package removes the whole app, the tray's window entry included
+- [ ] (basic) Windows: one MSI installs the app with no feature to choose; the portable zip carries
+      the same window
+- [ ] (basic) macOS: one DMG's single app bundle holds the unit and the window, and dragging it to
+      Applications installs both
+- [ ] (must not break) The existing packaged suites stay green on the one package, and the browser
+      and TUI paths are unchanged
+- [ ] (basic) Installing a newer version replaces the installed one in place on each OS (the `.deb`,
+      the MSI, the app bundle): exactly one version is installed afterwards, and the user's settings
+      and database survive, migrated by the new version
 - [ ] (edge) An older installer refuses to replace a newer installed version, names the installed
       version, and changes nothing
 - [ ] (edge) An upgrade quits a running unit cleanly before replacing files (no backend, whisper or
       ffmpeg left behind) and starts nothing; the next `stt-app open` starts the new version
 - [ ] (edge) A frontend refuses to start when its version differs from the service's, naming both
-      versions; with matching versions it attaches, and upgrading one artifact upgrades both
+      versions; with matching versions it attaches
 - [ ] (must not break) Reinstalling the same version repairs in place and keeps the user's data
 
 ## e2e stance
