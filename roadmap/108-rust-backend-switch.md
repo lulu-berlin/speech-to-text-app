@@ -1,7 +1,8 @@
 # 108 — The backend rewritten in Rust, phase 9: the switch
 
 Status: spec-approved
-Depends on: [107](107-rust-backend-app-mode.md) — and every earlier phase, all green
+Depends on: [107](107-rust-backend-app-mode.md), [111](111-rebrand-and-terminology.md) — and every
+earlier phase, all green
 Blocks: —
 
 ## Goal
@@ -86,3 +87,7 @@ user-run until the PR's own run is green, and that run is the merge gate.
 - 2026-11-10: filed as a draft with the rewrite's plan (item 100).
 - 2026-11-10: the user approved the item and its test list, with the atomic one-PR switch;
   `spec-approved`.
+- 2026-11-15: the switch now depends on item 111 (the rebrand): its packaging, paths and CI jobs
+  carry `protocolulu` names, and the switch is the place that guarantees they are consistent even if
+  item 107 landed while the old names were still current. Still `spec-approved`, and 111 must be
+  approved and done first.
