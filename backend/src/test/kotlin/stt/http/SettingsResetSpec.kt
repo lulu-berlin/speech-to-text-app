@@ -16,8 +16,8 @@ import stt.transcribe.GpuDevice
 
 /**
  * Roadmap item 72 (ADR 0062): `DELETE /api/settings` restores the defaults in one write — `auto`, `null`, `auto`,
- * `auto`, `null`, `8`, the values `V6` seeds — clears the CPU-fallback notice in the same write, answers `200`
- * Settings and publishes `settings-updated`, so other tabs follow. The concrete values are pinned here as well as
+ * `auto`, `null`, `8`, the values `V6` seeds, and `null` for the App language V18 adds — clears the CPU-fallback
+ * notice in the same write, answers `200` Settings and publishes `settings-updated`, so other tabs follow. The concrete values are pinned here as well as
  * compared to the examples, so a reset that drifts from the seed cannot pass.
  */
 class SettingsResetSpec :

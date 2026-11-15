@@ -81,6 +81,14 @@ EOF
 gcc -o /tmp/langs /tmp/langs.c -L"$L" -lwhisper -Wl,-rpath,"$L" && /tmp/langs > docs/api/languages.json
 ```
 
+## UI locales
+
+`ui-locales.json` is contract data, not a response: the app's own languages (roadmap item 88), one entry per shipped UI locale — its `code` (a BCP 47 tag), English `name`, `nativeName` (the name the locale calls itself), the whisper `language` code a transcription receives, `direction` (`ltr` or `rtl`), and `formatLocale`, the full BCP 47 tag `Intl` formats dates and numbers with (the split locale's own tag, or a canonical region; the app uses the system's full tag when it names the same UI locale). `default` is the locale used when the system's language is not shipped.
+
+- The Settings page's App language field lists them by `nativeName` and searches them by `code`, `name` and `nativeName` (item 88).
+- The list is the first wave's whisper codes with the `zh`, `pt` and `es` variants; `ar` is one locale because the transcription code covers dialectal speech (user decision 2026-11-12).
+- The backend stores the chosen `code` in the settings' `appLanguage`; `null` follows the system's language.
+
 ## Upload allow-list
 
 `allowed-extensions.json` is contract data, not a response: the extensions an upload accepts, checked case-insensitively (the content type is ignored).

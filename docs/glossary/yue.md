@@ -1,0 +1,42 @@
+# Cantonese (yue) — glossary
+
+The term evidence is recorded in `docs/reviews/yue.md`; this is the shared vocabulary. The
+compared products and their popularity are listed there (Google 1, Apple 2). A `—`
+carries no comparison; the term is the neutral written-Chinese word in Hong Kong usage, not a
+product's.
+
+| English                 | Cantonese                         | Evidence           | Note                                                  |
+| ----------------------- | --------------------------------- | ------------------ | ----------------------------------------------------- |
+| transcript              | 轉錄稿                            | Google 1: „轉錄稿“ | Google Meet zh-HK; the result                         |
+| transcription           | 轉錄                              | Google 1: „轉錄“   |                                                       |
+| queue                   | 佇列                              | —                  |                                                       |
+| task                    | 任務                              | —                  |                                                       |
+| upload                  | 上載                              | Apple 2: „上載“    | Hong Kong usage, not `上傳`                           |
+| download                | 下載                              | Apple 2: „下載“    |                                                       |
+| settings                | 設定                              | Apple 2: „設定“    |                                                       |
+| history                 | 記錄                              | —                  |                                                       |
+| device                  | 裝置                              | —                  |                                                       |
+| file                    | 檔案                              | Apple 2: „檔案“    |                                                       |
+| threads                 | 執行緒                            | —                  |                                                       |
+| speaker(s)              | 講者                              | —                  | Hong Kong usage; no grammatical gender                |
+| speakers (count)        | 講者數量                          | —                  |                                                       |
+| max speakers            | 講者數量上限                      | —                  |                                                       |
+| speaker mode            | 講者偵測                          | —                  | descriptive noun phrase                               |
+| diarization             | 講者識別                          | —                  |                                                       |
+| queue phases            | 分割音訊 / 轉錄 / 講者識別        | Google 1: „轉錄“   | nouns after the label                                 |
+| transcript phases       | 分割音訊 / 轉錄 / 講者識別 / 處理 | Google 1: „轉錄“   | `{phase}時{outcome}`; with a position `在 {time} 處…` |
+| turn                    | 發言                              | —                  |                                                       |
+| segment                 | 段落                              | —                  |                                                       |
+| play / pause            | 播放 / 暫停                       | —                  |                                                       |
+| seek                    | 播放位置                          | —                  | the slider's label, not a command                     |
+| merge                   | 合併                              | —                  |                                                       |
+| reassign                | 重新指派                          | —                  |                                                       |
+| save / discard          | 儲存 / 捨棄                       | —                  | editor shortcuts S and D                              |
+| retry / cancel / delete | 重試 / 取消 / 刪除                | —                  |                                                       |
+| connection              | 連線 / 已連線                     | —                  | `已連線` for the live badge                           |
+| user interface          | 使用者介面                        | —                  | `frontend` never appears in the UI                    |
+| default                 | 預設                              | —                  |                                                       |
+| error                   | 錯誤                              | —                  | `錯誤：{message}`                                     |
+
+This glossary is the Cantonese layer; the same neutrality rule as the other locales applies (see
+`docs/style-guides/yue.md`).

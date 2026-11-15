@@ -1,4 +1,6 @@
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import { ThemeProvider } from 'styled-components';
+import { LocaleProvider } from '../../app/LocaleProvider';
 import { describe, expect, it } from 'vitest';
 import { asRgb, px, required } from '../../test/dom';
 import { renderThemed } from '../../test/render';
@@ -81,5 +83,25 @@ describe('the progress bars', () => {
     const row = required(transcription.parentElement);
     expect(getComputedStyle(row).display).toBe('flex');
     expect(getComputedStyle(row).alignItems).toBe('center');
+  });
+});
+
+// The percentage follows the locale's number formatting (roadmap item 88, review fix 7): the
+// queue phase already formats through Intl, and the bar's own copy must not append a bare "%".
+describe('the progress bar percentage', () => {
+  it("formats through the locale's Intl rules", () => {
+    render(
+      <ThemeProvider theme={lightTheme}>
+        <LocaleProvider uiLocale="fr" locale="fr-FR">
+          <ProgressBar value={0.42} label="Transcription" />
+        </LocaleProvider>
+      </ThemeProvider>,
+    );
+    const expected = new Intl.NumberFormat('fr-FR', { style: 'percent' }).format(0.42);
+    const shown = screen.getByText(/42/);
+    // The space before the sign is the locale's own (a narrow no-break space in French), so the
+    // assertion compares the rendered text with Intl's output after normalising whitespace.
+    expect(shown.textContent?.replace(/\s+/g, ' ')).toBe(expected.replace(/\s+/g, ' '));
+    expect(shown.textContent).toMatch(/^42[\s\u00a0\u202f]%$/);
   });
 });

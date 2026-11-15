@@ -37,6 +37,11 @@ test('the documentation checks report their green lines on the current tree', ()
       expected:
         /^The diagram in docs\/architecture\.md matches the code: \d+ boxes, \d+ arrows\.\n$/,
     },
+    {
+      script: 'docs/check-reviews.ts',
+      args: [],
+      expected: /^docs\/reviews: \d+ pages match their catalogs\n$/,
+    },
   ];
 
   for (const { script, args, expected } of checks) {

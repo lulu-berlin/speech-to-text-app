@@ -1,6 +1,17 @@
 import styled from 'styled-components';
 import type { TaskStatus } from '../api/types';
+import { useMessages } from '../i18n/useMessages';
 import type { StatusGroup } from '../theme/theme';
+
+// The status's catalog message: the badge shows the status word, translated per locale.
+const STATUS_ID: Record<TaskStatus, string> = {
+  QUEUED: 'status.queued',
+  PAUSED: 'status.paused',
+  RUNNING: 'status.running',
+  COMPLETED: 'status.completed',
+  FAILED: 'status.failed',
+  CANCELED: 'status.canceled',
+};
 
 // The status→group mapping (ADR 0033): the exact status stays visible as the badge text,
 // only the treatment groups them. Items 14 and 15 reuse this.
@@ -31,5 +42,6 @@ export interface StatusBadgeProps {
 
 // A pill carrying the task's exact status, tinted by its status group.
 export function StatusBadge({ status }: StatusBadgeProps) {
-  return <Badge $group={statusGroup(status)}>{status}</Badge>;
+  const t = useMessages();
+  return <Badge $group={statusGroup(status)}>{t(STATUS_ID[status])}</Badge>;
 }

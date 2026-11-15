@@ -5,6 +5,13 @@ import { useWriteControl } from '../../app/ConnectionContext';
 import { SettingsContext } from '../../app/SettingsContext';
 import { fetchFrontends } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
+import { useErrorText } from '../../shared/i18n/useErrorText';
+import { useMessages } from '../../shared/i18n/useMessages';
+import {
+  SHIPPED_UI_LOCALES,
+  effectiveUiLocale,
+  systemLanguageTags,
+} from '../../shared/i18n/uiLocales';
 import { ApiError } from '../../shared/api/types';
 import type { FrontendEntry, SettingsUpdate, SpeakerMode } from '../../shared/api/types';
 import { errorMessage } from '../../shared/errorMessage';
@@ -24,7 +31,19 @@ const LANGUAGE_OPTIONS = languages.languages.map((language) => ({
   label: language.name,
 }));
 
-const SPEAKERS = ['auto', 'off', 'fixed'] as const;
+// The app's own languages (roadmap item 88): each locale that ships a catalog, under its own
+// name, filtered by its code, its English name and that name (the field is a searchable select).
+const APP_LANGUAGE_OPTIONS = SHIPPED_UI_LOCALES.map((locale) => ({
+  value: locale.code,
+  label: locale.nativeName,
+  keywords: [locale.name],
+}));
+
+const SPEAKERS = [
+  { value: 'auto', labelId: 'settings.speakers.auto' },
+  { value: 'off', labelId: 'settings.speakers.off' },
+  { value: 'fixed', labelId: 'settings.speakers.fixed' },
+] as const;
 
 // The form field each rejection code names (ADR 0062): the server's message shows there and
 // that field goes back to its stored value. A code the form has no field for uses the page
@@ -37,7 +56,8 @@ type SettingsField =
   | 'speakerCount'
   | 'maxSpeakers'
   | 'defaultFrontend'
-  | 'terminalCommand';
+  | 'terminalCommand'
+  | 'appLanguage';
 
 const FIELD_BY_ERROR_CODE: Record<string, SettingsField | undefined> = {
   'invalid-device': 'device',
@@ -124,6 +144,9 @@ function guardPaste(
 // settings this view formats — unless a settings-updated arrived while it ran, which is
 // newer and stands. It follows settings-updated events from another tab.
 export function SettingsView() {
+  const t = useMessages();
+  const errorText = useErrorText();
+  const appLanguageLabel = t('settings.appLanguage');
   const writes = useWriteControl();
   // The app's one settings instance (item 72): the form is this view's draft, the stored
   // settings are shared with the queue and the fallback banner.
@@ -145,6 +168,9 @@ export function SettingsView() {
   const [countPasteRefused, setCountPasteRefused] = useState(false);
   const [maxPasteRefused, setMaxPasteRefused] = useState(false);
   const [language, setLanguage] = useState<string>('');
+  // The App language draft (roadmap item 88): empty follows the system's language; a shipped
+  // code is the stored choice. The field shows the effective locale either way.
+  const [appLanguage, setAppLanguage] = useState<string>('');
   const [speakers, setSpeakers] = useState<string>('');
   // Which field the user is in: a settings-updated keeps its draft (ADR 0062). A ref, so
   // entering or leaving a field never re-syncs the form by itself.
@@ -170,6 +196,13 @@ export function SettingsView() {
   }, []);
 
   const stored = settings.context.settings;
+  // The app's own language (roadmap item 88): a stored choice, or the system's when the app
+  // ships it, and English otherwise. The draft is empty while the choice follows the system,
+  // so a write of another field stores no choice rather than pinning today's system language.
+  const shownAppLanguage = effectiveUiLocale(
+    appLanguage === '' ? null : appLanguage,
+    systemLanguageTags(),
+  );
   const writing = settings.matches({ loaded: 'saving' });
   const dismissing = settings.matches({ loaded: 'dismissing' });
   // Each typed field's parsed value, and whether it (or a refused paste) is invalid. Until
@@ -189,25 +222,22 @@ export function SettingsView() {
   // none of the form's fields uses the page's callout instead.
   const rejection = settings.context.error instanceof ApiError ? settings.context.error : null;
   const rejectionField = rejection === null ? null : (FIELD_BY_ERROR_CODE[rejection.code] ?? null);
-  const rejectionMessage = rejectionField === null ? null : (rejection?.message ?? null);
+  const rejectionMessage = rejectionField === null ? null : errorText(rejection);
   // A field's error: the rejection message when the server named that field, otherwise the
   // field's own validation message (or none).
   const fieldError = (field: SettingsField, local: string | null): string | null =>
     rejectionField === field ? rejectionMessage : local;
   const deviceError = fieldError('device', null);
-  const threadsError = fieldError(
-    'threads',
-    threadsInvalid ? 'Threads must be a whole number of 1 or more.' : null,
-  );
+  const threadsError = fieldError('threads', threadsInvalid ? t('settings.errors.threads') : null);
   const languageError = fieldError('language', null);
   const speakersError = fieldError('speakers', null);
   const speakerCountError = fieldError(
     'speakerCount',
-    speakerCountInvalid ? 'Speaker count must be a whole number from 1 to 20.' : null,
+    speakerCountInvalid ? t('settings.errors.speakerCount') : null,
   );
   const maxSpeakersError = fieldError(
     'maxSpeakers',
-    maxSpeakersInvalid ? 'Max speakers must be a whole number from 1 to 20.' : null,
+    maxSpeakersInvalid ? t('settings.errors.maxSpeakers') : null,
   );
 
   // The fields whose draft is invalid right now: a settings-updated keeps their draft and
@@ -245,6 +275,9 @@ export function SettingsView() {
     }
     if (!keepsDraft('terminalCommand')) {
       setTerminalCommand(stored.terminalCommand ?? '');
+    }
+    if (!keepsDraft('appLanguage')) {
+      setAppLanguage(stored.appLanguage ?? '');
     }
     if (!keepsDraft('threads')) {
       setThreads(stored.threads === null ? '' : String(stored.threads));
@@ -313,7 +346,7 @@ export function SettingsView() {
       value !== null &&
       !choices.some((choice) => choice.value === value)
     ) {
-      choices.push({ value, label: deviceLabel(value, stored?.gpuNames ?? {}) });
+      choices.push({ value, label: deviceLabel(value, t, stored?.gpuNames ?? {}) });
     }
   }
 
@@ -330,6 +363,7 @@ export function SettingsView() {
       device,
       defaultFrontend: defaultFrontend === '' ? null : defaultFrontend,
       terminalCommand: terminalCommandValue(terminalCommand),
+      appLanguage: appLanguage === '' ? null : appLanguage,
       threads: threadsValue !== undefined ? threadsValue : stored.threads,
       defaultLanguage: language,
       speakersMode: speakers as SpeakerMode,
@@ -424,33 +458,37 @@ export function SettingsView() {
   return (
     <Page>
       <Stack gap="lg">
-        <PageHeading>Settings</PageHeading>
+        <PageHeading>{t('settings.title')}</PageHeading>
         <Stack gap="md">
-          <p>
-            Where transcription runs and the defaults of new uploads. A saved change applies to the
-            next task; one already running keeps its device.
-          </p>
+          <p>{t('settings.intro')}</p>
           {settings.matches({ loaded: 'saving' }) ? (
-            <SavingStatus role="status">Saving…</SavingStatus>
+            <SavingStatus role="status">{t('settings.saving')}</SavingStatus>
           ) : null}
           {settings.context.error !== null && rejectionField === null ? (
             <ErrorCallout
-              title={errorMessage(settings.context.error)}
+              title={
+                settings.matches('failed')
+                  ? errorMessage(settings.context.error)
+                  : errorText(settings.context.error)
+              }
               action={
                 // Only the failed load retries: a rejected write is answered by fixing the
                 // field, and RETRY is not handled in the loaded states.
                 settings.matches('failed') ? (
                   <TextButton onClick={() => settingsActor.send({ type: 'RETRY' })}>
-                    Retry
+                    {t('settings.retry')}
                   </TextButton>
                 ) : undefined
               }
             />
           ) : null}
           {stored !== null && stored.deviceProbeError !== null ? (
-            <ErrorCallout title="The device probe failed" detail={stored.deviceProbeError} />
+            <ErrorCallout
+              title={t('settings.deviceProbeFailed')}
+              detail={stored.deviceProbeError}
+            />
           ) : null}
-          <Field label="Device" htmlFor="device">
+          <Field label={t('settings.device')} htmlFor="device">
             <Select
               id="device"
               value={device}
@@ -480,7 +518,7 @@ export function SettingsView() {
             </Select>
             {deviceError !== null ? <FieldError id="device-error">{deviceError}</FieldError> : null}
           </Field>
-          <Field label="Default frontend" htmlFor="defaultFrontend">
+          <Field label={t('settings.defaultFrontend')} htmlFor="defaultFrontend">
             <Select
               id="defaultFrontend"
               value={defaultFrontend}
@@ -492,7 +530,7 @@ export function SettingsView() {
                 commit({ defaultFrontend: next === '' ? null : next });
               }}
             >
-              <option value="">None</option>
+              <option value="">{t('settings.none')}</option>
               {frontends.map((frontend) => (
                 <option key={frontend.id} value={frontend.id}>
                   {frontend.name}
@@ -500,15 +538,15 @@ export function SettingsView() {
               ))}
             </Select>
             {frontendsError ? (
-              <FieldError id="frontends-error">Couldn't load the frontends list.</FieldError>
+              <FieldError id="frontends-error">{t('settings.frontendsLoadFailed')}</FieldError>
             ) : null}
           </Field>
-          <Field label="Terminal command" htmlFor="terminalCommand">
+          <Field label={t('settings.terminalCommand')} htmlFor="terminalCommand">
             <TextInput
               id="terminalCommand"
               type="text"
               value={terminalCommand}
-              placeholder="The OS terminal"
+              placeholder={t('settings.terminalCommandPlaceholder')}
               disabled={inert || dismissing || writes.disabled}
               title={writes.title}
               onFocus={() => {
@@ -528,7 +566,7 @@ export function SettingsView() {
               }}
             />
           </Field>
-          <Field label="Threads" htmlFor="threads">
+          <Field label={t('settings.threads')} htmlFor="threads">
             <NumberInput
               id="threads"
               type="number"
@@ -562,10 +600,32 @@ export function SettingsView() {
               <FieldError id="threads-error">{threadsError}</FieldError>
             ) : null}
           </Field>
-          <Field label="Default language" htmlFor="language">
+          <Field label={appLanguageLabel} htmlFor="appLanguage">
+            <SearchableSelect
+              id="appLanguage"
+              label={appLanguageLabel}
+              options={APP_LANGUAGE_OPTIONS}
+              value={shownAppLanguage}
+              onChange={(next) => {
+                setAppLanguage(next);
+                commit({ appLanguage: next });
+              }}
+              disabled={inert || dismissing || writes.disabled}
+              title={writes.title}
+              onFocus={() => {
+                focusedField.current = 'appLanguage';
+              }}
+              onBlur={() => {
+                if (focusedField.current === 'appLanguage') {
+                  focusedField.current = null;
+                }
+              }}
+            />
+          </Field>
+          <Field label={t('settings.defaultLanguage')} htmlFor="language">
             <SearchableSelect
               id="language"
-              label="Language"
+              label={t('settings.language')}
               options={LANGUAGE_OPTIONS}
               value={language}
               onChange={(next) => {
@@ -589,7 +649,7 @@ export function SettingsView() {
               <FieldError id="language-error">{languageError}</FieldError>
             ) : null}
           </Field>
-          <Field label="Speakers" htmlFor="speakers">
+          <Field label={t('settings.speakers')} htmlFor="speakers">
             <Select
               id="speakers"
               value={speakers}
@@ -607,7 +667,7 @@ export function SettingsView() {
               }}
               onChange={(event) => {
                 const next = event.target.value;
-                if (!(SPEAKERS as readonly string[]).includes(next)) {
+                if (!SPEAKERS.some((choice) => choice.value === next)) {
                   return;
                 }
                 const mode = next as SpeakerMode;
@@ -624,8 +684,8 @@ export function SettingsView() {
               }}
             >
               {SPEAKERS.map((choice) => (
-                <option key={choice} value={choice}>
-                  {choice}
+                <option key={choice.value} value={choice.value}>
+                  {t(choice.labelId)}
                 </option>
               ))}
             </Select>
@@ -634,7 +694,7 @@ export function SettingsView() {
             ) : null}
           </Field>
           {speakers === 'fixed' ? (
-            <Field label="Speaker count" htmlFor="speaker-count">
+            <Field label={t('settings.speakerCount')} htmlFor="speaker-count">
               <NumberInput
                 id="speaker-count"
                 type="number"
@@ -670,7 +730,7 @@ export function SettingsView() {
               ) : null}
             </Field>
           ) : null}
-          <Field label="Max speakers" htmlFor="max-speakers">
+          <Field label={t('settings.maxSpeakers')} htmlFor="max-speakers">
             <NumberInput
               id="max-speakers"
               type="number"
@@ -711,24 +771,24 @@ export function SettingsView() {
               title={writes.title}
               onClick={() => settingsActor.send({ type: 'ASK_RESET' })}
             >
-              Restore default settings
+              {t('settings.restore')}
             </TextButton>
           </RestoreRow>
           <p>
-            <TextLink to="/queue">Back to the queue</TextLink>
+            <TextLink to="/queue">{t('settings.backToQueue')}</TextLink>
           </p>
         </Stack>
       </Stack>
       <ConfirmDialog
         open={settings.matches({ loaded: 'confirming' })}
-        title="Restore default settings?"
-        confirmLabel="Restore"
+        title={t('settings.confirmTitle')}
+        confirmLabel={t('settings.confirmRestore')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
         onConfirm={() => settingsActor.send({ type: 'CONFIRM_RESET' })}
         onCancel={() => settingsActor.send({ type: 'CANCEL_RESET' })}
       >
-        Every field goes back to the server's defaults, and the CPU-fallback notice is cleared.
+        {t('settings.confirmBody')}
       </ConfirmDialog>
     </Page>
   );

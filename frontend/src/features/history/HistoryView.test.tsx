@@ -222,7 +222,7 @@ describe('the history list', () => {
     fireEvent.click(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' }));
 
     // The refusal surfaces inline; the task stays in the list.
-    expect(await screen.findByText(/Task 42 does not exist/)).toBeInTheDocument();
+    expect(await screen.findByText(/The task doesn't exist\./)).toBeInTheDocument();
     expect(rowOf('call.ogg')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
@@ -247,7 +247,7 @@ describe('the history list', () => {
 
     retryAnswer.resolve();
     expect(
-      await within(rowOf('call.ogg')).findByText(/Task 42 does not exist/),
+      await within(rowOf('call.ogg')).findByText(/The task doesn't exist\./),
     ).toBeInTheDocument();
     expect(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' })).toBeEnabled();
   });
@@ -267,7 +267,7 @@ describe('the history list', () => {
     confirmClicks += 1;
 
     // The refusal surfaces inline and the dialog closes; the task stays in the list.
-    expect(await screen.findByText(/Task 42 does not exist/)).toBeInTheDocument();
+    expect(await screen.findByText(/The task doesn't exist\./)).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByText('interview.mp3')).toBeInTheDocument();
     expect(confirmClicks).toBe(1);
@@ -441,7 +441,7 @@ describe('the history cards', () => {
     // line like the FAILED error.
     fireEvent.click(within(rowOf('call.ogg')).getByRole('button', { name: 'Retry' }));
     const retryFailure = await within(rowOf('call.ogg')).findByText(
-      'Retry failed: Task 42 does not exist',
+      "Retry failed: The task doesn't exist.",
     );
     expect(rowOf('call.ogg')).not.toHaveTextContent('ApiError');
     expect(getComputedStyle(retryFailure).color).toBe(asRgb(lightTheme.colors.danger));
@@ -457,7 +457,7 @@ describe('the history cards', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     const deleteFailure = await within(rowOf('interview.mp3')).findByText(
-      'Delete failed: Task 42 does not exist',
+      "Delete failed: The task doesn't exist.",
     );
     expect(rowOf('interview.mp3')).not.toHaveTextContent('ApiError');
     expect(getComputedStyle(deleteFailure).color).toBe(asRgb(lightTheme.colors.danger));

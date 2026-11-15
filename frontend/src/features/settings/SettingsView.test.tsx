@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw/http';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { LocaleProvider } from '../../app/LocaleProvider';
 import { SettingsContext, SettingsSync } from '../../app/SettingsContext';
 import { controllableEventStream } from '../../test/eventStream';
 import { ThemedProviders } from '../../test/render';
@@ -14,17 +15,19 @@ import settingsUpdatedDefaults from '../../../../docs/api/settings-updated.defau
 import errorFixture from '../../../../docs/api/error.json';
 import { SettingsView } from './SettingsView';
 
-function renderSettings() {
+function renderSettings(messages?: Record<string, string>) {
   return render(
     <ThemedProviders>
-      <ConnectionContext.Provider>
-        <SettingsContext.Provider>
-          <SettingsSync />
-          <MemoryRouter>
-            <SettingsView />
-          </MemoryRouter>
-        </SettingsContext.Provider>
-      </ConnectionContext.Provider>
+      <LocaleProvider messages={messages}>
+        <ConnectionContext.Provider>
+          <SettingsContext.Provider>
+            <SettingsSync />
+            <MemoryRouter>
+              <SettingsView />
+            </MemoryRouter>
+          </SettingsContext.Provider>
+        </ConnectionContext.Provider>
+      </LocaleProvider>
     </ThemedProviders>,
   );
 }
@@ -82,6 +85,7 @@ describe('the settings page', () => {
       maxSpeakers: 12,
       defaultFrontend: null,
       terminalCommand: null,
+      appLanguage: 'de',
     });
 
     // The stored answer is what the page shows.
@@ -256,6 +260,7 @@ describe('the settings threads field', () => {
       maxSpeakers: 12,
       defaultFrontend: null,
       terminalCommand: null,
+      appLanguage: 'de',
     });
 
     // Enter commits too.
@@ -357,6 +362,7 @@ describe('the settings typed counts', () => {
       maxSpeakers: 12,
       defaultFrontend: null,
       terminalCommand: null,
+      appLanguage: 'de',
     });
   });
 });
@@ -408,6 +414,7 @@ describe('the settings writes', () => {
       maxSpeakers: 12,
       defaultFrontend: null,
       terminalCommand: null,
+      appLanguage: 'de',
     });
 
     settle[1]?.(HttpResponse.json({ ...settingsFixed, device: 'cpu' }));
@@ -450,10 +457,10 @@ describe('a rejected settings write', () => {
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0]).toMatchObject({ device: 'gpu:0', threads: 4 });
 
-    // The rejection names the threads field: the server's message shows on that field, the
-    // field goes back to the stored 6, and no page-level callout takes over.
+    // The rejection names the threads field: the catalog's message for the code shows on
+    // that field, the field goes back to the stored 6, and no page-level callout takes over.
     await waitFor(() =>
-      expect(threads).toHaveAccessibleDescription(/threads must be null or a number >= 1/),
+      expect(threads).toHaveAccessibleDescription('Threads must be a whole number of 1 or more.'),
     );
     expect(threads).toHaveValue(6);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -468,6 +475,44 @@ describe('a rejected settings write', () => {
     expect(writes[1]).toMatchObject({ device: 'gpu:0', threads: 5 });
     await waitFor(() => expect(threads).toHaveValue(5));
     expect(device).toHaveValue('gpu:0');
+  });
+
+  it('shows the catalog message for a known refusal code and the server text for an unknown one', async () => {
+    let calls = 0;
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFixed)),
+      http.put('/api/settings', async () => {
+        calls += 1;
+        return calls === 1
+          ? HttpResponse.json(
+              {
+                error: 'invalid-threads',
+                message: 'threads must be null or a number >= 1, got 4',
+              },
+              { status: 400 },
+            )
+          : HttpResponse.json({ error: 'new-refusal', message: 'Server says no' }, { status: 400 });
+      }),
+    );
+
+    const first = renderSettings();
+    await settingsLoaded();
+    const threads = screen.getByLabelText('Threads');
+    fireEvent.change(threads, { target: { value: '4' } });
+    fireEvent.blur(threads);
+    await waitFor(() =>
+      expect(threads).toHaveAccessibleDescription('Threads must be a whole number of 1 or more.'),
+    );
+    first.unmount();
+
+    // A code the catalog does not know: the server's English message is the fallback.
+    renderSettings();
+    await settingsLoaded();
+    const secondThreads = screen.getByLabelText('Threads');
+    fireEvent.change(secondThreads, { target: { value: '4' } });
+    fireEvent.blur(secondThreads);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Server says no');
   });
 
   it('sends the change made during the rejected write as one rebuilt follow-up', async () => {
@@ -515,6 +560,7 @@ describe('a rejected settings write', () => {
       maxSpeakers: 12,
       defaultFrontend: null,
       terminalCommand: null,
+      appLanguage: 'de',
     });
     await waitFor(() => expect(threads).toHaveValue(6));
     await waitFor(() => expect(device).toHaveValue('cpu'));
@@ -535,7 +581,7 @@ describe('a rejected settings write', () => {
     // There is no retry for a write: fixing the field is the retry, so the callout has no
     // dead Retry button (RETRY is handled only by the failed load).
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Task 42 does not exist');
+    expect(alert).toHaveTextContent("The task doesn't exist.");
     expect(within(alert).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
@@ -679,7 +725,7 @@ describe('restoring the default settings', () => {
     // fixing it is the action, so there is no dead Retry (RETRY belongs to the failed load).
     const alert = await screen.findByRole('alert');
     expect(deletes).toBe(1);
-    expect(alert).toHaveTextContent('Task 42 does not exist');
+    expect(alert).toHaveTextContent("The task doesn't exist.");
     expect(within(alert).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 
     // Nothing was reset: settings.fixed.json is still what the form shows, and the action can
@@ -791,6 +837,7 @@ describe('switching the speakers mode', () => {
       maxSpeakers: 10,
       defaultFrontend: null,
       terminalCommand: null,
+      appLanguage: null,
     });
 
     // The draft mode and count stay, with the count's error; the other field followed the
@@ -861,7 +908,7 @@ describe('the default frontend', () => {
       }),
     );
     renderSettings();
-    const select = await screen.findByRole('combobox', { name: 'Default frontend' });
+    const select = await screen.findByRole('combobox', { name: 'Default user interface' });
     await waitFor(() =>
       expect(
         within(select)
@@ -888,7 +935,7 @@ describe('the default frontend load failure', () => {
     await settingsLoaded();
 
     // The app's own words, never the browser's, and not a silent "None" list.
-    expect(await screen.findByText("Couldn't load the frontends list.")).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't load the user interfaces list.")).toBeInTheDocument();
     expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
   });
 
@@ -909,6 +956,112 @@ describe('the default frontend load failure', () => {
 
     // Leaving aborts the read; its abort is not a load failure to report.
     expect(screen.queryByText("Couldn't load the frontends list.")).not.toBeInTheDocument();
+  });
+});
+
+describe('the message catalog', () => {
+  it('renders the page heading and the App language label from the catalog', async () => {
+    server.use(http.get('/api/settings', () => HttpResponse.json(settingsFixture)));
+    renderSettings({
+      'settings.title': 'Einstellungen',
+      'settings.appLanguage': 'App-Sprache',
+    });
+
+    // The overridden entries are what the screen shows: its words are not literals.
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'App-Sprache' })).toBeEnabled(),
+    );
+    expect(screen.getByRole('heading', { name: 'Einstellungen' })).toBeInTheDocument();
+  });
+});
+
+describe('the app language field', () => {
+  // The field defaults from the system's language, which jsdom fixes at en-US; each render
+  // here states the system language it is about and restores the real one afterwards.
+  function setSystemLanguage(tag: string) {
+    Object.defineProperty(window.navigator, 'language', { value: tag, configurable: true });
+    Object.defineProperty(window.navigator, 'languages', { value: [tag], configurable: true });
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(window.navigator, 'language');
+    Reflect.deleteProperty(window.navigator, 'languages');
+  });
+
+  // The field renders before the stored settings land but is inert until they do; an
+  // enabled field means the load answered, whatever the system language is.
+  async function appLanguageLoaded() {
+    const field = await screen.findByRole('combobox', { name: 'App language' });
+    await waitFor(() => expect(field).toBeEnabled());
+    return field;
+  }
+
+  it('offers the UI locales that ship a catalog by their own names, searches them by code, English name and native name, follows the system, and writes the choice', async () => {
+    const puts: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json(settingsFixture)),
+      http.put('/api/settings', async ({ request }) => {
+        const update = (await request.json()) as Record<string, unknown>;
+        puts.push(update);
+        return HttpResponse.json({ ...settingsFixture, ...update });
+      }),
+    );
+
+    // A system language the app does not ship falls back to English.
+    setSystemLanguage('sv-SE');
+    const first = renderSettings();
+    const field = await appLanguageLoaded();
+    expect(field).toHaveValue('English');
+
+    // Every locale with a catalog is offered under its own name; one without a catalog yet
+    // (item 88, discovered 2026-11-12) is not. Typing filters by the code, the English name and
+    // the native name, like the history search.
+    fireEvent.focus(field);
+    expect(screen.getByRole('option', { name: 'Deutsch (de)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'English (en)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Français (fr)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'العربية (ar)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'فارسی (fa)' })).toBeInTheDocument();
+
+    fireEvent.change(field, { target: { value: 'french' } });
+    expect(screen.getByRole('option', { name: 'Français (fr)' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Deutsch (de)' })).not.toBeInTheDocument();
+
+    fireEvent.change(field, { target: { value: 'Français' } });
+    expect(screen.getByRole('option', { name: 'Français (fr)' })).toBeInTheDocument();
+
+    fireEvent.change(field, { target: { value: 'fr' } });
+    expect(screen.getByRole('option', { name: 'Français (fr)' })).toBeInTheDocument();
+
+    // Choosing it writes the settings as a whole, App language included.
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Français (fr)' }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]).toMatchObject({ appLanguage: 'fr' });
+    await waitFor(() => expect(field).toHaveValue('Français'));
+    first.unmount();
+
+    // A shipped system language is the default when none is stored; a system language without
+    // a catalog is passed over for the next one that has one.
+    setSystemLanguage('de-DE');
+    server.use(http.get('/api/settings', () => HttpResponse.json(settingsFixture)));
+    const second = renderSettings();
+    expect(await appLanguageLoaded()).toHaveValue('Deutsch');
+    second.unmount();
+    Object.defineProperty(window.navigator, 'languages', {
+      value: ['fi-FI', 'fr-FR'],
+      configurable: true,
+    });
+    const third = renderSettings();
+    expect(await appLanguageLoaded()).toHaveValue('Français');
+    third.unmount();
+
+    // A stored choice stands over the system's language.
+    setSystemLanguage('sv-SE');
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json({ ...settingsFixture, appLanguage: 'de' })),
+    );
+    renderSettings();
+    expect(await appLanguageLoaded()).toHaveValue('Deutsch');
   });
 });
 

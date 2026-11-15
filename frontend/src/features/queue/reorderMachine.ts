@@ -5,7 +5,6 @@
 // land.
 import { assign, fromPromise, setup } from 'xstate';
 import { reorderQueue } from '../../shared/api/client';
-import { errorMessage } from '../../shared/api/types';
 
 export interface ReorderInput {
   order: number[];
@@ -31,7 +30,7 @@ function rankedOrder(queueOrder: number[], localOrder: number[], pending: number
 interface ReorderContext {
   order: number[];
   previousOrder: number[];
-  error: string | null;
+  error: unknown;
 }
 
 export const reorderMachine = setup({
@@ -101,7 +100,7 @@ export const reorderMachine = setup({
           actions: assign({
             // The server kept its order: restore the one the reorder started from.
             order: ({ context }) => context.previousOrder,
-            error: ({ event }) => errorMessage(event.error),
+            error: ({ event }) => event.error,
           }),
         },
       },

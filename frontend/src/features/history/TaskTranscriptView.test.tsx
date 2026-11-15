@@ -4,11 +4,13 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { App } from '../../app/App';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { LocaleProvider } from '../../app/LocaleProvider';
 import { SettingsContext, SettingsSync } from '../../app/SettingsContext';
 import { lightTheme } from '../../shared/theme/theme';
 import { eventStreamResponse } from '../../shared/api/handlers';
 import {
   error as errorFixture,
+  settings as settingsFixture,
   taskCanceled,
   taskCompleted,
   taskFailed,
@@ -1002,6 +1004,70 @@ describe('the transcript view', () => {
     expect(audio.currentTime).toBe(2.4);
   });
 
+  it('saves and discards with the letters the locale underlines', async () => {
+    // Item 88, discovered 2026-11-12: the shortcuts follow the catalog's access keys. With a
+    // French-style catalog that underlines E and I, Ctrl+E saves and Alt+I discards, the buttons
+    // advertise those keys, and the English Alt+D does nothing.
+    const editedTurns = turnsWithSegmentTwo('Merci à tous.');
+    const sent: unknown[] = [];
+    server.use(
+      http.put('/api/tasks/:id/segments/:segmentId', async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json(editedTurns);
+      }),
+    );
+    render(
+      <ThemedProviders>
+        <LocaleProvider
+          messages={{
+            'transcript.editor.save': '<u>E</u>nregistrer',
+            'transcript.editor.discard': '<u>I</u>gnorer',
+          }}
+        >
+          <ConnectionContext.Provider>
+            <SettingsContext.Provider>
+              <SettingsSync />
+              <MemoryRouter initialEntries={['/history/3']}>
+                <Routes>
+                  <Route path="/history/:taskId" element={<TaskTranscriptView />} />
+                </Routes>
+              </MemoryRouter>
+            </SettingsContext.Provider>
+          </ConnectionContext.Provider>
+        </LocaleProvider>
+      </ThemedProviders>,
+    );
+    const second = await screen.findByRole('button', { name: 'Thanks for joining us today.' });
+    second.focus();
+    fireEvent.keyDown(second, { key: 'e' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Enregistrer' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Alt+E Control+E Meta+E',
+    );
+    expect(within(dialog).getByRole('button', { name: 'Ignorer' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Alt+I Control+I Meta+I',
+    );
+
+    // The English letter is not this locale's shortcut: the editor stays open.
+    const field = screen.getByLabelText('Segment text');
+    fireEvent.keyDown(field, { key: 'd', code: 'KeyD', altKey: true });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Alt+I discards.
+    fireEvent.keyDown(field, { key: 'i', code: 'KeyI', altKey: true });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // Ctrl+E saves the changed draft.
+    second.focus();
+    fireEvent.keyDown(second, { key: 'e' });
+    const reopened = screen.getByLabelText('Segment text');
+    fireEvent.change(reopened, { target: { value: 'Merci à tous.' } });
+    fireEvent.keyDown(reopened, { key: 'e', code: 'KeyE', ctrlKey: true });
+    await waitFor(() => expect(sent).toEqual([{ text: 'Merci à tous.' }]));
+  });
+
   it('keeps following while the user types in the open editor, so playback still scrolls after it closes', async () => {
     // Root review 2026-10-23: the dialog's field events still bubble through the React tree into
     // the transcript region, whose scroll keys treat Space and the arrows as a hand scroll —
@@ -1572,16 +1638,17 @@ describe('the transcript view', () => {
   });
 
   it("keeps the Edit control a word space apart from its segment's frame", async () => {
-    // User report (item 52): the pencil touched the frame drawn around the segment. A left
+    // User report (item 52): the pencil touched the frame drawn around the segment. A start
     // margin of the theme's smallest spacing (0.25rem, about a word space) parts them; a margin,
-    // not padding, so the control's hover and focus boxes stay around the icon. jsdom has no
-    // layout, so this checks the style that gives the gap.
+    // not padding, so the control's hover and focus boxes stay around the icon. The side is
+    // logical, so it mirrors with the reading direction (item 88). jsdom has no layout, so this
+    // checks the style that gives the gap.
     await renderTranscript('3');
     fireEvent.click(screen.getByRole('button', { name: 'Thanks for joining us today.' }));
 
     const edit = screen.getByRole('button', { name: 'Edit segment' });
-    expect(getComputedStyle(edit).marginLeft).toBe(px(lightTheme.spacing.xs));
-    expect(getComputedStyle(edit).paddingLeft).toBe('0px');
+    expect(getComputedStyle(edit).marginInlineStart).toBe(px(lightTheme.spacing.xs));
+    expect(parseFloat(getComputedStyle(edit).paddingInlineStart)).toBe(0);
   });
 
   it('flows the segments as one paragraph of text, each still a button that seeks on Enter and Space', async () => {
@@ -2319,17 +2386,15 @@ describe('the transcript error states', () => {
     );
     await renderTranscript('3');
 
-    // The callout: a plain title, then the server's message as a muted detail line, on the
-    // surface fill with a danger bar on its left, announced as an alert.
+    // The callout: a plain title, then the catalog's message for the code as a muted detail
+    // line, on the surface fill with a danger bar on its inline start, announced as an alert.
     const callout = await screen.findByRole('alert');
     const title = within(callout).getByText("Couldn't load the transcript");
     expect(getComputedStyle(title).color).toBe(asRgb(lightTheme.colors.text));
-    const detail = within(callout).getByText('Task 42 does not exist');
+    const detail = within(callout).getByText("The task doesn't exist.");
     expect(getComputedStyle(detail).color).toBe(asRgb(lightTheme.colors.textMuted));
     const box = getComputedStyle(callout);
     expect(box.backgroundColor).toBe(asRgb(lightTheme.colors.surface));
-    expect(box.borderLeftColor).toBe(asRgb(lightTheme.colors.danger));
-    expect(box.borderLeftWidth).toBe(px(lightTheme.borderWidths.ring));
     expect(required(callout.querySelector('svg')).closest('[aria-hidden="true"]')).not.toBeNull();
 
     // The known parts stay; no loading mascot lingers in place of the turns.
@@ -2441,6 +2506,27 @@ describe('the themed player', () => {
       'Thanks for joining us today.',
     );
     expect(within(player).getByText('00:05 / 19:45')).toBeInTheDocument();
+  });
+
+  it('moves the seek bar toward the inline start with an RTL app language', async () => {
+    // Item 88's RTL item: the Radix slider takes the app's direction, so in Arabic the arrow
+    // keys run the other way — ArrowRight decreases (toward the inline end), ArrowLeft
+    // increases.
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json({ ...settingsFixture, appLanguage: 'ar' })),
+    );
+    render(
+      <MemoryRouter initialEntries={['/history/3']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    const seek = await screen.findByRole('slider');
+    expect(seek).toHaveAttribute('aria-valuenow', '0');
+    fireEvent.keyDown(seek, { key: 'ArrowRight' });
+    expect(seek).toHaveAttribute('aria-valuenow', '0');
+    fireEvent.keyDown(seek, { key: 'ArrowLeft' });
+    expect(seek).toHaveAttribute('aria-valuenow', '1');
   });
 
   it('follows a drag on the seek bar without seeking, and seeks once when the drag is released', async () => {
@@ -3164,19 +3250,21 @@ describe('a transcript opened after a merge', () => {
     const events = controllableEventStream();
     render(
       <ThemedProviders>
-        <ConnectionContext.Provider>
-          <SettingsContext.Provider>
-            <SettingsSync />
-            <MemoryRouter initialEntries={['/history']}>
-              <MergeArrived />
-              <OpenTranscript />
-              <Routes>
-                <Route path="/history" element={<p>history</p>} />
-                <Route path="/history/:taskId" element={<TaskTranscriptView />} />
-              </Routes>
-            </MemoryRouter>
-          </SettingsContext.Provider>
-        </ConnectionContext.Provider>
+        <LocaleProvider>
+          <ConnectionContext.Provider>
+            <SettingsContext.Provider>
+              <SettingsSync />
+              <MemoryRouter initialEntries={['/history']}>
+                <MergeArrived />
+                <OpenTranscript />
+                <Routes>
+                  <Route path="/history" element={<p>history</p>} />
+                  <Route path="/history/:taskId" element={<TaskTranscriptView />} />
+                </Routes>
+              </MemoryRouter>
+            </SettingsContext.Provider>
+          </ConnectionContext.Provider>
+        </LocaleProvider>
       </ThemedProviders>,
     );
 
@@ -3193,5 +3281,32 @@ describe('a transcript opened after a merge', () => {
     expect(turnsRequests()).toBe(1);
     const transcript = screen.getByRole('region', { name: 'Transcript' });
     expect(within(transcript).getByText('Speaker 2')).toBeInTheDocument();
+  });
+});
+
+describe('the editor button labels', () => {
+  it('keeps each label in one element, so the inline-flex button does not split it', async () => {
+    await renderTranscript('3');
+    openSegmentEditor('Thanks for joining us today.');
+    const save = screen.getByRole('button', { name: 'Save' });
+    const discard = screen.getByRole('button', { name: 'Discard' });
+    // The Button is an inline-flex row with a gap: a label rendered as a fragment (`<u>S</u>`
+    // plus `ave`) becomes two flex items, visibly "S  ave", and Chromium read it aloud as
+    // "S ave" (the bug this pattern had before). One element keeps it one label.
+    expect(save.childNodes).toHaveLength(1);
+    expect(discard.childNodes).toHaveLength(1);
+    expect(save).toHaveTextContent('Save');
+    expect(discard).toHaveTextContent('Discard');
+  });
+});
+
+describe("the transcript's own direction", () => {
+  it('lets each turn take its direction from its text, not from the app language', async () => {
+    // Item 88 (user decision 2026-11-13): an RTL app language must not flip an English
+    // transcript; the reading text carries dir="auto" so the browser resolves the turn's own
+    // direction (item 76 refines it per item later).
+    await renderTranscript('3');
+    const segment = screen.getByRole('button', { name: 'Thanks for joining us today.' });
+    expect(segment.closest('[dir="auto"]')).not.toBeNull();
   });
 });

@@ -241,9 +241,10 @@ Test list:
   rule 1 of the spec. Status back to in-progress.
 - 2026-10-31: review-finding cycle (the user chose it first): a rejected transport now says
   "Can't reach the app's service. Reconnecting…" for a read and keeps "Not saved: …" for a write;
-  the client boundary decides by method (GET is a read). `failureMessage()` leaves the app's
-  transport message alone instead of prefixing "Retry failed:"/"Delete failed:" (HistoryRow and the
-  failed task's status page), and rule 2 of the spec records the split. Red-first in
+  the client boundary decides by method (GET is a read). The failure line (`failureLine()`, which
+  item 88 later moved into the catalog reader) leaves the app's transport message alone instead of
+  prefixing "Retry failed:"/"Delete failed:" (HistoryRow and the failed task's status page), and
+  rule 2 of the spec records the split. Red-first in
   `writeGate.test.tsx`. No refactoring suggested or approved.
 - 2026-10-31: amendment cycle 1 (the user chose the amendment's first item):
   `uploadBatchMachine` takes `{ live }` as input and gains a `waiting` state; `QueueView` forwards
@@ -252,7 +253,8 @@ Test list:
   `AbortSignal`; the row is sent again from the start when the stream is live, with no error row
   and no per-request timeout. Red-first in `writeGate.test.tsx`, which covers both a first request
   that fails outright and one that hangs. The approved `Refactor:` commit extracted
-  `isTransportError()` for the upload actor and `failureMessage()`.
+  `isTransportError()` for the upload actor and `failureMessage()` (item 88 folded its rule into
+  `failureLine()` and removed it).
 - 2026-10-31: amendment cycle 2 (the user chose the next item): a batch pin, green on its first
   run — the first request hangs, the drop stops the batch, both rows are queued, no request starts
   while the stream is down, and the reconnect sends the cut-off row and then the row behind it.

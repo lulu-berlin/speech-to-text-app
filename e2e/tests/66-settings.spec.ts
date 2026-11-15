@@ -24,7 +24,7 @@ test('the Settings page lists the registered frontends and keeps the default and
     await expect(page.getByText('Live', { exact: true })).toBeVisible();
     await goTo(page, 'Settings');
 
-    const defaultFrontend = page.getByRole('combobox', { name: 'Default frontend' });
+    const defaultFrontend = page.getByRole('combobox', { name: 'Default user interface' });
     await expect
       .poll(async () => (await defaultFrontend.locator('option').allTextContents()).join('|'))
       .toBe('None|Browser|Terminal TUI');
@@ -48,7 +48,7 @@ test('the Settings page lists the registered frontends and keeps the default and
       .toBe('tui|wezterm start --');
 
     await page.reload();
-    await expect(page.getByRole('combobox', { name: 'Default frontend' })).toHaveValue('tui');
+    await expect(page.getByRole('combobox', { name: 'Default user interface' })).toHaveValue('tui');
     await expect(page.getByRole('textbox', { name: 'Terminal command' })).toHaveValue(
       'wezterm start --',
     );

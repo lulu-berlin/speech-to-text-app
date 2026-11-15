@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
+import { useIntl } from 'react-intl';
 import { CircleAlert } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { Link } from 'react-router';
 import styled from 'styled-components';
 import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
-import { failureMessage } from '../../shared/api/types';
+import { failureLine, useErrorText } from '../../shared/i18n/useErrorText';
+import { useMessages } from '../../shared/i18n/useMessages';
 import type { Task } from '../../shared/api/types';
 import { ListRow } from '../../shared/ui/ListRow';
 import { StatusBadge } from '../../shared/ui/StatusBadge';
@@ -36,7 +38,8 @@ const TaskLink = styled(Link)`
   ${focusRing}
 `;
 
-// The card's first line: the filename on the left, the status badge on the right.
+// The card's first line: the filename at the inline start, the status badge at the inline
+// end.
 const TitleRow = styled.div`
   display: flex;
   align-items: center;
@@ -64,7 +67,7 @@ function CardErrorLine({ children }: { children: string }) {
   );
 }
 
-// The card's quiet actions, right-aligned at the bottom.
+// The card's quiet actions, aligned to the inline end at the bottom.
 const Actions = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -75,6 +78,9 @@ const Actions = styled.div`
 // through confirmActionMachine, so the sending/done/failed state and any inline error live
 // in the machines (ADR 0031), not in React state.
 export function HistoryRow({ task }: { task: Task }) {
+  const t = useMessages();
+  const intl = useIntl();
+  const errorText = useErrorText();
   const connection = ConnectionContext.useActorRef();
   const writes = useWriteControl();
 
@@ -112,7 +118,7 @@ export function HistoryRow({ task }: { task: Task }) {
           </TaskLink>
           <StatusBadge status={task.status} />
         </TitleRow>
-        <MetaText>{formatTaskMeta(task)}</MetaText>
+        <MetaText>{formatTaskMeta(task, intl)}</MetaText>
         {task.error !== null ? <CardErrorLine>{task.error}</CardErrorLine> : null}
         <Actions>
           {isAllowedCommand('retry', task.status) ? (
@@ -129,7 +135,7 @@ export function HistoryRow({ task }: { task: Task }) {
                 retrySend({ type: 'START' });
               }}
             >
-              Retry
+              {t('history.retry')}
             </TextButton>
           ) : null}
           <TextButton
@@ -144,26 +150,30 @@ export function HistoryRow({ task }: { task: Task }) {
               deleteSend({ type: 'REQUEST' });
             }}
           >
-            Delete
+            {t('history.delete')}
           </TextButton>
         </Actions>
         {retryError ? (
-          <CardErrorLine>{failureMessage('Retry failed', retryError)}</CardErrorLine>
+          <CardErrorLine>
+            {failureLine(t('history.retryFailed'), retryError, errorText)}
+          </CardErrorLine>
         ) : null}
         {deleteError ? (
-          <CardErrorLine>{failureMessage('Delete failed', deleteError)}</CardErrorLine>
+          <CardErrorLine>
+            {failureLine(t('history.deleteFailed'), deleteError, errorText)}
+          </CardErrorLine>
         ) : null}
       </Stack>
       <ConfirmDialog
         open={deleteState.matches('confirming') || deleteState.matches('running')}
-        title="Delete task?"
-        confirmLabel="Delete"
+        title={t('history.delete.title')}
+        confirmLabel={t('history.delete.confirm')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
         onConfirm={() => deleteSend({ type: 'CONFIRM' })}
         onCancel={() => deleteSend({ type: 'CANCEL' })}
       >
-        {task.filename} and its transcript and audio will be deleted.
+        {t('history.delete.body', { filename: task.filename })}
       </ConfirmDialog>
     </ListRow>
   );

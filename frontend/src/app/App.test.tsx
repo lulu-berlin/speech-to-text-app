@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw/http';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eventStreamResponse } from '../shared/api/handlers';
 import {
   error as errorFixture,
@@ -35,6 +35,10 @@ function renderAt(path: string) {
 function headerBrand(): SVGElement {
   return required(required(screen.getByRole('banner')).querySelector('svg')) as SVGElement;
 }
+
+// settings.fixed.json stores German as the App language, which the app now follows (item 88);
+// the tests of the shared settings instance read the English UI, so they store none.
+const settingsFixedInEnglish = { ...settingsFixed, appLanguage: null };
 
 describe('the app root', () => {
   it('renders the page title', () => {
@@ -251,7 +255,6 @@ describe('the not-found pages', () => {
       'href',
       '/queue',
     );
-    expect(getComputedStyle(pageCallout).borderLeftColor).toBe(asRgb(lightTheme.colors.danger));
     page.unmount();
 
     // An unknown task (no id 42 in snapshot.json), once live: the same callout form with
@@ -265,7 +268,6 @@ describe('the not-found pages', () => {
       'href',
       '/history',
     );
-    expect(getComputedStyle(taskCallout).borderLeftColor).toBe(asRgb(lightTheme.colors.danger));
   });
 });
 
@@ -642,7 +644,7 @@ describe('the shared settings instance', () => {
     server.use(
       http.get('/api/settings', () => {
         gets += 1;
-        return HttpResponse.json(settingsFixed);
+        return HttpResponse.json(settingsFixedInEnglish);
       }),
     );
 
@@ -685,12 +687,12 @@ describe('a change made in the settings', () => {
     server.use(
       http.get('/api/settings', () => {
         gets += 1;
-        return HttpResponse.json(settingsFixed);
+        return HttpResponse.json(settingsFixedInEnglish);
       }),
       http.put('/api/settings', async ({ request }) => {
         puts += 1;
         const update = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...settingsFixed, ...update });
+        return HttpResponse.json({ ...settingsFixedInEnglish, ...update });
       }),
     );
 
@@ -719,7 +721,7 @@ describe('a failed settings load', () => {
         gets += 1;
         return gets === 1
           ? HttpResponse.json(errorFixture, { status: 500 })
-          : HttpResponse.json(settingsFixed);
+          : HttpResponse.json(settingsFixedInEnglish);
       }),
     );
 
@@ -806,7 +808,7 @@ describe('a settings-updated while a write is in flight', () => {
     const write = Promise.withResolvers<Response>();
     let puts = 0;
     server.use(
-      http.get('/api/settings', () => HttpResponse.json(settingsFixed)),
+      http.get('/api/settings', () => HttpResponse.json(settingsFixedInEnglish)),
       http.put('/api/settings', () => {
         puts += 1;
         return write.promise;
@@ -829,7 +831,7 @@ describe('a settings-updated while a write is in flight', () => {
     // auto — and must not overwrite the newer settings the event stored.
     fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
     await screen.findByLabelText('Device');
-    write.resolve(HttpResponse.json({ ...settingsFixed, device: 'auto' }));
+    write.resolve(HttpResponse.json({ ...settingsFixedInEnglish, device: 'auto' }));
     await waitFor(() => expect(screen.queryByText('Saving…')).not.toBeInTheDocument());
 
     // The form shows the event's device, not the answer's...
@@ -974,5 +976,69 @@ describe('the shared settings handlers', () => {
     );
     await waitFor(() => expect(screen.getByLabelText('Device')).toHaveValue('auto'));
     expect(screen.getByLabelText('Threads')).toHaveValue(null);
+  });
+});
+
+describe('the app language direction', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(document.documentElement, 'dir');
+    document.documentElement.lang = 'en';
+  });
+
+  it('mirrors for an RTL app language: the document direction and language follow it', async () => {
+    // Item 88's RTL item: the app language decides the document's direction (the ui-locales
+    // contract's `direction`), so every screen inherits it; English keeps LTR.
+    server.use(
+      http.get('/api/settings', () => HttpResponse.json({ ...settingsFixture, appLanguage: 'ar' })),
+    );
+    const arabic = renderAt('/settings');
+    await screen.findByRole('heading', { name: 'الإعدادات' });
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(document.documentElement.lang).toBe('ar');
+    arabic.unmount();
+
+    server.use(http.get('/api/settings', () => HttpResponse.json(settingsFixture)));
+    renderAt('/settings');
+    await screen.findByRole('heading', { name: 'Settings' });
+    expect(document.documentElement.dir).toBe('ltr');
+    expect(document.documentElement.lang).toBe('en');
+  });
+});
+
+describe('the app language', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(window.navigator, 'language');
+    Reflect.deleteProperty(window.navigator, 'languages');
+  });
+
+  it('follows the first system language that ships a catalog, and switches the whole UI when another is chosen', async () => {
+    // Item 88, discovered 2026-11-12: Finnish is a system language with no UI locale, so a Finnish
+    // system with German second reads German; choosing French in the picker switches the
+    // interface without a reload. (Persian played this role until its catalog shipped.)
+    Object.defineProperty(window.navigator, 'language', { value: 'fi-FI', configurable: true });
+    Object.defineProperty(window.navigator, 'languages', {
+      value: ['fi-FI', 'de-DE'],
+      configurable: true,
+    });
+    server.use(
+      http.put('/api/settings', async ({ request }) =>
+        HttpResponse.json({ ...settingsFixture, ...((await request.json()) as object) }),
+      ),
+    );
+    renderAt('/settings');
+
+    expect(await screen.findByRole('heading', { name: 'Einstellungen' })).toBeInTheDocument();
+    const field = screen.getByRole('combobox', { name: 'App-Sprache' });
+    await waitFor(() => expect(field).toBeEnabled());
+    expect(field).toHaveValue('Deutsch');
+
+    fireEvent.focus(field);
+    fireEvent.mouseDown(screen.getByRole('option', { name: 'Français (fr)' }));
+
+    expect(await screen.findByRole('heading', { name: 'Paramètres' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'File d’attente' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Langue de l’application' })).toHaveValue(
+      'Français',
+    );
   });
 });

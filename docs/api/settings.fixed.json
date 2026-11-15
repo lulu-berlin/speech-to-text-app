@@ -8,6 +8,7 @@
   "deviceFallback": null,
   "defaultFrontend": null,
   "terminalCommand": null,
+  "appLanguage": "de",
   "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"],
   "gpuNames": {
     "gpu:0": "NVIDIA GeForce RTX 3060",

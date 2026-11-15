@@ -16,6 +16,9 @@ internal object SettingsTable : Table("settings") {
     val defaultFrontend = text("default_frontend").nullable()
     val terminalCommand = text("terminal_command").nullable()
 
+    /** Roadmap item 88: the app's own language; null follows the system (V18). */
+    val appLanguage = text("app_language").nullable()
+
     const val ONLY_ROW_ID = 1
 
     override val primaryKey = PrimaryKey(id)
