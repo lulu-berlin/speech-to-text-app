@@ -157,6 +157,8 @@ graph TD
   70 --> 109
   88 --> 109
   98 --> 109
+  66 --> 110[110 app mode after a restart]
+  87 --> 110
   50 --> 64[64 evaluate Tauri ✓]:::done
   65[65 fix the row-color phase observation ✓]:::done
   64 --> 66[66 local service and frontend flavors ✓]:::done
@@ -328,3 +330,4 @@ graph TD
 | [107 — The backend rewritten in Rust, phase 8: app mode](107-rust-backend-app-mode.md) | spec-approved | 106 |
 | [108 — The backend rewritten in Rust, phase 9: the switch](108-rust-backend-switch.md) | spec-approved | 107 |
 | [109 — One UI core for every frontend: the `stt-ui` crate](109-shared-ui-crate.md) | spec-approved | 67, 70, 88, 98 |
+| [110 — In app mode, a service restart leaves a page that names the way back in](110-app-mode-after-service-restart.md) | draft | 66, 87 |
