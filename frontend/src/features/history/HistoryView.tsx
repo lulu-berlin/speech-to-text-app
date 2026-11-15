@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { FormattedMessage } from 'react-intl';
 import styled from 'styled-components';
 import { ConnectionContext } from '../../app/ConnectionContext';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { List } from '../../shared/ui/List';
 import { controlStyle } from '../../shared/ui/controlStyle';
 import { Field } from '../../shared/ui/Field';
+import { useMessages } from '../../shared/i18n/useMessages';
 import type { Task } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { PageHeading } from '../../shared/ui/typography';
@@ -16,11 +18,11 @@ import { HistoryRow } from './HistoryRow';
 const FINISHED: ReadonlySet<Task['status']> = new Set(['COMPLETED', 'FAILED', 'CANCELED']);
 
 // The status filter options: "all statuses" plus the three finished statuses.
-const FILTER_STATUSES: ReadonlyArray<{ value: string; label: string }> = [
-  { value: 'ALL', label: 'All statuses' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'FAILED', label: 'Failed' },
-  { value: 'CANCELED', label: 'Canceled' },
+const FILTER_STATUSES: ReadonlyArray<{ value: string; labelId: string }> = [
+  { value: 'ALL', labelId: 'history.status.all' },
+  { value: 'COMPLETED', labelId: 'history.status.completed' },
+  { value: 'FAILED', labelId: 'history.status.failed' },
+  { value: 'CANCELED', labelId: 'history.status.canceled' },
 ];
 
 const Title = styled(PageHeading)`
@@ -52,6 +54,7 @@ const NoMatchesLine = styled.p`
 `;
 
 export function HistoryView() {
+  const t = useMessages();
   const tasks = ConnectionContext.useSelector((state) => state.context.tasks);
   const live = ConnectionContext.useSelector((state) => state.value === 'live');
   const [search, setSearch] = useState('');
@@ -72,29 +75,29 @@ export function HistoryView() {
   return (
     <Page>
       <Stack gap="md">
-        <Title>History</Title>
+        <Title>{t('history.title')}</Title>
         {allFinished.length > 0 ? (
           <>
             <Controls gap="sm">
-              <Field label="Search" htmlFor="history-search">
+              <Field label={t('history.search')} htmlFor="history-search">
                 <SearchInput
                   id="history-search"
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  aria-label="Search by filename"
+                  aria-label={t('history.searchLabel')}
                 />
               </Field>
-              <Field label="Status" htmlFor="history-status">
+              <Field label={t('history.status')} htmlFor="history-status">
                 <StatusSelect
                   id="history-status"
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}
-                  aria-label="Filter by status"
+                  aria-label={t('history.statusLabel')}
                 >
                   {FILTER_STATUSES.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.labelId)}
                     </option>
                   ))}
                 </StatusSelect>
@@ -108,22 +111,24 @@ export function HistoryView() {
               </List>
             ) : (
               <NoMatches gap="sm">
-                <NoMatchesLine>No tasks match your search and filter.</NoMatchesLine>
+                <NoMatchesLine>{t('history.noMatches')}</NoMatchesLine>
                 <TextButton
                   onClick={() => {
                     setSearch('');
                     setStatusFilter('ALL');
                   }}
                 >
-                  Clear filters
+                  {t('history.clearFilters')}
                 </TextButton>
               </NoMatches>
             )}
           </>
         ) : live ? (
-          <EmptyState title="No transcripts yet">
-            Finished tasks appear here — <TextLink to="/queue">go to the queue</TextLink> to add
-            audio
+          <EmptyState title={t('history.empty.title')}>
+            <FormattedMessage
+              id="history.empty.body"
+              values={{ link: (chunks) => <TextLink to="/queue">{chunks}</TextLink> }}
+            />
           </EmptyState>
         ) : null}
       </Stack>

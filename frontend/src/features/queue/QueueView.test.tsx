@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw/http';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectionContext } from '../../app/ConnectionContext';
+import { LocaleProvider } from '../../app/LocaleProvider';
 import { SettingsContext, SettingsSync } from '../../app/SettingsContext';
 import {
   error as errorFixture,
@@ -25,22 +26,25 @@ import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
+import spanishMessages from '../../locales/es-ES.json';
 import settingsFallback from '../../../../docs/api/settings.fallback.json';
 import settingsFixed from '../../../../docs/api/settings.fixed.json';
 import settingsUpdatedFallback from '../../../../docs/api/settings-updated.fallback.json';
 import { QueueView } from './QueueView';
 
-function renderQueue() {
+function renderQueue(messages?: Record<string, string>, uiLocale?: string) {
   return render(
     <ThemedProviders>
-      <ConnectionContext.Provider>
-        <SettingsContext.Provider>
-          <SettingsSync />
-          <MemoryRouter>
-            <QueueView />
-          </MemoryRouter>
-        </SettingsContext.Provider>
-      </ConnectionContext.Provider>
+      <LocaleProvider messages={messages} uiLocale={uiLocale} locale={uiLocale}>
+        <ConnectionContext.Provider>
+          <SettingsContext.Provider>
+            <SettingsSync />
+            <MemoryRouter>
+              <QueueView />
+            </MemoryRouter>
+          </SettingsContext.Provider>
+        </ConnectionContext.Provider>
+      </LocaleProvider>
     </ThemedProviders>,
   );
 }
@@ -247,7 +251,7 @@ describe('the queue view CPU-fallback banner', () => {
     const banner = await screen.findByRole('alert');
     fireEvent.click(within(banner).getByRole('button', { name: 'Dismiss' }));
     expect(await screen.findByText('Could not dismiss the notice')).toBeInTheDocument();
-    expect(screen.getByText('Task 42 does not exist')).toBeInTheDocument();
+    expect(screen.getByText("The task doesn't exist.")).toBeInTheDocument();
     expect(screen.getByText(/was unavailable/)).toBeInTheDocument();
     // The failed dismissal settles back to idle: the user can try again.
     await waitFor(() =>
@@ -686,6 +690,20 @@ describe('the queue list', () => {
     expect(narrowRules.map((rule) => rule.style.alignItems)).toContain('flex-start');
   });
 
+  it('formats the phase percent for the format locale: Spanish puts a space before the sign', async () => {
+    // Item 88, discovered 2026-11-12: the queue appended the sign in the component, so Spanish
+    // and French showed 42% where their own number format puts a space. The percent now comes
+    // from the format locale's Intl.NumberFormat, like the durations.
+    controllableEventStream();
+    renderQueue(spanishMessages, 'es-ES');
+
+    // The running task's row (docs/api/snapshot.json: RUNNING, TRANSCRIBING, 42%).
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    const percent = new Intl.NumberFormat('es-ES', { style: 'percent' }).format(0.42);
+    expect(lecture.textContent).toContain(`Transcripción… ${percent}`);
+  });
+
   it('shows the diarization bar only while diarizing: its stage and progress update, and it hides when diarization does not apply', async () => {
     const events = controllableEventStream();
 
@@ -900,9 +918,11 @@ describe('task controls', () => {
 
     resumeAnswer.resolve();
     await waitFor(() =>
-      expect(within(lecture).getByText('Task 42 does not exist')).toBeInTheDocument(),
+      expect(within(lecture).getByText("The task doesn't exist.")).toBeInTheDocument(),
     );
-    expect(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' })).toBeEnabled();
+    await waitFor(() =>
+      expect(within(lecture).getByRole('button', { name: 'Resume lecture.m4a' })).toBeEnabled(),
+    );
     expect(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' })).toBeEnabled();
   });
 
@@ -1177,7 +1197,7 @@ describe('the queue reorder', () => {
     // The server rejected the new order: the rows fall back to the old order and the
     // error message is shown.
     await waitFor(() => expect(ordered).toEqual([[7, 5]]));
-    await screen.findByText('Task 42 does not exist');
+    await screen.findByText("The task doesn't exist.");
     const menuRows = screen.getAllByRole('listitem');
     expect(menuRows.map((row) => row.textContent)).toEqual([
       expect.stringContaining('lecture.m4a'),
@@ -1231,7 +1251,7 @@ describe('the queue pause', () => {
     // The rejection is an alert beside the control, naming the command and the server's message.
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Could not pause the queue');
-    expect(alert).toHaveTextContent('Task 42 does not exist');
+    expect(alert).toHaveTextContent("The task doesn't exist.");
 
     // The queue never paused, so the switch shows that real state and is usable again.
     expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -1268,7 +1288,7 @@ describe('the queue pause', () => {
     fireEvent.click(toggle);
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Could not resume the queue');
-    expect(alert).toHaveTextContent('Task 42 does not exist');
+    expect(alert).toHaveTextContent("The task doesn't exist.");
     // The queue never resumed, so the switch still shows it paused.
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(calls).toEqual(['pause', 'resume']);
@@ -1336,18 +1356,60 @@ describe('failed commands', () => {
 
     fireEvent.click(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' }));
     await waitFor(() =>
-      expect(within(lecture).getByText('Task 42 does not exist')).toBeInTheDocument(),
+      expect(within(lecture).getByText("The task doesn't exist.")).toBeInTheDocument(),
     );
 
     // The next action clears the error; the failed attempt changed nothing (the task is
     // still RUNNING, so its cancel asks for confirmation).
     fireEvent.click(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' }));
     await screen.findByRole('dialog');
+    expect(within(lecture).queryByText("The task doesn't exist.")).not.toBeInTheDocument();
+  });
+
+  it('shows the catalog text for a known refusal code and the server text for an unknown one', async () => {
+    let calls = 0;
+    server.use(
+      http.post('/api/tasks/:id/pause', () => {
+        calls += 1;
+        return calls === 1
+          ? HttpResponse.json(errorFixture, { status: 409 })
+          : HttpResponse.json({ error: 'new-refusal', message: 'Server says no' }, { status: 400 });
+      }),
+    );
+
+    renderQueue();
+    await screen.findByText('lecture.m4a');
+    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' }));
+    await waitFor(() =>
+      expect(within(lecture).getByText("The task doesn't exist.")).toBeInTheDocument(),
+    );
     expect(within(lecture).queryByText('Task 42 does not exist')).not.toBeInTheDocument();
+
+    // A code the catalog does not know: the server's English message is the fallback.
+    fireEvent.click(within(lecture).getByRole('button', { name: 'Pause lecture.m4a' }));
+    await waitFor(() => expect(within(lecture).getByText('Server says no')).toBeInTheDocument());
+    expect(within(lecture).queryByText("The task doesn't exist.")).not.toBeInTheDocument();
   });
 });
 
 describe('upload errors', () => {
+  it('shows the unsupported-format refusal from the catalog', async () => {
+    renderQueue({ 'error.unsupported-format': 'Format not supported' });
+    await screen.findByText('lecture.m4a');
+
+    fireEvent.drop(screen.getByRole('button', { name: /drop/i }), {
+      dataTransfer: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] },
+    });
+
+    const uploads = screen.getByRole('list', { name: 'Uploads' });
+    await waitFor(() =>
+      expect(within(uploads).getByText('Format not supported')).toBeInTheDocument(),
+    );
+    expect(within(uploads).queryByText('Unsupported file format')).not.toBeInTheDocument();
+  });
+
   it("keeps each error on its file's row: unsupported format, invalid input, and a duplicate with a link", async () => {
     // The three files that reach the server answer differently; the rejected file (a.txt)
     // must never reach it. The file's multipart Content-Type identifies it (jsdom drops

@@ -189,7 +189,7 @@ graph TD
   85[85 CI wall time ✓]:::done
   86[86 mobile feasibility]
   87[87 writes wait for the connection ✓]:::done
-  88[88 localization]
+  88[88 localization ✓]:::done
   74 --> 88
   73 --> 83
   81[81 dropped row command ✓]:::done
@@ -309,7 +309,7 @@ graph TD
 | [85 — CI wall time: a code pull request's checks finish sooner without proving less](../docs/specs/ci-wall-time.md)                                                         | done          | 84                          |
 | [86 — Mobile feasibility: can the app run on a phone with transcription and diarization fully on the device?](86-mobile-feasibility.md)                                    | spec-approved | —                           |
 | [87 — Writes wait for the connection, and a control with nothing to do says so](../docs/specs/writes-and-the-connection.md)                                                       | done          | —                           |
-| [88 — Localization: the app's own language, in every language whisper transcription supports](88-localization.md)                                                          | spec-approved | 74                          |
+| [88 — Localization: the app's own language, in every language whisper transcription supports](../docs/specs/localization.md)                                             | done          | 74                          |
 | [89 — The service package: the runner, the CLI and the tray, installed together](89-service-package.md) | spec-approved | 66 |
 | [90 — A nixpkgs bump, our own whisper.cpp 1.9.5 artifact on every route, and one platform vocabulary](../docs/specs/own-artifacts-and-platform-keys.md) | done | 63, 48, 49, 33 |
 | [91 — MSW 3: the API mocks, the shared handlers and the dev worker](../docs/specs/msw-3.md) | done | 13 |

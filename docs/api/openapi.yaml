@@ -697,6 +697,8 @@ components:
         defaultFrontend: {type: string, nullable: true}
         # Roadmap item 66, D10: the terminal the TUI opens in, replacing the OS launcher; null uses the OS launcher.
         terminalCommand: {type: string, nullable: true}
+        # Roadmap item 88: the app's own language (a shipped UI locale); null follows the system's language.
+        appLanguage: {type: string, nullable: true}
     Settings:
       allOf:
         - {$ref: "#/components/schemas/SettingsUpdate"}

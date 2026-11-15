@@ -1,4 +1,5 @@
 import styled from 'styled-components';
+import { useMessages } from '../shared/i18n/useMessages';
 import { ErrorCallout } from '../shared/ui/ErrorCallout';
 import { Page, Stack } from '../shared/ui/layout';
 import { TextLink } from '../shared/ui/TextLink';
@@ -11,14 +12,15 @@ const Title = styled(PageHeading)`
 // An unknown address: the page heading, then the error callout with the way to the queue
 // (item 25).
 export function NotFoundView() {
+  const t = useMessages();
   return (
     <Page>
       <Stack gap="md">
-        <Title>Not found</Title>
+        <Title>{t('app.notFound.title')}</Title>
         <ErrorCallout
-          title="This page doesn't exist"
-          detail="Check the address, or go to the queue."
-          action={<TextLink to="/queue">Go to the queue</TextLink>}
+          title={t('app.notFound.errorTitle')}
+          detail={t('app.notFound.detail')}
+          action={<TextLink to="/queue">{t('app.notFound.action')}</TextLink>}
         />
       </Stack>
     </Page>

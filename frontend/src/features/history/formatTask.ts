@@ -1,22 +1,25 @@
+import type { IntlShape } from 'react-intl';
 import { formatDuration } from '../../shared/formatDuration';
 import type { Task } from '../../shared/api/types';
 
 // The finish date and duration of a task, as the History cards and the transcript's header
-// block show them.
-
-// The fixed month names and UTC rendering of the finish date, so the text is the same for
-// every user (a toLocaleDateString would follow the reader's locale).
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-export function formatFinishDate(finishedAtMs: number): string {
-  const date = new Date(finishedAtMs);
-  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
-}
-
-// The meta line: the finish date and the duration joined by " · ", each only when known.
-export function formatTaskMeta(task: Pick<Task, 'finishedAt' | 'durationMs'>): string {
+// block show them. The date follows the locale's pattern (the month order and names are the
+// locale's) and stays on the UTC date the API stores; `intl` is the app's formatter, whose
+// locale is the format locale.
+export function formatTaskMeta(
+  task: Pick<Task, 'finishedAt' | 'durationMs'>,
+  intl: IntlShape,
+): string {
   return [
-    task.finishedAt !== null ? formatFinishDate(task.finishedAt) : null,
-    task.durationMs !== null ? formatDuration(task.durationMs) : null,
+    task.finishedAt !== null
+      ? intl.formatDate(new Date(task.finishedAt), {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          timeZone: 'UTC',
+        })
+      : null,
+    task.durationMs !== null ? formatDuration(task.durationMs, intl) : null,
   ]
     .filter((part) => part !== null)
     .join(' · ');

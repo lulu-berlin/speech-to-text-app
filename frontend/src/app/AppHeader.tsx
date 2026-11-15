@@ -10,6 +10,7 @@ import type { ThemeTokens } from '../shared/theme/theme';
 import { focusRing } from '../shared/ui/focusRing';
 import { Tooltip } from '../shared/ui/Tooltip';
 import { ConnectionContext } from './ConnectionContext';
+import { useMessages } from '../shared/i18n/useMessages';
 import { headerScrollMachine } from './headerScrollMachine';
 
 // The brand icon, product name, navigation between the views, the live connection
@@ -105,7 +106,7 @@ const NavItem = styled(NavLink)`
 // The connection indicator (item 59): a dot plus its label, informational — no reconnect
 // click. The dot carries the state's colour and is decorative; the label says the state.
 const Indicator = styled.span`
-  margin-left: auto;
+  margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
   gap: ${(props) => props.theme.spacing.xs};
@@ -113,7 +114,7 @@ const Indicator = styled.span`
 `;
 
 interface ConnectionDotProps {
-  $state: keyof typeof CONNECTION_LABEL;
+  $state: keyof typeof CONNECTION_LABEL_ID;
 }
 
 const CONNECTION_DOT_COLOR = {
@@ -136,16 +137,16 @@ const THEME_ICON = {
   dark: Moon,
 } as const;
 
-const THEME_LABEL = {
-  auto: 'Theme: system',
-  light: 'Theme: light',
-  dark: 'Theme: dark',
+const THEME_LABEL_ID = {
+  auto: 'app.theme.system',
+  light: 'app.theme.light',
+  dark: 'app.theme.dark',
 } as const;
 
-const CONNECTION_LABEL = {
-  connecting: 'Connecting',
-  live: 'Live',
-  reconnecting: 'Reconnecting',
+const CONNECTION_LABEL_ID = {
+  connecting: 'app.connection.connecting',
+  live: 'app.connection.live',
+  reconnecting: 'app.connection.reconnecting',
 } as const;
 
 export interface AppHeaderProps {
@@ -154,7 +155,10 @@ export interface AppHeaderProps {
 }
 
 export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
+  const t = useMessages();
+  const themeLabel = t(THEME_LABEL_ID[themeMode]);
   const connection = ConnectionContext.useSelector((state) => state.value);
+  const connectionLabel = t(CONNECTION_LABEL_ID[connection]);
   const running = ConnectionContext.useSelector((state) =>
     state.context.tasks.some((task) => task.status === 'RUNNING'),
   );
@@ -171,15 +175,15 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
   }, [sendScroll]);
   return (
     <Header>
-      <HomeLink to="/" aria-label="Speech-to-Text home">
+      <HomeLink to="/" aria-label={t('app.home')}>
         {compact ? null : <StenographerAnimation size="icon" backdrop={false} typing={running} />}
         <Title>Speech-to-Text</Title>
       </HomeLink>
       <HeaderControls>
         <Nav>
-          <NavItem to="/queue">Queue</NavItem>
-          <NavItem to="/history">History</NavItem>
-          <NavItem to="/settings">Settings</NavItem>
+          <NavItem to="/queue">{t('app.queue')}</NavItem>
+          <NavItem to="/history">{t('app.history')}</NavItem>
+          <NavItem to="/settings">{t('app.settings')}</NavItem>
         </Nav>
         <Indicator>
           <ConnectionDot
@@ -187,14 +191,10 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
             data-connection-state={connection}
             aria-hidden="true"
           />
-          {CONNECTION_LABEL[connection]}
+          {connectionLabel}
         </Indicator>
-        <Tooltip label={THEME_LABEL[themeMode]}>
-          <IconButton
-            icon={THEME_ICON[themeMode]}
-            label={THEME_LABEL[themeMode]}
-            onClick={onCycleThemeMode}
-          />
+        <Tooltip label={themeLabel}>
+          <IconButton icon={THEME_ICON[themeMode]} label={themeLabel} onClick={onCycleThemeMode} />
         </Tooltip>
       </HeaderControls>
     </Header>

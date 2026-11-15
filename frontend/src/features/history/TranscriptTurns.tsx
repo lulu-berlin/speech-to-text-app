@@ -7,8 +7,11 @@ import {
 } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Pencil, Play, Square } from 'lucide-react';
+import { FormattedMessage, useIntl } from 'react-intl';
 import styled, { useTheme } from 'styled-components';
 import { useWriteControl } from '../../app/ConnectionContext';
+import { accessKeyOf } from '../../shared/i18n/accessKeys';
+import { useMessages } from '../../shared/i18n/useMessages';
 import { Button } from '../../shared/ui/Button';
 import type { Segment, Turn, TurnSpeaker } from '../../shared/api/types';
 import { speakerTint } from '../../shared/theme/speakerPalette';
@@ -17,10 +20,6 @@ import { Icon } from '../../shared/ui/Icon';
 import { Stack } from '../../shared/ui/layout';
 import { Text } from '../../shared/ui/typography';
 import { formatDuration } from '../../shared/formatDuration';
-
-// What a text-less segment shows in its place (item 52, user decision 2026-10-23): the view's
-// placeholder only — the downloads render the stored text.
-const EMPTY_TEXT = '[empty]';
 
 // One turn of the reading column: its start time in a left gutter of one shared width,
 // and the speaker's name on its own line above the turn's text. On a phone the gutter
@@ -114,7 +113,7 @@ const SegmentButton = styled.span<{ $current: boolean; $empty: boolean }>`
 // in the middle of the line. A word space of margin parts it from the segment's frame (user
 // report: it touched it); a margin, so its hover and focus boxes stay around the icon.
 const SegmentControlBase = styled.span`
-  margin-left: ${(props) => props.theme.spacing.xs};
+  margin-inline-start: ${(props) => props.theme.spacing.xs};
   padding: 0;
   border-radius: ${(props) => props.theme.radii.button};
   cursor: pointer;
@@ -145,11 +144,14 @@ function SegmentControl({
   disabled = false,
   keepsFocusInField = false,
   keyshortcut,
+  dataEdit,
   children,
 }: {
   label: string;
   onActivate: () => void;
   disabled?: boolean;
+  // Marks the segment's Edit control, which the editor's close handler focuses again.
+  dataEdit?: boolean;
   // A click must not take the focus from the editor's field (the user's review 2026-10-23): the
   // dialog's preview sets this, so the caret stays where it was.
   keepsFocusInField?: boolean;
@@ -164,6 +166,7 @@ function SegmentControl({
       aria-label={label}
       aria-keyshortcuts={keyshortcut}
       aria-disabled={disabled || undefined}
+      data-edit-segment={dataEdit || undefined}
       onMouseDown={keepsFocusInField ? (event) => event.preventDefault() : undefined}
       onClick={disabled ? undefined : onActivate}
       onKeyDown={
@@ -250,6 +253,23 @@ const EditorArea = styled.textarea`
   resize: none;
 `;
 
+// Whether a keydown is the given access key. `code` survives the modifier mangling the letter
+// on macOS (Alt+S types ß there) and is used for the Latin letters it names; `key` covers other
+// scripts and synthetic events that carry no code.
+function isAccessKey(event: ReactKeyboardEvent<HTMLElement>, letter: string | null): boolean {
+  if (letter === null) {
+    return false;
+  }
+  if (event.code !== '' && /^[A-Z]$/u.test(letter)) {
+    return event.code === `Key${letter}`;
+  }
+  return event.key.toLocaleUpperCase() === letter;
+}
+
+function keyShortcuts(letter: string | null): string | undefined {
+  return letter === null ? undefined : `Alt+${letter} Control+${letter} Meta+${letter}`;
+}
+
 function SegmentEditor({
   text,
   edited,
@@ -271,6 +291,10 @@ function SegmentEditor({
   onDiscard: () => void;
   onRevert: () => void;
 }) {
+  const t = useMessages();
+  const intl = useIntl();
+  const saveKey = accessKeyOf(intl.messages['transcript.editor.save']);
+  const discardKey = accessKeyOf(intl.messages['transcript.editor.discard']);
   const writes = useWriteControl();
   const [draft, setDraft] = useState(text);
   // Opening the editor is ready to type (the user's review 2026-10-23): the field takes focus
@@ -296,21 +320,19 @@ function SegmentEditor({
       onSave(draft);
     }
   };
-  // Alt+S / Alt+D (the underlined letters; Ctrl and Cmd work too, the forms the user also
-  // expects) save and discard without leaving the field (root review 2026-10-23). Each label
-  // stays one element: the Button is a flex row with a gap, so a bare `<u>S</u>ave` became two
-  // flex items — visibly "S  ave" and, in Chromium, the accessible name "S ave" (CI, 2026-10-24).
+  // Alt (and Ctrl or Cmd, the forms the user also expects) with the letter the locale's
+  // catalog underlines saves or discards without leaving the field (root review 2026-10-23;
+  // item 88: the letter follows the translation). Each label stays one element: the Button is a
+  // flex row with a gap, so a bare `<u>S</u>ave` became two flex items — visibly "S  ave" and,
+  // in Chromium, the accessible name "S ave" (CI, 2026-10-24).
   const dialogShortcuts = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (!(event.altKey || event.ctrlKey || event.metaKey)) {
       return;
     }
-    // `code` survives the modifier mangling the letter on macOS (Alt+S types ß there); `key`
-    // covers synthetic events that carry no code.
-    const letter = event.code === '' ? event.key.toLowerCase() : event.code;
-    if (letter === 'KeyS' || letter === 's') {
+    if (isAccessKey(event, saveKey)) {
       event.preventDefault();
       commit();
-    } else if (letter === 'KeyD' || letter === 'd') {
+    } else if (isAccessKey(event, discardKey)) {
       event.preventDefault();
       onDiscard();
     }
@@ -319,7 +341,7 @@ function SegmentEditor({
     <EditorBox onKeyDown={dialogShortcuts}>
       <EditorArea
         ref={fieldRef}
-        aria-label="Segment text"
+        aria-label={t('transcript.editor.text')}
         dir="auto"
         // A dialog has room: the field wraps a long segment over several rows (the user's
         // review 2026-10-23) — no line breaks are *stored* either way: every break in typed or
@@ -344,7 +366,7 @@ function SegmentEditor({
         }}
       />
       <SegmentControl
-        label={previewing ? 'Stop segment' : 'Play segment'}
+        label={t(previewing ? 'transcript.stopSegment' : 'transcript.playSegment')}
         keepsFocusInField
         onActivate={previewing ? onStopPreview : onPreview}
       >
@@ -353,13 +375,16 @@ function SegmentEditor({
       <Button
         type="button"
         size="sm"
-        aria-keyshortcuts="Alt+S Control+S Meta+S"
+        aria-keyshortcuts={keyShortcuts(saveKey)}
         disabled={writes.disabled}
         title={writes.title}
         onClick={commit}
       >
         <span>
-          <u>S</u>ave
+          <FormattedMessage
+            id="transcript.editor.save"
+            values={{ u: (chunks) => <u>{chunks}</u> }}
+          />
         </span>
       </Button>
       {/* ADR 0061: whisper's original is there to go back to only when the text was edited. */}
@@ -372,18 +397,21 @@ function SegmentEditor({
           title={writes.title}
           onClick={onRevert}
         >
-          Revert
+          {t('transcript.editor.revert')}
         </Button>
       ) : null}
       <Button
         type="button"
         size="sm"
         variant="secondary"
-        aria-keyshortcuts="Alt+D Control+D Meta+D"
+        aria-keyshortcuts={keyShortcuts(discardKey)}
         onClick={onDiscard}
       >
         <span>
-          <u>D</u>iscard
+          <FormattedMessage
+            id="transcript.editor.discard"
+            values={{ u: (chunks) => <u>{chunks}</u> }}
+          />
         </span>
       </Button>
       {error === null ? null : <EditorError role="alert">{error}</EditorError>}
@@ -424,8 +452,7 @@ function EditDialog({
             event.preventDefault();
             const segment = document.querySelector<HTMLElement>('[data-active]');
             const edit =
-              segment?.parentElement?.querySelector<HTMLElement>('[aria-label="Edit segment"]') ??
-              segment;
+              segment?.parentElement?.querySelector<HTMLElement>('[data-edit-segment]') ?? segment;
             edit?.focus({ preventScroll: true });
           }}
         >
@@ -453,18 +480,20 @@ function SegmentControls({
   onPlaySegment: (segment: Segment) => void;
   onStopSegment: () => void;
 }) {
+  const t = useMessages();
   return (
     <>
       <SegmentControl
-        label="Edit segment"
+        label={t('transcript.editSegment')}
         keyshortcut="E"
+        dataEdit
         disabled={playingOnItsOwn}
         onActivate={() => onEdit(segment)}
       >
         <Icon icon={Pencil} size="sm" />
       </SegmentControl>
       <SegmentControl
-        label={playingOnItsOwn ? 'Stop segment' : 'Play segment'}
+        label={t(playingOnItsOwn ? 'transcript.stopSegment' : 'transcript.playSegment')}
         keyshortcut="P"
         onActivate={playingOnItsOwn ? onStopSegment : () => onPlaySegment(segment)}
       >
@@ -544,6 +573,8 @@ export function TranscriptTurns({
   onRevertEdit,
   editError,
 }: TranscriptTurnsProps) {
+  const t = useMessages();
+  const intl = useIntl();
   const tints = useTheme().colors.speakerTints;
   return (
     <TurnsList gap="lg">
@@ -553,12 +584,14 @@ export function TranscriptTurns({
             {reassigning ? (
               <SelectBox
                 type="checkbox"
-                aria-label={`Select turn starting ${formatDuration(turn.startMs)}`}
+                aria-label={t('transcript.selectTurn', {
+                  time: formatDuration(turn.startMs, intl),
+                })}
                 checked={turn.segments.every((segment) => selectedSegments.has(segment.id))}
                 onChange={() => onToggleTurn(turn)}
               />
             ) : null}{' '}
-            {formatDuration(turn.startMs)}
+            {formatDuration(turn.startMs, intl)}
           </TurnGutter>
           <TurnBody>
             <Stack gap="xs">
@@ -567,7 +600,7 @@ export function TranscriptTurns({
                   {speaker.speaker}
                 </SpeakerName>
               ) : null}
-              <TurnText>
+              <TurnText dir="auto">
                 {turn.segments.map((segment) => {
                   // A segment whisper left empty (or whitespace only) is not a hole in the
                   // text: it shows a grayed-out placeholder and stays editable (item 52, user
@@ -580,14 +613,16 @@ export function TranscriptTurns({
                       {reassigning ? (
                         <SelectBox
                           type="checkbox"
-                          aria-label={`Select segment starting ${formatDuration(segment.startMs)}`}
+                          aria-label={t('transcript.selectSegment', {
+                            time: formatDuration(segment.startMs, intl),
+                          })}
                           checked={selectedSegments.has(segment.id)}
                           onChange={() => onToggleSegment(segment)}
                         />
                       ) : null}
                       {reassigning ? (
                         <SegmentInert $empty={empty}>
-                          {empty ? EMPTY_TEXT : segment.text}
+                          {empty ? t('transcript.empty') : segment.text}
                         </SegmentInert>
                       ) : (
                         <SegmentButton
@@ -612,7 +647,7 @@ export function TranscriptTurns({
                             }
                           }}
                         >
-                          {empty ? EMPTY_TEXT : segment.text}
+                          {empty ? t('transcript.empty') : segment.text}
                         </SegmentButton>
                       )}{' '}
                       {!reassigning &&
@@ -630,8 +665,8 @@ export function TranscriptTurns({
                         <EditDialog
                           title={
                             speaker === undefined
-                              ? `${formatDuration(segment.startMs)}–${formatDuration(segment.endMs)}`
-                              : `${speaker.speaker} · ${formatDuration(segment.startMs)}–${formatDuration(segment.endMs)}`
+                              ? `${formatDuration(segment.startMs, intl)}–${formatDuration(segment.endMs, intl)}`
+                              : `${speaker.speaker} · ${formatDuration(segment.startMs, intl)}–${formatDuration(segment.endMs, intl)}`
                           }
                           onDiscard={onDiscardEdit}
                         >

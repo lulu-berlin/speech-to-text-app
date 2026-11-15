@@ -3,9 +3,11 @@ import { GripVertical, MoreVertical, Pause, Play, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { HTMLAttributes, Ref } from 'react';
 import { useMachine } from '@xstate/react';
+import { useIntl } from 'react-intl';
 import { css, styled } from 'styled-components';
 import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
-import { errorMessage } from '../../shared/api/types';
+import { useErrorText } from '../../shared/i18n/useErrorText';
+import { useMessages } from '../../shared/i18n/useMessages';
 import type { Task, TaskPhase } from '../../shared/api/types';
 import type { ThemeTokens } from '../../shared/theme/theme';
 import { formatDuration } from '../../shared/formatDuration';
@@ -25,10 +27,10 @@ import { Tooltip } from '../../shared/ui/Tooltip';
 import { RowContent, RowControls, RowName } from './rowParts';
 
 // The phase a task is in, as a text label next to its status (none while queued).
-const PHASE_LABELS: Record<NonNullable<TaskPhase>, string> = {
-  CHUNKING: 'Chunking',
-  TRANSCRIBING: 'Transcribing',
-  DIARIZING: 'Diarizing',
+const PHASE_LABEL_ID: Record<NonNullable<TaskPhase>, string> = {
+  CHUNKING: 'queue.phase.chunking',
+  TRANSCRIBING: 'queue.phase.transcribing',
+  DIARIZING: 'queue.phase.diarizing',
 };
 
 // The status line's color says which phase the task is in (item 59): preparing (chunking)
@@ -84,11 +86,11 @@ const SortableRow = styled(ListRow)<{ $lifted: boolean }>`
 const CONTROLS: {
   command: 'pause' | 'resume' | 'cancel';
   icon: LucideIcon;
-  verb: string;
+  labelId: string;
 }[] = [
-  { command: 'pause', icon: Pause, verb: 'Pause' },
-  { command: 'resume', icon: Play, verb: 'Resume' },
-  { command: 'cancel', icon: X, verb: 'Cancel' },
+  { command: 'pause', icon: Pause, labelId: 'queue.control.pause' },
+  { command: 'resume', icon: Play, labelId: 'queue.control.resume' },
+  { command: 'cancel', icon: X, labelId: 'queue.control.cancel' },
 ];
 
 export interface TaskRowProps {
@@ -124,6 +126,9 @@ export function TaskRow({
   dragOffset,
   lifted = false,
 }: TaskRowProps) {
+  const t = useMessages();
+  const intl = useIntl();
+  const errorText = useErrorText();
   const connection = ConnectionContext.useActorRef();
   const writes = useWriteControl();
   const [action, send] = useMachine(rowActionMachine, {
@@ -161,12 +166,13 @@ export function TaskRow({
     task.phase === null
       ? null
       : task.phase === 'CHUNKING'
-        ? `${PHASE_LABELS[task.phase]}…`
-        : `${PHASE_LABELS[task.phase]}… ${
-            task.phase === 'DIARIZING' ? diarizationPercent : transcriptionPercent
-          }%`;
+        ? `${t(PHASE_LABEL_ID[task.phase])}…`
+        : `${t(PHASE_LABEL_ID[task.phase])}… ${intl.formatNumber(
+            (task.phase === 'DIARIZING' ? diarizationPercent : transcriptionPercent) / 100,
+            { style: 'percent' },
+          )}`;
   const elapsed =
-    task.startedAt === null ? null : formatDuration(Math.max(0, nowMs - task.startedAt));
+    task.startedAt === null ? null : formatDuration(Math.max(0, nowMs - task.startedAt), intl);
   const runningStatus =
     phaseStatus === null ? null : elapsed === null ? phaseStatus : `${phaseStatus} · ${elapsed}`;
 
@@ -195,31 +201,31 @@ export function TaskRow({
   // The move actions, plus delete; the bound moves are disabled.
   const menuItems: DropdownMenuItem[] = [
     {
-      label: 'Move to top',
+      label: t('queue.move.top'),
       disabled: index === 0 || writes.disabled,
       title: writes.title,
       onSelect: () => onMoveTask(task.id, 0),
     },
     {
-      label: 'Move up',
+      label: t('queue.move.up'),
       disabled: index === 0 || writes.disabled,
       title: writes.title,
       onSelect: () => onMoveTask(task.id, index - 1),
     },
     {
-      label: 'Move down',
+      label: t('queue.move.down'),
       disabled: index === count - 1 || writes.disabled,
       title: writes.title,
       onSelect: () => onMoveTask(task.id, index + 1),
     },
     {
-      label: 'Move to bottom',
+      label: t('queue.move.bottom'),
       disabled: index === count - 1 || writes.disabled,
       title: writes.title,
       onSelect: () => onMoveTask(task.id, count - 1),
     },
     {
-      label: 'Delete',
+      label: t('queue.delete'),
       danger: true,
       disabled: writes.disabled,
       title: writes.title,
@@ -234,6 +240,8 @@ export function TaskRow({
       },
     },
   ];
+  const reorderLabel = t('queue.reorder', { filename: task.filename });
+  const actionsLabel = t('queue.actions', { filename: task.filename });
 
   return (
     <SortableRow
@@ -249,14 +257,14 @@ export function TaskRow({
             {running && runningStatus !== null && task.phase !== null ? (
               <RowPhase $phase={task.phase}>{runningStatus}</RowPhase>
             ) : task.phase !== null ? (
-              <RowPhase $phase={task.phase}>{PHASE_LABELS[task.phase]}</RowPhase>
+              <RowPhase $phase={task.phase}>{t(PHASE_LABEL_ID[task.phase])}</RowPhase>
             ) : null}
             {running ? null : <StatusBadge status={task.status} />}
             {dragHandleProps !== undefined ? (
-              <Tooltip label={`Reorder ${task.filename}`}>
+              <Tooltip label={reorderLabel}>
                 <IconButton
                   icon={GripVertical}
-                  label={`Reorder ${task.filename}`}
+                  label={reorderLabel}
                   disabled={writes.disabled}
                   title={writes.title}
                   {...dragHandleProps}
@@ -264,48 +272,50 @@ export function TaskRow({
               </Tooltip>
             ) : null}
             {CONTROLS.filter(({ command }) => isAllowedCommand(command, task.status)).map(
-              ({ command, icon, verb }) => (
-                <Tooltip key={command} label={`${verb} ${task.filename}`}>
-                  <IconButton
-                    icon={icon}
-                    label={`${verb} ${task.filename}`}
-                    // Item 81: not offered while the row's own command is in flight; the SSE
-                    // status can offer the next command before that request settles.
-                    disabled={action.matches('running') || writes.disabled}
-                    title={writes.title}
-                    onClick={() =>
-                      send({
-                        type: 'ACTIVATE',
-                        action: command,
-                        status: task.status,
-                        confirm: command === 'cancel' && confirmCancel,
-                      })
-                    }
-                  />
-                </Tooltip>
-              ),
+              ({ command, icon, labelId }) => {
+                const label = t('queue.control.label', {
+                  verb: t(labelId),
+                  filename: task.filename,
+                });
+                return (
+                  <Tooltip key={command} label={label}>
+                    <IconButton
+                      icon={icon}
+                      label={label}
+                      // Item 81: not offered while the row's own command is in flight; the SSE
+                      // status can offer the next command before that request settles.
+                      disabled={action.matches('running') || writes.disabled}
+                      title={writes.title}
+                      onClick={() =>
+                        send({
+                          type: 'ACTIVATE',
+                          action: command,
+                          status: task.status,
+                          confirm: command === 'cancel' && confirmCancel,
+                        })
+                      }
+                    />
+                  </Tooltip>
+                );
+              },
             )}
             <DropdownMenu
-              trigger={<IconButton icon={MoreVertical} label={`Actions for ${task.filename}`} />}
+              trigger={<IconButton icon={MoreVertical} label={actionsLabel} />}
               align="end"
               items={menuItems}
-              triggerTooltip={`Actions for ${task.filename}`}
+              triggerTooltip={actionsLabel}
             />
           </RowControls>
         </RowContent>
         {action.context.error !== null ? (
-          <RowActionError>{errorMessage(action.context.error)}</RowActionError>
+          <RowActionError>{errorText(action.context.error)}</RowActionError>
         ) : null}
         {deleteState.matches('failed') ? (
-          <RowActionError>
-            {deleteState.context.error instanceof Error
-              ? deleteState.context.error.message
-              : String(deleteState.context.error)}
-          </RowActionError>
+          <RowActionError>{errorText(deleteState.context.error)}</RowActionError>
         ) : null}
         <ProgressBar
           value={task.transcriptionProgress}
-          label="Transcription"
+          label={t('queue.transcription')}
           indeterminate={running && task.phase === 'CHUNKING'}
           showValue={!running}
         />
@@ -318,25 +328,25 @@ export function TaskRow({
       </Stack>
       <ConfirmDialog
         open={confirmingAction === 'cancel'}
-        title={`Cancel ${task.filename}?`}
-        confirmLabel="Cancel task"
+        title={t('queue.cancel.title', { filename: task.filename })}
+        confirmLabel={t('queue.cancel.confirm')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
         onConfirm={() => send({ type: 'CONFIRM' })}
         onCancel={() => send({ type: 'DISMISS' })}
       >
-        Stops the task; it can be retried from History.
+        {t('queue.cancel.body')}
       </ConfirmDialog>
       <ConfirmDialog
         open={deleteState.matches('confirming') || deleteState.matches('running')}
-        title={`Delete ${task.filename}?`}
-        confirmLabel="Delete task"
+        title={t('queue.delete.title', { filename: task.filename })}
+        confirmLabel={t('queue.delete.confirm')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
         onConfirm={() => deleteSend({ type: 'CONFIRM' })}
         onCancel={() => deleteSend({ type: 'CANCEL' })}
       >
-        Removes the task, its transcript and audio for good.
+        {t('queue.delete.body')}
       </ConfirmDialog>
     </SortableRow>
   );

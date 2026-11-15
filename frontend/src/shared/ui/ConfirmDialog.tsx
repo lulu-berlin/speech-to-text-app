@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
+import { useMessages } from '../i18n/useMessages';
 import { Button } from './Button';
 
 export interface ConfirmDialogProps {
@@ -63,6 +64,7 @@ export function ConfirmDialog({
   confirmTitle,
   children,
 }: ConfirmDialogProps) {
+  const t = useMessages();
   return (
     <Dialog.Root
       open={open}
@@ -79,7 +81,7 @@ export function ConfirmDialog({
           <Body>{children}</Body>
           <Actions>
             <Button variant="secondary" onClick={onCancel}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button disabled={confirmDisabled} title={confirmTitle} onClick={onConfirm}>
               {confirmLabel}

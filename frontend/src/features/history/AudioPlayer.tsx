@@ -1,6 +1,8 @@
 import type { RefObject } from 'react';
+import { useIntl } from 'react-intl';
 import { Pause, Play } from 'lucide-react';
 import styled from 'styled-components';
+import { useMessages } from '../../shared/i18n/useMessages';
 import { IconButton } from '../../shared/ui/IconButton';
 import { Row, Stack } from '../../shared/ui/layout';
 import { Slider } from '../../shared/ui/Slider';
@@ -55,7 +57,7 @@ export interface AudioPlayerProps {
 
 // The themed transcript player (item 25): the audio element without native controls, and
 // a stacked block — the seek bar (item 24's Slider, in seconds) full width on top, then
-// play/pause on the left and current / total time on the right.
+// play/pause at the inline start and the current / total time at the inline end.
 export function AudioPlayer({
   src,
   filename,
@@ -71,12 +73,14 @@ export function AudioPlayer({
   onToggle,
   disabled = false,
 }: AudioPlayerProps) {
+  const t = useMessages();
+  const intl = useIntl();
   return (
-    <Surface role="group" aria-label="Audio player" padding="md">
+    <Surface role="group" aria-label={t('transcript.player.label')} padding="md">
       <audio
         ref={audioRef}
         src={src}
-        aria-label={`Audio for ${filename}`}
+        aria-label={t('transcript.player.audio', { filename })}
         onTimeUpdate={(event) => onPlayhead(playheadMs(event.currentTarget))}
         onSeeked={(event) => onPlayhead(playheadMs(event.currentTarget))}
         onPlay={() => onPlayingChange(true)}
@@ -89,16 +93,16 @@ export function AudioPlayer({
           max={Math.floor(durationMs / 1000)}
           onChange={(seconds) => onDrag(seconds * 1000)}
           onCommit={(seconds) => onSeek(seconds * 1000)}
-          label="Seek"
+          label={t('transcript.player.seek')}
         />
         <ControlsRow gap="sm">
           <IconButton
             icon={playing ? Pause : Play}
-            label={playing ? 'Pause' : 'Play'}
+            label={t(playing ? 'transcript.player.pause' : 'transcript.player.play')}
             onClick={onToggle}
             disabled={disabled}
           />
-          <Times>{`${formatDuration(currentTimeMs)} / ${formatDuration(durationMs)}`}</Times>
+          <Times>{`${formatDuration(currentTimeMs, intl)} / ${formatDuration(durationMs, intl)}`}</Times>
         </ControlsRow>
       </Stack>
     </Surface>

@@ -262,7 +262,7 @@ export async function apiTaskIdOf(page: Page, filename: string): Promise<number>
 }
 
 // Switches view through the header navigation (finish notices carry their own links).
-export async function goTo(page: Page, view: 'Queue' | 'History' | 'Settings') {
+export async function goTo(page: Page, view: string) {
   await page.getByRole('navigation').getByRole('link', { name: view }).click();
 }
 

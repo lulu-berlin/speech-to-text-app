@@ -35,6 +35,8 @@ data class SettingsJson(
     val deviceFallback: String?,
     val defaultFrontend: String?,
     val terminalCommand: String?,
+    /** The app's own language (roadmap item 88); null follows the system's. */
+    val appLanguage: String?,
     val availableDevices: List<String>,
     /** Each offered `gpu:<index>` → the GPU's name from the startup probe (item 45). */
     val gpuNames: Map<String, String>,
@@ -54,6 +56,8 @@ data class SettingsEventJson(
     val deviceFallback: String?,
     val defaultFrontend: String?,
     val terminalCommand: String?,
+    /** The app's own language (roadmap item 88); null follows the system's. */
+    val appLanguage: String?,
 )
 
 /** The body of `PUT /api/settings` (item 32): the settings the user sets — the fallback notice is not one of them. */
@@ -69,6 +73,8 @@ data class SettingsRequest(
     val defaultFrontend: String? = null,
     /** The terminal command (roadmap item 66, D10); absent means the OS launcher, as for this whole write. */
     val terminalCommand: String? = null,
+    /** The app's own language (roadmap item 88); absent means the system's, as for this whole write. */
+    val appLanguage: String? = null,
 )
 
 /**
@@ -190,6 +196,7 @@ private fun SettingsRequest.validate(): Validated {
             maxSpeakers,
             defaultFrontend = defaultFrontend,
             terminalCommand = terminalCommand,
+            appLanguage = appLanguage,
         ),
     )
 }
@@ -216,6 +223,7 @@ internal fun Settings.toJson(
         deviceFallback = deviceFallback?.dbValue(),
         defaultFrontend = defaultFrontend,
         terminalCommand = terminalCommand,
+        appLanguage = appLanguage,
         availableDevices = listOf(Device.Cpu.dbValue(), Device.Auto.dbValue()) + gpuNames.keys,
         gpuNames = gpuNames,
         deviceProbeError = deviceProbeError,
@@ -234,4 +242,5 @@ internal fun Settings.toEventJson(): SettingsEventJson =
         deviceFallback = deviceFallback?.dbValue(),
         defaultFrontend = defaultFrontend,
         terminalCommand = terminalCommand,
+        appLanguage = appLanguage,
     )

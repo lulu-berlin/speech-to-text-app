@@ -2,6 +2,7 @@ import * as Menu from '@radix-ui/react-dropdown-menu';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import type { ReactNode } from 'react';
 import styled from 'styled-components';
+import { useUiDirection } from '../i18n/uiDirection';
 import { floatingPanel } from './floatingPanel';
 import { focusRing } from './focusRing';
 import { TooltipContent } from './Tooltip';
@@ -60,7 +61,7 @@ export function DropdownMenu({
 }: DropdownMenuProps) {
   const menuTrigger = <Menu.Trigger asChild>{trigger}</Menu.Trigger>;
   return (
-    <Menu.Root>
+    <Menu.Root dir={useUiDirection()}>
       {triggerTooltip === undefined ? (
         menuTrigger
       ) : (

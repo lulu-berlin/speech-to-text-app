@@ -1,5 +1,6 @@
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import styled from 'styled-components';
+import { useUiDirection } from '../i18n/uiDirection';
 import { focusRing } from './focusRing';
 
 // The root is the thumb's positioning context: Radix places the thumb absolutely at a
@@ -60,8 +61,10 @@ export interface SliderProps {
 // the slider role with the value exposed through aria. Radix places the range and thumb;
 // the track and the thumb's looks come from the tokens.
 export function Slider({ value, max, onChange, onCommit, label, disabled }: SliderProps) {
+  const direction = useUiDirection();
   return (
     <Root
+      dir={direction}
       value={[value]}
       max={max}
       step={1}

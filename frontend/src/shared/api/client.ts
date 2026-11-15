@@ -1,4 +1,4 @@
-import { ApiError, TRANSPORT_ERROR_CODE } from './types';
+import { ApiError, TRANSPORT_READ_ERROR_CODE, TRANSPORT_WRITE_ERROR_CODE } from './types';
 import type {
   ApiErrorBody,
   FrontendList,
@@ -43,8 +43,16 @@ const WRITE_UNREACHABLE = "Not saved: can't reach the app's service. Reconnectin
 const READ_UNREACHABLE = "Can't reach the app's service. Reconnecting…";
 
 // A read is a GET; every other method is a write.
+function isRead(method: string | undefined): boolean {
+  return method === undefined || method === 'GET';
+}
+
+function transportCode(method: string | undefined): string {
+  return isRead(method) ? TRANSPORT_READ_ERROR_CODE : TRANSPORT_WRITE_ERROR_CODE;
+}
+
 function transportMessage(method: string | undefined): string {
-  return method === undefined || method === 'GET' ? READ_UNREACHABLE : WRITE_UNREACHABLE;
+  return isRead(method) ? READ_UNREACHABLE : WRITE_UNREACHABLE;
 }
 
 // Every request goes through here, so no view ever prints the browser's transport text.
@@ -52,8 +60,9 @@ async function request(input: string, init?: RequestInit): Promise<Response> {
   try {
     return await fetch(input, init);
   } catch {
-    // An unreachable service rejects the fetch; `0` stands in for the absent HTTP status.
-    throw new ApiError(TRANSPORT_ERROR_CODE, transportMessage(init?.method));
+    // An unreachable service rejects the fetch; the read/write code lets the catalog say
+    // what did not happen.
+    throw new ApiError(transportCode(init?.method), transportMessage(init?.method));
   }
 }
 
@@ -219,15 +228,15 @@ export function uploadTask(
   };
   xhr.onerror = () => {
     forgetAbort();
-    reject(new ApiError(TRANSPORT_ERROR_CODE, WRITE_UNREACHABLE));
+    reject(new ApiError(TRANSPORT_WRITE_ERROR_CODE, WRITE_UNREACHABLE));
   };
   xhr.onabort = () => {
     forgetAbort();
-    reject(new ApiError(TRANSPORT_ERROR_CODE, WRITE_UNREACHABLE));
+    reject(new ApiError(TRANSPORT_WRITE_ERROR_CODE, WRITE_UNREACHABLE));
   };
   if (signal !== undefined) {
     if (signal.aborted) {
-      reject(new ApiError(TRANSPORT_ERROR_CODE, WRITE_UNREACHABLE));
+      reject(new ApiError(TRANSPORT_WRITE_ERROR_CODE, WRITE_UNREACHABLE));
       return promise;
     }
     signal.addEventListener('abort', abortRequest, { once: true });
