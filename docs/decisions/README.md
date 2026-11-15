@@ -38,7 +38,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0030 | [Segment text is trimmed in every output](0030-trimmed-segment-text-in-all-outputs.md) | accepted, json download point dropped by [0035](0035-no-json-download.md) | 2026-10-09 |
 | 0031 | [Frontend routing with react-router, state with XState](0031-frontend-routing-react-router-state-xstate.md) | accepted | 2026-10-09 |
 | 0032 | [Speaker-distance threshold 0.5448 for CAM++](0032-speaker-distance-threshold-for-campplus.md) | accepted | 2026-10-09 |
-| 0033 | [Design system: tokens, Radix primitives, IBM Plex Sans](0033-design-system-tokens-radix-plex.md) | accepted | 2026-10-09 |
+| 0033 | [Design system: tokens, Radix primitives, IBM Plex Sans](0033-design-system-tokens-radix-plex.md) | accepted, theme storage amended by [0068](0068-one-theme-token-file-for-every-frontend.md) | 2026-10-09 |
 | 0034 | [Speaker labels in downloads are the stored speaker names](0034-speaker-labels-are-stored-names.md) | accepted | 2026-10-09 |
 | 0035 | [No json transcript download](0035-no-json-download.md) | accepted | 2026-10-09 |
 | 0036 | [One nixpkgs pin shared by devenv and the flake](0036-shared-nixpkgs-pin.md) | accepted | 2026-10-09 |
@@ -72,3 +72,5 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0064 | [The service and the tray are one unit in app mode](0064-service-and-tray-are-one-unit.md) | accepted, supersedes "the tray is optional" in roadmap item 66 | 2026-10-31 |
 | 0065 | [We publish our own artifacts, their tags name what determines their content, and platform keys are Nix system names](0065-own-artifacts-versioned-tags-nix-platform-keys.md) | accepted | 2026-11-03 |
 | 0066 | [The frontend tests mock the API at the fetch and XHR layer, not at MSW 3's socket layer](0066-frontend-tests-mock-fetch-not-sockets.md) | accepted | 2026-11-06 |
+| 0067 | [One UI-text catalog for every frontend](0067-one-ui-text-catalog-for-every-frontend.md) | accepted | 2026-11-06 |
+| 0068 | [One theme-token file for every frontend](0068-one-theme-token-file-for-every-frontend.md) | accepted | 2026-11-07 |

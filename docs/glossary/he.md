@@ -2,7 +2,7 @@
 
 The term evidence is recorded in `docs/reviews/he.md`; this is the shared vocabulary. The
 compared products and their popularity are listed there (Google 1, Gemini 2, Microsoft 3, Apple
-4, Zoom 5, Otter 6, Descript 7, Amberscript 8).
+4, Zoom 5, Otter 6, Descript 7, Amberscript 8, GNOME Files 9, gedit 10).
 
 | English                       | Hebrew                              | Evidence                   | Note                                                                                                   |
 | ----------------------------- | ----------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -36,6 +36,8 @@ compared products and their popularity are listed there (Google 1, Gemini 2, Mic
 | app language                  | שפת האפליקציה                       | Google 1 (`שפת האפליקציה`) |                                                                                                        |
 | default                       | ברירת מחדל                          | Google 1                   | `שפת ברירת מחדל`, `הגדרות ברירת מחדל`                                                                  |
 | CPU / GPU                     | CPU / GPU                           | —                          | kept untranslated, as the siblings do                                                                  |
+| dismiss / close               | סגירה                               | GNOME Files 9, gedit 10    | the TUI's notices and dialogs; action noun                                                             |
+| finished                      | הסתיים                              | —                          | the queue's end state; `הושלם` stays the completed badge                                               |
 
 ## Gender and culture
 

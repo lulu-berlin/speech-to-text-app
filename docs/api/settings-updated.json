@@ -8,5 +8,6 @@
   "deviceFallback": null,
   "defaultFrontend": null,
   "terminalCommand": null,
-  "appLanguage": "de"
+  "appLanguage": "de",
+  "themeMode": "auto"
 }

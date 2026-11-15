@@ -147,6 +147,9 @@ export type ServerEvent =
 // so the machine has to reconnect itself.
 export type StreamEvent = ServerEvent | { type: 'disconnected'; closed: boolean };
 
+// Item 67 (ADR 0068): the theme mode the service stores and every frontend follows.
+export type ThemeMode = 'auto' | 'light' | 'dark';
+
 // Item 32 contract: the stored settings (docs/api/settings*.json). `device` and the entries of
 // `availableDevices` share one value space: `auto`, `cpu` or `gpu:<index>`. `deviceFallback`
 // names the GPU the engine switched to the CPU (the Queue's banner), null without a notice.
@@ -168,6 +171,8 @@ export interface Settings {
   // system's language when it is shipped (and English otherwise). Kept apart from
   // defaultLanguage, which is the transcription language.
   appLanguage: string | null;
+  // The theme every frontend draws in (roadmap item 67, ADR 0068): auto follows the OS.
+  themeMode: ThemeMode;
   availableDevices: string[];
   // The probe's name for each offered GPU, keyed by `gpu:<index>` (`{}` without a GPU); the
   // Settings page labels each GPU with it. Fixed by the startup probe, so it is not in

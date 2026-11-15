@@ -40,6 +40,15 @@ for that term.
 | theme                   | தீம்                                                                  | —                                   | `தீம்: இயக்க முறைமை`, `தீம்: ஒளி`, `தீம்: இருள்`             |
 | advanced                | மேம்பட்ட விருப்பங்கள்                                                 | —                                   | the disclosure that reveals options                          |
 | error                   | பிழை                                                                  | —                                   | `பிழை: {message}`                                            |
+| key                     | விசை                                                                  | —                                   | a keyboard key; the pressed key itself stays English in `[...]` |
+| options                 | விருப்பங்கள்                                                          | —                                   | `விருப்பங்களை மாற்று`                                        |
+| folder                  | கோப்புறை                                                              | —                                   | the file browser's directory                                 |
+| path                    | பாதை                                                                  | —                                   | `பாதை: {path}`                                               |
+| terminal                | முனையம்                                                               | —                                   | the emulator the TUI runs in, not the macOS app `Terminal`   |
+| revert                  | மீளமை                                                                 | —                                   | undo an edit; `மீளமைப்பு` as the action noun                 |
+| idle                    | செயலற்றது                                                             | —                                   | current alternative to `செயலற்ற நிலை`                        |
+| dismiss                 | மூடு                                                                  | —                                   | close a banner or notice                                     |
+| playback                | இயக்கம்                                                               | —                                   | `இயக்கத்தைப் பின்தொடர்` for follow playback                  |
 
 This glossary is the Tamil layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/ta.md`).

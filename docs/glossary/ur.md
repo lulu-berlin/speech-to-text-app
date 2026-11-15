@@ -38,6 +38,12 @@ was recorded for that term.
 | user interface          | صارف انٹرفیس                                         | —                   | `frontend` never appears in the UI                              |
 | default                 | ڈیفالٹ                                               | —                   |                                                                 |
 | error                   | خرابی                                                | —                   | `خرابی: {message}`                                              |
+| key / keys              | کلید / کلیدیں                                        | —                   | the TUI's key hints; the mark stays `[x]`                       |
+| path                    | راستہ                                                | —                   | a file or folder path; not `پاتھ`                               |
+| folder                  | فولڈر                                                | —                   | the upload dialog's file browser                                |
+| playback                | پلے بیک                                               | —                   | `پلے بیک پوزیشن`, `پلے بیک کی پیروی`                            |
+| theme                   | تھیم                                                 | —                   | `تھیم: ہلکا` / `تھیم: گہرا`                                     |
+| idle                    | بیکار                                                | —                   | the queue header when nothing runs                              |
 
 This glossary is the Urdu layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/ur.md`).

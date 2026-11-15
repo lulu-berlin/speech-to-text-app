@@ -151,10 +151,12 @@ const CONNECTION_LABEL_ID = {
 
 export interface AppHeaderProps {
   themeMode: ThemeMode;
+  // Whether the stored settings are read: the mode is written with them, so the control waits.
+  themeReady: boolean;
   onCycleThemeMode: () => void;
 }
 
-export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
+export function AppHeader({ themeMode, themeReady, onCycleThemeMode }: AppHeaderProps) {
   const t = useMessages();
   const themeLabel = t(THEME_LABEL_ID[themeMode]);
   const connection = ConnectionContext.useSelector((state) => state.value);
@@ -194,7 +196,12 @@ export function AppHeader({ themeMode, onCycleThemeMode }: AppHeaderProps) {
           {connectionLabel}
         </Indicator>
         <Tooltip label={themeLabel}>
-          <IconButton icon={THEME_ICON[themeMode]} label={themeLabel} onClick={onCycleThemeMode} />
+          <IconButton
+            icon={THEME_ICON[themeMode]}
+            label={themeLabel}
+            disabled={!themeReady}
+            onClick={onCycleThemeMode}
+          />
         </Tooltip>
       </HeaderControls>
     </Header>

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './helpers/test';
 import { HEADER_CLIP } from '../lib/backend.ts';
-import { ensureTranscript, openTranscript } from './helpers/ui';
+import { ensureTranscript, openTranscript, setTheme } from './helpers/ui';
 
 // The transcript's segments from the API, in the order the buttons render, with the buttons
 // themselves: an index selects a segment however its text repeats. CI transcribes on the CPU and
@@ -119,12 +119,8 @@ test("the editor field's text uses the theme's text color in the dark theme", as
   await ensureTranscript(page, HEADER_CLIP);
   await openTranscript(page, HEADER_CLIP);
 
-  // The header's theme button steps through the modes; stop at dark.
-  const theme = page.getByRole('button', { name: /^Theme: / });
-  for (let step = 0; step < 4; step += 1) {
-    if ((await theme.getAttribute('aria-label')) === 'Theme: dark') break;
-    await theme.click();
-  }
+  // The header's theme control steps through the modes; stop at dark.
+  await setTheme(page, 'dark');
   await expect(page.getByRole('button', { name: 'Theme: dark' })).toBeVisible();
 
   const region = page.getByRole('region', { name: 'Transcript' });

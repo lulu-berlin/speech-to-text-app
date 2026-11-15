@@ -18,6 +18,7 @@ import stt.config.parseStoredDevice
 import stt.db.Settings
 import stt.db.SettingsRepository
 import stt.db.SpeakersMode
+import stt.db.ThemeMode
 import stt.engine.ProcessingEngine
 import stt.transcribe.GpuDevice
 import java.nio.file.Files
@@ -37,6 +38,8 @@ data class SettingsJson(
     val terminalCommand: String?,
     /** The app's own language (roadmap item 88); null follows the system's. */
     val appLanguage: String?,
+    /** The theme every frontend draws in (roadmap item 67, ADR 0068): auto, light or dark. */
+    val themeMode: String,
     val availableDevices: List<String>,
     /** Each offered `gpu:<index>` → the GPU's name from the startup probe (item 45). */
     val gpuNames: Map<String, String>,
@@ -58,6 +61,7 @@ data class SettingsEventJson(
     val terminalCommand: String?,
     /** The app's own language (roadmap item 88); null follows the system's. */
     val appLanguage: String?,
+    val themeMode: String,
 )
 
 /** The body of `PUT /api/settings` (item 32): the settings the user sets — the fallback notice is not one of them. */
@@ -75,6 +79,8 @@ data class SettingsRequest(
     val terminalCommand: String? = null,
     /** The app's own language (roadmap item 88); absent means the system's, as for this whole write. */
     val appLanguage: String? = null,
+    /** The theme mode (roadmap item 67, ADR 0068); absent means auto, as for this whole write. */
+    val themeMode: String = "auto",
 )
 
 /**
@@ -155,7 +161,7 @@ private suspend fun dropStaleDefault(
     return cleared
 }
 
-/** Validates in contract order: device, threads, language, speakers, max speakers; the first failure wins. */
+/** Validates in contract order: device, threads, language, speakers, max speakers, theme; the first failure wins. */
 
 private fun SettingsRequest.validate(): Validated {
     val parsedDevice =
@@ -186,6 +192,9 @@ private fun SettingsRequest.validate(): Validated {
     if (maxSpeakers !in 1..MAX_SPEAKERS) {
         return Validated.Rejected("invalid-max-speakers", "maxSpeakers must be a number between 1 and $MAX_SPEAKERS, got $maxSpeakers")
     }
+    val theme =
+        ThemeMode.entries.firstOrNull { it.dbValue == themeMode }
+            ?: return Validated.Rejected("invalid-theme", "themeMode must be auto, light or dark, got \"$themeMode\"")
     return Validated.Valid(
         Settings(
             parsedDevice,
@@ -197,6 +206,7 @@ private fun SettingsRequest.validate(): Validated {
             defaultFrontend = defaultFrontend,
             terminalCommand = terminalCommand,
             appLanguage = appLanguage,
+            themeMode = theme,
         ),
     )
 }
@@ -224,6 +234,7 @@ internal fun Settings.toJson(
         defaultFrontend = defaultFrontend,
         terminalCommand = terminalCommand,
         appLanguage = appLanguage,
+        themeMode = themeMode.dbValue,
         availableDevices = listOf(Device.Cpu.dbValue(), Device.Auto.dbValue()) + gpuNames.keys,
         gpuNames = gpuNames,
         deviceProbeError = deviceProbeError,
@@ -243,4 +254,5 @@ internal fun Settings.toEventJson(): SettingsEventJson =
         defaultFrontend = defaultFrontend,
         terminalCommand = terminalCommand,
         appLanguage = appLanguage,
+        themeMode = themeMode.dbValue,
     )

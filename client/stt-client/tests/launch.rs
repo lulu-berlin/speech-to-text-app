@@ -11,8 +11,8 @@ use std::thread;
 
 use stt_client::{Service, launch_url};
 
-#[test]
-fn the_client_gets_a_one_time_launch_url_from_the_service_with_its_secret_as_the_bearer() {
+#[tokio::test]
+async fn the_client_gets_a_one_time_launch_url_from_the_service_with_its_secret_as_the_bearer() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let stand_in = thread::spawn(move || {
@@ -26,6 +26,7 @@ fn the_client_gets_a_one_time_launch_url_from_the_service_with_its_secret_as_the
         endpoint: format!("http://127.0.0.1:{port}"),
         secret: "the-install-secret".into(),
     })
+    .await
     .unwrap();
 
     assert_eq!(url, format!("http://127.0.0.1:{port}/open?t=one-time"));

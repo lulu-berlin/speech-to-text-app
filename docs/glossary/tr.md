@@ -35,6 +35,12 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | user interface          | kullanıcı arayüzü                                      | Microsoft 2                               | `frontend` never appears in the UI                                  |
 | default                 | varsayılan                                             | Microsoft 2: „Varsayılan“                 |                                                                     |
 | error                   | hata                                                   | Google 1: „Hata“                          | `Hata: {message}`                                                   |
+| folder                  | klasör                                                 | Apple 3: „Klasör“                         | the file browser's directory                                        |
+| path                    | yol                                                    | Apple 3: „yol adı“                        | a file or download location                                         |
+| rename                  | yeniden adlandır                                       | GNU coreutils 4: „yeniden adlandırıldı“   |                                                                     |
+| reorder                 | sırala / yeniden sırala                                | GNU coreutils 4: „sıralandı“              | the verb for the action, `yeniden sırala` for the outcome           |
+| mark                    | işaretle                                               | —                                         | selecting files or transcript segments                              |
+| format                  | biçim                                                  | —                                         | the download format; `Biçim:` as the label                          |
 
 This glossary is the Turkish layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/tr.md`).

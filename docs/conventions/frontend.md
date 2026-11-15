@@ -34,6 +34,20 @@ src/
 - All backend access goes through `/api` (same-origin in production, where the backend serves `dist/`; Vite dev server proxies `/api` to the backend).
 - Typed API client in `src/shared/api/` (added with the first API item); components never fetch directly.
 
+## User-visible text (ADR 0067)
+
+- Every string a user reads comes from `src/locales/<locale>.json`, through `useMessages()` and
+  `t()` (item 88's `react-intl` layer); components carry no user-visible literals, and the catalog
+  check fails on one. A key a locale lacks falls back to English, then to the key itself, so a
+  missing entry is visible in a test rather than silent.
+- Templates are ICU messages: `{name}` placeholders, `{count, plural, …}` for counts, passed as
+  `t('queue.upload.queued', { filename })`; sentence fragments are not concatenated in code.
+- The Rust clients compile the same catalogs in (`stt_client::text`), so a wording change is one
+  edit for every frontend. Server error `message` values are shown as received; they are contract
+  data, not catalog text.
+- Adding a string is a key in every locale file plus the lookup; a literal in a component is the
+  exception and needs a reason.
+
 ## Formatting (ADR 0015)
 
 - Frontend files are formatted with prettier (`.prettierrc` at repo root: semi, single quotes, print width 100, trailing commas); `prettier --check` runs inside `pnpm test` and fails the command on violations. Format before committing.

@@ -26,6 +26,7 @@ import { controllableEventStream } from '../../test/eventStream';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
+import uiText from '../../locales/en.json';
 import spanishMessages from '../../locales/es-ES.json';
 import settingsFallback from '../../../../docs/api/settings.fallback.json';
 import settingsFixed from '../../../../docs/api/settings.fixed.json';
@@ -1530,5 +1531,15 @@ describe('upload errors', () => {
 
     // Neither refusal became a task.
     expect(within(pending).getAllByRole('listitem')).toHaveLength(pendingBefore);
+  });
+});
+
+// ADR 0067: the queue's text is the shared catalog's, not a copy in the component - a wording
+// change in frontend/src/locales/en.json changes what the browser and the TUI show together.
+describe('shared UI text', () => {
+  it('renders the queue heading and the upload options toggle from the catalog', () => {
+    renderQueue();
+    expect(screen.getByRole('heading', { name: uiText['queue.title'] })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: uiText['queue.uploadOptions'] })).toBeInTheDocument();
   });
 });

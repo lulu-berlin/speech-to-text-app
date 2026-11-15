@@ -40,6 +40,14 @@ where the same word appears there; a `—` means no wording was recorded for tha
 | user interface          | رابط کاربری                                 | —                   | `frontend` never appears in the UI                           |
 | default                 | پیش‌فرض                                     | —                   |                                                              |
 | error                   | خطا                                         | —                   | `خطا: {message}`                                             |
+| theme                   | پوسته                                       | —                   | the TUI's color theme                                        |
+| terminal                | ترمینال                                     | —                   | the program the TUI opens in                                 |
+| path                    | مسیر                                        | —                   | a file's or folder's path                                    |
+| folder                  | پوشه                                        | —                   | the file browser's directory                                 |
+| mark                    | علامت زدن                                   | —                   | select a file or a segment; `انتخاب` is choose               |
+| assign                  | تخصیص                                       | —                   | put the marked segments on a speaker                         |
+| help                    | راهنما                                      | —                   | the `?` key-reference table                                  |
+| key hint                | کلیدها                                      | —                   | a footer row: `[Enter] ذخیره · [Esc] لغو`                    |
 
 This glossary is the Persian layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/fa.md`).

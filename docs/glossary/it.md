@@ -35,6 +35,12 @@ Otter 5, Descript 6, Amberscript 7).
 | user interface          | interfaccia utente                                                                | Microsoft 2, Apple 3                            | `frontend` never appears in the UI                                                             |
 | default                 | predefinito                                                                       | Microsoft 2, Apple 3: „Predefinito“             |                                                                                                |
 | error                   | errore                                                                            | Google 1                                        | `Errore: {message}`                                                                            |
+| terminal                | terminale                                                                         | Microsoft 2, Apple 3                            | the TUI's terminal                                                                             |
+| path                    | percorso                                                                          | Microsoft 2, Apple 3                            | file and download paths                                                                        |
+| folder                  | cartella                                                                          | Microsoft 2, Apple 3                            | the file browser                                                                               |
+| filter                  | filtro / filtrare                                                                 | Google 1, Microsoft 2                           | the history filter                                                                             |
+| search                  | cerca / ricerca                                                                   | Google 1                                        | the history search                                                                             |
+| file                    | file                                                                              | Microsoft 2, Apple 3                            | invariant                                                                                      |
 
 This glossary is the Italian layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/it.md`).

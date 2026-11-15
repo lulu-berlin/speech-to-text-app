@@ -37,6 +37,12 @@ not a product's.
 | user interface          | యూజర్ ఇంటర్ఫేస్                                                 | —                       | `frontend` never appears in the UI                          |
 | default                 | డిఫాల్ట్                                                        | —                       |                                                             |
 | error                   | లోపం                                                            | —                       | `లోపం: {message}`                                           |
+| terminal                | టెర్మినల్                                                       | —                       | the TUI's own setting and the OS terminal                   |
+| folder                  | ఫోల్డర్                                                         | —                       | the file browser                                            |
+| path                    | పాత్                                                            | —                       | `ఫైల్` is the file itself                                    |
+| theme                   | థీమ్                                                            | —                       | the `t` key's label                                         |
+| options                 | ఎంపికలు                                                         | —                       | `ఎంచుకోండి` is the verb "choose"                            |
+| keys                    | కీలు                                                            | —                       | the `?` key-reference headings                              |
 
 This glossary is the Telugu layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/te.md`).

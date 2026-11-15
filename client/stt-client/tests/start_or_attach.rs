@@ -13,8 +13,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use stt_client::{ServiceDirs, ensure_service, ensure_unit};
 
-#[test]
-fn a_running_service_is_used_and_nothing_is_started() {
+#[tokio::test]
+async fn a_running_service_is_used_and_nothing_is_started() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     support::answer_forever(listener, |_| support::healthy());
@@ -25,6 +25,7 @@ fn a_running_service_is_used_and_nothing_is_started() {
         started.set(true);
         Ok(())
     })
+    .await
     .unwrap();
 
     assert_eq!(service.service.endpoint, format!("http://127.0.0.1:{port}"));
@@ -35,8 +36,8 @@ fn a_running_service_is_used_and_nothing_is_started() {
     drop(dir);
 }
 
-#[test]
-fn with_no_service_answering_one_is_started_once_and_then_used() {
+#[tokio::test]
+async fn with_no_service_answering_one_is_started_once_and_then_used() {
     let dir = tempfile::tempdir().unwrap();
     let dirs = support::dirs_in(dir.path());
 
@@ -46,6 +47,7 @@ fn with_no_service_answering_one_is_started_once_and_then_used() {
         support::start_and_answer(dir.path());
         Ok(())
     })
+    .await
     .unwrap();
 
     assert!(started.get());
@@ -54,8 +56,8 @@ fn with_no_service_answering_one_is_started_once_and_then_used() {
 
 // ADR 0064: the launch that started the unit starts the tray; a launch that attached to a running
 // service starts nothing. So start-or-attach has to say which of the two it did.
-#[test]
-fn start_or_attach_reports_whether_this_launch_started_the_service() {
+#[tokio::test]
+async fn start_or_attach_reports_whether_this_launch_started_the_service() {
     let dir = tempfile::tempdir().unwrap();
     let dirs = support::dirs_in(dir.path());
 
@@ -64,6 +66,7 @@ fn start_or_attach_reports_whether_this_launch_started_the_service() {
         support::start_and_answer(dir.path());
         Ok(())
     })
+    .await
     .unwrap();
     assert!(started.started, "this launch started the service");
 
@@ -71,6 +74,7 @@ fn start_or_attach_reports_whether_this_launch_started_the_service() {
     let attached = ensure_service(&dirs, || {
         panic!("a running service must not be started again")
     })
+    .await
     .unwrap();
     assert!(!attached.started, "this launch attached to the service");
     assert_eq!(attached.service.endpoint, started.service.endpoint);
@@ -79,8 +83,8 @@ fn start_or_attach_reports_whether_this_launch_started_the_service() {
 // ADR 0064: opening any frontend brings the unit up - the service and the tray. The launch that
 // started the service starts the tray, exactly once; a launch that attached to a running service
 // starts no tray, since the running unit already has one.
-#[test]
-fn the_launch_that_starts_the_service_starts_the_tray_and_an_attaching_launch_starts_none() {
+#[tokio::test]
+async fn the_launch_that_starts_the_service_starts_the_tray_and_an_attaching_launch_starts_none() {
     let dir = tempfile::tempdir().unwrap();
     let dirs = support::dirs_in(dir.path());
     let trays = Cell::new(0);
@@ -97,6 +101,7 @@ fn the_launch_that_starts_the_service_starts_the_tray_and_an_attaching_launch_st
         },
         start_tray,
     )
+    .await
     .unwrap();
     assert!(first.started, "the first launch started the service");
     assert_eq!(
@@ -110,6 +115,7 @@ fn the_launch_that_starts_the_service_starts_the_tray_and_an_attaching_launch_st
         || panic!("a running service must not be started again"),
         start_tray,
     )
+    .await
     .unwrap();
     assert!(!second.started, "the second launch attached");
     assert_eq!(trays.get(), 1, "a launch that attached starts no tray");
@@ -117,8 +123,8 @@ fn the_launch_that_starts_the_service_starts_the_tray_and_an_attaching_launch_st
 
 // ADR 0064: the unit is both up or both down. When this launch started the service and the tray
 // then cannot start, the launch stops that service again and fails, naming the tray.
-#[test]
-fn when_the_tray_cannot_start_the_service_this_launch_started_stops_and_the_open_fails() {
+#[tokio::test]
+async fn when_the_tray_cannot_start_the_service_this_launch_started_stops_and_the_open_fails() {
     let dir = tempfile::tempdir().unwrap();
     let dirs = support::dirs_in(dir.path());
     let quit = Arc::new(AtomicBool::new(false));
@@ -131,6 +137,7 @@ fn when_the_tray_cannot_start_the_service_this_launch_started_stops_and_the_open
         },
         || Err(io::Error::other("no stt-tray beside stt-app")),
     )
+    .await
     .unwrap_err();
 
     assert!(

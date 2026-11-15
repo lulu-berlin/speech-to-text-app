@@ -9,6 +9,7 @@
   "defaultFrontend": null,
   "terminalCommand": null,
   "appLanguage": null,
+  "themeMode": "auto",
   "availableDevices": ["cpu", "auto", "gpu:0", "gpu:1"],
   "gpuNames": {
     "gpu:0": "NVIDIA GeForce RTX 3060",

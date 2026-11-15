@@ -10,7 +10,7 @@ Item 13 built the frontend foundation with almost no visual design: a theme of f
 - **Typeface: IBM Plex Sans** (OFL), self-hosted as a woff2 in the repository with its licence notice, latin subset; the system stack stays as fallback.
 - **Interactive primitives use Radix** (`@radix-ui/react-dialog`, `-tooltip`, `-dropdown-menu`, `-switch`, `-slider`) for behavior and accessibility only; all styling comes from the tokens. Icons come from **`lucide-react`**.
 - **Layout primitives** (`Page`, `Stack`, `Row`) are part of the system, so the spacing rhythm is enforced by code rather than by convention.
-- **Dark mode follows the OS with a manual override** (`auto → light → dark`), stored in `localStorage`.
+- **Dark mode follows the OS with a manual override** (`auto → light → dark`), stored in `localStorage`. *Amended by [ADR 0068](0068-one-theme-token-file-for-every-frontend.md) (2026-11-07): the mode is stored by the service and shared with the TUI; `localStorage` only remembers the last-known mode for the first paint.*
 - **Accessibility is part of the primitives**: AA contrast in both themes, visible focus rings, full keyboard operation, `prefers-reduced-motion`, correct roles and labels.
 
 ## Consequences

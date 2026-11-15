@@ -34,6 +34,9 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | user interface          | интерфейс                                                         | Microsoft 2: „интерфейс“                    | `frontend` never appears in the UI                                         |
 | default                 | по умолчанию                                                      | Microsoft 2: „по умолчанию“                 |                                                                            |
 | error                   | ошибка                                                            | Google 1: „Ошибка“                          | `Ошибка: {message}`                                                        |
+| playback                | воспроизведение                                                   | Apple 3: „Воспроизвести“                    | the running position; `♪ воспроизведение` in the TUI                       |
+| key                     | клавиша                                                           | GNU nano 4: „клавишу“                       | a physical key; its label stays English, as the program binds it           |
+| folder                  | папка                                                             | —                                           | the file browser's directory; never `каталог` next to a folder name        |
 
 This glossary is the Russian layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/ru.md`).

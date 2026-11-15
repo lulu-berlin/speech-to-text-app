@@ -1,0 +1,35 @@
+[package]
+name = "stt-tui"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+stt-client = { path = "../stt-client" }
+# History's finish date (roadmap item 67), written as the browser writes it.
+chrono = "0.4"
+# The terminal UI (roadmap item 67, decided 2026-10-22): ratatui on its crossterm backend.
+ratatui = "0.30"
+# Audio playback in a transcript (roadmap item 67): the service's FLAC clip, decoded here and sent
+# to the default output - ALSA on Linux (devenv's alsa-lib, the CI job's libasound2), WASAPI on
+# Windows, CoreAudio on macOS.
+cpal = "0.18"
+claxon = "0.4"
+# The shared colour tokens (`ui-theme/colors.json`) are parsed at startup (roadmap item 67).
+serde_json = "1"
+# `auto` falls back to the terminal's background: its answer to OSC 11, with a device-attributes
+# query behind it so a terminal that cannot answer is detected without waiting (roadmap item 67).
+terminal-colorsaurus = "1"
+tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread", "time"] }
+
+[dev-dependencies]
+# The TUI's tests run the real binary in a pseudo-terminal (a Unix pty, a Windows ConPTY) and read
+# what it draws through a terminal-screen parser (roadmap item 67, the portable-pty decision).
+portable-pty = "0.9"
+tempfile = "3"
+vt100 = "0.18"
+
+[target.'cfg(unix)'.dev-dependencies]
+# Reads the pty's termios flags: whether the TUI left the terminal cooked.
+libc = "0.2"

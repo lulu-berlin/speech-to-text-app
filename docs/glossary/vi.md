@@ -36,6 +36,13 @@ carries no comparison; the term is the neutral Vietnamese word, not a product's.
 | user interface          | giao diện người dùng                                   | Microsoft 2: „giao diện người dùng“       | `frontend` never appears in the UI                             |
 | default                 | mặc định                                               | Microsoft 2: „mặc định“                   |                                                                |
 | error                   | lỗi                                                    | Google 1: „Lỗi“                           | `Lỗi: {message}`                                               |
+| key (keyboard)          | phím                                                   | —                                         | the TUI's key labels; `Phím hàng đợi` for a key table          |
+| folder                  | thư mục                                                | Microsoft 2: „thư mục“                    | the file browser's directories                                 |
+| path                    | đường dẫn                                              | —                                         |                                                                |
+| format                  | định dạng                                              | —                                         | the download format                                            |
+| reset                   | đặt lại                                                | —                                         | `đặt lại hợp nhất`, `đặt lại tên`                              |
+| revert                  | hoàn tác                                               | —                                         | undo an edit; distinct from `bỏ` (discard)                     |
+| theme                   | giao diện                                              | —                                         | light/dark, as the existing catalog writes it                  |
 
 This glossary is the Vietnamese layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/vi.md`).

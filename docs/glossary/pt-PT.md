@@ -3,8 +3,7 @@
 The term evidence for the shared vocabulary is in `docs/glossary/pt-BR.md` and
 `docs/reviews/pt-BR.md`; this file records the European Portuguese terms and the products'
 Portuguese (Portugal) wordings. The compared products and their popularity are listed in
-`docs/reviews/pt-PT.md` (Google 1, Microsoft 2, Apple 3, Zoom 4, Otter 5, Descript 6,
-Amberscript 7).
+`docs/reviews/pt-PT.md` (Google 1, Microsoft 2, Apple 3, GNU nano 4).
 
 | English                | Portuguese (Portugal)                              | Evidence                                        | Note                                                                                            |
 | ---------------------- | -------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -27,6 +26,11 @@ Amberscript 7).
 | queue phases           | a dividir / a transcrever / a identificar falantes | Google 1: „A processar…“                        | the same nouns as pt-BR after `durante`                                                         |
 | save / discard         | guardar / descartar                                | Google 1, Apple 3                               | ready for access keys G and D when the keys are added                                           |
 | default user interface | interface do utilizador predefinida                | Google 1: „Interface“; user decision 2026-11-13 | `frontend` never appears in any language; `interfaz`/`interface`/`ממשק` in the sibling catalogs |
+| upload (TUI, queue)    | enviar / envio                                     | catalog: „A enviar {filename}“, „Envios“        | the action of sending a file; `carregar` stays for loading („A carregar transcrição…“)          |
+| search                 | pesquisar                                          | catalog: „Pesquisar“; nano 4: „Procurar“        | the catalog's `pesquisar`, not nano's `procurar`                                                |
+| pause / resume         | pausar / retomar                                   | catalog: „Pausar a fila“, „Retomar“             | verbs for the buttons and hints; the action nouns are `pausa` and `retoma`                     |
+| folder                 | pasta                                              | nano 4: „pasta“, „Ir para pasta“                | chosen over `diretório`; the file browser uses it                                               |
+| format                 | formato                                            | nano 4: „Formato DOS“                           | —                                                                                               |
 
 This glossary is the European-Portuguese layer; every term not listed here takes its wording
 from `docs/glossary/pt-BR.md`.

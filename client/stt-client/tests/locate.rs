@@ -9,8 +9,8 @@ use std::net::TcpListener;
 
 use stt_client::{ServiceDirs, locate};
 
-#[test]
-fn a_client_reads_the_endpoint_from_runtime_json_and_the_secret_from_config_json() {
+#[tokio::test]
+async fn a_client_reads_the_endpoint_from_runtime_json_and_the_secret_from_config_json() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     support::answer_forever(listener, |_| support::healthy());
@@ -33,6 +33,7 @@ fn a_client_reads_the_endpoint_from_runtime_json_and_the_secret_from_config_json
         config_dir: config_dir.path().to_path_buf(),
         runtime_dir: runtime_dir.path().to_path_buf(),
     })
+    .await
     .unwrap();
 
     assert_eq!(service.endpoint, format!("http://127.0.0.1:{port}"));

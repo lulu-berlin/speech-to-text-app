@@ -128,6 +128,11 @@ jobs:
       # The Rust client workspace (roadmap item 66: the client library, the tray, the `stt-app` CLI)
       # on the pinned Rust from versions.json.
       - uses: ./.github/actions/rust-toolchain
+      # The TUI's transcript playback links ALSA on Linux (roadmap item 67); macOS and Windows take
+      # their own output APIs and need no package.
+      - name: ALSA development files
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev
       - name: cargo fmt --check
         working-directory: client
         run: cargo fmt --check
@@ -204,8 +209,12 @@ jobs:
         with:
           downloads-cache: 'true'
           system-libs: 'true'
-      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) and the item-67 TUI
+      # journey are built with the pinned Rust.
       - uses: ./.github/actions/rust-toolchain
+      # The TUI links ALSA on Linux (roadmap item 67's playback), and the journey builds it here.
+      - name: ALSA development files
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev
       # Chromium's system libraries and the e2e package come from the build's own task, which is what
       # the invoke-it-as-root check exists for: it installs `playwright install-deps chromium` when it
       # runs as root and installs the package with the Gradle-managed pnpm, so the pnpm and Playwright
@@ -221,6 +230,10 @@ jobs:
           sudo chown -R "$(id -u):$(id -g)" "$gradle_home" "$GITHUB_WORKSPACE"
       - name: gradle e2e
         run: ./gradlew e2e
+      # Roadmap item 67: the TUI's journey against the real service - upload, COMPLETED, transcript -
+      # in a pseudo-terminal (client/stt-tui/tests/journey.rs). macOS and Windows run it too.
+      - name: gradle tuiJourney
+        run: ./gradlew tuiJourney
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
       - name: Upload the failed specs' traces
         if: failure()
@@ -268,7 +281,8 @@ jobs:
       - uses: ./.github/actions/jvm-toolchain
         with:
           downloads-cache: 'true'
-      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) and the item-67 TUI
+      # journey are built with the pinned Rust.
       - uses: ./.github/actions/rust-toolchain
       - name: gradle e2e
         run: |
@@ -288,6 +302,9 @@ jobs:
             tail -100 e2e/.e2e-backend.log
             exit 1
           }
+      # Roadmap item 67: the TUI's journey against the real service, as on Linux.
+      - name: gradle tuiJourney
+        run: ./gradlew tuiJourney
 
   macos-nix:
     name: macOS (Nix build + devenv)
@@ -576,11 +593,16 @@ jobs:
       - uses: ./.github/actions/jvm-toolchain
         with:
           downloads-cache: 'true'
-      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) is built with the pinned Rust.
+      # `stt-app` for the item-66 launch-token spec (tests/66-launch-token.spec.ts) and the item-67 TUI
+      # journey are built with the pinned Rust.
       - uses: ./.github/actions/rust-toolchain
       - name: gradlew.bat e2e
         shell: cmd
         run: gradlew.bat e2e
+      # Roadmap item 67: the TUI's journey against the real service, as on Linux - in a ConPTY.
+      - name: gradlew.bat tuiJourney
+        shell: cmd
+        run: gradlew.bat tuiJourney
       # Roadmap item 82: the failed specs' traces (.github/actions/upload-test-results).
       - name: Upload the failed specs' traces
         if: failure()

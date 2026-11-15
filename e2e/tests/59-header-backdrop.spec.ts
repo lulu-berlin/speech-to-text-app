@@ -1,21 +1,11 @@
-import { expect, test, type Page } from './helpers/test';
-import { MASCOT, appLive } from './helpers/ui';
+import { expect, test } from './helpers/test';
+import { MASCOT, appLive, setTheme } from './helpers/ui';
 
 // Item 59, finding 1: the brand used to carry the illustration's pastel backdrop into the
 // header. That decision was implemented in the compact-header cycle; this screenshot check
 // locks it in. A backdrop fills the whole artwork box, so every corner of the rendered
 // icon would be a backdrop colour; without one, the corners show the header behind the
 // mark. Both themes are compared.
-async function setTheme(page: Page, mode: 'light' | 'dark') {
-  const button = page.getByRole('button', { name: /Theme:/ });
-  for (let step = 0; step < 4; step += 1) {
-    if ((await button.getAttribute('aria-label')) === `Theme: ${mode}`) {
-      return;
-    }
-    await button.click();
-  }
-  throw new Error(`the theme did not reach ${mode}`);
-}
 
 test('the header brand icon has no pastel backdrop in either theme', async ({ page }) => {
   await appLive(page);

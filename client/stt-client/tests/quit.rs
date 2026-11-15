@@ -9,8 +9,8 @@ use std::sync::mpsc;
 
 use stt_client::{ServiceDirs, quit};
 
-#[test]
-fn quit_asks_the_running_service_to_stop_with_its_secret() {
+#[tokio::test]
+async fn quit_asks_the_running_service_to_stop_with_its_secret() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let (seen, requests) = mpsc::channel();
@@ -43,7 +43,7 @@ fn quit_asks_the_running_service_to_stop_with_its_secret() {
         runtime_dir: dir.path().to_path_buf(),
     };
 
-    quit(&dirs).unwrap();
+    quit(&dirs).await.unwrap();
 
     assert_eq!(
         requests
@@ -54,15 +54,15 @@ fn quit_asks_the_running_service_to_stop_with_its_secret() {
     );
 }
 
-#[test]
-fn quit_reports_no_service_when_none_answers() {
+#[tokio::test]
+async fn quit_reports_no_service_when_none_answers() {
     let dir = tempfile::tempdir().unwrap();
     let dirs = ServiceDirs {
         config_dir: dir.path().to_path_buf(),
         runtime_dir: dir.path().to_path_buf(),
     };
 
-    let error = quit(&dirs).unwrap_err();
+    let error = quit(&dirs).await.unwrap_err();
 
     assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "{error}");
 }

@@ -48,6 +48,16 @@ that term.
 | user interface          | antarmuka panganggo                                           | —                   | `frontend` never appears in the UI                         |
 | default                 | gawan                                                         | —                   |                                                            |
 | error                   | kesalahan                                                     | —                   | `Kesalahan: {message}`                                     |
+| key (keyboard)          | tombol                                                        | —                   | a key the TUI draws highlighted; heads the key tables      |
+| reorder                 | owahi urutan                                                  | —                   | reuses `owahi`, as the queue's own label                   |
+| mark                    | tandhai                                                       | —                   | the `[Space]` mark on files and turns, not `pilih`         |
+| assign                  | pilihaken                                                     | —                   | a segment to a speaker; kept apart from `tetepaken` (keep) |
+| rename                  | owahi nama                                                    | —                   | reuses `owahi`; the result is `nama gawan` or a new name   |
+| folder                  | folder                                                        | —                   | technical loan, as the file browser shows it               |
+| path                    | path                                                          | —                   | technical loan, as `Path: {path}` in the download dialog   |
+| page (a screenful)      | kaca                                                          | —                   | `kaca utama` is home, so `kaca` alone is a screenful       |
+| help                    | pitulungan                                                    | —                   | the `?` key-reference table                                |
+| quit                    | medal                                                         | —                   | krama of `metu`                                            |
 
 Interface loans accepted as Javanese technical writing uses them, with no separate row each:
 `status`, `filter`, `tema`, `notifikasi`, `aplikasi`, `layanan`, `kolom`, `permanen`, `klik`,

@@ -24,6 +24,11 @@ Word 4, Apple 5, Otter 6, Descript 7, Amberscript 8.
 | save / discard | guardar / descartar | Google 3, Apple 5 | access keys G and D |
 | completed / failed / canceled | completada / fallida / cancelada | Zoom 1, Teams 2 | uppercase badges; agrees with the task |
 | embedding / clustering | incrustación / agrupación | Amberscript 8 (English terms) | established Spanish terms |
+| download | descargar / descarga | Google 3: `Descargar` | verb for the action, noun for the dialog title |
+| path | ruta | — | `Ruta:` in the download dialog; `escribir una ruta` for typing one |
+| folder | carpeta | — | file browser; never `directorio` in the UI |
+| key (pressed) | tecla | — | the bracketed labels `[Enter]`, `[Esc]`, `[Space]` are the physical keys and are never translated; only the action word after them |
+| mark (a file) | marcar | — | `[Space] marcar`; `(seleccionado)` for a marked segment |
 
 ## Gender and culture
 

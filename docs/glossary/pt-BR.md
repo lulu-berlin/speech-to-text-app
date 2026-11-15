@@ -36,6 +36,10 @@ Otter 6, Descript 7, Amberscript 8).
 | app language                  | idioma do aplicativo                                            | Google 1                                                |                                                                           |
 | default                       | padrão                                                          | Google 1                                                | `idioma padrão`, `configurações padrão`                                   |
 | CPU / GPU                     | CPU / GPU                                                       | Microsoft 3                                             | acronyms unchanged                                                        |
+| folder                        | pasta                                                           | Google 1: „Nova pasta“                                  | the file browser's noun                                                   |
+| path                          | caminho                                                         | Google 1: „pasta“                                       | the typed or shown file path                                              |
+| download                      | baixar / download                                               | Microsoft 2: „Baixar“                                   | the verb `baixar`, the noun `download` as the products keep it            |
+| idle                          | inativo                                                         | —                                                       | the header's queue state, no gender                                       |
 
 ## Gender and culture
 

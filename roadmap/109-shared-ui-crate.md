@@ -1,7 +1,7 @@
 # 109 — One UI core for every frontend: the `stt-ui` crate
 
 Status: spec-approved
-Depends on: [67](67-tui-frontend.md) (the TUI's flows, state and playback modules), [70](70-rust-gui-window.md) (the Slint window reaches the same feature set), [88](88-localization.md) (the catalogs, glossary and review records), [98](98-rust-workspace-at-root.md) (the crate lives in `crates/`)
+Depends on: [67](../docs/specs/tui-frontend.md) (the TUI's flows, state and playback modules), [70](70-rust-gui-window.md) (the Slint window reaches the same feature set), [88](88-localization.md) (the catalogs, glossary and review records), [98](98-rust-workspace-at-root.md) (the crate lives in `crates/`)
 Blocks: — (the Rust browser frontend and the mobile frontends are later items built on it)
 
 ## Goal

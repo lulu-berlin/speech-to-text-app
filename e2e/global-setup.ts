@@ -10,6 +10,7 @@ import {
   captureSessionCookie,
   checkPreconditions,
   choosePort,
+  installBackend,
   loadState,
   refuseLiveRun,
   registerBrowserFrontend,
@@ -36,6 +37,8 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     build: () => buildUi({ root: repoRoot }),
     log: console.log,
   });
+  // The service the journey starts is this checkout's: built here, once per run.
+  installBackend();
   const dataDir = mkdtempSync(join(tmpdir(), 'stt-e2e-'));
   const fixturesDir = mkdtempSync(join(tmpdir(), 'stt-e2e-fixtures-'));
   writeFixtures(fixturesDir);

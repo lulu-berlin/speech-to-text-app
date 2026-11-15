@@ -8,6 +8,7 @@ import {
   goTo,
   openTranscript,
   rowOf,
+  setTheme,
   uploadClips,
   waitForTaskState,
 } from './helpers/ui';
@@ -20,20 +21,9 @@ import {
 // queue journey: item 15 cancelled its seed and its mate finished, so the queue starts
 // empty — this spec asserts exactly that as its precondition — and this spec's own long
 // clip owns the rest of the state.
-const THEME_STEP = 4;
-
 test('the finished shell: sticky header, nav pills, brand home link, text-only compact header', async ({
   page,
 }) => {
-  const themeButton = page.getByRole('button', { name: /Theme:/ });
-  const setTheme = async (mode: 'light' | 'dark' | 'system') => {
-    // The button's accessible name is the current mode (AppHeader THEME_LABEL); the
-    // cycle is system -> light -> dark -> system, so clicking until it shows is bounded.
-    for (let guard = 0; guard < THEME_STEP; guard++) {
-      if ((await themeButton.getAttribute('aria-label')) === `Theme: ${mode}`) return;
-      await themeButton.click();
-    }
-  };
   const shot = async (
     name: string,
     width: 'phone' | 'desktop',
@@ -41,7 +31,7 @@ test('the finished shell: sticky header, nav pills, brand home link, text-only c
     viewport: { width: number; height: number },
   ) => {
     await page.setViewportSize(viewport);
-    await setTheme(theme);
+    await setTheme(page, theme);
     await expect(page.getByRole('button', { name: `Theme: ${theme}` })).toBeVisible();
     await page.screenshot({ path: `screenshots/${name}-${theme}-${width}.png` });
   };

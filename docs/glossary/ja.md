@@ -1,7 +1,8 @@
 # Japanese (ja) — glossary
 
 The term evidence is recorded in `docs/reviews/ja.md`; this is the shared vocabulary. The
-compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3).
+compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3,
+GNOME Files 4, Midnight Commander 5).
 
 | English                 | Japanese                                  | Evidence                               | Note                                                                           |
 | ----------------------- | ----------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------ |
@@ -35,6 +36,12 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | user interface          | ユーザー インターフェイス                 | Microsoft 2                            | `frontend` never appears in the UI                                             |
 | default                 | 既定                                      | Microsoft 2: „既定“                    |                                                                                |
 | error                   | エラー                                    | Google 1: „エラー“                     | `エラー: {message}`                                                            |
+| folder                  | フォルダー                                | GNOME Files 4: „フォルダー“            | long vowel, as the file browser writes it                                      |
+| close / dismiss         | 閉じる                                    | —                                      | notices and dropdowns                                                          |
+| select / mark           | 選択                                      | GNOME Files 4: „すべて選択する“        | marked files and the transcript's `[a]`/`[Space]` marks                        |
+| reorder                 | 並べ替え                                  | —                                      | queue ordering                                                                 |
+| rename                  | 名前の変更                                | GNOME Files 4: „フォルダー名を変更“    | shorter than „名称変更“                                                        |
+| revert                  | 元に戻す                                  | —                                      | segment text, speaker names (never the destructive kind of reset)              |
 
 This glossary is the Japanese layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/ja.md`).

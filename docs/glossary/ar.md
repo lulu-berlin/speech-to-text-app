@@ -28,6 +28,10 @@ Word 4, Apple 5, Otter 6, Descript 7, Amberscript 8. Modern Standard Arabic thro
 | reassign | إعادة الإسناد | Zoom 1 | |
 | embedding / clustering | التضمين / التجميع | Amberscript 8 (English terms) | established Arabic technical terms |
 | completed / failed / canceled | مكتملة / فشلت / أُلغيت | Zoom 1, Teams 2 | agrees with المهمة (feminine) |
+| path | المسار | — | technical; the download, upload and file-browser strings print it LTR |
+| folder | المجلد | GNOME Files 10: `مجلد` | neutral |
+| file | الملف | GNOME Files 10: `الملفات` | neutral |
+| hint | التلميح | — | the footer is one row of key hints: a bare masdar next to the bracketed key |
 
 ## Gender and culture
 

@@ -35,6 +35,13 @@ compared products and their popularity are listed there (Google 1, Microsoft 2).
 | user interface          | ব্যবহারকারী ইন্টারফেস                                          | Microsoft 2                                   | `frontend` never appears in the UI                                 |
 | default                 | ডিফল্ট                                                         | Microsoft 2                                   |                                                                    |
 | error                   | ত্রুটি                                                         | Google 1: „ত্রুটি“                            | `ত্রুটি: {message}`                                                |
+| folder                  | ফোল্ডার                                                        | GNOME Files 3: „ফোল্ডার“                      | loanword, invariant                                                |
+| path                    | পথ                                                             | —                                             | `{path}-এ সংরক্ষিত` — case suffix hyphenated                       |
+| rename                  | নাম পরিবর্তন                                                   | GNOME Files 3: „নাম পরিবর্তন“                 | noun; the settings hint uses it shortened                          |
+| close / dismiss         | বন্ধ করুন / বন্ধ করা                                           | GNOME Files 3: „বন্ধ করুন“                    | imperative for the dialog, noun for an action name                 |
+| help                    | সহায়তা                                                        | GNOME Files 3: „সহায়তা“                       | the `[?]` key reference                                            |
+| key (keyboard)          | কী                                                             | —                                             | `সারির কী`, `কী:`; the bracketed Latin labels stay untranslated    |
+| hint verb (play/pause)  | চালান / বিরত                                                   | Google 1: „চালান“                             | the footer keeps the short form, no `করুন`                         |
 
 This glossary is the Bengali layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/bn.md`).

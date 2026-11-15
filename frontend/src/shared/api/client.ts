@@ -118,6 +118,24 @@ export async function saveSettings(settings: SettingsUpdate): Promise<Settings> 
   });
 }
 
+// The write that stores [settings] as they are: every setting the user sets, without the device
+// choices, the probe failure and the CPU-fallback notice (item 32's contract). A write that
+// changes some settings starts from it, so a setting it does not touch travels unchanged.
+export function settingsUpdateOf(settings: Settings): SettingsUpdate {
+  return {
+    device: settings.device,
+    threads: settings.threads,
+    defaultLanguage: settings.defaultLanguage,
+    speakersMode: settings.speakersMode,
+    speakersCount: settings.speakersCount,
+    maxSpeakers: settings.maxSpeakers,
+    defaultFrontend: settings.defaultFrontend,
+    terminalCommand: settings.terminalCommand,
+    appLanguage: settings.appLanguage,
+    themeMode: settings.themeMode,
+  };
+}
+
 // Item 22 contract: PUT /api/tasks/{id}/speakers/{speakerId} with { speaker } -> 200 Speakers;
 // a null name resets it to "Speaker N". The server stores the name as sent, so callers trim.
 export async function renameSpeaker(

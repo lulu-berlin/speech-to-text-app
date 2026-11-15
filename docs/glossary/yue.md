@@ -37,6 +37,12 @@ product's.
 | user interface          | 使用者介面                        | —                  | `frontend` never appears in the UI                    |
 | default                 | 預設                              | —                  |                                                       |
 | error                   | 錯誤                              | —                  | `錯誤：{message}`                                     |
+| key (pressed)           | 按鍵                              | —                  | the help table's column and the key hints             |
+| help                    | 說明                              | —                  | the `?` key reference                                 |
+| filter                  | 篩選                              | —                  | history and the settings dropdown                     |
+| path                    | 路徑                              | —                  | upload and download dialogs                           |
+| folder                  | 資料夾                            | —                  | the upload dialog's file browser                      |
+| idle                    | 閒置                              | —                  | the header's state word                               |
 
 This glossary is the Cantonese layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/yue.md`).

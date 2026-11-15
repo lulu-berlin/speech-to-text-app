@@ -1,0 +1,72 @@
+//! Roadmap item 67, second amendment: closing the upload dialog redraws the whole screen. A
+//! terminal that draws a glyph wider than the TUI counted it (an ambiguous-width `·` or `—`) leaves
+//! cells the TUI believes unchanged, so only a full repaint - the screen cleared, every row drawn
+//! again - removes what the dialog left; after it the screen is the queue as it is drawn afresh.
+
+#[path = "../../stt-client/tests/support/mod.rs"]
+mod support;
+mod terminal;
+
+use std::fs;
+use std::time::Duration;
+
+use terminal::{EventService, Tui};
+
+const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
+const WAIT: Duration = Duration::from_secs(20);
+/// The escape that clears the whole screen.
+const CLEAR: &str = "\x1b[2J";
+
+/// The queue's rows and footer, the lines a closed dialog must leave whole.
+fn queue_shown(text: &str) -> bool {
+    text.contains("lecture.m4a") && text.contains("memo.wav") && !text.contains("Esc cancel")
+}
+
+#[test]
+fn closing_the_upload_dialog_repaints_the_whole_screen() {
+    let service = EventService::start();
+    let state = tempfile::tempdir().unwrap();
+    support::write_bootstrap(state.path(), service.port);
+    let files = tempfile::tempdir().unwrap();
+    let audio = files.path().join("podcast.mp3");
+    fs::write(&audio, b"RIFF-FAKE-WAVE").unwrap();
+    let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), state.path(), 80, 24);
+    let mut stream = service.next_stream(WAIT);
+    stream.send("snapshot", SNAPSHOT);
+    // The settled screen: the startup settings read answered too, so the header names the mode
+    // (it appears when that answer lands, which would otherwise race the comparison below).
+    let fresh = tui.wait_for(WAIT, |text| queue_shown(text) && text.contains("Theme:"));
+
+    // Escape closes the dialog: the screen is cleared and the queue drawn again, as it was.
+    tui.press(b"u");
+    tui.wait_for(WAIT, |text| text.contains("Esc cancel"));
+    let before = tui.raw().len();
+    tui.press(b"\x1b");
+    let after = tui.wait_for(WAIT, queue_shown);
+    assert!(
+        tui.raw()[before..].contains(CLEAR),
+        "closing the dialog with Escape repaints the whole screen"
+    );
+    assert_eq!(
+        after, fresh,
+        "the queue is drawn as it was before the dialog"
+    );
+
+    // An upload closes the dialog too, with the same repaint.
+    std::thread::sleep(Duration::from_millis(100));
+    tui.press(b"u");
+    tui.wait_for(WAIT, |text| text.contains("Esc cancel"));
+    tui.press(audio.to_str().unwrap().as_bytes());
+    tui.wait_for(WAIT, |text| text.contains("podcast.mp3"));
+    let before = tui.raw().len();
+    tui.press(b"\r");
+    service.next_upload(WAIT).answer(
+        "201 Created",
+        r#"{"id":9,"filename":"podcast.mp3","status":"QUEUED","transcriptionProgress":0.0}"#,
+    );
+    tui.wait_for(WAIT, queue_shown);
+    assert!(
+        tui.raw()[before..].contains(CLEAR),
+        "closing the dialog with an upload repaints the whole screen"
+    );
+}

@@ -1,0 +1,122 @@
+{
+  "colors": {
+    "background": { "light": "#ffffff", "dark": "#14161a" },
+    "surface": { "light": "#f6f7f9", "dark": "#1b1e23" },
+    "surfaceRaised": { "light": "#ffffff", "dark": "#32373f" },
+    "text": { "light": "#1c1c1c", "dark": "#e8e8e8" },
+    "textMuted": { "light": "#5a616c", "dark": "#a4acb8" },
+    "border": { "light": "#d7d7d7", "dark": "#3a3f47" },
+    "accent": { "light": "#0057a8", "dark": "#7fb2e5" },
+    "accentText": { "light": "#ffffff", "dark": "#14161a" },
+    "accentTint": { "light": "#e3eefa", "dark": "#1a2a3c" },
+    "focusRing": { "light": "#0057a8", "dark": "#7fb2e5" },
+    "danger": { "light": "#b42318", "dark": "#f28b82" },
+    "overlay": { "light": "rgba(16, 24, 40, 0.4)", "dark": "rgba(0, 0, 0, 0.5)" },
+    "control": { "light": "#7c838e", "dark": "#7e8794" },
+    "buttonPrimaryHover": { "light": "#004b94", "dark": "#93bceb" },
+    "buttonPrimaryActive": { "light": "#00407f", "dark": "#a4c8f0" },
+    "buttonSecondaryActive": { "light": "#e8ecf1", "dark": "#242a31" },
+    "buttonDangerHover": { "light": "#9c1e15", "dark": "#f49c94" },
+    "buttonDangerActive": { "light": "#861a12", "dark": "#f6b3ac" },
+    "status": {
+      "pending": {
+        "background": { "light": "#eceef1", "dark": "#2a2e35" },
+        "text": { "light": "#3d434c", "dark": "#cdd2da" }
+      },
+      "active": {
+        "background": { "light": "#e3eefa", "dark": "#1a2a3c" },
+        "text": { "light": "#0057a8", "dark": "#7fb2e5" }
+      },
+      "done": {
+        "background": { "light": "#e3f4e8", "dark": "#18291f" },
+        "text": { "light": "#1d6436", "dark": "#7fcf9c" }
+      },
+      "problem": {
+        "background": { "light": "#fcebe9", "dark": "#3a1c1c" },
+        "text": { "light": "#b42318", "dark": "#f28b82" }
+      },
+      "gone": {
+        "background": { "light": "#f3f3f3", "dark": "#22252a" },
+        "text": { "light": "#5a616c", "dark": "#9aa2ad" }
+      }
+    },
+    "speakerTints": {
+      "light": [
+        "#0d559c",
+        "#df1212",
+        "#0b820b",
+        "#b912e3",
+        "#6e4f09",
+        "#952574",
+        "#0a7d7d",
+        "#6858f1",
+        "#d51186",
+        "#18603c",
+        "#7411d6",
+        "#7d710a",
+        "#a51d0d",
+        "#0f75b8",
+        "#a85c2a",
+        "#2135ed",
+        "#085d67",
+        "#4b5b07",
+        "#9b48d1",
+        "#cc3562"
+      ],
+      "dark": [
+        "#79b6f4",
+        "#f57d7d",
+        "#3bb73b",
+        "#db79f4",
+        "#e6a613",
+        "#e699cf",
+        "#39b0b0",
+        "#9f95f7",
+        "#f473c0",
+        "#32ca7e",
+        "#cb9ff7",
+        "#aea234",
+        "#f6998e",
+        "#40a8ee",
+        "#d79060",
+        "#a3acf8",
+        "#11c3d7",
+        "#9bbf0f",
+        "#c08ce2",
+        "#e186a1"
+      ]
+    }
+  },
+  "illustration": {
+    "backdropFrom": { "light": "#FFF6E9", "dark": "#23272e" },
+    "backdropTo": { "light": "#FFDDE8", "dark": "#1b1e23" },
+    "desk": { "light": "#C98B5E", "dark": "#8a5a38" },
+    "deskDeep": { "light": "#A86E45", "dark": "#6e4526" },
+    "deskRim": { "light": "#DDA477", "dark": "#9c6c42" },
+    "chairBack": { "light": "#E17055", "dark": "#b0503f" },
+    "chairSeat": { "light": "#F0846A", "dark": "#cd6b54" },
+    "machineTop": { "light": "#5A6B85", "dark": "#45536c" },
+    "machineFrom": { "light": "#4A5A75", "dark": "#3b4860" },
+    "machineTo": { "light": "#323F55", "dark": "#2e3950" },
+    "machineMetal": { "light": "#9AA9B4", "dark": "#798690" },
+    "machineMetalSoft": { "light": "#B2BEC3", "dark": "#8b98a2" },
+    "machineAccent": { "light": "#55EFC4", "dark": "#3fd9b0" },
+    "key": { "light": "#F5F6FA", "dark": "#d9dee6" },
+    "keyFlash": { "light": "#C9D3DC", "dark": "#97a3b0" },
+    "ink": { "light": "#2D1B3D", "dark": "#45355f" },
+    "inkSoft": { "light": "#4A3560", "dark": "#6a5790" },
+    "skin": { "light": "#E8A87C", "dark": "#f0b48c" },
+    "skinShade": { "light": "#CC8962", "dark": "#cf8a5e" },
+    "skinHighlight": { "light": "#F7D6C0", "dark": "#ffdcc6" },
+    "accentPurple": { "light": "#6C5CE7", "dark": "#8f7fed" },
+    "accentPurpleSoft": { "light": "#A29BFE", "dark": "#b3a9ff" },
+    "accentPink": { "light": "#E84393", "dark": "#f0579f" },
+    "accentYellow": { "light": "#FDCB6E", "dark": "#ffd485" },
+    "accentTeal": { "light": "#00B894", "dark": "#26c99c" },
+    "accentTealDeep": { "light": "#00A383", "dark": "#1fb58c" },
+    "accentBlue": { "light": "#0984E3", "dark": "#3f9df5" },
+    "lampGlow": { "light": "#FFEAA7", "dark": "#FFEAA7" },
+    "lampHot": { "light": "#FFF6D6", "dark": "#FFF6D6" },
+    "cheek": { "light": "#FF7675", "dark": "#ff8a87" }
+  }
+}

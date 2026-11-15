@@ -36,6 +36,13 @@ Otter 5, Descript 6, Amberscript 7).
 | user interface          | 使用者介面                          | Microsoft 2, Apple 3              | `frontend` never appears in the UI                                          |
 | default                 | 預設                                | Microsoft 2, Apple 3              |                                                                             |
 | error                   | 錯誤                                | Google 1                          | `錯誤：{message}`                                                           |
+| filter                  | 篩選                                | Microsoft 2                       | Excel 的篩選；`清除篩選` 表示清除                                           |
+| terminal                | 終端機                              | Apple 3                           | macOS 應用程式的名稱；`終端機指令`                                          |
+| folder                  | 資料夾                              | Apple 3, Microsoft 2              | TUI 檔案瀏覽器中的目錄                                                      |
+| path                    | 路徑                                | Microsoft 2, Apple 3              | `{path}` 是佔位符，不譯                                                     |
+| open                    | 開啟                                | Microsoft 2                       | 選單與按鈕的動詞                                                            |
+| rename                  | 重新命名                            | Microsoft 2                       | `重新命名：{name}`                                                          |
+| key (keyboard)          | 按鍵                                | Apple 3                           | 方括號標示的按鍵保留英文；`[p] 暫停`、`[v] 還原`                            |
 
 This glossary is the Traditional Chinese layer; the Simplified catalog keeps its own terms in
 `docs/glossary/zh-Hans.md`.

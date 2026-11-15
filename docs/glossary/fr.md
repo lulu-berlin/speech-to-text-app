@@ -35,6 +35,9 @@ Apple 5, Otter 6, Descript 7, Amberscript 8).
 | app language | langue de l’application | Google 3 | |
 | default frontend | interface par défaut | Google 3 | `interface`, not the anglicism |
 | embedding / clustering | plongement / regroupement | Amberscript 8 (English terms) | established French technical terms |
+| download | téléchargement | Google 3 | `Télécharger` as the action |
+| revert | rétablir | Google 3 | same word as the web editor's `Rétablir` |
+| key | touche | GNU nano 9 | terminal key labels keep the physical names (`[Enter]`, `[Esc]`) |
 
 ## Gender and culture
 

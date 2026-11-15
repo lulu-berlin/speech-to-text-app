@@ -37,6 +37,11 @@ product's.
 | user interface          | वापरकर्ता इंटरफेस                               | —                           | `frontend` never appears in the UI                         |
 | default                 | डीफॉल्ट                                         | —                           |                                                            |
 | error                   | त्रुटी                                          | —                           | `त्रुटी: {message}`                                        |
+| key (keyboard)          | की                                              | —                           | `[..]` मधील कीचे लेबल बदलत नाही                            |
+| key hint                | की-सूचना                                        | —                           | footer and help की लहान मार्गदर्शक ओळ                       |
+| path                    | पथ                                              | —                           |                                                            |
+| folder                  | फोल्डर                                          | —                           |                                                            |
+| playback                | प्लेबॅक                                         | —                           | प्लेबॅक स्थान, प्लेबॅकचे अनुसरण                             |
 
 This glossary is the Marathi layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/mr.md`).

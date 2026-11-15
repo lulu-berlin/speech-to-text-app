@@ -9,8 +9,8 @@ use std::net::TcpListener;
 
 use stt_client::{ServiceDirs, locate};
 
-#[test]
-fn a_runtime_json_whose_endpoint_does_not_answer_as_the_service_is_ignored() {
+#[tokio::test]
+async fn a_runtime_json_whose_endpoint_does_not_answer_as_the_service_is_ignored() {
     // A crash: the port the leftover names is closed.
     let closed = TcpListener::bind("127.0.0.1:0")
         .unwrap()
@@ -18,7 +18,7 @@ fn a_runtime_json_whose_endpoint_does_not_answer_as_the_service_is_ignored() {
         .unwrap()
         .port();
     let crashed = bootstrap_files(closed);
-    let error = locate(&crashed.dirs()).unwrap_err();
+    let error = locate(&crashed.dirs()).await.unwrap_err();
     assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "{error}");
 
     // Another program took the port: it answers, but refuses the secret as the service never would.
@@ -31,7 +31,7 @@ fn a_runtime_json_whose_endpoint_does_not_answer_as_the_service_is_ignored() {
         request
     });
     let taken = bootstrap_files(port);
-    let error = locate(&taken.dirs()).unwrap_err();
+    let error = locate(&taken.dirs()).await.unwrap_err();
     assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "{error}");
     let request = stand_in.join().unwrap();
     assert!(

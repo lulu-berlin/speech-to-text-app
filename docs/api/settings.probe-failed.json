@@ -9,6 +9,7 @@
   "defaultFrontend": null,
   "terminalCommand": null,
   "appLanguage": null,
+  "themeMode": "auto",
   "availableDevices": ["cpu", "auto"],
   "gpuNames": {},
   "deviceProbeError": "Executable not found: whisper-cli"

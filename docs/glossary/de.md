@@ -36,6 +36,8 @@ Apple 5, Otter 6, Descript 7, Amberscript 8).
 | app language | App-Sprache | Google 3 (`Sprache der App`) | short compound in the field |
 | default | Standard | Google 3 | `Standardsprache`, `Standardeinstellungen` |
 | CPU / GPU | CPU / GPU | Zoom 1 | acronyms unchanged |
+| idle | Leerlauf | — | the TUI header's state with no task running; not `untätig` |
+| revert | zurücksetzen | Zoom 1 | undoing an edit; the transcript edit prompt and its key hint use `Zurücksetzen` |
 
 ## Gender and culture
 

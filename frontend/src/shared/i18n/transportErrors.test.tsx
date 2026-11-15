@@ -40,6 +40,7 @@ describe('the transport error codes', () => {
       speakersCount: null,
       maxSpeakers: 8,
       appLanguage: null,
+      themeMode: 'auto',
     };
     const writeError = await saveSettings(update).catch((error: unknown) => error);
 

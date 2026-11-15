@@ -166,7 +166,7 @@ The schema is [docs/specs/database-schema.md](specs/database-schema.md) (later c
 
 | Part | Path |
 | --- | --- |
-| Migrations | [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/) (`V1__init.sql` … `V9__canonical_audio.sql`, `V11__drop_chunk_audio.sql`, then `V13__segment_original_text.sql` … `V17__terminal_command.sql`) and the class migrations [`V10__BackfillCanonicalClip.kt`](../backend/src/main/kotlin/stt/db/migration/V10__BackfillCanonicalClip.kt) and [`V12__GiveUpUnmigratedTasks.kt`](../backend/src/main/kotlin/stt/db/migration/V12__GiveUpUnmigratedTasks.kt), which `db/Database.kt` registers |
+| Migrations | [`backend/src/main/resources/db/migration/`](../backend/src/main/resources/db/migration/) (`V1__init.sql` … `V9__canonical_audio.sql`, `V11__drop_chunk_audio.sql`, then `V13__segment_original_text.sql` … `V19__theme_mode.sql`) and the class migrations [`V10__BackfillCanonicalClip.kt`](../backend/src/main/kotlin/stt/db/migration/V10__BackfillCanonicalClip.kt) and [`V12__GiveUpUnmigratedTasks.kt`](../backend/src/main/kotlin/stt/db/migration/V12__GiveUpUnmigratedTasks.kt), which `db/Database.kt` registers |
 | Opening the database, pragmas, migrations | [`db/Database.kt`](../backend/src/main/kotlin/stt/db/Database.kt) |
 | The app's scratch directory and its paths | [`db/ScratchDir.kt`](../backend/src/main/kotlin/stt/db/ScratchDir.kt) |
 | Repositories | [`db/TaskRepository.kt`](../backend/src/main/kotlin/stt/db/TaskRepository.kt), [`db/ChunkRepository.kt`](../backend/src/main/kotlin/stt/db/ChunkRepository.kt), [`db/SegmentRepository.kt`](../backend/src/main/kotlin/stt/db/SegmentRepository.kt), [`db/SettingsRepository.kt`](../backend/src/main/kotlin/stt/db/SettingsRepository.kt) |
@@ -239,8 +239,9 @@ and per-install secret in the durable config file, its pid and endpoint in the e
 - **Output.** The service and the tray are detached, so they log to their own files under the
   config directory instead of holding the launching command's output open.
 
-**Where in the code:** the client crate is [`client/stt-client`](../client/stt-client) — the library
-plus the CLI and the tray binaries; the service's side is in [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service)
+**Where in the code:** the client is the Cargo workspace [`client/`](../client) — the library
+[`client/stt-client`](../client/stt-client), the CLI [`client/stt-app`](../client/stt-app) and the tray
+[`client/stt-tray`](../client/stt-tray); the service's side is in [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service)
 and [`backend/src/main/kotlin/stt/http/`](../backend/src/main/kotlin/stt/http).
 
 ## 6. The frontend
@@ -286,5 +287,5 @@ The pages are [docs/specs/frontend-queue-ui.md](specs/frontend-queue-ui.md), [do
 | Backend build | [`backend/build.gradle.kts`](../backend/build.gradle.kts) |
 | Frontend build | [`frontend/package.json`](../frontend/package.json), [`frontend/vite.config.ts`](../frontend/vite.config.ts) |
 | End-to-end suite | [`e2e/tests/`](../e2e/tests/), [`e2e/global-setup.ts`](../e2e/global-setup.ts) |
-| Per-user service and frontends | [`client/stt-client/`](../client/stt-client/), [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service/), [`backend/src/main/kotlin/stt/http/TrayRoutes.kt`](../backend/src/main/kotlin/stt/http/TrayRoutes.kt) |
+| Per-user service and frontends | [`client/`](../client/), [`backend/src/main/kotlin/stt/service/`](../backend/src/main/kotlin/stt/service/), [`backend/src/main/kotlin/stt/http/TrayRoutes.kt`](../backend/src/main/kotlin/stt/http/TrayRoutes.kt) |
 | Continuous verification | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), [`.github/actions/`](../.github/actions/) |
