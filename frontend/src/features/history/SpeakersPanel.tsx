@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
+import { useIntl } from 'react-intl';
 import { useMachine } from '@xstate/react';
 import styled from 'styled-components';
 import type { TurnSpeaker } from '../../shared/api/types';
+import { useErrorText } from '../../shared/i18n/useErrorText';
+import { useMessages } from '../../shared/i18n/useMessages';
 import { useWriteControl } from '../../app/ConnectionContext';
 import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
@@ -37,12 +40,17 @@ const ErrorText = styled(Text)`
   margin: 0;
 `;
 
-// "A", "A and B", "A, B and C": the members folded into the survivor, for the confirmation.
-function joinNames(names: string[]): string {
+// "A", "A and B", "A, B and C" in English, as the catalog reads today; every other locale gets
+// its own conjunction from Intl (zh `A、B和C`, fr `A, B et C`), so the confirmation never shows
+// an English "and" inside a translated sentence.
+function joinNames(names: string[], locale: string): string {
   if (names.length <= 1) {
     return names.join('');
   }
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  if (locale.toLowerCase().startsWith('en')) {
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  }
+  return new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
 }
 
 // The speakers panel above the transcript (item 22): one editable name per effective
@@ -57,6 +65,9 @@ export function SpeakersPanel({
   reassigning,
   onStartReassign,
 }: SpeakersPanelProps) {
+  const t = useMessages();
+  const intl = useIntl();
+  const errorText = useErrorText();
   const [merge, mergeSend] = useMachine(
     speakerMergeMachine.provide({ actions: { merged: () => onMergesChanged() } }),
     { input: { taskId } },
@@ -73,7 +84,7 @@ export function SpeakersPanel({
   const folded = group.filter((speakerId) => speakerId !== into).map(nameOf);
 
   return (
-    <section aria-label="Speakers">
+    <section aria-label={t('transcript.speakers.label')}>
       <Stack gap="sm">
         {speakers.map((speaker) => (
           <SpeakerNameField
@@ -93,7 +104,7 @@ export function SpeakersPanel({
               title={writes.title}
               onClick={onStartReassign}
             >
-              Reassign speakers
+              {t('transcript.speakers.reassign')}
             </Button>
           ) : null}
           {speakers.length >= 2 && merge.matches('closed') ? (
@@ -103,7 +114,7 @@ export function SpeakersPanel({
               disabled={reassigning}
               onClick={() => mergeSend({ type: 'OPEN' })}
             >
-              Merge speakers…
+              {t('transcript.speakers.merge')}
             </Button>
           ) : null}
           {hasMerges ? (
@@ -114,11 +125,13 @@ export function SpeakersPanel({
               title={writes.title}
               onClick={() => resetSend({ type: 'RESET' })}
             >
-              Reset all merges
+              {t('transcript.speakers.resetMerges')}
             </Button>
           ) : null}
         </Row>
-        {reset.context.error !== null ? <ErrorText>{reset.context.error.message}</ErrorText> : null}
+        {reset.context.error !== null ? (
+          <ErrorText>{errorText(reset.context.error)}</ErrorText>
+        ) : null}
         {merge.matches('closed') || reassigning ? null : (
           <Stack gap="xs">
             {speakers.map((speaker) => (
@@ -132,9 +145,9 @@ export function SpeakersPanel({
               </label>
             ))}
             <label>
-              Keep
+              {t('transcript.speakers.keep')}
               <select
-                aria-label="Keep"
+                aria-label={t('transcript.speakers.keep')}
                 value={into === null ? '' : String(into)}
                 onChange={(event) =>
                   mergeSend({ type: 'KEEP', speakerId: Number(event.target.value) })
@@ -154,32 +167,32 @@ export function SpeakersPanel({
                 title={writes.title}
                 onClick={() => mergeSend({ type: 'REQUEST' })}
               >
-                Merge
+                {t('transcript.speakers.mergeAction')}
               </Button>
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => mergeSend({ type: 'CLOSE' })}
               >
-                Close
+                {t('transcript.speakers.close')}
               </Button>
             </Row>
             {merge.context.error !== null ? (
-              <ErrorText>{merge.context.error.message}</ErrorText>
+              <ErrorText>{errorText(merge.context.error)}</ErrorText>
             ) : null}
           </Stack>
         )}
       </Stack>
       <ConfirmDialog
         open={!reassigning && (merge.matches('confirming') || merge.matches('sending'))}
-        title="Merge speakers?"
-        confirmLabel="Merge"
+        title={t('transcript.speakers.mergeTitle')}
+        confirmLabel={t('transcript.speakers.mergeAction')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
         onConfirm={() => mergeSend({ type: 'CONFIRM' })}
         onCancel={() => mergeSend({ type: 'CANCEL' })}
       >
-        Merge {joinNames(folded)} into {survivor}? Their turns join {survivor}; you can undo this.
+        {t('transcript.speakers.mergeBody', { names: joinNames(folded, intl.locale), survivor })}
       </ConfirmDialog>
     </section>
   );
@@ -194,6 +207,8 @@ interface SpeakerNameFieldProps {
 }
 
 function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: SpeakerNameFieldProps) {
+  const t = useMessages();
+  const errorText = useErrorText();
   const [state, send] = useMachine(
     speakerRenameMachine.provide({
       actions: { renamed: (_, result) => onSpeakersChanged(result.speakers) },
@@ -212,7 +227,7 @@ function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: Spea
       <Row gap="sm">
         <NameInput
           type="text"
-          aria-label={`Name of speaker ${speaker.speakerId + 1}`}
+          aria-label={t('transcript.speakers.nameLabel', { number: speaker.speakerId + 1 })}
           value={state.context.draft}
           disabled={disabled || state.matches('sending') || writes.disabled}
           title={writes.title}
@@ -227,15 +242,19 @@ function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: Spea
         <Button
           type="button"
           variant="secondary"
-          aria-label={`Reset name of speaker ${speaker.speakerId + 1}`}
+          aria-label={t('transcript.speakers.resetNameLabel', {
+            number: speaker.speakerId + 1,
+          })}
           disabled={disabled || !state.can({ type: 'RESET' }) || writes.disabled}
           title={writes.title}
           onClick={() => send({ type: 'RESET' })}
         >
-          Reset name
+          {t('transcript.speakers.resetName')}
         </Button>
       </Row>
-      {state.context.error !== null ? <ErrorText>{state.context.error.message}</ErrorText> : null}
+      {state.context.error !== null ? (
+        <ErrorText>{errorText(state.context.error)}</ErrorText>
+      ) : null}
     </Stack>
   );
 }

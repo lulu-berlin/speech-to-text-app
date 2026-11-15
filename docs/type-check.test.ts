@@ -63,9 +63,13 @@ test('a type error in a documentation check fails the package type check', () =>
     breakCheck(root);
     const broken = typeCheck(root);
     assert.notEqual(broken.status, 0, 'the planted type errors fail the type check');
-    assert.match(broken.output, /check-links\.ts\(\d+,\d+\): error TS2322/);
-    assert.match(broken.output, /Type 'string' is not assignable to type 'number'/);
-    assert.match(broken.output, /Type 'string \| undefined' is not assignable to type 'string'/);
+    // tsc 7 colours and formats its diagnostics differently when its output is colour-enabled
+    // (`check-links.ts:91:7 - error TS2322`) and when it is not (`check-links.ts(91,7): error
+    // TS2322`); the assertion reads either, once the escape codes are gone.
+    const plain = broken.output.replace(/\x1b\[[0-9;]*m/g, '');
+    assert.match(plain, /check-links\.ts[:(]\d+[,:]\d+\)?[^\n]*error TS2322/);
+    assert.match(plain, /Type 'string' is not assignable to type 'number'/);
+    assert.match(plain, /Type 'string \| undefined' is not assignable to type 'string'/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

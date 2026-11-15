@@ -86,7 +86,9 @@ test('a type error in an e2e spec fails the package type check', () => {
     breakSpec(root);
     const broken = typeCheck(root);
     assert.notEqual(broken.status, 0, 'the planted type errors fail the type check');
-    assert.match(broken.output, /03-upload-queue\.spec\.ts\(\d+,\d+\): error TS2322/);
+    // TypeScript 7's pretty reporter prints `path:line:col - error TS…` (with colour codes);
+    // the file and the code are the evidence, not the reporter's exact punctuation.
+    assert.match(broken.output, /03-upload-queue\.spec\.ts[^\n]*TS2322/);
     assert.match(broken.output, /Type 'string' is not assignable to type 'number'/);
     assert.match(broken.output, /Type 'string \| undefined' is not assignable to type 'string'/);
   } finally {

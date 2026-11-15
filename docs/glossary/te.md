@@ -1,0 +1,42 @@
+# Telugu (te) — glossary
+
+The term evidence is recorded in `docs/reviews/te.md`; this is the shared vocabulary. Google's account page and Apple's
+`te-in` support articles are fully Telugu, so a row records their wording where the same word
+appears there, Google first where both use it; a `—` means the term is the neutral Telugu word,
+not a product's.
+
+| English                 | Telugu                                                          | Evidence                | Note                                                        |
+| ----------------------- | --------------------------------------------------------------- | ----------------------- | ----------------------------------------------------------- |
+| transcript              | ట్రాన్స్క్రిప్ట్                                                | —                       | the result; the process is `ట్రాన్స్క్రిప్షన్`              |
+| transcription           | ట్రాన్స్క్రిప్షన్                                               | —                       |                                                             |
+| queue                   | క్యూ                                                            | —                       |                                                             |
+| task                    | టాస్క్                                                          | —                       | neuter in agreement                                         |
+| upload                  | అప్లోడ్                                                         | —                       |                                                             |
+| download                | డౌన్లోడ్                                                        | Apple 3: „డౌన్లోడ్“     |                                                             |
+| settings                | సెట్టింగ్లు                                                     | Google 1: „సెట్టింగ్లు“ |                                                             |
+| history                 | చరిత్ర                                                          | —                       |                                                             |
+| device                  | డివైజ్                                                          | Apple 3: „డివైజ్“       |                                                             |
+| file                    | ఫైల్                                                            | Apple 3: „ఫైల్స్“       | Apple's page uses the plural; the catalog uses the singular |
+| threads                 | థ్రెడ్లు                                                        | —                       | technical noun                                              |
+| speaker(s)              | వక్త / వక్తలు                                                   | —                       | common gender; the voice's source, never the reader         |
+| speakers (count)        | వక్తల సంఖ్య                                                     | —                       |                                                             |
+| max speakers            | గరిష్ఠ వక్తలు                                                   | —                       |                                                             |
+| speaker mode            | వక్తల గుర్తింపు                                                 | —                       | descriptive noun phrase                                     |
+| diarization             | వక్తల గుర్తింపు                                                 | —                       |                                                             |
+| queue phases            | ఆడియో విభజన / ట్రాన్స్క్రిప్షన్ / వక్తల గుర్తింపు               | —                       | nouns after the label                                       |
+| transcript phases       | ఆడియో విభజన / ట్రాన్స్క్రిప్షన్ / వక్తల గుర్తింపు / ప్రాసెసింగ్ | —                       | `{phase} సమయంలో {outcome}`; with a position `{time} వద్ద …` |
+| turn                    | మాట                                                             | —                       | a speaker's utterance                                       |
+| segment                 | విభాగం                                                          | —                       |                                                             |
+| play / pause            | ప్లే చేయండి / పాజ్ చేయండి                                       | —                       | respectful plural imperative, no grammatical gender         |
+| seek                    | ప్లేబ్యాక్ స్థానం                                               | —                       | the slider's label, not a command                           |
+| merge                   | విలీనం చేయండి / విలీనం                                          | —                       | verb and its action noun                                    |
+| reassign                | వక్తను మార్చండి                                                 | —                       | change the speaker of the segments                          |
+| save / discard          | సేవ్ చేయండి / విస్మరించండి                                      | —                       | editor shortcuts S and D                                    |
+| retry / cancel / delete | మళ్లీ ప్రయత్నించండి / రద్దు చేయండి / తొలగించండి                 | Apple 3: „తొలగించండి“   |                                                             |
+| connection              | కనెక్షన్ / కనెక్ట్ అయింది                                       | —                       | `కనెక్ట్ అయింది` for the live badge                         |
+| user interface          | యూజర్ ఇంటర్ఫేస్                                                 | —                       | `frontend` never appears in the UI                          |
+| default                 | డిఫాల్ట్                                                        | —                       |                                                             |
+| error                   | లోపం                                                            | —                       | `లోపం: {message}`                                           |
+
+This glossary is the Telugu layer; the same neutrality rule as the other locales applies (see
+`docs/style-guides/te.md`).

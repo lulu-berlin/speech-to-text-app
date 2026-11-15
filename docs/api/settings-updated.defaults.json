@@ -7,5 +7,6 @@
   "maxSpeakers": 8,
   "deviceFallback": null,
   "defaultFrontend": null,
-  "terminalCommand": null
+  "terminalCommand": null,
+  "appLanguage": null
 }

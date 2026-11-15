@@ -138,7 +138,7 @@ test('the settings write fields wait for the connection while the service is fro
   await appLive(page);
   await page.getByRole('navigation').getByRole('link', { name: 'Settings' }).click();
 
-  const frontend = page.getByRole('combobox', { name: 'Default frontend' });
+  const frontend = page.getByRole('combobox', { name: 'Default user interface' });
   const terminal = page.getByRole('textbox', { name: 'Terminal command' });
   await expect(frontend).toBeEnabled();
   await expect(terminal).toBeEnabled();

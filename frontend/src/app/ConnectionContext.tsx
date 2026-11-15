@@ -1,4 +1,5 @@
 import { createActorContext } from '@xstate/react';
+import { useIntl } from 'react-intl';
 import { connectionMachine } from '../shared/state/connectionMachine';
 
 // One connection to GET /api/events for the whole app. The provider is rendered by App,
@@ -6,16 +7,17 @@ import { connectionMachine } from '../shared/state/connectionMachine';
 export const ConnectionContext = createActorContext(connectionMachine);
 
 // What a disabled write control says (item 87): the header's "Reconnecting" is the banner,
-// this is the control's own explanation. "Service", never "backend", in what a user reads.
-export const WRITES_UNAVAILABLE = "Can't reach the app's service. Reconnecting…";
+// this is the control's own explanation, read from the catalog so every locale sees its own
+// sentence. "Service", never "backend", in what a user reads.
 
 // One notion of "writes enabled" (item 87): true only while the live stream is up, so no
 // panel carries its own copy of the check. A control that writes adds `writes.disabled` to
 // its own disabled state and shows `writes.title`; reading and local interaction do not
 // consult it.
 export function useWriteControl(): { disabled: boolean; title: string | undefined } {
+  const intl = useIntl();
   const live = ConnectionContext.useSelector((state) => state.matches('live'));
   return live
     ? { disabled: false, title: undefined }
-    : { disabled: true, title: WRITES_UNAVAILABLE };
+    : { disabled: true, title: intl.formatMessage({ id: 'error.transport-read' }) };
 }

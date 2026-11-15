@@ -1,3 +1,4 @@
+import { useIntl } from 'react-intl';
 import { keyframes, styled } from 'styled-components';
 import { ProgressFill, ProgressRow, ProgressTrack, ProgressValue } from './progressParts';
 
@@ -17,7 +18,7 @@ const IndeterminateFill = styled.div`
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  inset-inline-start: 0;
   width: 40%;
   background: ${(props) => props.theme.colors.accent};
 
@@ -27,7 +28,7 @@ const IndeterminateFill = styled.div`
   }
 
   @media (prefers-reduced-motion: reduce) {
-    left: 30%;
+    inset-inline-start: 30%;
   }
 `;
 
@@ -45,13 +46,14 @@ export interface ProgressBarProps {
 }
 
 // The transcription progress: a token track with an accent fill, its percentage as small
-// muted text to the right of the track (item 25).
+// muted text at the inline end of the track (item 25).
 export function ProgressBar({
   value,
   label,
   indeterminate = false,
   showValue = true,
 }: ProgressBarProps) {
+  const intl = useIntl();
   const percent = Math.round(value * 100);
   return (
     <ProgressRow>
@@ -64,7 +66,9 @@ export function ProgressBar({
       >
         {indeterminate ? <IndeterminateFill /> : <ProgressFill $value={value} />}
       </ProgressTrack>
-      {indeterminate || !showValue ? null : <ProgressValue>{percent}%</ProgressValue>}
+      {indeterminate || !showValue ? null : (
+        <ProgressValue>{intl.formatNumber(value, { style: 'percent' })}</ProgressValue>
+      )}
     </ProgressRow>
   );
 }

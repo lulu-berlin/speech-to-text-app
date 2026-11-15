@@ -24,13 +24,18 @@ data class Settings(
      * the OS launcher.
      */
     val terminalCommand: String? = null,
+    /**
+     * The app's own language (roadmap item 88), apart from [defaultLanguage] (the transcription language): null
+     * follows the system's language when it is one of the shipped UI locales, and English otherwise.
+     */
+    val appLanguage: String? = null,
 )
 
 /**
  * The defaults `V6__settings.sql` seeds and `DELETE /api/settings` restores (roadmap item 72, ADR 0062): auto,
- * whisper's and the speaker model's own thread count (null), auto-detect, auto speakers, 8 max speakers, and no
- * CPU-fallback notice. Changing a default requires the migration and this constant together; the reset route spec
- * pins these values.
+ * whisper's and the speaker model's own thread count (null), auto-detect, auto speakers, 8 max speakers, no
+ * CPU-fallback notice, and the system's app language (null). Changing a default requires the migration and this
+ * constant together; the reset route spec pins these values.
  */
 val DEFAULT_SETTINGS =
     Settings(
@@ -40,4 +45,5 @@ val DEFAULT_SETTINGS =
         speakersMode = SpeakersMode.AUTO,
         speakersCount = null,
         defaultMaxSpeakers = 8,
+        appLanguage = null,
     )

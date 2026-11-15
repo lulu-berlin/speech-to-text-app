@@ -16,13 +16,13 @@ export const ProgressFill = styled.div<{ $value: number }>`
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  inset-inline-start: 0;
   width: ${(props) => props.$value * 100}%;
   background: ${(props) => props.theme.colors.accent};
 `;
 
 // The row a bar's track sits in: the track grows, the value (a percentage or a stage
-// label) hugs the right edge, in the small muted text style (item 25).
+// label) hugs the inline end, in the small muted text style (item 25).
 export const ProgressRow = styled.div`
   display: flex;
   align-items: center;

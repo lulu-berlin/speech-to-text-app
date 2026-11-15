@@ -1,6 +1,7 @@
 import { useMachine } from '@xstate/react';
 import { styled } from 'styled-components';
 import { languages } from '../../shared/api/fixtures';
+import { useMessages } from '../../shared/i18n/useMessages';
 import { toggleMachine } from '../../shared/state/toggleMachine';
 import { controlStyle } from '../../shared/ui/controlStyle';
 import { Field } from '../../shared/ui/Field';
@@ -17,12 +18,16 @@ const LANGUAGE_OPTIONS = languages.languages.map((language) => ({
   label: language.name,
 }));
 
-const SPEAKERS_CHOICES = ['auto', 'off', 'fixed'] as const;
+const SPEAKERS_CHOICES = [
+  { value: 'auto', labelId: 'queue.speakers.auto' },
+  { value: 'off', labelId: 'queue.speakers.off' },
+  { value: 'fixed', labelId: 'queue.speakers.fixed' },
+] as const;
 
-export type SpeakersChoice = (typeof SPEAKERS_CHOICES)[number];
+export type SpeakersChoice = (typeof SPEAKERS_CHOICES)[number]['value'];
 
 function isSpeakersChoice(value: string): value is SpeakersChoice {
-  return (SPEAKERS_CHOICES as readonly string[]).includes(value);
+  return SPEAKERS_CHOICES.some((choice) => choice.value === value);
 }
 
 // The count inputs accept 1–20 only (item 12 contract): anything else is clamped, and a
@@ -64,6 +69,7 @@ export function UploadOptionsPanel({
   maxSpeakers,
   onMaxSpeakersChange,
 }: UploadOptionsPanelProps) {
+  const t = useMessages();
   const [disclosure, sendDisclosure] = useMachine(toggleMachine);
   const [advanced, sendAdvanced] = useMachine(toggleMachine);
   return (
@@ -72,20 +78,20 @@ export function UploadOptionsPanel({
         aria-expanded={disclosure.matches('open')}
         onClick={() => sendDisclosure({ type: 'TOGGLE' })}
       >
-        Upload options
+        {t('queue.uploadOptions')}
       </TextButton>
       {disclosure.matches('open') ? (
         <Stack gap="md">
-          <Field label="Language" htmlFor="language">
+          <Field label={t('queue.language')} htmlFor="language">
             <SearchableSelect
               id="language"
-              label="Language"
+              label={t('queue.language')}
               options={LANGUAGE_OPTIONS}
               value={language}
               onChange={onLanguageChange}
             />
           </Field>
-          <Field label="Speakers" htmlFor="speakers">
+          <Field label={t('queue.speakers')} htmlFor="speakers">
             <Select
               id="speakers"
               value={speakers}
@@ -96,13 +102,15 @@ export function UploadOptionsPanel({
                 }
               }}
             >
-              <option value="auto">auto</option>
-              <option value="off">off</option>
-              <option value="fixed">fixed</option>
+              {SPEAKERS_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {t(choice.labelId)}
+                </option>
+              ))}
             </Select>
           </Field>
           {speakers === 'fixed' ? (
-            <Field label="Speaker count" htmlFor="speaker-count">
+            <Field label={t('queue.speakerCount')} htmlFor="speaker-count">
               <NumberInput
                 id="speaker-count"
                 type="number"
@@ -119,10 +127,10 @@ export function UploadOptionsPanel({
             aria-expanded={advanced.matches('open')}
             onClick={() => sendAdvanced({ type: 'TOGGLE' })}
           >
-            Advanced
+            {t('queue.advanced')}
           </TextButton>
           {advanced.matches('open') ? (
-            <Field label="Max speakers" htmlFor="max-speakers">
+            <Field label={t('queue.maxSpeakers')} htmlFor="max-speakers">
               <NumberInput
                 id="max-speakers"
                 type="number"

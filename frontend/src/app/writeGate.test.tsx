@@ -12,10 +12,13 @@ import {
   turns as turnsFixture,
 } from '../shared/api/fixtures';
 import { server } from '../test/server';
+import de from '../locales/de.json';
+import en from '../locales/en.json';
 import { App } from './App';
 
-// The reason every write control names while the connection is not live (item 87).
-const WRITES_UNAVAILABLE = "Can't reach the app's service. Reconnecting…";
+// The reason every write control names while the connection is not live (item 87), read from the
+// English catalog so a wording change keeps the test pointing at the shipped text.
+const WRITES_UNAVAILABLE = en['error.transport-read'];
 
 function renderAt(path: string) {
   return render(
@@ -177,7 +180,7 @@ describe('writes wait for the connection', () => {
       await screen.findByLabelText('Device'),
       screen.getByLabelText('Threads'),
       screen.getByRole('combobox', { name: 'Language' }),
-      screen.getByRole('combobox', { name: 'Default frontend' }),
+      screen.getByRole('combobox', { name: 'Default user interface' }),
       screen.getByRole('textbox', { name: 'Terminal command' }),
       screen.getByLabelText('Speakers'),
       screen.getByLabelText('Max speakers'),
@@ -663,4 +666,19 @@ describe('writes wait for the connection', () => {
     expect(screen.queryByText('a.mp3')).not.toBeInTheDocument();
     expect(attempts).toBe(1);
   }, 20_000);
+});
+
+describe('the write gate in another language', () => {
+  it('names why in the app language, not in English', async () => {
+    const stream = openEventStream(snapshotFixture);
+    server.use(
+      http.get('/api/settings', () =>
+        HttpResponse.json({ ...settingsFallback, appLanguage: 'de' }),
+      ),
+    );
+    renderAt('/queue');
+    const dropZone = await screen.findByRole('button', { name: de['queue.drop.compact'] });
+    stream.drop();
+    await waitFor(() => expect(dropZone).toHaveAttribute('title', de['error.transport-read']));
+  });
 });

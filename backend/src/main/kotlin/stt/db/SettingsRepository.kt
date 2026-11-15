@@ -28,6 +28,7 @@ class SettingsRepository(
                 deviceFallback = row[SettingsTable.deviceFallback]?.let { parseStoredDevice(it) },
                 defaultFrontend = row[SettingsTable.defaultFrontend],
                 terminalCommand = row[SettingsTable.terminalCommand],
+                appLanguage = row[SettingsTable.appLanguage],
             )
         }
 
@@ -45,6 +46,7 @@ class SettingsRepository(
                 it[SettingsTable.deviceFallback] = settings.deviceFallback?.dbValue()
                 it[SettingsTable.defaultFrontend] = settings.defaultFrontend
                 it[SettingsTable.terminalCommand] = settings.terminalCommand
+                it[SettingsTable.appLanguage] = settings.appLanguage
             }
         }
     }

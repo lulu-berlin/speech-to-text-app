@@ -1,10 +1,11 @@
+import { useMessages } from '../shared/i18n/useMessages';
 import { LoadingState } from '../shared/ui/LoadingState';
 import { ConnectionContext } from './ConnectionContext';
 
 // The label follows the connection state: the first snapshot, or a drop (item 17).
-const REGION_LABEL = {
-  connecting: 'Connecting…',
-  reconnecting: 'Reconnecting…',
+const REGION_LABEL_ID = {
+  connecting: 'app.connecting',
+  reconnecting: 'app.reconnecting',
 } as const;
 
 // The app's loading region (item 17): until the first snapshot arrives — and again while
@@ -12,9 +13,10 @@ const REGION_LABEL = {
 // mascot above a short label). It reads the state inside the connection provider, so it
 // is its own component.
 export function ConnectingRegion() {
+  const t = useMessages();
   const state = ConnectionContext.useSelector((state) => state.value);
   if (state === 'live') {
     return null;
   }
-  return <LoadingState label={REGION_LABEL[state]} />;
+  return <LoadingState label={t(REGION_LABEL_ID[state])} />;
 }

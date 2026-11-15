@@ -14,6 +14,8 @@ import type { SpeakersChoice } from './UploadOptionsPanel';
 import { TextLink } from '../../shared/ui/TextLink';
 import type { UploadOptions } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
+import { useErrorText } from '../../shared/i18n/useErrorText';
+import { useMessages } from '../../shared/i18n/useMessages';
 import { finishedStatus, pendingStatus } from '../../shared/api/types';
 import type { Settings, Task, TaskStatus } from '../../shared/api/types';
 import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
@@ -21,7 +23,6 @@ import { finishNoticeMachine } from './finishNoticeMachine';
 import { dropZoneMachine } from './dropZoneMachine';
 import { DeviceFallbackBanner } from './DeviceFallbackBanner';
 import type { FinishNotice } from './finishNoticeMachine';
-import { errorMessage } from '../../shared/errorMessage';
 import { ErrorCallout } from '../../shared/ui/ErrorCallout';
 import { focusRing } from '../../shared/ui/focusRing';
 import { List } from '../../shared/ui/List';
@@ -73,11 +74,12 @@ const EmptyZoneContent = styled.span`
 // queue is empty, so the piece is charm, not a running signal) or the compact line. The
 // mascot stays while dragging over the empty state.
 function DropZoneContent({ empty, over }: { empty: boolean; over: boolean }) {
+  const t = useMessages();
   const label = over
-    ? 'Release to upload'
+    ? t('queue.drop.release')
     : empty
-      ? 'No tasks yet — drop audio files here, or click to choose them'
-      : 'Drop audio files here or click to choose';
+      ? t('queue.drop.empty')
+      : t('queue.drop.compact');
   if (!empty) {
     return label;
   }
@@ -132,9 +134,11 @@ function duplicateTarget(tasks: Task[], taskId: number): string {
 // The inline error of a duplicate upload: "Already uploaded" with a link to the existing
 // task (item 14).
 function DuplicateNotice({ taskId, tasks }: { taskId: number; tasks: Task[] }) {
+  const t = useMessages();
   return (
     <RowError>
-      Already uploaded — <TextLink to={duplicateTarget(tasks, taskId)}>open</TextLink>
+      {t('queue.duplicate')}{' '}
+      <TextLink to={duplicateTarget(tasks, taskId)}>{t('queue.open')}</TextLink>
     </RowError>
   );
 }
@@ -142,17 +146,21 @@ function DuplicateNotice({ taskId, tasks }: { taskId: number; tasks: Task[] }) {
 // One finished task's notice: "... transcribed — open" (to its transcript) or
 // "... failed/canceled — see History" (item 16).
 function FinishNoticeLine({ notice }: { notice: FinishNotice }) {
+  const t = useMessages();
   if (notice.status === 'COMPLETED') {
     return (
       <span>
-        {notice.filename} transcribed — <TextLink to={`/history/${notice.id}`}>open</TextLink>
+        {t('queue.finished.completed', { filename: notice.filename })}{' '}
+        <TextLink to={`/history/${notice.id}`}>{t('queue.open')}</TextLink>
       </span>
     );
   }
   return (
     <span>
-      {notice.filename} {notice.status === 'FAILED' ? 'failed' : 'canceled'} —{' '}
-      <TextLink to="/history">see History</TextLink>
+      {t(notice.status === 'FAILED' ? 'queue.finished.failed' : 'queue.finished.canceled', {
+        filename: notice.filename,
+      })}{' '}
+      <TextLink to="/history">{t('queue.seeHistory')}</TextLink>
     </span>
   );
 }
@@ -169,10 +177,15 @@ function UploadRowTrailing({
   tasks: Task[];
   waiting: boolean;
 }) {
+  const t = useMessages();
+  const errorText = useErrorText();
   if (row.status === 'uploading') {
     return (
       <UploadProgress>
-        <ProgressBar value={row.progress} label={`Uploading ${row.file.name}`} />
+        <ProgressBar
+          value={row.progress}
+          label={t('queue.upload.uploading', { filename: row.file.name })}
+        />
       </UploadProgress>
     );
   }
@@ -180,12 +193,14 @@ function UploadRowTrailing({
     return row.duplicateTaskId !== undefined ? (
       <DuplicateNotice taskId={row.duplicateTaskId} tasks={tasks} />
     ) : (
-      <RowError>{row.error}</RowError>
+      <RowError>{row.error === null ? '' : errorText(row.error)}</RowError>
     );
   }
   return (
     <RowStatus>
-      {waiting && row.status === 'queued' ? 'Waiting for the connection…' : row.status}
+      {waiting && row.status === 'queued'
+        ? t('queue.upload.waiting')
+        : t(row.status === 'done' ? 'queue.upload.done' : 'queue.upload.queued')}
     </RowStatus>
   );
 }
@@ -194,6 +209,8 @@ function UploadRowTrailing({
 type BatchOption = 'language' | 'speakersMode' | 'speakersCount' | 'maxSpeakers';
 
 export function QueueView() {
+  const t = useMessages();
+  const errorText = useErrorText();
   const connection = ConnectionContext.useActorRef();
   const { tasks, queue } = ConnectionContext.useSelector((state) => state.context);
   const writes = useWriteControl();
@@ -369,7 +386,7 @@ export function QueueView() {
   return (
     <Page>
       <Stack gap="lg">
-        <PageHeading>Queue</PageHeading>
+        <PageHeading>{t('queue.title')}</PageHeading>
         <DeviceFallbackBanner />
         {notices.context.notices.length > 0 ? (
           <Stack gap="sm">
@@ -422,7 +439,7 @@ export function QueueView() {
           }}
         />
         {visibleRows.length > 0 ? (
-          <List label="Uploads">
+          <List label={t('queue.uploads')}>
             {visibleRows.map((row) => (
               <ListRow key={row.id}>
                 <RowContent>
@@ -434,11 +451,11 @@ export function QueueView() {
           </List>
         ) : null}
         <Row gap="sm">
-          <span>Pause the queue</span>
+          <span>{t('queue.pause')}</span>
           <Switch
             checked={queue?.paused ?? false}
             onCheckedChange={() => sendPause({ type: 'TOGGLE', paused: !(queue?.paused ?? false) })}
-            label="Pause the queue"
+            label={t('queue.pause')}
             disabled={pause.matches('sending') || writes.disabled}
             title={writes.title}
           />
@@ -446,17 +463,15 @@ export function QueueView() {
         {pause.context.error !== null ? (
           <ErrorCallout
             title={
-              pause.context.attempted === true
-                ? 'Could not pause the queue'
-                : 'Could not resume the queue'
+              pause.context.attempted === true ? t('queue.pauseFailed') : t('queue.resumeFailed')
             }
-            detail={errorMessage(pause.context.error)}
+            detail={errorText(pause.context.error)}
           />
         ) : null}
         {pendingTasks.length > 0 ? (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <SortableContext items={reorder.context.order} strategy={verticalListSortingStrategy}>
-              <List label="Pending tasks">
+              <List label={t('queue.pendingTasks')}>
                 {pendingTasks.map((task, index) => (
                   <SortableTaskRow
                     key={task.id}
@@ -471,7 +486,7 @@ export function QueueView() {
           </DndContext>
         ) : null}
         {reorder.context.error !== null ? (
-          <ReorderError>{reorder.context.error}</ReorderError>
+          <ReorderError>{errorText(reorder.context.error)}</ReorderError>
         ) : null}
       </Stack>
     </Page>

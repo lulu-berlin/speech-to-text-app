@@ -9,6 +9,9 @@ import { focusRing } from './focusRing';
 export interface SearchableSelectOption {
   value: string;
   label: string;
+  // Extra text the filter matches besides the value and the label (roadmap item 88: a UI
+  // locale's English name, so a locale is findable by code, English name and native name).
+  keywords?: string[];
 }
 
 export interface SearchableSelectProps {
@@ -100,9 +103,11 @@ export function SearchableSelect({
     if (needle === '') {
       return options;
     }
-    return options.filter(
-      (option) =>
-        option.label.toLowerCase().includes(needle) || option.value.toLowerCase().includes(needle),
+    return options.filter((option) =>
+      [option.label, option.value, ...(option.keywords ?? [])]
+        .join(' ')
+        .toLowerCase()
+        .includes(needle),
     );
   }, [options, query]);
 

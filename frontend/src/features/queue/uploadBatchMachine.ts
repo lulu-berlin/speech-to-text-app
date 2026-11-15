@@ -22,7 +22,7 @@ export interface UploadRow {
   status: 'queued' | 'uploading' | 'done' | 'error';
   // Upload progress 0..1 while uploading (bytes sent).
   progress: number;
-  error: string | null;
+  error: ApiError | null;
   // The task a successful upload created; the row leaves once it is in the live state.
   taskId?: number;
   // The existing task a duplicate upload names; the row links to it.
@@ -42,7 +42,7 @@ interface UploadBatchContext {
   live: boolean;
   // The app's message of a request that failed at the transport while the stream stayed live
   // (item 87's second review): published as the row's error after the grace.
-  stalledError: string | null;
+  stalledError: ApiError | null;
 }
 
 type UploadEvent =
@@ -53,7 +53,7 @@ type UploadEvent =
   | { type: 'UPLOAD_DUP'; id: number; duplicateTaskId: number }
   // `transport` marks a request that never reached the service (item 87): the row waits and
   // is sent again when the live stream returns, instead of becoming an error row.
-  | { type: 'UPLOAD_ERROR'; id: number; message: string; transport: boolean };
+  | { type: 'UPLOAD_ERROR'; id: number; error: ApiError; transport: boolean };
 
 function inFlightRow(rows: UploadRow[]): UploadRow {
   const row = rows.find((candidate) => candidate.status === 'uploading');
@@ -112,7 +112,7 @@ export const uploadBatchMachine = setup({
           sendBack({
             type: 'UPLOAD_ERROR',
             id: input.row.id,
-            message: errorMessage(error),
+            error: error instanceof ApiError ? error : new ApiError('unknown', errorMessage(error)),
             transport: isTransportError(error),
           });
         },
@@ -138,7 +138,7 @@ export const uploadBatchMachine = setup({
           options,
           status: supported ? ('queued' as const) : ('error' as const),
           progress: 0,
-          error: supported ? null : 'Unsupported file format',
+          error: supported ? null : new ApiError('unsupported-format', 'Unsupported file format'),
         };
       });
       return { rows: [...context.rows, ...created], nextId: context.nextId + event.files.length };
@@ -180,9 +180,7 @@ export const uploadBatchMachine = setup({
       rows: ({ context, event }) =>
         event.type === 'UPLOAD_ERROR'
           ? context.rows.map((row) =>
-              row.id === event.id
-                ? { ...row, status: 'error' as const, error: event.message }
-                : row,
+              row.id === event.id ? { ...row, status: 'error' as const, error: event.error } : row,
             )
           : context.rows,
     }),
@@ -190,7 +188,7 @@ export const uploadBatchMachine = setup({
       live: ({ context, event }) => (event.type === 'CONNECTION' ? event.live : context.live),
     }),
     rememberError: assign({
-      stalledError: ({ event }) => (event.type === 'UPLOAD_ERROR' ? event.message : null),
+      stalledError: ({ event }) => (event.type === 'UPLOAD_ERROR' ? event.error : null),
     }),
     // The stream stayed live through the grace: the cut-off row is an error with the app's
     // message, and the batch behind it goes on.

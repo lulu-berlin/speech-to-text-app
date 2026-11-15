@@ -164,6 +164,10 @@ export interface Settings {
   // The command line of the terminal the TUI opens in (roadmap item 66, D10), replacing the OS
   // launcher; null uses the OS launcher.
   terminalCommand: string | null;
+  // The app's own language (roadmap item 88): a shipped UI locale, or null to follow the
+  // system's language when it is shipped (and English otherwise). Kept apart from
+  // defaultLanguage, which is the transcription language.
+  appLanguage: string | null;
   availableDevices: string[];
   // The probe's name for each offered GPU, keyed by `gpu:<index>` (`{}` without a GPU); the
   // Settings page labels each GPU with it. Fixed by the startup probe, so it is not in
@@ -232,19 +236,19 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// The code of a request that never reached the service (item 87): `0` stands in for the absent
-// HTTP status.
-export const TRANSPORT_ERROR_CODE = '0';
+// The codes of a request that never reached the service (item 87): a read and a write have
+// their own, so the catalog says "Not saved" only for a write.
+export const TRANSPORT_READ_ERROR_CODE = 'transport-read';
+export const TRANSPORT_WRITE_ERROR_CODE = 'transport-write';
 
 // Whether a thrown value is the app's "never reached the service" error (item 87): the one
 // predicate the upload batch and the message helpers share.
 export function isTransportError(error: unknown): error is ApiError {
-  return error instanceof ApiError && error.code === TRANSPORT_ERROR_CODE;
+  return (
+    error instanceof ApiError &&
+    (error.code === TRANSPORT_READ_ERROR_CODE || error.code === TRANSPORT_WRITE_ERROR_CODE)
+  );
 }
 
-// The line a row shows for a failed write: the app's transport message already says "Not saved",
-// so the row's own "Retry failed:"/"Delete failed:" prefix would double it; a server answer keeps
-// the row's prefix.
-export function failureMessage(prefix: string, error: unknown): string {
-  return isTransportError(error) ? errorMessage(error) : `${prefix}: ${errorMessage(error)}`;
-}
+// The failure line moved to `shared/i18n/useErrorText.ts` (`failureLine`), where it is read from
+// the catalog; `isTransportError` stays the one predicate the upload batch and that line share.

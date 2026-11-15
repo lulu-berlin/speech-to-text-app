@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useIntl } from 'react-intl';
 import { MoreVertical } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
@@ -6,7 +7,8 @@ import styled from 'styled-components';
 import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
 import { editSegment, revertSegment } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
-import { errorMessage, failureMessage } from '../../shared/api/types';
+import { failureLine, useErrorText } from '../../shared/i18n/useErrorText';
+import { useMessages } from '../../shared/i18n/useMessages';
 import type { Segment, Task, TaskPhase, Turn, Turns } from '../../shared/api/types';
 import { Page, Row, Stack } from '../../shared/ui/layout';
 import { MetaText, PageHeading, Text } from '../../shared/ui/typography';
@@ -33,15 +35,11 @@ import { SpeakersPanel } from './SpeakersPanel';
 import { speakerReassignMachine } from './speakerReassignMachine';
 
 // The plain-word form of a running phase, for "Failed/Canceled while <phase>".
-const PHASE_WORDS: Record<Exclude<TaskPhase, null>, string> = {
-  CHUNKING: 'chunking',
-  TRANSCRIBING: 'transcribing',
-  DIARIZING: 'diarizing',
+const PHASE_ID: Record<Exclude<TaskPhase, null>, string> = {
+  CHUNKING: 'transcript.phase.chunking',
+  TRANSCRIBING: 'transcript.phase.transcribing',
+  DIARIZING: 'transcript.phase.diarizing',
 };
-
-function phaseWord(phase: TaskPhase): string {
-  return phase === null ? 'processing' : PHASE_WORDS[phase];
-}
 
 // The statuses that get a status page instead of the transcript.
 const FINISHED_ISSUES: ReadonlySet<Task['status']> = new Set(['FAILED', 'CANCELED']);
@@ -132,6 +130,7 @@ const TranscriptRegion = styled.div`
 // Its own component because the machine input needs the loaded task's status, which the
 // parent does not have before the first snapshot (useMachine fixes the input at mount).
 function RetryButton({ task }: { task: Task }) {
+  const t = useMessages();
   const connection = ConnectionContext.useActorRef();
   const writes = useWriteControl();
   const navigate = useNavigate();
@@ -159,12 +158,15 @@ function RetryButton({ task }: { task: Task }) {
         retrySend({ type: 'START' });
       }}
     >
-      Retry
+      {t('transcript.retry')}
     </Button>
   );
 }
 
 export function TaskTranscriptView() {
+  const t = useMessages();
+  const intl = useIntl();
+  const errorText = useErrorText();
   const { taskId } = useParams();
   const id = Number(taskId);
   const navigate = useNavigate();
@@ -198,7 +200,7 @@ export function TaskTranscriptView() {
   };
   const transcriptMenuItems: DropdownMenuItem[] = [
     {
-      label: 'Delete',
+      label: t('history.delete'),
       danger: true,
       disabled: writes.disabled,
       title: writes.title,
@@ -526,7 +528,7 @@ export function TaskTranscriptView() {
         setEditError(null);
       })
       .catch((error: unknown) => {
-        setEditError(errorMessage(error));
+        setEditError(errorText(error));
       });
   };
 
@@ -717,11 +719,11 @@ export function TaskTranscriptView() {
     return (
       <Page measure="reading">
         <Stack gap="md">
-          <Title>Task not found</Title>
+          <Title>{t('transcript.notFound.title')}</Title>
           <ErrorCallout
-            title="This task doesn't exist"
-            detail="It was deleted, or the link is wrong."
-            action={<TextLink to="/history">Back to History</TextLink>}
+            title={t('transcript.notFound.errorTitle')}
+            detail={t('transcript.notFound.detail')}
+            action={<TextLink to="/history">{t('transcript.notFound.action')}</TextLink>}
           />
         </Stack>
       </Page>
@@ -733,14 +735,14 @@ export function TaskTranscriptView() {
   const deleteDialog = (
     <ConfirmDialog
       open={deleteState.matches('confirming') || deleteState.matches('running')}
-      title="Delete task?"
-      confirmLabel="Delete"
+      title={t('history.delete.title')}
+      confirmLabel={t('history.delete')}
       confirmDisabled={writes.disabled}
       confirmTitle={writes.title}
       onConfirm={() => deleteSend({ type: 'CONFIRM' })}
       onCancel={() => deleteSend({ type: 'CANCEL' })}
     >
-      {task.filename} and its transcript and audio will be deleted.
+      {t('history.delete.body', { filename: task.filename })}
     </ConfirmDialog>
   );
 
@@ -750,8 +752,8 @@ export function TaskTranscriptView() {
       <Page measure="reading">
         <Stack gap="md">
           <Title>{task.filename}</Title>
-          <Text>This task is still in the queue.</Text>
-          <TextLink to="/queue">Go to the queue</TextLink>
+          <Text>{t('transcript.pending')}</Text>
+          <TextLink to="/queue">{t('transcript.goToQueue')}</TextLink>
         </Stack>
       </Page>
     );
@@ -784,23 +786,29 @@ export function TaskTranscriptView() {
       disabled={reassigning || editingSegmentId !== null}
     />
   ) : (
-    <NoAudioNote>This task has no audio because it ended before chunking.</NoAudioNote>
+    <NoAudioNote>{t('transcript.noAudio')}</NoAudioNote>
   );
 
   // A failed or canceled task gets a status page, not a transcript (item 15).
   if (FINISHED_ISSUES.has(task.status)) {
-    const outcome = task.status === 'FAILED' ? 'Failed' : 'Canceled';
-    const progress =
-      task.transcribedUntilMs !== null ? ` at ${formatDuration(task.transcribedUntilMs)}` : '';
+    const outcome = t(task.status === 'FAILED' ? 'transcript.failed' : 'transcript.canceled');
+    const phase = task.phase === null ? t('transcript.phase.processing') : t(PHASE_ID[task.phase]);
+    const outcomeLine =
+      task.transcribedUntilMs !== null
+        ? t('transcript.outcomeAt', {
+            outcome,
+            phase,
+            time: formatDuration(task.transcribedUntilMs, intl),
+          })
+        : t('transcript.outcome', { outcome, phase });
     return (
       <Page measure="reading">
         <Stack gap="md">
           <Title>{task.filename}</Title>
-          <Text>
-            {outcome} while {phaseWord(task.phase)}
-            {progress}
-          </Text>
-          {task.error !== null ? <Text>Error: {task.error}</Text> : null}
+          <Text>{outcomeLine}</Text>
+          {task.error !== null ? (
+            <Text>{t('transcript.error', { message: task.error })}</Text>
+          ) : null}
           {audioBlock}
           <Row gap="sm">
             <RetryButton task={task} />
@@ -808,7 +816,7 @@ export function TaskTranscriptView() {
               trigger={
                 <IconButton
                   icon={MoreVertical}
-                  label={`Actions for ${task.filename}`}
+                  label={t('transcript.actions', { filename: task.filename })}
                   disabled={reassigning}
                 />
               }
@@ -817,7 +825,9 @@ export function TaskTranscriptView() {
             />
           </Row>
           {deleteState.matches('failed') ? (
-            <Text>{failureMessage('Delete failed', deleteState.context.error)}</Text>
+            <Text>
+              {failureLine(t('history.deleteFailed'), deleteState.context.error, errorText)}
+            </Text>
           ) : null}
         </Stack>
         {deleteDialog}
@@ -830,7 +840,7 @@ export function TaskTranscriptView() {
       <Stack gap="md">
         <Stack gap="xs">
           <Title>{task.filename}</Title>
-          <MetaText>{formatTaskMeta(task)}</MetaText>
+          <MetaText>{formatTaskMeta(task, intl)}</MetaText>
         </Stack>
         {audioBlock}
         <Row gap="sm">
@@ -838,7 +848,7 @@ export function TaskTranscriptView() {
             <DownloadLink
               key={format}
               href={`/api/tasks/${id}/transcript?format=${format}`}
-              aria-label={`Download transcript (${format})`}
+              aria-label={t('transcript.download', { format })}
             >
               {format.toUpperCase()}
             </DownloadLink>
@@ -847,7 +857,7 @@ export function TaskTranscriptView() {
             trigger={
               <IconButton
                 icon={MoreVertical}
-                label={`Actions for ${task.filename}`}
+                label={t('transcript.actions', { filename: task.filename })}
                 disabled={reassigning}
               />
             }
@@ -877,28 +887,26 @@ export function TaskTranscriptView() {
         ) : null}
         {turnsState.matches('failed') ? (
           <ErrorCallout
-            title="Couldn't load the transcript"
-            detail={errorMessage(turnsState.context.error)}
+            title={t('transcript.loadFailed')}
+            detail={errorText(turnsState.context.error)}
             action={
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => turnsSend({ type: 'RETRY' })}
               >
-                Retry
+                {t('transcript.retry')}
               </Button>
             }
           />
         ) : turnsBySpeaker === null ? (
-          <LoadingState label="Loading transcript…" />
+          <LoadingState label={t('transcript.loading')} />
         ) : (
           <>
             {reassigning ? (
-              <ReassignBar aria-label="Reassign speakers">
-                <Text>Select segments to move to a different speaker</Text>
-                <Text>
-                  {selectedSegments.size} segment{selectedSegments.size === 1 ? '' : 's'} selected
-                </Text>
+              <ReassignBar aria-label={t('transcript.reassign.label')}>
+                <Text>{t('transcript.reassign.hint')}</Text>
+                <Text>{t('transcript.reassign.selected', { count: selectedSegments.size })}</Text>
                 <Button
                   type="button"
                   variant="secondary"
@@ -908,18 +916,18 @@ export function TaskTranscriptView() {
                     setPickerOpen(true);
                   }}
                 >
-                  Move to…
+                  {t('transcript.reassign.moveTo')}
                 </Button>
                 {pickerOpen ? (
                   <Row gap="sm">
                     <label>
-                      Move to
+                      {t('transcript.reassign.moveToLabel')}
                       <select
-                        aria-label="Move to speaker"
+                        aria-label={t('transcript.reassign.moveToSpeaker')}
                         value={chosenTarget}
                         onChange={(event) => setChosenTarget(event.target.value)}
                       >
-                        <option value="">New speaker</option>
+                        <option value="">{t('transcript.reassign.newSpeaker')}</option>
                         {(turns?.speakers ?? []).map((speaker) => (
                           <option key={speaker.speakerId} value={String(speaker.speakerId)}>
                             {speaker.speaker}
@@ -933,35 +941,33 @@ export function TaskTranscriptView() {
                       title={writes.title}
                       onClick={sendReassign}
                     >
-                      Move
+                      {t('transcript.move')}
                     </Button>
                   </Row>
                 ) : null}
                 <Button type="button" variant="secondary" onClick={endReassign}>
-                  Cancel
+                  {t('transcript.cancel')}
                 </Button>
                 {reassignState.context.error !== null ? (
-                  <BarError>{reassignState.context.error.message}</BarError>
+                  <BarError>{errorText(reassignState.context.error)}</BarError>
                 ) : null}
                 <ConfirmDialog
                   open={reassignState.matches('confirming')}
-                  title="Reassign speakers?"
-                  confirmLabel="Move"
+                  title={t('transcript.reassign.title')}
+                  confirmLabel={t('transcript.move')}
                   confirmDisabled={writes.disabled}
                   confirmTitle={writes.title}
                   onConfirm={() => reassignSend({ type: 'CONFIRM' })}
                   onCancel={() => reassignSend({ type: 'CANCEL' })}
                 >
-                  {
-                    'This task has merged speakers. Reassigning makes those merges permanent: "Reset all merges" will no longer be available.'
-                  }
+                  {t('transcript.reassign.body')}
                 </ConfirmDialog>
               </ReassignBar>
             ) : null}
             <TranscriptRegion
               ref={transcriptRegionRef}
               role="region"
-              aria-label="Transcript"
+              aria-label={t('transcript.label')}
               // Item 74: the task's language (whisper's detected one, the requested one as
               // fallback) marks the transcript, so fontconfig picks that script's glyph forms
               // — Japanese kanji and kana in their JP forms, not the SC fallback's. The app
@@ -1013,7 +1019,7 @@ export function TaskTranscriptView() {
       </Stack>
       {!following ? (
         <Button type="button" onClick={() => followModeSend({ type: 'RESUME' })}>
-          Back to playing position
+          {t('transcript.backToPlaying')}
         </Button>
       ) : null}
       {deleteDialog}
