@@ -545,8 +545,13 @@ fn draw_upload(frame: &mut Frame, view: &View<'_>, upload: &UploadDialog) {
     };
     let path_row = lines.len() as u16;
     lines.push(path);
+    // A failed path's message: whole when the dialog could widen for it, else its end - what went
+    // wrong - in view.
     if let Some(error) = browser.error() {
-        lines.push(Line::styled(error.to_string(), fg(view, view.theme.danger)));
+        lines.push(Line::styled(
+            draft_tail(error, inner.width),
+            fg(view, view.theme.danger),
+        ));
     }
     let mut footer: Vec<Span> = Vec::new();
     for (key, args) in [
@@ -783,7 +788,8 @@ fn upload_entries_width(upload: &UploadDialog) -> u16 {
 }
 
 /// The widest fixed text the dialog draws - its title, folder line, mark hint, path row, the typed
-/// path in it, and its keys - so nothing is clipped; the typed path widens the dialog as it grows.
+/// path in it, a failed path's message, and its keys - so nothing is clipped; the typed path and
+/// the message widen the dialog as they grow.
 fn upload_prose_width(upload: &UploadDialog) -> u16 {
     let text = stt_client::text;
     let browser = upload.browser();
@@ -817,6 +823,7 @@ fn upload_prose_width(upload: &UploadDialog) -> u16 {
     ]
     .iter()
     .map(|line| plain(line))
+    .chain(browser.error().map(|error| error.chars().count() as u16))
     .max()
     .unwrap_or(0)
 }

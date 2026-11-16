@@ -867,6 +867,10 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
 - [x] (must not break) (the user, 2026-11-16) Every pty test waits for a key's frame before it
       presses the next key, in `download`, `dialog_redraw` and the journey steps -
       `client/stt-tui/tests/dialog_redraw.rs`, `client/stt-tui/tests/journey.rs`
+- [x] (edge) (discovered, the run 43802779592 on macOS) A typed path's error is shown whole inside
+      the upload dialog: the dialog widens for it while the terminal has room, and a message wider
+      than the terminal keeps its end - what went wrong - in view -
+      `client/stt-tui/tests/upload_error_whole.rs`
 
 ## Cycle log
 
@@ -1045,6 +1049,12 @@ kept here.
   reproduced red locally under a 60-character `TMPDIR`; `upload_area` did not (the frame before
   the settings is brief), its evidence is the macOS run. Both pass under that `TMPDIR`, the light
   OS and plainly.
+- 2026-11-16 (workspace), cycle "a typed path's error is shown whole inside the dialog": red - at
+  120 columns `/a-folder-that-is-not-there/…/missing.wav does not exist` ended at the dialog's
+  border after `…/a-folder-that-is-no`, though the terminal had room (the macOS run's
+  `upload_typed` failure, there with its long temporary folder). Green: the dialog's width counts
+  the message (`upload_prose_width`), and the message is drawn through `draft_tail`, so one wider
+  than the terminal keeps `… does not exist` in view.
 
 ## Acceptance criteria
 
@@ -3929,3 +3939,8 @@ kept here.
   its merge; the stand-in service stores the theme mode `dark` unless a test stores another (no
   product knob); a typed path cut off at its field's edge is a product defect with its own line;
   the refused upload's frame is fixed in the product (the upload's line goes before its notice).
+- 2026-11-16 (decisions, the user, on the run 43802779592): the refactors `typed_field` and
+  `settings_in` approved; `upload.rs` waits for a long typed path's end and `upload_area` for the
+  stored mode, following the approved lines; a typed path's error clipped at the dialog's border is
+  a product defect with its own line; the light flash at startup goes to `docs/known-issues.md`,
+  not fixed in this item.
