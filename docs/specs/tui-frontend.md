@@ -1194,6 +1194,19 @@ kept here.
   needs both rows drawn (`None < Some` held of a screen without memo's row). Verified: 10 of 10
   runs green; with the Up press taken out the test stops at the selection's wait (20 s) instead
   of sending a wrong `J`. The known-issues row is removed.
+- 2026-11-16 (workspace), the run 43893962274 (`1b0b4c15`): `check (windows-2025)` green - 235
+  passed, 8 ignored - with `check (ubuntu-24.04)` and the Linux and Windows e2e jobs, the TUI
+  journey among them; both macOS jobs were never given a runner ("not acquired by Runner of type
+  hosted"), so they are owed by the next run. The five diagnostic commits were then dropped
+  (rebase onto `origin/main` `f30e7a61`, no conflict): `ci.yml` runs `cargo test --locked` again
+  and the harness prints no raw output. Gates on the cleaned branch: `cargo fmt --check`, clippy
+  `-D warnings` and `cargo test` for every crate green; the `stt-tui` suite 10 times, 188 of 188
+  each; frontend `pnpm test` and `pnpm build`; `gradle check`; `pnpm --dir docs test` (49 tests,
+  check-reviews included); the e2e package's 55 lib tests, prettier and `tsc`; the Playwright
+  journey as `gradle e2e` runs it (the installed launcher as `E2E_BACKEND_CMD`): 63 passed, 1
+  skipped; `gradle tuiJourney`: 3 passed. Run without `E2E_BACKEND_CMD`, the browser journey stops
+  at `87-writes-wait-for-the-connection`'s second spec (a restarted service's sessions); the user
+  ruled it the GUI's, not this item's - recorded in `docs/known-issues.md`.
 
 ## Acceptance criteria
 
