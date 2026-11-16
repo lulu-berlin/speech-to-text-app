@@ -849,6 +849,20 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
 - [x] (failure) (discovered, the PR's CI run 2026-11-16) A key pressed right after a terminal
       resize is applied: 50 rounds of resize-then-`?` and resize-then-Escape each open and close the
       key reference - `client/stt-tui/tests/resize_keys.rs`
+- [ ] (must not break) (discovered, the diagnostic run 43795905007) Under a Windows ConPTY the pty
+      tests start the TUI and read its first frame: their terminal answers the cursor-position
+      query ConPTY asks before the program may start, as every terminal does -
+      `client/stt-tui/tests/terminal/mod.rs` (`answer_queries`); proven by the Windows legs of a
+      dispatched run
+- [ ] (edge) (discovered, the diagnostic run on macOS) A typed path longer than its field keeps its
+      end - where the cursor is - in view, in the upload and the download dialogs
+- [ ] (edge) (discovered, a local stress run) An upload the service refuses never shows its notice
+      beside the upload's own progress line: the line goes first
+- [ ] (must not break) (discovered, the diagnostic run) The pty tests do not depend on the machine
+      they run on: each TUI starts in a folder of its own, the stored theme mode is `dark` unless
+      a test stores another, and a folder is compared as the OS resolves it
+- [ ] (must not break) (the user, 2026-11-16) Every pty test waits for a key's frame before it
+      presses the next key, in `download`, `dialog_redraw` and the journey steps
 
 ## Cycle log
 
@@ -966,6 +980,21 @@ kept here.
   read where they read before. A throwaway probe (deleted) lost a key within 12 rounds in 6 of 6
   runs on the mio source and none in 6 runs of 400 keys on the `poll(2)` one. The known issue
   "a key pressed in the same moment as a terminal resize can be lost" is removed.
+- 2026-11-16 (workspace), the diagnostic run 43795905007 at `812b0141` (a marked diagnostic
+  commit printing the terminal's raw bytes on a failing pty test, CI's `cargo test` with
+  `--no-fail-fast`): no failure is a lost key, and `resize_keys` passed on Linux and macOS.
+  Windows: the TUI runs and its terminal received four bytes, `\x1b[6n` - ConPTY's cursor query
+  (`portable-pty` 0.9 creates it with `PSEUDOCONSOLE_INHERIT_CURSOR`), which the harness never
+  answered, so the program never started. Linux and macOS: the failures depend on the runner -
+  `$HOME` as the dialogs' folder (`portable-pty` starts a command there without a `cwd`), the
+  macOS runner's light appearance under `auto`, `/private/var` for `/var`, and typed paths
+  longer than their field. A local stress run (12 parallel runs, 8 rounds) failed
+  `upload::a_refused_upload…` twice: a frame shows the duplicate's notice beside the 100 % upload
+  line, since `send_in_turn` sends `Duplicate` before `UploadDone`.
+  Cycle "under ConPTY the TUI starts": red is the run's `Windows (e2e)` leg - `tuiJourney`'s two
+  tests that start the TUI waited 60 s on a blank screen with those four bytes; the harness now
+  answers `ESC [ 6 n` with `ESC [ 1 ; 1 R`. Green is the next dispatched run's to prove; locally
+  the pty suite is unchanged by it.
 
 ## Acceptance criteria
 
@@ -3845,3 +3874,8 @@ kept here.
 - 2026-11-16 (decision, the user): lost keys are fixed with crossterm's `use-dev-tty` event
   source, not an own stdin reader (which would need a second escape parser - crossterm's is
   private); the new line "a key pressed right after a terminal resize is applied" is approved.
+- 2026-11-16 (decisions, the user, after the diagnostic run): the harness answers ConPTY's cursor
+  query, and the next dispatch carries a marked diagnostic printing the journey's turns before
+  its merge; the stand-in service stores the theme mode `dark` unless a test stores another (no
+  product knob); a typed path cut off at its field's edge is a product defect with its own line;
+  the refused upload's frame is fixed in the product (the upload's line goes before its notice).

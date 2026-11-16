@@ -1075,9 +1075,11 @@ pub struct Reported {
     pub background: &'static str,
 }
 
-/// The terminal's answers to the queries the TUI wrote in `output[from..]`: the device attributes
-/// (DA1, `ESC [ c`) every terminal answers, and its text and background colours (OSC 10, OSC 11)
-/// when it has them to report. Returns where the next scan starts.
+/// The terminal's answers to the queries written in `output[from..]`: the device attributes (DA1,
+/// `ESC [ c`) every terminal answers, the cursor position (DSR, `ESC [ 6 n`) - which a Windows
+/// ConPTY asks before it lets the program start, and waits for (`PSEUDOCONSOLE_INHERIT_CURSOR`,
+/// set by `portable-pty`) - and its text and background colours (OSC 10, OSC 11) when it has them
+/// to report. Returns where the next scan starts.
 fn answer_queries(
     output: &[u8],
     from: usize,
@@ -1085,12 +1087,13 @@ fn answer_queries(
     keyboard: &Mutex<Box<dyn Write + Send>>,
 ) -> usize {
     const DA1: &[u8] = b"\x1b[c";
+    const DSR: &[u8] = b"\x1b[6n";
     const OSC10: &[u8] = b"\x1b]10;?";
     const OSC11: &[u8] = b"\x1b]11;?";
     let mut at = from;
     loop {
         let rest = &output[at..];
-        let found = [DA1, OSC10, OSC11]
+        let found = [DA1, DSR, OSC10, OSC11]
             .into_iter()
             .filter_map(|query| {
                 rest.windows(query.len())
@@ -1104,6 +1107,9 @@ fn answer_queries(
         };
         let answer = if query == DA1 {
             Some("\x1b[?62;22c".to_string())
+        } else if query == DSR {
+            // The cursor where a fresh terminal has it: the top-left cell.
+            Some("\x1b[1;1R".to_string())
         } else if query == OSC10 {
             colours.map(|colours| format!("\x1b]10;{}\x1b\\", colours.foreground))
         } else {
