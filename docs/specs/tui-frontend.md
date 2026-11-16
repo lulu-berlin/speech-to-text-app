@@ -1155,6 +1155,15 @@ kept here.
   ran into `Oct 9`, and every column after a run of blanks was off; a blank cell now reads as a
   space (`cell_text`). `theme_switch`'s `auto_in_terminal` dropped its event stream on return, so
   the TUI was reconnecting: it keeps it.
+- 2026-11-16 (workspace), the run 43871242612 (`f89a3ad8`): every job green but
+  `check (windows-2025)` - 233 green, 4 red; the journey green on all three OSes. Three read a
+  screen ConPTY was still repainting after a wait that did not ask for the finished screen
+  (`mouse::clicks_hit…`, `quit`, `running_row`); their waits now ask for it. The fourth,
+  `theme_switch::auto_is_dark…`, cannot be set up on Windows: it needs an OS that says nothing,
+  which an empty `PATH` gives on Unix, but the TUI's `reg` is found in the system folder whatever
+  `PATH` holds, so Windows always answers (the runner's light appearance); its sibling
+  `auto_reads_a_light…` passed there only because the runner is light. Both are ignored on
+  Windows, with the reason in the test.
 
 ## Acceptance criteria
 

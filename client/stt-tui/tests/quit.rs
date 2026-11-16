@@ -110,9 +110,13 @@ fn q_is_a_character_in_a_settings_dropdown_rather_than_escape() {
         "`q` did not quit"
     );
     tui.press(b"\x1b");
-    tui.wait_for(Duration::from_secs(5), |text| !text.contains("Esc close"));
+    // Closed, and Settings drawn again: a screen still being repainted (a Windows ConPTY repaints
+    // on its own schedule) can show neither the dropdown nor the page.
+    let screen = tui.wait_for(Duration::from_secs(20), |text| {
+        !text.contains("Esc close") && text.contains("Restore default settings")
+    });
     assert!(
-        tui.text().contains("Restore default settings"),
+        screen.contains("Restore default settings"),
         "Settings stays open"
     );
 }

@@ -160,7 +160,9 @@ fn clicks_hit_the_upload_area_and_the_rows_below_the_notices_and_upload_lines() 
     tui.press(b"\r");
     let held = service.next_upload(WAIT);
     let screen = tui.wait_for(WAIT, |text| {
-        text.contains("uploading a.mp3 100%") && !text.contains("Upload audio")
+        text.contains("uploading a.mp3 100%")
+            && !text.contains("Upload audio")
+            && text.contains("memo.wav")
     });
 
     // Clicking memo.wav where it is drawn - under the running row's progress line - selects it: `d`

@@ -35,8 +35,12 @@ fn a_running_row_shows_its_phase_and_elapsed_time_ticking_beside_its_percentage(
     let mut stream = service.next_stream(WAIT);
     stream.send("snapshot", SNAPSHOT);
 
-    // Twelve seconds in: the running row's phase, its elapsed time, and its percentage.
-    let screen = tui.wait_for(WAIT, |text| text.contains("Transcribing… · 00:12"));
+    // Twelve seconds in: the running row's phase, its elapsed time, and its percentage - the row
+    // drawn to its end, which a screen still being repainted may not be yet.
+    let screen = tui.wait_for(WAIT, |text| {
+        text.lines()
+            .any(|line| line.contains("Transcribing… · 00:12") && line.contains('%'))
+    });
     let row = screen
         .lines()
         .find(|line| line.contains("lecture.m4a"))

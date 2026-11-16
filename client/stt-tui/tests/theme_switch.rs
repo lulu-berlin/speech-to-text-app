@@ -90,8 +90,10 @@ struct Started {
     _dirs: [tempfile::TempDir; 2],
 }
 
-/// The TUI started with the stored mode `auto`, where the OS says nothing (no `gsettings`,
-/// `defaults` or `reg` on an empty `PATH`), in a terminal reporting `colours`.
+/// The TUI started with the stored mode `auto`, where the OS says nothing (no `gsettings` or
+/// `defaults` on an empty `PATH`), in a terminal reporting `colours`. Unix only: on Windows the
+/// TUI's `reg` is found in the system folder whatever `PATH` holds, so the OS always answers there
+/// and the terminal is never asked (run 43871242612: the runner's light appearance won).
 fn auto_in_terminal(colours: Option<Reported>) -> Started {
     let service = EventService::start();
     let dir = tempfile::tempdir().unwrap();
@@ -123,6 +125,10 @@ fn auto_in_terminal(colours: Option<Reported>) -> Started {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "Windows always answers through reg; see auto_in_terminal"
+)]
 fn auto_reads_a_light_terminal_background_when_the_os_says_nothing() {
     let started = auto_in_terminal(Some(Reported {
         foreground: "rgb:0000/0000/0000",
@@ -134,6 +140,10 @@ fn auto_reads_a_light_terminal_background_when_the_os_says_nothing() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "Windows always answers through reg; see auto_in_terminal"
+)]
 fn auto_is_dark_when_neither_the_os_nor_the_terminal_says() {
     let started = auto_in_terminal(None);
     started.tui.wait_for_cell(WAIT, "memo.wav", |_| true);
