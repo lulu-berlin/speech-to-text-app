@@ -1207,6 +1207,17 @@ kept here.
   skipped; `gradle tuiJourney`: 3 passed. Run without `E2E_BACKEND_CMD`, the browser journey stops
   at `87-writes-wait-for-the-connection`'s second spec (a restarted service's sessions); the user
   ruled it the GUI's, not this item's - recorded in `docs/known-issues.md`.
+- 2026-11-16 (workspace), the run 43904222789 (`a742d2ea`): every job green, both macOS ones
+  included, but `check (windows-2025)`: `dialog_redraw`'s two screens differed only in the running
+  row's elapsed time (`918:59:40` against `918:59:39`), which counts the wall clock's seconds; the
+  comparison leaves it out as it leaves out the tile (`f47a1552`). The run 43907080135
+  (`f47a1552`): every check and e2e job green on all three OSes (`check (windows-2025)` 235 passed,
+  8 ignored). Its packaging jobs then went red - `Linux (Nix build)`, `Linux (Nix flake check)`,
+  `Linux (bundle e2e)` and `Linux (flake package e2e)` - all on one cause: the flake's frontend
+  source held `frontend/` and `docs/api/` only, so `tsc` could not find the shared colour tokens
+  this item added (`TS2307: Cannot find module '../../../../ui-theme/colors.json'`). `ui-theme/`
+  joins the frontend's `sourceOf`; no Rust is built by the flake, so nothing else reads it there.
+  This environment has no Nix: the fix is proven by the next run's Nix jobs.
 
 ## Acceptance criteria
 
