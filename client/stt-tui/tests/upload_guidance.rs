@@ -63,9 +63,13 @@ fn the_upload_dialog_names_its_folder_and_says_how_to_use_it() {
         folder.path().to_path_buf()
     };
     let folder_line = catalog("tui.browse.folder").replace("{dir}", &shown.display().to_string());
-    let footer = [footer_files, footer_tab, footer_path, footer_cancel].join("    ");
+    let footer = [footer_files, footer_tab, footer_path, footer_cancel.clone()].join("    ");
     tui.press(b"u");
-    let screen = tui.wait_for(WAIT, |text| text.contains("talk.mp3"));
+    // The dialog drawn down to its last line: a screen still being repainted (a Windows ConPTY
+    // repaints on its own schedule) can show the file before the footer below it.
+    let screen = tui.wait_for(WAIT, |text| {
+        text.contains("talk.mp3") && text.contains(footer_cancel.as_str())
+    });
     for (what, text) in [
         ("title", &title),
         ("folder line", &folder_line),
