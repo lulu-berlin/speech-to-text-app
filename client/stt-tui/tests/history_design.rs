@@ -10,12 +10,10 @@ mod tokens;
 
 use std::time::Duration;
 
-use serde_json::{Value, json};
-use terminal::{EventService, Tui};
+use terminal::{EventService, Tui, settings_in};
 use tokens::token;
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
-const SETTINGS: &str = include_str!("../../../docs/api/settings.json");
 const WAIT: Duration = Duration::from_secs(20);
 const WIDTH: usize = 100;
 
@@ -32,11 +30,9 @@ fn the_history_page_follows_its_design() {
     let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 100, 30);
     let mut stream = service.next_stream(WAIT);
     stream.send("snapshot", SNAPSHOT);
-    let mut settings: Value = serde_json::from_str(SETTINGS).unwrap();
-    settings["themeMode"] = json!("dark");
     service
         .next_get_from(&tui, WAIT)
-        .answer("200 OK", &settings.to_string());
+        .answer("200 OK", &settings_in("dark"));
     let (text, muted, accent, border, raised) = (
         dark(&["colors", "text"]),
         dark(&["colors", "textMuted"]),

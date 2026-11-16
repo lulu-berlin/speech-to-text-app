@@ -12,14 +12,12 @@ mod tokens;
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use settings_fixture::{body, stored};
-use terminal::{EventService, Reported, Tui};
+use settings_fixture::body;
+use terminal::{EventService, Reported, Tui, settings_in};
 use tokens::token;
 use vt100::Color;
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
-/// The stored settings the startup read answers: every field the contract's defaults.
-const DEFAULTS: &str = include_str!("../../../docs/api/settings.json");
 const DEFAULTS_EVENT: &str = include_str!("../../../docs/api/settings-updated.defaults.json");
 const WAIT: Duration = Duration::from_secs(20);
 
@@ -27,11 +25,6 @@ const WAIT: Duration = Duration::from_secs(20);
 /// `—` separator in it.
 fn border(mode: &str) -> Color {
     token(&["colors", "border"], mode)
-}
-
-/// The stored settings in theme mode `mode`.
-fn settings_in(mode: &str) -> String {
-    stored(DEFAULTS, json!({ "themeMode": mode }))
 }
 
 #[test]

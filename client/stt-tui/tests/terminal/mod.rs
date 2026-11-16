@@ -764,12 +764,13 @@ pub struct EventStream {
     pub authorization: Option<String>,
 }
 
-/// The contract's default settings (`docs/api/settings.json`) with the theme mode `dark` stored:
-/// what the stand-in answers a settings read with unless a test answers it itself.
-fn stored_dark() -> String {
+/// The contract's default settings (`docs/api/settings.json`) with the theme mode `mode` stored,
+/// so the TUI draws in it; `dark` is what the stand-in answers a settings read with unless a test
+/// answers it itself.
+pub fn settings_in(mode: &str) -> String {
     let mut settings: serde_json::Value =
         serde_json::from_str(include_str!("../../../../docs/api/settings.json")).unwrap();
-    settings["themeMode"] = serde_json::json!("dark");
+    settings["themeMode"] = serde_json::json!(mode);
     settings.to_string()
 }
 
@@ -830,7 +831,7 @@ impl EventService {
                     } else if request.line.starts_with("GET /api/settings ")
                         && !captured.swap(false, std::sync::atomic::Ordering::SeqCst)
                     {
-                        crate::support::respond(&mut stream, "200 OK", &stored_dark());
+                        crate::support::respond(&mut stream, "200 OK", &settings_in("dark"));
                         answered.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     } else if request.line.starts_with("GET /api/tasks")
                         || request.line.starts_with("GET /api/settings ")

@@ -11,21 +11,12 @@ mod tokens;
 
 use std::time::Duration;
 
-use serde_json::{Value, json};
-use terminal::{EventService, Tui};
+use terminal::{EventService, Tui, settings_in};
 use tokens::token;
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
 const TURNS: &str = include_str!("../../../docs/api/turns.json");
 const WAIT: Duration = Duration::from_secs(20);
-
-/// The settings example in the given theme mode, so the TUI draws in it.
-fn settings_in(mode: &str) -> String {
-    let mut settings: Value =
-        serde_json::from_str(include_str!("../../../docs/api/settings.json")).unwrap();
-    settings["themeMode"] = json!(mode);
-    settings.to_string()
-}
 
 #[test]
 fn the_tui_draws_from_the_shared_tokens_in_the_stored_mode() {

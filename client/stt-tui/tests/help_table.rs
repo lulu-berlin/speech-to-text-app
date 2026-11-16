@@ -10,12 +10,12 @@ mod tokens;
 
 use std::time::Duration;
 
-use serde_json::{Value, json};
-use terminal::{EventService, OpenTranscript, Scene, Tui, open_transcript, table_cells, table_row};
+use terminal::{
+    EventService, OpenTranscript, Scene, Tui, open_transcript, settings_in, table_cells, table_row,
+};
 use tokens::token;
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
-const SETTINGS: &str = include_str!("../../../docs/api/settings.json");
 const WAIT: Duration = Duration::from_secs(20);
 
 /// The table row whose key cell is `key` and whose description is `words`: its screen row and the
@@ -50,11 +50,9 @@ fn the_reference_is_a_key_and_description_table() {
     let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 100, 30);
     let mut stream = service.next_stream(WAIT);
     stream.send("snapshot", SNAPSHOT);
-    let mut settings: Value = serde_json::from_str(SETTINGS).unwrap();
-    settings["themeMode"] = json!("dark");
     service
         .next_get_from(&tui, WAIT)
-        .answer("200 OK", &settings.to_string());
+        .answer("200 OK", &settings_in("dark"));
     let accent = token(&["colors", "accent"], "dark");
     let muted = token(&["colors", "textMuted"], "dark");
     tui.wait_for_cell(WAIT, "memo.wav", |cell| {
