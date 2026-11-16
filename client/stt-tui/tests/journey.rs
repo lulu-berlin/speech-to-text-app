@@ -147,6 +147,8 @@ fn an_upload_completes_and_its_transcript_reads_back() {
     tui.press(b"u");
     tui.wait_for(WAIT, |text| text.contains("Upload audio"));
     tui.press(jfk.as_bytes());
+    // The typed path's frame, its file name in view, before Enter sends it.
+    tui.wait_for(WAIT, |text| text.contains(&name));
     tui.press(b"\r");
     // The notice says it was queued; the queue row's percentage is gone as soon as it starts
     // running, so the row cannot stand in for this.

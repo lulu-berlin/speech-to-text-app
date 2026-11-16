@@ -52,8 +52,8 @@ fn closing_the_upload_dialog_repaints_the_whole_screen() {
         "the queue is drawn as it was before the dialog"
     );
 
-    // An upload closes the dialog too, with the same repaint.
-    std::thread::sleep(Duration::from_millis(100));
+    // An upload closes the dialog too, with the same repaint. The queue's frame after Escape is
+    // already awaited, so `u` cannot reach the TUI with the Escape as one Alt-u.
     tui.press(b"u");
     tui.wait_for(WAIT, |text| text.contains("Esc cancel"));
     tui.press(audio.to_str().unwrap().as_bytes());

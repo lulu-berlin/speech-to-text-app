@@ -864,8 +864,9 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       they run on: each TUI starts in a folder of its own, the stored theme mode is `dark` unless
       a test stores another, and a folder is compared as the OS resolves it -
       `client/stt-tui/tests/terminal/mod.rs`, `settings_fixture/mod.rs`
-- [ ] (must not break) (the user, 2026-11-16) Every pty test waits for a key's frame before it
-      presses the next key, in `download`, `dialog_redraw` and the journey steps
+- [x] (must not break) (the user, 2026-11-16) Every pty test waits for a key's frame before it
+      presses the next key, in `download`, `dialog_redraw` and the journey steps -
+      `client/stt-tui/tests/dialog_redraw.rs`, `client/stt-tui/tests/journey.rs`
 
 ## Cycle log
 
@@ -1024,6 +1025,15 @@ kept here.
   back); the 256-colour test waits for the stored mode's chip, as the frames before the startup
   settings land draw in what `auto` resolves to; `upload_guidance` compares the folder resolved
   on Unix (macOS's `/var` is `/private/var`).
+  Refactor (approved by the user): one `terminal::settings_in(mode)` replaces the stand-in's
+  `stored_dark` and the copies in `theme_colours`, `theme_switch`, `dialog_dim`,
+  `header_design`, `help_table` and `history_design` (`377f3b20`); `queue_design`'s `stored()`
+  sets four more fields and keeps its own.
+- 2026-11-16 (workspace), "every pty test waits for a key's frame before the next key" (a
+  hardening, no red): `download` already waits after each key; `dialog_redraw` drops its 100 ms
+  sleep before the second `u` - the queue's frame after Escape is awaited, so the two keys
+  cannot reach the TUI as one Alt-u - and the journey waits for the typed path's file name before
+  Enter sends it.
 
 ## Acceptance criteria
 
