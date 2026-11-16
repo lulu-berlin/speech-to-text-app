@@ -1055,6 +1055,15 @@ kept here.
   `upload_typed` failure, there with its long temporary folder). Green: the dialog's width counts
   the message (`upload_prose_width`), and the message is drawn through `draft_tail`, so one wider
   than the terminal keeps `… does not exist` in view.
+- 2026-11-16 (workspace), the journey's `Task 1 has no speaker 1`: the diagnostic in the run
+  43802779592 (macOS) read `1 turns; speakers [Speaker 0]`, one segment 0-10360 ms - whisper
+  made one segment of `jfk.wav` there, Linux makes two; one segment carries one speaker whatever
+  `Count(2)` asks. Not a race (the turns read answers only a completed task) and not the reset.
+  Fix (the user's choice): `r_resets_the_merges_the_service_reports` uploads `jfk.wav` said twice
+  with 1.5 s of silence between (`twice`, written by the test), asserts at least two speakers
+  with the turns in its message before merging the first two it reports, and expects that many
+  back after `R`. Green locally (the journey's three tests); macOS and Windows are the next
+  dispatched run's.
 
 ## Acceptance criteria
 
@@ -3944,3 +3953,5 @@ kept here.
   stored mode, following the approved lines; a typed path's error clipped at the dialog's border is
   a product defect with its own line; the light flash at startup goes to `docs/known-issues.md`,
   not fixed in this item.
+- 2026-11-16 (decision, the user): the journey's merge test uploads `jfk.wav` said twice, apart,
+  rather than a new two-voice fixture.

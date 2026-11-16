@@ -59,6 +59,45 @@ fn required(name: &str) -> String {
         .unwrap_or_else(|_| panic!("{name} is unset - run the journey with `gradle tuiJourney`"))
 }
 
+/// `clip` (16-bit PCM) said twice with 1.5 s of silence between, written into `into`: two
+/// utterances apart, which whisper splits into at least two segments - `jfk.wav` alone is one
+/// segment on the macOS runner's build (run 43802779592), and one segment carries one speaker.
+fn twice(clip: &Path, into: &Path) -> PathBuf {
+    let bytes = fs::read(clip).unwrap();
+    // The RIFF chunks after the 12-byte header: `fmt ` is kept, `data` holds the samples.
+    let (mut format, mut samples) = (None, None);
+    let mut at = 12;
+    while at + 8 <= bytes.len() {
+        let size = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap()) as usize;
+        let body = &bytes[at + 8..(at + 8 + size).min(bytes.len())];
+        match &bytes[at..at + 4] {
+            b"fmt " => format = Some(body),
+            b"data" => samples = Some(body),
+            _ => {}
+        }
+        at += 8 + size + size % 2;
+    }
+    let format = format.expect("a WAV has a fmt chunk");
+    let samples = samples.expect("a WAV has a data chunk");
+    // The format's bytes per second and per sample frame: 1.5 s of zero samples between.
+    let rate = u32::from_le_bytes(format[8..12].try_into().unwrap()) as usize;
+    let frame = u16::from_le_bytes(format[12..14].try_into().unwrap()) as usize;
+    let silence = vec![0u8; rate * 3 / 2 / frame * frame];
+    let data = [samples, &silence, samples].concat();
+    let mut wav = Vec::new();
+    wav.extend_from_slice(b"RIFF");
+    wav.extend_from_slice(&((4 + 8 + format.len() + 8 + data.len()) as u32).to_le_bytes());
+    wav.extend_from_slice(b"WAVEfmt ");
+    wav.extend_from_slice(&(format.len() as u32).to_le_bytes());
+    wav.extend_from_slice(format);
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    wav.extend_from_slice(&data);
+    let path = into.join("jfk-twice.wav");
+    fs::write(&path, wav).unwrap();
+    path
+}
+
 /// Starts the service on a free port with its data in `data` and its bootstrap files in `state`,
 /// transcribing with the tiny model.
 fn start_service(launcher: &str, state: &Path, data: &Path, tiny_model: &str) -> RunningService {
@@ -276,12 +315,16 @@ fn r_resets_the_merges_the_service_reports() {
     wait_until_up(&mut service, state.path(), &runtime);
     let dirs = support::dirs_in(state.path());
 
-    // A task diarized into two speakers, then merged into one: the service reports the merge.
+    // A task diarized into two speakers, then merged into one: the service reports the merge. The
+    // clip is `jfk.wav` said twice, apart: the clip alone is one segment on some whisper builds,
+    // and one segment carries one speaker.
+    let clips = tempfile::tempdir().unwrap();
+    let clip = twice(Path::new(&jfk), clips.path());
     let upload = runtime.block_on(async {
         let service = stt_client::locate(&dirs).await.unwrap();
         stt_client::upload(
             &service,
-            Path::new(&jfk),
+            &clip,
             &stt_client::UploadOptions {
                 language: "en".to_string(),
                 speakers: stt_client::Speakers::Count(2),
@@ -293,23 +336,32 @@ fn r_resets_the_merges_the_service_reports() {
     });
     let id = upload.id;
     let deadline = Instant::now() + TRANSCRIBE;
-    loop {
+    let turns = loop {
         let read = runtime.block_on(async {
             let service = stt_client::locate(&dirs).await.unwrap();
             stt_client::turns(&service, id).await
         });
-        if read.is_ok() {
-            break;
+        if let Ok(turns) = read {
+            break turns;
         }
         assert!(
             Instant::now() < deadline,
             "task {id} did not finish in time"
         );
         thread::sleep(Duration::from_millis(250));
-    }
+    };
+    let speakers: Vec<i64> = turns
+        .speakers
+        .iter()
+        .map(|speaker| speaker.speaker_id)
+        .collect();
+    assert!(
+        speakers.len() >= 2,
+        "the clip said twice is diarized into two speakers: {turns:?}"
+    );
     let merged = runtime.block_on(async {
         let service = stt_client::locate(&dirs).await.unwrap();
-        stt_client::merge_speakers(&service, id, &[0, 1], 1)
+        stt_client::merge_speakers(&service, id, &speakers[..2], speakers[1])
             .await
             .unwrap();
         stt_client::turns(&service, id).await.unwrap()
@@ -336,7 +388,7 @@ fn r_resets_the_merges_the_service_reports() {
             let service = stt_client::locate(&dirs).await.unwrap();
             stt_client::turns(&service, id).await.unwrap()
         });
-        if !read.has_merges && read.speakers.len() == 2 {
+        if !read.has_merges && read.speakers.len() == speakers.len() {
             break;
         }
         assert!(
