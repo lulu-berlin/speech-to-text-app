@@ -81,8 +81,10 @@ fn the_upload_dialog_names_its_folder_and_says_how_to_use_it() {
     // At 60 columns the dialog is clipped as the design's fixed-width mockup allows, but its
     // title still shows whole.
     tui.resize(60, 24);
+    // The dialog redrawn at the new width, down to its folder line below the title: a screen
+    // still being repainted can show neither yet.
     let screen = tui.wait_for(WAIT, |text| {
-        text.lines().all(|line| line.chars().count() <= 60)
+        text.lines().all(|line| line.chars().count() <= 60) && text.contains("Folder  ")
     });
     assert!(
         screen.contains(title.as_str()),

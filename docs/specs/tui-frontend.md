@@ -902,11 +902,12 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       ([ADR 0069](../decisions/0069-tui-input-through-termina.md)) - `paste.rs`, `mouse.rs`,
       `footer_click.rs`, `segment_click.rs`, `upload_dialog.rs`, `settings_dropdown.rs`,
       `horizontal_wheel.rs` on the Windows leg
-- [ ] (must not break) (discovered, the run 43850892737 on Windows) Under a Windows ConPTY a
-      screen a wait accepts is whole: ConPTY paints what it holds before it passes the TUI's next
-      frame marker on, so a wait asks for a later frame (F12, bound nowhere) and checks again once
-      it has arrived - `client/stt-tui/tests/terminal/mod.rs` (`conpty_flushed`); and a folder's
-      root reads as the OS writes it (`/`, `C:/`) - `upload_up.rs`
+- [ ] (must not break) (discovered, the runs 43850892737 and 43860329866 on Windows) Under a
+      Windows ConPTY a test reads the screen as the TUI drew it: a blank cell ConPTY skipped
+      (`ESC [ n C`) reads as a space (`cell_text`), and a wait asks for what the finished screen
+      shows - never only for something to have gone (`settle`, `mouse`, `same_name_uploads`,
+      `upload_guidance`, `stenographer`) - since ConPTY repaints after it has passed the TUI's frame
+      markers on; and a folder's root reads as the OS writes it (`/`, `C:/`) - `upload_up.rs`
 
 ## Cycle log
 
@@ -1139,6 +1140,21 @@ kept here.
   differently from what the TUI drew - rows cut short and ending in `�` (`┌Settings───…─�`),
   glyphs a column off (`  ✎Speech-to-Text`) - which the next run's marked diagnostic (the whole
   raw output of a failing Windows test) is to explain.
+- 2026-11-16 (workspace), the run 43860329866 (`df5380db`): `check (ubuntu-24.04)` and
+  `check (macos-15)` green; `check (windows-2025)` 225 green, 12 red, `paste.rs` green. The
+  marked diagnostic's raw output, replayed through vt100 here (a throwaway test, deleted), drew
+  `dialog_dim`'s and `history_design`'s screens correctly at their end - `┌Queue keys` where
+  `dialog_dim` looked for it - so the TUI drew right and the tests read wrong, in two ways. ConPTY
+  passes the TUI's frame markers on at once and repaints the screen after them
+  (`\x1b[?2026h\x1b[?2026l` pairs, then `\x1b[H` and the whole screen), so the F12 barrier of
+  `aa44d6af` rested on a wrong reading and is gone; and a wait that asks only for something to
+  have gone (`!text.contains(…)`, `!= before`) took a screen mid-repaint - the failing ones, and
+  `settle`, now ask for what the finished screen shows as well. And ConPTY
+  moves the cursor over blanks (`\x1b[22C`) rather than writing them, so vt100 left those cells
+  empty and the tests' cell readers (`Scene`, `marked`, `wait_for_cell`) dropped them - `call.ogg`
+  ran into `Oct 9`, and every column after a run of blanks was off; a blank cell now reads as a
+  space (`cell_text`). `theme_switch`'s `auto_in_terminal` dropped its event stream on return, so
+  the TUI was reconnecting: it keeps it.
 
 ## Acceptance criteria
 

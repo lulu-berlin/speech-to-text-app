@@ -62,7 +62,9 @@ fn clicking_tabs_rows_the_upload_area_and_a_history_row_twice_does_what_the_keys
     tui.click(3, row_of(&screen, "Choose audio files"));
     tui.wait_for(WAIT, |text| text.contains("Esc cancel"));
     tui.press(b"\x1b");
-    let screen = tui.wait_for(WAIT, |text| !text.contains("Esc cancel"));
+    let screen = tui.wait_for(WAIT, |text| {
+        !text.contains("Esc cancel") && text.contains("memo.wav")
+    });
 
     // Clicking the second queue row - under the running row's progress line - selects it: `d`
     // offers that row's file.

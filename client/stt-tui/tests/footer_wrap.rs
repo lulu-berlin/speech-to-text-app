@@ -138,8 +138,12 @@ fn table_lists(screen: &str, hint: &str) -> bool {
 /// Opens the `?` reference titled `title`, scrolls its table down until it has shown a row for each
 /// hint of `left`, and closes it.
 fn reference_lists(tui: &mut Tui, title: &str, left: &[String]) {
+    // The reference drawn down to its closing line: a screen still being repainted (a Windows
+    // ConPTY repaints on its own schedule) can show its title before its rows.
+    let closes = stt_client::text("tui.help.close", &[]).replace(['[', ']'], "");
+    let whole = |text: &str| text.contains(title) && text.contains(&closes);
     tui.press(b"?");
-    let mut screen = tui.wait_for(WAIT, |text| text.contains(title));
+    let mut screen = tui.wait_for(WAIT, whole);
     let mut seen: Vec<&String> = Vec::new();
     loop {
         seen.extend(left.iter().filter(|hint| table_lists(&screen, hint)));
@@ -155,7 +159,7 @@ fn reference_lists(tui: &mut Tui, title: &str, left: &[String]) {
         );
         tui.press(b"\x1b[B");
         let before = screen.clone();
-        screen = tui.wait_for(WAIT, |text| text != before);
+        screen = tui.wait_for(WAIT, |text| text != before && whole(text));
     }
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains(title));

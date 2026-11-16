@@ -53,7 +53,9 @@ fn restoring_the_defaults_asks_first_and_then_resets_every_field() {
         "{screen}"
     );
     tui.press(b"\x1b");
-    let screen = tui.wait_for(WAIT, |text| !text.contains("Restore default settings?"));
+    let screen = tui.wait_for(WAIT, |text| {
+        !text.contains("Restore default settings?") && text.contains("Restore default settings")
+    });
     tui.settle();
     assert!(
         !service.command_arrived(),

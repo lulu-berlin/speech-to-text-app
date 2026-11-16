@@ -185,7 +185,11 @@ fn the_large_tile_types_on_the_empty_queue_and_rests_on_the_empty_history() {
         .unwrap_or_else(|| panic!("the empty history's tile:\n{}", history.text()));
     let resting = large(&history.text(), place);
     let head = tile(&history.text(), width);
-    let moved = tui.wait_for(Duration::from_secs(5), |text| tile(text, width) != head);
+    // The header's tile moved, on a page drawn down to its text: a screen still being repainted
+    // can show the header before the body.
+    let moved = tui.wait_for(Duration::from_secs(5), |text| {
+        tile(text, width) != head && text.contains("No completed tasks yet")
+    });
     assert_eq!(
         large(&moved, place),
         resting,

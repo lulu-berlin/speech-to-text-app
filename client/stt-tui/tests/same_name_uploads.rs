@@ -73,7 +73,11 @@ fn a_second_upload_of_the_same_name_keeps_its_own_progress_line() {
         "201 Created",
         r#"{"id":9,"filename":"a.mp3","status":"QUEUED","transcriptionProgress":0.0}"#,
     );
-    let screen = tui.wait_for(WAIT, |text| uploading_lines(text, "a.mp3") == 1);
+    // The first's notice with one line left: a screen still being repainted can show one line
+    // before it shows the notice.
+    let screen = tui.wait_for(WAIT, |text| {
+        uploading_lines(text, "a.mp3") == 1 && text.contains("queued a.mp3")
+    });
     assert!(
         screen.contains("queued a.mp3"),
         "the first one's line goes:\n{screen}"

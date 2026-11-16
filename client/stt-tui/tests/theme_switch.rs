@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use settings_fixture::body;
-use terminal::{EventService, Reported, Tui, settings_in};
+use terminal::{EventService, EventStream, Reported, Tui, settings_in};
 use tokens::token;
 use vt100::Color;
 
@@ -85,6 +85,8 @@ fn t_cycles_the_stored_mode_and_another_frontends_change_repaints_live() {
 struct Started {
     tui: Tui,
     _service: EventService,
+    /// The open stream: dropped, the TUI would show itself reconnecting.
+    _stream: EventStream,
     _dirs: [tempfile::TempDir; 2],
 }
 
@@ -115,6 +117,7 @@ fn auto_in_terminal(colours: Option<Reported>) -> Started {
     Started {
         tui,
         _service: service,
+        _stream: stream,
         _dirs: [dir, empty],
     }
 }

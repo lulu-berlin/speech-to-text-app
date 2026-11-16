@@ -194,7 +194,7 @@ fn reversed(screen: &vt100::Screen) -> String {
         let text: String = (0..columns.get())
             .filter_map(|column| screen.cell(row, column))
             .filter(|cell| terminal::cell_marked(cell, page))
-            .map(|cell| cell.contents())
+            .map(terminal::cell_text)
             .collect();
         if !text.trim().is_empty() {
             last = text.trim().trim_start_matches("✓").trim().to_string();
