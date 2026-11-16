@@ -902,12 +902,13 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       ([ADR 0069](../decisions/0069-tui-input-through-termina.md)) - `paste.rs`, `mouse.rs`,
       `footer_click.rs`, `segment_click.rs`, `upload_dialog.rs`, `settings_dropdown.rs`,
       `horizontal_wheel.rs` on the Windows leg
-- [ ] (must not break) (discovered, the runs 43850892737 and 43860329866 on Windows) Under a
+- [ ] (must not break) (discovered, the runs 43850892737 to 43877126064 on Windows) Under a
       Windows ConPTY a test reads the screen as the TUI drew it: a blank cell ConPTY skipped
-      (`ESC [ n C`) reads as a space (`cell_text`), and a wait asks for what the finished screen
-      shows - never only for something to have gone (`settle`, `mouse`, `same_name_uploads`,
-      `upload_guidance`, `stenographer`) - since ConPTY repaints after it has passed the TUI's frame
-      markers on; and a folder's root reads as the OS writes it (`/`, `C:/`) - `upload_up.rs`
+      (`ESC [ n C`) reads as a space (`cell_text`), and a screen a wait accepts is one ConPTY has
+      finished painting - it paints after it has passed the TUI's frame markers on and marks no
+      end of its paint, so a wait takes a screen once ConPTY has written nothing for 150 ms
+      (`CONPTY_SETTLE`, Windows only); and a folder's root reads as the OS writes it (`/`, `C:/`) -
+      `client/stt-tui/tests/terminal/mod.rs`, `upload_up.rs`
 
 ## Cycle log
 
@@ -1164,6 +1165,15 @@ kept here.
   `PATH` holds, so Windows always answers (the runner's light appearance); its sibling
   `auto_reads_a_light…` passed there only because the runner is light. Both are ignored on
   Windows, with the reason in the test.
+- 2026-11-16 (workspace), the run 43877126064 (`b44c19dd`): every job green but
+  `check (windows-2025)` - 234 green, 1 red, 8 ignored (the two OS-silent theme tests among
+  them). The red one, `upload_guidance`, had passed in the two runs before: another wait that took
+  the first matching screen while ConPTY was still painting below it. Each round had shown one or
+  two such tests out of 213 waits whose screens are read further, so the user chose one rule over
+  a review of every wait: on Windows a screen a wait accepts must have had no ConPTY output for
+  150 ms after it (`CONPTY_SETTLE`), else it is read again; output that never pauses is taken at
+  the wait's timeout, as before. On Unix waits are unchanged (188 tests green locally).
+  `upload_guidance` also waits for its dialog drawn to the footer (`cb7c5667`).
 
 ## Acceptance criteria
 
@@ -4061,3 +4071,8 @@ kept here.
 - 2026-11-16 (decision, the user): the Windows paste and mouse defects are fixed in this item; the
   TUI's input is read through termina on every OS
   ([ADR 0069](../decisions/0069-tui-input-through-termina.md)), crossterm keeps drawing.
+- 2026-11-16 (decision, the user, on the run 43877126064): the Windows pty waits let ConPTY
+  settle (150 ms with no output) rather than every one of the 213 screen-reading waits being
+  reviewed. The workspace's ignore of the two theme tests that need an OS saying nothing, on
+  Windows where `reg` always answers, was put to the user with it; the user's confirmation is
+  asked at the hand-over.

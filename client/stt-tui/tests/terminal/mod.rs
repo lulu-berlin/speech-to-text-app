@@ -34,13 +34,17 @@ pub struct Tui {
 /// The painting's progress: how many reads of the TUI's output the screen has taken in, and whether
 /// it is inside a frame - a synchronized update the TUI opened and has not ended yet, whose screen
 /// is half a frame. A wait wakes on every read, not only at a frame's end: a Windows ConPTY passes
-/// the markers on at once and repaints the screen after them, on its own schedule (run
-/// 43860329866's raw output), so a frame's cells arrive after its end marker there and a wait has
-/// to ask for what the finished screen shows, never only for something to have gone.
+/// the markers on at once and repaints the screen after them, on its own schedule and with nothing
+/// to mark its paint's end (run 43860329866's raw output), so there a wait lets it settle
+/// ([`CONPTY_SETTLE`]).
 struct Draw {
     reads: u64,
     inside: bool,
 }
+
+/// How long a Windows ConPTY must have written nothing before a screen counts as painted (see
+/// [`Tui::wait_for_screen`]): it paints on its own timer, in bursts far shorter than this.
+const CONPTY_SETTLE: Duration = Duration::from_millis(150);
 
 impl Tui {
     /// Starts the TUI at `program` in a `cols` x `rows` terminal with the service directories in
@@ -283,7 +287,10 @@ impl Tui {
     /// It wakes on the reader's signal that the screen took in more output rather than polling a
     /// timer; `timeout` only bounds a TUI that fails to draw what the test expects. Mid-frame - after
     /// a synchronized update's start, before its end - the screen is half painted and is not read,
-    /// so a predicate never holds of a partial screen (see [`Draw`] for a ConPTY's).
+    /// so a predicate never holds of a partial screen. A Windows ConPTY paints after the frame's
+    /// markers and marks no end of its paint (see [`Draw`]), so there a screen `holds` is true of
+    /// counts once ConPTY has written nothing for [`CONPTY_SETTLE`]: more output, and it is read
+    /// again; output that never pauses (an animation) is taken at `timeout`, as any screen was.
     pub fn wait_for_screen(
         &self,
         timeout: Duration,
@@ -301,7 +308,19 @@ impl Tui {
                 !painting && holds(screen.screen())
             };
             if holds_now {
-                return;
+                let settle = CONPTY_SETTLE.min(deadline.saturating_duration_since(Instant::now()));
+                if !cfg!(windows) || settle.is_zero() {
+                    return;
+                }
+                let waiting = draw.lock().unwrap();
+                let (waiting, quiet) = redrawn
+                    .wait_timeout_while(waiting, settle, |draw| draw.reads == seen)
+                    .unwrap();
+                drop(waiting);
+                if quiet.timed_out() {
+                    return;
+                }
+                continue;
             }
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
