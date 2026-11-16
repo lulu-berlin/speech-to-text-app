@@ -23,8 +23,10 @@ fn the_upload_area_is_reachable_and_opens_the_prompt() {
     let mut tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
     let mut stream = service.next_stream(WAIT);
     stream.send("snapshot", SNAPSHOT);
+    // The stored mode drawn: the frames before the startup settings land are in what `auto`
+    // resolves to on this machine, and the colours below are compared across frames.
     let scene = tui.wait_for_scene(WAIT, |text| {
-        text.contains(AREA) && text.contains("memo.wav")
+        text.contains(AREA) && text.contains("memo.wav") && text.contains("Theme: dark")
     });
     // The header's line has no fill of its own: the page's background.
     let page = scene.bg("Queue 2 tasks");

@@ -54,7 +54,8 @@ fn uploading_by_path_queues_the_file_and_reports_a_bad_path_or_format() {
     let path = files.path().join("podcast.mp3");
     let path = path.to_str().unwrap();
     tui.press(path.as_bytes());
-    tui.wait_for(WAIT, |text| text.contains(path));
+    // The typed path's frame: its end, the file name, is in view however long the path is.
+    tui.wait_for(WAIT, |text| text.contains("podcast.mp3"));
     tui.press(b"\r");
 
     let upload = service.next_upload(WAIT);

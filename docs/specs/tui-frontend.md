@@ -1034,6 +1034,17 @@ kept here.
   sleep before the second `u` - the queue's frame after Escape is awaited, so the two keys
   cannot reach the TUI as one Alt-u - and the journey waits for the typed path's file name before
   Enter sends it.
+- 2026-11-16 (workspace), the run 43802779592 at `a9dc8637`: `check (ubuntu-24.04)` and
+  `Linux (e2e)` green; `check (macos-15)` 3 failures (from 10). Locally the `stt-tui` suite passed
+  10 runs of 10 (187 tests each). Two follow the approved lines and are fixed in their tests,
+  as the user approved: `upload::uploading_by_path…` waited for the whole typed path, which a
+  long path now shows by its end - it waits for the file name; `upload_area` read the page's
+  background from a frame drawn before the startup settings landed (light on the macOS runner)
+  - it waits for `Theme: dark`. That window is a known issue now (a light flash at startup for
+  `dark` stored on a light OS). The third is a product defect with its own line below. `upload`
+  reproduced red locally under a 60-character `TMPDIR`; `upload_area` did not (the frame before
+  the settings is brief), its evidence is the macOS run. Both pass under that `TMPDIR`, the light
+  OS and plainly.
 
 ## Acceptance criteria
 
