@@ -533,18 +533,11 @@ fn draw_upload(frame: &mut Frame, view: &View<'_>, upload: &UploadDialog) {
     lines.push(rule);
     // The path being typed, its end in view when it is wider than the row: the cursor follows it.
     let path_prefix = format!("{}   ", stt_client::text("tui.upload.path", &[]));
-    let path_prefix_width = path_prefix.chars().count() as u16;
-    let typed = browser.typed().map(|path| {
-        draft_tail(
-            path,
-            inner
-                .width
-                .saturating_sub(path_prefix_width)
-                .saturating_sub(1),
-        )
-    });
+    let typed = browser
+        .typed()
+        .map(|path| typed_field(path, path_prefix.chars().count() as u16, inner.width));
     let path = match &typed {
-        Some(path) => Line::from(vec![
+        Some((path, _)) => Line::from(vec![
             Span::styled(path_prefix, fg(view, view.theme.muted)),
             Span::raw(path.clone()),
         ]),
@@ -625,9 +618,8 @@ fn draw_upload(frame: &mut Frame, view: &View<'_>, upload: &UploadDialog) {
         }
     }
     // The cursor at the typed path's end, on the line it is drawn on.
-    if let Some(path) = &typed {
-        let column = inner.x + path_prefix_width + path.chars().count() as u16;
-        frame.set_cursor_position((column, inner.y + path_row));
+    if let Some((_, column)) = typed {
+        frame.set_cursor_position((inner.x + column, inner.y + path_row));
     }
 }
 
@@ -855,16 +847,14 @@ fn draw_download(frame: &mut Frame, view: &View<'_>, download: &Download) {
         hint(view, "tui.hint.downloadUp", &[]),
     ];
     // The target being typed, its end in view when it is wider than the row.
-    let path_prefix_width = prefix_width("tui.download.path", "path");
     let typed = browser.typed().map(|typed| {
-        draft_tail(
+        typed_field(
             typed,
-            area.width
-                .saturating_sub(2 + path_prefix_width)
-                .saturating_sub(1),
+            prefix_width("tui.download.path", "path"),
+            area.width.saturating_sub(2),
         )
     });
-    if let Some(typed) = &typed {
+    if let Some((typed, _)) = &typed {
         lines.push(Line::from(stt_client::text(
             "tui.download.path",
             &[("path", typed)],
@@ -890,9 +880,8 @@ fn draw_download(frame: &mut Frame, view: &View<'_>, download: &Download) {
     ));
     modal(frame, view, title, lines, false);
     // The cursor at the typed target's end, in the same row the cursor of an upload's path takes.
-    if let Some(typed) = &typed {
-        let column = 1 + path_prefix_width + typed.chars().count() as u16;
-        cursor(frame, area, 4, column);
+    if let Some((_, column)) = typed {
+        cursor(frame, area, 4, 1 + column);
     }
 }
 
@@ -3368,6 +3357,18 @@ fn prefix_width(key: &str, placeholder: &str) -> u16 {
         .unwrap_or_default()
         .chars()
         .count() as u16
+}
+
+/// A draft typed into a row `row_width` cells wide after a label `prefix_width` cells wide: what is
+/// drawn of it - its end behind a `…` when all of it would not leave the cursor a cell - and the
+/// cursor's column after it, counted from the row's start.
+fn typed_field(draft: &str, prefix_width: u16, row_width: u16) -> (String, u16) {
+    let shown = draft_tail(
+        draft,
+        row_width.saturating_sub(prefix_width).saturating_sub(1),
+    );
+    let column = prefix_width + shown.chars().count() as u16;
+    (shown, column)
 }
 
 /// The end of `draft` that fits in `width` cells: all of it when it fits, otherwise its last
