@@ -122,8 +122,11 @@ pub enum Submit {
 }
 
 /// The existing files a pasted text names: tokens split at unquoted spaces, with single or double
-/// quotes and a backslash understood, and `file://` URIs decoded - a terminal's drag-and-drop.
+/// quotes understood, a backslash escaping the next character as a Unix shell's quoting does (on
+/// Windows a backslash separates a path's folders), and `file://` URIs decoded - a terminal's
+/// drag-and-drop.
 pub fn pasted_paths(text: &str) -> Vec<std::path::PathBuf> {
+    let backslash_escapes = cfg!(not(windows));
     let mut tokens = Vec::new();
     let mut token = String::new();
     let mut quoted: Option<char> = None;
@@ -135,7 +138,7 @@ pub fn pasted_paths(text: &str) -> Vec<std::path::PathBuf> {
             continue;
         }
         match character {
-            '\\' => escaped = true,
+            '\\' if backslash_escapes => escaped = true,
             '"' | '\'' if quoted == Some(character) => quoted = None,
             '"' | '\'' if quoted.is_none() => quoted = Some(character),
             _ if character.is_whitespace() && quoted.is_none() => {
@@ -155,6 +158,13 @@ pub fn pasted_paths(text: &str) -> Vec<std::path::PathBuf> {
             let path = match token.strip_prefix("file://") {
                 Some(rest) => {
                     let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+                    // On Windows `file:///C:/…` is the path `C:/…`: the slash before the drive goes.
+                    let rest = match rest.strip_prefix('/') {
+                        Some(drive) if cfg!(windows) && drive.as_bytes().get(1) == Some(&b':') => {
+                            drive
+                        }
+                        _ => rest,
+                    };
                     percent_decoded(rest)
                 }
                 None => std::path::PathBuf::from(token),

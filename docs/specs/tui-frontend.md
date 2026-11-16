@@ -1129,6 +1129,16 @@ kept here.
   With it: a ConPTY barrier in `wait_for_screen` (F12 asks for a later frame, whose marker ConPTY
   passes on only after painting the earlier ones) and `upload_up`'s root read as the OS writes it.
   Green is the next dispatched run's to prove.
+- 2026-11-16 (workspace), the run 43857877463 (`aa44d6af`): `check (ubuntu-24.04)` and
+  `check (macos-15)` green on the termina input. `check (windows-2025)`: 220 green, 17 red (from
+  25) - the clicks act now but for one. `paste.rs` no longer types the pasted text as keys, but
+  the dialog does not open: `pasted_paths` read a backslash as a Unix shell's escape, so a pasted
+  Windows path (`"C:\Users\…\a b.wav"`) named no file. Fix: on Windows a backslash separates a
+  path's folders, and `file:///C:/…` is the path `C:/…` (`upload_dialog.rs`); Unix keeps its
+  shell quoting (`paste.rs` green locally). The other red tests read rows ConPTY repainted
+  differently from what the TUI drew - rows cut short and ending in `�` (`┌Settings───…─�`),
+  glyphs a column off (`  ✎Speech-to-Text`) - which the next run's marked diagnostic (the whole
+  raw output of a failing Windows test) is to explain.
 
 ## Acceptance criteria
 
