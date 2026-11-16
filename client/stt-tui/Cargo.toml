@@ -11,6 +11,10 @@ stt-client = { path = "../stt-client" }
 chrono = "0.4"
 # The terminal UI (roadmap item 67, decided 2026-10-22): ratatui on its crossterm backend.
 ratatui = "0.30"
+# ratatui's own crossterm, with its `poll(2)` event source on Unix instead of the default mio one:
+# mio's returns a resize and drops the keyboard's readiness from the same poll, so a key pressed
+# with a resize waited for the next key (crossterm 0.29.0, `event/source/unix/mio.rs`).
+crossterm = { version = "0.29", features = ["use-dev-tty"] }
 # Audio playback in a transcript (roadmap item 67): the service's FLAC clip, decoded here and sent
 # to the default output - ALSA on Linux (devenv's alsa-lib, the CI job's libasound2), WASAPI on
 # Windows, CoreAudio on macOS.

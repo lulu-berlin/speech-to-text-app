@@ -1,6 +1,6 @@
 # 67 — A terminal UI frontend
 
-Status: done (roadmap item 67, approved 2026-11-15)
+Status: in-progress
 Depends on: [66](local-service-and-frontends.md) (done; the per-user service, frontend
 descriptors and launch model — the credential, runtime endpoint and descriptor this item uses are
 built there, as is the Rust pin), [12](http-api-and-sse.md) (done; the HTTP/SSE
@@ -841,6 +841,15 @@ that the TUI's strings enter it translated, in every shipped locale, with their 
       shared catalog, never a catalog key. (`client/stt-client/tests/text.rs`,
       `client/stt-tui/tests/settings_terminal.rs`)
 
+### The pull request's CI run (reopened 2026-11-16)
+
+The PR's first CI run (#660, run id 43748398299, head `3da7f225`) failed five jobs, all in the
+TUI's pty suite. The user reopened the item for them, lost keys first.
+
+- [x] (failure) (discovered, the PR's CI run 2026-11-16) A key pressed right after a terminal
+      resize is applied: 50 rounds of resize-then-`?` and resize-then-Escape each open and close the
+      key reference - `client/stt-tui/tests/resize_keys.rs`
+
 ## Cycle log
 
 Earlier cycles are recorded in the Approval log below; entries from the merge of item 88 on are
@@ -943,6 +952,20 @@ kept here.
   build through a throwaway wrapper). Not run here, the user's: those two specs on a machine
   with `/bin/sh`, and CI's macOS and Windows `cargo test` legs, the only proof of the
   default-terminal keys and of the Windows 24-bit branch.
+- 2026-11-16 (workspace, reopened after the PR's CI run; `Status: in-progress`), cycle "a key
+  right after a resize": no crossterm release fixes the mio event source (0.29.0 of 2025-04-05 is
+  the latest; master's `event/source/unix/mio.rs` still returns the resize and drops the tty's
+  edge-triggered readiness from the same poll). Red: `resize_keys.rs` timed out after 20 s with
+  the key reference still open - the Escape pressed after the resize was never read. Green:
+  `stt-tui` takes crossterm 0.29 with `use-dev-tty`, which compiles crossterm's other Unix source
+  (`event/source/unix/tty.rs`: level-triggered `poll(2)` through `filedescriptor`, `select` on
+  macOS, the SIGWINCH pipe drained and the tty polled again on every read); the feature unifies
+  with ratatui's crossterm, so there is one crossterm and the keyboard thread is unchanged.
+  Windows does not compile either source. Both sources read the same descriptor (crossterm's
+  `tty_fd`: stdin when it is a terminal, else `/dev/tty`), so the packaged app and the pty tests
+  read where they read before. A throwaway probe (deleted) lost a key within 12 rounds in 6 of 6
+  runs on the mio source and none in 6 runs of 400 keys on the `poll(2)` one. The known issue
+  "a key pressed in the same moment as a terminal resize can be lost" is removed.
 
 ## Acceptance criteria
 
@@ -3815,3 +3838,10 @@ kept here.
   its database stops at V18 (`app language`), without this branch's V19 - so it is not evidence
   for this branch: `66-launch-token.spec.ts` and `66-settings.spec.ts` stay the user's to run in
   this worktree, with CI's macOS and Windows `cargo test` legs. Not pushed, not merged.
+- 2026-11-16 (workspace, the user): reopened, `Status: in-progress`, for the PR's CI run #660
+  (five failed jobs in the pty suite), in three clusters - lost keys, Windows startup, test
+  synchronization - with the journey's `Task 1 has no speaker 1` investigated on its own. The
+  status is set in this file, which the squash had already moved from `roadmap/`.
+- 2026-11-16 (decision, the user): lost keys are fixed with crossterm's `use-dev-tty` event
+  source, not an own stdin reader (which would need a second escape parser - crossterm's is
+  private); the new line "a key pressed right after a terminal resize is applied" is approved.

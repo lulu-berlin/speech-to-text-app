@@ -187,9 +187,7 @@ fn every_page_footer_is_one_row_and_the_rest_are_in_the_reference() {
     let left = wait_footer(&tui, TRANSCRIPT);
     reference_lists(&mut tui, "Transcript keys", &left);
     tui.resize(80, 24);
-    // The redraw at 80 columns: only there is the footer wider than 50. The wait also keeps this
-    // test from pressing a key into the resize race of `resize_keeps_a_key_pressed_right_after_it`
-    // - it is not about that.
+    // The redraw at 80 columns: only there is the footer wider than 50.
     tui.wait_for(WAIT, |text| {
         text.lines()
             .last()
