@@ -92,6 +92,6 @@ fn a_status_page_plays_the_tasks_audio_or_says_why_it_has_none() {
             && offers(text, &["back"], &["Space play"])
     });
     tui.press(b" ");
-    std::thread::sleep(Duration::from_millis(500));
+    tui.settle();
     assert!(!service.get_arrived(), "a task without audio reads no clip");
 }

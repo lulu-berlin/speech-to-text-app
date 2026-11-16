@@ -97,14 +97,16 @@ fn q_is_a_character_in_a_settings_dropdown_rather_than_escape() {
     tui.press(b"\r");
     tui.wait_for(Duration::from_secs(20), |text| text.contains("✓ Auto"));
     tui.press(b"q");
-    std::thread::sleep(Duration::from_millis(300));
+    // The cursor's round trip behind `q` is drawn only by a TUI that is still running, with the
+    // dropdown open.
+    tui.settle_in_list();
     assert!(
         tui.text().contains("Esc close"),
         "the dropdown stays open:\n{}",
         tui.text()
     );
     assert!(
-        tui.exit_within(Duration::from_millis(200)).is_none(),
+        tui.exit_within(Duration::ZERO).is_none(),
         "`q` did not quit"
     );
     tui.press(b"\x1b");

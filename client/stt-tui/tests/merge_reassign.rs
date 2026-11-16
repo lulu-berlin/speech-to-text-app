@@ -64,7 +64,7 @@ fn merging_and_reassigning_exclude_each_other() {
     });
     assert!(!screen.contains("Merging"), "no merge began:\n{screen}");
     assert!(!screen.contains("Rename:"), "no rename began:\n{screen}");
-    std::thread::sleep(Duration::from_millis(300));
+    open.tui.settle();
     assert!(
         !open.service.command_arrived(),
         "no reset was sent while segments were marked"

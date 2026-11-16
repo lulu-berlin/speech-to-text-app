@@ -383,6 +383,32 @@ impl Tui {
         self.press(format!("\x1b[<0;{};{}M", column + 1, row + 1).as_bytes());
     }
 
+    /// A barrier: returns once the TUI has handled every key typed before it. It opens the key
+    /// reference with `?` and closes it again, waiting for each frame: keys are handled in the
+    /// order they are typed, so whatever an earlier key started - a request, a redraw - has been
+    /// started by then, with no clock in the wait. Only where `?` opens the reference: on a page,
+    /// not in a prompt or a dialog.
+    pub fn settle(&mut self) {
+        let close = stt_client::text("tui.help.close", &[]);
+        let plain = close.replace(['[', ']'], "");
+        let open = |text: &str| text.contains(&close) || text.contains(&plain);
+        self.press(b"?");
+        self.wait_for(Duration::from_secs(20), open);
+        self.press(b"?");
+        self.wait_for(Duration::from_secs(20), |text| !open(text));
+    }
+
+    /// [`Tui::settle`] inside a list - a dialog's file list, a dropdown - where `?` would be typed:
+    /// it moves the cursor down a row and back up, waiting for each frame. The cursor must have a
+    /// row below it.
+    pub fn settle_in_list(&mut self) {
+        let before = self.marked_text();
+        self.press(b"\x1b[B");
+        self.wait_for_screen(Duration::from_secs(20), |screen| marked(screen) != before);
+        self.press(b"\x1b[A");
+        self.wait_for_screen(Duration::from_secs(20), |screen| marked(screen) == before);
+    }
+
     /// The TUI's exit status once it has exited, or `None` if it still runs after `timeout`.
     pub fn exit_within(&mut self, timeout: Duration) -> Option<ExitStatus> {
         let deadline = Instant::now() + timeout;
@@ -757,12 +783,21 @@ impl Upload {
 }
 
 /// One open event stream of an [`EventService`]; dropping it closes the connection, as a service
-/// that went away would.
+/// that went away would. It beats as the service does: a `heartbeat` event every
+/// [`HEARTBEAT`] (ADR 0044), so a test that takes its time on a slow machine never sees its stream
+/// fall silent for the TUI's 15 s and drop - only one that asks it to ([`EventStream::fall_silent`]).
 pub struct EventStream {
-    stream: std::net::TcpStream,
+    /// The connection, shared with the heartbeat so an event and a beat never interleave.
+    stream: Arc<Mutex<std::net::TcpStream>>,
+    /// Whether the heartbeat still beats; read and cleared under the connection's lock, so no beat
+    /// leaves once [`EventStream::fall_silent`] returns.
+    beating: Arc<std::sync::atomic::AtomicBool>,
     /// The `Authorization` header the stream was asked for with.
     pub authorization: Option<String>,
 }
+
+/// How often a stand-in stream beats: the service's own heartbeat interval (ADR 0044).
+const HEARTBEAT: Duration = Duration::from_secs(5);
 
 /// The contract's default settings (`docs/api/settings.json`) with the theme mode `mode` stored,
 /// so the TUI draws in it; `dark` is what the stand-in answers a settings read with unless a test
@@ -810,10 +845,7 @@ impl EventService {
                         .unwrap();
                         stream.flush().unwrap();
                         let authorization = request.header("Authorization").map(str::to_owned);
-                        let _ = handed.send(EventStream {
-                            stream,
-                            authorization,
-                        });
+                        let _ = handed.send(EventStream::open(stream, authorization));
                     } else if request.line.starts_with("POST /api/tasks ") {
                         let _ = uploaded.send(Upload { request, stream });
                     } else if request.line.starts_with("POST /api/tasks/")
@@ -934,17 +966,56 @@ impl EventService {
 }
 
 impl EventStream {
+    /// The stream on `stream`, its heartbeat beating.
+    fn open(stream: std::net::TcpStream, authorization: Option<String>) -> EventStream {
+        let stream = Arc::new(Mutex::new(stream));
+        let beating = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let (connection, alive) = (Arc::clone(&stream), Arc::clone(&beating));
+        thread::spawn(move || {
+            loop {
+                thread::sleep(HEARTBEAT);
+                let mut stream = connection.lock().unwrap();
+                if !alive.load(std::sync::atomic::Ordering::SeqCst)
+                    || write!(stream, "event: heartbeat\ndata: {{}}\n\n")
+                        .and_then(|()| stream.flush())
+                        .is_err()
+                {
+                    return;
+                }
+            }
+        });
+        EventStream {
+            stream,
+            beating,
+            authorization,
+        }
+    }
+
+    /// Stops the heartbeat: from now on the stream says nothing it is not told to, as a silent
+    /// network partition would leave it.
+    pub fn fall_silent(&self) {
+        let _connection = self.stream.lock().unwrap();
+        self.beating
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
     /// Sends the event `name` with `json` as its data, one `data:` line per JSON line.
     pub fn send(&mut self, name: &str, json: &str) {
         let data: String = json.lines().map(|line| format!("data: {line}\n")).collect();
-        write!(self.stream, "event: {name}\n{data}\n").unwrap();
-        self.stream.flush().unwrap();
+        let mut stream = self.stream.lock().unwrap();
+        write!(stream, "event: {name}\n{data}\n").unwrap();
+        stream.flush().unwrap();
     }
 }
 
 impl Drop for EventStream {
     fn drop(&mut self) {
-        let _ = self.stream.shutdown(std::net::Shutdown::Both);
+        self.fall_silent();
+        let _ = self
+            .stream
+            .lock()
+            .unwrap()
+            .shutdown(std::net::Shutdown::Both);
     }
 }
 

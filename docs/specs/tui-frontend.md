@@ -871,6 +871,26 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       the upload dialog: the dialog widens for it while the terminal has room, and a message wider
       than the terminal keeps its end - what went wrong - in view -
       `client/stt-tui/tests/upload_error_whole.rs`
+- [x] (must not break) (the user, 2026-11-16: "tests that rely on real clock time are always
+      flaky") No pty test can fail because the machine is slow:
+      - the stand-in's event streams beat every 5 s as the service does (ADR 0044), so no test's
+        stream falls silent for 15 s and drops; `silence.rs` silences its own -
+        `client/stt-tui/tests/terminal/mod.rs` (`EventStream`, `fall_silent`)
+      - a paused playhead is compared with the paused frame's, not with a fixed `0:01`; the 1.2 s
+        after it stays, as a window in which a playhead still moving would show -
+        `client/stt-tui/tests/transcript_playback.rs`
+      - a double-click's clicks go back to back, and no sleep waits for an Escape that is
+        already drawn - `mouse.rs`, `settings_dropdown.rs`, `upload_options.rs`
+- [x] (must not break) (the user, 2026-11-16) A check that nothing was sent or changed waits for
+      a barrier - a later key's frame (`Tui::settle`, `Tui::settle_in_list`) or a later event's
+      request - instead of a sleep, so it checks once the TUI has handled what came before, not
+      after a guessed time (a request the TUI had already started may still be on the network
+      then; the check is stronger, not airtight): the sleeps in `cancel_confirmation`,
+      `commands`, `confirm_dialog`, `events_refresh`, `footer_click`, `history_delete`,
+      `merge_reassign`, `no_audio`, `no_audio_device`, `paste`, `prompt_revert`, `quit`,
+      `settings_restore`, `status_playback`, `upload_up` and `write_gate`. Three windows stay,
+      as observations that cannot fail falsely: `connection` and `stenographer` show an
+      animation at rest for 1.5 s, and `no_service` gives a runner a second to leave its record.
 
 ## Cycle log
 
@@ -3955,3 +3975,6 @@ kept here.
   not fixed in this item.
 - 2026-11-16 (decision, the user): the journey's merge test uploads `jfk.wav` said twice, apart,
   rather than a new two-voice fixture.
+- 2026-11-16 (decision, the user): every real-clock dependency of the pty suite is removed or
+  turned into a barrier (items 1-4 of the inventory); the product's own timers are not made
+  injectable.

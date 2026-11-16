@@ -38,7 +38,7 @@ fn a_history_row_is_deleted_after_the_dialog_and_leaves_with_the_event() {
     );
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains("Delete call.ogg?"));
-    std::thread::sleep(Duration::from_millis(200));
+    tui.settle();
     assert!(!service.command_arrived(), "Escape sends nothing");
 
     // Asked again, Enter deletes it; the service's event takes the row away, the other stays.

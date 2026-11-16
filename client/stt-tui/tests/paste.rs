@@ -76,7 +76,7 @@ fn a_pasted_path_opens_the_upload_dialog_and_text_that_is_not_a_path_is_ignored(
 
     // Text that names no existing file opens nothing.
     paste(&mut tui, "hello there, this is not a path");
-    std::thread::sleep(Duration::from_millis(300));
+    tui.settle();
     assert!(
         !tui.text().contains("Upload audio"),
         "text that is not a path is ignored:\n{}",

@@ -54,7 +54,7 @@ fn restoring_the_defaults_asks_first_and_then_resets_every_field() {
     );
     tui.press(b"\x1b");
     let screen = tui.wait_for(WAIT, |text| !text.contains("Restore default settings?"));
-    std::thread::sleep(Duration::from_millis(300));
+    tui.settle();
     assert!(
         !service.command_arrived(),
         "nothing is sent until it is confirmed"

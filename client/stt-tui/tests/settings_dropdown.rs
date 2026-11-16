@@ -169,8 +169,7 @@ fn a_dropdown_lists_the_options_and_chooses_one_and_escape_closes_it_alone() {
     assert!(modes.contains("auto") && modes.contains("off"), "{modes}");
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains("Esc close"));
-    // An Escape with the next key right behind it reads as Alt and that key: let it settle.
-    std::thread::sleep(Duration::from_millis(300));
+    // The Escape's frame is awaited, so the Down below cannot reach the TUI with it as Alt-Down.
     tui.press(b"\x1b[B");
     tui.press(b"\r");
     let frontends = tui.wait_for(WAIT, |text| text.contains("✓ browser"));

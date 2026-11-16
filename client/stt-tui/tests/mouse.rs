@@ -50,8 +50,8 @@ fn clicking_tabs_rows_the_upload_area_and_a_history_row_twice_does_what_the_keys
 
     // Double-clicking the history row opens its transcript.
     let row = row_of(&screen, "interview.mp3");
+    // Back to back: the second click well inside the double-click's 500 ms on any machine.
     tui.click(3, row);
-    std::thread::sleep(Duration::from_millis(120));
     tui.click(3, row);
     service.next_get_from(&tui, WAIT).answer("200 OK", TURNS);
     tui.wait_for(WAIT, |text| text.contains("Good morning."));
@@ -63,7 +63,6 @@ fn clicking_tabs_rows_the_upload_area_and_a_history_row_twice_does_what_the_keys
     tui.wait_for(WAIT, |text| text.contains("Esc cancel"));
     tui.press(b"\x1b");
     let screen = tui.wait_for(WAIT, |text| !text.contains("Esc cancel"));
-    std::thread::sleep(Duration::from_millis(100));
 
     // Clicking the second queue row - under the running row's progress line - selects it: `d`
     // offers that row's file.
@@ -169,7 +168,6 @@ fn clicks_hit_the_upload_area_and_the_rows_below_the_notices_and_upload_lines() 
     tui.wait_for(WAIT, |text| text.contains("Delete memo.wav?"));
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains("Delete memo.wav?"));
-    std::thread::sleep(Duration::from_millis(100));
 
     // Clicking inside the upload area opens the dialog.
     tui.click(3, row_of(&screen, "Choose audio files"));

@@ -39,7 +39,7 @@ fn cancelling_a_started_task_asks_first_and_a_never_started_one_does_not() {
     tui.wait_for(WAIT, |text| text.contains("Cancel lecture.m4a?"));
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains("Cancel lecture.m4a?"));
-    std::thread::sleep(Duration::from_millis(300));
+    tui.settle();
     assert!(!service.command_arrived(), "Escape sends nothing");
 
     // memo.wav never started: `c` cancels it at once, with no dialog.

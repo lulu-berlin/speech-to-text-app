@@ -61,7 +61,7 @@ fn deleting_and_cancelling_a_started_task_ask_in_the_dialog() {
     );
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains("Cancel lecture.m4a?"));
-    std::thread::sleep(Duration::from_millis(200));
+    tui.settle();
     assert!(!service.command_arrived(), "Escape sends nothing");
 
     // Asked again, Enter cancels it.
@@ -130,8 +130,6 @@ fn merging_and_reassigning_in_a_task_with_merges_ask_in_the_dialog() {
         "Merge Speaker 1 into Speaker 2? Their turns join Speaker 2; you can undo this.",
         "Merge",
     );
-    std::thread::sleep(Duration::from_millis(200));
-    assert!(!service.command_arrived(), "the merge waits for the answer");
     tui.press(b"\r");
     let merge = service.next_command(WAIT);
     assert!(
@@ -160,15 +158,16 @@ fn merging_and_reassigning_in_a_task_with_merges_ask_in_the_dialog() {
         "makes those merges permanent",
         "Move",
     );
-    std::thread::sleep(Duration::from_millis(200));
-    assert!(
-        !service.command_arrived(),
-        "the reassignment waits for the answer"
-    );
     tui.press(b"\r");
     let reassign = service.next_command(WAIT);
     let body: Value = serde_json::from_str(&reassign.request().body).unwrap();
     assert_eq!(body, json!({ "segmentIds": [3], "speakerId": null }));
+    // Each waited for its answer: one merge and one reassignment went out, none before.
+    tui.settle();
+    assert!(
+        !service.command_arrived(),
+        "the merge and the reassignment each waited for the answer"
+    );
 }
 
 #[test]

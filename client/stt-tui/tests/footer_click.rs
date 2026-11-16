@@ -25,7 +25,7 @@ fn a_click_on_a_footer_hint_performs_its_key_and_a_multi_key_hint_does_not() {
     // A hint naming several keys stays keyboard-only: a click on "move" does nothing.
     let (column, row) = position_of(&screen, "move");
     tui.click(column, row);
-    std::thread::sleep(Duration::from_millis(300));
+    tui.settle();
     assert!(
         !service.command_arrived(),
         "a multi-key hint acts on no click"

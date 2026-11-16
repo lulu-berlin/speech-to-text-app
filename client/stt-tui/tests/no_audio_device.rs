@@ -38,7 +38,7 @@ fn without_an_audio_device_play_says_so_and_the_tui_stays_usable() {
 
     // Space there tries again and still says so - it does not claim to play in silence.
     tui.press(b" ");
-    std::thread::sleep(Duration::from_millis(500));
+    tui.settle();
     let history = tui.text();
     assert!(
         history.contains(NO_DEVICE) && !history.contains("♪ playing"),

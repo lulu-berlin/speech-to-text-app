@@ -81,7 +81,7 @@ fn enter_on_dotdot_backspace_and_left_each_go_up_a_folder() {
     assert!(!root.contains("../"), "the root has no `../`:\n{root}");
     tui.press(b"\x1b[D");
     tui.press(b"\x7f");
-    std::thread::sleep(Duration::from_millis(300));
+    tui.settle_in_list();
     let still = tui.text();
     assert!(
         at_root(&still),

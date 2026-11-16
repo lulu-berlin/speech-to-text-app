@@ -46,7 +46,7 @@ fn a_history_row_without_audio_offers_no_playback_and_says_why() {
     tui.press(b"j");
     tui.wait_for(WAIT, |screen| offers(screen, &["retry"], &["Space play"]));
     tui.press(b" ");
-    std::thread::sleep(Duration::from_millis(500));
+    tui.settle();
     assert!(!service.get_arrived(), "a task without audio reads no clip");
     assert!(!service.command_arrived(), "nor does Space send anything");
 }

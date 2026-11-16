@@ -22,10 +22,12 @@ fn a_stream_silent_for_15_seconds_is_opened_anew() {
     support::write_bootstrap(dir.path(), service.port);
     let tui = Tui::start(env!("CARGO_BIN_EXE_stt-tui").as_ref(), dir.path(), 120, 24);
     let mut first = service.next_stream(WAIT);
+    // The first stream stays open and says nothing after its snapshot - not even a heartbeat.
+    first.fall_silent();
     first.send("snapshot", SNAPSHOT);
     tui.wait_for(WAIT, |text| text.contains("memo.wav"));
 
-    // The first stream stays open and says nothing - not even a heartbeat.
+    // A silent 15 s later the TUI opens a new stream.
     let mut second = service.next_stream(SILENCE_AND_RECONNECT);
     assert_eq!(
         second.authorization.as_deref(),

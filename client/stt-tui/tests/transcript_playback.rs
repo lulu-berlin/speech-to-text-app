@@ -73,14 +73,26 @@ fn space_plays_the_transcript_and_pauses_it_with_the_player_bar_shown() {
     // The playhead follows the audio: a second in, the bar reads it.
     tui.wait_for(WAIT, |text| text.contains("0:01 / 19:45"));
 
-    // Space pauses: the state changes and the playhead stands still.
+    // Space pauses: the state changes and the playhead stands still where the pause found it -
+    // read from the paused frame, as a slow machine may pause it a second or two in. The window
+    // after it only gives a playhead that kept moving the time to show it; it cannot fail a pause.
     tui.press(b" ");
-    tui.wait_for(WAIT, |text| text.contains('▶'));
+    let paused = tui.wait_for(WAIT, |text| text.contains('▶'));
+    let playhead = |text: &str| {
+        text.lines()
+            .find_map(|line| {
+                let at = line.find(" / 19:45")?;
+                line[..at].split_whitespace().last().map(str::to_owned)
+            })
+            .expect("the bar shows the playhead")
+    };
+    let at = playhead(&paused);
     std::thread::sleep(Duration::from_millis(1200));
-    let paused = tui.text();
-    assert!(
-        paused.contains("0:01 / 19:45"),
-        "a paused playhead stands still:\n{paused}"
+    let later = tui.text();
+    assert_eq!(
+        playhead(&later),
+        at,
+        "a paused playhead stands still:\n{later}"
     );
 }
 

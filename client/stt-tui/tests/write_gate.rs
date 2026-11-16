@@ -98,7 +98,7 @@ fn writes_are_refused_with_the_reason_while_the_stream_is_down() {
         notice(&screen, "theme").unwrap().contains(REASON),
         "{screen}"
     );
-    std::thread::sleep(Duration::from_millis(300));
+    tui.settle();
     assert!(
         !service.command_arrived(),
         "a refused write is not sent:\n{screen}"

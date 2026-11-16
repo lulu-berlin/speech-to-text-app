@@ -17,7 +17,7 @@ const WAIT: Duration = Duration::from_secs(20);
 fn segment_edited_and_speakers_reassigned_re_read_the_open_transcript() {
     let OpenTranscript {
         service,
-        tui,
+        mut tui,
         mut stream,
         state: _state,
     } = open_transcript();
@@ -62,12 +62,21 @@ fn segment_edited_and_speakers_reassigned_re_read_the_open_transcript() {
             })
     });
 
-    // An event for another task does not re-read this transcript.
+    // An event for another task does not re-read this transcript: an event for this one behind it
+    // re-reads it once - events are handled in order, so a read the first had started would be
+    // ahead of it.
     stream.send(
         "segment-edited",
         r#"{"id":9,"segment":{"id":12,"startMs":0,"endMs":10,"text":"elsewhere","edited":true}}"#,
     );
-    std::thread::sleep(Duration::from_millis(300));
+    stream.send(
+        "segment-edited",
+        r#"{"id":3,"segment":{"id":1,"startMs":0,"endMs":10,"text":"Good morning.","edited":false}}"#,
+    );
+    service
+        .next_get(WAIT)
+        .answer("200 OK", &renamed.to_string());
+    tui.settle();
     assert!(
         !service.get_arrived(),
         "another task's edit leaves this transcript alone"

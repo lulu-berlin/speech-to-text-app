@@ -210,7 +210,7 @@ fn pause_resume_cancel_retry_reorder_and_the_queue_pause_use_the_shared_api() {
 
     // A command the selected task's status does not allow sends nothing: retry on a QUEUED task.
     tui.press(b"r");
-    std::thread::sleep(Duration::from_millis(300));
+    tui.settle();
     assert!(
         !service.command_arrived(),
         "a QUEUED task cannot be retried, so no request goes out"

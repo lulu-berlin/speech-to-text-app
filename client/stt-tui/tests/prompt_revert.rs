@@ -51,16 +51,21 @@ fn ctrl_r_in_the_edit_prompt_reverts_the_segment_and_keeps_the_prompt_open() {
         "Ctrl-R types nothing:\n{reverted}"
     );
 
-    // Nothing is left to revert: Ctrl-R again sends nothing and types nothing.
+    // Nothing is left to revert: Ctrl-R again sends nothing and types nothing. A `z` typed behind
+    // it shows right after the draft - keys are handled in order - and Backspace takes it again.
     tui.press(b"\x12");
-    std::thread::sleep(Duration::from_millis(500));
+    tui.press(b"z");
+    let screen = tui.wait_for(WAIT, |text| text.contains("Segment text: Good morning.z"));
     assert!(
         !service.command_arrived(),
         "an unedited segment has nothing to revert"
     );
-    let screen = tui.text();
+    tui.press(b"\x7f");
+    tui.wait_for(WAIT, |text| {
+        text.contains("Segment text: Good morning.") && !text.contains("Good morning.z")
+    });
     assert!(
-        screen.contains("Segment text: Good morning.") && !screen.contains("Good morning.r"),
+        !screen.contains("Good morning.r"),
         "the draft is unchanged:\n{screen}"
     );
 

@@ -200,9 +200,7 @@ fn tab_and_the_arrows_move_between_the_files_and_the_two_chips() {
     tui.wait_for(WAIT, |text| text.contains("✓ de  german"));
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains("auto  auto-detect"));
-    // An Escape with the next key right behind it reads as Alt and that key: let it settle.
-    std::thread::sleep(Duration::from_millis(300));
-
+    // The Escape's frame is awaited, so the Right below cannot reach the TUI with it as Alt-Right.
     // Left and right move between the two chips without changing either value.
     tui.press(b"\x1b[C");
     tui.press(b"\x1b[B");
