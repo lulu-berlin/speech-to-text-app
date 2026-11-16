@@ -857,8 +857,9 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
 - [x] (edge) (discovered, the diagnostic run on macOS) A typed path longer than its field keeps its
       end - where the cursor is - in view, in the upload and the download dialogs -
       `client/stt-tui/tests/typed_path_tail.rs`
-- [ ] (edge) (discovered, a local stress run) An upload the service refuses never shows its notice
-      beside the upload's own progress line: the line goes first
+- [x] (edge) (discovered, a local stress run) An upload the service refuses never shows its notice
+      beside the upload's own progress line: the line goes first -
+      `client/stt-tui/tests/refused_upload_frame.rs`
 - [ ] (must not break) (discovered, the diagnostic run) The pty tests do not depend on the machine
       they run on: each TUI starts in a folder of its own, the stored theme mode is `dark` unless
       a test stores another, and a folder is compared as the OS resolves it
@@ -1002,6 +1003,14 @@ kept here.
   Green: both dialogs draw the typed text through `draft_tail` (`view.rs`), its last characters
   behind a `…` when it is wider than the row less one cell for the cursor, and put the cursor
   after what they drew.
+  Refactor (approved by the user): `typed_field` draws a dialog's typed draft and returns its
+  cursor column, for both dialogs (`1ebb8bd2`).
+- 2026-11-16 (workspace), cycle "a refused upload's notice never shares a frame with its
+  progress line": the harness gains `Tui::frames`, every whole frame replayed from the TUI's
+  output, so the test reads each frame and not only the ones a wait saw. Red, 3 of 3 runs: a
+  frame held `uploading podcast.mp3 100%` above `≡ podcast.mp3 already uploaded — Enter open`.
+  Green: `send_in_turn` sends the file's `UploadDone` before the service's answer (the duplicate
+  offer or the notice); an upload whose answer never came is held as before.
 
 ## Acceptance criteria
 

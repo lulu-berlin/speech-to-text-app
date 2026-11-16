@@ -232,6 +232,26 @@ impl Tui {
         String::from_utf8_lossy(&self.raw.lock().unwrap()).into_owned()
     }
 
+    /// The text of every whole frame the TUI has drawn so far, in order, replayed from its output:
+    /// what must hold of each frame - not only of the ones a wait happened to look at - is read
+    /// here. The terminal is taken to have kept its present size.
+    pub fn frames(&self) -> Vec<String> {
+        let raw = self.raw.lock().unwrap().clone();
+        let (rows, cols) = self.screen.lock().unwrap().screen().size();
+        let mut replay = vt100::Parser::new(rows, cols, 0);
+        let mut frames = Vec::new();
+        let mut start = 0;
+        for (at, window) in raw.windows(FRAME_MARKER_LEN).enumerate() {
+            if window == FRAME_END {
+                let end = at + FRAME_MARKER_LEN;
+                replay.process(&raw[start..end]);
+                start = end;
+                frames.push(replay.screen().contents());
+            }
+        }
+        frames
+    }
+
     /// The screen's text at the whole frame `shown` holds for, or a panic with the screen after
     /// `timeout`.
     pub fn wait_for(&self, timeout: Duration, shown: impl Fn(&str) -> bool) -> String {

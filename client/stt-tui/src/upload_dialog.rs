@@ -582,35 +582,35 @@ pub(crate) async fn send_in_turn(
             });
         })
         .await;
+        if let Err(error) = &result
+            && error.lost()
+        {
+            // No answer came: this file and the ones behind it wait for the connection, and the
+            // Ui sends them again once a snapshot says it is back.
+            let files: Vec<PathBuf> = std::iter::once(path).chain(pending).collect();
+            let _ = sender.send(Message::UploadHeld {
+                files,
+                options,
+                name,
+            });
+            return;
+        }
+        // The file's line goes before what the service answered shows, so no frame says the file
+        // is still on its way beside that answer.
+        let _ = sender.send(Message::UploadDone(id));
         // A file the service already has is offered as the task it is; any other refusal is its
         // error.
-        let notice = match result {
-            Ok(task) => Some(text("tui.upload.queued", &[("filename", &task.filename)])),
-            Err(error) if error.lost() => {
-                // No answer came: this file and the ones behind it wait for the connection, and
-                // the Ui sends them again once a snapshot says it is back.
-                let files: Vec<PathBuf> = std::iter::once(path).chain(pending).collect();
-                let _ = sender.send(Message::UploadHeld {
-                    files,
-                    options,
-                    name,
-                });
-                return;
-            }
+        let _ = sender.send(match result {
+            Ok(task) => Message::Notice(text("tui.upload.queued", &[("filename", &task.filename)])),
             Err(error) => match error.duplicate() {
-                Some(existing) => {
-                    let _ = sender.send(Message::Duplicate {
-                        task: existing,
-                        filename: name.clone(),
-                    });
-                    None
+                Some(existing) => Message::Duplicate {
+                    task: existing,
+                    filename: name,
+                },
+                None => {
+                    Message::Notice(text("tui.upload.failed", &[("error", &error.to_string())]))
                 }
-                None => Some(text("tui.upload.failed", &[("error", &error.to_string())])),
             },
-        };
-        let _ = sender.send(Message::UploadDone(id));
-        if let Some(notice) = notice {
-            let _ = sender.send(Message::Notice(notice));
-        }
+        });
     }
 }
