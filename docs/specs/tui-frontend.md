@@ -1174,6 +1174,13 @@ kept here.
   150 ms after it (`CONPTY_SETTLE`), else it is read again; output that never pauses is taken at
   the wait's timeout, as before. On Unix waits are unchanged (188 tests green locally).
   `upload_guidance` also waits for its dialog drawn to the footer (`cb7c5667`).
+- 2026-11-16 (workspace), the run 43884436898 (`aeeb1c22`): every job green but
+  `check (windows-2025)` - 234 green, 1 red, 8 ignored; no test read a half-painted screen. The red
+  one, `dialog_redraw`, compared the whole queue before and after the dialog while a task ran, so
+  the header's stenographer tile had moved a frame on (`▞▚` against `▚▞`, its pen a column
+  further) - an animation, which the settle's wait lets show on a slow runner. It compares the
+  screens without the tile now (its three rows' first eleven columns); every other cell must still
+  match.
 
 ## Acceptance criteria
 

@@ -22,6 +22,26 @@ fn queue_shown(text: &str) -> bool {
     text.contains("lecture.m4a") && text.contains("memo.wav") && !text.contains("Esc cancel")
 }
 
+/// The header's stenographer tile: its first three rows' first columns, which animate while a task
+/// runs.
+const TILE: (usize, usize) = (3, 11);
+
+/// `text` without the stenographer tile, which may have moved on between two screens of the same
+/// queue (on a slow runner it does: the run 43884436898 compared two of its frames).
+fn without_tile(text: &str) -> String {
+    text.lines()
+        .enumerate()
+        .map(|(row, line)| {
+            if row < TILE.0 {
+                line.chars().skip(TILE.1).collect()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn closing_the_upload_dialog_repaints_the_whole_screen() {
     let service = EventService::start();
@@ -48,7 +68,8 @@ fn closing_the_upload_dialog_repaints_the_whole_screen() {
         "closing the dialog with Escape repaints the whole screen"
     );
     assert_eq!(
-        after, fresh,
+        without_tile(&after),
+        without_tile(&fresh),
         "the queue is drawn as it was before the dialog"
     );
 
