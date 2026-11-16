@@ -92,7 +92,7 @@ fn a_changed_setting_is_saved_whole_and_the_answer_is_shown() {
             "defaultFrontend": "browser",
             "terminalCommand": "kitty -e",
             "appLanguage": null,
-            "themeMode": "auto"
+            "themeMode": "dark"
         })
     );
     write.answer("200 OK", &stored(SETTINGS, json!({ "threads": 5 })));

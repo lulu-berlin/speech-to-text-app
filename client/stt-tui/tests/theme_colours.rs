@@ -173,10 +173,9 @@ fn a_terminal_without_true_colour_gets_the_nearest_256_colour_entries() {
         .next_get_from(&tui, WAIT)
         .answer("200 OK", &settings_in("dark"));
     tui.wait_for(WAIT, |text| text.contains("memo.wav"));
-    // The open tab is drawn on its chip once the palette is in use.
-    tui.wait_for_cell(WAIT, "Queue", |cell| {
-        cell.bgcolor() != vt100::Color::Default
-    });
+    // The open tab is drawn on the stored mode's chip once the startup settings are in: before
+    // they land the TUI draws in what `auto` resolves to on this machine, light on a light OS.
+    tui.wait_for_cell(WAIT, "Queue", |cell| cell.bgcolor() == accent);
     let scene = tui.wait_for_scene(WAIT, |text| text.contains("memo.wav"));
     assert_eq!(scene.fg("Queue"), background, "the open tab's text");
     assert_eq!(scene.bg("Queue"), accent, "the open tab's chip");

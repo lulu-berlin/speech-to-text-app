@@ -55,8 +55,14 @@ fn the_upload_dialog_names_its_folder_and_says_how_to_use_it() {
     tui.wait_for(WAIT, |text| text.contains("memo.wav"));
 
     let title = catalog("tui.upload.title");
-    let folder_line =
-        catalog("tui.browse.folder").replace("{dir}", &folder.path().display().to_string());
+    // The dialog names the folder as the OS reports the working folder: resolved on Unix, where
+    // macOS's temporary folder lies behind a link (`/var` is `/private/var`), as given on Windows.
+    let shown = if cfg!(unix) {
+        fs::canonicalize(folder.path()).unwrap()
+    } else {
+        folder.path().to_path_buf()
+    };
+    let folder_line = catalog("tui.browse.folder").replace("{dir}", &shown.display().to_string());
     let footer = [footer_files, footer_tab, footer_path, footer_cancel].join("    ");
     tui.press(b"u");
     let screen = tui.wait_for(WAIT, |text| text.contains("talk.mp3"));

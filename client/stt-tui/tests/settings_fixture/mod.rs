@@ -4,8 +4,9 @@
 
 use serde_json::Value;
 
-/// Stored settings with every field set, so a write that drops one shows.
-pub const SETTINGS: &str = r#"{"device":"auto","threads":4,"defaultLanguage":"de","speakersMode":"fixed","speakersCount":3,"maxSpeakers":12,"deviceFallback":null,"defaultFrontend":"browser","terminalCommand":"kitty -e","appLanguage":null,"themeMode":"auto","availableDevices":["cpu","auto","gpu:0","gpu:1"],"gpuNames":{"gpu:0":"NVIDIA GeForce RTX 3060","gpu:1":"AMD Radeon RX 6600"},"deviceProbeError":null}"#;
+/// Stored settings with every field set, so a write that drops one shows; the theme mode `dark`,
+/// so no test draws in whatever appearance the machine's OS prefers.
+pub const SETTINGS: &str = r#"{"device":"auto","threads":4,"defaultLanguage":"de","speakersMode":"fixed","speakersCount":3,"maxSpeakers":12,"deviceFallback":null,"defaultFrontend":"browser","terminalCommand":"kitty -e","appLanguage":null,"themeMode":"dark","availableDevices":["cpu","auto","gpu:0","gpu:1"],"gpuNames":{"gpu:0":"NVIDIA GeForce RTX 3060","gpu:1":"AMD Radeon RX 6600"},"deviceProbeError":null}"#;
 
 /// Two frontends installed, as `GET /api/frontends` lists them (roadmap item 66).
 pub const FRONTENDS: &str = r#"{"frontends":[{"id":"browser","name":"Browser","kind":"browser"},{"id":"window","name":"Window","kind":"gui"}]}"#;

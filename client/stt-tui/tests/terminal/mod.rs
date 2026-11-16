@@ -26,6 +26,9 @@ pub struct Tui {
     /// How far the output reader's painting has got, waited on: a test waits for a redraw, never
     /// for a timer.
     drawn: Arc<(Mutex<Draw>, Condvar)>,
+    /// The empty folder the TUI starts in when its test names none: without one, `portable-pty`
+    /// starts it in `$HOME`, and the dialogs would list whatever the machine keeps there.
+    _folder: Option<tempfile::TempDir>,
 }
 
 /// The painting's progress: the frames it has completed, and whether it is inside a frame - a
@@ -132,9 +135,17 @@ impl Tui {
         for (key, value) in env {
             command.env(key, value);
         }
-        if let Some(cwd) = cwd {
-            command.cwd(cwd);
-        }
+        let folder = match cwd {
+            Some(cwd) => {
+                command.cwd(cwd);
+                None
+            }
+            None => {
+                let folder = tempfile::tempdir().unwrap();
+                command.cwd(folder.path());
+                Some(folder)
+            }
+        };
         let child = pty.slave.spawn_command(command).unwrap();
         drop(pty.slave);
         let screen = Arc::new(Mutex::new(vt100::Parser::new(
@@ -207,6 +218,7 @@ impl Tui {
             screen,
             raw,
             drawn: redrawn,
+            _folder: folder,
         }
     }
 
@@ -752,10 +764,21 @@ pub struct EventStream {
     pub authorization: Option<String>,
 }
 
+/// The contract's default settings (`docs/api/settings.json`) with the theme mode `dark` stored:
+/// what the stand-in answers a settings read with unless a test answers it itself.
+fn stored_dark() -> String {
+    let mut settings: serde_json::Value =
+        serde_json::from_str(include_str!("../../../../docs/api/settings.json")).unwrap();
+    settings["themeMode"] = serde_json::json!("dark");
+    settings.to_string()
+}
+
 impl EventService {
-    /// The stand-in, which answers `GET /api/settings` with the contract's defaults unless the test
-    /// asks for the next one: a TUI's startup read then cannot sit in front of the test's own reads.
-    /// Each connection is read on its own thread, so one slow request never holds up the others.
+    /// The stand-in, which answers `GET /api/settings` with the contract's defaults - the theme
+    /// mode `dark` stored, so no test draws in whatever appearance the machine's OS prefers - unless
+    /// the test asks for the next one: a TUI's startup read then cannot sit in front of the test's
+    /// own reads. Each connection is read on its own thread, so one slow request never holds up
+    /// the others.
     pub fn start() -> EventService {
         let settings_captured = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let settings_answered = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -807,11 +830,7 @@ impl EventService {
                     } else if request.line.starts_with("GET /api/settings ")
                         && !captured.swap(false, std::sync::atomic::Ordering::SeqCst)
                     {
-                        crate::support::respond(
-                            &mut stream,
-                            "200 OK",
-                            include_str!("../../../../docs/api/settings.json"),
-                        );
+                        crate::support::respond(&mut stream, "200 OK", &stored_dark());
                         answered.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     } else if request.line.starts_with("GET /api/tasks")
                         || request.line.starts_with("GET /api/settings ")

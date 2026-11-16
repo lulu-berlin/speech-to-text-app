@@ -860,9 +860,10 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
 - [x] (edge) (discovered, a local stress run) An upload the service refuses never shows its notice
       beside the upload's own progress line: the line goes first -
       `client/stt-tui/tests/refused_upload_frame.rs`
-- [ ] (must not break) (discovered, the diagnostic run) The pty tests do not depend on the machine
+- [x] (must not break) (discovered, the diagnostic run) The pty tests do not depend on the machine
       they run on: each TUI starts in a folder of its own, the stored theme mode is `dark` unless
-      a test stores another, and a folder is compared as the OS resolves it
+      a test stores another, and a folder is compared as the OS resolves it -
+      `client/stt-tui/tests/terminal/mod.rs`, `settings_fixture/mod.rs`
 - [ ] (must not break) (the user, 2026-11-16) Every pty test waits for a key's frame before it
       presses the next key, in `download`, `dialog_redraw` and the journey steps
 
@@ -1011,6 +1012,18 @@ kept here.
   frame held `uploading podcast.mp3 100%` above `≡ podcast.mp3 already uploaded — Enter open`.
   Green: `send_in_turn` sends the file's `UploadDone` before the service's answer (the duplicate
   offer or the notice); an upload whose answer never came is held as before.
+- 2026-11-16 (workspace), cycle "the pty tests do not depend on the machine": red, locally, the
+  suite run with a light OS (a `gsettings` answering `'prefer-light'` first on `PATH`), a `HOME`
+  holding three folders and `TMPDIR` a link to a long folder - `download`, `playing_segment`,
+  `settings_dropdown`, `tab_keys` (2), `turn_time` and `upload_guidance` failed as on the macOS
+  runner (run 43795905007), the plain run green. The Windows check leg of that run, at `812b0141`,
+  failed every pty test with the four bytes `\x1b[6n`, as `Windows (e2e)` did. Green: the
+  harness starts a TUI without a folder of its test in an empty one of its own (`portable-pty`
+  would start it in `$HOME`); the stand-in answers the startup settings with `themeMode` `dark`
+  and the settings tests' fixture stores `dark` (`settings.rs` expects the stored mode written
+  back); the 256-colour test waits for the stored mode's chip, as the frames before the startup
+  settings land draw in what `auto` resolves to; `upload_guidance` compares the folder resolved
+  on Unix (macOS's `/var` is `/private/var`).
 
 ## Acceptance criteria
 
