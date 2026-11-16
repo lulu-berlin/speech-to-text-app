@@ -32,6 +32,14 @@ fn row_line(text: &str, name: &str) -> Option<usize> {
         .position(|line| line.contains(name) && line.contains('%'))
 }
 
+/// Whether the selected row - the one with the selection's bar `▍` - is `name`'s, in the queue or
+/// in History. A key that acts on the selection waits for it: the selection is a row index, so the
+/// key it follows has to have landed before the command reads it.
+fn selected(text: &str, name: &str) -> bool {
+    text.lines()
+        .any(|line| line.contains('▍') && line.contains(name))
+}
+
 fn task(id: i64, filename: &str, status: &str, progress: f64) -> String {
     format!(
         r#"{{"id":{id},"filename":"{filename}","status":"{status}","transcriptionProgress":{progress}}}"#
@@ -121,6 +129,7 @@ fn pause_resume_cancel_retry_reorder_and_the_queue_pause_use_the_shared_api() {
     });
     tui.press(b"\x1b[B");
     tui.press(b"\x1b[B");
+    tui.wait_for(WAIT, |text| selected(text, "lecture.m4a"));
     tui.press(b"r");
     let retry = service.next_command(WAIT);
     assert!(
@@ -142,6 +151,7 @@ fn pause_resume_cancel_retry_reorder_and_the_queue_pause_use_the_shared_api() {
 
     // Shift-Up moves the selected (last) row up: the same order the browser's drag sends.
     tui.press(b"\x1b[B"); // Down, onto the last row
+    tui.wait_for(WAIT, |text| selected(text, "lecture.m4a"));
     tui.press(b"\x1b[1;2A");
     let reorder_up = service.next_command(WAIT);
     let request = reorder_up.request();
@@ -165,6 +175,7 @@ fn pause_resume_cancel_retry_reorder_and_the_queue_pause_use_the_shared_api() {
 
     // `J` moves the selected row down: back to the queue's order.
     tui.press(b"\x1b[A"); // Up, onto the first row
+    tui.wait_for(WAIT, |text| selected(text, "lecture.m4a"));
     tui.press(b"J");
     let reorder_down = service.next_command(WAIT);
     let request = reorder_down.request();
@@ -177,7 +188,10 @@ fn pause_resume_cancel_retry_reorder_and_the_queue_pause_use_the_shared_api() {
     reorder_down.answer("200 OK", &queue(&[7, 5]));
     stream.send("queue-updated", &queue(&[7, 5]));
     tui.wait_for(WAIT, |text| {
-        row_line(text, "memo.wav") < row_line(text, "lecture.m4a")
+        match (row_line(text, "memo.wav"), row_line(text, "lecture.m4a")) {
+            (Some(memo), Some(lecture)) => memo < lecture,
+            _ => false,
+        }
     });
 
     // Space pauses the whole queue, and pauses it back.

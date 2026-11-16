@@ -849,7 +849,7 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
 - [x] (failure) (discovered, the PR's CI run 2026-11-16) A key pressed right after a terminal
       resize is applied: 50 rounds of resize-then-`?` and resize-then-Escape each open and close the
       key reference - `client/stt-tui/tests/resize_keys.rs`
-- [ ] (must not break) (discovered, the diagnostic run 43795905007) Under a Windows ConPTY the pty
+- [x] (must not break) (discovered, the diagnostic run 43795905007) Under a Windows ConPTY the pty
       tests start the TUI and read its first frame: their terminal answers the cursor-position
       query ConPTY asks before the program may start, as every terminal does -
       `client/stt-tui/tests/terminal/mod.rs` (`answer_queries`); proven by the Windows legs of a
@@ -891,24 +891,28 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       `settings_restore`, `status_playback`, `upload_up` and `write_gate`. Three windows stay,
       as observations that cannot fail falsely: `connection` and `stenographer` show an
       animation at rest for 1.5 s, and `no_service` gives a runner a second to leave its record.
-- [ ] (must not break) (discovered, the run 43802779592 on Windows) Under a Windows ConPTY the
+- [x] (must not break) (discovered, the run 43802779592 on Windows) Under a Windows ConPTY the
       pty tests see what the TUI drew as soon as it arrives and read it row by row: a wait wakes
       on every read of the output, not only at a frame's end marker, and the screen's text has
       one line per row - `client/stt-tui/tests/terminal/mod.rs` (`Draw::reads`, `screen_text`);
       proven by the Windows legs of a dispatched run
-- [ ] (failure) (discovered, the run 43850892737 on Windows) On Windows a pasted path opens the
+- [x] (failure) (discovered, the run 43850892737 on Windows) On Windows a pasted path opens the
       upload dialog and a click or the wheel acts, as on Unix - no pasted letter acts as a key:
       the TUI reads its input through termina in virtual-terminal input
       ([ADR 0069](../decisions/0069-tui-input-through-termina.md)) - `paste.rs`, `mouse.rs`,
       `footer_click.rs`, `segment_click.rs`, `upload_dialog.rs`, `settings_dropdown.rs`,
       `horizontal_wheel.rs` on the Windows leg
-- [ ] (must not break) (discovered, the runs 43850892737 to 43877126064 on Windows) Under a
+- [x] (must not break) (discovered, the runs 43850892737 to 43877126064 on Windows) Under a
       Windows ConPTY a test reads the screen as the TUI drew it: a blank cell ConPTY skipped
       (`ESC [ n C`) reads as a space (`cell_text`), and a screen a wait accepts is one ConPTY has
       finished painting - it paints after it has passed the TUI's frame markers on and marks no
       end of its paint, so a wait takes a screen once ConPTY has written nothing for 150 ms
       (`CONPTY_SETTLE`, Windows only); and a folder's root reads as the OS writes it (`/`, `C:/`) -
       `client/stt-tui/tests/terminal/mod.rs`, `upload_up.rs`
+- [x] (must not break) (the user, 2026-11-16, from `docs/known-issues.md`) The queue-commands pty
+      test is deterministic: a key that acts on the selection - History's retry, Shift-Up, `J` -
+      is pressed only once the selection is drawn on the row it means, and the final order is
+      awaited with both rows drawn - `client/stt-tui/tests/commands.rs`
 
 ## Cycle log
 
@@ -1181,6 +1185,15 @@ kept here.
   further) - an animation, which the settle's wait lets show on a slow runner. It compares the
   screens without the tile now (its three rows' first eleven columns); every other cell must still
   match.
+- 2026-11-16 (workspace, the user: "a TUI issue, fixed in this item"): `commands.rs`'s
+  queue-commands test, which failed once on 2026-11-13 (cycle 139; the `J` body was not
+  recorded), pressed a selection move and the command that reads it back to back. The TUI keeps
+  the selection as a row index and the keys arrive in order, so the code shows no reorder of
+  them; the failure's cause is unconfirmed. The test now waits for the selection's bar `▍` on the
+  row each command means before the command (History's retry, Shift-Up, `J`), and its last wait
+  needs both rows drawn (`None < Some` held of a screen without memo's row). Verified: 10 of 10
+  runs green; with the Up press taken out the test stops at the selection's wait (20 s) instead
+  of sending a wrong `J`. The known-issues row is removed.
 
 ## Acceptance criteria
 
@@ -4080,6 +4093,7 @@ kept here.
   ([ADR 0069](../decisions/0069-tui-input-through-termina.md)), crossterm keeps drawing.
 - 2026-11-16 (decision, the user, on the run 43877126064): the Windows pty waits let ConPTY
   settle (150 ms with no output) rather than every one of the 213 screen-reading waits being
-  reviewed. The workspace's ignore of the two theme tests that need an OS saying nothing, on
-  Windows where `reg` always answers, was put to the user with it; the user's confirmation is
-  asked at the hand-over.
+  reviewed. The two theme tests that need an OS saying nothing are ignored on Windows, where
+  `reg` always answers (`theme_switch.rs`).
+- 2026-11-16 (decision, the user, after the run 43893962274): the Windows ignore of the two theme
+  tests is accepted.
