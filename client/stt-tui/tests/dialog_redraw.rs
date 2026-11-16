@@ -26,16 +26,28 @@ fn queue_shown(text: &str) -> bool {
 /// runs.
 const TILE: (usize, usize) = (3, 11);
 
-/// `text` without the stenographer tile, which may have moved on between two screens of the same
-/// queue (on a slow runner it does: the run 43884436898 compared two of its frames).
-fn without_tile(text: &str) -> String {
+/// What comes before a running row's elapsed time.
+const ELAPSED: &str = "… · ";
+
+/// `text` without what moves while a task runs: the stenographer tile, which animates (the run
+/// 43884436898 compared two of its frames), and the running row's elapsed time, which counts the
+/// wall clock's seconds (the run 43904222789: `918:59:40` against `918:59:39`). On a slow runner
+/// the two screens are more than a frame or a second apart.
+fn steady(text: &str) -> String {
     text.lines()
         .enumerate()
         .map(|(row, line)| {
-            if row < TILE.0 {
+            let line: String = if row < TILE.0 {
                 line.chars().skip(TILE.1).collect()
             } else {
                 line.to_string()
+            };
+            match line.split_once(ELAPSED) {
+                Some((status, rest)) => {
+                    let after = rest.trim_start_matches(|c: char| !c.is_whitespace());
+                    format!("{status}{ELAPSED}<elapsed>{after}")
+                }
+                None => line,
             }
         })
         .collect::<Vec<_>>()
@@ -68,8 +80,8 @@ fn closing_the_upload_dialog_repaints_the_whole_screen() {
         "closing the dialog with Escape repaints the whole screen"
     );
     assert_eq!(
-        without_tile(&after),
-        without_tile(&fresh),
+        steady(&after),
+        steady(&fresh),
         "the queue is drawn as it was before the dialog"
     );
 
