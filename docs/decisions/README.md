@@ -74,3 +74,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0066 | [The frontend tests mock the API at the fetch and XHR layer, not at MSW 3's socket layer](0066-frontend-tests-mock-fetch-not-sockets.md) | accepted | 2026-11-06 |
 | 0067 | [One UI-text catalog for every frontend](0067-one-ui-text-catalog-for-every-frontend.md) | accepted | 2026-11-06 |
 | 0068 | [One theme-token file for every frontend](0068-one-theme-token-file-for-every-frontend.md) | accepted | 2026-11-07 |
+| 0069 | [The TUI reads its input through termina](0069-tui-input-through-termina.md) | accepted | 2026-11-16 |

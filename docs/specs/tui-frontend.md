@@ -896,6 +896,17 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       on every read of the output, not only at a frame's end marker, and the screen's text has
       one line per row - `client/stt-tui/tests/terminal/mod.rs` (`Draw::reads`, `screen_text`);
       proven by the Windows legs of a dispatched run
+- [ ] (failure) (discovered, the run 43850892737 on Windows) On Windows a pasted path opens the
+      upload dialog and a click or the wheel acts, as on Unix - no pasted letter acts as a key:
+      the TUI reads its input through termina in virtual-terminal input
+      ([ADR 0069](../decisions/0069-tui-input-through-termina.md)) - `paste.rs`, `mouse.rs`,
+      `footer_click.rs`, `segment_click.rs`, `upload_dialog.rs`, `settings_dropdown.rs`,
+      `horizontal_wheel.rs` on the Windows leg
+- [ ] (must not break) (discovered, the run 43850892737 on Windows) Under a Windows ConPTY a
+      screen a wait accepts is whole: ConPTY paints what it holds before it passes the TUI's next
+      frame marker on, so a wait asks for a later frame (F12, bound nowhere) and checks again once
+      it has arrived - `client/stt-tui/tests/terminal/mod.rs` (`conpty_flushed`); and a folder's
+      root reads as the OS writes it (`/`, `C:/`) - `upload_up.rs`
 
 ## Cycle log
 
@@ -1103,6 +1114,21 @@ kept here.
   stream live. Risk left [INFERENCE]: with no frame to wait for under ConPTY, a colour read
   (`wait_for_scene`, `wait_for_cell`) may take a row ConPTY has not painted yet; the next
   dispatched run shows whether it does.
+- 2026-11-16 (workspace), the run 43850892737 (`8c1e031c`): Linux, macOS and every e2e leg
+  green, the journey three of three on every OS. `check (windows-2025)`: 212 green, 25 red - nine
+  click and wheel tests saw no mouse; `paste.rs`'s path arrived as keystrokes (its `/` opened
+  History's search); thirteen read a screen ConPTY had not finished painting (`dialog_dim`'s
+  border cell empty, `call.oggOct 9` with a column not yet drawn); `upload_up` expected the root
+  `/` where Windows shows `C:/`. The user chose to fix the input in this item. Cycle "Windows
+  paste and mouse": `stt-tui` reads its input through termina (ADR 0069,
+  `client/stt-tui/src/keyboard.rs`) - virtual-terminal input on Windows, one parser on every OS,
+  its events mapped onto the crossterm events the TUI handles; the mouse and bracketed-paste modes
+  are asked for with their escape sequences, since crossterm's Windows mouse command resets the
+  console's input mode; the `use-dev-tty` dependency of cycle 1 goes. Red is the run's Windows
+  leg; locally the pty suite stays green on the new path (188 tests, `resize_keys` included).
+  With it: a ConPTY barrier in `wait_for_screen` (F12 asks for a later frame, whose marker ConPTY
+  passes on only after painting the earlier ones) and `upload_up`'s root read as the OS writes it.
+  Green is the next dispatched run's to prove.
 
 ## Acceptance criteria
 
@@ -3997,3 +4023,6 @@ kept here.
 - 2026-11-16 (decision, the user): every real-clock dependency of the pty suite is removed or
   turned into a barrier (items 1-4 of the inventory); the product's own timers are not made
   injectable.
+- 2026-11-16 (decision, the user): the Windows paste and mouse defects are fixed in this item; the
+  TUI's input is read through termina on every OS
+  ([ADR 0069](../decisions/0069-tui-input-through-termina.md)), crossterm keeps drawing.

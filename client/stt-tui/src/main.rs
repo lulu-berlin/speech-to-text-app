@@ -14,10 +14,7 @@ use std::time::{Duration, Instant};
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::cursor::SetCursorStyle;
 use ratatui::crossterm::event as terminal_event;
-use ratatui::crossterm::event::{
-    DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyCode,
-    MouseButton, MouseEventKind,
-};
+use ratatui::crossterm::event::{KeyCode, MouseButton, MouseEventKind};
 use ratatui::crossterm::terminal::{
     BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate,
 };
@@ -42,6 +39,7 @@ mod download;
 mod footer;
 mod hints;
 mod input;
+mod keyboard;
 mod player;
 mod settings;
 mod state;
@@ -217,18 +215,20 @@ fn main() -> ExitCode {
     let mut terminal = ratatui::init();
     // The cursor a prompt shows is a blinking block, as the user asked (DECSCUSR 1); the terminal's
     // own shape comes back when the TUI leaves.
-    let _ = execute!(
-        io::stdout(),
-        SetCursorStyle::BlinkingBlock,
-        EnableMouseCapture,
-        EnableBracketedPaste
-    );
-    std::thread::spawn(move || {
-        while let Ok(event) = terminal_event::read() {
-            if keys.send(Message::Terminal(event)).is_err() {
-                return;
-            }
+    let _ = execute!(io::stdout(), SetCursorStyle::BlinkingBlock);
+    // Keys, mouse reports and pastes are read on a thread of their own (ADR 0069).
+    let keyboard = match keyboard::Keyboard::open() {
+        Ok(keyboard) => keyboard,
+        Err(error) => {
+            let _ = execute!(io::stdout(), SetCursorStyle::DefaultUserShape);
+            ratatui::restore();
+            eprintln!("stt-tui: the terminal's input cannot be read ({error})");
+            return ExitCode::FAILURE;
         }
+    };
+    let reader = keyboard.reader();
+    std::thread::spawn(move || {
+        keyboard::read(reader, |event| keys.send(Message::Terminal(event)).is_ok());
     });
     let shown = show(
         &mut terminal,
@@ -238,12 +238,8 @@ fn main() -> ExitCode {
         sender,
         clues,
     );
-    let _ = execute!(
-        io::stdout(),
-        SetCursorStyle::DefaultUserShape,
-        DisableMouseCapture,
-        DisableBracketedPaste
-    );
+    keyboard.close();
+    let _ = execute!(io::stdout(), SetCursorStyle::DefaultUserShape);
     ratatui::restore();
     match shown {
         Ok(()) => ExitCode::SUCCESS,
