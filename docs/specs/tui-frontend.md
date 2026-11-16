@@ -891,6 +891,11 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       `settings_restore`, `status_playback`, `upload_up` and `write_gate`. Three windows stay,
       as observations that cannot fail falsely: `connection` and `stenographer` show an
       animation at rest for 1.5 s, and `no_service` gives a runner a second to leave its record.
+- [ ] (must not break) (discovered, the run 43802779592 on Windows) Under a Windows ConPTY the
+      pty tests see what the TUI drew as soon as it arrives and read it row by row: a wait wakes
+      on every read of the output, not only at a frame's end marker, and the screen's text has
+      one line per row - `client/stt-tui/tests/terminal/mod.rs` (`Draw::reads`, `screen_text`);
+      proven by the Windows legs of a dispatched run
 
 ## Cycle log
 
@@ -1084,6 +1089,20 @@ kept here.
   with the turns in its message before merging the first two it reports, and expects that many
   back after `R`. Green locally (the journey's three tests); macOS and Windows are the next
   dispatched run's.
+- 2026-11-16 (workspace), the run 43802779592 on Windows (`a9dc8637`): with the cursor query
+  answered the TUI starts and draws there (`DIAGNOSTIC child: Ok(None); 8204 raw bytes`, the
+  first frame in them); `check (windows-2025)` ran 143 tests green and 83 red before its 25-minute
+  bound, `Windows (e2e)`'s journey 2 green and `r_resets` red at the one-segment merge (fixed
+  since). The 83: a ConPTY paints the screen on its own schedule - it passes the TUI's
+  synchronized-update markers on (`\x1b[?2026h\x1b[?2026l` pairs) but a frame's cells arrive
+  around them, so a wait that woke only at a frame's end slept its whole 20 s and the stream
+  went silent behind it (`Not sent: cancel. Can't reach the app's service.`); and it paints whole
+  rows and lets them wrap, so vt100's `contents` joined rows (`Theme: dark  │ ◕ ◕ │▞▚  Queue`),
+  and every test reading lines read two rows as one. The harness now wakes a wait on every read
+  and reads the screen row by row (`screen_text`); the heartbeat (`78eb3f28`) keeps a slow test's
+  stream live. Risk left [INFERENCE]: with no frame to wait for under ConPTY, a colour read
+  (`wait_for_scene`, `wait_for_cell`) may take a row ConPTY has not painted yet; the next
+  dispatched run shows whether it does.
 
 ## Acceptance criteria
 

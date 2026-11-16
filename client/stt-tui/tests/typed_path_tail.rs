@@ -8,7 +8,7 @@ mod terminal;
 
 use std::time::Duration;
 
-use terminal::{EventService, Tui};
+use terminal::{EventService, Tui, screen_text};
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
 const TURNS: &str = include_str!("../../../docs/api/turns.json");
@@ -23,7 +23,7 @@ fn long_path(end: &str) -> String {
 /// cursor on the cell right after it.
 fn end_in_view(screen: &vt100::Screen, end: &str) -> bool {
     let (row, column) = screen.cursor_position();
-    let contents = screen.contents();
+    let contents = screen_text(screen);
     contents.lines().enumerate().any(|(index, line)| {
         let Some(byte) = line.find(end) else {
             return false;

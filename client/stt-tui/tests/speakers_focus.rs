@@ -11,15 +11,14 @@ mod terminal;
 
 use std::time::Duration;
 
-use terminal::open_transcript;
+use terminal::{open_transcript, screen_text};
 
 const WAIT: Duration = Duration::from_secs(20);
 
 /// The screen rows of the speakers in the panel: the two rows under the panel's title row, so a
 /// row added above the panel does not move this test's aim.
 fn speaker_rows(screen: &vt100::Screen) -> [usize; 2] {
-    let top = screen
-        .contents()
+    let top = screen_text(screen)
         .lines()
         .position(|line| line.contains("Speakers"))
         .expect("the Speakers panel is on screen");

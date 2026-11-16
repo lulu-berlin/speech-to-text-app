@@ -31,10 +31,13 @@ pub struct Tui {
     _folder: Option<tempfile::TempDir>,
 }
 
-/// The painting's progress: the frames it has completed, and whether it is inside a frame - a
-/// synchronized update the TUI opened and has not ended yet, whose screen is half a frame.
+/// The painting's progress: how many reads of the TUI's output the screen has taken in, and whether
+/// it is inside a frame - a synchronized update the TUI opened and has not ended yet, whose screen
+/// is half a frame. A wait wakes on every read, not only at a frame's end: a Windows ConPTY passes
+/// the markers on but paints the screen on its own schedule, so a frame's cells can arrive after
+/// its end marker (run 43802779592: each wait then slept its whole timeout).
 struct Draw {
-    frames: u64,
+    reads: u64,
     inside: bool,
 }
 
@@ -162,7 +165,7 @@ impl Tui {
         let answers = Arc::clone(&keyboard);
         let redrawn = Arc::new((
             Mutex::new(Draw {
-                frames: 0,
+                reads: 0,
                 inside: false,
             }),
             Condvar::new(),
@@ -189,13 +192,11 @@ impl Tui {
                 scanned = answer_queries(&all, scanned, colours, &answers);
                 let mut frame_bytes = tail.clone();
                 frame_bytes.extend_from_slice(&bytes[..read]);
-                let mut ends = 0u64;
                 for window in frame_bytes.windows(FRAME_MARKER_LEN) {
                     if window == FRAME_START {
                         inside = true;
                     } else if window == FRAME_END {
                         inside = false;
-                        ends += 1;
                     }
                 }
                 let keep = frame_bytes.len().saturating_sub(FRAME_MARKER_LEN - 1);
@@ -203,12 +204,10 @@ impl Tui {
                 drop(all);
                 {
                     let mut draw = notify.0.lock().unwrap();
-                    draw.frames += ends;
+                    draw.reads += 1;
                     draw.inside = inside;
                 }
-                if ends > 0 {
-                    notify.1.notify_all();
-                }
+                notify.1.notify_all();
             }
         });
         Tui {
@@ -258,7 +257,7 @@ impl Tui {
                 let end = at + FRAME_MARKER_LEN;
                 replay.process(&raw[start..end]);
                 start = end;
-                frames.push(replay.screen().contents());
+                frames.push(screen_text(replay.screen()));
             }
         }
         frames
@@ -269,7 +268,7 @@ impl Tui {
     pub fn wait_for(&self, timeout: Duration, shown: impl Fn(&str) -> bool) -> String {
         let mut matched = None;
         self.wait_for_screen(timeout, |screen| {
-            let text = screen.contents();
+            let text = screen_text(screen);
             let holds = shown(&text);
             if holds {
                 matched = Some(text);
@@ -280,10 +279,10 @@ impl Tui {
     }
 
     /// Waits until `holds` is true of a whole frame, or panics with the screen after `timeout`.
-    /// It wakes on the reader's redraw signal rather than polling a timer; `timeout` only bounds a
-    /// TUI that fails to draw what the test expects. A frame is read only once the TUI has ended
-    /// its synchronized update: mid-frame the screen is half painted, and a predicate that held
-    /// there would hand its caller a partial screen.
+    /// It wakes on the reader's signal that the screen took in more output rather than polling a
+    /// timer; `timeout` only bounds a TUI that fails to draw what the test expects. Mid-frame - after
+    /// a synchronized update's start, before its end - the screen is half painted and is not read,
+    /// so a predicate never holds of a partial screen.
     pub fn wait_for_screen(
         &self,
         timeout: Duration,
@@ -292,9 +291,9 @@ impl Tui {
         let deadline = Instant::now() + timeout;
         let (draw, redrawn) = &*self.drawn;
         loop {
-            // The count before the check: a redraw that lands between the check and the wait is
+            // The count before the check: output that lands between the check and the wait is
             // seen as a change and never slept past.
-            let seen = draw.lock().unwrap().frames;
+            let seen = draw.lock().unwrap().reads;
             let holds_now = {
                 let screen = self.screen.lock().unwrap();
                 let painting = draw.lock().unwrap().inside;
@@ -311,7 +310,7 @@ impl Tui {
                 );
             }
             let waiting = draw.lock().unwrap();
-            if waiting.frames == seen {
+            if waiting.reads == seen {
                 let _ = redrawn.wait_timeout(waiting, remaining).unwrap();
             }
         }
@@ -357,7 +356,7 @@ impl Tui {
     pub fn wait_for_scene(&self, timeout: Duration, shown: impl Fn(&str) -> bool) -> Scene {
         let mut matched = None;
         self.wait_for_screen(timeout, |screen| {
-            let holds = shown(&screen.contents());
+            let holds = shown(&screen_text(screen));
             if holds {
                 matched = Some(Scene::of(screen));
             }
@@ -368,7 +367,7 @@ impl Tui {
 
     /// The screen's text, one line per row.
     pub fn text(&self) -> String {
-        self.screen.lock().unwrap().screen().contents()
+        screen_text(self.screen.lock().unwrap().screen())
     }
 
     /// Types `keys` - the bytes a terminal sends for them - into the TUI.
@@ -464,6 +463,15 @@ pub fn style(scene: &Scene, row: usize, needle: &str) -> (vt100::Color, vt100::C
         .unwrap_or_else(|| panic!("{needle:?} is on row {row}:\n{text}"));
     let cell = scene.cell(row, text[..byte].chars().count()).unwrap();
     (cell.fg, cell.bg)
+}
+
+/// The screen's text, one line per row as drawn. vt100's own `contents` joins a row the terminal let
+/// wrap into the next into one line - a Windows ConPTY paints whole rows and lets them wrap - so a
+/// test reading lines would take two rows for one there (run 43802779592).
+pub fn screen_text(screen: &vt100::Screen) -> String {
+    let columns = screen.size().1.get();
+    let rows: Vec<String> = screen.rows(0, columns).collect();
+    rows.join("\n").trim_end_matches('\n').to_string()
 }
 
 /// The footer's hints on `screen`: the three-space-separated parts of the rows under the screen's last

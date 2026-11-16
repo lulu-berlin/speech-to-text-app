@@ -9,7 +9,7 @@ mod terminal;
 use std::time::Duration;
 
 use serde_json::json;
-use terminal::{EventService, Tui, WIDE};
+use terminal::{EventService, Tui, WIDE, screen_text};
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
 const WAIT: Duration = Duration::from_secs(20);
@@ -93,7 +93,7 @@ fn the_view_follows_the_cursor_and_the_vim_keys_page_and_jump() {
     // there too, so the segments the screen shows are the whole viewport, not a frame in progress.
     tui.wait_for_highlight(WAIT, "Line 01.");
     tui.wait_for_screen(WAIT, |screen| {
-        let shown = screen.contents();
+        let shown = screen_text(screen);
         shown.contains("? help") && visible_segments(&shown).first() == Some(&1)
     });
     let screen = tui.text();

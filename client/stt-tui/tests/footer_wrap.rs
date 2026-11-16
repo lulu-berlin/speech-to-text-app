@@ -9,7 +9,7 @@ mod terminal;
 
 use std::time::Duration;
 
-use terminal::{EventService, Tui, table_cells};
+use terminal::{EventService, Tui, screen_text, table_cells};
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
 const TURNS: &str = include_str!("../../../docs/api/turns.json");
@@ -95,7 +95,7 @@ fn wait_footer(tui: &Tui, keys: &[&str]) -> Vec<String> {
     let hints = hints(keys);
     let mut left = Vec::new();
     tui.wait_for_screen(WAIT, |screen| {
-        let text = screen.contents();
+        let text = screen_text(screen);
         let lines: Vec<&str> = text.lines().collect();
         let [.., above, footer] = lines.as_slice() else {
             return false;

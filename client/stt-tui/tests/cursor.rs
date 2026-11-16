@@ -10,7 +10,7 @@ mod terminal;
 use std::time::Duration;
 
 use settings_fixture::{FRONTENDS, SETTINGS};
-use terminal::{EventService, Tui, open_transcript};
+use terminal::{EventService, Tui, open_transcript, screen_text};
 
 const SNAPSHOT: &str = include_str!("../../../docs/api/snapshot.json");
 const WAIT: Duration = Duration::from_secs(20);
@@ -22,7 +22,7 @@ fn cursor_after(screen: &vt100::Screen, prefix: &str) -> bool {
         return false;
     }
     let (row, column) = screen.cursor_position();
-    let contents = screen.contents();
+    let contents = screen_text(screen);
     let Some((index, line)) = contents
         .lines()
         .enumerate()
@@ -49,7 +49,7 @@ fn cursor_on(screen: &vt100::Screen, needle: &str, mark: char) -> bool {
         return false;
     }
     let (row, column) = screen.cursor_position();
-    let contents = screen.contents();
+    let contents = screen_text(screen);
     let Some((index, line)) = contents
         .lines()
         .enumerate()
