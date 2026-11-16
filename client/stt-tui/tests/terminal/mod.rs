@@ -31,13 +31,14 @@ pub struct Tui {
     _folder: Option<tempfile::TempDir>,
 }
 
-/// The painting's progress: how many reads of the TUI's output the screen has taken in, and whether
-/// it is inside a frame - a synchronized update the TUI opened and has not ended yet, whose screen
-/// is half a frame. A wait wakes on every read, not only at a frame's end: a Windows ConPTY passes
-/// the markers on but paints the screen on its own schedule, so a frame's cells can arrive after
-/// its end marker (run 43802779592: each wait then slept its whole timeout).
+/// The painting's progress: how many reads of the TUI's output the screen has taken in, how many
+/// frame ends it has read, and whether it is inside a frame - a synchronized update the TUI opened
+/// and has not ended yet, whose screen is half a frame. A wait wakes on every read, not only at a
+/// frame's end: a Windows ConPTY paints the screen on its own schedule and a frame's cells can
+/// arrive after its end marker (run 43802779592: each wait then slept its whole timeout).
 struct Draw {
     reads: u64,
+    ends: u64,
     inside: bool,
 }
 
@@ -166,6 +167,7 @@ impl Tui {
         let redrawn = Arc::new((
             Mutex::new(Draw {
                 reads: 0,
+                ends: 0,
                 inside: false,
             }),
             Condvar::new(),
@@ -192,11 +194,13 @@ impl Tui {
                 scanned = answer_queries(&all, scanned, colours, &answers);
                 let mut frame_bytes = tail.clone();
                 frame_bytes.extend_from_slice(&bytes[..read]);
+                let mut ends = 0;
                 for window in frame_bytes.windows(FRAME_MARKER_LEN) {
                     if window == FRAME_START {
                         inside = true;
                     } else if window == FRAME_END {
                         inside = false;
+                        ends += 1;
                     }
                 }
                 let keep = frame_bytes.len().saturating_sub(FRAME_MARKER_LEN - 1);
@@ -205,6 +209,7 @@ impl Tui {
                 {
                     let mut draw = notify.0.lock().unwrap();
                     draw.reads += 1;
+                    draw.ends += ends;
                     draw.inside = inside;
                 }
                 notify.1.notify_all();
@@ -282,7 +287,8 @@ impl Tui {
     /// It wakes on the reader's signal that the screen took in more output rather than polling a
     /// timer; `timeout` only bounds a TUI that fails to draw what the test expects. Mid-frame - after
     /// a synchronized update's start, before its end - the screen is half painted and is not read,
-    /// so a predicate never holds of a partial screen.
+    /// so a predicate never holds of a partial screen. Under a Windows ConPTY, which paints on its
+    /// own schedule, a screen the predicate holds of is confirmed by [`Tui::conpty_flushed`].
     pub fn wait_for_screen(
         &self,
         timeout: Duration,
@@ -299,7 +305,7 @@ impl Tui {
                 let painting = draw.lock().unwrap().inside;
                 !painting && holds(screen.screen())
             };
-            if holds_now {
+            if holds_now && (!cfg!(windows) || self.conpty_flushed(deadline, &mut holds)) {
                 return;
             }
             let remaining = deadline.saturating_duration_since(Instant::now());
@@ -314,6 +320,36 @@ impl Tui {
                 let _ = redrawn.wait_timeout(waiting, remaining).unwrap();
             }
         }
+    }
+
+    /// Whether `holds` is still true once ConPTY has painted everything the TUI drew before. A
+    /// ConPTY passes the TUI's synchronized-update markers through in order and paints what it holds
+    /// before it passes one on, so once a later frame's end has arrived every cell of the earlier
+    /// frames is on the screen. The later frame is asked for with F12, which no screen binds: the
+    /// TUI redraws on every key. A TUI that has exited draws nothing more; its screen is final.
+    fn conpty_flushed(
+        &self,
+        deadline: Instant,
+        holds: &mut impl FnMut(&vt100::Screen) -> bool,
+    ) -> bool {
+        let (draw, redrawn) = &*self.drawn;
+        let before = draw.lock().unwrap().ends;
+        {
+            let mut keyboard = self.keyboard.lock().unwrap();
+            let _ = keyboard
+                .write_all(b"\x1b[24~")
+                .and_then(|()| keyboard.flush());
+        }
+        let mut waiting = draw.lock().unwrap();
+        while waiting.ends == before {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            waiting = redrawn.wait_timeout(waiting, remaining).unwrap().0;
+        }
+        drop(waiting);
+        holds(self.screen.lock().unwrap().screen())
     }
 
     /// The marked cells' text as drawn now (the current segment, the selection), as

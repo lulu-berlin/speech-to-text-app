@@ -73,9 +73,21 @@ fn enter_on_dotdot_backspace_and_left_each_go_up_a_folder() {
         text.contains("recordings/") && !text.contains("top.wav")
     });
 
-    // At the root `../` is gone and going up keeps the root: its folder line reads "Folder  /"
-    // followed by blanks, which no deeper folder's line does.
-    let at_root = |text: &str| text.contains("Folder  / ");
+    // At the root `../` is gone and going up keeps the root: its folder line names a root as the
+    // OS writes one - `/` on Unix, a drive such as `C:/` on Windows - which no deeper folder does.
+    let at_root = |text: &str| {
+        text.lines().any(|line| {
+            line.split_once("Folder  ").is_some_and(|(_, rest)| {
+                let folder = rest.split('│').next().unwrap_or_default().trim_end();
+                let drive = folder.strip_suffix(['/', '\\']).unwrap_or(folder);
+                folder == "/"
+                    || (drive.len() == 2
+                        && drive.ends_with(':')
+                        && drive.starts_with(|c: char| c.is_ascii_alphabetic())
+                        && drive.len() < folder.len())
+            })
+        })
+    };
     tui.press(b"/\r");
     let root = tui.wait_for(WAIT, at_root);
     assert!(!root.contains("../"), "the root has no `../`:\n{root}");
