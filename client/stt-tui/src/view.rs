@@ -531,13 +531,22 @@ fn draw_upload(frame: &mut Frame, view: &View<'_>, upload: &UploadDialog) {
             .collect::<Vec<_>>(),
     ));
     lines.push(rule);
-    let path = match browser.typed() {
+    // The path being typed, its end in view when it is wider than the row: the cursor follows it.
+    let path_prefix = format!("{}   ", stt_client::text("tui.upload.path", &[]));
+    let path_prefix_width = path_prefix.chars().count() as u16;
+    let typed = browser.typed().map(|path| {
+        draft_tail(
+            path,
+            inner
+                .width
+                .saturating_sub(path_prefix_width)
+                .saturating_sub(1),
+        )
+    });
+    let path = match &typed {
         Some(path) => Line::from(vec![
-            Span::styled(
-                format!("{}   ", stt_client::text("tui.upload.path", &[])),
-                fg(view, view.theme.muted),
-            ),
-            Span::raw(path.to_string()),
+            Span::styled(path_prefix, fg(view, view.theme.muted)),
+            Span::raw(path.clone()),
         ]),
         None => muted_hint(view, "tui.upload.footerPath", &[]),
     };
@@ -615,12 +624,9 @@ fn draw_upload(frame: &mut Frame, view: &View<'_>, upload: &UploadDialog) {
             frame.render_widget(Paragraph::new(lines), list);
         }
     }
-    // The path being typed: the cursor at its end, on the line it is drawn on.
-    if let Some(path) = browser.typed() {
-        let column = inner.x
-            + stt_client::text("tui.upload.path", &[]).chars().count() as u16
-            + 3
-            + path.chars().count() as u16;
+    // The cursor at the typed path's end, on the line it is drawn on.
+    if let Some(path) = &typed {
+        let column = inner.x + path_prefix_width + path.chars().count() as u16;
         frame.set_cursor_position((column, inner.y + path_row));
     }
 }
@@ -848,7 +854,17 @@ fn draw_download(frame: &mut Frame, view: &View<'_>, download: &Download) {
         hint(view, "tui.hint.downloadOpen", &[]),
         hint(view, "tui.hint.downloadUp", &[]),
     ];
-    if let Some(typed) = browser.typed() {
+    // The target being typed, its end in view when it is wider than the row.
+    let path_prefix_width = prefix_width("tui.download.path", "path");
+    let typed = browser.typed().map(|typed| {
+        draft_tail(
+            typed,
+            area.width
+                .saturating_sub(2 + path_prefix_width)
+                .saturating_sub(1),
+        )
+    });
+    if let Some(typed) = &typed {
         lines.push(Line::from(stt_client::text(
             "tui.download.path",
             &[("path", typed)],
@@ -873,9 +889,9 @@ fn draw_download(frame: &mut Frame, view: &View<'_>, download: &Download) {
         |_| String::new(),
     ));
     modal(frame, view, title, lines, false);
-    // The target being typed, in the same row the cursor of an upload's path takes.
-    if let Some(typed) = browser.typed() {
-        let column = 1 + prefix_width("tui.download.path", "path") + typed.chars().count() as u16;
+    // The cursor at the typed target's end, in the same row the cursor of an upload's path takes.
+    if let Some(typed) = &typed {
+        let column = 1 + path_prefix_width + typed.chars().count() as u16;
         cursor(frame, area, 4, column);
     }
 }
@@ -3352,6 +3368,21 @@ fn prefix_width(key: &str, placeholder: &str) -> u16 {
         .unwrap_or_default()
         .chars()
         .count() as u16
+}
+
+/// The end of `draft` that fits in `width` cells: all of it when it fits, otherwise its last
+/// characters behind a `…`, so the end being typed - where the cursor is - stays in view.
+fn draft_tail(draft: &str, width: u16) -> String {
+    let width = width as usize;
+    let length = draft.chars().count();
+    if length <= width {
+        return draft.to_string();
+    }
+    if width == 0 {
+        return String::new();
+    }
+    let tail: String = draft.chars().skip(length - (width - 1)).collect();
+    format!("…{tail}")
 }
 
 /// Shows the cursor at `column` of `area`'s `row` - where a prompt's draft ends. A prompt draws the

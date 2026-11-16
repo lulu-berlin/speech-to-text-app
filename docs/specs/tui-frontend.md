@@ -854,8 +854,9 @@ TUI's pty suite. The user reopened the item for them, lost keys first.
       query ConPTY asks before the program may start, as every terminal does -
       `client/stt-tui/tests/terminal/mod.rs` (`answer_queries`); proven by the Windows legs of a
       dispatched run
-- [ ] (edge) (discovered, the diagnostic run on macOS) A typed path longer than its field keeps its
-      end - where the cursor is - in view, in the upload and the download dialogs
+- [x] (edge) (discovered, the diagnostic run on macOS) A typed path longer than its field keeps its
+      end - where the cursor is - in view, in the upload and the download dialogs -
+      `client/stt-tui/tests/typed_path_tail.rs`
 - [ ] (edge) (discovered, a local stress run) An upload the service refuses never shows its notice
       beside the upload's own progress line: the line goes first
 - [ ] (must not break) (discovered, the diagnostic run) The pty tests do not depend on the machine
@@ -995,6 +996,12 @@ kept here.
   tests that start the TUI waited 60 s on a blank screen with those four bytes; the harness now
   answers `ESC [ 6 n` with `ESC [ 1 ; 1 R`. Green is the next dispatched run's to prove; locally
   the pty suite is unchanged by it.
+- 2026-11-16 (workspace), cycle "a typed path keeps its end in view": red - in an 80-column
+  terminal the upload dialog's `Or type a path` row ended at `/a-deeply-nested-folder/…/a-deeply`
+  at the box's edge, and the cursor stood outside the dialog, so `upload-end.mp3` never showed.
+  Green: both dialogs draw the typed text through `draft_tail` (`view.rs`), its last characters
+  behind a `…` when it is wider than the row less one cell for the cursor, and put the cursor
+  after what they drew.
 
 ## Acceptance criteria
 
