@@ -1,10 +1,10 @@
 # 111 — Rebrand to `protocolulu`, rename the screens to Recordings and Transcripts, and audit the copy
 
 Status: draft
-Depends on: [88](88-localization.md) (the catalogs, glossaries, review records and catalog checks
-this renames; its spec moves to `docs/specs/localization.md` when item 88 lands), [89](89-service-package.md)
-(package and artifact names), [66](../docs/specs/local-service-and-frontends.md) (the per-user
-directories, the app ID and the launch model)
+Depends on: [88](../docs/specs/localization.md) (the catalogs, glossaries, review records and
+catalog checks this renames), [89](89-service-package.md) (package and artifact names),
+[66](../docs/specs/local-service-and-frontends.md) (the per-user directories, the app ID and the
+launch model)
 Blocks: [108](108-rust-backend-switch.md) — the switch adopts the new names rather than renaming
 everything a second time
 
