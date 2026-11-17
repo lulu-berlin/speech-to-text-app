@@ -77,6 +77,12 @@ frontends: one command set, one binding table, hints generated from it.
   event handlers stay until its Rust port.
 - **The audio sink is a trait per target** (cpal, Slint's audio, WebAudio), and the core assumes no
   global runtime; no `no_std` promise until item 86's outcome.
+- **Item 70 ships the TUI's UI in the window first** (the user, 2026-11-17): the window has the
+  TUI's pages, layout, keys and appearance inside item 70, so `flow`, `model` and `keys` are built
+  from two renderers of one design that already agree rather than from one and a promise. Both
+  frontends render the same pages and layout, so `model` is exactly what each draws — pages stay out
+  of `flow`, and a later mobile layout may still group the interactions differently. The browser
+  keeps its own design and gains only the generated catalogs and hints until its Rust port.
 
 ## Proposal
 
@@ -183,3 +189,6 @@ mobile) owe their own.
   ICU JSON catalogs are embedded compressed (the user's size concern) and generated into the
   React app; the TUI's bindings are canonical where it has one; the browser reads the generated
   hints now. Test list approved as filed; `spec-approved`.
+- 2026-11-17 (clause added, the user's request): item 70 ships the TUI's UI — its pages, layout,
+  keys and appearance — in the window before this item starts; `flow`, `model` and `keys` then
+  unify two renderers that already agree.

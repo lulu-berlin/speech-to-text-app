@@ -170,17 +170,18 @@ graph TD
   49 --> 66
   66 --> 67[67 TUI frontend]
   12 --> 67
-  66 --> 70[70 Rust GUI window]
+  66 --> 70[70 GUI window: the TUI]
   66 --> 89[89 service package]
   67 --> 70
   49 --> 70
+  67 --> 76
   70 --> 76
   74 --> 76
   62 --> 68[68 Windows audio-only ffmpeg ✓]:::done
   49 --> 68
   62 --> 69[69 macOS audio-only ffmpeg ✓]:::done
   48 --> 69
-  70[70 Rust GUI window]
+  70[70 GUI window: the TUI]
   71[71 repository and chunking performance ✓]:::done
   72[72 frontend state and errors ✓]:::done
   73[73 reassign speakers ✓]:::done
@@ -295,13 +296,13 @@ graph TD
 | [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66, 12                      |
 | [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
-| [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
+| [70 — Replace Electron with a Rust GUI for the window flavor: the TUI, natively](70-rust-gui-window.md)                                                            | spec-approved | 49, 66, 67                  |
 | [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](../docs/specs/repository-and-chunking-performance.md)    | done          | —                           |
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
 | [73 — Reassign speakers: move selected segments to an existing or a new speaker](../docs/specs/speaker-reassignment.md)                                            | done          | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](../docs/specs/desktop-presentation.md)                                      | done          | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](../docs/specs/oracle-retirement.md)                                                               | done          | —                           |
-| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70, 74                       |
+| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 67, 70, 74                   |
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79, 84, 87 |
 | [79 — The full e2e journey on Windows](../docs/specs/windows-e2e-journey.md)                                                                                 | done          | 21, 49, 51                  |
