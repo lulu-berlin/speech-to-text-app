@@ -167,7 +167,9 @@ the TUI has is dropped or re-laid-out. The browser frontend stays React with its
 - **The appearance is the TUI's design**: the screens of `docs/design/tui/` (ten sheets, dark and
   light), the tokens of `ui-theme/colors.json`, and the stored `themeMode` with the TUI's true-colour
   values (ADR 0068); the terminal-only fallbacks (256 colours, `NO_COLOR`) do not apply to the
-  window. The user signs off the look, as item 17's pattern.
+  window. The user signs off the look, as item 17's pattern. RTL text keeps the same order and
+  mirroring in both (item 76); the TUI cannot shape glyphs, which is the one recorded appearance
+  difference.
 - **The hints and the help are the TUI's**: the shared catalog texts (`tui.hint.*`, `tui.help.*`),
   shown only while their action can act, `? more` when they do not fit, clickable, and the `?`
   reference per page with the same keys, descriptions and scrolling; no user-visible English literal

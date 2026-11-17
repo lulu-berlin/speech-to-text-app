@@ -174,6 +174,7 @@ graph TD
   66 --> 89[89 service package]
   67 --> 70
   49 --> 70
+  67 --> 76
   70 --> 76
   74 --> 76
   62 --> 68[68 Windows audio-only ffmpeg ✓]:::done
@@ -301,7 +302,7 @@ graph TD
 | [73 — Reassign speakers: move selected segments to an existing or a new speaker](../docs/specs/speaker-reassignment.md)                                            | done          | —                           |
 | [74 — Desktop presentation: font coverage, Japanese glyphs, app icon and desktop entry](../docs/specs/desktop-presentation.md)                                      | done          | —                           |
 | [75 — Retire the Python oracle: the app is the behavioral reference](../docs/specs/oracle-retirement.md)                                                               | done          | —                           |
-| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 70, 74                       |
+| [76 — Right-to-left transcription: direction-aware transcripts and layout](76-right-to-left-transcription.md)                                                      | spec-approved | 67, 70, 74                   |
 | [77 — Private test temp dirs for the backend suite, and a named leak in the upload spec](../docs/specs/test-harness-temp-dirs.md)                                            | done          | —                           |
 | [78 — The first stable release: release gates, one version everywhere, and the release process](78-stable-release.md)                                         | spec-approved | 49, 52, 65, 68, 69, 72, 74, 76, 77, 79, 84, 87 |
 | [79 — The full e2e journey on Windows](../docs/specs/windows-e2e-journey.md)                                                                                 | done          | 21, 49, 51                  |

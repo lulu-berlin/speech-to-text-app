@@ -1,8 +1,9 @@
 # 76 — Right-to-left transcription: direction-aware transcripts and layout
 
 Status: spec-approved
-Depends on: [70](70-rust-gui-window.md) (the Slint window implements the same rule, and it exists
-only after 70) — the browser part is independent of 70; [74](../docs/specs/desktop-presentation.md) supplies
+Depends on: [67](67-tui-frontend.md) (the TUI whose transcript, dialogs and mouse targets this item
+now covers), [70](70-rust-gui-window.md) (the window is the TUI's UI, and it exists only after 70) —
+the browser part is independent of 70; [74](../docs/specs/desktop-presentation.md) supplies
 the transcript's `lang`/fonts, a related but independent change (direction itself is
 content-derived)
 Blocks: —
@@ -16,8 +17,11 @@ mirrors for an RTL-first transcript, and speaker names and filenames follow the 
 The direction comes from the text itself, not from the task language, so mixed-language and
 auto-detected recordings work without storing a detected language. LTR content is untouched.
 Direction is presentation only: the stored text and the txt/srt/vtt downloads stay byte-identical.
-The same rule applies in the Slint window (item 70), whose bidi support this item checks; the
-terminal TUI's lack of bidi is recorded as unsupported.
+The same rule applies in every frontend: the browser, the Slint window (item 70) and the terminal
+TUI (item 67), which draw one UI. The TUI orders each wrapped line itself with the Unicode bidi
+algorithm and maps its cursor, selection and mouse hits through that order. A cell grid cannot shape
+glyphs — Arabic joining and ligatures need a text shaper — so order and mirroring are identical
+across the frontends while the emulator decides the glyph forms; that is the recorded difference.
 
 ## Evidence
 
@@ -49,6 +53,13 @@ terminal TUI's lack of bidi is recorded as unsupported.
 - The e2e fixture model is `whisperTinyEn` (`TEST_WHISPER_TINY_EN_MODEL`, `versions.json`), which is
   English-only, so it cannot produce a real RTL transcript; the e2e seeds a completed task's rows
   instead (Decided, 2026-10-28).
+- **A terminal can order text itself; it cannot shape it** (2026-11-17). The TUI owns every cell it
+  draws (ratatui's buffer, `client/stt-tui/src/view.rs`), so the Unicode bidi algorithm can order
+  each wrapped line before it is written; `unicode-bidi` is the Rust implementation of that
+  algorithm. Glyph shaping needs a text shaper that a cell grid does not have: whether Arabic letters
+  join is the emulator's choice. Of the common emulators, only a few apply bidi themselves; the
+  notable one, mlterm, would reorder the TUI's already-visual cells, and no terminal escape sequence
+  reports or disables that.
 
 ## Decided (2026-10-23, user)
 
@@ -92,7 +103,13 @@ terminal TUI's lack of bidi is recorded as unsupported.
    mixed-direction turns; an e2e that produces or seeds an RTL transcript at desktop and phone
    widths; the user's visual sign-off.
 7. **ADR** for the direction model: content-derived paragraph direction, `dir="auto"` on
-   paragraphs/names/filenames, logical CSS, the fallback rule.
+   paragraphs/names/filenames, logical CSS, the fallback rule, and the TUI's own bidi ordering with
+   the shaping and bidi-aware-terminal limits.
+8. **The TUI**: each turn's wrapped line ordered by the Unicode bidi algorithm with the paragraph's
+   first-strong base direction and written in visual order; the edit, rename and search cursor, the
+   selection highlight, the mouse hit-test, the playhead and the segment markings invert that
+   order; names, filenames, the help and the segment editor follow the same rule; timestamps and
+   the player stay LTR.
 
 ## Decided (consultation, 2026-10-28)
 
@@ -103,9 +120,21 @@ terminal TUI's lack of bidi is recorded as unsupported.
   shows an inline segment leaking into its paragraph; timestamps and the player stay `dir="ltr"`.
 - **A short Latin-first name (`WHO`) stays LTR**: the first-strong rule, not a per-task override, is
   the behavior (the user's stated rule).
-- **The TUI is recorded as unsupported** (terminal bidi) — a documented scope line, not a skip in
-  the browser tests. **The Slint window implements the same rule** in this item, after item 70
-  (this item's dependency); non-DOM consumers use the same first-strong rule.
+- **The TUI draws bidi itself** (the user, 2026-11-17; this replaces the 2026-10-28 "recorded as
+  unsupported" line). The TUI owns every cell, so it orders each wrapped line with the Unicode bidi
+  algorithm and writes the visual order; the logical↔visual mapping backs the edit, rename and
+  search cursor, the selection highlight, the mouse hit-test, the playhead and the segment markings.
+  Names, filenames, the help and the segment editor follow the first-strong rule as in the browser;
+  timestamps and the player stay LTR.
+- **Shaping is the recorded difference, and the user accepts it** (2026-11-17): the TUI cannot join
+  or ligate Arabic; order, mirroring and hit-testing are still the window's.
+- **A bidi-aware terminal is the one unsupported configuration** (2026-11-17): an emulator that
+  reorders cells itself (mlterm with bidi enabled) double-reorders the TUI's visual order, and no
+  portable query reports or switches that off. The TUI names the setting in its help page where the
+  environment identifies the emulator (`TERM`/`MLTERM`); every emulator without its own bidi is
+  exact.
+- **The Slint window implements the same rule** in this item, after item 70 (this item's
+  dependency); non-DOM consumers use the same first-strong rule.
 - Because the window is part of this deliverable, the item starts after item 70; its browser part is
   ready before that.
 
@@ -128,8 +157,18 @@ terminal TUI's lack of bidi is recorded as unsupported.
       layout with no overflow or clipped text
 - [ ] In edit mode (item 52), the segment editor is aligned by the segment's first alphabetic
       character, independent of its paragraph's direction; closing it restores the paragraph rule
+- [ ] (after item 67) The TUI draws a seeded RTL transcript in the same order as the window: a
+      mixed-direction line (`WHO: مرحبا`, a number inside an Arabic run) matches a hand-derived
+      visual order, a Latin-first turn stays LTR, and an RTL turn after it stays RTL
+- [ ] (after item 67) In the TUI the cursor, the selection highlight and a mouse click in an RTL
+      line name the logical character they cover: the rename and edit cursor, a marked segment and
+      the playhead land where they are drawn
 - [ ] (after item 70) The Slint window applies the same paragraph and name direction rule to a
-      seeded RTL transcript; the TUI's terminal-bidi limitation is recorded as unsupported
+      seeded RTL transcript, and its order matches the TUI's for the same text; the recorded limit
+      is glyph shaping, not order
+- [ ] (after item 67) Where the environment names an emulator that reorders text itself (mlterm,
+      through `TERM` or `MLTERM`), the TUI's `?` reference names that setting and why it must be
+      off, and a terminal that names none shows no such line
 - [ ] (must not break) LTR transcripts, the existing e2e journey, the frontend suite and the
       output-format suites stay green
 
@@ -138,6 +177,9 @@ terminal TUI's lack of bidi is recorded as unsupported.
 - Paragraphs, speaker names and filenames take their direction from their first alphabetic
   character; the transcript mirrors correctly; mixed runs and fallbacks behave as decided; LTR
   content and the downloads are unchanged; an e2e and the user's visual check prove the layout.
+- The TUI and the window draw the same order and mirroring for the same transcript, with the TUI's
+  cursor, selection and mouse hits mapped through its visual order; the TUI's glyph shaping is the
+  recorded difference, and a terminal that applies its own bidi is the recorded unsupported setting.
 - All test-list items ticked and green; user approved the diff.
 
 ## Approval log
@@ -157,3 +199,11 @@ terminal TUI's lack of bidi is recorded as unsupported.
   fixture, `dir="auto"` is the mechanism, and the Slint window implements the same rule (so this
   item depends on item 70), while the TUI's terminal-bidi limitation is recorded as unsupported.
   Test list approved as written; status set to spec-approved.
+- 2026-11-17 (amendment, the user's instruction): the TUI is no longer recorded as unsupported — it
+  draws bidi itself (the Unicode bidi algorithm per wrapped line, with the cursor, selection and
+  mouse-hit maps inverted through the visual order), so the window and the TUI draw the same order.
+  Glyph shaping is the recorded difference the user accepts, and a terminal that applies its own
+  bidi (mlterm with bidi enabled) is the one unsupported setting. The window's test item became
+  three (TUI order, TUI hit mapping, window order equals the TUI's), and, at the user's instruction
+  the same day, one item covers the help reference's notice for a bidi-aware emulator: 15 items in
+  total.
