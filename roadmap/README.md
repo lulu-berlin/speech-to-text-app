@@ -170,7 +170,7 @@ graph TD
   49 --> 66
   66 --> 67[67 TUI frontend]
   12 --> 67
-  66 --> 70[70 Rust GUI window]
+  66 --> 70[70 GUI window: the TUI]
   66 --> 89[89 service package]
   67 --> 70
   49 --> 70
@@ -180,7 +180,7 @@ graph TD
   49 --> 68
   62 --> 69[69 macOS audio-only ffmpeg ✓]:::done
   48 --> 69
-  70[70 Rust GUI window]
+  70[70 GUI window: the TUI]
   71[71 repository and chunking performance ✓]:::done
   72[72 frontend state and errors ✓]:::done
   73[73 reassign speakers ✓]:::done
@@ -295,7 +295,7 @@ graph TD
 | [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66, 12                      |
 | [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
-| [70 — Replace Electron with a Rust GUI for the window flavor](70-rust-gui-window.md)                                                                               | spec-approved | 49, 66, 67                  |
+| [70 — Replace Electron with a Rust GUI for the window flavor: the TUI, natively](70-rust-gui-window.md)                                                            | spec-approved | 49, 66, 67                  |
 | [71 — Repository and chunking performance: indexed queue queries, one list query, bounded chunking memory](../docs/specs/repository-and-chunking-performance.md)    | done          | —                           |
 | [72 — Frontend state and error handling: visible errors, one settings owner, auto-save with a restore-defaults reset](../docs/specs/frontend-state-and-errors.md)                       | done          | —                           |
 | [73 — Reassign speakers: move selected segments to an existing or a new speaker](../docs/specs/speaker-reassignment.md)                                            | done          | —                           |

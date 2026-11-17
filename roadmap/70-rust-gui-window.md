@@ -1,9 +1,9 @@
-# 70 — Replace Electron with a Rust GUI for the window flavor
+# 70 — Replace Electron with a Rust GUI for the window flavor: the TUI, natively
 
 Status: spec-approved
 Depends on: [66](../docs/specs/local-service-and-frontends.md) (the service, descriptors, credential and Rust
-pin — spec-approved), [67](67-tui-frontend.md) (the `stt-client` crate and the Rust workspace —
-spec-approved), [49](../docs/specs/windows-support.md) (the Windows packages)
+pin — done), [67](67-tui-frontend.md) (the `stt-client` crate, the Rust workspace and the TUI whose
+UI this item renders), [49](../docs/specs/windows-support.md) (the Windows packages)
 Blocks: —
 
 ## Goal
@@ -11,8 +11,11 @@ Blocks: —
 The window flavor no longer ships Electron or Chromium: it is a native **Slint** window in the
 item-66 client model (attaches to the per-user service, starts it when absent, uses its credential),
 accepts audio files dropped onto the window for upload, and is packaged in the same Linux, macOS and
-Windows artifacts with an automated end-to-end proof. It reaches parity with the browser UI,
-including the stenographer animation and audio playback. The browser frontend stays React; the tray
+Windows artifacts with an automated end-to-end proof. **It is the TUI in a window**: the same pages,
+the same layout, the same keys and the same appearance, drawn natively at a resizable size from the
+shared theme tokens; anything the TUI shows, the window shows in the same place and runs from the same
+key. What only a window can do is additive — dropped files feed the TUI's upload flow — and nothing
+the TUI has is dropped or re-laid-out. The browser frontend stays React with its own design; the tray
 (Rust, item 66) and the TUI (Rust, item 67) are unaffected.
 
 ## Evidence
@@ -74,8 +77,21 @@ including the stenographer animation and audio playback. The browser frontend st
   `e2e/playwright.desktop.config.ts`, and the Electron form of the CI jobs `desktop-e2e`,
   `desktop-nix-e2e`, `desktop-bundle-e2e`, `macos-dmg`.
 - **Playback and rich UI live in the window today**: the transcript player, per-segment playback,
-  speaker rename/merge, merges and settings. The native window implements them (the TUI does not;
-  item 67 excludes playback).
+  speaker rename/merge, merges and settings. The native window implements them, as the TUI now does
+  (item 67 added audio playback through the audio device, with the browser's `playbackMachine`
+  semantics).
+- **The TUI's interaction layer has no counterpart in the browser or the window** (2026-11-17).
+  Item 67 is keyboard-first: one command set for every page and dialog (queue, history, transcript,
+  status, settings, upload, download, confirmations); single-key bindings that give way to text where
+  a field takes letters; a footer of contextual hints — the shared catalog texts with the key marked
+  (`[p]ause`, `re[v]ert`; the brackets stay under `NO_COLOR`) — each shown only while its action can
+  act, packed to the width, ended with `? more` when they do not fit, and clickable; and `?` opens
+  the page's reference of keys and descriptions (`tui.help.*`), scrollable and closed by `?` or Esc.
+  The browser binds shortcuts only for the segment editor
+  (`frontend/src/shared/i18n/accessKeys.ts`, `aria-keyshortcuts` on its buttons) and handles Escape
+  in the transcript; it has no page-wide bindings, no hints and no help reference. The TUI's design
+  is also the newer, signed-off one (`docs/design/tui/`, ten sheets: five pages, dark and light), so
+  the window's target is the TUI's design rendered natively — not the browser's design in a window.
 
 ## Considered and rejected
 
@@ -86,7 +102,8 @@ including the stenographer animation and audio playback. The browser frontend st
   unworkable (see the risk note).
 - **Moving the browser frontend to Slint's web target**: rejected (the user): canvas/WASM and the
   Slint runtime would replace React, the design system and the 173 frontend tests, for no size
-  win. The browser stays React; the window's UI is a deliberate second implementation.
+  win. The browser stays React with its own design; the window is the TUI's UI as a deliberate
+  second implementation (2026-11-17).
 
 ## Decided (consultation, 2026-10-22)
 
@@ -130,6 +147,38 @@ including the stenographer animation and audio playback. The browser frontend st
   and the renderer policy, superseding ADR 0059's shell decision and restating ADR 0055's boundary
   as "the window talks only to the service origin".
 
+## Decided (consultation, 2026-11-17)
+
+- **The window is the TUI: the same pages, layout, keys and appearance** (the user, 2026-11-17).
+  Not "close to": a screen, a region, a binding or a colour that differs from the TUI's is a defect.
+  This belongs to item 70, ahead of item 109 — not added to the Electron shell first (this item
+  removes it) and not deferred, which would ship a window with a different UI and then reconcile the
+  two.
+- **The binding table is the TUI's, unchanged**: every key does in the window what it does in the
+  TUI, on the same page; the window adds no command and loses none. OS-level keys (Cmd+Q, Alt+F4) may
+  close the window as every window closes, but never replace a TUI key, and a text field takes
+  letters as text exactly as the TUI's modes do.
+- **The layout is the TUI's at every size**: the same regions in the same order and proportions
+  (header and status line, tabs, list, footer hints, modals), on the same monospace grid. A window of
+  any size presents some number of columns and rows, and for that pair the frame is cell for cell the
+  TUI's at the same pair: the TUI's own reflow rules (hints to `? more`, a row's columns dropped,
+  dialogs narrowed) are what both then draw. There is no canonical size to be equal at, and no
+  browser-style layout: equality is per size.
+- **The appearance is the TUI's design**: the screens of `docs/design/tui/` (ten sheets, dark and
+  light), the tokens of `ui-theme/colors.json`, and the stored `themeMode` with the TUI's true-colour
+  values (ADR 0068); the terminal-only fallbacks (256 colours, `NO_COLOR`) do not apply to the
+  window. The user signs off the look, as item 17's pattern.
+- **The hints and the help are the TUI's**: the shared catalog texts (`tui.hint.*`, `tui.help.*`),
+  shown only while their action can act, `? more` when they do not fit, clickable, and the `?`
+  reference per page with the same keys, descriptions and scrolling; no user-visible English literal
+  enters the Slint code (ADR 0067).
+- **The mouse behaves as the TUI's does**: the same click targets — rows, tabs, hints, segments,
+  dialog buttons — run the same commands as their keys.
+- **Window-only affordances are additive**: dropped files feed the TUI's upload flow; the OS window
+  identity, tray launch and packaging stay as decided. The browser is not changed and is not the
+  window's design target.
+- **Seven test-list items added below** (18 in total) are the equality's behaviors.
+
 ## Proposal
 
 1. `stt-window` crate: Slint UI (`.slint` files) + Rust logic through `stt-client`; descriptor
@@ -138,9 +187,10 @@ including the stenographer animation and audio playback. The browser frontend st
    against generated constants from `docs/api/allowed-extensions.json`; multi-file uploads with
    per-file progress; upload-options panel; the server's size/duplicate errors; folder drops out
    of scope (the browser does not accept them either).
-3. UI parity: queue and controls, history, transcript with turns and speakers, per-segment
-   playback and the player (a native audio stack with `playbackMachine`'s semantics), rename/merge,
-   merges, settings, loading/empty states and the animation.
+3. The TUI's pages and features in the window: queue and controls, history, transcript with turns
+   and speakers, per-segment playback and the player (a native audio stack with
+   `playbackMachine`'s semantics), rename/merge, merges, settings, loading/empty states and the
+   stenographer tile and animation.
 4. Animation: a codegen step from `stenographer.svg` to Slint elements; the nine animations as
    Slint property animations; reduced-motion detection per OS (or an app setting) settled in the
    first cycle.
@@ -149,6 +199,10 @@ including the stenographer animation and audio playback. The browser frontend st
    e2e.
 6. Measurement: payload/closure, glibc floor, startup time and resident memory next to a freshly
    recorded Electron baseline; the ADR records the comparison.
+7. The TUI's UI in the window: its pages and regions on the same monospace grid with its reflow
+   rules, its binding table verbatim, its footer hints and `?` reference from the shared catalog
+   texts, its mouse targets, and the shared tokens and `themeMode` (ADR 0068); a check compares the
+   window's frame with the TUI's for the same state.
 
 ## Open questions (settled in the first cycles)
 
@@ -160,6 +214,14 @@ including the stenographer animation and audio playback. The browser frontend st
 - **Audio stack**: `rodio`/`cpal` vs `cpal` + a decoder, chosen with the playback test; seek and
   pause-at-`endMs` semantics must match the browser.
 - **Slint version pin, license notice and codegen location** for the SVG geometry.
+- **How equality is proven**: the TUI's harness already yields its frame text at any size; the first
+  cycle chooses the seam that lets a check compare the window's drawing of the same state with the
+  TUI's frame (a text dump of the window's drawing, or a view model both produce), and the first test
+  uses a few representative grid sizes rather than one canonical size. The window's pixels are
+  checked by snapshot rendering plus the user's visual sign-off, as the animation's rule says.
+- **The cell size and the minimum window size**: the design is a grid; the first cycle fixes the cell
+  size (font and spacing) and a smallest usable window with the user. The TUI's reflow rules apply at
+  every size, so the minimum is a usability floor, not a parity boundary.
 - **Automated look comparison** for the animation: Slint's testing backend is internal; snapshot
   rendering at fixed times plus the user's visual sign-off is the accepted route unless a stable
   harness is found in the first cycle.
@@ -185,6 +247,24 @@ including the stenographer animation and audio playback. The browser frontend st
 - [ ] Payload/closure sizes, glibc floors, startup time and resident memory are measured and
       recorded next to a freshly recorded Electron baseline
 - [ ] The tray lists and opens the window, and no duplicate service starts
+- [ ] The window's pages are the TUI's: every TUI page and dialog exists with the same regions in
+      the same order, and for any column-and-row count the window can present, the window's drawn
+      frame and the TUI's at that same count agree cell for cell — a differing character or position
+      fails the check
+- [ ] Every key the TUI binds runs the same command on the same page in the window, and a text
+      field takes letters as text exactly as the TUI's modes do; a missing, added or different
+      binding fails a check
+- [ ] Narrowing the window reflows as the TUI does: hints fall back to `? more`, rows drop their
+      columns, dialogs narrow, and no region changes order
+- [ ] The window draws the TUI's design: the same tokens and `themeMode` as the TUI (ADR 0068), and
+      the user signs the appearance off against `docs/design/tui/`
+- [ ] The hints and the `?` reference behave as the TUI's: only the actions that can act now are
+      listed, `? more` when they do not fit, a clicked hint performs its action, the reference lists
+      that page's own keys and closes on `?` or Esc
+- [ ] A click on a row, tab, hint, segment or dialog button runs the same command its key does, as
+      in the TUI
+- [ ] (must not break) The TUI's pages, layout, bindings, hints and help are unchanged, and both
+      frontends read one catalog key set
 - [ ] (must not break) The browser UI, the API contract, Docker, and the Linux/macOS/Windows server
       suites and e2e stay green
 - [ ] (must not break) The TUI and tray from items 66/67 are unaffected; the shared `stt-client`
@@ -197,6 +277,8 @@ including the stenographer animation and audio playback. The browser frontend st
   boundary, rendered without a GPU requirement.
 - The agreed UI surface, including per-segment playback and the stenographer animation, is in the
   window, with the browser and TUI unaffected.
+- The window is the TUI's UI: the same pages, layout, keys and appearance at every size it can
+  present, from the shared tokens and `themeMode`, and signed off by the user.
 - Sizes, floors, startup and memory are recorded against the Electron baseline; `desktop/` and its
   Electron CI jobs are removed in the same cutover; the ADR records the choice and the drop risk.
 - All test-list items ticked and green; user approved the diff.
@@ -213,3 +295,9 @@ including the stenographer animation and audio playback. The browser frontend st
   generated vector reimplementation; the software renderer is the shipped default (no GPU
   requirement). Test list approved (11 items). Status: spec-approved; work starts after items 66
   and 67.
+- 2026-11-17 (amendment, the user's request): the window and the TUI are one UI — the same pages,
+  layout, keys and appearance, the TUI's rendered natively — part of this item and ahead of item
+  109, so it is neither built for the Electron shell first nor left out of the native window; the
+  browser keeps its own design. Seven test-list items added (18 in total); approved by the user on
+  2026-11-17, with the layout stated per size rather than at one canonical size. Status:
+  `spec-approved`.
