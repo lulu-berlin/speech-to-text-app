@@ -272,6 +272,11 @@ fn a_refused_upload_shows_the_service_message_and_leaves_the_ui_usable() {
         rows(&screen),
         "no task row is added:\n{screen}"
     );
+    // The prompt still works after the refusal: it opens again, and Escape closes it. The dialog
+    // closes when Enter submits, so an Escape here without reopening would quit the TUI (the pull
+    // request's macOS run, 2026-11-19: the write then hit a closed pty).
+    tui.press(b"u");
+    tui.wait_for(WAIT, |text| text.contains("Upload audio"));
     tui.press(b"\x1b");
     tui.wait_for(WAIT, |text| !text.contains("Upload audio"));
     tui.press(b"q");

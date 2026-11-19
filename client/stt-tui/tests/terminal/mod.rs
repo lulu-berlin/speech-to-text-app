@@ -45,6 +45,9 @@ pub struct Tui {
 struct Draw {
     reads: u64,
     inside: bool,
+    /// Whether the TUI's output ended - the process exited - so a wait that times out can say so
+    /// instead of blaming the expected screen.
+    ended: bool,
 }
 
 impl Tui {
@@ -185,6 +188,7 @@ impl Tui {
             Mutex::new(Draw {
                 reads: 0,
                 inside: false,
+                ended: false,
             }),
             Condvar::new(),
         ));
@@ -227,6 +231,13 @@ impl Tui {
                 }
                 notify.1.notify_all();
             }
+            // The TUI's output ended: it exited (or its terminal went away). A wait that times out
+            // says so.
+            {
+                let mut draw = notify.0.lock().unwrap();
+                draw.ended = true;
+            }
+            notify.1.notify_all();
         });
         Tui {
             child,
@@ -337,10 +348,18 @@ impl Tui {
             }
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
+                // Whether the TUI is still there: a test that waits on a dead child should say so,
+                // not report the screen it froze on (the pull request's Windows run, 2026-11-19).
+                let state = if draw.lock().unwrap().ended {
+                    "the TUI's output ended: it exited before drawing what the test expected"
+                } else {
+                    "the TUI is still running"
+                };
                 let Some((reported, styles)) = self.reported() else {
                     panic!(
                         "the TUI did not show what was expected within {timeout:?}; screen:\n{}\n\
-                         (no frame reported: the pty tests need a debug build of stt-tui, ADR 0070)",
+                         (no frame reported: the pty tests need a debug build of stt-tui, ADR 0070)\n\
+                         {state}",
                         self.text()
                     );
                 };
@@ -359,7 +378,7 @@ impl Tui {
                     .unwrap_or_default();
                 panic!(
                     "the TUI did not show what was expected within {timeout:?}; screen:\n{}\n\
-                     frame reported last (tile and clock left out):\n{reported}{differing}",
+                     frame reported last (tile and clock left out):\n{reported}{differing}\n{state}",
                     self.text()
                 );
             }
@@ -580,6 +599,23 @@ pub fn settled_text(screen: &vt100::Screen) -> String {
     text.join("\n").trim_end_matches('\n').to_string()
 }
 
+/// `token` with the foreground dropped for a cell that shows only a space: a space's foreground
+/// is never visible - unless the cell is underlined or reversed, whose ink or field is the
+/// foreground - and a Windows ConPTY does not repaint it, so the screen can keep a stale colour
+/// where the frame reports the buffer's (the pull request's Windows run, 2026-11-19). Background
+/// and attributes are compared as they are.
+fn invisible_foreground(text: &str, token: &str) -> String {
+    let attributes = token.rsplit('/').next().unwrap_or_default();
+    if text.starts_with(' ') && !attributes.contains('U') && !attributes.contains('R') {
+        match token.split_once('/') {
+            Some((_, rest)) => format!("-/{rest}"),
+            None => token.to_string(),
+        }
+    } else {
+        token.to_string()
+    }
+}
+
 /// The cells' styles as [`Tui::wait_for_screen`] compares them with the reported frame's: one row
 /// per line, a token per cell that starts a character - the right half of a wide one has none -
 /// the tile's left out. A token is `foreground/background/attributes` as the TUI's frame report
@@ -609,10 +645,13 @@ pub fn settled_styles(screen: &vt100::Screen) -> String {
                     .filter(|(set, _)| *set)
                     .map(|(_, letter)| letter)
                     .collect();
-                    format!(
-                        "{}/{}/{attributes}",
-                        colour(cell.fgcolor()),
-                        colour(cell.bgcolor())
+                    invisible_foreground(
+                        cell_text(cell),
+                        &format!(
+                            "{}/{}/{attributes}",
+                            colour(cell.fgcolor()),
+                            colour(cell.bgcolor())
+                        ),
                     )
                 })
                 .collect();
@@ -635,14 +674,14 @@ fn settled_frame(frame: &str) -> (String, String) {
         .map(|(row, pair)| {
             let tokens = pair.get(1).copied().unwrap_or_default().split(' ');
             let mut text = String::new();
-            let mut kept_tokens: Vec<&str> = Vec::new();
+            let mut kept_tokens: Vec<String> = Vec::new();
             let mut column = 0;
             for (cluster, token) in pair[0].graphemes(true).zip(tokens) {
                 let at = column;
                 column += unicode_width::UnicodeWidthStr::width(cluster);
                 if !in_tile(row as u16, at as u16) {
                     text.extend(cluster.chars().next());
-                    kept_tokens.push(token);
+                    kept_tokens.push(invisible_foreground(cluster, token));
                 }
             }
             (without_elapsed_clock(&text), kept_tokens.join(" "))

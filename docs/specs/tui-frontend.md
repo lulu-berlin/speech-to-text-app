@@ -1149,6 +1149,21 @@ the dash is the review's evidence.
       leaves the other half's column unrepainted; ratatui issue #2933, filed by the user) -
       `client/stt-tui/src/wide_overlap.rs`
 
+### The pull request's CI run (2026-11-19)
+
+The branch's run on `b9aa4e40` failed three jobs; the user put all three in scope.
+
+- [x] (must not break) (the macOS check job) The refused-upload test quits only after reopening the
+      prompt: the dialog closes when Enter submits, so an Escape without reopening quit the TUI and
+      the next key hit a closed pty (`EIO`) - `client/stt-tui/tests/upload.rs`
+- [x] (must not break) (the Windows journey) A screen settles when it equals the reported frame in
+      everything visible: a space cell's foreground is left out - a Windows ConPTY does not repaint
+      it and a space's colour never shows, unless the cell is underlined or reversed, whose colours
+      stay compared - `client/stt-tui/tests/terminal/mod.rs` (`invisible_foreground`)
+- [x] (must not break) (the Windows check job) A wait that times out says whether the TUI is still
+      running or its output ended, and the arrow-hint test proves the input reaches the TUI (the key
+      reference opens and closes) before it asks for the dialog -
+      `client/stt-tui/tests/terminal/mod.rs` (`Draw::ended`), `client/stt-tui/tests/arrow_hints.rs`
 
 ## Cycle log
 
@@ -2371,6 +2386,23 @@ kept here.
   legs - in particular S14's frame report under a Windows ConPTY and S8's style comparison
   there - which the pull request's CI shows. The workspace stops here; the squash, `done` and the
   hand-over are the root agent's.
+- 2026-11-19 (workspace, the pull request's CI run on `b9aa4e40`; the user: "do all 3"): three
+  jobs failed, all in the pty tests. (1) `check (macos-15)`: `upload.rs`'s refused-upload test
+  pressed Escape after the 413, but the dialog closes when Enter submits, so the Escape quit the
+  TUI and `press("q")` then wrote to a closed pty (`Os { code: 5, kind: InputOutputError }` at
+  `press`); the test now reopens the prompt and closes it before quitting. (2) `Windows (e2e)`,
+  the journey: every wait timed out with the frame text equal and one style token different - row
+  0's last cell, a space, reported with the text colour (`rgb:28,28,28`) and shown muted
+  (`rgb:90,97,108`), same background: ConPTY does not repaint a space's foreground, which is
+  invisible anyway; `settled_styles` and `settled_frame` now drop a space cell's foreground, while
+  underlined and reversed cells keep theirs (their colour shows). (3) `check (windows-2025)`:
+  `arrow_hints` timed out with the dialog never opened - the screen and the last frame both showed
+  the queue, and no child panic was in the log; the wait now reports whether the TUI is still
+  running or its output ended, and the test proves input reaches the TUI (the key reference opens
+  and closes) before asking for the dialog, so the next Windows run names the cause. Gates on this
+  branch: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test
+  --locked` over the client workspace - every binary green (run with a reconstructed `PATH`: the
+  machine's environment change left the sandbox without the devenv's `cc` and `pkg-config`).
 
 ## Acceptance criteria
 

@@ -58,6 +58,14 @@ fn clicking_an_arrow_hint_does_what_the_arrow_key_does() {
     stream.send("snapshot", SNAPSHOT);
     tui.wait_for(WAIT, |text| text.contains("memo.wav"));
 
+    // The input reaches the TUI before the dialog is asked for: the key reference opens and closes.
+    // A run that loses the first key fails here, naming input, rather than 20 s later as a dialog
+    // that never opened (the pull request's Windows run, 2026-11-19).
+    tui.press(b"?");
+    tui.wait_for(WAIT, |text| text.contains("Queue keys"));
+    tui.press(b"?");
+    tui.wait_for(WAIT, |text| !text.contains("Queue keys"));
+
     // The dialog names a folder as the OS reports it (the second review, S12).
     let parent = format!("Folder  {}", terminal::os_folder(&folder).display());
     let inside = format!("Folder  {}", terminal::os_folder(&sub).display());
