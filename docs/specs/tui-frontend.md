@@ -1164,6 +1164,9 @@ The branch's run on `b9aa4e40` failed three jobs; the user put all three in scop
       running or its output ended, and the arrow-hint test proves the input reaches the TUI (the key
       reference opens and closes) before it asks for the dialog -
       `client/stt-tui/tests/terminal/mod.rs` (`Draw::ended`), `client/stt-tui/tests/arrow_hints.rs`
+- [x] (must not break) (the next run's Windows check) A Tab completion is read with the platform's
+      separator (`\` on Windows), so the completion test expects what the dialog types rather than
+      `/` - `client/stt-tui/tests/upload_typed.rs`
 
 ## Cycle log
 
@@ -2403,6 +2406,13 @@ kept here.
   branch: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test
   --locked` over the client workspace - every binary green (run with a reconstructed `PATH`: the
   machine's environment change left the sandbox without the devenv's `cc` and `pkg-config`).
+- 2026-11-19 (workspace, the next CI run on `611c0de2`): the macOS check and the Windows journey
+  passed (the upload test's reopen and the space-cell style rule), and the arrow test passed with
+  the input barrier; the Windows check failed in `upload_typed.rs`'s Tab-completion test - the
+  dialog completed `clips\` there, the platform's separator, while the test expected `clips/`. The
+  three expectations now use `std::path::MAIN_SEPARATOR`. The failing screen showed the dialog open
+  with the completion typed and the TUI still running, so the fix is the test's, not the dialog's.
+  Gate: `cargo test --locked -p stt-tui --test upload_typed` green, `cargo fmt --check` green.
 
 ## Acceptance criteria
 

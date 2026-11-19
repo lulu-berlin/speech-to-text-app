@@ -111,21 +111,26 @@ fn tab_completes_a_typed_paths_files_and_folders() {
     tui.press(b"u");
     tui.wait_for(WAIT, |text| text.contains("top.wav"));
 
-    // `cl` + Tab completes the one folder, with its slash.
+    // `cl` + Tab completes the one folder, with the platform's separator (`\` on Windows).
+    let sep = std::path::MAIN_SEPARATOR;
     tui.press(b"cl");
     tui.press(b"\t");
-    tui.wait_for(WAIT, |text| text.contains("Or type a path   clips/"));
+    tui.wait_for(WAIT, |text| {
+        text.contains(&format!("Or type a path   clips{sep}"))
+    });
 
     // `tal` + Tab completes as far as the two files agree, `talk.`.
     tui.press(b"tal");
     tui.press(b"\t");
-    tui.wait_for(WAIT, |text| text.contains("Or type a path   clips/talk."));
+    tui.wait_for(WAIT, |text| {
+        text.contains(&format!("Or type a path   clips{sep}talk."))
+    });
 
     // `mp3` + Tab completes the one file whole; Enter uploads it.
     tui.press(b"mp3");
     tui.press(b"\t");
     tui.wait_for(WAIT, |text| {
-        text.contains("Or type a path   clips/talk.mp3")
+        text.contains(&format!("Or type a path   clips{sep}talk.mp3"))
     });
     tui.press(b"\r");
     let upload = service.next_upload(WAIT);
