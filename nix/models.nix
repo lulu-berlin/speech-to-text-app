@@ -12,7 +12,11 @@ let
     };
 
     speaker = {
-      url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx";
+      # The publisher replaced its release asset on 2026-11-19 with a re-export (29,596,979
+      # bytes, sha256 98daf9bc…, ONNX producer 2.14.1 where the pinned bytes say 2.4.1), which
+      # broke every build pinned to the old bytes. The pin stays on those bytes, fetched from a
+      # commit-pinned revision of the publisher's mirror; the hash is unchanged.
+      url = "https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx";
       sha256 = "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b";
     };
 
