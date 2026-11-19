@@ -1,6 +1,6 @@
 # 0003 — Diarization in Kotlin with CAM++ via ONNX Runtime
 
-Status: accepted, auto speaker-count rule amended by [0027](0027-auto-speaker-count-allows-one-speaker.md) · Date: 2026-10-05
+Status: accepted, auto speaker-count rule amended by [0027](0027-auto-speaker-count-allows-one-speaker.md), model source amended 2026-11-19 · Date: 2026-10-05
 
 ## Context
 ADR 0002 excludes Python, so the oracle's speechbrain ECAPA-TDNN embedder (PyTorch) cannot be used. The JVM needs a speaker-embedding model it can run natively, plus the audio feature front-end that model expects. The oracle's clustering, rescue, and turn-merging logic is plain numeric code that can be ported directly.
@@ -8,8 +8,13 @@ ADR 0002 excludes Python, so the oracle's speechbrain ECAPA-TDNN embedder (PyTor
 ## Decision
 - Diarization is re-implemented in Kotlin.
 - Speaker embeddings: **3D-Speaker CAM++ (English, VoxCeleb)** ONNX model, run through **ONNX Runtime Java**.
-  - Asset: `https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`
+  - Asset: `https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx`
   - sha256: `357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b`
+  - **Amended 2026-11-19:** the publisher replaced its GitHub release asset with a re-export
+    (29,596,979 bytes, sha256 `98daf9bc…`, ONNX producer 2.14.1 where these bytes say 2.4.1), which
+    broke every build pinned to the hash above. The pin stays on the recorded bytes, fetched from a
+    commit-pinned revision of the publisher's mirror, so the model and its re-tuned threshold
+    ([ADR 0032](0032-speaker-distance-threshold-for-campplus.md)) are unchanged.
   - License: Apache-2.0
   - Output: 512-dimensional embedding (ONNX output `embedding`, shape `[N, 512]`; metadata `output_dim = 512`, verified 2026-10-05).
 - Front-end: an 80-dim Kaldi fbank implemented in Kotlin, using the sherpa-onnx `features.h` defaults this model was exported for:
