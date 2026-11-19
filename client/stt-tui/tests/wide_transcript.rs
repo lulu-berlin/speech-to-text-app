@@ -13,10 +13,17 @@ use terminal::{OpenTranscript, open_transcript_sized};
 
 const WAIT: Duration = Duration::from_secs(20);
 
-/// The first segment: Japanese, a word with a combining accent among it, longer than a row of a
-/// 120-column terminal (eight times eleven wide characters is 176 columns).
+/// The first segment: Japanese, a word with a combining accent among it on Unix - Windows's ConPTY
+/// advances a column for a combining mark, shifting the row and dropping the cell after it, so
+/// there the word is plain (`docs/known-issues.md`, Tests) - longer than a row of a 120-column
+/// terminal (eight times eleven wide characters is 176 columns).
 fn first_segment() -> String {
-    "東京で会議を開きます。".repeat(4) + "Cafe\u{301}で" + &"東京で会議を開きます。".repeat(4)
+    let word = if cfg!(windows) {
+        "Cafeで"
+    } else {
+        "Cafe\u{301}で"
+    };
+    "東京で会議を開きます。".repeat(4) + word + &"東京で会議を開きます。".repeat(4)
 }
 
 /// The second segment: Japanese with an emoji, drawn after the first.

@@ -1167,6 +1167,10 @@ The branch's run on `b9aa4e40` failed three jobs; the user put all three in scop
 - [x] (must not break) (the next run's Windows check) A Tab completion is read with the platform's
       separator (`\` on Windows), so the completion test expects what the dialog types rather than
       `/` - `client/stt-tui/tests/upload_typed.rs`
+- [x] (must not break) (the Windows check after that) The wide-script test's combining-mark word
+      runs plain on Windows: ConPTY advances a column for a combining mark and drops the cell after
+      it, so the screen can never equal the frame there (`docs/known-issues.md`, Tests) - the mark
+      stays tested on Unix - `client/stt-tui/tests/wide_transcript.rs`
 
 ## Cycle log
 
@@ -2413,6 +2417,14 @@ kept here.
   three expectations now use `std::path::MAIN_SEPARATOR`. The failing screen showed the dialog open
   with the completion typed and the TUI still running, so the fix is the test's, not the dialog's.
   Gate: `cargo test --locked -p stt-tui --test upload_typed` green, `cargo fmt --check` green.
+- 2026-11-19 (workspace, the CI run on `db80466d`): the macOS check, the Windows journey and the
+  arrow test passed; the Windows check reached the binaries after `upload_typed` and failed in
+  `wide_transcript.rs`'s wide-script test. The screen row read `Cafe\u{301} 東京` where the reported
+  frame had `Cafe\u{301}で東京`: ConPTY advanced a column for the combining mark and dropped the
+  cell after it, so the screen can never equal the frame. The test's combining word now runs plain
+  on Windows (the mark stays tested on Unix), and the limit is recorded in
+  `docs/known-issues.md` (Tests). Gate: `cargo test --locked -p stt-tui --test wide_transcript`
+  green, `cargo fmt --check` green.
 
 ## Acceptance criteria
 
