@@ -8,5 +8,6 @@
   "deviceFallback": "gpu:1",
   "defaultFrontend": null,
   "terminalCommand": null,
-  "appLanguage": null
+  "appLanguage": null,
+  "themeMode": "auto"
 }

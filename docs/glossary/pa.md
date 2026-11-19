@@ -1,7 +1,8 @@
 # Punjabi (pa) — glossary
 
 The term evidence is recorded in `docs/reviews/pa.md`; this is the shared vocabulary. The
-compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3).
+compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3,
+Firefox 4, VLC 5, GNOME Files 6, Dolphin 7, gedit 8).
 
 | English                 | Punjabi                                             | Evidence                                   | Note                                                         |
 | ----------------------- | --------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
@@ -25,12 +26,13 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | transcript phases       | ਆਡੀਓ ਵੰਡ / ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ / ਸਪੀਕਰ ਪਛਾਣ / ਪ੍ਰੋਸੈਸਿੰਗ | Google 1                                   | `{phase} ਦੌਰਾਨ {outcome}`; with a position `{time} 'ਤੇ …`    |
 | turn                    | ਬੋਲੀ                                                | Microsoft 2                                | feminine noun                                                |
 | segment                 | ਹਿੱਸਾ                                               | —                                          | masculine noun                                               |
-| play / pause            | ਚਲਾਓ / ਰੋਕੋ                                         | Apple 3: „ਚਲਾਓ“                            | gender-neutral imperatives                                   |
+| play / pause            | ਚਲਾਓ / ਵਿਰਾਮ / ਰੋਕੋ                                 | Firefox 4: „ਚਲਾਓ“ / „ਵਿਰਾਮ“; VLC 5: „ਚਲਾਓ“ | pause is a state label; ਰੋਕੋ is stop, still used by the non-TUI pause keys |
+| resume                  | ਜਾਰੀ ਰੱਖੋ                                           | VLC 5: „ਜਾਰੀ ਰੱਖੋ“                         | the opposite of pause                                         |
 | seek                    | ਪਲੇਬੈਕ ਸਥਿਤੀ                                        | Google 1                                   | the slider's label, not a command                            |
 | merge                   | ਮਿਲਾਓ / ਮਿਲਾਪ                                       | Google 1: „ਮਿਲਾਓ“                          | verb for the action, noun for the merge                      |
 | reassign                | ਮੁੜ-ਨਿਰਧਾਰਤ ਕਰੋ                                     | Microsoft 2                                |                                                              |
 | save / discard          | ਸੰਭਾਲੋ / ਛੱਡੋ                                       | Google 1: „ਸੰਭਾਲੋ“                         | editor shortcuts S and D                                     |
-| retry / cancel / delete | ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ / ਰੱਦ ਕਰੋ / ਹਟਾਓ                 | Google 1, Microsoft 2                      |                                                              |
+| retry / cancel / delete | ਫੇਰ ਕੋਸ਼ਿਸ਼ ਕਰੋ / ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ / ਰੱਦ ਕਰੋ / ਹਟਾਓ | Firefox 4: „ਫੇਰ ਕੋਸ਼ਿਸ਼ ਕਰੋ“ / „ਰੱਦ ਕਰੋ“; VLC 5: „ਹਟਾਓ“ | TUI strings use ਫੇਰ ਕੋਸ਼ਿਸ਼; non-TUI keys still say ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ |
 | connection              | ਕਨੈਕਸ਼ਨ / ਕਨੈਕਟ ਹੈ                                  | Microsoft 2: „ਕਨੈਕਟ ਹੈ“                    | `ਕਨੈਕਟ ਹੈ` for the live badge                                |
 | user interface          | ਵਰਤੋਂਕਾਰ ਇੰਟਰਫੇਸ                                    | Microsoft 2                                | `frontend` never appears in the UI                           |
 | default                 | ਡਿਫ਼ਾਲਟ                                             | Microsoft 2: „ਡਿਫ਼ਾਲਟ“                     |                                                              |

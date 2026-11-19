@@ -1,7 +1,7 @@
 # 98 — The Rust workspace lives at the repository root, and its crates in `crates/`
 
 Status: spec-approved
-Depends on: [67](67-tui-frontend.md) (it splits `client/` into four crates on its own branch), [66](../docs/specs/local-service-and-frontends.md) (done; the workspace, the toolchain file and the version pin)
+Depends on: [67](../docs/specs/tui-frontend.md) (it splits `client/` into four crates on its own branch), [66](../docs/specs/local-service-and-frontends.md) (done; the workspace, the toolchain file and the version pin)
 Blocks: —
 
 ## Goal

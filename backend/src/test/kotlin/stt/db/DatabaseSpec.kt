@@ -62,13 +62,13 @@ class DatabaseSpec :
 
         given("an empty data directory") {
             `when`("opening the database for the first time") {
-                then("stt.db is created, V1 to V18 apply, and a reopen applies nothing and preserves rows") {
+                then("stt.db is created, V1 to V19 apply, and a reopen applies nothing and preserves rows") {
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
 
                         Database.open(dataDir).use { first ->
                             tableNames(first).shouldContainAll(expectedTables)
-                            migratedCount(first).shouldBe(18)
+                            migratedCount(first).shouldBe(19)
                             first.connection
                                 .createStatement()
                                 .use { st ->
@@ -84,7 +84,7 @@ class DatabaseSpec :
 
                         Database.open(dataDir).use { second ->
                             rowCount(second, "tasks").shouldBe(1)
-                            migratedCount(second).shouldBe(18)
+                            migratedCount(second).shouldBe(19)
                         }
                     }
                 }
@@ -92,7 +92,7 @@ class DatabaseSpec :
                     // A database written before Flyway 13.12.0 stores these checksums; if the new engine
                     // computed or compared them differently, opening that database would fail validation
                     // instead of applying nothing. The values are the ones the pre-bump database in
-                    // .devenv/state/stt holds (V1-V12) and the same algorithm gives for V13-V18:
+                    // .devenv/state/stt holds (V1-V12) and the same algorithm gives for V13-V19:
                     // CRC32 over the migration file's lines without their terminators.
                     runTest {
                         val dataDir = tempdir("stt-db").toPath()
@@ -307,6 +307,23 @@ class DatabaseSpec :
             }
         }
 
+        given("a database migrated to V9 only, whose settings row predates the theme mode") {
+            `when`("the database is opened") {
+                then("V19 fills the theme mode with auto and the repository reads it") {
+                    runTest {
+                        val dataDir = tempdir("stt-db").toPath()
+                        // V10 and V12 are class migrations this raw Flyway cannot resolve, so the old
+                        // database stops at V9 - before the theme mode, with the settings row (V6) there.
+                        migrateTo(dataDir, version = "9", rows = emptyList())
+
+                        Database.open(dataDir).use { db ->
+                            SettingsRepository(db).get().themeMode.shouldBe(ThemeMode.AUTO)
+                        }
+                    }
+                }
+            }
+        }
+
         given("a data directory path whose parent directories do not exist either") {
             `when`("opening the database") {
                 then("the directories are created and stt.db is created inside") {
@@ -451,7 +468,7 @@ private fun insertAudio(
 
 /**
  * The `flyway_schema_history` checksums a `stt.db` written before Flyway 13.12.0 carries, by version.
- * V1-V12 are read off the pre-bump database in `.devenv/state/stt`; V13-V18 use the same algorithm it
+ * V1-V12 are read off the pre-bump database in `.devenv/state/stt`; V13-V19 use the same algorithm it
  * proves: CRC32 over the migration file's lines, without their terminators. V10 and V12 are Java
  * migrations, which Flyway stores with no checksum.
  */
@@ -475,6 +492,7 @@ private val storedChecksumsBeforeTheBump =
         "16" to 129474160,
         "17" to 384228314,
         "18" to -457174061,
+        "19" to 492583506,
     )
 
 /** Every applied migration's version and stored checksum, in the order Flyway applied them. */

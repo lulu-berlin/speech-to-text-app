@@ -47,7 +47,7 @@ async function getJson(request: APIRequestContext, path: string): Promise<Record
   }
 }
 
-export const test = base.extend<{ queueReset: void; runnerHealth: void }>({
+export const test = base.extend<{ queueReset: void; runnerHealth: void; themeReset: void }>({
   // Roadmap item 85 (discovered): a pathological runner is recognised by its own spec timings and
   // the journey aborts, instead of sitting out the job's timeout (runs #544, #570, #576).
   runnerHealth: [
@@ -96,6 +96,34 @@ export const test = base.extend<{ queueReset: void; runnerHealth: void }>({
           if (!response.ok()) throw new Error(`resuming the queue answered ${response.status()}`);
         },
       });
+      await use();
+    },
+    { auto: true },
+  ],
+  // Roadmap item 67 (ADR 0068): the service stores the theme mode, so a spec that switched it would
+  // hand its choice to every later spec, where a fresh browser context once started on `auto`.
+  // Before each spec the stored mode goes back to `auto` through the API.
+  themeReset: [
+    async ({ request }, use) => {
+      const stored = await getJson(request, '/api/settings');
+      if (stored.themeMode !== 'auto') {
+        // A write takes the stored settings without the read-only ones (item 32's contract).
+        const readOnly: Record<string, true> = {
+          availableDevices: true,
+          gpuNames: true,
+          deviceProbeError: true,
+          deviceFallback: true,
+        };
+        const writable = Object.fromEntries(
+          Object.entries(stored).filter(([key]) => !readOnly[key]),
+        );
+        const response = await request.put(appUrl('/api/settings'), {
+          data: { ...writable, themeMode: 'auto' },
+        });
+        if (!response.ok()) {
+          throw new Error(`resetting the theme mode answered ${response.status()}`);
+        }
+      }
       await use();
     },
     { auto: true },

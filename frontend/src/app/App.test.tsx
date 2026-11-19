@@ -20,6 +20,7 @@ import { darkTheme, lightTheme } from '../shared/theme/theme';
 import { controllableEventStream } from '../test/eventStream';
 import { server } from '../test/server';
 import settingsUpdatedFallback from '../../../docs/api/settings-updated.fallback.json';
+import settingsUpdatedDefaults from '../../../docs/api/settings-updated.defaults.json';
 import { App } from './App';
 
 function renderAt(path: string) {
@@ -195,7 +196,7 @@ describe('the app root', () => {
     expect(getComputedStyle(shell).lineHeight).toBe(String(lineHeights.body));
   });
 
-  it('cycles the theme control through auto, light and dark, storing the choice', () => {
+  it('writes the theme mode to the service, follows another frontend, and paints the last-known mode first', async () => {
     localStorage.clear();
     const listeners: (() => void)[] = [];
     const media = {
@@ -208,37 +209,76 @@ describe('the app root', () => {
       'matchMedia',
       vi.fn(() => media),
     );
+    const writes: unknown[] = [];
+    server.use(
+      http.put('/api/settings', async ({ request }) => {
+        const update = (await request.json()) as Record<string, unknown>;
+        writes.push(update);
+        return HttpResponse.json({ ...settingsFixture, ...update });
+      }),
+    );
+    const events = controllableEventStream();
     const { unmount } = renderAt('/queue');
     const background = () => getComputedStyle(screen.getByRole('main')).backgroundColor;
 
-    // No stored choice: the OS decides (light).
+    // The stored mode is auto: the OS decides (light), and the control can write once the
+    // settings are read.
+    const control = await screen.findByRole('button', { name: 'Theme: system' });
+    await waitFor(() => expect(control).toBeEnabled());
     expect(background()).toBe(asRgb(lightTheme.colors.background));
 
-    // auto → light: stored, and it overrides the OS.
-    fireEvent.click(screen.getByRole('button', { name: 'Theme: system' }));
-    expect(localStorage.getItem('stt-theme-mode')).toBe('light');
+    // auto → light: written as part of the whole settings, and it overrides the OS.
+    fireEvent.click(control);
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(writes[0]).toEqual({
+      device: settingsFixture.device,
+      threads: settingsFixture.threads,
+      defaultLanguage: settingsFixture.defaultLanguage,
+      speakersMode: settingsFixture.speakersMode,
+      speakersCount: settingsFixture.speakersCount,
+      maxSpeakers: settingsFixture.maxSpeakers,
+      defaultFrontend: settingsFixture.defaultFrontend,
+      terminalCommand: settingsFixture.terminalCommand,
+      appLanguage: settingsFixture.appLanguage,
+      themeMode: 'light',
+    });
+    await screen.findByRole('button', { name: 'Theme: light' });
     act(() => {
       media.matches = true;
       listeners.forEach((listener) => listener());
     });
     expect(background()).toBe(asRgb(lightTheme.colors.background));
+    expect(localStorage.getItem('stt-theme-mode')).toBe('light');
 
-    // light → dark: stored and applied.
-    fireEvent.click(screen.getByRole('button', { name: 'Theme: light' }));
+    // Another frontend stores dark: the page follows it live, and remembers it.
+    events.send('settings-updated', { ...settingsUpdatedDefaults, themeMode: 'dark' });
+    await screen.findByRole('button', { name: 'Theme: dark' });
+    expect(background()).toBe(asRgb(darkTheme.colors.background));
     expect(localStorage.getItem('stt-theme-mode')).toBe('dark');
-    expect(background()).toBe(asRgb(darkTheme.colors.background));
+    unmount();
 
-    // dark → auto: the stored choice is cleared and the OS rules again.
-    fireEvent.click(screen.getByRole('button', { name: 'Theme: dark' }));
-    expect(localStorage.getItem('stt-theme-mode')).toBeNull();
-    expect(background()).toBe(asRgb(darkTheme.colors.background));
+    // A reload paints the last-known mode before the settings answer, then follows the answer.
     act(() => {
       media.matches = false;
       listeners.forEach((listener) => listener());
     });
+    const held = Promise.withResolvers<Response>();
+    let asked = false;
+    server.use(
+      http.get('/api/settings', () => {
+        asked = true;
+        return held.promise;
+      }),
+    );
+    controllableEventStream();
+    renderAt('/queue');
+    expect(background()).toBe(asRgb(darkTheme.colors.background));
+    expect(screen.getByRole('button', { name: 'Theme: dark' })).toBeDisabled();
+    await waitFor(() => expect(asked).toBe(true));
+    act(() => held.resolve(HttpResponse.json({ ...settingsFixture, themeMode: 'light' })));
+    await screen.findByRole('button', { name: 'Theme: light' });
     expect(background()).toBe(asRgb(lightTheme.colors.background));
 
-    unmount();
     vi.unstubAllGlobals();
   });
 });

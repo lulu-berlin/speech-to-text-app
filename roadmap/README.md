@@ -168,7 +168,7 @@ graph TD
   64 --> 66[66 local service and frontend flavors ✓]:::done
   48 --> 66
   49 --> 66
-  66 --> 67[67 TUI frontend]
+  66 --> 67[67 TUI frontend ✓]:::done
   12 --> 67
   66 --> 70[70 GUI window: the TUI]
   66 --> 89[89 service package]
@@ -293,7 +293,7 @@ graph TD
 | [64 — Evaluate Tauri as the desktop shell](../docs/specs/tauri-evaluation.md) | done | 50 |
 | [65 — `59-row-color`'s chunking-phase observation is flaky](../docs/specs/row-color-phase-observation.md)                                                                    | done          | —                           |
 | [66 — A per-user local service with selectable frontends (browser, window, TUI; tray optional)](../docs/specs/local-service-and-frontends.md)                                   | done          | 48, 49, 64                  |
-| [67 — A terminal UI frontend](67-tui-frontend.md)                                                                                                                  | spec-approved | 66, 12                      |
+| [67 — A terminal UI frontend](../docs/specs/tui-frontend.md)                                                                                                       | done          | 66, 12                      |
 | [68 — An audio-only ffmpeg for Windows, shipped as a pinned prebuilt artifact](../docs/specs/windows-audio-only-ffmpeg.md)                                                    | done          | 62, 49                      |
 | [69 — An audio-only ffmpeg for macOS aarch64-darwin, shipped as a pinned prebuilt artifact](../docs/specs/macos-audio-only-ffmpeg.md) | done | 62, 48 |
 | [70 — Replace Electron with a Rust GUI for the window flavor: the TUI, natively](70-rust-gui-window.md)                                                            | spec-approved | 49, 66, 67                  |

@@ -8,26 +8,27 @@ publish.workspace = true
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# Plain HTTP only: the service listens on loopback, so no TLS stack and no gzip (roadmap item 66).
-ureq = { version = "3", default-features = false }
+# Async HTTP on tokio (roadmap item 67, decided 2026-10-22). Plain HTTP only: the service listens on
+# loopback, so no TLS stack, no HTTP/2 and no compression - none of reqwest's default features.
+reqwest = { version = "0.13", default-features = false, features = ["json", "multipart", "stream"] }
+tokio = { version = "1", features = ["fs", "io-util", "time"] }
+# Streams an upload from the file on disk, so a large recording is never held in memory whole.
+tokio-util = { version = "0.7", features = ["io"] }
 # Splits the user's `terminalCommand` setting the way a POSIX shell splits a command line.
 shlex = "2"
-# The tray's icon and menu (roadmap item 66, items 2-3; ADR 0064). Optional: they link against a
-# tray host's C libraries (GTK 3 and AppIndicator on Linux), which devenv.nix and the packages
-# provide, so the client still builds on a machine with no GUI toolkit.
-tray-icon = { version = "0.26.1", optional = true }
-muda = { version = "0.21.2", optional = true }
-tao = { version = "0.37.2", optional = true }
-# These three pin gtk 0.18 on Linux (muda's gtk3 menu backend, tao's GTK event loop), which requires
-# glib ^0.18; glib 0.18.5 carries GHSA-wrw7-89jp-8q8g (an unsound `VariantStrIter` iterator) and the
-# fix is glib 0.20, whose first gtk line (0.19) these crates have not adopted. Both upstreams track
-# the move; bump all three together once a release takes gtk 0.19, run `cargo update`, and the
-# Dependabot alert on glib goes with it.
+# The app's language (roadmap item 88): ICU4X writes the dates, numbers and plural categories of
+# the locale the browser's `Intl` uses, from data compiled into the binary.
+icu = { version = "2", features = ["compiled_data"] }
+# The finish dates the TUI shows, from the API's UTC milliseconds.
+chrono = "0.4"
+# The system's language on Windows and macOS, where no POSIX locale variable names it.
+sys-locale = "0.3"
+
+[build-dependencies]
+# Reads `frontend/src/locales/<locale>.json` and `docs/api/ui-locales.json` into the constants the
+# crate compiles in (ADR 0067).
+serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"
-
-[features]
-# `stt-tray` shows its icon and menu with this feature; without it the tray runs virtually, which
-# ADR 0064 allows where no tray host exists (a shell session, a headless runner).
-tray-menu = ["dep:tray-icon", "dep:muda", "dep:tao"]
+tokio = { version = "1", features = ["macros", "rt"] }

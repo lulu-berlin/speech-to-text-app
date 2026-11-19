@@ -905,17 +905,31 @@ export async function captureSessionCookie(dirs: {
 const BACKEND_INSTALL = join(backendDir, 'build', 'install', 'stt-backend');
 
 /**
- * The backend's installed launcher, building the distribution once per run when it is missing. The
- * launcher runs the app's JVM directly — no Gradle daemon or wrapper at test time — and Windows gets
- * Gradle's own `.bat`, which `needsShell` runs through cmd.exe.
+ * Builds the backend's installed distribution from this checkout, once per run, before the shared
+ * service starts: a run reusing whatever install was there tested the old service after a backend
+ * change (2026-11-08, a branch with V18 against a V17 install). Gradle's up-to-date check keeps a run
+ * without a backend change cheap. `./gradlew e2e` has built it already - its task depends on
+ * `installDist` - and says so with `E2E_BACKEND_INSTALLED`.
+ */
+export function installBackend(): void {
+  if (process.env.E2E_BACKEND_INSTALLED === '1') return;
+  console.log('e2e: building the backend distribution (gradle installDist)');
+  const gradle = backendGradle({ task: 'installDist' });
+  execFileSync(gradle.command, gradle.args, { cwd: gradle.cwd, stdio: 'inherit' });
+}
+
+/**
+ * The backend's installed launcher, building the distribution when it is missing (a spec run outside
+ * the journey's global setup, which builds it). The launcher runs the app's JVM directly - no Gradle
+ * daemon or wrapper at test time - and Windows gets Gradle's own `.bat`, which `needsShell` runs
+ * through cmd.exe.
  */
 async function backendLauncher(): Promise<string> {
   const windows = process.platform === 'win32';
   const launcher = join(BACKEND_INSTALL, 'bin', `stt-backend${windows ? '.bat' : ''}`);
   if (!existsSync(launcher)) {
     console.log(`e2e: no backend launcher at ${launcher}; building the distribution`);
-    const gradle = backendGradle({ task: 'installDist' });
-    execFileSync(gradle.command, gradle.args, { cwd: gradle.cwd, stdio: 'inherit' });
+    installBackend();
   }
   if (!existsSync(launcher)) {
     throw new Error(`no backend launcher at ${launcher} after installDist`);
@@ -944,7 +958,7 @@ export async function startService({
   for (const dir of [configDir, runtimeDir]) mkdirSync(dir, { recursive: true });
   // The distribution's launcher, not `gradle run`: Gradle at test time is minutes of daemon and
   // wrapper work under a loaded runner (CI run #500: the macOS leg sat the whole 600 s health
-  // timeout), while the launcher starts the same JVM directly. `installDist` runs once per run.
+  // timeout), while the launcher starts the same JVM directly. The global setup builds it.
   const launcher = await backendLauncher();
   console.log(`e2e: starting the service with ${launcher} on :${port}`);
   // A service whose durable port was taken serves on a free one and advertises that in `runtime.json`;

@@ -150,3 +150,27 @@ test('a review page that is not its generated form fails the check', () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('a tui row with no compared product fails the check', () => {
+  const root = plantedTree();
+  try {
+    // Roadmap item 67, the user's translation line (2026-11-17): every `tui.*` row records a
+    // compared product and its wording. A dash is no comparison, even though the generic rule
+    // above accepts it for the other keys.
+    const page = readFileSync(join(repoRoot, 'docs/reviews/de.md'), 'utf8');
+    const bare = page.replace(
+      /^\| tui\.hint\.theme\s+\|[^\n]*$/m,
+      '| tui.hint.theme | [t] theme | [t] Design | — | neutral | — |',
+    );
+    assert.notEqual(bare, page, 'the German page carries a tui.hint.theme row');
+    writeFileSync(join(root, 'docs/reviews/de.md'), bare);
+    const outcome = runCheck('docs/check-reviews.ts', [], root);
+    assert.equal(outcome.status, 1);
+    assert.match(
+      outcome.stdout,
+      /docs\/reviews\/de\.md:\d+: "tui\.hint\.theme" has no compared product/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

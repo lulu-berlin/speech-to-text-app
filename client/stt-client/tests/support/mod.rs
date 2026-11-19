@@ -82,6 +82,18 @@ pub fn respond(stream: &mut TcpStream, status: &str, body: &str) {
     .unwrap();
 }
 
+/// Answers with `status` and a binary `body` (a clip's `/audio`), closing the connection.
+pub fn respond_bytes(stream: &mut TcpStream, status: &str, body: &[u8]) {
+    use std::io::Write;
+    write!(
+        stream,
+        "HTTP/1.1 {status}\r\nContent-Type: audio/flac\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    )
+    .unwrap();
+    stream.write_all(body).unwrap();
+}
+
 /// Answers every request on `listener` until the test ends, `status` and body chosen by `answer`.
 pub fn answer_forever(
     listener: TcpListener,

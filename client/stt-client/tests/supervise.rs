@@ -11,14 +11,15 @@ use std::time::{Duration, Instant};
 
 use stt_client::{Supervisor, Watch, watch_service};
 
-#[test]
-fn the_tray_restarts_a_dead_service_and_stops_when_the_restart_fails() {
+#[tokio::test]
+async fn the_tray_restarts_a_dead_service_and_stops_when_the_restart_fails() {
     // A live service: nothing to do.
     let live = tempfile::tempdir().unwrap();
     support::start_and_answer(live.path());
     let watch = watch_service(&support::dirs_in(live.path()), || {
         panic!("a live service must not be restarted")
-    });
+    })
+    .await;
     assert!(matches!(watch, Watch::Alive), "{watch:?}");
 
     // A dead service - its runtime.json points at a port nothing listens on - comes back.
@@ -27,7 +28,8 @@ fn the_tray_restarts_a_dead_service_and_stops_when_the_restart_fails() {
     let watch = watch_service(&support::dirs_in(dead.path()), || {
         support::start_and_answer(dead.path());
         Ok(())
-    });
+    })
+    .await;
     assert!(matches!(watch, Watch::Restarted), "{watch:?}");
 
     // A dead service that cannot be restarted: the tray stops too, with the reason.
@@ -35,7 +37,8 @@ fn the_tray_restarts_a_dead_service_and_stops_when_the_restart_fails() {
     support::write_bootstrap(lost.path(), support::closed_port());
     let watch = watch_service(&support::dirs_in(lost.path()), || {
         Err(io::Error::other("no stt-service beside stt-tray"))
-    });
+    })
+    .await;
     match watch {
         Watch::Stop(error) => assert!(
             error.to_string().contains("no stt-service beside stt-tray"),
@@ -45,21 +48,21 @@ fn the_tray_restarts_a_dead_service_and_stops_when_the_restart_fails() {
     }
 }
 
-#[test]
-fn a_service_that_dies_a_fourth_time_within_60_seconds_stops_the_tray() {
+#[tokio::test]
+async fn a_service_that_dies_a_fourth_time_within_60_seconds_stops_the_tray() {
     let start = Instant::now();
 
     // Three deaths within the window are restarted; the fourth is a crash loop.
     let looping = tempfile::tempdir().unwrap();
     let mut supervisor = Supervisor::new();
     for seconds in [0, 10, 20] {
-        let watch = die_and_watch(&mut supervisor, looping.path(), start + secs(seconds));
+        let watch = die_and_watch(&mut supervisor, looping.path(), start + secs(seconds)).await;
         assert!(
             matches!(watch, Watch::Restarted),
             "death at {seconds}s: {watch:?}"
         );
     }
-    match die_and_watch(&mut supervisor, looping.path(), start + secs(30)) {
+    match die_and_watch(&mut supervisor, looping.path(), start + secs(30)).await {
         Watch::Stop(error) => assert!(error.to_string().contains("3 times"), "{error}"),
         other => panic!("a fourth death within 60 seconds must stop the tray, got {other:?}"),
     }
@@ -68,7 +71,7 @@ fn a_service_that_dies_a_fourth_time_within_60_seconds_stops_the_tray() {
     let spread = tempfile::tempdir().unwrap();
     let mut supervisor = Supervisor::new();
     for seconds in [0, 10, 20, 70] {
-        let watch = die_and_watch(&mut supervisor, spread.path(), start + secs(seconds));
+        let watch = die_and_watch(&mut supervisor, spread.path(), start + secs(seconds)).await;
         assert!(
             matches!(watch, Watch::Restarted),
             "death at {seconds}s: {watch:?}"
@@ -78,12 +81,14 @@ fn a_service_that_dies_a_fourth_time_within_60_seconds_stops_the_tray() {
 
 /// Lets the service in `dir` die - its runtime.json now points at a port nothing listens on - then
 /// has `supervisor` look at it at `now`, restarting it as a stand-in that answers.
-fn die_and_watch(supervisor: &mut Supervisor, dir: &Path, now: Instant) -> Watch {
+async fn die_and_watch(supervisor: &mut Supervisor, dir: &Path, now: Instant) -> Watch {
     support::write_bootstrap(dir, support::closed_port());
-    supervisor.watch(&support::dirs_in(dir), now, || {
-        support::start_and_answer(dir);
-        Ok(())
-    })
+    supervisor
+        .watch(&support::dirs_in(dir), now, || {
+            support::start_and_answer(dir);
+            Ok(())
+        })
+        .await
 }
 
 fn secs(seconds: u64) -> Duration {

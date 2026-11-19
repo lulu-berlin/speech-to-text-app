@@ -69,11 +69,17 @@ function breakSpec(root: string): void {
   writeFileSync(join(root, BROKEN_FILE), `${source}\n${PLAIN_ERROR}${INDEX_ERROR}`);
 }
 
+// `--pretty false` pins the plain `file(line,col): error` format the assertions read: in a colour
+// terminal Node's test runner passes colour on, and tsc 7 then prints its coloured form instead.
 function typeCheck(root: string): { status: number; output: string } {
-  const result = spawnSync(process.execPath, [tsc, '-p', join(root, 'tsconfig.json')], {
-    cwd: root,
-    encoding: 'utf8',
-  });
+  const result = spawnSync(
+    process.execPath,
+    [tsc, '--pretty', 'false', '-p', join(root, 'tsconfig.json')],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    },
+  );
   return { status: result.status ?? -1, output: `${result.stdout}${result.stderr}` };
 }
 

@@ -2,14 +2,16 @@
 
 The term evidence is recorded in `docs/reviews/fr.md`; this is the shared vocabulary. The
 compared products and their popularity are listed there (Zoom 1, Teams 2, Google 3, Word 4,
-Apple 5, Otter 6, Descript 7, Amberscript 8).
+Apple 5, Otter 6, Descript 7, Amberscript 8, GNU nano 9, GNOME Files 10, Midnight Commander 11).
 
 | English | French | Evidence | Note |
 |---|---|---|---|
 | transcript | transcription | Otter 6, Amberscript 8 | the result and the process share the word |
 | queue | file d’attente | Zoom 1 | |
+| reorder | réorganiser | Teams 2 | queue and segment order |
 | task | tâche | — | chosen over Amberscript's `commande` for one consistent noun |
 | upload | importer / importation | Google Drive 3 | not `téléverser`, not `uploader` |
+| folder | dossier | GNOME Files 10 | `Dossier`; Midnight Commander’s `Répertoire` is the technical synonym, not used |
 | settings | paramètres | Zoom 1, Apple 5 | |
 | history | historique | Apple 5, Google 3 | |
 | device | appareil | Zoom 1 | |
@@ -31,10 +33,16 @@ Apple 5, Otter 6, Descript 7, Amberscript 8).
 | cancel | annuler | Zoom 1 | |
 | delete | supprimer | Google 3 | |
 | completed / failed / canceled | terminé / échec / annulé | Zoom 1, Teams 2 | uppercase as status badges |
+| idle | inactif | Apple 5 | app state, not a person |
 | theme | thème | Apple 5 | |
 | app language | langue de l’application | Google 3 | |
 | default frontend | interface par défaut | Google 3 | `interface`, not the anglicism |
 | embedding / clustering | plongement / regroupement | Amberscript 8 (English terms) | established French technical terms |
+| download | téléchargement | Google 3 | `Télécharger` as the action |
+| path | chemin | Midnight Commander 11 | `Chemin du répertoire :` |
+| revert | rétablir | Google 3 | same word as the web editor's `Rétablir` |
+| key | touche | GNU nano 9 | terminal key labels keep the physical names (`[Enter]`, `[Esc]`) |
+| selected | sélectionné / sélectionnée | GNOME Files 10 | agrees with the item (`voix` → `sélectionnée`) |
 
 ## Gender and culture
 

@@ -15,6 +15,7 @@ internal object SettingsTable : Table("settings") {
     val deviceFallback = text("device_fallback").nullable()
     val defaultFrontend = text("default_frontend").nullable()
     val terminalCommand = text("terminal_command").nullable()
+    val themeMode = text("theme_mode")
 
     /** Roadmap item 88: the app's own language; null follows the system (V18). */
     val appLanguage = text("app_language").nullable()

@@ -8,7 +8,8 @@ Blocks: line 4 of item 66's test list (the window attaching to a running service
 
 Per OS, **one package** that installs everything the app is — the `stt-service` runner (the backend
 in app mode), the `stt-app` CLI, the `stt-tray` binary built with its `tray-menu` feature, the
-backend's installDist, the JRE, the built UI and the `stt-window` GUI — all beside each other, so
+backend's installDist, the JRE, the built UI, the `stt-window` GUI and the `bin/stt-tui` terminal
+frontend — all beside each other, so
 `stt-app open browser` starts the service and the tray with no environment variable pointing at
 anything else ([ADR 0064](../docs/decisions/0064-service-and-tray-are-one-unit.md)) and the window
 needs no separate install. The window is bundled, not optional.
@@ -86,8 +87,9 @@ needs no separate install. The window is bundled, not optional.
 ## Proposal
 
 1. **Contents of the one package**: `bin/stt-service` (a small runner that execs the backend with
-   the packaged JRE in app mode), `bin/stt-app`, `bin/stt-tray` (with `tray-menu`), `stt-window`
-   (item 70), `backend/lib` (Gradle `installDist`), `jre`, `ui` (the built frontend). Per OS it is
+   the packaged JRE in app mode), `bin/stt-app`, `bin/stt-tray` (with `tray-menu`), `bin/stt-tui`
+   (item 67), `stt-window` (item 70), `backend/lib` (Gradle `installDist`), `jre`, `ui` (the built
+   frontend). Per OS it is
    one `.deb` (window dependencies declared, no second package), one MSI (one product, no feature
    tree, the portable zips unchanged) and one macOS app bundle with the window inside it, shipped in
    one DMG.
@@ -97,8 +99,7 @@ needs no separate install. The window is bundled, not optional.
 3. **CI**: a job per OS that installs the single package, runs `stt-app open browser --print-url`
    to bring the unit up and then the packaged desktop spec that asserts the window attaches, one
    backend runs, and closing the window leaves the service up.
-4. **Not in this item**: the tray's icon on a headless runner (proven virtual), and the TUI
-   (item 67).
+4. **Not in this item**: the tray's icon on a headless runner (proven virtual).
 5. **Upgrades**: in-place replacement on every installer, refused downgrades, the clean quit before
    replacing files, and the frontend's version-mismatch refusal. The release version itself comes
    from item 78 (`VERSION`); the tests build two versions of the package to prove the upgrade and
@@ -167,7 +168,8 @@ above.)
 - [ ] The window is a singleton: opening it again (tray, or a second `stt-app open gui`) attaches to
       the running window and raises it instead of starting a second (ADR 0064)
 - [ ] (basic) Each OS has one installer and it installs the whole app: the runner, the CLI, the
-      tray, the backend, the JRE, the UI and the window, nothing left to download or add; after it,
+      tray, the backend, the JRE, the UI, the window and the terminal frontend, the terminal's
+      descriptor written on install, nothing left to download or add; after it,
       `stt-app open browser` starts the service and the tray, and `stt-app open gui` opens the
       window attaching to that service
 - [ ] (basic) Linux: one `.deb` installs the app, a browser-only use launches nothing else, and

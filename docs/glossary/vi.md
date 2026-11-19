@@ -1,8 +1,9 @@
 # Vietnamese (vi) — glossary
 
 The term evidence is recorded in `docs/reviews/vi.md`; this is the shared vocabulary. The
-compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3). A `—`
-carries no comparison; the term is the neutral Vietnamese word, not a product's.
+compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3, VLC 4,
+GNOME Files 5, GNU nano 6, Transmission 7, Midnight Commander 8). A `—` carries no comparison; the
+term is the neutral Vietnamese word, not a product's.
 
 | English                 | Vietnamese                                             | Evidence                                  | Note                                                           |
 | ----------------------- | ------------------------------------------------------ | ----------------------------------------- | -------------------------------------------------------------- |
@@ -17,7 +18,7 @@ carries no comparison; the term is the neutral Vietnamese word, not a product's.
 | device                  | thiết bị                                               | Microsoft 2: „thiết bị“                   |                                                                |
 | file                    | tệp                                                    | Microsoft 2: „tệp“                        | `tên tệp` for a file name                                      |
 | threads                 | luồng                                                  | Microsoft 2: „luồng“                      | technical noun                                                 |
-| speaker(s)              | người nói                                              | —                                         | no grammatical gender; the voice's source                      |
+| speaker(s)              | người nói                                              | Microsoft 2: „người nói“                  | no grammatical gender; the voice's source                      |
 | speakers (count)        | số người nói                                           | —                                         |                                                                |
 | max speakers            | số người nói tối đa                                    | —                                         |                                                                |
 | speaker mode            | nhận diện người nói                                    | —                                         | descriptive noun phrase                                        |
@@ -25,7 +26,7 @@ carries no comparison; the term is the neutral Vietnamese word, not a product's.
 | queue phases            | chia âm thanh / chép lời / nhận diện người nói         | Google 1: „chép lời“                      | nouns after the label                                          |
 | transcript phases       | chia âm thanh / chép lời / nhận diện người nói / xử lý | Google 1: „chép lời“                      | `{outcome} khi đang {phase}`; with a position `… ở mốc {time}` |
 | turn                    | lượt nói                                               | —                                         |                                                                |
-| segment                 | đoạn                                                   | —                                         |                                                                |
+| segment                 | đoạn                                                   | VLC 4: „Đoạn dữ liệu“                     |                                                                |
 | play / pause            | phát / tạm dừng                                        | Apple 3: „Phát“                           | verb phrases, genderless                                       |
 | seek                    | vị trí phát                                            | —                                         | the slider's label, not a command                              |
 | merge                   | hợp nhất                                               | Google 1: „Hợp nhất“                      |                                                                |
@@ -36,6 +37,14 @@ carries no comparison; the term is the neutral Vietnamese word, not a product's.
 | user interface          | giao diện người dùng                                   | Microsoft 2: „giao diện người dùng“       | `frontend` never appears in the UI                             |
 | default                 | mặc định                                               | Microsoft 2: „mặc định“                   |                                                                |
 | error                   | lỗi                                                    | Google 1: „Lỗi“                           | `Lỗi: {message}`                                               |
+| key (keyboard)          | phím                                                   | —                                         | the TUI's key labels; `Phím hàng đợi` for a key table          |
+| folder                  | thư mục                                                | Microsoft 2: „thư mục“                    | the file browser's directories                                 |
+| path                    | đường dẫn                                              | VLC 4: „Đường dẫn“                        |                                                                |
+| format                  | định dạng                                              | GNOME Files 5: „Định dạng“                | the download format                                            |
+| reset                   | đặt lại                                                | GNOME Files 5: „Đặt lại“                  | `đặt lại hợp nhất`, `đặt lại tên`                              |
+| undo                    | hoàn tác                                               | GNOME Files 5: „Hoàn tác“                 | the undo in the merge sentence                                 |
+| revert                  | hoàn nguyên                                            | GNOME Files 5: „Hoàn nguyên“              | restore the segment's original text; not `hoàn tác` (undo)     |
+| theme                   | giao diện                                              | VLC 4: „Giao diện“                        | light/dark, as the existing catalog writes it                  |
 
 This glossary is the Vietnamese layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/vi.md`).

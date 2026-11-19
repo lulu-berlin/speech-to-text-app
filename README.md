@@ -202,7 +202,11 @@ Prerequisites:
 - **Java 21 or newer** (Gradle 9.8.2 itself runs on Java 17–27, but the backend compiles with `-Xjdk-release=21`, so a 17–20 launcher JVM cannot build it). The app is run with JDK 21, which Gradle downloads when your Java is another version.
 - **Linux**: glibc 2.38 or newer (Ubuntu 24.04+, Debian 13+, Fedora 39+) and the system libraries the prebuilt tools are linked against — only this path needs them; Nix, devenv and Docker bring their own:
   - whisper-cli: `libstdc++6`, `libgomp1` and the Vulkan loader `libvulkan1` (needed even without a GPU);
-  - ffmpeg: `libasound2` (`libasound2t64` on Ubuntu 24.04+ and Debian 13), `libpulse0`, `libxcb1`, `libxcb-shm0` and `libudev1`.
+  - ffmpeg: `libasound2` (`libasound2t64` on Ubuntu 24.04+ and Debian 13), `libpulse0`, `libxcb1`,
+    `libxcb-shm0` and `libudev1`.
+  - the Rust client (`cd client`) — the terminal UI plays a transcript's audio (roadmap item 67) —
+    links ALSA, so building it on Linux needs the development files: `libasound2-dev`. The
+    development shell and the CI client jobs bring them.
 
   The list is owned by `./gradlew runtimeSystemDeps`, so this README, the bootstrap and CI cannot
   drift. The integration tests depend on it, so a host that is missing a library fails there with the
@@ -225,12 +229,16 @@ cd speech-to-text-app
 Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads about 850 MB (more when Gradle also has to download JDK 21) and builds the frontend and the backend. Later runs reuse the downloads and still check every file's SHA-256.
 
 - `./gradlew dev` — dev mode, like `devenv up`: the Vite dev server on <http://localhost:5173> with hot reload, and the backend rebuilt and restarted when its sources change. Vite is ready first; the API answers once the backend has built and logs `Responding at`. Ctrl-C stops both.
-- `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. One spec also builds `stt-app` with Cargo (roadmap item 66), so Rust must be installed: the development shell has it, otherwise [rustup](https://rustup.rs/), which reads `client/rust-toolchain.toml`. On Linux, Chromium also needs system libraries from apt (Debian and Ubuntu only). `./gradlew e2eSystemDeps` installs them when run as root, for example in a container; run as yourself, it only checks them and, if some are missing, fails with the `sudo apt-get install …` line to run (Gradle never asks for your password):
+- `./gradlew e2e` — the [end-to-end tests](e2e/) against the built app, with Gradle's own test fixtures and Chromium. One spec also builds `stt-app` with Cargo (roadmap item 66), so Rust must be installed: the development shell has it, otherwise [rustup](https://rustup.rs/), which reads `client/rust-toolchain.toml`. On Linux, Chromium also needs system libraries from apt (Debian and Ubuntu only). `./gradlew e2eSystemDeps` installs them when run as root, for example in a container; run as yourself, it only checks them and, if some are missing, fails with the `sudo apt-get install …` line to run (Gradle never asks for your password). On a
+  NixOS host the tools Gradle manages cannot run, so there `./gradlew e2e` uses the tools on
+  `PATH` instead, the development shell's. In order:
 
   ```sh
   ./gradlew e2eSystemDeps
   ./gradlew e2e
   ```
+
+- `./gradlew tuiJourney` — the terminal UI's end-to-end journey (roadmap item 67): the real `stt-tui` in a pseudo-terminal against the installed service uploads Gradle's `jfk.wav` fixture, waits for the task to complete and reads its transcript back. It builds with Cargo, so Rust must be installed as for `./gradlew e2e`; a plain `cargo test` skips it. The managed tools cannot run on a NixOS host (as for `./gradlew e2e`, above), so there the task uses the tools on `PATH` instead — the development shell's.
 
 - `./gradlew checkVersions` — checks that `versions.json` still matches the Gradle wrapper, the flake's locked nixpkgs and `client/rust-toolchain.toml`.
 - `cd client && cargo test` — the Rust client workspace's tests (roadmap item 66). Gradle does not download Rust: install [rustup](https://rustup.rs/), which reads `client/rust-toolchain.toml` and installs the pinned Rust the first time; `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are CI's other two checks.

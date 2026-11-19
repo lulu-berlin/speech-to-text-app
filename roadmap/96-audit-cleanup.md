@@ -1,7 +1,7 @@
 # 96 — Cleanup from the 2026-11-06 audit: dead code, duplicated code and comments that contradict it
 
 Status: spec-approved
-Depends on: [95](../docs/specs/failure-paths.md) (same engine and route files), [67](67-tui-frontend.md) (the `client/stt-client` rows only)
+Depends on: [95](../docs/specs/failure-paths.md) (same engine and route files), [67](../docs/specs/tui-frontend.md) (the Client (Rust) rows only)
 Blocks: —
 
 ## Goal
@@ -197,8 +197,8 @@ None. (Settled 2026-11-09, see "Decided".)
   generated shared contract.
 - **Three backlog rows join the item**: the two `segment(...)` test builders, `TestTransitions.kt`'s
   copy of `allowedTransitions`, and turn rows keyed by array index.
-- **The `client/stt-client` rows stay in this item**; if item 67 is still running when the rest is
-  done, they split into a small follow-up.
+- **The Client (Rust) rows stay in this item**: they cover the four crates `client/stt-app`,
+  `client/stt-client`, `client/stt-tray` and `client/stt-tui`, not the library alone.
 
 ## Test list
 
@@ -240,8 +240,7 @@ e2e journeys running unchanged are part of its must-not-break proof.
   known-issues rows "Dead exports" and "Duplicated helpers" (Frontend) were merged into it.
 - 2026-11-09: consultation (user): drop `contentType`/`model` with a migration; keep both of item
   75's guards; move the two `STT_` variables into `Config`; turn the unused-locals flags on; one
-  settings list per side; absorb the three named backlog rows; the client rows stay here and split
-  into a follow-up if item 67 is still running. Status stays `draft` until the updated test list is
+  settings list per side; absorb the three named backlog rows; the client rows stay here. Status stays `draft` until the updated test list is
   approved.
 - 2026-11-09: approved by the user: the decisions recorded above and the 11-line test list as
   updated. Status set to spec-approved.

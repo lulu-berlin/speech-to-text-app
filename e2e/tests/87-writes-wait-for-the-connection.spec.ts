@@ -9,7 +9,7 @@ import {
   stopBackend,
 } from '../lib/backend.ts';
 import { awaitUploadOutcome } from '../lib/upload-outcome.ts';
-import { appLive, ensureTranscript, openTranscript, turnTextOf } from './helpers/ui';
+import { appLive, ensureTranscript, openTranscript, signIn, turnTextOf } from './helpers/ui';
 import { expect, test } from './helpers/test';
 
 // Item 87: a write is offered only while the app can carry it out, and the reading surface keeps
@@ -52,8 +52,11 @@ test('writes wait for the connection: the transcript stays readable and a rename
     await expect(pause).toBeDisabled();
     await expect(pause).toHaveAttribute('title', /Can't reach the app's service/);
 
-    // A fresh process on the same socket and data directory brings the connection back.
+    // A fresh process on the same socket and data directory brings the connection back. The
+    // service keeps its sessions in memory, so the restarted one answers the old cookie with 401:
+    // the browser enters again through the launch handshake, as 13-restart does (roadmap item 66).
     restarted = await startBackend({ port, dataDir });
+    await signIn(page);
     await expect(page.getByText('Live', { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(dropZone).toBeEnabled();
 

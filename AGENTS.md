@@ -24,7 +24,7 @@ A web app that transcribes uploaded audio files with speaker diarization. Backen
 AGENTS.md  devenv.nix  flake.nix  .editorconfig  .prettierrc
 backend/   Gradle (Kotlin DSL) Ktor app; backend/deps.json = Nix lockfile for Gradle deps
 frontend/  Vite + React + TS + styled-components (pnpm)
-client/    Rust workspace: the stt-client crate (library, `stt-app` CLI and tray binaries; roadmap item 66)
+client/    Rust workspace: four crates — `stt-client` (library), `stt-app` (CLI and tray binaries), `stt-tray` (the tray's menu) and `stt-tui` (the terminal frontend; roadmap item 67)
 desktop/   Electron desktop app: starts the bundled backend, packaged with electron-builder
 e2e/       Playwright end-to-end suites: the built app against the real backend, and the packaged desktop app
 nix/       shared Nix expressions (models; more in item 16)
@@ -64,7 +64,7 @@ Keep [docs/known-issues.md](docs/known-issues.md) current: add every real findin
 
 - Backend: Kotest (`BehaviorSpec`) + `kotlinx-coroutines-test` (`runTest`, virtual time for engine/queue tests). Tests that spawn real processes (from item 05 on) are tagged `Integration` (Kotest `Tag`, ADR 0021); they are excluded from `gradle test`/`gradle check` and run separately with `gradle integrationTest`. HTTP route tests use Ktor `testApplication`.
 - Frontend: Vitest + React Testing Library (jsdom) (+ MSW for API mocks from the first API item on).
-- End-to-end: Playwright in the top-level `e2e/` package against the real backend (item 21). Every item that adds or changes an app feature includes at least one e2e test of it in its test list and approval; build, packaging and refactor-only items are exempt and say why ([ADR 0046](docs/decisions/0046-every-feature-has-an-e2e-test.md)).
+- End-to-end: Playwright in the top-level `e2e/` package against the real backend (item 21). Every item that adds or changes an app feature includes at least one e2e test of it in its test list and approval; build, packaging and refactor-only items are exempt and say why ([ADR 0046](docs/decisions/0046-every-feature-has-an-e2e-test.md)). The terminal app is the exception: Playwright cannot drive a terminal, so its end-to-end proof is its pty journey (`./gradlew tuiJourney`), which ADR 0046's 2026-11-17 amendment records.
 - Formatting is part of the standard commands (ADR 0015): see [Commands](#commands).
 
 ## Commands
@@ -94,7 +94,7 @@ Frontend (pnpm — ADR 0012):
 
 Client (the Rust workspace in `client/` — roadmap item 66; Rust from the devenv, pinned in `versions.json` and `client/rust-toolchain.toml`, which `./gradlew checkVersions` holds together). Run from `client/`:
 
-- `cargo test` — the client crates' tests.
+- `cargo test` — the client crates' tests. The TUI's end-to-end journey (`stt-tui/tests/journey.rs`, roadmap item 67) is ignored there: it needs the real service, and `./gradlew tuiJourney` (from the repository root) runs it with the installed backend, the managed tools and the fixtures.
 - `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` — the formatting and lint gates; CI runs all three on Linux, macOS and Windows.
 
 Documentation (the `docs/` package — TypeScript run by Node's type stripping, ADR 0054 — plus the individual checks; everything below runs from the repository root, so run it after changing `README.md` or `docs/architecture.md`, code the overview names, backend exception handling, or the CI workflow):

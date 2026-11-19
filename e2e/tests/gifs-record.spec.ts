@@ -95,10 +95,11 @@ async function transcriptUrl(browser: Browser, clip: string): Promise<string> {
 // recorded before it is cut off (re-encoded with the devenv's ffmpeg, as global setup
 // prepares the fixtures).
 // The recordings are dark mode only (decided with the user), from the very first frame:
-// the context prefers dark, the stored theme choice (themeMode.ts, key stt-theme-mode)
-// is seeded as dark before the app loads, and the document canvas is dark too —
-// otherwise the app's first paint (before React mounts and applies the theme) is a
-// white flash in the recordings.
+// the context prefers dark (the service's stored mode is auto, which follows it), the
+// browser's last-known mode (themeMode.ts, key stt-theme-mode) is seeded as dark for the
+// paint before the settings arrive, and the document canvas is dark too — otherwise the
+// app's first paint (before React mounts and applies the theme) is a white flash in the
+// recordings.
 async function recordFlow(
   browser: Browser,
   name: string,

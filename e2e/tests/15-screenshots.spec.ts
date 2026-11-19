@@ -7,6 +7,7 @@ import {
   appLive,
   goTo,
   rowOf,
+  setTheme,
   uploadClips,
   waitForTaskState,
 } from './helpers/ui';
@@ -25,19 +26,9 @@ const VIEWPORTS: Record<'phone' | 'desktop', { width: number; height: number }> 
 test('captures the acceptance screenshots', async ({ page }) => {
   const fixturesDir = loadState().fixturesDir;
 
-  const themeButton = page.getByRole('button', { name: /Theme:/ });
-  const setTheme = async (mode: 'light' | 'dark' | 'system') => {
-    // The button's accessible name is the current mode (AppHeader THEME_LABEL); the
-    // cycle is system -> light -> dark -> system, so clicking until it shows is bounded.
-    for (let guard = 0; guard < 4; guard++) {
-      if ((await themeButton.getAttribute('aria-label')) === `Theme: ${mode}`) return;
-      await themeButton.click();
-    }
-  };
-
   const shot = async (name: string, width: 'phone' | 'desktop', theme: 'light' | 'dark') => {
     await page.setViewportSize(VIEWPORTS[width]);
-    await setTheme(theme);
+    await setTheme(page, theme);
     await expect(page.getByRole('button', { name: `Theme: ${theme}` })).toBeVisible();
     await page.screenshot({ path: `screenshots/${name}-${theme}-${width}.png` });
   };

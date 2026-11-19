@@ -1,21 +1,47 @@
-//! The client side of the per-user service (roadmap item 66), shared by the tray and the `stt-app` CLI.
+//! The client side of the per-user service (roadmap item 66), shared by the tray, the `stt-app` CLI
+//! and the TUI.
 
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
-use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
 mod autostart;
+mod commands;
+mod events;
 mod quote;
-#[cfg(feature = "tray-menu")]
-pub mod tray_menu;
+mod read;
+mod segments;
+mod settings;
+mod speakers;
+mod text;
+mod upload;
 
 pub use autostart::{Autostart, autostart_entry, install, remove};
+pub use commands::{
+    TaskCommand, delete_task, dismiss_device_fallback, reorder_queue, set_queue_paused,
+    task_command,
+};
+pub use events::{Event, Events, Queue, Snapshot, SpeakersChanged, Task, TaskProgress, events};
+pub use read::{Segment, Speaker, Turn, Turns, audio, transcript, turns};
+pub use segments::{edit_segment, revert_segment};
+pub use settings::{
+    Frontend, Language, Settings, frontends, languages, restore_settings, save_settings, settings,
+};
+pub use speakers::{merge_speakers, reassign_segments, reset_merges, set_speaker_name};
+pub use text::{
+    DEFAULT_LOCALE, Locale, catalog, date_medium, date_medium_in, date_month_day,
+    date_month_day_in, duration, duration_in, effective_ui_locale, format, format_locale_for,
+    integer, integer_in, locale, number, number_in, resolve_ui_locale, set_locale,
+    system_language_tags, template, text, text_in,
+};
+pub use upload::{
+    Speakers, UploadError, UploadOptions, allowed_extension, upload, upload_with_progress,
+};
 
 /// The per-user directories the service keeps its bootstrap files in: the durable `config.json` in
 /// `config_dir`, the ephemeral `runtime.json` in `runtime_dir`.
@@ -137,7 +163,7 @@ impl ServiceDirs {
 }
 
 /// The running service as a client reaches it: where it answers and the credential it requires.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Service {
     pub endpoint: String,
     pub secret: String,
@@ -166,14 +192,14 @@ fn runtime_file(dirs: &ServiceDirs) -> PathBuf {
 /// secret from `config.json`. The endpoint counts only when it answers `GET /api/health` with
 /// `200` to the secret: a `runtime.json` left by a crash, a port another program took, or a
 /// service that hangs is `NotFound`, the same as no `runtime.json` at all.
-pub fn locate(dirs: &ServiceDirs) -> io::Result<Service> {
+pub async fn locate(dirs: &ServiceDirs) -> io::Result<Service> {
     let runtime: Runtime = read_json(&runtime_file(dirs))?;
     let config: Config = read_json(&dirs.config_dir.join("config.json"))?;
     let service = Service {
         endpoint: runtime.endpoint,
         secret: config.secret,
     };
-    if answers_as_the_service(&service) {
+    if answers_as_the_service(&service).await {
         Ok(service)
     } else {
         Err(io::Error::new(
@@ -265,11 +291,11 @@ pub struct StartOrAttach {
 /// `locate`'s result, or - when no service answers - [start] once and its result, polled until the
 /// service answers `HEALTH_TIMEOUT`'s worth of attempts: a client starts the service only when
 /// none runs (roadmap item 66, item 4), and never a second one.
-pub fn ensure_service(
+pub async fn ensure_service(
     dirs: &ServiceDirs,
     start: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<StartOrAttach> {
-    let error = match locate(dirs) {
+    let error = match locate(dirs).await {
         Ok(service) => {
             return Ok(StartOrAttach {
                 service,
@@ -285,7 +311,7 @@ pub fn ensure_service(
     let deadline = Instant::now() + START_TIMEOUT;
     let mut last = error;
     while Instant::now() < deadline {
-        match locate(dirs) {
+        match locate(dirs).await {
             Ok(service) => {
                 return Ok(StartOrAttach {
                     service,
@@ -294,7 +320,7 @@ pub fn ensure_service(
             }
             Err(error) => last = error,
         }
-        thread::sleep(POLL_INTERVAL);
+        tokio::time::sleep(POLL_INTERVAL).await;
     }
     Err(io::Error::new(
         io::ErrorKind::TimedOut,
@@ -307,16 +333,16 @@ pub fn ensure_service(
 /// its tray, so a launch that attached starts nothing. The unit is both up or both down: when the
 /// tray cannot start, the service this launch started is stopped again and the error names the
 /// tray.
-pub fn ensure_unit(
+pub async fn ensure_unit(
     dirs: &ServiceDirs,
     start_service: impl FnOnce() -> io::Result<()>,
     start_tray: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<StartOrAttach> {
-    let run = ensure_service(dirs, start_service)?;
+    let run = ensure_service(dirs, start_service).await?;
     if run.started
         && let Err(error) = start_tray()
     {
-        let message = match quit(dirs) {
+        let message = match quit(dirs).await {
             Ok(()) => format!(
                 "the tray could not start: {error}; the service this launch started was stopped again"
             ),
@@ -332,12 +358,15 @@ pub fn ensure_unit(
 /// Tells the running [service] which tray it is (ADR 0064): the tray's [pid] and the [command] that
 /// starts it again, so the service can restart the tray when it dies. ApiError only; a service that
 /// is not app mode has no such route and answers 404.
-pub fn register_tray(service: &Service, pid: u32, command: &[String]) -> io::Result<()> {
+pub async fn register_tray(service: &Service, pid: u32, command: &[String]) -> io::Result<()> {
     let body = serde_json::json!({ "pid": pid, "command": command }).to_string();
-    let response = ureq::post(format!("{}/api/tray", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
+    let response = client()
+        .post(format!("{}/api/tray", service.endpoint))
+        .bearer_auth(&service.secret)
         .header("Content-Type", "application/json")
-        .send(body)
+        .body(body)
+        .send()
+        .await
         .map_err(io::Error::other)?;
     let status = response.status();
     if status.is_success() {
@@ -353,27 +382,27 @@ pub fn register_tray(service: &Service, pid: u32, command: &[String]) -> io::Res
 /// tray's whole body when `stt-tray` is built without the `tray-menu` feature): it watches the
 /// service, restarts it, registers itself so the service can restart it in turn, and ends the
 /// process when the unit stops or cannot be kept up.
-pub fn supervise_until_stopped(dirs: &ServiceDirs) -> ExitCode {
+pub async fn supervise_until_stopped(dirs: &ServiceDirs) -> ExitCode {
     let mut supervisor = Supervisor::new();
     // Whether the service this tray belongs to knows it: every service process needs its own
     // registration, so a restart of the service registers the tray again (ADR 0064).
     let mut registered = false;
     loop {
-        match watch_and_register(&mut supervisor, dirs, &mut registered) {
+        match watch_and_register(&mut supervisor, dirs, &mut registered).await {
             Watch::Stopped => return ExitCode::SUCCESS,
             Watch::Stop(error) => {
                 eprintln!("stt-tray: {error}; the tray stops too");
                 return ExitCode::FAILURE;
             }
             Watch::Restarted => {
-                registered = register_self(dirs);
-                thread::sleep(LOOK_INTERVAL);
+                registered = register_self(dirs).await;
+                tokio::time::sleep(LOOK_INTERVAL).await;
             }
             Watch::Alive => {
                 if !registered {
-                    registered = register_self(dirs);
+                    registered = register_self(dirs).await;
                 }
-                thread::sleep(LOOK_INTERVAL);
+                tokio::time::sleep(LOOK_INTERVAL).await;
             }
         }
     }
@@ -382,15 +411,17 @@ pub fn supervise_until_stopped(dirs: &ServiceDirs) -> ExitCode {
 /// One look at the service, plus the tray's registration (ADR 0064): a tray tells each service
 /// process who it is, so the service can start it again when it dies. Both the virtual tray and the
 /// one with an icon take this step, so the two cannot drift apart.
-pub fn watch_and_register(
+pub async fn watch_and_register(
     supervisor: &mut Supervisor,
     dirs: &ServiceDirs,
     registered: &mut bool,
 ) -> Watch {
-    let watch = supervisor.watch(dirs, Instant::now(), || start_runner_beside(dirs));
+    let watch = supervisor
+        .watch(dirs, Instant::now(), || start_runner_beside(dirs))
+        .await;
     match watch {
-        Watch::Restarted => *registered = register_self(dirs),
-        Watch::Alive if !*registered => *registered = register_self(dirs),
+        Watch::Restarted => *registered = register_self(dirs).await,
+        Watch::Alive if !*registered => *registered = register_self(dirs).await,
         Watch::Alive | Watch::Stopped | Watch::Stop(_) => {}
     }
     watch
@@ -401,11 +432,13 @@ pub const LOOK_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Tells the service who this tray is, so the service can start it again when it dies. False while
 /// no service answers yet or the registration failed; the next look tries again.
-fn register_self(dirs: &ServiceDirs) -> bool {
-    let registered = locate(dirs).and_then(|service| {
+async fn register_self(dirs: &ServiceDirs) -> bool {
+    let registered = async {
+        let service = locate(dirs).await?;
         let command = vec![std::env::current_exe()?.to_string_lossy().into_owned()];
-        register_tray(&service, std::process::id(), &command)
-    });
+        register_tray(&service, std::process::id(), &command).await
+    }
+    .await;
     match registered {
         Ok(()) => true,
         Err(error) => {
@@ -434,11 +467,11 @@ pub enum Watch {
 /// again through [restart] and waited for, and a restart that fails - or a service that never
 /// answers after it - means the tray stops too. A missing `runtime.json` is a clean stop, which the
 /// tray honours rather than undoing.
-pub fn watch_service(dirs: &ServiceDirs, restart: impl FnOnce() -> io::Result<()>) -> Watch {
+pub async fn watch_service(dirs: &ServiceDirs, restart: impl FnOnce() -> io::Result<()>) -> Watch {
     if !runtime_file(dirs).exists() {
         return Watch::Stopped;
     }
-    match ensure_service(dirs, restart) {
+    match ensure_service(dirs, restart).await {
         Ok(StartOrAttach { started: false, .. }) => Watch::Alive,
         Ok(StartOrAttach { started: true, .. }) => Watch::Restarted,
         Err(error) => Watch::Stop(error),
@@ -464,7 +497,7 @@ impl Supervisor {
 
     /// One look at the service at `now`, like [`watch_service`]; a restart beyond
     /// [`RESTART_LIMIT`] within [`RESTART_WINDOW`] is refused and stops the tray.
-    pub fn watch(
+    pub async fn watch(
         &mut self,
         dirs: &ServiceDirs,
         now: Instant,
@@ -483,6 +516,7 @@ impl Supervisor {
             restarts.push(now);
             restart()
         })
+        .await
     }
 }
 
@@ -494,22 +528,26 @@ const POLL_INTERVAL: Duration = Duration::from_millis(100);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Whether `service`'s endpoint answers `GET /api/health` with `200` to its secret in time.
-fn answers_as_the_service(service: &Service) -> bool {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(HEALTH_TIMEOUT))
+async fn answers_as_the_service(service: &Service) -> bool {
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(HEALTH_TIMEOUT)
+        .no_proxy()
         .build()
-        .into();
-    agent
+    else {
+        return false;
+    };
+    client
         .get(format!("{}/api/health", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .call()
-        .is_ok_and(|response| response.status() == 200)
+        .bearer_auth(&service.secret)
+        .send()
+        .await
+        .is_ok_and(|response| response.status() == reqwest::StatusCode::OK)
 }
 
 /// Asks the running service to stop (roadmap item 66, item 4): `POST /api/quit` with the per-install
 /// secret, which the service answers `202 Accepted` before it stops. `NotFound` means no service runs.
-pub fn quit(dirs: &ServiceDirs) -> io::Result<()> {
-    let service = locate(dirs).map_err(|error| {
+pub async fn quit(dirs: &ServiceDirs) -> io::Result<()> {
+    let service = locate(dirs).await.map_err(|error| {
         if error.kind() == io::ErrorKind::NotFound {
             io::Error::new(
                 io::ErrorKind::NotFound,
@@ -519,12 +557,14 @@ pub fn quit(dirs: &ServiceDirs) -> io::Result<()> {
             error
         }
     })?;
-    let response = ureq::post(format!("{}/api/quit", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .send_empty()
+    let response = client()
+        .post(format!("{}/api/quit", service.endpoint))
+        .bearer_auth(&service.secret)
+        .send()
+        .await
         .map_err(io::Error::other)?;
     let status = response.status();
-    if status == 202 {
+    if status == reqwest::StatusCode::ACCEPTED {
         Ok(())
     } else {
         Err(io::Error::other(format!(
@@ -542,14 +582,16 @@ struct LaunchToken {
 /// The one-time browser URL of the running `service`: a token from `POST /api/launch-token`,
 /// asked for with the per-install secret as `Authorization: Bearer`, opened as
 /// `<endpoint>/open?t=<token>`. The secret itself never appears in the URL.
-pub fn launch_url(service: &Service) -> io::Result<String> {
-    let mut response = ureq::post(format!("{}/api/launch-token", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .send_empty()
-        .map_err(io::Error::other)?;
-    let body = response
-        .body_mut()
-        .read_to_string()
+pub async fn launch_url(service: &Service) -> io::Result<String> {
+    let body = client()
+        .post(format!("{}/api/launch-token", service.endpoint))
+        .bearer_auth(&service.secret)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(io::Error::other)?
+        .text()
+        .await
         .map_err(io::Error::other)?;
     let launch: LaunchToken = parse_json(&body)?;
     Ok(format!("{}/open?t={}", service.endpoint, launch.token))
@@ -595,7 +637,7 @@ pub struct OpenPlan {
 /// for its one-time URL and opens the default browser there; a terminal frontend goes through the
 /// OS terminal chain ([terminal_command]); a GUI one runs its own command. `service` is `None` when
 /// none runs, which only the browser needs.
-pub fn open_plan(
+pub async fn open_plan(
     descriptor: &Descriptor,
     service: Option<&Service>,
     os: Os,
@@ -608,7 +650,8 @@ pub fn open_plan(
                     io::ErrorKind::NotFound,
                     "no running service answers, and the browser frontend needs one",
                 )
-            })?)?;
+            })?)
+            .await?;
             Ok(OpenPlan {
                 command: browser_command(&url, os),
                 url: Some(url),
@@ -746,46 +789,78 @@ pub fn terminal_command(
     }
 }
 
+/// The host OS as the launchers name it.
+pub fn host_os() -> Os {
+    Os::from(std::env::consts::OS)
+}
+
+/// Whether `program` is somewhere on `PATH`: the terminal chain's lookup.
+pub fn on_path(program: &str) -> bool {
+    std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).any(|dir| dir.join(program).is_file()))
+        .unwrap_or(false)
+}
+
+/// What opens a terminal on an OS when no `terminalCommand` is set, as a settings screen shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DefaultTerminal {
+    /// Linux: the words placed before the TUI's command, as the command line the setting takes -
+    /// so a setting holding it opens what the chain opens.
+    Prefix(String),
+    /// Windows and macOS: their launcher (PowerShell, Terminal) is no prefix a setting can hold.
+    Os(Os),
+    /// Linux with nothing on the chain found.
+    None,
+}
+
+/// The terminal [terminal_command] opens on `os` without a setting: on Linux `$TERMINAL` with
+/// `-e`, else the first of [`LINUX_TERMINALS`] that `on_path` finds, with its run words.
+pub fn default_terminal(
+    os: Os,
+    terminal_var: Option<&str>,
+    on_path: &dyn Fn(&str) -> bool,
+) -> DefaultTerminal {
+    if os != Os::Linux {
+        return DefaultTerminal::Os(os);
+    }
+    let words: Vec<&str> = match terminal_var.filter(|terminal| !terminal.is_empty()) {
+        Some(terminal) => vec![terminal, "-e"],
+        None => match LINUX_TERMINALS.iter().find(|(program, _)| on_path(program)) {
+            Some((program, run)) => std::iter::once(*program)
+                .chain(run.iter().copied())
+                .collect(),
+            None => return DefaultTerminal::None,
+        },
+    };
+    shlex::try_join(words).map_or(DefaultTerminal::None, DefaultTerminal::Prefix)
+}
+
 /// The Linux terminal chain after `$TERMINAL`, in order, each with the words that make it run a
-/// program: the freedesktop launcher, the Debian alternative, GNOME's, KDE's, then X11's.
-const LINUX_TERMINALS: [(&str, &[&str]); 5] = [
+/// program: the freedesktop launcher, the Debian alternative, the modern desktop terminals, then
+/// GNOME's, KDE's and X11's.
+const LINUX_TERMINALS: [(&str, &[&str]); 10] = [
     ("xdg-terminal-exec", &[]),
     ("x-terminal-emulator", &["-e"]),
+    // The terminals people run on modern desktops: kitty and foot take the program directly,
+    // the rest say "run this" their own way.
+    ("kitty", &[]),
+    ("foot", &[]),
+    ("alacritty", &["-e"]),
+    ("wezterm", &["start", "--"]),
+    ("ghostty", &["-e"]),
     ("gnome-terminal", &["--"]),
     ("konsole", &["-e"]),
     ("xterm", &["-e"]),
 ];
 
-/// `GET /api/settings`, as far as a client reads it.
-#[derive(Deserialize)]
-struct Settings {
-    #[serde(rename = "defaultFrontend")]
-    default_frontend: Option<String>,
-    #[serde(rename = "terminalCommand")]
-    terminal_command: Option<String>,
-}
-
 /// The id of the default frontend the user picked in the settings (roadmap item 66), or `None` while none is set.
-pub fn default_frontend(service: &Service) -> io::Result<Option<String>> {
-    Ok(settings_of(service)?.default_frontend)
+pub async fn default_frontend(service: &Service) -> io::Result<Option<String>> {
+    Ok(settings(service).await?.default_frontend)
 }
 
 /// The terminal command the user set for the TUI (roadmap item 66, D10), or `None` for the OS launcher.
-pub fn terminal_command_setting(service: &Service) -> io::Result<Option<String>> {
-    Ok(settings_of(service)?.terminal_command)
-}
-
-/// `GET /api/settings` with the per-install secret.
-fn settings_of(service: &Service) -> io::Result<Settings> {
-    let mut response = ureq::get(format!("{}/api/settings", service.endpoint))
-        .header("Authorization", format!("Bearer {}", service.secret))
-        .call()
-        .map_err(io::Error::other)?;
-    let body = response
-        .body_mut()
-        .read_to_string()
-        .map_err(io::Error::other)?;
-    parse_json(&body)
+pub async fn terminal_command_setting(service: &Service) -> io::Result<Option<String>> {
+    Ok(settings(service).await?.terminal_command)
 }
 
 /// One installed frontend, as its installer registered it: one JSON file per frontend in the
@@ -978,6 +1053,54 @@ fn read_json<T: DeserializeOwned>(file: &Path) -> io::Result<T> {
 }
 
 /// `text` as JSON of type `T`; a mismatch is `InvalidData`.
-fn parse_json<T: DeserializeOwned>(text: &str) -> io::Result<T> {
+pub(crate) fn parse_json<T: DeserializeOwned>(text: &str) -> io::Result<T> {
     serde_json::from_str(text).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+/// The service's error body (`error.json`), as far as a client reads it.
+#[derive(Deserialize)]
+pub(crate) struct ApiError {
+    pub(crate) message: String,
+    /// The task a duplicate upload names (`error.duplicate-audio.json`).
+    #[serde(default, rename = "taskId")]
+    pub(crate) task_id: Option<i64>,
+}
+
+/// A response's body as type `T`; a response that is not a success is the service's own `message`
+/// as the error, which is what a client shows.
+pub(crate) async fn response_json<T: DeserializeOwned>(
+    response: reqwest::Response,
+) -> io::Result<T> {
+    let status = response.status();
+    let body = response.text().await.map_err(io::Error::other)?;
+    if status.is_success() {
+        return parse_json(&body);
+    }
+    let message = parse_json::<ApiError>(&body)
+        .map(|error| error.message)
+        .unwrap_or_else(|_| format!("the service answered {status}"));
+    Err(io::Error::other(message))
+}
+
+/// The one HTTP client every call uses: direct, never through a proxy - the service is loopback-only
+/// and the per-install secret must not reach a proxy (roadmap item 67).
+pub(crate) fn client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .expect("an HTTP client builds")
+}
+
+/// The body of a successful answer as bytes, or the service's message: what a clip's `/audio`
+/// read needs, where the body is not JSON.
+pub(crate) async fn response_bytes(response: reqwest::Response) -> io::Result<Vec<u8>> {
+    let status = response.status();
+    let body = response.bytes().await.map_err(io::Error::other)?;
+    if status.is_success() {
+        return Ok(body.to_vec());
+    }
+    let message = parse_json::<ApiError>(&String::from_utf8_lossy(&body))
+        .map(|error| error.message)
+        .unwrap_or_else(|_| format!("the service answered {status}"));
+    Err(io::Error::other(message))
 }

@@ -1,11 +1,12 @@
 # Arabic — glossary
 
 Evidence per string: `docs/reviews/ar.md`. Products and popularity: Zoom 1, Teams 2, Google 3,
-Word 4, Apple 5, Otter 6, Descript 7, Amberscript 8. Modern Standard Arabic throughout.
+Word 4, Apple 5, Otter 6, Descript 7, Amberscript 8, nano 9, GNOME Files 10. Modern Standard
+Arabic throughout.
 
 | English | Arabic | Evidence | Note |
 |---|---|---|---|
-| transcript | النص | Otter 6, Amberscript 8 | |
+| transcript | النص | Apple 5: `النص`; Otter 6, Amberscript 8 | Apple's Arabic uses `النسخة النصية` and `النص` for the text itself |
 | transcription | النسخ | Google 3, Amberscript 8 | |
 | queue | قائمة الانتظار | Zoom 1 | |
 | task | المهمة | — | feminine, one consistent noun |
@@ -28,6 +29,10 @@ Word 4, Apple 5, Otter 6, Descript 7, Amberscript 8. Modern Standard Arabic thro
 | reassign | إعادة الإسناد | Zoom 1 | |
 | embedding / clustering | التضمين / التجميع | Amberscript 8 (English terms) | established Arabic technical terms |
 | completed / failed / canceled | مكتملة / فشلت / أُلغيت | Zoom 1, Teams 2 | agrees with المهمة (feminine) |
+| path | المسار | nano 9: `المسار` | technical; the download, upload and file-browser strings print it LTR |
+| folder | المجلد | GNOME Files 10: `مجلد` | neutral |
+| file | الملف | GNOME Files 10: `الملفات` | neutral |
+| hint | التلميح | — | the footer is one row of key hints: a bare masdar next to the bracketed key |
 
 ## Gender and culture
 

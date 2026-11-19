@@ -54,6 +54,20 @@ export async function appLive(page: Page) {
   await expect(page.getByText('Live', { exact: true })).toBeVisible();
 }
 
+// Steps the header's theme control until it shows `mode` (roadmap item 67): the control writes the
+// mode to the service and shows the stored answer, so each click waits for the label to change
+// before the next. The cycle is system -> light -> dark -> system, so three steps reach any mode.
+export async function setTheme(page: Page, mode: 'system' | 'light' | 'dark') {
+  const control = page.getByRole('button', { name: /^Theme: / });
+  for (let step = 0; step < 3; step += 1) {
+    const label = await control.getAttribute('aria-label');
+    if (label === `Theme: ${mode}`) return;
+    await control.click();
+    await expect(control).not.toHaveAttribute('aria-label', label ?? '');
+  }
+  await expect(control).toHaveAttribute('aria-label', `Theme: ${mode}`);
+}
+
 // Uploads the named fixture clips through the queue's file input (the drop zone), and waits for the
 // server's answer to each one: a spec must not go on to wait for a task the server refused, or for an
 // upload the browser aborted — that is what spent a whole stall window in CI run #465, where the POST
