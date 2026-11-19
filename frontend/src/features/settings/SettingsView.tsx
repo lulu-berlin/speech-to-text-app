@@ -3,7 +3,7 @@ import type { ClipboardEvent } from 'react';
 import styled from 'styled-components';
 import { useWriteControl } from '../../app/ConnectionContext';
 import { SettingsContext } from '../../app/SettingsContext';
-import { fetchFrontends } from '../../shared/api/client';
+import { fetchFrontends, settingsUpdateOf } from '../../shared/api/client';
 import { languages } from '../../shared/api/fixtures';
 import { useErrorText } from '../../shared/i18n/useErrorText';
 import { useMessages } from '../../shared/i18n/useMessages';
@@ -359,7 +359,10 @@ export function SettingsView() {
     if (stored === null) {
       return;
     }
+    // The stored settings, with the form's fields over them: a setting the page has no field
+    // for (the theme mode) travels as stored.
     const update: SettingsUpdate = {
+      ...settingsUpdateOf(stored),
       device,
       defaultFrontend: defaultFrontend === '' ? null : defaultFrontend,
       terminalCommand: terminalCommandValue(terminalCommand),

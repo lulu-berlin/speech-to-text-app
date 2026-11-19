@@ -2,7 +2,7 @@
 
 The term evidence is recorded in `docs/reviews/it.md`; this is the shared vocabulary. The
 compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3, Zoom 4,
-Otter 5, Descript 6, Amberscript 7).
+VLC 5, Otter 6, Descript 7, Amberscript 8, GNOME Files 9, Midnight Commander 10).
 
 | English                 | Italian                                                                           | Evidence                                        | Note                                                                                           |
 | ----------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -24,7 +24,7 @@ Otter 5, Descript 6, Amberscript 7).
 | queue phases            | suddivisione / trascrizione / identificazione delle voci                          | Google 1: „Trascrizione“                        | nouns after the label                                                                          |
 | transcript phases       | la suddivisione / la trascrizione / l'identificazione delle voci / l'elaborazione | Google 1                                        | the phase carries its article, because the template cannot elide (`durante l'identificazione`) |
 | turn                    | turno                                                                             | Microsoft 2: „turno“                            |                                                                                                |
-| segment                 | segmento                                                                          | Descript 6                                      |                                                                                                |
+| segment                 | segmento                                                                          | Descript 7; VLC 5: „segmenti“                   |                                                                                                |
 | play / pause            | riproduci / pausa                                                                 | Apple 3                                         |                                                                                                |
 | seek                    | posizione di riproduzione                                                           | Google 1: „Posizione“                             | the slider's label, not a command                                                              |
 | merge                   | unisci                                                                            | Google 1: „Unisci“                              |                                                                                                |
@@ -35,6 +35,12 @@ Otter 5, Descript 6, Amberscript 7).
 | user interface          | interfaccia utente                                                                | Microsoft 2, Apple 3                            | `frontend` never appears in the UI                                                             |
 | default                 | predefinito                                                                       | Microsoft 2, Apple 3: „Predefinito“             |                                                                                                |
 | error                   | errore                                                                            | Google 1                                        | `Errore: {message}`                                                                            |
+| terminal                | terminale                                                                         | Microsoft 2, Apple 3                            | the TUI's terminal                                                                             |
+| path                    | percorso                                                                          | Microsoft 2, Apple 3                            | file and download paths                                                                        |
+| folder                  | cartella                                                                          | Microsoft 2, Apple 3                            | the file browser                                                                               |
+| filter                  | filtro / filtrare                                                                 | Google 1, Microsoft 2                           | the history filter                                                                             |
+| search                  | cerca / ricerca                                                                   | Google 1                                        | the history search                                                                             |
+| file                    | file                                                                              | Microsoft 2, Apple 3                            | invariant                                                                                      |
 
 This glossary is the Italian layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/it.md`).

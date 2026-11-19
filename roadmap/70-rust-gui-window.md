@@ -2,8 +2,8 @@
 
 Status: spec-approved
 Depends on: [66](../docs/specs/local-service-and-frontends.md) (the service, descriptors, credential and Rust
-pin — done), [67](67-tui-frontend.md) (the `stt-client` crate, the Rust workspace and the TUI whose
-UI this item renders), [49](../docs/specs/windows-support.md) (the Windows packages)
+pin — done), [67](../docs/specs/tui-frontend.md) (the `stt-client` crate, the Rust workspace and the
+TUI whose UI this item renders), [49](../docs/specs/windows-support.md) (the Windows packages)
 Blocks: —
 
 ## Goal

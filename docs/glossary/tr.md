@@ -1,7 +1,8 @@
 # Turkish (tr) — glossary
 
 The term evidence is recorded in `docs/reviews/tr.md`; this is the shared vocabulary. The
-compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3).
+compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3,
+GNU coreutils 4, GNU nano 5, VLC 6, GNOME Files 7).
 
 | English                 | Turkish                                                | Evidence                                  | Note                                                                |
 | ----------------------- | ------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------- |
@@ -28,13 +29,19 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | play / pause            | oynat / duraklat                                       | Apple 3: „Oynat“, „Duraklat“              | imperatives, genderless                                             |
 | seek                    | oynatma konumu                                         | Google 1                                  | the slider's label, not a command                                   |
 | merge                   | birleştir / birleştirme                                | Google 1: „Birleştir“                     | verb for the action, noun for the merge                             |
-| reassign                | yeniden ata                                            | Microsoft 2                               |                                                                     |
-| save / discard          | kaydet / bırak                                         | Google 1: „Kaydet“; bırak: —              | editor shortcuts K and B                                            |
+| reassign                | yeniden ata                                            | Microsoft 2: „Cihazlara ata“              |                                                                     |
+| save / discard          | kaydet / bırak                                         | Google 1: „Kaydet“, GNU nano 5: „Kaydet“; bırak: — | editor shortcuts K and B                                   |
 | retry / cancel / delete | yeniden dene / iptal / sil                             | Google 1, Microsoft 2                     |                                                                     |
 | connection              | bağlantı / bağlı                                       | Microsoft 2: „Bağlı“; bağlantı: —         | `Bağlı` for the live badge                                          |
 | user interface          | kullanıcı arayüzü                                      | Microsoft 2                               | `frontend` never appears in the UI                                  |
 | default                 | varsayılan                                             | Microsoft 2: „Varsayılan“                 |                                                                     |
 | error                   | hata                                                   | Google 1: „Hata“                          | `Hata: {message}`                                                   |
+| folder                  | klasör                                                 | Apple 3: „Klasör“                         | the file browser's directory                                        |
+| path                    | yol                                                    | Apple 3: „yol adı“                        | a file or download location                                         |
+| rename                  | yeniden adlandır                                       | GNU coreutils 4: „yeniden adlandırıldı“   |                                                                     |
+| reorder                 | sırala / yeniden sırala                                | GNU coreutils 4: „sıralandı“              | the verb for the action, `yeniden sırala` for the outcome           |
+| mark                    | işaretle                                               | GNU nano 5: „metni işaretle“              | selecting files or transcript segments                              |
+| format                  | biçim                                                  | GNU coreutils 4: „çıktı biçimi“           | the download format; `Biçim:` as the label                          |
 
 This glossary is the Turkish layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/tr.md`).

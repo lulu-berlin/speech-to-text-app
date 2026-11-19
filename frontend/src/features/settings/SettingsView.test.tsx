@@ -86,6 +86,7 @@ describe('the settings page', () => {
       defaultFrontend: null,
       terminalCommand: null,
       appLanguage: 'de',
+      themeMode: 'auto',
     });
 
     // The stored answer is what the page shows.
@@ -261,6 +262,7 @@ describe('the settings threads field', () => {
       defaultFrontend: null,
       terminalCommand: null,
       appLanguage: 'de',
+      themeMode: 'auto',
     });
 
     // Enter commits too.
@@ -363,6 +365,7 @@ describe('the settings typed counts', () => {
       defaultFrontend: null,
       terminalCommand: null,
       appLanguage: 'de',
+      themeMode: 'auto',
     });
   });
 });
@@ -415,6 +418,7 @@ describe('the settings writes', () => {
       defaultFrontend: null,
       terminalCommand: null,
       appLanguage: 'de',
+      themeMode: 'auto',
     });
 
     settle[1]?.(HttpResponse.json({ ...settingsFixed, device: 'cpu' }));
@@ -561,6 +565,7 @@ describe('a rejected settings write', () => {
       defaultFrontend: null,
       terminalCommand: null,
       appLanguage: 'de',
+      themeMode: 'auto',
     });
     await waitFor(() => expect(threads).toHaveValue(6));
     await waitFor(() => expect(device).toHaveValue('cpu'));
@@ -838,6 +843,7 @@ describe('switching the speakers mode', () => {
       defaultFrontend: null,
       terminalCommand: null,
       appLanguage: null,
+      themeMode: 'auto',
     });
 
     // The draft mode and count stay, with the count's error; the other field followed the

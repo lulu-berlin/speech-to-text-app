@@ -1,7 +1,7 @@
 # Russian (ru) — glossary
 
 The term evidence is recorded in `docs/reviews/ru.md`; this is the shared vocabulary. The
-compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3).
+compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3, VLC 4, GNU nano 5, GNOME Files 6).
 
 | English                 | Russian                                                           | Evidence                                    | Note                                                                       |
 | ----------------------- | ----------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------- |
@@ -24,7 +24,7 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | transcript phases       | разбиения аудио / транскрипции / определения спикеров / обработки | Google 1                                    | genitive, because the template reads `во время {phase}`                    |
 | turn                    | реплика                                                           | Microsoft 2: „реплика“                      |                                                                            |
 | segment                 | сегмент                                                           | —                                           |                                                                            |
-| play / pause            | воспроизвести / пауза                                             | Apple 3: „Воспроизвести“                    | infinitives on buttons; neutral                                            |
+| play / pause            | воспроизвести / пауза                                             | Apple 3: „Воспроизвести“; VLC 4: „Пауза“    | infinitives on buttons; neutral                                            |
 | seek                    | позиция воспроизведения                                           | Google 1                                    | the slider's label, not a command                                          |
 | merge                   | объединить / объединение                                          | Google 1: „Объединить“                      | verb for the action, noun for the merge                                    |
 | reassign                | переназначить                                                     | Microsoft 2: „переназначить“                |                                                                            |
@@ -34,6 +34,18 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | user interface          | интерфейс                                                         | Microsoft 2: „интерфейс“                    | `frontend` never appears in the UI                                         |
 | default                 | по умолчанию                                                      | Microsoft 2: „по умолчанию“                 |                                                                            |
 | error                   | ошибка                                                            | Google 1: „Ошибка“                          | `Ошибка: {message}`                                                        |
+| playback                | воспроизведение                                                   | Apple 3: „Воспроизвести“                    | the running position; `♪ воспроизведение` in the TUI                       |
+| key                     | клавиша                                                           | GNU nano 5: „клавишу“                       | a physical key; its label stays English, as the program binds it           |
+| folder                  | папка                                                             | GNOME Files 6: „Папка“                      | the file browser's directory; never `каталог` next to a folder name        |
+| resume                  | продолжить / продолжение                                          | VLC 4: „Продолжить“                         | verb on a key, noun as the action name                                     |
+| edit                    | изменить / изменение                                              | VLC 4: „Изменить“                           | a segment or a setting                                                     |
+| revert                  | вернуть / возврат                                                 | GNOME Files 6: „Вернуть“                    | an undone edit of a segment                                                |
+| move                    | переместить / перемещение                                         | GNOME Files 6: „Переместить в…“             | segments, speakers and the queue order                                     |
+| theme                   | тема                                                              | Microsoft 2: „Тема“                         |                                                                            |
+| filter                  | фильтр / фильтровать                                              | VLC 4: „Фильтр“                             | the history filter                                                         |
+| format                  | формат                                                            | VLC 4: „Формат“                             | a file format; never `шаблон`                                              |
+| path                    | путь                                                              | VLC 4: „Путь“                               | the download and upload path                                               |
+| mark                    | отметить                                                          | GNU nano 5: „Отметить текст…“               | selects a file or a whole turn                                             |
 
 This glossary is the Russian layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/ru.md`).

@@ -10,8 +10,8 @@ use stt_client::{
     Descriptor, Launch, LaunchCommand, OpenPlan, Os, Service, TerminalSettings, open_plan,
 };
 
-#[test]
-fn a_terminal_frontend_becomes_the_os_terminal_command_and_needs_no_service() {
+#[tokio::test]
+async fn a_terminal_frontend_becomes_the_os_terminal_command_and_needs_no_service() {
     let descriptor = Descriptor {
         version: 1,
         id: "tui".into(),
@@ -27,7 +27,9 @@ fn a_terminal_frontend_becomes_the_os_terminal_command_and_needs_no_service() {
         on_path: &|program| program == "xterm",
     };
 
-    let plan = open_plan(&descriptor, None, Os::Linux, &settings).unwrap();
+    let plan = open_plan(&descriptor, None, Os::Linux, &settings)
+        .await
+        .unwrap();
 
     assert_eq!(plan.url, None);
     assert_eq!(
@@ -44,8 +46,8 @@ fn a_terminal_frontend_becomes_the_os_terminal_command_and_needs_no_service() {
     );
 }
 
-#[test]
-fn a_gui_frontend_runs_its_own_command() {
+#[tokio::test]
+async fn a_gui_frontend_runs_its_own_command() {
     let descriptor = Descriptor {
         version: 1,
         id: "window".into(),
@@ -61,15 +63,17 @@ fn a_gui_frontend_runs_its_own_command() {
         on_path: &|_| false,
     };
 
-    let plan = open_plan(&descriptor, None, Os::Linux, &settings).unwrap();
+    let plan = open_plan(&descriptor, None, Os::Linux, &settings)
+        .await
+        .unwrap();
 
     assert_eq!(plan.url, None);
     assert_eq!(plan.command.program, "stt-window");
     assert_eq!(plan.command.args, ["--attach"]);
 }
 
-#[test]
-fn a_browser_frontend_asks_the_service_for_its_one_time_url() {
+#[tokio::test]
+async fn a_browser_frontend_asks_the_service_for_its_one_time_url() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     support::answer_forever(listener, |_| {
@@ -96,6 +100,7 @@ fn a_browser_frontend_asks_the_service_for_its_one_time_url() {
         Os::Linux,
         &settings,
     )
+    .await
     .unwrap();
 
     assert_eq!(
@@ -108,12 +113,14 @@ fn a_browser_frontend_asks_the_service_for_its_one_time_url() {
         [format!("http://127.0.0.1:{port}/open?t=one-time")]
     );
 
-    let error = open_plan(&descriptor, None, Os::Linux, &settings).unwrap_err();
+    let error = open_plan(&descriptor, None, Os::Linux, &settings)
+        .await
+        .unwrap_err();
     assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "{error}");
 }
 
-#[test]
-fn a_terminal_frontend_with_no_launcher_is_an_error_naming_its_program() {
+#[tokio::test]
+async fn a_terminal_frontend_with_no_launcher_is_an_error_naming_its_program() {
     let descriptor = Descriptor {
         version: 1,
         id: "tui".into(),
@@ -129,7 +136,9 @@ fn a_terminal_frontend_with_no_launcher_is_an_error_naming_its_program() {
         on_path: &|_| false,
     };
 
-    let error = open_plan(&descriptor, None, Os::Linux, &settings).unwrap_err();
+    let error = open_plan(&descriptor, None, Os::Linux, &settings)
+        .await
+        .unwrap_err();
 
     assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "{error}");
     assert!(error.to_string().contains("stt-tui"), "{error}");

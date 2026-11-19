@@ -38,7 +38,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0030 | [Segment text is trimmed in every output](0030-trimmed-segment-text-in-all-outputs.md) | accepted, json download point dropped by [0035](0035-no-json-download.md) | 2026-10-09 |
 | 0031 | [Frontend routing with react-router, state with XState](0031-frontend-routing-react-router-state-xstate.md) | accepted | 2026-10-09 |
 | 0032 | [Speaker-distance threshold 0.5448 for CAM++](0032-speaker-distance-threshold-for-campplus.md) | accepted | 2026-10-09 |
-| 0033 | [Design system: tokens, Radix primitives, IBM Plex Sans](0033-design-system-tokens-radix-plex.md) | accepted | 2026-10-09 |
+| 0033 | [Design system: tokens, Radix primitives, IBM Plex Sans](0033-design-system-tokens-radix-plex.md) | accepted, theme storage amended by [0068](0068-one-theme-token-file-for-every-frontend.md) | 2026-10-09 |
 | 0034 | [Speaker labels in downloads are the stored speaker names](0034-speaker-labels-are-stored-names.md) | accepted | 2026-10-09 |
 | 0035 | [No json transcript download](0035-no-json-download.md) | accepted | 2026-10-09 |
 | 0036 | [One nixpkgs pin shared by devenv and the flake](0036-shared-nixpkgs-pin.md) | accepted | 2026-10-09 |
@@ -51,7 +51,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0043 | [ONNX Runtime is pinned like sqlite-jdbc](0043-onnxruntime-pinned-like-sqlite-jdbc.md) | accepted, applies 0042 to onnxruntime | 2026-10-11 |
 | 0044 | [SSE heartbeat event and client inactivity watchdog](0044-sse-heartbeat-and-client-watchdog.md) | accepted, extends item 12's event list | 2026-10-11 |
 | 0045 | [The joined playback FLAC is re-encoded (losslessly)](0045-joined-playback-flac-reencoded.md) | superseded by [0052](0052-canonical-clip-in-database-chunks-as-windows.md) | 2026-10-11 |
-| 0046 | [Every app feature has an end-to-end test](0046-every-feature-has-an-e2e-test.md) | accepted | 2026-10-11 |
+| 0046 | [Every app feature has an end-to-end test](0046-every-feature-has-an-e2e-test.md) | accepted, the terminal app's e2e amended by its pty journey | 2026-10-11 |
 | 0047 | [External tools are resolved from PATH; no tool-path variables](0047-external-tools-resolved-from-path.md) | accepted, withdraws item 16's `STT_WHISPER_CLI`/`STT_FFMPEG` | 2026-10-11 |
 | 0048 | [The task's id in the logging context (MDC) and named engine coroutines](0048-task-id-in-logging-context-and-named-coroutines.md) | accepted | 2026-10-12 |
 | 0049 | [Gradle 9.8 in every build path; the root wrapper is for humans without Nix](0049-gradle-9-everywhere-root-wrapper-for-humans.md) | accepted, scopes 0014's "no Gradle wrapper" | 2026-10-12 |
@@ -72,3 +72,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0064 | [The service and the tray are one unit in app mode](0064-service-and-tray-are-one-unit.md) | accepted, supersedes "the tray is optional" in roadmap item 66 | 2026-10-31 |
 | 0065 | [We publish our own artifacts, their tags name what determines their content, and platform keys are Nix system names](0065-own-artifacts-versioned-tags-nix-platform-keys.md) | accepted | 2026-11-03 |
 | 0066 | [The frontend tests mock the API at the fetch and XHR layer, not at MSW 3's socket layer](0066-frontend-tests-mock-fetch-not-sockets.md) | accepted | 2026-11-06 |
+| 0067 | [One UI-text catalog for every frontend](0067-one-ui-text-catalog-for-every-frontend.md) | accepted (amended 2026-11-15) | 2026-11-06 |
+| 0068 | [One theme-token file for every frontend](0068-one-theme-token-file-for-every-frontend.md) | accepted (amended 2026-11-15) | 2026-11-07 |
+| 0069 | [The TUI reads its input through termina](0069-tui-input-through-termina.md) | accepted | 2026-11-16 |
+| 0070 | [The TUI reports its drawn frames to its pty tests](0070-tui-reports-its-frames-to-the-pty-tests.md) | accepted | 2026-11-18 |

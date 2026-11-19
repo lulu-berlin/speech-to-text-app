@@ -699,6 +699,8 @@ components:
         terminalCommand: {type: string, nullable: true}
         # Roadmap item 88: the app's own language (a shipped UI locale); null follows the system's language.
         appLanguage: {type: string, nullable: true}
+        # Roadmap item 67, ADR 0068: the theme every frontend draws in; auto follows the OS's preference. Absent stores auto.
+        themeMode: {type: string, enum: [auto, light, dark]}
     Settings:
       allOf:
         - {$ref: "#/components/schemas/SettingsUpdate"}

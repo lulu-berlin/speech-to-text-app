@@ -1,0 +1,47 @@
+[package]
+name = "stt-tui"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+stt-client = { path = "../stt-client" }
+# History's finish date (roadmap item 67), written as the browser writes it.
+chrono = "0.4"
+# The terminal UI (roadmap item 67, decided 2026-10-22): ratatui on its crossterm backend, which
+# draws and switches raw mode.
+ratatui = "0.30"
+# The keyboard, the mouse and pastes (ADR 0069): termina reads them on every OS - Windows in
+# virtual-terminal input, where crossterm's console records carry no paste - with one parser and,
+# on Unix, a level-triggered `poll(2)` that reads a key pressed with a resize.
+termina = "0.3"
+# Audio playback in a transcript (roadmap item 67): the service's FLAC clip, decoded here and sent
+# to the default output - ALSA on Linux (devenv's alsa-lib, the CI job's libasound2), WASAPI on
+# Windows, CoreAudio on macOS.
+cpal = "0.18"
+claxon = "0.4"
+# The shared colour tokens (`ui-theme/colors.json`) are parsed at startup (roadmap item 67).
+serde_json = "1"
+# `auto` falls back to the terminal's background: its answer to OSC 11, with a device-attributes
+# query behind it so a terminal that cannot answer is detected without waiting (roadmap item 67).
+terminal-colorsaurus = "1"
+tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread", "time"] }
+# Display widths (roadmap item 67, the review R6): a CJK or emoji character takes two columns, a
+# combining mark none - what the terminal draws, so wrapping and clicks count the same columns.
+unicode-width = "0.2"
+# User-visible characters (roadmap item 67, the review R20): a grapheme cluster - a base letter and
+# its combining marks, a Devanagari syllable, an emoji sequence - is one character to truncate and to
+# erase.
+unicode-segmentation = "1"
+
+[dev-dependencies]
+# The TUI's tests run the real binary in a pseudo-terminal (a Unix pty, a Windows ConPTY) and read
+# what it draws through a terminal-screen parser (roadmap item 67, the portable-pty decision).
+portable-pty = "0.9"
+tempfile = "3"
+vt100 = "0.18"
+
+[target.'cfg(unix)'.dev-dependencies]
+# Reads the pty's termios flags: whether the TUI left the terminal cooked.
+libc = "0.2"

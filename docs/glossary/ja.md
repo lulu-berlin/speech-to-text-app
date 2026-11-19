@@ -1,7 +1,8 @@
 # Japanese (ja) — glossary
 
 The term evidence is recorded in `docs/reviews/ja.md`; this is the shared vocabulary. The
-compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3).
+compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3,
+VLC 4, GNOME Files 5, Midnight Commander 6, GNOME Terminal 7, gedit 8).
 
 | English                 | Japanese                                  | Evidence                               | Note                                                                           |
 | ----------------------- | ----------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------ |
@@ -35,6 +36,12 @@ compared products and their popularity are listed there (Google 1, Microsoft 2, 
 | user interface          | ユーザー インターフェイス                 | Microsoft 2                            | `frontend` never appears in the UI                                             |
 | default                 | 既定                                      | Microsoft 2: „既定“                    |                                                                                |
 | error                   | エラー                                    | Google 1: „エラー“                     | `エラー: {message}`                                                            |
+| folder                  | フォルダー                                | GNOME Files 5: „フォルダー“            | long vowel, as the file browser writes it                                      |
+| close / dismiss | 閉じる | VLC 4: „閉じる (&C)“ | notices and dropdowns |
+| select / mark | 選択 | GNOME Files 5: „すべて選択する“ | marked files and the transcript's `[a]`/`[Space]` marks |
+| reorder | 並べ替え | GNOME Files 5: „並べ替え“ | queue ordering |
+| rename | 名前の変更 | GNOME Files 5: „フォルダー名を変更“ | shorter than „名称変更“ |
+| revert | 元に戻す | GNOME Files 5: „元に戻す“ | segment text, speaker names (never the destructive kind of reset) |
 
 This glossary is the Japanese layer; the same neutrality rule as the other locales applies (see
 `docs/style-guides/ja.md`).

@@ -1,7 +1,7 @@
 # 76 — Right-to-left transcription: direction-aware transcripts and layout
 
 Status: spec-approved
-Depends on: [67](67-tui-frontend.md) (the TUI whose transcript, dialogs and mouse targets this item
+Depends on: [67](../docs/specs/tui-frontend.md) (the TUI whose transcript, dialogs and mouse targets this item
 now covers), [70](70-rust-gui-window.md) (the window is the TUI's UI, and it exists only after 70) —
 the browser part is independent of 70; [74](../docs/specs/desktop-presentation.md) supplies
 the transcript's `lang`/fonts, a related but independent change (direction itself is

@@ -102,6 +102,11 @@ for (const [code, messages] of shipped) {
     if (row.compared !== '—' && !/[„«"「『“]/.test(row.compared)) {
       problems.push(`${page}:${row.line}: "${row.key}" names a product without its wording`);
     }
+    // Roadmap item 67, the user's translation line (2026-11-17): every `tui.*` row records a
+    // compared product; a dash, accepted for the other keys, means none was found.
+    if (row.key.startsWith('tui.') && row.compared === '—') {
+      problems.push(`${page}:${row.line}: "${row.key}" has no compared product`);
+    }
   }
 }
 

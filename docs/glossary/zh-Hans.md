@@ -2,7 +2,7 @@
 
 The term evidence is recorded in `docs/reviews/zh-Hans.md`; this is the shared vocabulary. The
 compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3, Zoom 4,
-Otter 5, Descript 6, Amberscript 7).
+Otter 5, Descript 6, Amberscript 7, GNOME 文件 8, Midnight Commander 9, GNU nano 10).
 
 | English                 | Chinese (Simplified)                | Evidence                                | Note                                                                           |
 | ----------------------- | ----------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------ |
@@ -34,6 +34,16 @@ Otter 5, Descript 6, Amberscript 7).
 | user interface          | 用户界面                            | Microsoft 2, Apple 3                    | `frontend` never appears in the UI                                             |
 | default                 | 默认                                | Microsoft 2, Apple 3                    |                                                                                |
 | error                   | 错误                                | Google 1                                | `错误：{message}`                                                              |
+| key (keyboard) | 按键 | Midnight Commander 9: `Backspace 键` | the key-reference table reads `按键：` / `描述：` |
+| terminal                | 终端                                | Midnight Commander 9: `终端选项`        | the TUI runs in one; `终端命令` names the setting                              |
+| TUI                     | TUI                                 | —                                       | never translated, like `Speech-to-Text`                                         |
+| path                    | 路径                                | GNU nano 10: `路径“%s”`                 | file browser and download dialog                                                |
+| folder                  | 文件夹                              | GNOME Files 8: `打开文件夹`             | the terminal catalogs say `目录`; the file browser keeps the everyday word      |
+| mark                    | 标记                                | Midnight Commander 9: `全部标记`        | marking files and segments for an action                                        |
+| filter | 筛选 | GNOME Files 8: `按日期筛选` | `[f]ilter`, `筛选：{filter}`; the verb form, not `过滤` |
+| rename                  | 重命名                              | Midnight Commander 9: `更名`            | speakers, tasks, files                                                          |
+| format                  | 格式                                | GNOME Files 8: `格式`                   | download format, file format                                                    |
+| options                 | 选项                                | Midnight Commander 9: `选项`            | the upload dialog's `[Tab] 选项`                                                |
 
 This glossary is the Simplified Chinese layer; the Traditional catalog keeps its own terms
 (Taiwan conventions) in `docs/glossary/zh-Hant.md`.

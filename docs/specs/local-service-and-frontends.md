@@ -5,7 +5,7 @@ Depends on: [48](macos-support.md), [49](windows-support.md), [64](tauri-evaluat
 all **done** before this item starts (the user 2026-10-19): they bring macOS/Windows support and
 packaging/CI and the shell choice, so the login/tray/terminal mechanics this item adds become
 testable on all three OSes.
-Blocks: [67](../../roadmap/67-tui-frontend.md) (the TUI is one of this item's frontends)
+Blocks: [67](tui-frontend.md) (the TUI is one of this item's frontends)
 
 ## Goal
 

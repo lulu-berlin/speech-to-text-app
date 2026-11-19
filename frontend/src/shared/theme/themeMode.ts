@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import type { ThemeMode } from '../api/types';
 import { darkTheme, lightTheme, themeFor } from './theme';
 import type { ThemeTokens } from './theme';
 
-// Dark mode follows the OS unless the user picks a mode; the choice is stored (ADR 0033).
-export type ThemeMode = 'auto' | 'light' | 'dark';
+// The theme mode the service stores for every frontend (roadmap item 67, ADR 0068); auto
+// follows the OS.
+export type { ThemeMode };
 
+// The browser's copy of the last mode it drew in: the first paint uses it until the stored
+// settings arrive.
 const STORAGE_KEY = 'stt-theme-mode';
 
 // The cycle order: auto → light → dark → auto.
@@ -25,19 +28,7 @@ export function saveThemeMode(mode: ThemeMode): void {
   }
 }
 
-// The token set for the stored choice, falling back to the OS preference in auto mode.
+// The token set for the mode, falling back to the OS preference in auto mode.
 export function resolveTheme(mode: ThemeMode, prefersDark: boolean): ThemeTokens {
   return mode === 'light' ? lightTheme : mode === 'dark' ? darkTheme : themeFor(prefersDark);
-}
-
-// The stored mode and a cycle action; saving happens in an effect so the updater stays pure.
-export function useThemeMode(): [ThemeMode, () => void] {
-  const [mode, setMode] = useState<ThemeMode>(loadThemeMode);
-  const cycle = useCallback(() => {
-    setMode((current) => cycleThemeMode(current));
-  }, []);
-  useEffect(() => {
-    saveThemeMode(mode);
-  }, [mode]);
-  return [mode, cycle];
 }

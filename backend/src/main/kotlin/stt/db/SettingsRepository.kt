@@ -29,6 +29,7 @@ class SettingsRepository(
                 defaultFrontend = row[SettingsTable.defaultFrontend],
                 terminalCommand = row[SettingsTable.terminalCommand],
                 appLanguage = row[SettingsTable.appLanguage],
+                themeMode = ThemeMode.fromDbValue(row[SettingsTable.themeMode]),
             )
         }
 
@@ -47,6 +48,7 @@ class SettingsRepository(
                 it[SettingsTable.defaultFrontend] = settings.defaultFrontend
                 it[SettingsTable.terminalCommand] = settings.terminalCommand
                 it[SettingsTable.appLanguage] = settings.appLanguage
+                it[SettingsTable.themeMode] = settings.themeMode.dbValue
             }
         }
     }

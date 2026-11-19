@@ -29,6 +29,10 @@ data class Settings(
      * follows the system's language when it is one of the shipped UI locales, and English otherwise.
      */
     val appLanguage: String? = null,
+    /**
+     * The theme every frontend draws in (roadmap item 67, ADR 0068): auto follows the OS's preference.
+     */
+    val themeMode: ThemeMode = ThemeMode.AUTO,
 )
 
 /**

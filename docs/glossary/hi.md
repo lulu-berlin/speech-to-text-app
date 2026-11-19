@@ -2,7 +2,7 @@
 
 The term evidence is recorded in `docs/reviews/hi.md`; this is the shared vocabulary. The
 compared products and their popularity are listed there (Google 1, Microsoft 2, Apple 3, Zoom 4,
-Otter 5, Descript 6, Amberscript 7).
+VLC 5, Otter 6, Descript 7, Amberscript 8, GNOME Files 9, gedit 10, GNOME Terminal 11).
 
 | English                 | Hindi                                               | Evidence                                         | Note                                                                                |
 | ----------------------- | --------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------- |

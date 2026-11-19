@@ -1,5 +1,5 @@
 import 'styled-components';
-import { darkSpeakerTints, lightSpeakerTints } from './speakerPalette';
+import colorsFile from '../../../../ui-theme/colors.json';
 
 // The five status groups (ADR 0033): pending = QUEUED, PAUSED; active = RUNNING;
 // done = COMPLETED; problem = FAILED; gone = CANCELED.
@@ -261,68 +261,88 @@ const baseTokens = {
   },
 };
 
+// The shared colour tokens (ADR 0068): `ui-theme/colors.json` holds one value per role and theme,
+// and both themes take every colour from it, so the browser and the TUI cannot drift apart. A role
+// missing from a theme fails the type check; the tokens test fails when the file and the themes
+// disagree about which roles exist.
+type Mode = 'light' | 'dark';
+
+function colorsFor(mode: Mode): ThemeTokens['colors'] {
+  const themed = colorsFile.colors;
+  const status = (group: keyof typeof themed.status) => ({
+    background: themed.status[group].background[mode],
+    text: themed.status[group].text[mode],
+  });
+  return {
+    background: themed.background[mode],
+    surface: themed.surface[mode],
+    surfaceRaised: themed.surfaceRaised[mode],
+    text: themed.text[mode],
+    textMuted: themed.textMuted[mode],
+    border: themed.border[mode],
+    accent: themed.accent[mode],
+    accentText: themed.accentText[mode],
+    accentTint: themed.accentTint[mode],
+    focusRing: themed.focusRing[mode],
+    danger: themed.danger[mode],
+    overlay: themed.overlay[mode],
+    control: themed.control[mode],
+    buttonPrimaryHover: themed.buttonPrimaryHover[mode],
+    buttonPrimaryActive: themed.buttonPrimaryActive[mode],
+    buttonSecondaryActive: themed.buttonSecondaryActive[mode],
+    buttonDangerHover: themed.buttonDangerHover[mode],
+    buttonDangerActive: themed.buttonDangerActive[mode],
+    status: {
+      pending: status('pending'),
+      active: status('active'),
+      done: status('done'),
+      problem: status('problem'),
+      gone: status('gone'),
+    },
+    speakerTints: themed.speakerTints[mode],
+  };
+}
+
+function illustrationFor(mode: Mode): ThemeTokens['illustration'] {
+  const art = colorsFile.illustration;
+  return {
+    backdropFrom: art.backdropFrom[mode],
+    backdropTo: art.backdropTo[mode],
+    desk: art.desk[mode],
+    deskDeep: art.deskDeep[mode],
+    deskRim: art.deskRim[mode],
+    chairBack: art.chairBack[mode],
+    chairSeat: art.chairSeat[mode],
+    machineTop: art.machineTop[mode],
+    machineFrom: art.machineFrom[mode],
+    machineTo: art.machineTo[mode],
+    machineMetal: art.machineMetal[mode],
+    machineMetalSoft: art.machineMetalSoft[mode],
+    machineAccent: art.machineAccent[mode],
+    key: art.key[mode],
+    keyFlash: art.keyFlash[mode],
+    ink: art.ink[mode],
+    inkSoft: art.inkSoft[mode],
+    skin: art.skin[mode],
+    skinShade: art.skinShade[mode],
+    skinHighlight: art.skinHighlight[mode],
+    accentPurple: art.accentPurple[mode],
+    accentPurpleSoft: art.accentPurpleSoft[mode],
+    accentPink: art.accentPink[mode],
+    accentYellow: art.accentYellow[mode],
+    accentTeal: art.accentTeal[mode],
+    accentTealDeep: art.accentTealDeep[mode],
+    accentBlue: art.accentBlue[mode],
+    lampGlow: art.lampGlow[mode],
+    lampHot: art.lampHot[mode],
+    cheek: art.cheek[mode],
+  };
+}
+
 export const lightTheme: ThemeTokens = {
   ...baseTokens,
-  colors: {
-    background: '#ffffff',
-    surface: '#f6f7f9',
-    surfaceRaised: '#ffffff',
-    text: '#1c1c1c',
-    textMuted: '#5a616c',
-    border: '#d7d7d7',
-    accent: '#0057a8',
-    accentText: '#ffffff',
-    accentTint: '#e3eefa',
-    focusRing: '#0057a8',
-    danger: '#b42318',
-    overlay: 'rgba(16, 24, 40, 0.4)',
-    control: '#7c838e',
-    buttonPrimaryHover: '#004b94',
-    buttonPrimaryActive: '#00407f',
-    buttonSecondaryActive: '#e8ecf1',
-    buttonDangerHover: '#9c1e15',
-    buttonDangerActive: '#861a12',
-    status: {
-      pending: { background: '#eceef1', text: '#3d434c' },
-      active: { background: '#e3eefa', text: '#0057a8' },
-      done: { background: '#e3f4e8', text: '#1d6436' },
-      problem: { background: '#fcebe9', text: '#b42318' },
-      gone: { background: '#f3f3f3', text: '#5a616c' },
-    },
-    speakerTints: lightSpeakerTints,
-  },
-  illustration: {
-    backdropFrom: '#FFF6E9',
-    backdropTo: '#FFDDE8',
-    desk: '#C98B5E',
-    deskDeep: '#A86E45',
-    deskRim: '#DDA477',
-    chairBack: '#E17055',
-    chairSeat: '#F0846A',
-    machineTop: '#5A6B85',
-    machineFrom: '#4A5A75',
-    machineTo: '#323F55',
-    machineMetal: '#9AA9B4',
-    machineMetalSoft: '#B2BEC3',
-    machineAccent: '#55EFC4',
-    key: '#F5F6FA',
-    keyFlash: '#C9D3DC',
-    ink: '#2D1B3D',
-    inkSoft: '#4A3560',
-    skin: '#E8A87C',
-    skinShade: '#CC8962',
-    skinHighlight: '#F7D6C0',
-    accentPurple: '#6C5CE7',
-    accentPurpleSoft: '#A29BFE',
-    accentPink: '#E84393',
-    accentYellow: '#FDCB6E',
-    accentTeal: '#00B894',
-    accentTealDeep: '#00A383',
-    accentBlue: '#0984E3',
-    lampGlow: '#FFEAA7',
-    lampHot: '#FFF6D6',
-    cheek: '#FF7675',
-  },
+  colors: colorsFor('light'),
+  illustration: illustrationFor('light'),
   shadows: {
     card: '0 0.0625rem 0.125rem rgba(16, 24, 40, 0.08)',
     raised: '0 0.25rem 0.75rem rgba(16, 24, 40, 0.12)',
@@ -331,71 +351,8 @@ export const lightTheme: ThemeTokens = {
 
 export const darkTheme: ThemeTokens = {
   ...baseTokens,
-  colors: {
-    background: '#14161a',
-    surface: '#1b1e23',
-    // A clear elevation step off the page and the resting surface (item 59): 1.51:1 and
-    // 1.40:1, where the old value was 1.21:1 and 1.12:1.
-    surfaceRaised: '#32373f',
-    text: '#e8e8e8',
-    textMuted: '#a4acb8',
-    border: '#3a3f47',
-    accent: '#7fb2e5',
-    accentText: '#14161a',
-    accentTint: '#1a2a3c',
-    focusRing: '#7fb2e5',
-    danger: '#f28b82',
-    overlay: 'rgba(0, 0, 0, 0.5)',
-    control: '#7e8794',
-    buttonPrimaryHover: '#93bceb',
-    buttonPrimaryActive: '#a4c8f0',
-    buttonSecondaryActive: '#242a31',
-    buttonDangerHover: '#f49c94',
-    buttonDangerActive: '#f6b3ac',
-    status: {
-      pending: { background: '#2a2e35', text: '#cdd2da' },
-      active: { background: '#1a2a3c', text: '#7fb2e5' },
-      done: { background: '#18291f', text: '#7fcf9c' },
-      problem: { background: '#3a1c1c', text: '#f28b82' },
-      gone: { background: '#22252a', text: '#9aa2ad' },
-    },
-    speakerTints: darkSpeakerTints,
-  },
-  illustration: {
-    // The backdrop follows the surface family so the piece sits in dark mode (item 17).
-    backdropFrom: '#23272e',
-    backdropTo: '#1b1e23',
-    desk: '#8a5a38',
-    deskDeep: '#6e4526',
-    deskRim: '#9c6c42',
-    chairBack: '#b0503f',
-    chairSeat: '#cd6b54',
-    machineTop: '#45536c',
-    machineFrom: '#3b4860',
-    machineTo: '#2e3950',
-    machineMetal: '#798690',
-    machineMetalSoft: '#8b98a2',
-    machineAccent: '#3fd9b0',
-    key: '#d9dee6',
-    keyFlash: '#97a3b0',
-    // The ink sits on the dark backdrop, so the hair lifts instead of merging with it.
-    ink: '#45355f',
-    inkSoft: '#6a5790',
-    skin: '#f0b48c',
-    skinShade: '#cf8a5e',
-    skinHighlight: '#ffdcc6',
-    accentPurple: '#8f7fed',
-    accentPurpleSoft: '#b3a9ff',
-    accentPink: '#f0579f',
-    accentYellow: '#ffd485',
-    accentTeal: '#26c99c',
-    accentTealDeep: '#1fb58c',
-    accentBlue: '#3f9df5',
-    // The lamp's warm light stays warm in both themes.
-    lampGlow: '#FFEAA7',
-    lampHot: '#FFF6D6',
-    cheek: '#ff8a87',
-  },
+  colors: colorsFor('dark'),
+  illustration: illustrationFor('dark'),
   shadows: {
     card: '0 0.0625rem 0.25rem rgba(0, 0, 0, 0.4)',
     raised: '0 0.5rem 1.5rem rgba(0, 0, 0, 0.55)',

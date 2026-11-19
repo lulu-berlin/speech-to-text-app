@@ -2,9 +2,13 @@
 //! in a terminal through a per-OS launcher, since no OS has a "default terminal" to ask for:
 //! Windows starts PowerShell, which the configured console host (Windows Terminal when set) draws;
 //! macOS asks Terminal; Linux takes the first of a chain that starts with `$TERMINAL` and then
-//! `xdg-terminal-exec`. The real launch on each OS is proven by its CI leg (test list item 10).
+//! `xdg-terminal-exec`, the Debian alternative, the modern desktop terminals (kitty, foot,
+//! alacritty, wezterm, ghostty) and the desktop ones. The real launch on each OS is proven by its
+//! CI leg (test list item 10).
 
-use stt_client::{LaunchCommand, Os, TerminalSettings, terminal_command};
+use stt_client::{
+    DefaultTerminal, LaunchCommand, Os, TerminalSettings, default_terminal, terminal_command,
+};
 
 fn strings(items: &[&str]) -> Vec<String> {
     items.iter().map(|item| item.to_string()).collect()
@@ -241,5 +245,76 @@ fn a_terminal_command_setting_replaces_the_os_launcher() {
             program: "foot".into(),
             args: strings(&["-e", "stt-tui", "--theme", "dark"]),
         })
+    );
+}
+
+/// The chain also knows the terminals people run on modern desktops (2026-11-08): kitty and foot
+/// take the program directly, alacritty and ghostty with `-e`, and wezterm with `start --`. Each
+/// sits after the freedesktop launcher and the Debian alternative and before the desktop ones.
+#[test]
+fn the_linux_chain_knows_the_modern_terminals() {
+    let argv = strings(&["--theme", "dark"]);
+    let only = |names: &'static [&'static str]| move |program: &str| names.contains(&program);
+    let launch = |program: &str, args: &[&str]| {
+        Some(LaunchCommand {
+            program: program.into(),
+            args: strings(args),
+        })
+    };
+
+    for (present, expected) in [
+        (
+            &["kitty"][..],
+            launch("kitty", &["stt-tui", "--theme", "dark"]),
+        ),
+        (
+            &["foot"][..],
+            launch("foot", &["stt-tui", "--theme", "dark"]),
+        ),
+        (
+            &["alacritty"][..],
+            launch("alacritty", &["-e", "stt-tui", "--theme", "dark"]),
+        ),
+        (
+            &["wezterm"][..],
+            launch("wezterm", &["start", "--", "stt-tui", "--theme", "dark"]),
+        ),
+        (
+            &["ghostty"][..],
+            launch("ghostty", &["-e", "stt-tui", "--theme", "dark"]),
+        ),
+        // The generic launchers still win, and the desktop terminals still follow.
+        (
+            &["kitty", "xdg-terminal-exec"][..],
+            launch("xdg-terminal-exec", &["stt-tui", "--theme", "dark"]),
+        ),
+        (
+            &["kitty", "x-terminal-emulator"][..],
+            launch("x-terminal-emulator", &["-e", "stt-tui", "--theme", "dark"]),
+        ),
+        (
+            &["kitty", "gnome-terminal"][..],
+            launch("kitty", &["stt-tui", "--theme", "dark"]),
+        ),
+    ] {
+        assert_eq!(
+            terminal_command(
+                "stt-tui",
+                &argv,
+                Os::Linux,
+                &TerminalSettings {
+                    terminal_var: None,
+                    on_path: &only(present),
+                    terminal_override: None,
+                },
+            ),
+            expected,
+            "present: {present:?}"
+        );
+    }
+    // The settings screen names the same launcher as the default.
+    assert_eq!(
+        default_terminal(Os::Linux, None, &only(&["kitty"])),
+        DefaultTerminal::Prefix("kitty".into())
     );
 }

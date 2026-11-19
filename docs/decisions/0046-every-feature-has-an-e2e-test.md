@@ -1,6 +1,6 @@
 # 0046 — Every app feature has an end-to-end test
 
-Status: accepted · Date: 2026-10-11
+Status: accepted (amended 2026-11-17: the terminal app's end-to-end proof is its pty journey, not Playwright) · Date: 2026-10-11
 
 ## Context
 
@@ -12,6 +12,13 @@ The unit and integration suites were green while the real app was broken in ways
 - The e2e test is part of the item's test list (Canon TDD step 1) and part of its approval: an item is not `in-review` without it, and the diff review includes the e2e run's result.
 - Items that change no app feature (build, packaging, toolchain, pure refactors) are exempt; their item states why.
 - The e2e suite runs on the user's machine (Playwright's browser comes from `devenv.nix`; the sandbox has none), so an item's e2e result is recorded from the user's run.
+
+**Amendment 2026-11-17 (roadmap item 67).** Playwright cannot drive a terminal app, so the terminal
+frontend's end-to-end proof is its pty journey: `stt-tui`'s `journey.rs` starts the real service and
+the real TUI in a pseudo-terminal, uploads a fixture, waits for the task and reads its transcript
+back, run by `./gradlew tuiJourney` in CI on Linux, macOS and Windows. It is that feature's e2e test
+under this decision's rule - in the item's test list, part of its approval, green before
+`in-review` - and the browser's features keep the Playwright suite.
 
 ## Consequences
 

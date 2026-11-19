@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 864 592" width="864" height="592">
+<rect width="864" height="592" rx="10" fill="#0e0f12"/>
+<text x="12" y="20" font-family="DejaVu Sans, sans-serif" font-size="12" fill="#a4acb8">History (searching, the status filter on All) — dark</text>
+<rect x="12" y="30" width="840" height="540" fill="#14161a"/>
+<rect x="12" y="30" width="840" height="18" fill="#1b1e23"/>
+<rect x="12" y="30" width="92.4" height="18" fill="#1a2a3c"/>
+<text x="12" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> ╭─────╮   </text>
+<text x="104.4" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="134.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">  Speech-to-Text</text>
+<text x="238.8" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="58.800000000000004" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">   idle</text>
+<text x="642" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="16.8" lengthAdjust="spacingAndGlyphs" fill="#7fcf9c" xml:space="preserve">● </text>
+<text x="658.8000000000001" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="33.6" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">Live</text>
+<text x="692.4" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="50.400000000000006" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">    ◐ </text>
+<text x="742.8000000000001" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold" text-decoration="underline">t</text>
+<text x="751.2" y="43" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">heme: dark </text>
+<rect x="12" y="48" width="840" height="18" fill="#1b1e23"/>
+<rect x="12" y="48" width="92.4" height="18" fill="#1a2a3c"/>
+<text x="12" y="61" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> │ ─ ─ │   </text>
+<text x="121.2" y="61" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve" text-decoration="underline">Q</text>
+<text x="129.60000000000002" y="61" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">ueue </text>
+<rect x="196.8" y="48" width="8.4" height="18" fill="#7fb2e5"/>
+<rect x="205.20000000000002" y="48" width="8.4" height="18" fill="#7fb2e5"/>
+<text x="205.20000000000002" y="61" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#14161a" xml:space="preserve" font-weight="bold" text-decoration="underline">H</text>
+<rect x="213.60000000000002" y="48" width="58.800000000000004" height="18" fill="#7fb2e5"/>
+<text x="213.60000000000002" y="61" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="58.800000000000004" lengthAdjust="spacingAndGlyphs" fill="#14161a" xml:space="preserve" font-weight="bold">istory </text>
+<text x="306" y="61" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve" text-decoration="underline">S</text>
+<text x="314.40000000000003" y="61" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="67.2" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">ettings </text>
+<rect x="12" y="66" width="92.4" height="18" fill="#1a2a3c"/>
+<text x="12" y="79" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> ╰┬───┬╯   </text>
+<text x="104.4" y="79" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="747.6" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">─────────────────────────────────────────────────────────────────────────────────────────</text>
+<text x="28.8" y="97" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">/</text>
+<text x="37.2" y="97" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="75.60000000000001" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> Search  </text>
+<rect x="112.80000000000001" y="84" width="235.20000000000002" height="18" fill="#32373f"/>
+<text x="112.80000000000001" y="97" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="235.20000000000002" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve"> harbour█                   </text>
+<text x="390" y="97" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">f</text>
+<text x="398.40000000000003" y="97" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="75.60000000000001" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> Status  </text>
+<rect x="474" y="84" width="67.2" height="18" fill="#32373f"/>
+<text x="474" y="97" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="67.2" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve"> All ▾  </text>
+<text x="608.4" y="97" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="109.2" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">4 of 12 tasks</text>
+<text x="12" y="115" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="823.2" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">  ────────────────────────────────────────────────────────────────────────────────────────────────</text>
+<rect x="12" y="120" width="840" height="18" fill="#1a2a3c"/>
+<text x="12" y="133" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="16.8" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve"> ▍</text>
+<rect x="28.8" y="120" width="92.4" height="18" fill="#18291f"/>
+<text x="28.8" y="133" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#7fcf9c" xml:space="preserve"> COMPLETED </text>
+<text x="138" y="133" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="151.20000000000002" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve" font-weight="bold">harbour-master.m4a</text>
+<text x="524.4" y="133" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="176.4" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">Nov 7, 2026 · 1:12:40</text>
+<rect x="28.8" y="138" width="92.4" height="18" fill="#18291f"/>
+<text x="28.8" y="151" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#7fcf9c" xml:space="preserve"> COMPLETED </text>
+<text x="138" y="151" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="109.2" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve">interview.mp3</text>
+<text x="524.4" y="151" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="159.6" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">Oct 9, 2026 · 19:45</text>
+<rect x="28.8" y="156" width="92.4" height="18" fill="#3a1c1c"/>
+<text x="28.8" y="169" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#f28b82" xml:space="preserve"> FAILED    </text>
+<text x="138" y="169" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="142.8" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve">harbour-noise.wav</text>
+<text x="524.4" y="169" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="159.6" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">Oct 8, 2026 · 03:12</text>
+<text x="12" y="187" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="159.6" lengthAdjust="spacingAndGlyphs" fill="#f28b82" xml:space="preserve">                 ⚠ </text>
+<text x="171.6" y="187" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="411.6" lengthAdjust="spacingAndGlyphs" fill="#f28b82" xml:space="preserve">whisper-cli exited with code 1 while transcribing</text>
+<rect x="28.8" y="192" width="92.4" height="18" fill="#22252a"/>
+<text x="28.8" y="205" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#9aa2ad" xml:space="preserve"> CANCELED  </text>
+<text x="138" y="205" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="184.8" lengthAdjust="spacingAndGlyphs" fill="#e8e8e8" xml:space="preserve">harbour-tour-part2.m4a</text>
+<text x="524.4" y="205" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="92.4" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">Oct 2, 2026</text>
+<rect x="12" y="534" width="840" height="18" fill="#1b1e23"/>
+<text x="20.4" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">Enter</text>
+<text x="62.400000000000006" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> open</text>
+<text x="104.4" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">  ·  </text>
+<text x="146.4" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">Space</text>
+<text x="188.4" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> play</text>
+<text x="230.4" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">  ·  </text>
+<text x="272.40000000000003" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold" text-decoration="underline">r</text>
+<text x="280.8" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="33.6" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">etry</text>
+<text x="314.40000000000003" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">  ·  </text>
+<text x="356.40000000000003" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="25.200000000000003" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">Del</text>
+<text x="381.6" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="58.800000000000004" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> delete</text>
+<text x="440.40000000000003" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">  ·  </text>
+<text x="482.40000000000003" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">/</text>
+<text x="490.8" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="58.800000000000004" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> search</text>
+<text x="549.6" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">  ·  </text>
+<text x="591.6" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold" text-decoration="underline">f</text>
+<text x="600" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve">ilter</text>
+<text x="642" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#3a3f47" xml:space="preserve">  ·  </text>
+<text x="684" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">x</text>
+<text x="692.4" y="547" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="117.60000000000001" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> clear filters</text>
+<rect x="12" y="552" width="840" height="18" fill="#1b1e23"/>
+<text x="20.4" y="565" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="8.4" lengthAdjust="spacingAndGlyphs" fill="#7fb2e5" xml:space="preserve" font-weight="bold">?</text>
+<text x="28.8" y="565" font-family="DejaVu Sans Mono, monospace" font-size="14" textLength="42" lengthAdjust="spacingAndGlyphs" fill="#a4acb8" xml:space="preserve"> help</text>
+</svg>
