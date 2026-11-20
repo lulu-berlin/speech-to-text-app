@@ -15,6 +15,12 @@ in
     [
       pkgs.git
 
+      # The client's native build: Rust links through `cc`, and `alsa-sys` (cpal's Linux backend)
+      # asks `pkg-config` for ALSA's flags, so both belong to the shell rather than to whatever the
+      # host happens to install (ADR 0010). macOS's clang links CoreAudio without a pkg-config file.
+      pkgs.stdenv.cc
+      pkgs.pkg-config
+
       # Transcribe CLI: the pinned 1.9.5 build (Vulkan on Linux, static Metal on darwin) from the
       # version-named whisper-cpp-1.9.5 asset on x86_64-linux and aarch64-darwin (roadmap items 63,
       # 48 and 90), the same one `nix build .` and .#desktop ship.
