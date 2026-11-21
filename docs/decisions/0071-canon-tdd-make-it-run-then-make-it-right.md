@@ -55,7 +55,8 @@ copies a computed value into an expected value.
   prompts point at AGENTS.md, so they need no change.
 - A cycle may take one more round and one more user decision; the per-cycle checkpoints still bound
   it.
-- A TTSR rule (`green-cycle-asks-the-user`,
-  [`.omp/rules/`](../../.omp/rules/green-cycle-asks-the-user.md)) reminds the agent at the
-  green/commit point that the make-it-right proposals and the refactor question are the user's; it
-  is a warning, not an interrupt.
+- Two TTSR rules ([`make-it-right-asks-the-user`](../../.omp/rules/make-it-right-asks-the-user.md)
+  and [`refactor-asks-the-user`](../../.omp/rules/refactor-asks-the-user.md)) check the agent's
+  suggestions: a refactor suggestion or the next-test proposal must carry the make-it-right
+  outcome, and the next-test proposal the refactor outcome; a warning, not an interrupt. They fire
+  on the suggestions, not on every green mention (2026-11-21).
