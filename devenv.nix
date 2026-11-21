@@ -152,6 +152,26 @@ in
   # survive `devenv up` restarts; the packaged app sets its own STT_DATA_DIR (flake.nix).
   env.STT_DATA_DIR = "${config.devenv.state}/stt";
 
+  # The TUI in development (roadmap item 67): a client reads its service from `config.json` and
+  # `runtime.json`, which app mode writes; dev mode does not, so the shell writes a dev bootstrap
+  # pointing at the dev server, and `cargo run -p stt-tui` attaches with no hand-made files. The
+  # dev server has no credential filter, so the secret is a placeholder. The endpoint follows
+  # STT_PORT at the moment the shell is entered (the dev server's default is 8080).
+  env.STT_CONFIG_DIR = "${config.devenv.state}/stt-tui";
+  env.STT_RUNTIME_DIR = "${config.devenv.state}/stt-tui";
+  enterShell = ''
+    mkdir -p "$STT_CONFIG_DIR"
+    printf '{"secret":"dev"}' > "$STT_CONFIG_DIR/config.json"
+    printf '{"endpoint":"http://127.0.0.1:%s"}' "''${STT_PORT:-8080}" > "$STT_CONFIG_DIR/runtime.json"
+  '';
+
+  # The TUI in one word, from anywhere in the tree: the bootstrap above points it at the dev
+  # server (`devenv up`), which must already be running.
+  scripts."stt-tui" = {
+    exec = "cd \"$DEVENV_ROOT/client\" && exec cargo run -p stt-tui";
+    description = "Run the terminal UI against the dev server (devenv up)";
+  };
+
   # Roadmap item 50: electron-builder runs `fpm` from PATH (pkgs.fpm above) instead of
   # downloading its own.
   env.USE_SYSTEM_FPM = "true";
