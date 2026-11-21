@@ -14,7 +14,7 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0006 | [Exposed, Flyway, and Kotest](0006-exposed-flyway-kotest.md)                            | accepted | 2026-10-05 |
 | 0007 | [Server-Sent Events for live updates](0007-sse-live-updates.md)                          | accepted | 2026-10-05 |
 | 0008 | [Default whisper model](0008-default-whisper-model.md)                                  | accepted, source moved to this repository's mirror (2026-10-15, [0055](0055-desktop-window-has-no-network-path.md)) | 2026-10-05 |
-| 0009 | [Approval-gated Canon TDD workflow](0009-approval-gated-canon-tdd-workflow.md)          | accepted | 2026-10-05 |
+| 0009 | [Approval-gated Canon TDD workflow](0009-approval-gated-canon-tdd-workflow.md)          | accepted, workflow steps 4–6 replaced by [0011](0011-one-omp-instance-per-workspace.md), step 3 amended by [0071](0071-canon-tdd-make-it-run-then-make-it-right.md) | 2026-10-05 |
 | 0010 | [Development toolchain in devenv](0010-development-toolchain.md)                        | accepted | 2026-10-05 |
 | 0011 | [One omp instance per roadmap workspace](0011-one-omp-instance-per-workspace.md)        | accepted | 2026-10-05 |
 | 0012 | [Frontend dependency management: pnpm](0012-frontend-dependency-management-pnpm.md)      | accepted | 2026-10-05 |
@@ -76,3 +76,4 @@ New ADRs are appended with the next free number. A superseded ADR gets `Status: 
 | 0068 | [One theme-token file for every frontend](0068-one-theme-token-file-for-every-frontend.md) | accepted (amended 2026-11-15) | 2026-11-07 |
 | 0069 | [The TUI reads its input through termina](0069-tui-input-through-termina.md) | accepted | 2026-11-16 |
 | 0070 | [The TUI reports its drawn frames to its pty tests](0070-tui-reports-its-frames-to-the-pty-tests.md) | accepted | 2026-11-18 |
+| 0071 | [Canon TDD's step 3 has two rounds: make it run, then make it right](0071-canon-tdd-make-it-run-then-make-it-right.md) | accepted, amends [0009](0009-approval-gated-canon-tdd-workflow.md) and AGENTS.md § Canon TDD step 3 | 2026-11-21 |
