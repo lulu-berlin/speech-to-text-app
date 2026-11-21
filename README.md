@@ -155,6 +155,8 @@ devenv up
 
 Open the Vite URL it prints (<http://localhost:5173>). Stop with Ctrl-C, then `q`, or run `devenv down`.
 
+The shell also writes the terminal UI's dev bootstrap — `config.json` (a placeholder secret; the dev server has no credential filter) and `runtime.json` (the backend's endpoint) under `.devenv/state/stt-tui` — and provides the `stt-tui` script, so a second terminal in the shell runs the TUI against this server with `stt-tui`. Start `devenv up` first: the TUI attaches to a running service and starts none.
+
 **The app as it ships, from source** — build the frontend once and let the backend serve it:
 
 ```sh
@@ -242,6 +244,7 @@ Then open <http://localhost:8080>; stop with Ctrl-C. The first run downloads abo
 
 - `./gradlew checkVersions` — checks that `versions.json` still matches the Gradle wrapper, the flake's locked nixpkgs and `client/rust-toolchain.toml`.
 - `cd client && cargo test` — the Rust client workspace's tests (roadmap item 66). Gradle does not download Rust: install [rustup](https://rustup.rs/), which reads `client/rust-toolchain.toml` and installs the pinned Rust the first time; `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are CI's other two checks.
+- `stt-tui` — the terminal UI against the dev server (`devenv up`): a shell script that runs `cargo run -p stt-tui` from `client/`, with the shell's dev bootstrap pointing it at the backend, so there are no files to write.
 - `./gradlew -p backend check` — the backend's tests. They need a UTF-8 locale, for example `export LANG=C.UTF-8` first; `./gradlew run` does not. A running Gradle daemon keeps the locale it started with, so after changing it run `./gradlew --stop` once.
 
 Where things live:
