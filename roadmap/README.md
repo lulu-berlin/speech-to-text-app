@@ -220,6 +220,7 @@ graph TD
   49 --> 80
   51 --> 80
   82[82 CI diagnosability ✓]:::done
+  112[112 upload part limit]
   classDef done fill:#d4edda,stroke:#2e7d32
 ```
 
@@ -337,3 +338,4 @@ graph TD
 | [109 — One UI core for every frontend: the `stt-ui` crate](109-shared-ui-crate.md) | spec-approved | 67, 70, 88, 98 |
 | [110 — In app mode, a service restart leaves a page that names the way back in](110-app-mode-after-service-restart.md) | draft | 66, 87 |
 | [111 — Rebrand to `protocolulu`, rename the screens to Recordings and Transcripts, and audit the copy](111-rebrand-and-terminology.md) | draft | 66, 88, 89 |
+| [112 — Uploads over 50 MiB answer 500: the multipart part limit is not the app's cap](112-upload-part-limit.md) | spec-approved | — |
