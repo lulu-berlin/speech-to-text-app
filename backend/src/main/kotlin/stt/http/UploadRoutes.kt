@@ -10,6 +10,9 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingCall
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.io.IOException
 import stt.config.Config
 import stt.db.AudioRepository
 import stt.db.Database
@@ -20,6 +23,35 @@ import stt.db.UploadTooLargeException
 import stt.db.discardStaged
 import stt.db.stageChannel
 import stt.engine.ProcessingEngine
+
+/**
+ * The multipart scanner's own bound on a part: the app's cap plus this margin, so a part of exactly the cap can still
+ * find its closing boundary, which the scanner counts too (item 112). Ktor's default (50 MiB) is below the app's cap.
+ */
+private const val PART_SCAN_MARGIN = 1_048_576L
+
+/** Ktor 3.6.1's boundary scanner: "Limit of N bytes exceeded while searching for …". */
+private const val BOUNDARY_SCAN_LIMIT_PREFIX = "Limit of "
+private const val BOUNDARY_SCAN_LIMIT_MARKER = " bytes exceeded while searching for "
+
+/** Ktor 3.6.1's part-declared `Content-Length`: "Multipart content length exceeds limit N …". */
+private const val PART_LENGTH_LIMIT_PREFIX = "Multipart content length exceeds limit "
+
+/**
+ * Ktor 3.6.1's multipart parser signals a part over its `formFieldLimit` as an [IOException] — the boundary scanner's
+ * [BOUNDARY_SCAN_LIMIT_PREFIX] message, or a part-declared `Content-Length`'s [PART_LENGTH_LIMIT_PREFIX] message —
+ * and closes a part's body with it, so reading the body wraps it in a
+ * `ClosedReadChannelException`. The text is the only discriminator the parser offers; its exception classes are not
+ * public API.
+ */
+private fun Throwable.isMultipartLimitExceeded(): Boolean =
+    generateSequence(this) { it.cause }.any { cause ->
+        cause is IOException &&
+            cause.message?.let { message ->
+                (message.startsWith(BOUNDARY_SCAN_LIMIT_PREFIX) && message.contains(BOUNDARY_SCAN_LIMIT_MARKER)) ||
+                    message.startsWith(PART_LENGTH_LIMIT_PREFIX)
+            } == true
+    }
 
 /** The `413 upload-too-large` of item 41: the message names the limit in binary units. */
 private suspend fun RoutingCall.respondTooLarge(limit: Long) =
@@ -55,7 +87,8 @@ internal var afterFilePartStaged: (suspend () -> Unit)? = null
  * committed the same bytes first is answered with the same 409 (item 41). A created task is announced and
  * taken at once ([ProcessingEngine.taskCreated]:
  * `task-updated` and `queue-updated` on the events stream, then the worker is woken). Answers `201` with the
- * created task.
+ * created task. The multipart parser scans each part up to the app's cap plus a 1 MiB margin (item 112), so the
+ * advertised cap is never cut off by Ktor's 50 MiB default; a part over that bound answers `413 upload-too-large`.
  */
 fun Application.uploadRoutes(config: Config) {
     val tasks: TaskRepository by dependencies
@@ -73,7 +106,7 @@ fun Application.uploadRoutes(config: Config) {
             var contentType: String? = null
             var staged: StagedUpload? = null
             val fields = mutableMapOf<String, String>()
-            val multipart = call.receiveMultipart()
+            val multipart = call.receiveMultipart(formFieldLimit = limit + PART_SCAN_MARGIN)
             try {
                 while (true) {
                     val part = multipart.readPart() ?: break
@@ -171,6 +204,17 @@ fun Application.uploadRoutes(config: Config) {
                         }
                     }
                 }
+            } catch (e: Exception) {
+                // A part over the parser's own bound — a chunked form field, or a file beyond the cap plus the margin
+                // — answers the same 413 as an over-cap file, never the last-resort 500 (item 112). A client
+                // disconnect is not this: its cause is not the scanner's limit and it is rethrown. The parser fails
+                // in a coroutine of the call's job, so the call is already cancelled here: the answer is written
+                // non-cancellably.
+                if (e.isMultipartLimitExceeded()) {
+                    withContext(NonCancellable) { call.respondTooLarge(limit) }
+                    return@post
+                }
+                throw e
             } finally {
                 // Discards whatever was staged and no task claimed, on every path (item 41).
                 staged?.let { db.discardStaged(it) }

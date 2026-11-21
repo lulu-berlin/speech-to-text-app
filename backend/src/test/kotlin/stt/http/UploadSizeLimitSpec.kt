@@ -1,27 +1,15 @@
 package stt.http
 
 import io.kotest.core.spec.style.BehaviorSpec
-import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
-import io.ktor.client.HttpClient
-import io.ktor.client.request.forms.ChannelProvider
-import io.ktor.client.request.forms.formData
-import io.ktor.client.request.forms.submitFormWithBinaryData
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.Headers
-import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.testing.testApplication
-import io.ktor.utils.io.jvm.javaio.toByteReadChannel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import stt.db.Database
-import stt.db.QueueStateRepository
 import stt.db.rowCount
 import stt.db.singleValue
 import stt.executeSql
@@ -35,64 +23,14 @@ import stt.executeSql
  */
 class UploadSizeLimitSpec :
     BehaviorSpec({
-        /** One file part with [filename], as the upload form sends it (the content type is ignored). */
-        fun fileHeaders(filename: String): Headers =
-            Headers.build {
-                append(HttpHeaders.ContentType, "audio/x-wav")
-                append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
-            }
-
-        /** An upload whose body size is known up front, so the request declares its `Content-Length`. */
-        suspend fun uploadDeclared(
-            client: HttpClient,
-            filename: String,
-            bytes: ByteArray,
-        ): HttpResponse =
-            client.submitFormWithBinaryData(
-                url = "/api/tasks",
-                formData = formData { append("file", bytes, fileHeaders(filename)) },
-            )
-
-        /** An upload streamed through a [ChannelProvider]: no `Content-Length`, so the body arrives chunked. */
-        suspend fun uploadChunked(
-            client: HttpClient,
-            filename: String,
-            bytes: ByteArray,
-        ): HttpResponse =
-            client.submitFormWithBinaryData(
-                url = "/api/tasks",
-                formData =
-                    formData {
-                        append(
-                            "file",
-                            ChannelProvider { bytes.inputStream().toByteReadChannel() },
-                            fileHeaders(filename),
-                        )
-                    },
-            )
-
-        /** The `413 upload-too-large` contract of a 64-byte limit against `docs/api/error.upload-too-large.json`. */
-        suspend fun assertTooLarge(response: HttpResponse) {
-            response.status shouldBe HttpStatusCode.PayloadTooLarge
-            response.contentType()?.withoutParameters() shouldBe ContentType.Application.Json
-            val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-            body shouldHaveShapeOf apiExample("error.upload-too-large.json")
-            body.getValue("error").jsonPrimitive.content shouldBe "upload-too-large"
-            body
-                .getValue("message")
-                .jsonPrimitive
-                .content shouldBe "The upload exceeds the maximum size of 64 bytes"
-        }
-
         given("an upload limit of 64 bytes (queue paused)") {
             `when`("an upload over the limit arrives with a declared Content-Length and another as a chunked body") {
                 then("both are 413 upload-too-large naming the limit, no task and no staged original remain") {
                     val bytes = ByteArray(65) { it.toByte() }
-                    val dataDir = tempdir("stt-data").toPath()
-                    Database.open(dataDir).use { db -> QueueStateRepository(db).setPaused(true) }
+                    val dataDir = pausedDataDir()
 
                     testApplication {
-                        application { sttApp(stt.config.testConfig(dataDir, maxUploadBytes = 64)) }
+                        uploadApp(dataDir, maxUploadBytes = 64)
 
                         // Declared Content-Length: refused from the header, before any part is read.
                         assertTooLarge(uploadDeclared(client, "big.wav", bytes))
@@ -113,11 +51,10 @@ class UploadSizeLimitSpec :
             `when`("it arrives chunked, and a 64-byte file arrives with a declared body size") {
                 then("the chunked upload is 201 with all 64 bytes stored; the declared one is 413, as decided") {
                     val bytes = ByteArray(64) { it.toByte() }
-                    val dataDir = tempdir("stt-data").toPath()
-                    Database.open(dataDir).use { db -> QueueStateRepository(db).setPaused(true) }
+                    val dataDir = pausedDataDir()
 
                     testApplication {
-                        application { sttApp(stt.config.testConfig(dataDir, maxUploadBytes = 64)) }
+                        uploadApp(dataDir, maxUploadBytes = 64)
 
                         val chunked = uploadChunked(client, "exact.wav", bytes)
                         chunked.status shouldBe HttpStatusCode.Created
@@ -149,8 +86,7 @@ class UploadSizeLimitSpec :
             `when`("the part outgrows the limit and the cleanup's delete is refused") {
                 then("the answer is still 413 upload-too-large, not a 500") {
                     val bytes = ByteArray(65) { it.toByte() }
-                    val dataDir = tempdir("stt-data").toPath()
-                    Database.open(dataDir).use { db -> QueueStateRepository(db).setPaused(true) }
+                    val dataDir = pausedDataDir()
                     // A trigger that refuses the cleanup's delete.
                     executeSql(
                         dataDir,
@@ -159,7 +95,7 @@ class UploadSizeLimitSpec :
                     )
 
                     testApplication {
-                        application { sttApp(stt.config.testConfig(dataDir, maxUploadBytes = 64)) }
+                        uploadApp(dataDir, maxUploadBytes = 64)
                         assertTooLarge(uploadChunked(client, "big.wav", bytes))
 
                         // The refused delete left the staged original behind; the answer did not become a 500.
