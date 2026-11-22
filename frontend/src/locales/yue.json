@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "重新指派失敗：{error}",
   "tui.segment.editPrompt": "段落文字：{text}",
   "tui.segment.editFailed": "編輯失敗：{error}",
-  "tui.segment.revertFailed": "還原失敗：{error}"
+  "tui.segment.revertFailed": "還原失敗：{error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

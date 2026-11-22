@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "फिर से असाइन करना विफल: {error}",
   "tui.segment.editPrompt": "खंड का पाठ: {text}",
   "tui.segment.editFailed": "संपादन विफल: {error}",
-  "tui.segment.revertFailed": "पूर्ववत करना विफल: {error}"
+  "tui.segment.revertFailed": "पूर्ववत करना विफल: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

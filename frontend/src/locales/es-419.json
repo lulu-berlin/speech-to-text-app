@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "Error al reasignar: {error}",
   "tui.segment.editPrompt": "Texto del segmento: {text}",
   "tui.segment.editFailed": "Error al editar: {error}",
-  "tui.segment.revertFailed": "Error al revertir: {error}"
+  "tui.segment.revertFailed": "Error al revertir: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

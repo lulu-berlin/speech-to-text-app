@@ -353,6 +353,7 @@
   "tui.help.description": "Description:",
   "tui.help.moreAbove": "↑ more",
   "tui.help.moreBelow": "↓ more",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself.",
   "tui.upload.areaTitle": "Upload",
   "tui.upload.choose": "Choose audio files",
   "tui.upload.chooseKeys": "[u] or [Enter], or paste / drop a path into the terminal",

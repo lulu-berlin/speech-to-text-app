@@ -1,6 +1,6 @@
 import { expect, test } from './helpers/test';
 import { appUrl } from '../lib/backend.ts';
-import { appLive, goTo, uploadClips, waitForTaskState } from './helpers/ui';
+import { appLive, goTo, turnTextOf, uploadClips, waitForTaskState } from './helpers/ui';
 
 // The localization journey (roadmap item 88, test-list item 20; ADR 0046): the same
 // upload → transcript → speakers → settings path as the English suite, with the app
@@ -52,7 +52,7 @@ test('the German journey: the interface switches and the whole path reads German
   await page.getByRole('link', { name: 'jfk-a.wav' }).click();
   await expect(page.getByRole('heading', { name: 'jfk-a.wav' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Sprechende' })).toBeVisible();
-  const turn = page.locator('span:text-is("Speaker 1") + p');
+  const turn = turnTextOf(page, 'Speaker 1');
   await expect(turn).toHaveCount(1);
   await expect(turn).toContainText(/ask not what your country can do for you/i);
 
@@ -104,7 +104,7 @@ test('the Arabic journey: the interface mirrors and reads Arabic, and the path s
   await page.getByRole('link', { name: 'jfk-a.wav' }).click();
   await expect(page.getByRole('heading', { name: 'jfk-a.wav' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'الأصوات' })).toBeVisible();
-  const turn = page.locator('span:text-is("Speaker 1") + p');
+  const turn = turnTextOf(page, 'Speaker 1');
   await expect(turn).toHaveCount(1);
   await expect(turn).toContainText(/ask not what your country can do for you/i);
 
@@ -113,8 +113,7 @@ test('the Arabic journey: the interface mirrors and reads Arabic, and the path s
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
 
   // Item 88 (user decision 2026-11-13): an English turn keeps its own direction inside the RTL
-  // shell — the reading text resolves dir="auto" to ltr, so the text is not mirrored.
-  await expect(turn).toHaveAttribute('dir', 'auto');
+  // shell — item 76 decides it from the turn's text, so the text is not mirrored.
   await expect
     .poll(() => turn.evaluate((element) => getComputedStyle(element).direction))
     .toBe('ltr');

@@ -103,6 +103,9 @@ pub struct View<'a> {
     pub history_offset: &'a std::cell::Cell<usize>,
     /// The footer hints a click performs, as the last frame drew them.
     pub footer_hits: &'a std::cell::RefCell<Vec<FooterHint>>,
+    /// Whether the environment names an emulator that reorders text itself: the key reference
+    /// then adds the notice that its setting must be off.
+    pub reorders: bool,
 }
 
 impl<'a> View<'a> {
@@ -321,6 +324,24 @@ pub struct Dialog {
     pub confirm: String,
 }
 
+/// The notice's lines, split at the colon so the reference's table stays narrow: the catalog's
+/// `tui.help.reorder` names the terminal's setting and why it must be off. Empty when no catalog
+/// text carries the key.
+pub fn notice_lines() -> (String, String) {
+    let text = stt_client::text("tui.help.reorder", &[]);
+    match text.split_once(": ") {
+        Some((first, second)) => (first.to_string(), second.to_string()),
+        None => (text, String::new()),
+    }
+}
+
+/// Whether the environment names an emulator that reorders text itself (mlterm, through `TERM`
+/// or `MLTERM`): the TUI orders each wrapped line itself, so its bidi setting must be off.
+pub fn reorders_text() -> bool {
+    std::env::var("TERM").is_ok_and(|value| value.contains("mlterm"))
+        || std::env::var("MLTERM").is_ok_and(|value| !value.is_empty())
+}
+
 /// The page's full key reference, over the screen, as btop's help: a table of every key of the page,
 /// `Key:` in the accent and `Description:` muted, whether it can act now or not (the footer shows
 /// those that can, and leaves the rest to `? more`), and how to close it. A table taller than the
@@ -358,6 +379,14 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
     );
     lines.push(Line::default());
     lines.push(hint(view, "tui.help.close", &[]));
+    if view.reorders {
+        let (first, second) = notice_lines();
+        lines.push(Line::default());
+        lines.push(Line::styled(first, fg(view, view.theme.muted)));
+        if !second.is_empty() {
+            lines.push(Line::styled(second, fg(view, view.theme.muted)));
+        }
+    }
     let mut block = dialog_block(view, stt_client::text(help_title(view.screen), &[]))
         .padding(ratatui::widgets::Padding::horizontal(1));
     let more = fg(view, view.theme.muted);
@@ -374,7 +403,8 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
 }
 
 /// The rows the key reference keeps around its table rows: its two borders, the header, a blank row
-/// and the line saying how to close it.
+/// and the line saying how to close it. A reordering emulator's notice adds a blank row and its two
+/// lines (`notice_lines`), counted beside this constant.
 const HELP_CHROME: u16 = 5;
 /// The spaces between the key reference's columns.
 const HELP_GAP: usize = 4;
@@ -404,6 +434,9 @@ pub fn help_max_scroll(frame: Rect, view: &View<'_>) -> usize {
 /// `scroll` rows (at most to its last).
 fn help_table(frame: Rect, view: &View<'_>, scroll: usize) -> HelpTable {
     let screen = view.screen;
+    // The notice's blank row and its two lines, when the environment names an emulator that
+    // reorders text itself.
+    let chrome = HELP_CHROME + if view.reorders { 3 } else { 0 };
     let entries: Vec<(String, String)> = crate::footer::reference(view)
         .iter()
         .map(|hint| crate::hints::key_and_words(hint))
@@ -423,16 +456,24 @@ fn help_table(frame: Rect, view: &View<'_>, scroll: usize) -> HelpTable {
         .unwrap_or(0);
     let visible = entries
         .len()
-        .min(usize::from(frame.height.saturating_sub(2 + HELP_CHROME)))
+        .min(usize::from(frame.height.saturating_sub(2 + chrome)))
         .max(1)
         .min(entries.len());
     let first = scroll.min(entries.len() - visible);
     let close = crate::hints::line("tui.help.close", &[], Some(Color::Reset)).width();
     let title = width_of(&stt_client::text(help_title(screen), &[]));
-    let content = (key_width + HELP_GAP + words_width).max(close).max(title);
+    let notice = if view.reorders {
+        width_of(&notice_lines().0)
+    } else {
+        0
+    };
+    let content = (key_width + HELP_GAP + words_width)
+        .max(close)
+        .max(title)
+        .max(notice);
     // The borders and a column of padding inside each.
     let width = (content as u16 + 4).min(frame.width);
-    let height = (visible as u16 + HELP_CHROME).min(frame.height);
+    let height = (visible as u16 + chrome).min(frame.height);
     HelpTable {
         area: Rect {
             x: frame.x + (frame.width - width) / 2,
@@ -2856,15 +2897,29 @@ fn draw_transcript(frame: &mut Frame, area: Rect, view: &View<'_>, transcript: &
     let mut blocks: Vec<(u16, usize)> = Vec::new();
     // The segments counted over the turns, as the cursor counts them.
     let mut flat = 0usize;
+    let turn_texts: Vec<String> = turns
+        .turns
+        .iter()
+        .map(|turn| {
+            turn.segments
+                .iter()
+                .map(|segment| segment.text.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
+    let directions = stt_client::direction::turn_directions(
+        &turn_texts.iter().map(String::as_str).collect::<Vec<_>>(),
+    );
     for (turn_index, turn) in turns.turns.iter().enumerate() {
         let wrapped = turn_rows(
             view,
             transcript,
             turn_index,
             flat,
-            current,
             playing,
             inner.width,
+            directions[turn_index],
         );
         flat += turn.segments.len();
         blocks.push((wrapped.len() as u16, turn.segments.len().max(1)));
@@ -2912,22 +2967,23 @@ fn draw_transcript(frame: &mut Frame, area: Rect, view: &View<'_>, transcript: &
 }
 
 /// Turn `turn_index`'s rows, `width` columns wide: its speaker's name in the speaker's tint, then
-/// its segments - the cursor's (`current`) highlighted and the playhead's (`playing`) in the
-/// accent, each with its box while segments are marked - and its time under the name; each
-/// character carries the segment it shows, counted from `first`, the turn's first segment as the
-/// cursor counts them.
+/// its segments - the cursor's highlighted and the playhead's (`playing`) in the accent, each with
+/// its box while segments are marked - and its time under the name; each character carries the
+/// segment it shows, counted from `first`, the turn's first segment as the cursor counts them.
+/// The turn's `direction` orders each row (roadmap item 76): an RTL turn is mirrored.
 fn turn_rows(
     view: &View<'_>,
     transcript: &Transcript,
     turn_index: usize,
     first: usize,
-    current: Option<(usize, usize)>,
     playing: Option<(usize, usize)>,
     width: u16,
+    direction: Option<stt_client::direction::Direction>,
 ) -> Vec<Vec<Glyph>> {
     let turns = &transcript.turns;
     let turn = &turns.turns[turn_index];
     let marking = transcript.marking();
+    let current = transcript.position();
     let name = turns
         .speakers
         .iter()
@@ -2988,14 +3044,37 @@ fn turn_rows(
             Some(flat),
         ));
     }
-    let header: Vec<Glyph> = glyphs_of(&[
-        (clock_style, time),
-        (Style::new(), "  ".to_string()),
-        (tint, name.to_string()),
-    ])
-    .collect();
+    let rtl = direction == Some(stt_client::direction::Direction::Rtl);
+    let base = if rtl {
+        stt_client::direction::Direction::Rtl
+    } else {
+        stt_client::direction::Direction::Ltr
+    };
+    // The speaker's name in its own direction, placed by the turn (as the browser isolates it).
+    let name: Vec<Glyph> = visual_order(
+        glyphs_of(&[(tint, name.to_string())]).collect(),
+        stt_client::direction::standalone_direction(name),
+    );
+    let gap: Vec<Glyph> = glyphs_of(&[(Style::new(), "  ".to_string())]).collect();
+    let clock: Vec<Glyph> = glyphs_of(&[(clock_style, time)]).collect();
+    let header = header_row(name, gap, clock, width, rtl);
     let mut wrapped = vec![header];
-    wrapped.extend(wrap_tagged(&runs, width, &indent, &indent));
+    for row in wrap_tagged(&runs, width, &indent, &indent) {
+        let content: Vec<Glyph> = row.into_iter().skip(after_time).collect();
+        let ordered = visual_order(content, base);
+        let blank = (Style::new(), " ".to_string(), None);
+        let mut line = Vec::new();
+        if rtl {
+            let pad = (width as usize).saturating_sub(after_time + glyphs_width(&ordered));
+            line.extend(std::iter::repeat_n(blank.clone(), pad));
+            line.extend(ordered);
+            line.extend(std::iter::repeat_n(blank, after_time));
+        } else {
+            line.extend(std::iter::repeat_n(blank, after_time));
+            line.extend(ordered);
+        }
+        wrapped.push(line);
+    }
     wrapped
 }
 
@@ -3160,6 +3239,43 @@ fn glyphs_of(parts: &[(Style, String)]) -> impl Iterator<Item = Glyph> + '_ {
     parts.iter().flat_map(|(style, text)| {
         crate::graphemes::of(text).map(move |cluster| (*style, cluster.to_string(), None))
     })
+}
+
+/// `glyphs` in the order the terminal draws them: its runs ordered by the Unicode bidi algorithm
+/// with `base` as the paragraph's direction, a paired bracket in a right-to-left run mirrored
+/// (roadmap item 76).
+fn visual_order(glyphs: Vec<Glyph>, base: stt_client::direction::Direction) -> Vec<Glyph> {
+    crate::bidi::visual(
+        glyphs,
+        |glyph| glyph.1.as_str(),
+        |glyph, mirrored| glyph.1 = mirrored,
+        base,
+    )
+}
+
+/// The turn's header row, `width` columns wide: its time and its speaker's name, the name in its
+/// own direction and the two placed by the turn's - an RTL turn's against the right edge, padded
+/// on the left, an LTR turn's from the left.
+fn header_row(
+    name: Vec<Glyph>,
+    gap: Vec<Glyph>,
+    clock: Vec<Glyph>,
+    width: u16,
+    rtl: bool,
+) -> Vec<Glyph> {
+    let (parts, padded) = if rtl {
+        ([name, gap, clock], true)
+    } else {
+        ([clock, gap, name], false)
+    };
+    let mut row = parts.concat();
+    if padded {
+        let pad = (width as usize).saturating_sub(glyphs_width(&row));
+        let mut padded_row = vec![(Style::new(), " ".to_string(), None); pad];
+        padded_row.extend(row);
+        row = padded_row;
+    }
+    row
 }
 
 /// The columns `text` takes on screen: two for each wide (CJK, emoji) character, none for a

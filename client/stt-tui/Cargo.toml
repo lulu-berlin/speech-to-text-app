@@ -34,6 +34,7 @@ unicode-width = "0.2"
 # its combining marks, a Devanagari syllable, an emoji sequence - is one character to truncate and to
 # erase.
 unicode-segmentation = "1"
+unicode-bidi = "0.3"
 
 [dev-dependencies]
 # The TUI's tests run the real binary in a pseudo-terminal (a Unix pty, a Windows ConPTY) and read

@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "ਮੁੜ-ਨਿਰਧਾਰਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ: {error}",
   "tui.segment.editPrompt": "ਹਿੱਸੇ ਦਾ ਟੈਕਸਟ: {text}",
   "tui.segment.editFailed": "ਸੋਧਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ: {error}",
-  "tui.segment.revertFailed": "ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਿਆ: {error}"
+  "tui.segment.revertFailed": "ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਿਆ: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

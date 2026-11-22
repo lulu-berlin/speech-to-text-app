@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "화자를 다시 지정하지 못했습니다: {error}",
   "tui.segment.editPrompt": "구간 텍스트: {text}",
   "tui.segment.editFailed": "편집하지 못했습니다: {error}",
-  "tui.segment.revertFailed": "되돌리지 못했습니다: {error}"
+  "tui.segment.revertFailed": "되돌리지 못했습니다: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

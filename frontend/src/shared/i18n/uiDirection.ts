@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { TextDirection } from './uiLocales';
+import type { TextDirection } from '../textDirection';
 
 // The app's UI direction (item 88): the shell and its Radix-based controls (the seek slider,
 // the per-task menus) follow it, so an RTL app language mirrors them. The default is LTR for

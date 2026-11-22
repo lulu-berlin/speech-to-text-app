@@ -33,6 +33,7 @@ use crate::state::{Page, Screen};
 use crate::transcript::Transcript;
 use crate::upload_dialog::UploadDialog;
 
+mod bidi;
 mod browser;
 mod choices;
 mod download;
@@ -391,6 +392,9 @@ struct Ui {
     history_offset: std::cell::Cell<usize>,
     /// The footer hints a click performs, as the last frame drew them.
     footer_hits: std::cell::RefCell<Vec<view::FooterHint>>,
+    /// Whether the environment names an emulator that reorders text itself: the key reference
+    /// then adds the notice that its setting must be off.
+    reorders: bool,
 }
 
 impl Ui {
@@ -435,6 +439,7 @@ impl Ui {
             queue_offset: std::cell::Cell::new(0),
             history_offset: std::cell::Cell::new(0),
             footer_hits: std::cell::RefCell::new(Vec::new()),
+            reorders: view::reorders_text(),
         }
     }
 
@@ -815,6 +820,7 @@ impl Ui {
             queue_offset: &self.queue_offset,
             history_offset: &self.history_offset,
             footer_hits: &self.footer_hits,
+            reorders: self.reorders,
         }
     }
 

@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "gán lại thất bại: {error}",
   "tui.segment.editPrompt": "Văn bản đoạn: {text}",
   "tui.segment.editFailed": "sửa thất bại: {error}",
-  "tui.segment.revertFailed": "hoàn nguyên thất bại: {error}"
+  "tui.segment.revertFailed": "hoàn nguyên thất bại: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

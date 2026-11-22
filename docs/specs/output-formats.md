@@ -38,7 +38,7 @@ Diarized formats (port of oracle `write_diarized_outputs`). Labels are the task'
   - txt: one trimmed segment text per line, no speaker lines, ending with a single `\n`;
   - srt: one numbered cue per non-blank segment, `{i}\n{start} --> {end}\n{text}\n\n`; a segment whose trimmed text is empty gets no cue and the numbering has no gap (decided 2026-10-09);
   - vtt: `WEBVTT\n\n`, then one cue per non-blank segment, `{start} --> {end}\n{text}\n\n` (the header stays even when every segment is blank, since only zero segments is no speech);
-- **Download file names** (decided 2026-10-09): `<original filename stem>.<format>`, like the oracle's output prefix (`interview.mp3` → `interview.srt`). This item provides the name; item 12 sends it in `Content-Disposition`.
+- **Download file names** (decided 2026-10-09): `<original filename stem>.<format>`, like the oracle's output prefix (`interview.mp3` → `interview.srt`). This item provides the name; item 12 sends it in `Content-Disposition`. Since item 76 (2026-11-25) the header is `attachment; filename="<ASCII fallback>"; filename*=UTF-8''<name, percent-encoded UTF-8>` (RFC 6266/5987): a browser ignores raw UTF-8 in `filename=` (an Arabic name was saved as `transcript.txt`), so `filename*` carries the name exactly, and the fallback has each non-ASCII character, `"` and `\` as `_`.
 
 ## Open questions (answered 2026-10-09)
 

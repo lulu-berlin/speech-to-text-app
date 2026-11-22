@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "वक्ता बदलता आले नाही: {error}",
   "tui.segment.editPrompt": "विभागाचा मजकूर: {text}",
   "tui.segment.editFailed": "संपादन अयशस्वी: {error}",
-  "tui.segment.revertFailed": "पूर्वस्थितीत आणता आले नाही: {error}"
+  "tui.segment.revertFailed": "पूर्वस्थितीत आणता आले नाही: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

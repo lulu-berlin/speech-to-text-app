@@ -848,16 +848,22 @@ pub fn open_transcript_with(turns: &str) -> OpenTranscript {
 
 /// Opens `interview.mp3`'s transcript, its turns read as `turns`, in a terminal `cols` wide.
 pub fn open_transcript_sized(turns: &str, cols: u16) -> OpenTranscript {
+    open_transcript_sized_on(turns, cols, &[])
+}
+
+/// [`open_transcript_sized`] with `env` set on the TUI, for a transcript that plays on a sink.
+pub fn open_transcript_sized_on(turns: &str, cols: u16, env: &[(&str, &str)]) -> OpenTranscript {
     const SNAPSHOT: &str = include_str!("../../../../docs/api/snapshot.json");
     const WAIT: Duration = Duration::from_secs(20);
     let service = EventService::start();
     let state = tempfile::tempdir().unwrap();
     crate::support::write_bootstrap(state.path(), service.port);
-    let mut tui = Tui::start(
+    let mut tui = Tui::start_with_env(
         env!("CARGO_BIN_EXE_stt-tui").as_ref(),
         state.path(),
         cols,
         24,
+        env,
     );
     let mut stream = service.next_stream(WAIT);
     stream.send("snapshot", SNAPSHOT);

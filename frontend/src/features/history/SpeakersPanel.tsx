@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useIntl } from 'react-intl';
+import { useEffect, type ReactNode } from 'react';
+import { FormattedMessage, useIntl } from 'react-intl';
 import { useMachine } from '@xstate/react';
 import styled from 'styled-components';
 import type { TurnSpeaker } from '../../shared/api/types';
@@ -10,7 +10,9 @@ import { Button } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { controlStyle } from '../../shared/ui/controlStyle';
 import { Row, Stack } from '../../shared/ui/layout';
+import { IsolatedText } from '../../shared/ui/IsolatedText';
 import { Text } from '../../shared/ui/typography';
+import { standaloneDirection } from '../../shared/textDirection';
 import { speakerRenameMachine } from './speakerRenameMachine';
 import { resetMergesMachine, speakerMergeMachine } from './speakerMergeMachine';
 
@@ -42,15 +44,20 @@ const ErrorText = styled(Text)`
 
 // "A", "A and B", "A, B and C" in English, as the catalog reads today; every other locale gets
 // its own conjunction from Intl (zh `A、B和C`, fr `A, B et C`), so the confirmation never shows
-// an English "and" inside a translated sentence.
-function joinNames(names: string[], locale: string): string {
-  if (names.length <= 1) {
-    return names.join('');
-  }
-  if (locale.toLowerCase().startsWith('en')) {
-    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-  }
-  return new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
+// an English "and" inside a translated sentence. Each name is an isolated element in its own
+// direction (item 76), so it cannot reorder the sentence around it.
+function joinNames(names: string[], locale: string): ReactNode[] {
+  const parts: { type: string; value: string }[] = locale.toLowerCase().startsWith('en')
+    ? names.flatMap((value, index) => [
+        ...(index === 0
+          ? []
+          : [{ type: 'literal', value: index === names.length - 1 ? ' and ' : ', ' }]),
+        { type: 'element', value },
+      ])
+    : new Intl.ListFormat(locale, { type: 'conjunction' }).formatToParts(names);
+  return parts.map((part, index) =>
+    part.type === 'element' ? <IsolatedText key={index} text={part.value} /> : part.value,
+  );
 }
 
 // The speakers panel above the transcript (item 22): one editable name per effective
@@ -141,7 +148,7 @@ export function SpeakersPanel({
                   checked={group.includes(speaker.speakerId)}
                   onChange={() => mergeSend({ type: 'TOGGLE', speakerId: speaker.speakerId })}
                 />
-                {speaker.speaker}
+                <IsolatedText text={speaker.speaker} />
               </label>
             ))}
             <label>
@@ -154,7 +161,11 @@ export function SpeakersPanel({
                 }
               >
                 {group.map((speakerId) => (
-                  <option key={speakerId} value={String(speakerId)}>
+                  <option
+                    key={speakerId}
+                    value={String(speakerId)}
+                    dir={standaloneDirection(nameOf(speakerId))}
+                  >
                     {nameOf(speakerId)}
                   </option>
                 ))}
@@ -192,7 +203,13 @@ export function SpeakersPanel({
         onConfirm={() => mergeSend({ type: 'CONFIRM' })}
         onCancel={() => mergeSend({ type: 'CANCEL' })}
       >
-        {t('transcript.speakers.mergeBody', { names: joinNames(folded, intl.locale), survivor })}
+        <FormattedMessage
+          id="transcript.speakers.mergeBody"
+          values={{
+            names: joinNames(folded, intl.locale),
+            survivor: <IsolatedText text={survivor} />,
+          }}
+        />
       </ConfirmDialog>
     </section>
   );
@@ -229,6 +246,7 @@ function SpeakerNameField({ taskId, speaker, disabled, onSpeakersChanged }: Spea
           type="text"
           aria-label={t('transcript.speakers.nameLabel', { number: speaker.speakerId + 1 })}
           value={state.context.draft}
+          dir={standaloneDirection(state.context.draft)}
           disabled={disabled || state.matches('sending') || writes.disabled}
           title={writes.title}
           onChange={(event) => send({ type: 'EDIT', value: event.target.value })}

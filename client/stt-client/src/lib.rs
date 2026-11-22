@@ -12,6 +12,7 @@ use serde::de::DeserializeOwned;
 
 mod autostart;
 mod commands;
+pub mod direction;
 mod events;
 mod quote;
 mod read;

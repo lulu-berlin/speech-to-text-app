@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "পুনরায় বরাদ্দ করা যায়নি: {error}",
   "tui.segment.editPrompt": "অংশের লেখা: {text}",
   "tui.segment.editFailed": "সম্পাদনা করা যায়নি: {error}",
-  "tui.segment.revertFailed": "পূর্বাবস্থায় ফিরিয়ে আনা যায়নি: {error}"
+  "tui.segment.revertFailed": "পূর্বাবস্থায় ফিরিয়ে আনা যায়নি: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

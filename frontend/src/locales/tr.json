@@ -386,5 +386,6 @@
   "tui.speakers.reassignFailed": "yeniden atama başarısız: {error}",
   "tui.segment.editPrompt": "Segment metni: {text}",
   "tui.segment.editFailed": "düzenleme başarısız: {error}",
-  "tui.segment.revertFailed": "geri alma başarısız: {error}"
+  "tui.segment.revertFailed": "geri alma başarısız: {error}",
+  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
 }

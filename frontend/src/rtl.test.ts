@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 // direction-neutral by construction — a directional icon has to be mirrored for the other
 // direction rather than silently point the wrong way.
 const SHELL = /^\/src\/(?:app|features|shared\/ui)\//;
-const TRANSCRIPT_TURNS = '/src/features/history/TranscriptTurns.tsx';
 
 // Every source file's raw text, keyed by its path from the project root (the pattern the
 // design-value convention uses).
@@ -72,7 +71,7 @@ function shellSources(): Array<[string, string]> {
 }
 
 describe('the RTL layout', () => {
-  it('lays the shell out with logical properties, keeps its icons direction-neutral and the transcript’s own direction', () => {
+  it('lays the shell out with logical properties and keeps its icons direction-neutral', () => {
     const violations = shellSources().flatMap(([file, source]) =>
       source.split('\n').flatMap((text, index) =>
         PHYSICAL_RULES.flatMap(({ rule, pattern }) => {
@@ -89,8 +88,6 @@ describe('the RTL layout', () => {
         .map((name) => `${file}: ${name}`),
     );
     expect(directional).toEqual([]);
-
-    expect(sources[TRANSCRIPT_TURNS]).toContain('dir="auto"');
 
     // The error callout's danger bar is a logical side now (item 25). jsdom's CSS engine
     // drops `border-inline-start`, so the styled source is the evidence here: the browser

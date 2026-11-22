@@ -28,6 +28,7 @@ import { ThemedProviders } from '../../test/render';
 import languages from '../../../../docs/api/languages.json';
 import uiText from '../../locales/en.json';
 import spanishMessages from '../../locales/es-ES.json';
+import arabicMessages from '../../locales/ar.json';
 import settingsFallback from '../../../../docs/api/settings.fallback.json';
 import settingsFixed from '../../../../docs/api/settings.fixed.json';
 import settingsUpdatedFallback from '../../../../docs/api/settings-updated.fallback.json';
@@ -115,6 +116,13 @@ class TestXhr {
   abort(): void {
     this.aborted += 1;
     this.onabort?.();
+  }
+}
+
+// A fake XHR that reports 50% sent and never completes, so the row stays uploading.
+class StalledXhr extends TestXhr {
+  send(): void {
+    this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 });
   }
 }
 
@@ -470,12 +478,6 @@ describe('the queue view upload flow', () => {
   });
 
   it("gives an uploading file's progress bar a fixed width beside the filename, and the full row width on a phone", async () => {
-    // A fake XHR that reports 50% sent and never completes, so the row stays uploading.
-    class StalledXhr extends TestXhr {
-      send(): void {
-        this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 });
-      }
-    }
     vi.stubGlobal('XMLHttpRequest', StalledXhr);
     try {
       renderQueue();
@@ -948,13 +950,15 @@ describe('task controls', () => {
     expect(screen.queryByText('memo.wav')).not.toBeInTheDocument();
 
     // A running task asks for confirmation first.
-    const lecture = screen.getByText('lecture.m4a').closest('li') as HTMLElement;
+    const lecture = screen
+      .getByText('lecture.m4a', { selector: 'li *' })
+      .closest('li') as HTMLElement;
     fireEvent.click(within(lecture).getByRole('button', { name: 'Cancel lecture.m4a' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Cancel lecture.m4a?')).toBeInTheDocument();
+    expect(dialog).toHaveAccessibleName('Cancel lecture.m4a?');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel task' }));
     await waitFor(() => expect(canceled).toEqual(['7', '5']));
-    expect(screen.queryByText('lecture.m4a')).not.toBeInTheDocument();
+    expect(screen.queryByText('lecture.m4a', { selector: 'li *' })).not.toBeInTheDocument();
 
     // A paused task that has started also asks for confirmation.
     events.send('task-updated', { ...taskPaused, id: 9, filename: 'notes.mp3' });
@@ -1303,6 +1307,11 @@ describe('the queue pause', () => {
 });
 
 describe('finished tasks', () => {
+  // A finish notice by its whole text: the filename inside it is an isolated element (item 76),
+  // so the sentence spans several nodes.
+  const notice = (text: RegExp) => (_: string, element: Element | null) =>
+    element?.tagName === 'SPAN' && text.test(element.textContent ?? '');
+
   it('shows a notice with a link when a task leaves the queue finished, and the row leaves', async () => {
     const events = controllableEventStream();
     renderQueue();
@@ -1311,7 +1320,7 @@ describe('finished tasks', () => {
     // RUNNING -> COMPLETED: a transcript link.
     events.send('task-updated', { ...taskCompleted, id: 5, filename: 'lecture.m4a' });
     await screen.findByRole('link', { name: 'open' });
-    expect(screen.getByText(/lecture\.m4a transcribed/)).toBeInTheDocument();
+    expect(screen.getByText(notice(/lecture\.m4a transcribed/))).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'open' })).toHaveAttribute('href', '/history/5');
 
     // A fresh task, queued -> running -> failed (transitions stay in the table): a
@@ -1322,14 +1331,14 @@ describe('finished tasks', () => {
     await screen.findByText('notes.mp3');
     events.send('task-updated', { ...taskRunning, id: 9, filename: 'notes.mp3' });
     events.send('task-updated', { ...taskFailed, id: 9, filename: 'notes.mp3' });
-    await screen.findByText(/notes\.mp3 failed/);
+    await screen.findByText(notice(/notes\.mp3 failed/));
 
     // Queued -> canceled (another fresh task): a History link too.
     events.send('task-updated', { ...taskQueued, id: 10, filename: 'draft.wav' });
     events.send('queue-updated', { ...queueFixture, taskIds: [7, 10] });
     await screen.findByText('draft.wav');
     events.send('task-updated', { ...taskCanceled, id: 10, filename: 'draft.wav' });
-    await screen.findByText(/draft\.wav canceled/);
+    await screen.findByText(notice(/draft\.wav canceled/));
 
     // Every finished task's notice links to History (completed links to its transcript).
     const historyLinks = screen.getAllByRole('link', { name: 'see History' });
@@ -1541,5 +1550,71 @@ describe('shared UI text', () => {
     renderQueue();
     expect(screen.getByRole('heading', { name: uiText['queue.title'] })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: uiText['queue.uploadOptions'] })).toBeInTheDocument();
+  });
+});
+
+describe('filenames in their own direction', () => {
+  it('shows a filename in its own direction in an upload row, and isolated in the cancel dialog and the finish notice', async () => {
+    // Item 76: a filename is user content — an uploading row's name takes its first letter's
+    // direction, and inside a sentence (the cancel dialog's title, the finish notice) the name is
+    // an isolated element in its own direction, so the sentence reads as written.
+    vi.stubGlobal('XMLHttpRequest', StalledXhr);
+    const events = controllableEventStream();
+    try {
+      renderQueue();
+      await screen.findByText('lecture.m4a');
+      await waitForUploadsEnabled();
+      fireEvent.drop(screen.getByRole('button', { name: /drop/i }), {
+        dataTransfer: { files: [new File(['x'], 'محاضرة.mp3', { type: 'audio/mpeg' })] },
+      });
+      const uploads = screen.getByRole('list', { name: 'Uploads' });
+      const uploading = await within(uploads).findByText('محاضرة.mp3');
+      expect(getComputedStyle(uploading).direction).toBe('rtl');
+
+      events.send('task-updated', { ...taskPaused, id: 9, filename: 'درس الأحد.m4a' });
+      events.send('queue-updated', { ...queueFixture, taskIds: [9] });
+      const row = (await screen.findByText('درس الأحد.m4a')).closest('li') as HTMLElement;
+      fireEvent.click(within(row).getByRole('button', { name: 'Cancel درس الأحد.m4a' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Cancel درس الأحد.m4a?' });
+      const inTitle = within(dialog).getByText('درس الأحد.m4a');
+      expect(inTitle.tagName).toBe('BDI');
+      expect(getComputedStyle(inTitle).direction).toBe('rtl');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      events.send('task-updated', { ...taskCompleted, id: 9, filename: 'درس الأحد.m4a' });
+      await screen.findByRole('link', { name: 'open' });
+      const inNotice = screen.getByText('درس الأحد.m4a', { selector: 'bdi' });
+      expect(getComputedStyle(inNotice).direction).toBe('rtl');
+      expect(required(inNotice.parentElement)).toHaveTextContent('درس الأحد.m4a transcribed —');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('shows a filename with no letter as ltr in the queue and upload rows, even under an RTL app language', async () => {
+    // Item 76: a standalone filename with no letter falls back to LTR, not to the app language.
+    vi.stubGlobal('XMLHttpRequest', StalledXhr);
+    const events = controllableEventStream();
+    try {
+      // The shell sets the document's direction from the app language (SettingsLocaleProvider);
+      // the queue rendered alone has no shell, so the Arabic shell's rtl is set here.
+      document.documentElement.dir = 'rtl';
+      renderQueue(arabicMessages, 'ar');
+      await screen.findByText('lecture.m4a');
+
+      events.send('task-updated', { ...taskQueued, id: 9, filename: '١٢٣' });
+      events.send('queue-updated', { ...queueFixture, taskIds: [9] });
+      expect(getComputedStyle(await screen.findByText('١٢٣')).direction).toBe('ltr');
+
+      const input = required(document.querySelector<HTMLInputElement>('input[type="file"]'));
+      await waitFor(() => expect(input).toBeEnabled());
+      fireEvent.change(input, {
+        target: { files: [new File(['x'], '٢٠٢٥', { type: 'audio/mpeg' })] },
+      });
+      expect(getComputedStyle(await screen.findByText('٢٠٢٥')).direction).toBe('ltr');
+    } finally {
+      vi.unstubAllGlobals();
+      document.documentElement.dir = '';
+    }
   });
 });

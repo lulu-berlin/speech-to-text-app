@@ -4,7 +4,7 @@ Status: spec-approved
 Depends on: [49](../docs/specs/windows-support.md), [52](../docs/specs/edit-transcription.md),
 [65](../docs/specs/row-color-phase-observation.md), [68](../docs/specs/windows-audio-only-ffmpeg.md),
 [69](../docs/specs/macos-audio-only-ffmpeg.md), [72](../docs/specs/frontend-state-and-errors.md),
-[74](../docs/specs/desktop-presentation.md), [76](76-right-to-left-transcription.md),
+[74](../docs/specs/desktop-presentation.md), [76](../docs/specs/right-to-left-transcription.md),
 [77](../docs/specs/test-harness-temp-dirs.md), [79](../docs/specs/windows-e2e-journey.md),
 [84](../docs/specs/e2e-reliability.md), [87](../docs/specs/writes-and-the-connection.md) — the gates
 proposed below — and the six MED known issues listed under Evidence, which no roadmap item handles
