@@ -59,4 +59,6 @@ copies a computed value into an expected value.
   and [`refactor-asks-the-user`](../../.omp/rules/refactor-asks-the-user.md)) check the agent's
   suggestions: a refactor suggestion or the next-test proposal must carry the make-it-right
   outcome, and the next-test proposal the refactor outcome; a warning, not an interrupt. They fire
-  on the suggestions, not on every green mention (2026-11-21).
+  only on a proposal line (the condition is anchored to the line start) and ask about the agent's
+  own proposal, not a prompt, review or quote describing one; the leftover single rule is removed
+  (2026-11-21, 2026-11-22).
