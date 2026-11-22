@@ -1,8 +1,8 @@
 ---
 name: refactor-asks-the-user
 description: "The next-test proposal carries the green cycle's refactor outcome: the user's answer, or 'no refactoring suggested' with the reason"
-condition: ["(?i)(next test|propose the next)"]
-question: "Does this output suggest the next test without the refactor outcome in it — the user's answer, or 'no refactoring suggested' with the reason?"
+condition: ["(?im)^\\s*(?:\\*\\*)?next test"]
+question: "Does this output, as the agent's own next-test proposal (not a prompt, a review or a quote describing one), suggest the next test without the refactor outcome in it — the user's answer, or 'no refactoring suggested' with the reason?"
 scope: ["text"]
 agents: main
 repeatMode: always

@@ -1,8 +1,8 @@
 ---
 name: make-it-right-asks-the-user
 description: "A refactor suggestion or the next-test proposal carries the green cycle's make-it-right outcome: the user's choices among the proposed improvements, or 'nothing to improve' with the reason"
-condition: ["(?i)(refactor|next test|propose the next)"]
-question: "Does this output suggest a refactor or the next test without the make-it-right outcome in it — the user's choices among the concrete improvements, or 'nothing to improve' with the reason?"
+condition: ["(?im)^\\s*(?:\\*\\*)?(?:next test|refactor(?: suggestions?|:)|i suggest (?:a |the )?refactor)"]
+question: "Does this output, as the agent's own proposal for its next step (not a prompt, a review or a quote describing one), suggest a refactor or the next test without the make-it-right outcome in it — the user's choices among the concrete improvements, or 'nothing to improve' with the reason?"
 scope: ["text"]
 agents: main
 repeatMode: always
