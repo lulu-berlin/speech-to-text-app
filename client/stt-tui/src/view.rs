@@ -3656,7 +3656,9 @@ fn draw_edit_prompt(
     paragraph: Option<stt_client::direction::Direction>,
 ) {
     use stt_client::direction::{Direction, letter_direction};
-    let label_width = prefix_width("tui.segment.editPrompt", "text");
+    // The catalog template ends in its draft: the label is the template with the draft empty.
+    let label = stt_client::text("tui.segment.editPrompt", &[("text", "")]);
+    let label_width = u16::try_from(text_width(&label)).unwrap_or(u16::MAX);
     let field_width = usize::from(area.width.saturating_sub(label_width));
     let field = if view.no_color {
         Style::new()
@@ -3698,10 +3700,7 @@ fn draw_edit_prompt(
         .iter()
         .position(|glyph| glyph.2.is_some())
         .map_or(0, |index| glyphs_width(&probed[..index]));
-    let mut line = vec![Span::raw(stt_client::text(
-        "tui.segment.editPrompt",
-        &[("text", "")],
-    ))];
+    let mut line = vec![Span::raw(label)];
     line.extend(spans_of(&laid_out(glyphs_of(&[(field, shown)]).collect())));
     frame.render_widget(Paragraph::new(Line::from(line)), area);
     cursor(
