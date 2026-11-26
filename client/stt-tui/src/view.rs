@@ -2894,20 +2894,7 @@ fn draw_transcript(frame: &mut Frame, area: Rect, view: &View<'_>, transcript: &
     let mut blocks: Vec<(u16, usize)> = Vec::new();
     // The segments counted over the turns, as the cursor counts them.
     let mut flat = 0usize;
-    let turn_texts: Vec<String> = turns
-        .turns
-        .iter()
-        .map(|turn| {
-            turn.segments
-                .iter()
-                .map(|segment| segment.text.as_str())
-                .collect::<Vec<_>>()
-                .join(" ")
-        })
-        .collect();
-    let directions = stt_client::direction::turn_directions(
-        &turn_texts.iter().map(String::as_str).collect::<Vec<_>>(),
-    );
+    let directions = transcript.paragraph_directions();
     for (turn_index, turn) in turns.turns.iter().enumerate() {
         let wrapped = turn_rows(
             view,
