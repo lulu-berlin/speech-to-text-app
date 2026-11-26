@@ -173,36 +173,32 @@ fn the_rename_prompt_draws_an_rtl_name_in_visual_order_with_the_cursor_where_typ
     tui.wait_for(WAIT, |text| text.contains("أحمد"));
     tui.press(b"r");
     let label = "Rename: ";
-    let field = 80 - label.chars().count();
-    let right_aligned = |name: &str| {
-        let width = name.chars().count();
-        (
-            format!("{label}{}{name}", " ".repeat(field - width)),
-            label.chars().count() + field - width - 1,
-        )
-    };
-    let (cells, column) = right_aligned(&reversed("أحمد"));
+    let (cells, column) = right_aligned(label, &reversed("أحمد"));
     tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
 
     // Retyped with a Latin first letter, the name is left to right again, the cursor after it.
     erase(&mut tui, "أحمد");
     tui.press(b"Sam");
     let cells = format!("{label}Sam");
-    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 8 + 3));
+    tui.wait_for_screen(WAIT, |screen| {
+        prompt_shows(screen, &cells, cells.chars().count())
+    });
 
     // A name without a letter is left to right, as a standalone name is: it does not take a
     // paragraph's direction.
     erase(&mut tui, "Sam");
     tui.press(b"12");
     let cells = format!("{label}12");
-    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 8 + 2));
+    tui.wait_for_screen(WAIT, |screen| {
+        prompt_shows(screen, &cells, cells.chars().count())
+    });
 
     // Digits first and then Arabic: the first letter makes the name RTL. Read from the right, `12`
     // comes first in its own order, then `د.` and `أحمد` - so left to right the cells hold the
     // Arabic part reversed and then ` 12`.
     erase(&mut tui, "12");
     tui.press("12 د. أحمد".as_bytes());
-    let (cells, column) = right_aligned(&format!("{} 12", reversed("د. أحمد")));
+    let (cells, column) = right_aligned(label, &format!("{} 12", reversed("د. أحمد")));
     tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
 }
 
@@ -233,10 +229,17 @@ fn the_playing_segment_is_filled_in_an_rtl_row() {
     );
 }
 
-/// The edit prompt's label.
-const LABEL: &str = "Segment text: ";
-/// The prompt's field at 80 columns: the row after the label.
-const FIELD: usize = 80 - 14;
+/// A prompt's row at 80 columns - `label`, then `cells` (a right-to-left draft as drawn) against
+/// the row's end - and the cursor's column: the free cell left of them, where the next letter
+/// lands.
+fn right_aligned(label: &str, cells: &str) -> (String, usize) {
+    let width = cells.chars().count();
+    let blanks = 80 - label.chars().count() - width;
+    (
+        format!("{label}{}{cells}", " ".repeat(blanks)),
+        80 - width - 1,
+    )
+}
 
 /// Whether `screen` shows a prompt's row as `cells`, left to right from its label (its trailing
 /// blanks aside), with the cursor shown on that row at `column`.
@@ -275,54 +278,53 @@ fn the_edit_prompt_draws_a_hebrew_draft_in_visual_order_with_the_cursor_where_ty
 
     // The first segment's text replaced by a Hebrew one, as the user did: `e` opens the prompt on
     // the first segment's text, Backspace clears its characters, and the Hebrew is typed.
+    let label = "Segment text: ";
     let draft = "שלום רב מה שלומך";
     tui.press(b"e");
-    tui.wait_for(WAIT, |text| text.contains("Segment text: WHO:"));
+    tui.wait_for(WAIT, |text| text.contains(&format!("{label}WHO:")));
     erase(&mut tui, MIXED);
     tui.press(draft.as_bytes());
 
     // A draft that is all Hebrew is one right-to-left run, right-aligned in the field after the
     // label: the cells hold it reversed, against the row's end. Each new letter lands left of the
     // run, so the cursor sits on the free cell there.
-    let width = draft.chars().count();
-    let cells = format!("{LABEL}{}{}", " ".repeat(FIELD - width), reversed(draft));
-    tui.wait_for_screen(WAIT, |screen| {
-        prompt_shows(screen, &cells, 14 + FIELD - width - 1)
-    });
+    let (cells, column) = right_aligned(label, &reversed(draft));
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
 
     // Erased back and retyped with a Latin first letter, the draft is left to right again, from
     // the field's start; its Arabic run is reversed in place, and the next Arabic letter lands at
     // that run's left end, so the cursor sits on the run's first cell.
     erase(&mut tui, draft);
     tui.press("WHO: مرحبا".as_bytes());
-    let cells = format!("{LABEL}WHO: {}", reversed("مرحبا"));
-    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 14 + 5));
+    let cells = format!("{label}WHO: {}", reversed("مرحبا"));
+    tui.wait_for_screen(WAIT, |screen| {
+        prompt_shows(screen, &cells, label.chars().count() + 5)
+    });
 
     // A draft wider than the field shows its end, the part being typed: its start is cut behind a
     // `…`, which a right-to-left draft shows at the right; one cell stays free for the cursor.
     erase(&mut tui, "WHO: مرحبا");
     let long = [draft; 5].join(" ");
     tui.press(long.as_bytes());
+    let field = 80 - label.chars().count();
     let tail: String = long
         .chars()
-        .skip(long.chars().count() - (FIELD - 2))
+        .skip(long.chars().count() - (field - 2))
         .collect();
-    let cells = format!("{LABEL} {}…", reversed(&tail));
-    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 14));
+    let (cells, column) = right_aligned(label, &format!("{}…", reversed(&tail)));
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
 
     // A draft without a letter takes its paragraph's direction: in the Arabic turn, `2024` is
     // right-aligned, the cursor left of it.
     tui.press(b"\x1b");
-    tui.wait_for(WAIT, |text| !text.contains(LABEL));
+    tui.wait_for(WAIT, |text| !text.contains(label));
     let with_number = format!("{} 2024 {}", reversed("بدأنا"), reversed("في عام"));
     tui.press(b"j");
     tui.wait_for_highlight(WAIT, &with_number);
     tui.press(b"e");
-    tui.wait_for(WAIT, |text| text.contains(LABEL));
+    tui.wait_for(WAIT, |text| text.contains(label));
     erase(&mut tui, WITH_NUMBER);
     tui.press(b"2024");
-    let cells = format!("{LABEL}{}2024", " ".repeat(FIELD - 4));
-    tui.wait_for_screen(WAIT, |screen| {
-        prompt_shows(screen, &cells, 14 + FIELD - 4 - 1)
-    });
+    let (cells, column) = right_aligned(label, "2024");
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
 }
