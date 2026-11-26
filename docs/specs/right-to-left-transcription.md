@@ -235,6 +235,13 @@ chrome follow the app language, item 88.)
       of direction cases
 - [x] (discovered) A download of a task with a non-ASCII name (an RTL one included) keeps that name:
       the browser saves `محاضرة الأحد.txt`, not `transcript.txt`
+- [ ] (discovered) The TUI's segment edit prompt draws its draft in visual order after its label —
+      the draft's own first letter's direction, a draft without a letter its turn's, and with no
+      lettered turn the app language's — and the cursor sits where the next typed letter appears: a
+      Hebrew draft reads correctly on screen, not backwards
+- [ ] (discovered) The TUI's speaker rename prompt draws the name in visual order by its own first
+      letter, the cursor where the next typed letter appears (cycle 18's caret test, which asserted
+      the logical order, is corrected)
 
 ## Acceptance criteria
 
@@ -516,3 +523,9 @@ chrome follow the app language, item 88.)
 - 2026-11-25 (workspace, the user's choice): one discovered item added — a download of a task with
   a non-ASCII name keeps that name (the end-to-end download of cycle 13 found it saved as
   `transcript.txt`): 20 items.
+- 2026-11-26 (workspace, the user's choices): two discovered items added after the user's report
+  that a segment edited to Hebrew in the TUI (kitty, which applies no bidi) read backwards — the
+  edit prompt and the rename prompt draw their draft in visual order, the cursor where the next
+  typed letter appears (an RTL draft's leftmost cell): 22 items. The draft's direction is the
+  2026-11-25 editor rule; the prompt's label is chrome and stays left to right. The cycles go on
+  top of the prepared commit `8c5a430e` (PR #143), which the root agent re-squashes.
