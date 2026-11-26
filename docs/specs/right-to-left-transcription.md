@@ -242,12 +242,15 @@ chrome follow the app language, item 88.)
 - [x] (discovered) The TUI's speaker rename prompt draws the name in visual order by its own first
       letter, the cursor where the next typed letter appears (cycle 18's caret test, which asserted
       the logical order, is corrected)
-- [ ] (discovered) In kitty's default mode (`force_ltr no`, which turns each right-to-left word's
-      letters itself and keeps the words left to right), an opt-in TUI setting makes the TUI write
+- [ ] (discovered) For kitty's default mode (`force_ltr no`, which turns each right-to-left word's
+      letters itself and keeps the words left to right): with `STT_TUI_RTL_WORDS=1` the TUI writes
       each RTL word's letters in typed order while it orders the words and aligns the line, so the
-      text reads correctly and Arabic joins; the cursor, selection and clicks keep the drawn
-      positions; the `?` reference names `force_ltr yes` (or `kitty -o force_ltr=yes`) and the
-      setting when the environment names kitty
+      text reads correctly and Arabic joins; without it, rows are drawn as before
+- [ ] (discovered) With `STT_TUI_RTL_WORDS=1`, the cursor, the selection and a click keep the drawn
+      positions: they land on the word kitty shows there
+- [ ] (discovered) When the environment names kitty (`TERM=xterm-kitty` or `KITTY_WINDOW_ID`), the
+      `?` reference names `force_ltr yes` (or `kitty -o force_ltr=yes`) and `STT_TUI_RTL_WORDS=1`,
+      and a terminal that names neither shows no such line
 
 ## Acceptance criteria
 
@@ -574,3 +577,6 @@ chrome follow the app language, item 88.)
   correctly. A program can neither read nor set `force_ltr` (kitty's `query-terminal` does not
   answer it), so the user chose an opt-in TUI setting for kitty's default mode, with the `?`
   reference naming both: one discovered item, 23 items.
+- 2026-11-26 (workspace, the user's choices): the kitty mode is switched on with an environment
+  variable read at start, `STT_TUI_RTL_WORDS=1` (as `NO_COLOR` and `MLTERM` are read), and the
+  kitty item is split into three — the ordering, the positions, the `?` notice: 25 items.
