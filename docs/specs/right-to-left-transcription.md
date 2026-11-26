@@ -523,6 +523,24 @@ chrome follow the app language, item 88.)
   helper; `a1d6b969` `stt_client::direction::editor_direction` holds the editor rule; `398f29b5`
   `raised(view)` is the typed field's style for History's search and the prompts.
 
+- **Cycle 23 — 2026-11-26 — (discovered) kitty's default mode: each RTL word in typed order.**
+  Test: `client/stt-tui/tests/rtl_transcript.rs`
+  (`with_rtl_words_each_rtl_word_keeps_its_letters_in_typed_order`). Red at `b21fa355` with the
+  test uncommitted: with `STT_TUI_RTL_WORDS=1` the rows still held each Arabic word reversed. Green:
+  `b9602f3b` (the tree the green run was on) — client `cargo fmt --check`, `cargo clippy
+  --all-targets -- -D warnings`, `cargo test` green. Make it right (the user's choices, in the same
+  commit): the mode applies wherever the TUI orders text (the rows, a turn header's speaker name,
+  the edit and rename prompts, whose cursor stays counted in the visual order); a word is a run of
+  RTL letters with their marks, and digits, spaces and punctuation stay put (tested with an Arabic
+  comma and Hebrew niqqud); any value but empty or `0` switches the mode on (tested with `yes` and
+  `0`); the step is the named function `typed_words`. Found on the way and recorded in
+  `docs/known-issues.md` (`096362c7`), at the user's choice, rather than as an item: the Speakers
+  panel, History, the Queue and the transcript's title draw names unordered. Refactors (approved),
+  each green on its own tree (client fmt, clippy, `cargo test`): `a42f0a62` one `written(view, …)`
+  applies the mode; `37b3bcb2` `typed_words` moves to `bidi.rs`; `7617bba5` the tests build their
+  turns with `turns_of`. The item stays unticked until the user's check in kitty's default mode
+  (`force_ltr no`) with `STT_TUI_RTL_WORDS=1` shows the words reading correctly.
+
 ## Approval log
 
 - 2026-10-23: filed as a draft at the user's request (right-to-left writing systems in the
