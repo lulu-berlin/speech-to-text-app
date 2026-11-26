@@ -206,10 +206,11 @@
 
       # Each part's source holds only what its build reads: its own directory, docs/api (the
       # frontend imports the contract JSON, the backend's contract tests read it), for the frontend
-      # ui-theme (the colour tokens it shares with the TUI, roadmap item 67) and, for ktlint, the
-      # root .editorconfig. A commit elsewhere (roadmap, docs, e2e, devenv) leaves both derivations
-      # unchanged, so it costs no rebuild. The paths are inside the flake's store copy, which holds
-      # git-tracked files only. toSource names the result `source`.
+      # ui-theme (the colour tokens it shares with the TUI, roadmap item 67) and
+      # docs/text-direction-cases.json (the direction rule's shared cases its test imports, roadmap
+      # item 76) and, for ktlint, the root .editorconfig. A commit elsewhere (roadmap, docs, e2e,
+      # devenv) leaves both derivations unchanged, so it costs no rebuild. The paths are inside the
+      # flake's store copy, which holds git-tracked files only. toSource names the result `source`.
       sourceOf = paths:
         pkgs.lib.fileset.toSource {
           root = ./.;
@@ -288,7 +289,7 @@
       frontend = pkgs.stdenv.mkDerivation (finalAttrs: {
         pname = "stt-frontend";
         version = "0.1.0";
-        src = sourceOf [./frontend ./docs/api ./ui-theme];
+        src = sourceOf [./frontend ./docs/api ./docs/text-direction-cases.json ./ui-theme];
 
         sourceRoot = "source/frontend";
 
