@@ -3655,7 +3655,7 @@ fn draw_edit_prompt(
     draft: &str,
     paragraph: Option<stt_client::direction::Direction>,
 ) {
-    use stt_client::direction::{Direction, letter_direction};
+    use stt_client::direction::{Direction, last_letter_direction, letter_direction};
     // The catalog template ends in its draft: the label is the template with the draft empty.
     let label = stt_client::text("tui.segment.editPrompt", &[("text", "")]);
     let label_width = u16::try_from(text_width(&label)).unwrap_or(u16::MAX);
@@ -3709,14 +3709,6 @@ fn draw_edit_prompt(
         0,
         label_width + u16::try_from(at).unwrap_or(u16::MAX),
     );
-}
-
-/// The direction of `text`'s last letter, if it has one.
-fn last_letter_direction(text: &str) -> Option<stt_client::direction::Direction> {
-    let mut buffer = [0u8; 4];
-    text.chars().rev().find_map(|character| {
-        stt_client::direction::letter_direction(character.encode_utf8(&mut buffer))
-    })
 }
 
 /// The catalog text `key` with `args` filled in and its keys highlighted in the accent colour, or

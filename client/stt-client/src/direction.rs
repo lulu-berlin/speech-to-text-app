@@ -37,6 +37,18 @@ pub fn letter_direction(text: &str) -> Option<Direction> {
     })
 }
 
+/// The direction of `text`'s last letter, by the same letters as [`letter_direction`]: what a
+/// letter typed after it continues, which decides where an editor's cursor goes. `None` without a
+/// letter.
+pub fn last_letter_direction(text: &str) -> Option<Direction> {
+    let letter = LETTER.find_iter(text).last()?.as_str().chars().next()?;
+    Some(if rtl_letter(letter) {
+        Direction::Rtl
+    } else {
+        Direction::Ltr
+    })
+}
+
 /// A standalone text's direction - a speaker name or a filename, on its own or inside a sentence:
 /// its letter direction, and left-to-right when it has no letter (not the app language's).
 pub fn standalone_direction(text: &str) -> Direction {
