@@ -1,8 +1,9 @@
 //! A line's visual order (roadmap item 76): a terminal writes each cell where it is told, so the
 //! TUI orders a line itself - the Unicode bidi algorithm, the paragraph's direction as its base -
-//! before it writes the cells, left to right.
+//! before it writes the cells, left to right. kitty's default mode turns each right-to-left word's
+//! letters itself, so for it ([`typed_words`]) those letters go back in typed order.
 
-use stt_client::direction::Direction;
+use stt_client::direction::{Direction, letter_direction};
 use unicode_bidi::{BidiInfo, Level};
 
 /// `glyphs` - one user-visible character each, `text` giving its characters - reordered from
@@ -67,6 +68,29 @@ pub fn visual<G>(
             glyph
         })
         .collect()
+}
+
+/// `glyphs`, in visual order, with each right-to-left word's letters put back in typed order -
+/// for kitty's default mode (`STT_TUI_RTL_WORDS`), which draws each right-to-left word's letters
+/// right to left itself. A word is a run of right-to-left letters, `text` giving each glyph's
+/// characters with its combining marks; digits, spaces and punctuation stay where the visual order
+/// put them, and so does every word.
+pub fn typed_words<G>(mut glyphs: Vec<G>, text: impl Fn(&G) -> &str) -> Vec<G> {
+    let rtl = |glyph: &G| letter_direction(text(glyph)) == Some(Direction::Rtl);
+    let mut start = 0;
+    while start < glyphs.len() {
+        if rtl(&glyphs[start]) {
+            let mut end = start;
+            while end < glyphs.len() && rtl(&glyphs[end]) {
+                end += 1;
+            }
+            glyphs[start..end].reverse();
+            start = end;
+        } else {
+            start += 1;
+        }
+    }
+    glyphs
 }
 
 // The paired brackets a right-to-left run draws mirrored (Unicode's Bidi_Mirroring_Glyph for the

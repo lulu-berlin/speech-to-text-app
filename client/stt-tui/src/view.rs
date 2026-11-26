@@ -3255,36 +3255,11 @@ fn visual_order(glyphs: Vec<Glyph>, base: stt_client::direction::Direction) -> V
     )
 }
 
-/// `glyphs`, in visual order, with each right-to-left word's letters put back in typed order -
-/// for kitty's default mode (`STT_TUI_RTL_WORDS`), which draws each right-to-left word's letters
-/// right to left itself. A word is a run of right-to-left letters, each with its combining marks;
-/// digits, spaces and punctuation stay where the visual order put them, and so does every word.
-fn typed_words(mut glyphs: Vec<Glyph>) -> Vec<Glyph> {
-    let rtl = |glyph: &Glyph| {
-        stt_client::direction::letter_direction(&glyph.1)
-            == Some(stt_client::direction::Direction::Rtl)
-    };
-    let mut start = 0;
-    while start < glyphs.len() {
-        if rtl(&glyphs[start]) {
-            let mut end = start;
-            while end < glyphs.len() && rtl(&glyphs[end]) {
-                end += 1;
-            }
-            glyphs[start..end].reverse();
-            start = end;
-        } else {
-            start += 1;
-        }
-    }
-    glyphs
-}
-
 /// `glyphs`, in visual order, as the TUI writes them to the terminal: under `STT_TUI_RTL_WORDS`
-/// each right-to-left word's letters in typed order ([`typed_words`]), otherwise as ordered.
+/// each right-to-left word's letters in typed order (`bidi::typed_words`), otherwise as ordered.
 fn written(view: &View<'_>, glyphs: Vec<Glyph>) -> Vec<Glyph> {
     if view.rtl_words {
-        typed_words(glyphs)
+        crate::bidi::typed_words(glyphs, |glyph| glyph.1.as_str())
     } else {
         glyphs
     }
