@@ -395,6 +395,9 @@ struct Ui {
     /// Whether the environment names an emulator that reorders text itself: the key reference
     /// then adds the notice that its setting must be off.
     reorders: bool,
+    /// Whether `STT_TUI_RTL_WORDS` asks for kitty's default mode: each right-to-left word is
+    /// written in typed order, for the terminal to turn.
+    rtl_words: bool,
 }
 
 impl Ui {
@@ -440,6 +443,7 @@ impl Ui {
             history_offset: std::cell::Cell::new(0),
             footer_hits: std::cell::RefCell::new(Vec::new()),
             reorders: view::reorders_text(),
+            rtl_words: view::rtl_words(),
         }
     }
 
@@ -821,6 +825,7 @@ impl Ui {
             history_offset: &self.history_offset,
             footer_hits: &self.footer_hits,
             reorders: self.reorders,
+            rtl_words: self.rtl_words,
         }
     }
 

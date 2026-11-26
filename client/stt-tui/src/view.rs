@@ -106,6 +106,9 @@ pub struct View<'a> {
     /// Whether the environment names an emulator that reorders text itself: the key reference
     /// then adds the notice that its setting must be off.
     pub reorders: bool,
+    /// Whether `STT_TUI_RTL_WORDS` asks for kitty's default mode: each right-to-left word is
+    /// written in typed order, for the terminal to turn.
+    pub rtl_words: bool,
 }
 
 impl<'a> View<'a> {
@@ -349,6 +352,12 @@ pub fn notice_lines() -> (String, String) {
 pub fn reorders_text() -> bool {
     std::env::var("TERM").is_ok_and(|value| value.contains("mlterm"))
         || std::env::var("MLTERM").is_ok_and(|value| !value.is_empty())
+}
+
+/// Whether `STT_TUI_RTL_WORDS` asks for kitty's default mode (`force_ltr no`), which turns each
+/// right-to-left word's letters itself: any value but an empty one or `0`.
+pub fn rtl_words() -> bool {
+    std::env::var("STT_TUI_RTL_WORDS").is_ok_and(|value| !value.is_empty() && value != "0")
 }
 
 /// The page's full key reference, over the screen, as btop's help: a table of every key of the page,
@@ -3045,6 +3054,11 @@ fn turn_rows(
         glyphs_of(&[(tint, name.to_string())]).collect(),
         stt_client::direction::standalone_direction(name),
     );
+    let name = if view.rtl_words {
+        typed_words(name)
+    } else {
+        name
+    };
     let gap: Vec<Glyph> = glyphs_of(&[(Style::new(), "  ".to_string())]).collect();
     let clock: Vec<Glyph> = glyphs_of(&[(clock_style, time)]).collect();
     let header = header_row(name, gap, clock, width, rtl);
@@ -3052,6 +3066,11 @@ fn turn_rows(
     for row in wrap_tagged(&runs, width, &indent, &indent) {
         let content: Vec<Glyph> = row.into_iter().skip(after_time).collect();
         let ordered = visual_order(content, base);
+        let ordered = if view.rtl_words {
+            typed_words(ordered)
+        } else {
+            ordered
+        };
         let blank = (Style::new(), " ".to_string(), None);
         let mut line = Vec::new();
         if rtl {
@@ -3241,6 +3260,31 @@ fn visual_order(glyphs: Vec<Glyph>, base: stt_client::direction::Direction) -> V
         |glyph, mirrored| glyph.1 = mirrored,
         base,
     )
+}
+
+/// `glyphs`, in visual order, with each right-to-left word's letters put back in typed order -
+/// for kitty's default mode (`STT_TUI_RTL_WORDS`), which draws each right-to-left word's letters
+/// right to left itself. A word is a run of right-to-left letters, each with its combining marks;
+/// digits, spaces and punctuation stay where the visual order put them, and so does every word.
+fn typed_words(mut glyphs: Vec<Glyph>) -> Vec<Glyph> {
+    let rtl = |glyph: &Glyph| {
+        stt_client::direction::letter_direction(&glyph.1)
+            == Some(stt_client::direction::Direction::Rtl)
+    };
+    let mut start = 0;
+    while start < glyphs.len() {
+        if rtl(&glyphs[start]) {
+            let mut end = start;
+            while end < glyphs.len() && rtl(&glyphs[end]) {
+                end += 1;
+            }
+            glyphs[start..end].reverse();
+            start = end;
+        } else {
+            start += 1;
+        }
+    }
+    glyphs
 }
 
 /// The turn's header row, `width` columns wide: its time and its speaker's name, the name in its
@@ -3703,7 +3747,15 @@ fn draw_typed_prompt(
         .position(|glyph| glyph.2.is_some())
         .map_or(0, |index| glyphs_width(&probed[..index]));
     let mut line = vec![Span::raw(label)];
-    line.extend(spans_of(&laid_out(glyphs_of(&[(field, shown)]).collect())));
+    // The cursor's cell above is counted in the visual order, where the terminal shows the draft;
+    // kitty's default mode only has each RTL word's letters written in typed order.
+    let drawn = laid_out(glyphs_of(&[(field, shown)]).collect());
+    let drawn = if view.rtl_words {
+        typed_words(drawn)
+    } else {
+        drawn
+    };
+    line.extend(spans_of(&drawn));
     frame.render_widget(Paragraph::new(Line::from(line)), area);
     cursor(
         frame,

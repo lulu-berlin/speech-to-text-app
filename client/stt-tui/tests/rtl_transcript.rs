@@ -133,6 +133,67 @@ fn an_rtl_transcript_is_drawn_in_visual_order_and_its_rtl_turns_are_mirrored() {
 }
 
 #[test]
+fn with_rtl_words_each_rtl_word_keeps_its_letters_in_typed_order() {
+    // kitty's default mode turns each right-to-left word's letters itself and keeps the words left
+    // to right; with STT_TUI_RTL_WORDS set (any value but `0`) the TUI orders the words and aligns
+    // the rows, and writes each RTL word's letters in typed order for kitty to turn. The transcript:
+    // an Arabic speaker name, an Arabic comma after a word, and a Hebrew word with niqqud.
+    let seeded = turns_with_arabic_name()
+        .replace(MIXED, "WHO: مرحبا، بكم")
+        .replace(AFTER, "Thanks שָׁלוֹם.");
+    let OpenTranscript {
+        service: _service,
+        mut tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript_sized_on(&seeded, 80, &[("STT_TUI_RTL_WORDS", "yes")]);
+
+    // The mixed turn (LTR): `WHO:`, then its Arabic run read from the right - `مرحبا`, the comma,
+    // `بكم` - so left to right `بكم`, the comma, `مرحبا`, each word in typed order; the comma is
+    // not a letter and stays where the order put it.
+    let mixed = "WHO: بكم ،مرحبا";
+    // The Arabic turn (RTL): from the right edge `في`, `عام`, `2024`, `بدأنا` - so left to right
+    // `بدأنا 2024 عام في`, each word in typed order.
+    let with_number = "بدأنا 2024 عام في";
+    // The Latin turn: its Hebrew word, marks and all, in typed order.
+    let latin = "Thanks שָׁלוֹם.";
+    let screen = tui.wait_for(WAIT, |text| {
+        text.contains(mixed) && text.contains(with_number) && text.contains(latin)
+    });
+
+    // The Arabic speaker name in both of its turns' headers is a word in typed order too.
+    assert!(
+        terminal::turn(&screen, "00:00", "أحمد", mixed),
+        "the mixed turn reads left to right, its Arabic words in typed order:\n{screen}"
+    );
+    assert!(
+        row_with(&screen, with_number).ends_with(&format!("{with_number}       │")),
+        "the RTL turn's text is right-aligned, its words in typed order:\n{screen}"
+    );
+    assert!(
+        terminal::turn(&screen, "00:10", "أحمد", latin),
+        "the Latin turn's Hebrew word is in typed order:\n{screen}"
+    );
+
+    // The rename prompt: the Arabic name right-aligned in typed order, the cursor where it is in
+    // the visual order - the free cell left of the name.
+    tui.press(b"r");
+    let (cells, column) = right_aligned("Rename: ", "أحمد");
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
+
+    // `0` leaves the mode off: the rows are in visual order, each RTL word reversed.
+    let OpenTranscript {
+        service: _service,
+        tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript_sized_on(&turns(), 80, &[("STT_TUI_RTL_WORDS", "0")]);
+    tui.wait_for(WAIT, |text| {
+        text.contains(&format!("WHO: {}", reversed("مرحبا بكم")))
+    });
+}
+
+#[test]
 fn a_click_on_an_rtl_row_marks_the_segment_drawn_there() {
     let OpenTranscript {
         service: _service,
