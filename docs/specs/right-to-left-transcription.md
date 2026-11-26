@@ -251,7 +251,7 @@ chrome follow the app language, item 88.)
 - [ ] (discovered) When the environment names kitty (`TERM=xterm-kitty` or `KITTY_WINDOW_ID`), the
       `?` reference names `force_ltr yes` (or `kitty -o force_ltr=yes`) and `STT_TUI_RTL_WORDS=1`,
       and a terminal that names neither shows no such line
-- [ ] (discovered, must not break) The documentation checks pass: the review pages are in their
+- [x] (discovered, must not break) The documentation checks pass: the review pages are in their
       generated form, and the TUI's reorder notice is translated in every shipped locale, each
       review row naming a compared product and its wording
 - [ ] (discovered, must not break) The Nix-built frontend builds: its source holds the shared
@@ -563,8 +563,11 @@ chrome follow the app language, item 88.)
   sandbox). (3) The documentation checks — the review pages were not in their generated form, and
   `tui.help.reorder` was English in all 27 locales with no compared product, which item 67's rule
   forbids for `tui.*` rows: translated in every locale, each row citing the locale's own
-  settings comparison, the pages regenerated; `pnpm --dir docs test` 50 passed, frontend `pnpm
-  test` 395 passed. The translations wait for the user's review.
+  settings comparison, the pages regenerated (`eaf0d3e0`); `pnpm --dir docs test` 50 passed,
+  frontend `pnpm test` 395 passed. The user approved the translations as written, the ASCII `: `
+  kept in ja, yue, zh-Hans and zh-Hant for the TUI's two-line split. Refactor (approved):
+  `1fcb08f7` the Windows stop tests read as sequences of listings (`listings(...cims)`). The Nix
+  and Windows items stay unticked until `nix build .#frontend` and the PR's Windows e2e pass.
 
 ## Approval log
 
