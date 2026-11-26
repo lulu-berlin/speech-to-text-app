@@ -17,23 +17,7 @@ const WAIT: Duration = Duration::from_secs(20);
 #[test]
 fn the_help_names_the_terminals_reorder_setting_when_the_environment_names_one() {
     // The environment names mlterm: the reference says its bidi setting must be off.
-    let service = EventService::start();
-    let dir = tempfile::tempdir().unwrap();
-    support::write_bootstrap(dir.path(), service.port);
-    let mut tui = Tui::start_with_env(
-        env!("CARGO_BIN_EXE_stt-tui").as_ref(),
-        dir.path(),
-        200,
-        24,
-        &[("TERM", "mlterm")],
-    );
-    let mut stream = service.next_stream(WAIT);
-    stream.send("snapshot", SNAPSHOT);
-    tui.wait_for(WAIT, |text| {
-        text.contains("? help") && text.contains("memo.wav")
-    });
-    tui.press(b"?");
-    let help = tui.wait_for(WAIT, |text| text.contains("Queue keys"));
+    let help = help_under(200, &[("TERM", "mlterm")]);
     assert!(
         help.contains("mlterm"),
         "the reference names mlterm:\n{help}"
@@ -48,23 +32,7 @@ fn the_help_names_the_terminals_reorder_setting_when_the_environment_names_one()
     );
 
     // A terminal that names no such emulator shows no such line.
-    let service = EventService::start();
-    let dir = tempfile::tempdir().unwrap();
-    support::write_bootstrap(dir.path(), service.port);
-    let mut tui = Tui::start_with_env(
-        env!("CARGO_BIN_EXE_stt-tui").as_ref(),
-        dir.path(),
-        200,
-        24,
-        &[("TERM", "xterm-256color"), ("MLTERM", "")],
-    );
-    let mut stream = service.next_stream(WAIT);
-    stream.send("snapshot", SNAPSHOT);
-    tui.wait_for(WAIT, |text| {
-        text.contains("? help") && text.contains("memo.wav")
-    });
-    tui.press(b"?");
-    let help = tui.wait_for(WAIT, |text| text.contains("Queue keys"));
+    let help = help_under(200, &[("TERM", "xterm-256color"), ("MLTERM", "")]);
     assert!(
         !help.contains("mlterm"),
         "a terminal that names none shows no such line:\n{help}"
