@@ -549,6 +549,23 @@ chrome follow the app language, item 88.)
   turns with `turns_of`. The item stays unticked until the user's check in kitty's default mode
   (`force_ltr no`) with `STT_TUI_RTL_WORDS=1` shows the words reading correctly.
 
+- **Cycle 24 — 2026-11-26 — (discovered, must not break) PR run 713's three failures.** On
+  `8c5a430e`, the run the user reported: (1) Windows' e2e — `76-rtl-transcript.spec.ts` met
+  `disk I/O error` at `e2e/lib/seed.ts:30`, the stopped backend's JVM still holding `stt.db`.
+  Test: `e2e/lib/backend.test.ts` (`on Windows the backend stop returns only once the killed JVM
+  has left the process list`). Red at `b877eb2f` with the test uncommitted: the stop looked once
+  and returned. Green: `ef37353e` — e2e `node --test` over `lib/*.test.ts`, `prettier --check`,
+  `tsc`. Make it right (the user's choices, in the same commit): the stop waits for the app JVM too
+  when the kill took the spawn's tree, and fails naming the pids still listed after
+  `exitTimeoutMs` (60 s); the Windows run itself is CI's. (2) The Nix frontend build — `tsc` could
+  not find `docs/text-direction-cases.json`, which the frontend's fileset left out: `b877eb2f`
+  adds it (`flake.nix`); verified by the user's `nix build .#frontend`, not here (no `nix` in the
+  sandbox). (3) The documentation checks — the review pages were not in their generated form, and
+  `tui.help.reorder` was English in all 27 locales with no compared product, which item 67's rule
+  forbids for `tui.*` rows: translated in every locale, each row citing the locale's own
+  settings comparison, the pages regenerated; `pnpm --dir docs test` 50 passed, frontend `pnpm
+  test` 395 passed. The translations wait for the user's review.
+
 ## Approval log
 
 - 2026-10-23: filed as a draft at the user's request (right-to-left writing systems in the
