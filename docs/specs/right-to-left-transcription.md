@@ -251,6 +251,14 @@ chrome follow the app language, item 88.)
 - [ ] (discovered) When the environment names kitty (`TERM=xterm-kitty` or `KITTY_WINDOW_ID`), the
       `?` reference names `force_ltr yes` (or `kitty -o force_ltr=yes`) and `STT_TUI_RTL_WORDS=1`,
       and a terminal that names neither shows no such line
+- [ ] (discovered, must not break) The documentation checks pass: the review pages are in their
+      generated form, and the TUI's reorder notice is translated in every shipped locale, each
+      review row naming a compared product and its wording
+- [ ] (discovered, must not break) The Nix-built frontend builds: its source holds the shared
+      direction table its test imports
+- [ ] (discovered, must not break) On Windows, a spec that stops the backend and opens its
+      database (the RTL seed) finds the database released: the stop returns only once the killed
+      processes are gone
 
 ## Acceptance criteria
 
@@ -598,3 +606,9 @@ chrome follow the app language, item 88.)
 - 2026-11-26 (workspace, the user's choices): the kitty mode is switched on with an environment
   variable read at start, `STT_TUI_RTL_WORDS=1` (as `NO_COLOR` and `MLTERM` are read), and the
   kitty item is split into three — the ordering, the positions, the `?` notice: 25 items.
+- 2026-11-26 (workspace, the user's choices): PR #143's run 713 (on `8c5a430e`) failed three ways
+  — the documentation checks (review pages not in their generated form; `tui.help.reorder`
+  untranslated, with no compared product), the Nix frontend build (its source lacks
+  `docs/text-direction-cases.json`), and Windows' e2e (the RTL seed met `disk I/O error`: the
+  stopped backend still held `stt.db`). All three fixed now, as three discovered must-not-break
+  items; the Windows stop waits for the killed processes to leave the process list: 28 items.
