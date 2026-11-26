@@ -2327,13 +2327,7 @@ fn draw_history_controls(
 ) {
     let muted = fg(view, view.theme.muted);
     let key = fg(view, view.theme.accent);
-    let raised = if view.no_color {
-        Style::new()
-    } else {
-        Style::new()
-            .fg(view.theme.text)
-            .bg(view.theme.surface_raised)
-    };
+    let raised = raised(view);
     // The query - its whole characters that fit after the field's leading blank - then blanks to
     // the field's width, counted in display columns, as drawn.
     let query = format!(
@@ -3604,6 +3598,17 @@ fn highlight(view: &View<'_>) -> Style {
     }
 }
 
+/// A typed field's style: the body text on the raised surface, or nothing when `NO_COLOR` is set.
+fn raised(view: &View<'_>) -> Style {
+    if view.no_color {
+        Style::new()
+    } else {
+        Style::new()
+            .fg(view.theme.text)
+            .bg(view.theme.surface_raised)
+    }
+}
+
 /// The width of a catalog template's text before its `{placeholder}`, in columns: where a draft
 /// filled into it starts.
 fn prefix_width(key: &str, placeholder: &str) -> u16 {
@@ -3666,13 +3671,7 @@ fn draw_typed_prompt(
     let label = stt_client::text(key, &[(placeholder, "")]);
     let label_width = u16::try_from(text_width(&label)).unwrap_or(u16::MAX);
     let field_width = usize::from(area.width.saturating_sub(label_width));
-    let field = if view.no_color {
-        Style::new()
-    } else {
-        Style::new()
-            .fg(view.theme.text)
-            .bg(view.theme.surface_raised)
-    };
+    let field = raised(view);
     // A cell is kept for the next letter, so the cursor always has one.
     let shown = draft_tail(
         draft,
