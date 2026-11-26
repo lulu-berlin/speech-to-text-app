@@ -109,6 +109,9 @@ pub struct View<'a> {
     /// Whether `STT_TUI_RTL_WORDS` asks for kitty's default mode: each right-to-left word is
     /// written in typed order, for the terminal to turn.
     pub rtl_words: bool,
+    /// Whether the environment names kitty: the key reference then adds the notice naming its
+    /// `force_ltr` and `STT_TUI_RTL_WORDS`.
+    pub kitty: bool,
 }
 
 impl<'a> View<'a> {
@@ -336,11 +339,10 @@ pub struct Dialog {
     pub confirm: String,
 }
 
-/// The notice's lines, split at the colon so the reference's table stays narrow: the catalog's
-/// `tui.help.reorder` names the terminal's setting and why it must be off. Empty when no catalog
-/// text carries the key.
-pub fn notice_lines() -> (String, String) {
-    let text = stt_client::text("tui.help.reorder", &[]);
+/// A notice's lines, split at the colon so the reference's table stays narrow: the catalog's `key`
+/// names the terminal's setting and why. Empty when no catalog text carries the key.
+pub fn notice_lines(key: &str) -> (String, String) {
+    let text = stt_client::text(key, &[]);
     match text.split_once(": ") {
         Some((first, second)) => (first.to_string(), second.to_string()),
         None => (text, String::new()),
@@ -352,6 +354,14 @@ pub fn notice_lines() -> (String, String) {
 pub fn reorders_text() -> bool {
     std::env::var("TERM").is_ok_and(|value| value.contains("mlterm"))
         || std::env::var("MLTERM").is_ok_and(|value| !value.is_empty())
+}
+
+/// Whether the environment names kitty - its `TERM`, or `KITTY_WINDOW_ID`, which a multiplexer
+/// run inside kitty keeps: kitty turns each right-to-left word's letters itself unless its
+/// `force_ltr` is on.
+pub fn kitty_text() -> bool {
+    std::env::var("TERM").is_ok_and(|value| value.contains("kitty"))
+        || std::env::var("KITTY_WINDOW_ID").is_ok_and(|value| !value.is_empty())
 }
 
 /// Whether `STT_TUI_RTL_WORDS` asks for kitty's default mode (`force_ltr no`), which turns each
@@ -397,13 +407,8 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
     );
     lines.push(Line::default());
     lines.push(hint(view, "tui.help.close", &[]));
-    if view.reorders {
-        let (first, second) = notice_lines();
-        lines.push(Line::default());
-        lines.push(Line::styled(first, fg(view, view.theme.muted)));
-        if !second.is_empty() {
-            lines.push(Line::styled(second, fg(view, view.theme.muted)));
-        }
+    for line in &table.notices {
+        lines.push(Line::styled(line.clone(), fg(view, view.theme.muted)));
     }
     let mut block = dialog_block(view, stt_client::text(help_title(view.screen), &[]))
         .padding(ratatui::widgets::Padding::horizontal(1));
@@ -421,8 +426,8 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
 }
 
 /// The rows the key reference keeps around its table rows: its two borders, the header, a blank row
-/// and the line saying how to close it. A reordering emulator's notice adds a blank row and its two
-/// lines (`notice_lines`), counted beside this constant.
+/// and the line saying how to close it. The notices the environment calls for add their rows
+/// (`help_notices`), counted beside this constant.
 const HELP_CHROME: u16 = 5;
 /// The spaces between the key reference's columns.
 const HELP_GAP: usize = 4;
@@ -435,6 +440,8 @@ struct HelpTable {
     key_width: usize,
     first: usize,
     visible: usize,
+    /// The notices' rows under the table (`help_notices`), each notice after a blank row.
+    notices: Vec<String>,
 }
 
 /// Where the key reference is drawn over `frame`: what a click outside it is measured against.
@@ -452,9 +459,6 @@ pub fn help_max_scroll(frame: Rect, view: &View<'_>) -> usize {
 /// `scroll` rows (at most to its last).
 fn help_table(frame: Rect, view: &View<'_>, scroll: usize) -> HelpTable {
     let screen = view.screen;
-    // The notice's blank row and its two lines, when the environment names an emulator that
-    // reorders text itself.
-    let chrome = HELP_CHROME + if view.reorders { 3 } else { 0 };
     let entries: Vec<(String, String)> = crate::footer::reference(view)
         .iter()
         .map(|hint| crate::hints::key_and_words(hint))
@@ -472,25 +476,19 @@ fn help_table(frame: Rect, view: &View<'_>, scroll: usize) -> HelpTable {
         .chain([width_of(&stt_client::text("tui.help.description", &[]))])
         .max()
         .unwrap_or(0);
+    let close = crate::hints::line("tui.help.close", &[], Some(Color::Reset)).width();
+    let title = width_of(&stt_client::text(help_title(screen), &[]));
+    let content = (key_width + HELP_GAP + words_width).max(close).max(title);
+    // The borders and a column of padding inside each.
+    let width = (content as u16 + 4).min(frame.width);
+    let notices = help_notices(view, width.saturating_sub(4));
+    let chrome = HELP_CHROME + notices.len() as u16;
     let visible = entries
         .len()
         .min(usize::from(frame.height.saturating_sub(2 + chrome)))
         .max(1)
         .min(entries.len());
     let first = scroll.min(entries.len() - visible);
-    let close = crate::hints::line("tui.help.close", &[], Some(Color::Reset)).width();
-    let title = width_of(&stt_client::text(help_title(screen), &[]));
-    let notice = if view.reorders {
-        width_of(&notice_lines().0)
-    } else {
-        0
-    };
-    let content = (key_width + HELP_GAP + words_width)
-        .max(close)
-        .max(title)
-        .max(notice);
-    // The borders and a column of padding inside each.
-    let width = (content as u16 + 4).min(frame.width);
     let height = (visible as u16 + chrome).min(frame.height);
     HelpTable {
         area: Rect {
@@ -503,7 +501,39 @@ fn help_table(frame: Rect, view: &View<'_>, scroll: usize) -> HelpTable {
         key_width,
         first,
         visible,
+        notices,
     }
+}
+
+/// The notices the environment calls for under the key reference's table, as rows `width`
+/// columns wide: each after a blank row, split at its colon (`notice_lines`) and wrapped, so a long
+/// notice - or a long translation - never widens the reference. mlterm's names its bidi setting;
+/// kitty's names `force_ltr` and `STT_TUI_RTL_WORDS`, or says the mode is on.
+fn help_notices(view: &View<'_>, width: u16) -> Vec<String> {
+    let mut keys = Vec::new();
+    if view.reorders {
+        keys.push("tui.help.reorder");
+    }
+    if view.kitty {
+        keys.push(if view.rtl_words {
+            "tui.help.kittyWords"
+        } else {
+            "tui.help.kitty"
+        });
+    }
+    let mut rows = Vec::new();
+    for key in keys {
+        rows.push(String::new());
+        let (first, second) = notice_lines(key);
+        for part in [first, second].into_iter().filter(|part| !part.is_empty()) {
+            rows.extend(
+                wrap_tagged(&[(Style::new(), part, None)], width, &[], &[])
+                    .into_iter()
+                    .map(|row| row.into_iter().map(|glyph| glyph.1).collect::<String>()),
+            );
+        }
+    }
+    rows
 }
 
 /// The rows a modal has inside its border: what a list drawn in one shows at once.

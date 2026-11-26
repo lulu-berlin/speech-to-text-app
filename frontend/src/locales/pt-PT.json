@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "Texto do segmento: {text}",
   "tui.segment.editFailed": "a edição falhou: {error}",
   "tui.segment.revertFailed": "não foi possível reverter: {error}",
-  "tui.help.reorder": "A definição bidi do mlterm tem de estar desativada: o TUI ordena o texto por si."
+  "tui.help.reorder": "A definição bidi do mlterm tem de estar desativada: o TUI ordena o texto por si.",
+  "tui.help.kitty": "O kitty inverte sozinho as palavras da direita para a esquerda: defina force_ltr yes (ou inicie kitty -o force_ltr=yes), ou execute o TUI com STT_TUI_RTL_WORDS=1 para manter o predefinido do kitty.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS está ativado: o TUI escreve cada palavra da direita para a esquerda para o modo predefinido do kitty a inverter."
 }

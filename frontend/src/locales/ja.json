@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "セグメントのテキスト: {text}",
   "tui.segment.editFailed": "編集に失敗しました: {error}",
   "tui.segment.revertFailed": "元に戻せませんでした: {error}",
-  "tui.help.reorder": "mlterm の bidi 設定はオフにしてください: TUI がテキストの順序を自分で整えます。"
+  "tui.help.reorder": "mlterm の bidi 設定はオフにしてください: TUI がテキストの順序を自分で整えます。",
+  "tui.help.kitty": "kitty は右から左に書く単語を自分で反転します: force_ltr yes を設定するか (kitty -o force_ltr=yes で起動)、kitty の既定のまま STT_TUI_RTL_WORDS=1 を付けて TUI を起動してください。",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS がオンです: TUI は右から左に書く単語を、kitty の既定モードが反転する形で書きます。"
 }

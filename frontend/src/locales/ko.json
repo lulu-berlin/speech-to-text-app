@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "구간 텍스트: {text}",
   "tui.segment.editFailed": "편집하지 못했습니다: {error}",
   "tui.segment.revertFailed": "되돌리지 못했습니다: {error}",
-  "tui.help.reorder": "mlterm의 bidi 설정을 꺼야 합니다: TUI가 텍스트 순서를 직접 정합니다."
+  "tui.help.reorder": "mlterm의 bidi 설정을 꺼야 합니다: TUI가 텍스트 순서를 직접 정합니다.",
+  "tui.help.kitty": "kitty는 오른쪽에서 왼쪽으로 쓰는 단어를 스스로 뒤집습니다: force_ltr yes를 설정하거나(또는 kitty -o force_ltr=yes로 시작), kitty 기본값을 유지하려면 STT_TUI_RTL_WORDS=1로 TUI를 실행하세요.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS가 켜져 있습니다: TUI는 오른쪽에서 왼쪽으로 쓰는 각 단어를 kitty 기본 모드가 뒤집도록 씁니다."
 }

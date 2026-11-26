@@ -398,6 +398,9 @@ struct Ui {
     /// Whether `STT_TUI_RTL_WORDS` asks for kitty's default mode: each right-to-left word is
     /// written in typed order, for the terminal to turn.
     rtl_words: bool,
+    /// Whether the environment names kitty: the key reference names its `force_ltr` and
+    /// `STT_TUI_RTL_WORDS`.
+    kitty: bool,
 }
 
 impl Ui {
@@ -444,6 +447,7 @@ impl Ui {
             footer_hits: std::cell::RefCell::new(Vec::new()),
             reorders: view::reorders_text(),
             rtl_words: view::rtl_words(),
+            kitty: view::kitty_text(),
         }
     }
 
@@ -826,6 +830,7 @@ impl Ui {
             footer_hits: &self.footer_hits,
             reorders: self.reorders,
             rtl_words: self.rtl_words,
+            kitty: self.kitty,
         }
     }
 

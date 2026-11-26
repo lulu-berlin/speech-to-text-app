@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "Teks segmen: {text}",
   "tui.segment.editFailed": "gagal mengedit: {error}",
   "tui.segment.revertFailed": "gagal mengembalikan: {error}",
-  "tui.help.reorder": "Setelan bidi mlterm harus dinonaktifkan: TUI mengurutkan teks sendiri."
+  "tui.help.reorder": "Setelan bidi mlterm harus dinonaktifkan: TUI mengurutkan teks sendiri.",
+  "tui.help.kitty": "kitty membalik sendiri kata dari kanan ke kiri: setel force_ltr yes (atau jalankan kitty -o force_ltr=yes), atau jalankan TUI dengan STT_TUI_RTL_WORDS=1 untuk mempertahankan default kitty.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS aktif: TUI menulis setiap kata kanan-ke-kiri agar dibalik oleh mode default kitty."
 }

@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "Teks segmen: {text}",
   "tui.segment.editFailed": "Ngowahi gagal: {error}",
   "tui.segment.revertFailed": "Wangsulaken gagal: {error}",
-  "tui.help.reorder": "Setelan bidi mlterm kedah dipunpateni: TUI ngurutaken teks piyambak."
+  "tui.help.reorder": "Setelan bidi mlterm kedah dipunpateni: TUI ngurutaken teks piyambak.",
+  "tui.help.kitty": "kitty muwalik piyambak tembung saking tengen ngiwa: setel force_ltr yes (utawi wiwiti kitty -o force_ltr=yes), utawi lampahaken TUI kanthi STT_TUI_RTL_WORDS=1 supados gawan kitty tetep.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS urip: TUI nyerat saben tembung tengen-ngiwa supados dipunwalik dening mode gawan kitty."
 }

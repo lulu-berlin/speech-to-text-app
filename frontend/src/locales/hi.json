@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "खंड का पाठ: {text}",
   "tui.segment.editFailed": "संपादन विफल: {error}",
   "tui.segment.revertFailed": "पूर्ववत करना विफल: {error}",
-  "tui.help.reorder": "mlterm की bidi सेटिंग बंद होनी चाहिए: TUI टेक्स्ट को खुद क्रम में लगाता है।"
+  "tui.help.reorder": "mlterm की bidi सेटिंग बंद होनी चाहिए: TUI टेक्स्ट को खुद क्रम में लगाता है।",
+  "tui.help.kitty": "kitty दाएँ-से-बाएँ शब्दों को खुद उलट देता है: force_ltr yes सेट करें (या kitty -o force_ltr=yes से शुरू करें), या kitty का डिफ़ॉल्ट रखने के लिए TUI को STT_TUI_RTL_WORDS=1 के साथ चलाएँ।",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS चालू है: TUI हर दाएँ-से-बाएँ शब्द को ऐसे लिखता है कि kitty का डिफ़ॉल्ट मोड उसे उलट दे।"
 }

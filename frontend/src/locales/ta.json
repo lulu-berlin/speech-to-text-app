@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "பிரிவு உரை: {text}",
   "tui.segment.editFailed": "திருத்தம் தோல்வி: {error}",
   "tui.segment.revertFailed": "மீளமைப்பு தோல்வி: {error}",
-  "tui.help.reorder": "mlterm இன் bidi அமைப்பு அணைக்கப்பட வேண்டும்: TUI தானே உரையை வரிசைப்படுத்துகிறது."
+  "tui.help.reorder": "mlterm இன் bidi அமைப்பு அணைக்கப்பட வேண்டும்: TUI தானே உரையை வரிசைப்படுத்துகிறது.",
+  "tui.help.kitty": "kitty வலமிருந்து இடமாக எழுதும் சொற்களைத் தானே திருப்புகிறது: force_ltr yes அமைக்கவும் (அல்லது kitty -o force_ltr=yes உடன் தொடங்கவும்), அல்லது kitty இன் இயல்புநிலையை வைத்திருக்க STT_TUI_RTL_WORDS=1 உடன் TUI ஐ இயக்கவும்.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS இயக்கத்தில் உள்ளது: kitty இன் இயல்புநிலை பயன்முறை திருப்பும் வகையில் TUI ஒவ்வொரு வலமிருந்து இடச் சொல்லையும் எழுதுகிறது."
 }

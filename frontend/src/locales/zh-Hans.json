@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "片段文本：{text}",
   "tui.segment.editFailed": "编辑失败：{error}",
   "tui.segment.revertFailed": "还原失败：{error}",
-  "tui.help.reorder": "mlterm 的 bidi 设置必须关闭: TUI 会自行排列文本。"
+  "tui.help.reorder": "mlterm 的 bidi 设置必须关闭: TUI 会自行排列文本。",
+  "tui.help.kitty": "kitty 会自行反转从右到左书写的词语: 请设置 force_ltr yes（或用 kitty -o force_ltr=yes 启动），或用 STT_TUI_RTL_WORDS=1 运行 TUI，保留 kitty 的默认设置。",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS 已开启: TUI 会把每个从右到左的词语写成由 kitty 默认模式反转的形式。"
 }

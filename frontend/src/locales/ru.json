@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "Текст сегмента: {text}",
   "tui.segment.editFailed": "Не удалось изменить: {error}",
   "tui.segment.revertFailed": "Не удалось вернуть: {error}",
-  "tui.help.reorder": "Настройка bidi в mlterm должна быть выключена: TUI сам упорядочивает текст."
+  "tui.help.reorder": "Настройка bidi в mlterm должна быть выключена: TUI сам упорядочивает текст.",
+  "tui.help.kitty": "kitty сам переворачивает слова, которые пишутся справа налево: задайте force_ltr yes (или запустите kitty -o force_ltr=yes) либо запустите TUI с STT_TUI_RTL_WORDS=1, чтобы оставить режим kitty по умолчанию.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS включён: TUI пишет каждое слово справа налево так, чтобы режим kitty по умолчанию его перевернул."
 }

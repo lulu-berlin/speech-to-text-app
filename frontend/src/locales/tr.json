@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "Segment metni: {text}",
   "tui.segment.editFailed": "düzenleme başarısız: {error}",
   "tui.segment.revertFailed": "geri alma başarısız: {error}",
-  "tui.help.reorder": "mlterm'in bidi ayarı kapalı olmalı: TUI metni kendisi sıralar."
+  "tui.help.reorder": "mlterm'in bidi ayarı kapalı olmalı: TUI metni kendisi sıralar.",
+  "tui.help.kitty": "kitty sağdan sola yazılan kelimeleri kendisi çevirir: force_ltr yes ayarlayın (veya kitty -o force_ltr=yes ile başlatın) ya da kitty'nin varsayılanını korumak için TUI'yi STT_TUI_RTL_WORDS=1 ile çalıştırın.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS açık: TUI, sağdan sola yazılan her kelimeyi kitty'nin varsayılan modu çevirecek biçimde yazar."
 }

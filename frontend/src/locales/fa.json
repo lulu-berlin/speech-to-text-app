@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "متن بخش: {text}",
   "tui.segment.editFailed": "ویرایش انجام نشد: {error}",
   "tui.segment.revertFailed": "بازگردانی انجام نشد: {error}",
-  "tui.help.reorder": "تنظیم bidi در mlterm باید خاموش باشد: TUI خودش متن را مرتب می‌کند."
+  "tui.help.reorder": "تنظیم bidi در mlterm باید خاموش باشد: TUI خودش متن را مرتب می‌کند.",
+  "tui.help.kitty": "kitty خودش واژه‌های راست‌به‌چپ را وارونه می‌کند: force_ltr yes را تنظیم کنید (یا kitty -o force_ltr=yes را اجرا کنید)، یا TUI را با STT_TUI_RTL_WORDS=1 اجرا کنید تا حالت پیش‌فرض kitty بماند.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS روشن است: TUI هر واژهٔ راست‌به‌چپ را طوری می‌نویسد که حالت پیش‌فرض kitty آن را وارونه کند."
 }

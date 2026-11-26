@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "विभागाचा मजकूर: {text}",
   "tui.segment.editFailed": "संपादन अयशस्वी: {error}",
   "tui.segment.revertFailed": "पूर्वस्थितीत आणता आले नाही: {error}",
-  "tui.help.reorder": "mlterm चे bidi सेटिंग बंद असणे आवश्यक आहे: TUI स्वतः मजकूर क्रमाने लावते."
+  "tui.help.reorder": "mlterm चे bidi सेटिंग बंद असणे आवश्यक आहे: TUI स्वतः मजकूर क्रमाने लावते.",
+  "tui.help.kitty": "kitty उजवीकडून-डावीकडे शब्द स्वतः उलटवते: force_ltr yes सेट करा (किंवा kitty -o force_ltr=yes ने सुरू करा), किंवा kitty चे पूर्वनिर्धारित ठेवण्यासाठी TUI ला STT_TUI_RTL_WORDS=1 सह चालवा.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS चालू आहे: TUI प्रत्येक उजवीकडून-डावीकडे शब्द असा लिहिते की kitty चा पूर्वनिर्धारित मोड तो उलटवेल."
 }

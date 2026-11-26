@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "Văn bản đoạn: {text}",
   "tui.segment.editFailed": "sửa thất bại: {error}",
   "tui.segment.revertFailed": "hoàn nguyên thất bại: {error}",
-  "tui.help.reorder": "Cài đặt bidi của mlterm phải được tắt: TUI tự sắp xếp thứ tự văn bản."
+  "tui.help.reorder": "Cài đặt bidi của mlterm phải được tắt: TUI tự sắp xếp thứ tự văn bản.",
+  "tui.help.kitty": "kitty tự đảo các từ viết từ phải sang trái: đặt force_ltr yes (hoặc khởi động kitty -o force_ltr=yes), hoặc chạy TUI với STT_TUI_RTL_WORDS=1 để giữ mặc định của kitty.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS đang bật: TUI viết mỗi từ phải sang trái để chế độ mặc định của kitty đảo lại."
 }

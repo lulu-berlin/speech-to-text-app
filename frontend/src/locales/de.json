@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "Segmenttext: {text}",
   "tui.segment.editFailed": "Bearbeiten fehlgeschlagen: {error}",
   "tui.segment.revertFailed": "Zurücksetzen fehlgeschlagen: {error}",
-  "tui.help.reorder": "Die bidi-Einstellung von mlterm muss aus sein: Die TUI ordnet den Text selbst."
+  "tui.help.reorder": "Die bidi-Einstellung von mlterm muss aus sein: Die TUI ordnet den Text selbst.",
+  "tui.help.kitty": "kitty dreht Wörter von rechts nach links selbst um: Setze force_ltr yes (oder starte kitty -o force_ltr=yes) oder starte die TUI mit STT_TUI_RTL_WORDS=1, um kittys Standard zu behalten.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS ist an: Die TUI schreibt jedes Wort von rechts nach links so, dass kittys Standardmodus es umdreht."
 }

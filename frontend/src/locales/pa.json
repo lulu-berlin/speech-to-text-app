@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "ਹਿੱਸੇ ਦਾ ਟੈਕਸਟ: {text}",
   "tui.segment.editFailed": "ਸੋਧਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ: {error}",
   "tui.segment.revertFailed": "ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਿਆ: {error}",
-  "tui.help.reorder": "mlterm ਦੀ bidi ਸੈਟਿੰਗ ਬੰਦ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ: TUI ਆਪਣੇ ਆਪ ਟੈਕਸਟ ਨੂੰ ਕ੍ਰਮ ਵਿੱਚ ਲਗਾਉਂਦਾ ਹੈ।"
+  "tui.help.reorder": "mlterm ਦੀ bidi ਸੈਟਿੰਗ ਬੰਦ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ: TUI ਆਪਣੇ ਆਪ ਟੈਕਸਟ ਨੂੰ ਕ੍ਰਮ ਵਿੱਚ ਲਗਾਉਂਦਾ ਹੈ।",
+  "tui.help.kitty": "kitty ਸੱਜੇ-ਤੋਂ-ਖੱਬੇ ਸ਼ਬਦਾਂ ਨੂੰ ਆਪ ਉਲਟਾ ਦਿੰਦਾ ਹੈ: force_ltr yes ਸੈੱਟ ਕਰੋ (ਜਾਂ kitty -o force_ltr=yes ਨਾਲ ਸ਼ੁਰੂ ਕਰੋ), ਜਾਂ kitty ਦਾ ਡਿਫ਼ਾਲਟ ਰੱਖਣ ਲਈ TUI ਨੂੰ STT_TUI_RTL_WORDS=1 ਨਾਲ ਚਲਾਓ।",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS ਚਾਲੂ ਹੈ: TUI ਹਰ ਸੱਜੇ-ਤੋਂ-ਖੱਬੇ ਸ਼ਬਦ ਨੂੰ ਇਸ ਤਰ੍ਹਾਂ ਲਿਖਦਾ ਹੈ ਕਿ kitty ਦਾ ਡਿਫ਼ਾਲਟ ਮੋਡ ਉਸਨੂੰ ਉਲਟਾ ਦੇਵੇ।"
 }

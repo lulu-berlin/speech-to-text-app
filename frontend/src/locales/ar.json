@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "نص المقطع: {text}",
   "tui.segment.editFailed": "فشل التحرير: {error}",
   "tui.segment.revertFailed": "فشل التراجع: {error}",
-  "tui.help.reorder": "يجب إيقاف إعداد bidi في mlterm: واجهة TUI ترتّب النص بنفسها."
+  "tui.help.reorder": "يجب إيقاف إعداد bidi في mlterm: واجهة TUI ترتّب النص بنفسها.",
+  "tui.help.kitty": "يعكس kitty بنفسه حروف الكلمات المكتوبة من اليمين إلى اليسار: اضبط force_ltr yes (أو شغّل kitty -o force_ltr=yes)، أو شغّل واجهة TUI مع STT_TUI_RTL_WORDS=1 للإبقاء على وضع kitty الافتراضي.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS مفعّل: تكتب واجهة TUI كل كلمة من اليمين إلى اليسار ليعكسها kitty في وضعه الافتراضي."
 }

@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "విభాగం టెక్స్ట్: {text}",
   "tui.segment.editFailed": "సవరణ విఫలమైంది: {error}",
   "tui.segment.revertFailed": "పూర్వస్థితికి మార్చలేకపోయాం: {error}",
-  "tui.help.reorder": "mlterm యొక్క bidi సెట్టింగ్ ఆఫ్‌లో ఉండాలి: TUI టెక్స్ట్‌ను స్వయంగా క్రమంలో పెడుతుంది."
+  "tui.help.reorder": "mlterm యొక్క bidi సెట్టింగ్ ఆఫ్‌లో ఉండాలి: TUI టెక్స్ట్‌ను స్వయంగా క్రమంలో పెడుతుంది.",
+  "tui.help.kitty": "kitty కుడి నుండి ఎడమకు రాసే పదాలను తానే తిప్పుతుంది: force_ltr yes సెట్ చేయండి (లేదా kitty -o force_ltr=yes తో ప్రారంభించండి), లేదా kitty డిఫాల్ట్‌ను ఉంచడానికి STT_TUI_RTL_WORDS=1 తో TUI ను నడపండి.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS ఆన్‌లో ఉంది: kitty డిఫాల్ట్ మోడ్ తిప్పేలా TUI ప్రతి కుడి-నుండి-ఎడమ పదాన్ని రాస్తుంది."
 }

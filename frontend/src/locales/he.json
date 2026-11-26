@@ -387,5 +387,7 @@
   "tui.segment.editPrompt": "טקסט הקטע: {text}",
   "tui.segment.editFailed": "העריכה נכשלה: {error}",
   "tui.segment.revertFailed": "השחזור נכשל: {error}",
-  "tui.help.reorder": "ההגדרה bidi של mlterm חייבת להיות כבויה: ה-TUI מסדר את הטקסט בעצמו."
+  "tui.help.reorder": "ההגדרה bidi של mlterm חייבת להיות כבויה: ה-TUI מסדר את הטקסט בעצמו.",
+  "tui.help.kitty": "kitty הופך בעצמו מילים מימין לשמאל: הגדירו force_ltr yes (או הפעילו kitty -o force_ltr=yes), או הפעילו את ה-TUI עם STT_TUI_RTL_WORDS=1 כדי לשמור על ברירת המחדל של kitty.",
+  "tui.help.kittyWords": "STT_TUI_RTL_WORDS פועל: ה-TUI כותב כל מילה מימין לשמאל כך שמצב ברירת המחדל של kitty יהפוך אותה."
 }
