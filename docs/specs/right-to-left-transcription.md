@@ -242,7 +242,7 @@ chrome follow the app language, item 88.)
 - [x] (discovered) The TUI's speaker rename prompt draws the name in visual order by its own first
       letter, the cursor where the next typed letter appears (cycle 18's caret test, which asserted
       the logical order, is corrected)
-- [ ] (discovered) For kitty's default mode (`force_ltr no`, which turns each right-to-left word's
+- [x] (discovered) For kitty's default mode (`force_ltr no`, which turns each right-to-left word's
       letters itself and keeps the words left to right): with `STT_TUI_RTL_WORDS=1` the TUI writes
       each RTL word's letters in typed order while it orders the words and aligns the line, so the
       text reads correctly and Arabic joins; without it, rows are drawn as before
@@ -546,8 +546,10 @@ chrome follow the app language, item 88.)
   panel, History, the Queue and the transcript's title draw names unordered. Refactors (approved),
   each green on its own tree (client fmt, clippy, `cargo test`): `a42f0a62` one `written(view, …)`
   applies the mode; `37b3bcb2` `typed_words` moves to `bidi.rs`; `7617bba5` the tests build their
-  turns with `turns_of`. The item stays unticked until the user's check in kitty's default mode
-  (`force_ltr no`) with `STT_TUI_RTL_WORDS=1` shows the words reading correctly.
+  turns with `turns_of`. The user's check in kitty's default mode (`force_ltr no`) with
+  `STT_TUI_RTL_WORDS=1`, reported 2026-11-26: the Hebrew reads correctly — the issue is fixed (the
+  build's commit is not recorded; the branch the user pushed as `wip/76-ci` was at `9725ead4`).
+  Ticked on that check.
 
 - **Cycle 24 — 2026-11-26 — (discovered, must not break) PR run 713's three failures.** On
   `8c5a430e`, the run the user reported: (1) Windows' e2e — `76-rtl-transcript.spec.ts` met
