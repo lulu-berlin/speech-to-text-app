@@ -234,6 +234,10 @@ paths:
           description: The rendered file
           headers:
             Content-Disposition:
+              description: >-
+                `attachment; filename="<ASCII fallback>"; filename*=UTF-8''<percent-encoded UTF-8 name>`
+                (RFC 6266/5987): the name is `<original filename stem>.<format>`; the fallback has each
+                non-ASCII character, `"` and `\` as `_`.
               schema: {type: string}
           content:
             text/plain: {schema: {type: string}}

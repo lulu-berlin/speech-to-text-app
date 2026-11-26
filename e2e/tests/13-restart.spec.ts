@@ -1,17 +1,11 @@
 import { expect, test } from './helpers/test';
-import {
-  RESTART_CLIPS,
-  loadState,
-  refreshStoredSession,
-  saveState,
-  startBackend,
-  stopBackend,
-} from '../lib/backend.ts';
+import { RESTART_CLIPS, loadState, startBackend, stopBackend } from '../lib/backend.ts';
 import {
   appLive,
   moveRowDown,
   rowOrder,
   signIn,
+  startSharedBackend,
   uploadClips,
   waitForTaskState,
 } from './helpers/ui';
@@ -62,12 +56,6 @@ test('restarting the backend reconnects the event stream and the state is restor
     // `gradle run` the app JVM could outlive the group kill by accident, but the
     // packaged wrapper's JVM dies with its group, so the handover must be explicit.
     await stopBackend(restarted.pid, port, dataDir);
-    const fresh = await startBackend({ port, dataDir });
-    saveState({ pid: fresh.pid });
-    await signIn(page);
-    // Later tests' contexts start from the stored session, and this restarted service only knows
-    // the one this page just made (roadmap item 66).
-    const { configDir = '', runtimeDir = '' } = loadState();
-    await refreshStoredSession({ configDir, runtimeDir });
+    await startSharedBackend(page);
   }
 });

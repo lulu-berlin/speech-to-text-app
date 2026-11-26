@@ -463,3 +463,58 @@ describe('the history cards', () => {
     expect(getComputedStyle(deleteFailure).color).toBe(asRgb(lightTheme.colors.danger));
   });
 });
+
+describe('filenames in their own direction', () => {
+  it('shows queue and history filenames in their own direction, start-aligned, and leaves mixed names in their order', async () => {
+    // Item 76: a filename is user content — its first letter decides its direction (and so its
+    // start side), whatever the app language; a mixed name is one text in its first letter's
+    // direction, shown as stored.
+    server.use(
+      http.get('/api/events', () =>
+        eventStreamResponse([
+          [
+            'snapshot',
+            {
+              tasks: [
+                { ...taskQueued, id: 7, filename: 'محاضرة 2024.wav', finishedAt: null },
+                { ...taskCompleted, id: 3, filename: 'درس الأحد.m4a', finishedAt: 300 },
+                { ...taskCompleted, id: 4, filename: 'notes final.mp3', finishedAt: 200 },
+                { ...taskCanceled, id: 5, filename: 'WHO مقابلة.wav', finishedAt: 100 },
+              ],
+              queue: { paused: false, taskIds: [7] },
+            },
+          ],
+        ]),
+      ),
+    );
+    const direction = (filename: string) =>
+      getComputedStyle(screen.getByText(filename, { selector: 'li *' })).direction;
+
+    const queue = render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+    await screen.findByText('محاضرة 2024.wav', { selector: 'li *' });
+    expect(direction('محاضرة 2024.wav')).toBe('rtl');
+    queue.unmount();
+
+    await renderHistory();
+    expect(direction('درس الأحد.m4a')).toBe('rtl');
+    expect(direction('notes final.mp3')).toBe('ltr');
+    expect(direction('WHO مقابلة.wav')).toBe('ltr');
+
+    // The delete confirmation names the file as an isolated element in its own direction.
+    fireEvent.click(within(rowOf('درس الأحد.m4a')).getByRole('button', { name: 'Delete' }));
+    const dialog = screen.getByRole('dialog');
+    const inBody = within(dialog).getByText('درس الأحد.m4a');
+    expect(inBody.tagName).toBe('BDI');
+    expect(getComputedStyle(inBody).direction).toBe('rtl');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    // The transcript page's heading is the file name in its own direction.
+    fireEvent.click(screen.getByRole('link', { name: 'درس الأحد.m4a' }));
+    const heading = await screen.findByRole('heading', { name: 'درس الأحد.m4a' });
+    expect(getComputedStyle(heading).direction).toBe('rtl');
+  });
+});

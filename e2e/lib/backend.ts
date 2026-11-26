@@ -404,7 +404,9 @@ export async function waitForHealth(
 // now; find the app JVM by its args and SIGKILL the whole chain, so nothing survives to
 // hold the port or linger. Windows has neither a POSIX group nor a catchable SIGTERM
 // (roadmap item 79): there the same listing finds the app JVM and `taskkill /T /F` ends
-// its tree, whisper-cli and ffmpeg included.
+// its tree, whisper-cli and ffmpeg included, and the stop waits until the killed processes
+// have left the listing (roadmap item 76) — failing when they are still there after
+// [exitTimeoutMs].
 export async function stopBackend(
   pid: number | undefined,
   port: number,
@@ -414,12 +416,15 @@ export async function stopBackend(
     list = () => processes({ platform }),
     forceKill = taskkill,
     spawnTree = false,
+    exitTimeoutMs = 60_000,
   }: {
     platform?: NodeJS.Platform;
     list?: () => ProcessRow[];
     forceKill?: (pid: number) => Promise<boolean>;
     /** End the spawn's own tree before the app JVM's (a start failure still owns its spawn). */
     spawnTree?: boolean;
+    /** How long, on Windows, the killed processes may take to leave the listing. */
+    exitTimeoutMs?: number;
   } = {},
 ): Promise<void> {
   const rows = list();
@@ -431,7 +436,18 @@ export async function stopBackend(
     // The app JVM's own tree is the narrower kill; the spawn's pid is the fallback when the listing
     // cannot see the JVM, and the target when the failure is still in the caller's hands.
     const target = spawnTree ? (pid ?? advertised) : (advertised ?? jvm?.pid ?? pid);
-    if (target !== undefined) await forceKill(target);
+    if (target !== undefined) {
+      await forceKill(target);
+      // taskkill returns, and the port closes, while a dying process may still hold `stt.db` (a
+      // seed opening it then meets `disk I/O error`): the stop returns once the killed pid and
+      // the app JVM — a descendant /T ends, and the one holding the database — are both gone.
+      const killed = [target, jvm?.pid].filter((each) => each !== undefined);
+      const left = () => list().filter((row) => killed.includes(row.pid));
+      if (!(await waitUntil(() => left().length === 0, { timeoutMs: exitTimeoutMs }))) {
+        const pids = left().map((row) => row.pid);
+        throw new Error(`taskkill ended ${target}, but ${pids.join(', ')} still runs`);
+      }
+    }
   } else {
     if (advertised !== undefined) {
       try {

@@ -23,6 +23,9 @@ icu = { version = "2", features = ["compiled_data"] }
 chrono = "0.4"
 # The system's language on Windows and macOS, where no POSIX locale variable names it.
 sys-locale = "0.3"
+# A text's direction is its first letter's (roadmap item 76): `\p{L}`, Unicode's letter categories,
+# as the browser's rule matches them.
+regex = "1"
 
 [build-dependencies]
 # Reads `frontend/src/locales/<locale>.json` and `docs/api/ui-locales.json` into the constants the

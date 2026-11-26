@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "পুনরায় বরাদ্দ করা যায়নি: {error}",
   "tui.segment.editPrompt": "অংশের লেখা: {text}",
   "tui.segment.editFailed": "সম্পাদনা করা যায়নি: {error}",
-  "tui.segment.revertFailed": "পূর্বাবস্থায় ফিরিয়ে আনা যায়নি: {error}"
+  "tui.segment.revertFailed": "পূর্বাবস্থায় ফিরিয়ে আনা যায়নি: {error}",
+  "tui.help.reorder": "mlterm-এর bidi সেটিং বন্ধ রাখতে হবে: TUI নিজেই টেক্সট সাজায়।",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0-এর জন্য kitty-তে force_ltr yes দরকার: সেটি সেট করুন (অথবা kitty -o force_ltr=yes দিয়ে চালু করুন), অথবা kitty-র ডিফল্টের জন্য STT_TUI_RTL_WORDS সরিয়ে দিন।",
+  "tui.help.kittyWords": "kitty ডান-থেকে-বামের শব্দ নিজেই উল্টে দেখায়: TUI প্রতিটি শব্দ এমনভাবে লেখে যাতে kitty সেটি উল্টে দেয়; force_ltr yes থাকলে STT_TUI_RTL_WORDS=0 দিয়ে TUI চালান।"
 }

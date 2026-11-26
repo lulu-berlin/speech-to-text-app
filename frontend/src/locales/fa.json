@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "تغییر گوینده انجام نشد: {error}",
   "tui.segment.editPrompt": "متن بخش: {text}",
   "tui.segment.editFailed": "ویرایش انجام نشد: {error}",
-  "tui.segment.revertFailed": "بازگردانی انجام نشد: {error}"
+  "tui.segment.revertFailed": "بازگردانی انجام نشد: {error}",
+  "tui.help.reorder": "تنظیم bidi در mlterm باید خاموش باشد: TUI خودش متن را مرتب می‌کند.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 به force_ltr yes در kitty نیاز دارد: آن را تنظیم کنید (یا kitty -o force_ltr=yes را اجرا کنید)، یا STT_TUI_RTL_WORDS را حذف کنید تا حالت پیش‌فرض kitty بماند.",
+  "tui.help.kittyWords": "kitty خودش واژه‌های راست‌به‌چپ را وارونه می‌کند: TUI هر واژه را طوری می‌نویسد که kitty آن را وارونه کند؛ با force_ltr yes، TUI را با STT_TUI_RTL_WORDS=0 اجرا کنید."
 }

@@ -1,5 +1,7 @@
 import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { FileMessage } from '../../shared/ui/FileMessage';
+import { standaloneDirection } from '../../shared/textDirection';
 import {
   SortableContext,
   sortableKeyboardCoordinates,
@@ -150,16 +152,17 @@ function FinishNoticeLine({ notice }: { notice: FinishNotice }) {
   if (notice.status === 'COMPLETED') {
     return (
       <span>
-        {t('queue.finished.completed', { filename: notice.filename })}{' '}
+        <FileMessage id="queue.finished.completed" filename={notice.filename} />{' '}
         <TextLink to={`/history/${notice.id}`}>{t('queue.open')}</TextLink>
       </span>
     );
   }
   return (
     <span>
-      {t(notice.status === 'FAILED' ? 'queue.finished.failed' : 'queue.finished.canceled', {
-        filename: notice.filename,
-      })}{' '}
+      <FileMessage
+        id={notice.status === 'FAILED' ? 'queue.finished.failed' : 'queue.finished.canceled'}
+        filename={notice.filename}
+      />{' '}
       <TextLink to="/history">{t('queue.seeHistory')}</TextLink>
     </span>
   );
@@ -443,7 +446,7 @@ export function QueueView() {
             {visibleRows.map((row) => (
               <ListRow key={row.id}>
                 <RowContent>
-                  <RowName>{row.file.name}</RowName>
+                  <RowName dir={standaloneDirection(row.file.name)}>{row.file.name}</RowName>
                   <UploadRowTrailing row={row} tasks={tasks} waiting={upload.matches('waiting')} />
                 </RowContent>
               </ListRow>

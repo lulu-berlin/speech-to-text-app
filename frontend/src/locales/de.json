@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "Neu zuordnen fehlgeschlagen: {error}",
   "tui.segment.editPrompt": "Segmenttext: {text}",
   "tui.segment.editFailed": "Bearbeiten fehlgeschlagen: {error}",
-  "tui.segment.revertFailed": "Zurücksetzen fehlgeschlagen: {error}"
+  "tui.segment.revertFailed": "Zurücksetzen fehlgeschlagen: {error}",
+  "tui.help.reorder": "Die bidi-Einstellung von mlterm muss aus sein: Die TUI ordnet den Text selbst.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 braucht kittys force_ltr yes: Setze es (oder starte kitty -o force_ltr=yes) oder entferne STT_TUI_RTL_WORDS für kittys Standard.",
+  "tui.help.kittyWords": "kitty dreht Wörter von rechts nach links selbst um: Die TUI schreibt jedes so, dass kitty es umdreht; mit force_ltr yes starte die TUI mit STT_TUI_RTL_WORDS=0."
 }

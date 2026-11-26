@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "重新指派失敗：{error}",
   "tui.segment.editPrompt": "片段文字：{text}",
   "tui.segment.editFailed": "編輯失敗：{error}",
-  "tui.segment.revertFailed": "還原失敗：{error}"
+  "tui.segment.revertFailed": "還原失敗：{error}",
+  "tui.help.reorder": "mlterm 的 bidi 設定必須關閉: TUI 會自行排列文字。",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 需要 kitty 的 force_ltr yes: 請設定（或以 kitty -o force_ltr=yes 啟動），或移除 STT_TUI_RTL_WORDS，保留 kitty 的預設。",
+  "tui.help.kittyWords": "kitty 會自行反轉由右至左書寫的字詞: TUI 會將每個字詞寫成由 kitty 反轉的樣子；若使用 force_ltr yes，請以 STT_TUI_RTL_WORDS=0 執行 TUI。"
 }

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useIntl } from 'react-intl';
+import { FileMessage } from '../../shared/ui/FileMessage';
 import { CircleAlert } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { Link } from 'react-router';
@@ -20,6 +21,7 @@ import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { isAllowedCommand } from '../../shared/state/transitions';
 import { formatTaskMeta } from './formatTask';
+import { standaloneDirection } from '../../shared/textDirection';
 
 const Filename = styled.span`
   color: inherit;
@@ -113,7 +115,7 @@ export function HistoryRow({ task }: { task: Task }) {
     <ListRow variant="card">
       <Stack gap="xs">
         <TitleRow>
-          <TaskLink to={`/history/${task.id}`}>
+          <TaskLink to={`/history/${task.id}`} dir={standaloneDirection(task.filename)}>
             <Filename>{task.filename}</Filename>
           </TaskLink>
           <StatusBadge status={task.status} />
@@ -173,7 +175,7 @@ export function HistoryRow({ task }: { task: Task }) {
         onConfirm={() => deleteSend({ type: 'CONFIRM' })}
         onCancel={() => deleteSend({ type: 'CANCEL' })}
       >
-        {t('history.delete.body', { filename: task.filename })}
+        <FileMessage id="history.delete.body" filename={task.filename} />
       </ConfirmDialog>
     </ListRow>
   );

@@ -6,7 +6,8 @@ import { Button } from './Button';
 
 export interface ConfirmDialogProps {
   open: boolean;
-  title: string;
+  // A node, so a filename in the title can be an isolated element (item 76).
+  title: ReactNode;
   confirmLabel: string;
   onConfirm: () => void;
   onCancel: () => void;

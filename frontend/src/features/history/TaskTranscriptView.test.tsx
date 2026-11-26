@@ -22,21 +22,49 @@ import { mediaRulesFor, px, required, styleRules } from '../../test/dom';
 import { server } from '../../test/server';
 import { ThemedProviders } from '../../test/render';
 import { TaskTranscriptView } from './TaskTranscriptView';
+import arabic from '../../locales/ar.json';
+import englishText from '../../locales/en.json';
 
-function renderTranscript(taskId: string) {
-  render(
+// The app opened at a task's transcript, in whatever app language the settings name.
+function openTask(taskId: string) {
+  return render(
     <MemoryRouter initialEntries={[`/history/${taskId}`]}>
       <App />
     </MemoryRouter>,
   );
+}
+
+// The app opened at a task's transcript in English, once the connection is live.
+function renderTranscript(taskId: string) {
+  openTask(taskId);
   return screen.findByText('Live');
 }
 
-// The current segment's inline editor, opened from its Edit control; returns its field.
-function openSegmentEditor(name: string): HTMLElement {
+// The settings endpoint names `appLanguage` as the app language, so the next render is in it.
+function serveAppLanguage(appLanguage: string) {
+  server.use(
+    http.get('/api/settings', () => HttpResponse.json({ ...settingsFixture, appLanguage })),
+  );
+}
+
+// The event stream's snapshot holds exactly [tasks], with an empty, running queue.
+function serveSnapshot(tasks: unknown[]) {
+  server.use(
+    http.get('/api/events', () =>
+      eventStreamResponse([['snapshot', { tasks, queue: { paused: false, taskIds: [] } }]]),
+    ),
+  );
+}
+
+// The current segment's inline editor, opened from its Edit control; returns its field. The
+// controls are found by their labels in [catalog], the app language's (English by default).
+function openSegmentEditor(
+  name: string,
+  catalog: { 'transcript.editSegment': string; 'transcript.editor.text': string } = englishText,
+): HTMLElement {
   fireEvent.click(screen.getByRole('button', { name }));
-  fireEvent.click(screen.getByRole('button', { name: 'Edit segment' }));
-  return screen.getByLabelText('Segment text');
+  fireEvent.click(screen.getByRole('button', { name: catalog['transcript.editSegment'] }));
+  return screen.getByLabelText(catalog['transcript.editor.text']);
 }
 
 // The media element reports its playhead: moves it to `seconds` and fires the time update.
@@ -147,19 +175,7 @@ describe('the transcript view', () => {
     // Mock addition: the snapshot's task 4 is COMPLETED with speakersMode "off" (the
     // default snapshot has it FAILED, which now shows a status page). The /turns handler
     // serves turns.speakers-off.json for id 4's off mode.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskFailed, id: 4, status: 'COMPLETED', speakersMode: 'off' }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskFailed, id: 4, status: 'COMPLETED', speakersMode: 'off' }]);
     await renderTranscript('4');
 
     // The turn text (docs/api/turns.speakers-off.json) is visible.
@@ -195,19 +211,7 @@ describe('the transcript view', () => {
     // chunking may still be completed; the stock completed example has audio). The default
     // snapshot's task 7 is QUEUED, which now shows "still in the queue" instead.
     const completedWithoutAudio = { ...taskCompleted, id: 8, hasAudio: false };
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [completedWithoutAudio],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([completedWithoutAudio]);
     await renderTranscript('8');
 
     expect(screen.queryByLabelText(/Audio/)).not.toBeInTheDocument();
@@ -913,19 +917,7 @@ describe('the transcript view', () => {
 
     // Speakers off (task 4, turns.speakers-off.json): the range alone; segment 2 is [4100,7900).
     cleanup();
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskFailed, id: 4, status: 'COMPLETED', speakersMode: 'off' }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskFailed, id: 4, status: 'COMPLETED', speakersMode: 'off' }]);
     await renderTranscript('4');
     openSegmentEditor('And call the dentist on Monday.');
     expect(screen.getByRole('dialog')).toHaveAccessibleName('00:04–00:07');
@@ -1577,21 +1569,6 @@ describe('the transcript view', () => {
     expect(audio.currentTime).toBe(9.6);
   });
 
-  it("lets the editor field take the segment's own direction, not the paragraph's", async () => {
-    // User decision 2026-10-23: `dir="auto"` on the field alone makes the browser pick the
-    // direction from the segment's first strong character, whatever the paragraph does; closing
-    // the editor leaves the segment with no direction of its own (the paragraph rule applies
-    // again). jsdom does not resolve auto, so the attribute is what this pins — the browser
-    // check is the e2e journey's.
-    await renderTranscript('3');
-    const field = openSegmentEditor('Thanks for joining us today.');
-    expect(field).toHaveAttribute('dir', 'auto');
-
-    fireEvent.keyDown(field, { key: 'Escape' });
-    const segment = screen.getByRole('button', { name: 'Thanks for joining us today.' });
-    expect(segment).not.toHaveAttribute('dir');
-  });
-
   it("puts focus in the editor's field on opening it, the cursor after the last character", async () => {
     // The user's review 2026-10-23: pressing Edit must leave the user typing at once, with the
     // caret at the end of the segment's text — not on the Edit control, and not after the first
@@ -1875,16 +1852,7 @@ describe('the transcript view', () => {
   it('shows a status page for a canceled task with no error and no transcript', async () => {
     // Mock addition: the snapshot's task 5 is CANCELED (the default snapshot has it RUNNING),
     // so the canceled status page is reachable.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            { tasks: [{ ...taskCanceled, id: 5 }], queue: { paused: false, taskIds: [] } },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskCanceled, id: 5 }]);
     await renderTranscript('5');
 
     expect(await screen.findByText(/canceled while transcribing at/i)).toBeInTheDocument();
@@ -2428,19 +2396,7 @@ describe('the transcript header block', () => {
   it("shows the task's name as the heading and its finish date and duration under it", async () => {
     // finishedAt 1791537645000 -> "Oct 9, 2026" (UTC); durationMs 1185000 -> "19:45" (mm:ss),
     // the History card's format.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskCompleted, id: 3, finishedAt: 1791537645000, durationMs: 1185000 }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskCompleted, id: 3, finishedAt: 1791537645000, durationMs: 1185000 }]);
     await renderTranscript('3');
 
     const heading = await screen.findByRole('heading', { level: 2, name: 'interview.mp3' });
@@ -2454,19 +2410,7 @@ describe('the transcript header block', () => {
 describe('the themed player', () => {
   it('plays and pauses with an icon button, seeks with the Slider, shows the current and total time, and the highlight follows without native controls', async () => {
     // durationMs 1185000 -> total "19:45" and a seek bar of 1185 seconds.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskCompleted, id: 3, durationMs: 1185000 }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskCompleted, id: 3, durationMs: 1185000 }]);
     await renderTranscript('3');
     await screen.findByText('Good morning.');
 
@@ -2512,14 +2456,8 @@ describe('the themed player', () => {
     // Item 88's RTL item: the Radix slider takes the app's direction, so in Arabic the arrow
     // keys run the other way — ArrowRight decreases (toward the inline end), ArrowLeft
     // increases.
-    server.use(
-      http.get('/api/settings', () => HttpResponse.json({ ...settingsFixture, appLanguage: 'ar' })),
-    );
-    render(
-      <MemoryRouter initialEntries={['/history/3']}>
-        <App />
-      </MemoryRouter>,
-    );
+    serveAppLanguage('ar');
+    openTask('3');
 
     const seek = await screen.findByRole('slider');
     expect(seek).toHaveAttribute('aria-valuenow', '0');
@@ -2531,19 +2469,7 @@ describe('the themed player', () => {
 
   it('follows a drag on the seek bar without seeking, and seeks once when the drag is released', async () => {
     // durationMs 1185000 -> total "19:45" and a seek bar of 1185 seconds.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskCompleted, id: 3, durationMs: 1185000 }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskCompleted, id: 3, durationMs: 1185000 }]);
     await renderTranscript('3');
     await screen.findByText('Good morning.');
 
@@ -3104,19 +3030,7 @@ describe('times past one hour', () => {
     expect(screen.queryByText('61:01')).not.toBeInTheDocument();
 
     // The status page's "at" time reads the same way: transcribedUntilMs 3661000 → 1:01:01.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskFailed, id: 4, transcribedUntilMs: 3661000 }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskFailed, id: 4, transcribedUntilMs: 3661000 }]);
     await renderTranscript('4');
     expect(await screen.findByText(/failed while transcribing at 1:01:01/i)).toBeInTheDocument();
   });
@@ -3126,19 +3040,7 @@ describe('the reading column', () => {
   it("marks the transcript region with the task's exposed language", async () => {
     // Item 74: the API's task.language is whisper's detected language (the requested one as
     // fallback); the transcript carries it so fontconfig picks that script's glyph forms.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskCompleted, id: 3, language: 'ja' }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskCompleted, id: 3, language: 'ja' }]);
     await renderTranscript('3');
     await screen.findByText('Good morning.');
 
@@ -3148,19 +3050,7 @@ describe('the reading column', () => {
   it('never marks the transcript with the auto placeholder as its language', async () => {
     // Item 74 (discovered): an auto upload whose run detected nothing exposes the request's
     // placeholder "auto", which is not a language tag; the transcript then carries no lang.
-    server.use(
-      http.get('/api/events', () =>
-        eventStreamResponse([
-          [
-            'snapshot',
-            {
-              tasks: [{ ...taskCompleted, id: 3, language: 'auto' }],
-              queue: { paused: false, taskIds: [] },
-            },
-          ],
-        ]),
-      ),
-    );
+    serveSnapshot([{ ...taskCompleted, id: 3, language: 'auto' }]);
     await renderTranscript('3');
     await screen.findByText('Good morning.');
 
@@ -3210,7 +3100,8 @@ describe('the reading column', () => {
     expect(new Set(gutters).size).toBe(1);
     expect(gutters[0]).toMatch(/^\S+ 1fr$/);
     expect(gutters[0]).not.toMatch(/^(auto|max-content|min-content) /);
-    const speaker = within(row).getByText('Speaker 1');
+    // The name's own line: the block around the name, which is isolated in its own direction.
+    const speaker = required(within(row).getByText('Speaker 1').parentElement);
     expect(getComputedStyle(speaker).display).toBe('block');
     const text = required(within(row).getByText('Good morning.').closest('p'));
     expect(speaker.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -3301,12 +3192,425 @@ describe('the editor button labels', () => {
 });
 
 describe("the transcript's own direction", () => {
+  // A /turns answer with one turn per entry, alternating the two speakers, 5 s apart and 4 s long: a
+  // text is a one-segment turn, a list of texts a turn of those segments (sharing its 4 s evenly).
+  function turnsOf(entries: Array<string | string[]>): Turns {
+    let nextId = 1;
+    return {
+      speakers: turnsFixture.speakers,
+      hasMerges: false,
+      turns: entries.map((entry, index) => {
+        const texts = typeof entry === 'string' ? [entry] : entry;
+        const startMs = index * 5000;
+        const endMs = startMs + 4000;
+        const step = 4000 / texts.length;
+        return {
+          speakerId: index % 2,
+          startMs,
+          endMs,
+          text: texts.filter((text) => text !== '').join(' '),
+          segments: texts.map((text, at) => ({
+            id: nextId++,
+            startMs: startMs + at * step,
+            endMs: startMs + (at + 1) * step,
+            text,
+            edited: false,
+          })),
+        };
+      }),
+    };
+  }
+
+  // An element's resolved direction.
+  function direction(element: Element): string {
+    return getComputedStyle(element).direction;
+  }
+
+  // The resolved direction of the paragraph holding the segment named `name`.
+  async function paragraphDirection(name: string): Promise<string> {
+    const segment = await screen.findByRole('button', { name });
+    return direction(required(segment.closest('p')));
+  }
+
+  // The resolved direction of the turn row holding a turn's gutter — gutter, speaker name and
+  // text — found in the transcript region (named in the app language) by the turn's start time
+  // (written in the app language's digits).
+  function rowDirection(regionName: string, time: string): string {
+    const region = screen.getByRole('region', { name: regionName });
+    return direction(required(within(region).getByText(time).parentElement));
+  }
+
+  // Task 3 rendered with one turn per text: each turn's paragraph direction, in order. [afterRender]
+  // checks the rendered page first (its task's language, say); the render is cleaned up after.
+  async function readDirections(texts: string[], afterRender = () => {}): Promise<string[]> {
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(turnsOf(texts))));
+    await renderTranscript('3');
+    afterRender();
+    const directions = [];
+    for (const text of texts) {
+      directions.push(await paragraphDirection(text));
+    }
+    cleanup();
+    return directions;
+  }
+
   it('lets each turn take its direction from its text, not from the app language', async () => {
     // Item 88 (user decision 2026-11-13): an RTL app language must not flip an English
-    // transcript; the reading text carries dir="auto" so the browser resolves the turn's own
-    // direction (item 76 refines it per item later).
+    // transcript; item 76 decides the turn's direction from its own text.
+    serveAppLanguage('ar');
+    openTask('3');
+    await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
+    expect(await paragraphDirection('Thanks for joining us today.')).toBe('ltr');
+  });
+
+  it("gives a turn with no letter the previous turn's direction, or at the start the next lettered turn's", async () => {
+    // Item 76 (user decision 2026-11-23): digits and punctuation do not decide a direction, so a
+    // turn without a letter follows the conversation — the turn before it, or at the start of
+    // the transcript the first turn that has a letter — in an English task under an English UI.
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json(
+          turnsOf(['...', 'مرحبا بكم في البرنامج.', '12, 3.', 'Thanks for listening.']),
+        ),
+      ),
+      // Editing the Arabic turn to digits only leaves English as the only lettered turn.
+      http.put('/api/tasks/:id/segments/:segmentId', () =>
+        HttpResponse.json(turnsOf(['...', '2024.', '12, 3.', 'Thanks for listening.'])),
+      ),
+    );
     await renderTranscript('3');
-    const segment = screen.getByRole('button', { name: 'Thanks for joining us today.' });
-    expect(segment.closest('[dir="auto"]')).not.toBeNull();
+
+    expect(await paragraphDirection('...')).toBe('rtl');
+    expect(await paragraphDirection('12, 3.')).toBe('rtl');
+    expect(await paragraphDirection('Thanks for listening.')).toBe('ltr');
+
+    // An edit decides again from the stored texts: no lettered turn precedes any more, so every
+    // turn without a letter takes the English turn's direction.
+    fireEvent.change(openSegmentEditor('مرحبا بكم في البرنامج.'), { target: { value: '2024.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await paragraphDirection('2024.')).toBe('ltr');
+    expect(await paragraphDirection('...')).toBe('ltr');
+    expect(await paragraphDirection('12, 3.')).toBe('ltr');
+  });
+
+  it('mirrors each turn row — timestamp, speaker name and text — with its paragraph, and leaves the player to the app language', async () => {
+    // Item 76 (user decision 2026-11-23): a turn's timestamp and speaker name are placed like the
+    // paragraph that follows them, so an RTL turn's row resolves rtl (its gutter moves to the
+    // right, its name aligns right) and an LTR turn's ltr; the player follows the app language.
+    // jsdom has no layout: the row's resolved direction is what mirrors its grid.
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json(turnsOf(['مرحبا بكم في البرنامج.', 'Thanks for listening.'])),
+      ),
+    );
+    // The player's audio element, labelled in the app language.
+    const playerDirection = (label: string) => direction(screen.getByLabelText(label));
+
+    // English app language: the Arabic turn's row mirrors, the player does not.
+    const english = openTask('3');
+    await screen.findByRole('button', { name: 'Thanks for listening.' });
+    expect(rowDirection('Transcript', '00:00')).toBe('rtl');
+    expect(rowDirection('Transcript', '00:05')).toBe('ltr');
+    expect(playerDirection('Audio for interview.mp3')).toBe('ltr');
+    english.unmount();
+
+    // Arabic app language: the player mirrors, the English turn's row does not.
+    serveAppLanguage('ar');
+    openTask('3');
+    await screen.findByRole('button', { name: 'Thanks for listening.' });
+    await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
+    expect(rowDirection('النص', '٠٠:٠٠')).toBe('rtl');
+    expect(rowDirection('النص', '٠٠:٠٥')).toBe('ltr');
+    expect(playerDirection('صوت interview.mp3')).toBe('rtl');
+  });
+
+  // turnsOf's two turns — an English one, then an Arabic one — spoken by `12 د. أحمد` and
+  // `Speaker 1`.
+  function namedTurns(): Turns {
+    return {
+      ...turnsOf(['Thanks for listening.', 'مرحبا بكم في البرنامج.']),
+      speakers: [
+        { speakerId: 0, speaker: '12 د. أحمد' },
+        { speakerId: 1, speaker: 'Speaker 1' },
+      ],
+    };
+  }
+
+  it("orders a speaker name by its own first letter, placed in a turn by the turn's direction", async () => {
+    // Item 76 (user decisions 2026-10-23, 2026-11-23): a name's own first letter decides its
+    // order — `12 د. أحمد` is rtl, `Speaker 1` ltr — while in a turn it sits where its row puts it;
+    // the speakers panel's name fields are standalone names and follow the rule in full.
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(namedTurns())));
+    await renderTranscript('3');
+    await screen.findByRole('button', { name: 'Thanks for listening.' });
+    const region = screen.getByRole('region', { name: 'Transcript' });
+
+    // In the transcript: each name keeps its own order inside a row of the other direction.
+    expect(direction(required(within(region).getByText('00:00').parentElement))).toBe('ltr');
+    expect(direction(within(region).getByText('12 د. أحمد'))).toBe('rtl');
+    expect(direction(required(within(region).getByText('00:05').parentElement))).toBe('rtl');
+    expect(direction(within(region).getByText('Speaker 1'))).toBe('ltr');
+
+    // In the speakers panel: the name fields take their names' directions, and re-decide while
+    // a name is typed.
+    expect(direction(screen.getByLabelText('Name of speaker 1'))).toBe('rtl');
+    const second = screen.getByLabelText('Name of speaker 2');
+    expect(direction(second)).toBe('ltr');
+    fireEvent.change(second, { target: { value: 'أحمد' } });
+    expect(direction(second)).toBe('rtl');
+    fireEvent.change(second, { target: { value: 'Bob' } });
+    expect(direction(second)).toBe('ltr');
+
+    // The segment editor's title isolates the name, so the times after it keep their order.
+    openSegmentEditor('Thanks for listening.');
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName('12 د. أحمد · 00:00–00:04');
+    expect(direction(within(dialog).getByText('12 د. أحمد'))).toBe('rtl');
+  });
+
+  it('shows each speaker name in its own direction in the merge and reassign forms', async () => {
+    // Item 76: the merge form's choices, the merge confirmation and the reassign picker are
+    // standalone places for a name; the confirmation isolates each name in its own direction
+    // inside its sentence, which reads as written.
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(namedTurns())));
+    await renderTranscript('3');
+    await screen.findByRole('button', { name: 'Thanks for listening.' });
+    const panel = screen.getByRole('region', { name: 'Speakers' });
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Merge speakers…' }));
+    expect(direction(within(panel).getByText('12 د. أحمد'))).toBe('rtl');
+    expect(direction(within(panel).getByText('Speaker 1'))).toBe('ltr');
+    fireEvent.click(within(panel).getByRole('checkbox', { name: '12 د. أحمد' }));
+    fireEvent.click(within(panel).getByRole('checkbox', { name: 'Speaker 1' }));
+    const keep = within(panel).getByRole('combobox', { name: 'Keep' });
+    expect(direction(within(keep).getByRole('option', { name: '12 د. أحمد' }))).toBe('rtl');
+    expect(direction(within(keep).getByRole('option', { name: 'Speaker 1' }))).toBe('ltr');
+    fireEvent.change(keep, { target: { value: '0' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Merge' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(
+      'Merge Speaker 1 into 12 د. أحمد? Their turns join 12 د. أحمد; you can undo this.',
+    );
+    for (const survivor of within(dialog).getAllByText('12 د. أحمد')) {
+      expect(survivor.tagName).toBe('BDI');
+      expect(direction(survivor)).toBe('rtl');
+    }
+    expect(within(dialog).getByText('Speaker 1').tagName).toBe('BDI');
+    expect(direction(within(dialog).getByText('Speaker 1'))).toBe('ltr');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Reassign speakers' }));
+    const bar = screen.getByRole('region', { name: 'Reassign speakers' });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select segment starting 00:00' }));
+    fireEvent.click(within(bar).getByRole('button', { name: 'Move to…' }));
+    const picker = within(bar).getByRole('combobox', { name: 'Move to speaker' });
+    expect(direction(within(picker).getByRole('option', { name: '12 د. أحمد' }))).toBe('rtl');
+    expect(direction(within(picker).getByRole('option', { name: 'Speaker 1' }))).toBe('ltr');
+  });
+
+  it('shows a name or a filename with no letter as ltr, even under an RTL app language', async () => {
+    // Item 76 (user decision 2026-10-23): a standalone name or filename with no letter falls back
+    // to LTR — not to the app language's direction. Arabic app language; a digits-only speaker
+    // name and a digits-only file name (no extension).
+    serveAppLanguage('ar');
+    serveSnapshot([{ ...taskCompleted, id: 3, filename: '٢٠٢٤', finishedAt: 300 }]);
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json({
+          ...turnsOf(['مرحبا بكم في البرنامج.', 'Thanks for listening.']),
+          speakers: [
+            { speakerId: 0, speaker: '12' },
+            { speakerId: 1, speaker: 'Speaker 1' },
+          ],
+        }),
+      ),
+    );
+    render(
+      <MemoryRouter initialEntries={['/history']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    // The history card.
+    const card = await screen.findByRole('link', { name: '٢٠٢٤' });
+    await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
+    expect(direction(card)).toBe('ltr');
+
+    // The transcript page: its heading, the name field and the turn's name.
+    fireEvent.click(card);
+    expect(direction(await screen.findByRole('heading', { name: '٢٠٢٤' }))).toBe('ltr');
+    expect(direction(await screen.findByDisplayValue('12'))).toBe('ltr');
+    const transcript = screen.getByRole('region', { name: arabic['transcript.label'] });
+    expect(direction(within(transcript).getByText('12'))).toBe('ltr');
+
+    // The merge form's label and Keep option, and the reassign picker's option.
+    const panel = screen.getByRole('region', { name: arabic['transcript.speakers.label'] });
+    fireEvent.click(
+      within(panel).getByRole('button', { name: arabic['transcript.speakers.merge'] }),
+    );
+    expect(direction(within(panel).getByText('12'))).toBe('ltr');
+    fireEvent.click(within(panel).getByRole('checkbox', { name: '12' }));
+    const keep = within(panel).getByRole('combobox', { name: arabic['transcript.speakers.keep'] });
+    expect(direction(within(keep).getByRole('option', { name: '12' }))).toBe('ltr');
+    fireEvent.click(
+      within(panel).getByRole('button', { name: arabic['transcript.speakers.close'] }),
+    );
+    fireEvent.click(
+      within(panel).getByRole('button', { name: arabic['transcript.reassign.label'] }),
+    );
+    const bar = screen.getByRole('region', { name: arabic['transcript.reassign.label'] });
+    fireEvent.click(within(transcript).getAllByRole('checkbox')[1]!);
+    fireEvent.click(
+      within(bar).getByRole('button', { name: arabic['transcript.reassign.moveTo'] }),
+    );
+    const picker = within(bar).getByRole('combobox', {
+      name: arabic['transcript.reassign.moveToSpeaker'],
+    });
+    expect(direction(within(picker).getByRole('option', { name: '12' }))).toBe('ltr');
+  });
+
+  it("aligns the open segment editor by the segment's own first letter, not its paragraph's", async () => {
+    // Item 76 (user decision 2026-10-23, item 52): while the editor is open its field takes the
+    // segment's own direction — `12 مرحبا` is rtl inside an LTR paragraph — and follows the draft;
+    // closing it leaves the segment without a direction of its own, under the paragraph's.
+    server.use(
+      http.get('/api/tasks/:id/turns', () => HttpResponse.json(turnsWithSegmentTwo('12 مرحبا'))),
+    );
+    await renderTranscript('3');
+    const field = openSegmentEditor('12 مرحبا');
+    expect(direction(field)).toBe('rtl');
+    // The page behind the modal editor is hidden from the accessibility tree: read it by its text.
+    expect(direction(required(screen.getByText('Good morning.').closest('p')))).toBe('ltr');
+
+    fireEvent.change(field, { target: { value: 'Hello there' } });
+    expect(direction(field)).toBe('ltr');
+
+    fireEvent.keyDown(field, { key: 'Escape' });
+    const segment = screen.getByRole('button', { name: '12 مرحبا' });
+    expect(segment).not.toHaveAttribute('dir');
+    expect(direction(segment)).toBe('ltr');
+  });
+
+  it("gives the editor of a segment with no letter its paragraph's direction, or the app language's", async () => {
+    // Item 76 (user decision 2026-11-25): a draft without a letter takes its paragraph's
+    // direction — the turn's, which a letter-less turn takes from its neighbours — and when no turn
+    // has a letter, the app language's.
+    server.use(
+      http.get('/api/tasks/:id/turns', () =>
+        HttpResponse.json(turnsOf(['مرحبا بكم في البرنامج.', '2024.'])),
+      ),
+    );
+    await renderTranscript('3');
+    const field = openSegmentEditor('2024.');
+    expect(direction(field)).toBe('rtl');
+    fireEvent.keyDown(field, { key: 'Escape' });
+    cleanup();
+
+    serveAppLanguage('ar');
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(turnsOf(['12', '...']))));
+    openTask('3');
+    await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
+    await screen.findByRole('button', { name: '...' });
+    expect(direction(openSegmentEditor('...', arabic))).toBe('rtl');
+  });
+
+  it("makes an RTL-first paragraph rtl whatever the task's language, digits and punctuation before it included", async () => {
+    // Item 76 (user decision 2026-10-23): the first letter decides; digits (Western or
+    // Arabic-Indic) and punctuation before it do not, and the task's language plays no part —
+    // `en` (task 3) and `auto` alike.
+    const texts = ['١٢، مرحبا بكم', '(2024) «مرحبا»'];
+    // The task's language marks the transcript (item 74): this render is the `en` task.
+    expect(
+      await readDirections(texts, () =>
+        expect(screen.getByRole('region', { name: 'Transcript' })).toHaveAttribute('lang', 'en'),
+      ),
+    ).toEqual(['rtl', 'rtl']);
+
+    // An `auto` task's transcript carries no language: this render is the `auto` task.
+    serveSnapshot([{ ...taskCompleted, id: 3, language: 'auto' }]);
+    expect(
+      await readDirections(texts, () =>
+        expect(screen.getByRole('region', { name: 'Transcript' })).not.toHaveAttribute('lang'),
+      ),
+    ).toEqual(['rtl', 'rtl']);
+  });
+
+  it('decides the direction per paragraph: a Latin-first turn after an RTL one is ltr, and the RTL ones stay rtl', async () => {
+    // Item 76 (user decision 2026-10-23): direction is per paragraph, not per transcript — the
+    // first turn does not decide the others, in either direction.
+    expect(
+      await readDirections(['مرحبا بكم في البرنامج.', 'Thanks for joining us.', 'شكرا لكم.']),
+    ).toEqual(['rtl', 'ltr', 'rtl']);
+    expect(
+      await readDirections(['Thanks for joining us.', 'مرحبا بكم في البرنامج.', 'Good night.']),
+    ).toEqual(['ltr', 'rtl', 'ltr']);
+  });
+
+  it("gives the paragraphs of a transcript without any letter the app language's direction", async () => {
+    // Item 76 (user decision 2026-11-23): with no letter in any turn there is no neighbour to
+    // follow, so the paragraphs take the app language's direction — they inherit the document's.
+    const texts = ['12, 3.', '...'];
+
+    expect(
+      await readDirections(texts, () =>
+        expect([rowDirection('Transcript', '00:00'), rowDirection('Transcript', '00:05')]).toEqual([
+          'ltr',
+          'ltr',
+        ]),
+      ),
+    ).toEqual(['ltr', 'ltr']);
+
+    serveAppLanguage('ar');
+    server.use(http.get('/api/tasks/:id/turns', () => HttpResponse.json(turnsOf(texts))));
+    openTask('3');
+    await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
+    for (const text of texts) {
+      expect(await paragraphDirection(text)).toBe('rtl');
+    }
+    expect([
+      rowDirection(arabic['transcript.label'], '٠٠:٠٠'),
+      rowDirection(arabic['transcript.label'], '٠٠:٠٥'),
+    ]).toEqual(['rtl', 'rtl']);
+  });
+
+  it('keeps a Latin-first mixed paragraph ltr, its Arabic run inside it as stored and without a direction of its own', async () => {
+    // Item 76 (decided 2026-10-28): `WHO: مرحبا بكم` is an LTR paragraph — its later Arabic run
+    // does not flip it; the run is ordered RTL by the browser's bidi algorithm inside it, so no
+    // element within the paragraph carries a `dir` (the real order is the e2e's to see).
+    expect(await readDirections(['WHO: مرحبا بكم', 'مرحبا WHO'])).toEqual(['ltr', 'rtl']);
+
+    server.use(
+      http.get('/api/tasks/:id/turns', () => HttpResponse.json(turnsOf(['WHO: مرحبا بكم']))),
+    );
+    await renderTranscript('3');
+    const paragraph = required(
+      (await screen.findByRole('button', { name: 'WHO: مرحبا بكم' })).closest('p'),
+    );
+    expect(paragraph.textContent?.trim()).toBe('WHO: مرحبا بكم');
+    expect(paragraph.querySelectorAll('[dir]')).toHaveLength(0);
+  });
+
+  it("decides a turn's direction from its stored texts, never from an empty segment's placeholder", async () => {
+    // Item 76 (discovered): an empty first segment shows the app language's placeholder ([empty] /
+    // [فارغ]) first in its paragraph; the stored segment texts decide the direction, not it.
+    server.use(
+      http.get('/api/tasks/:id/turns', () => HttpResponse.json(turnsOf([['', 'مرحبا بكم']]))),
+    );
+    await renderTranscript('3');
+    expect(
+      await screen.findByRole('button', { name: englishText['transcript.empty'] }),
+    ).toBeVisible();
+    expect(await paragraphDirection('مرحبا بكم')).toBe('rtl');
+    cleanup();
+
+    serveAppLanguage('ar');
+    server.use(
+      http.get('/api/tasks/:id/turns', () => HttpResponse.json(turnsOf([['', 'Hello there']]))),
+    );
+    openTask('3');
+    await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
+    expect(await screen.findByRole('button', { name: arabic['transcript.empty'] })).toBeVisible();
+    expect(await paragraphDirection('Hello there')).toBe('ltr');
   });
 });

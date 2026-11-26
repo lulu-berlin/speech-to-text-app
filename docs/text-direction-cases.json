@@ -1,0 +1,150 @@
+{
+  "letters": [
+    { "text": "Good morning.", "direction": "ltr", "why": "Latin first letter" },
+    { "text": "مرحبا بكم في البرنامج.", "direction": "rtl", "why": "Arabic first letter" },
+    {
+      "text": "12. مرحبا",
+      "direction": "rtl",
+      "why": "digits and punctuation before the first letter do not decide"
+    },
+    {
+      "text": "١٢، مرحبا",
+      "direction": "rtl",
+      "why": "Arabic-Indic digits and the Arabic comma do not decide either"
+    },
+    {
+      "text": "(2024) Hello",
+      "direction": "ltr",
+      "why": "brackets and digits before a Latin letter do not decide"
+    },
+    {
+      "text": "«مرحبا»",
+      "direction": "rtl",
+      "why": "a quotation mark before the first letter does not decide"
+    },
+    {
+      "text": "WHO: مرحبا",
+      "direction": "ltr",
+      "why": "a mixed text takes its first letter's direction: Latin"
+    },
+    {
+      "text": "مرحبا WHO",
+      "direction": "rtl",
+      "why": "a mixed text takes its first letter's direction: Arabic"
+    },
+    {
+      "text": "12 د. أحمد",
+      "direction": "rtl",
+      "why": "a name after a number: the first letter is Arabic"
+    },
+    { "text": "Speaker 1", "direction": "ltr", "why": "the default speaker name" },
+    {
+      "text": "12, 3.",
+      "direction": "none",
+      "why": "digits and punctuation only: no letter, no direction of its own"
+    },
+    { "text": "...", "direction": "none", "why": "punctuation only" },
+    { "text": "", "direction": "none", "why": "an empty text" },
+    {
+      "text": "سپاس",
+      "direction": "rtl",
+      "why": "Persian: Arabic script with its own letters (پ)"
+    },
+    {
+      "text": "ٹھیک ہے",
+      "direction": "rtl",
+      "why": "Urdu: Arabic script with its own letters (ٹ ھ ے)"
+    },
+    {
+      "text": "ڄڻ",
+      "direction": "rtl",
+      "why": "Sindhi: Arabic script with its own letters (ڄ ڻ)"
+    },
+    {
+      "text": "ښه",
+      "direction": "rtl",
+      "why": "Pashto: Arabic script with its own letters (ښ)"
+    },
+    { "text": "שלום", "direction": "rtl", "why": "Hebrew" },
+    {
+      "text": "װאָס מאַכסטו",
+      "direction": "rtl",
+      "why": "Yiddish: Hebrew script with its own letters (װ)"
+    },
+    { "text": "ܫܠܡܐ", "direction": "rtl", "why": "Syriac" },
+    { "text": "ދިވެހި", "direction": "rtl", "why": "Thaana" },
+    { "text": "ߒߞߏ", "direction": "rtl", "why": "N'Ko" },
+    {
+      "text": "Привет",
+      "direction": "ltr",
+      "why": "Cyrillic: any script that is not right-to-left is ltr"
+    },
+    {
+      "text": "你好",
+      "direction": "ltr",
+      "why": "Han: any script that is not right-to-left is ltr"
+    },
+    {
+      "text": "\ufb2a",
+      "direction": "rtl",
+      "why": "a Hebrew presentation form (U+FB2A, the U+FB1D–FDFF range)"
+    },
+    {
+      "text": "\ufee3\ufeae",
+      "direction": "rtl",
+      "why": "Arabic presentation forms (U+FEE3, the U+FE70–FEFF range)"
+    },
+    {
+      "text": "\ud803\udc00",
+      "direction": "rtl",
+      "why": "Old Turkic (U+10C00, the U+10800–10FFF range)"
+    },
+    {
+      "text": "\ud83a\udd00",
+      "direction": "rtl",
+      "why": "Adlam (U+1E900, the U+1E800–1EFFF range)"
+    },
+    {
+      "text": "\u0651Hello",
+      "direction": "ltr",
+      "why": "a combining mark (the Arabic shadda) is not a letter and does not decide"
+    }
+  ],
+  "turns": [
+    {
+      "texts": ["...", "مرحبا بكم", "12, 3.", "Thanks."],
+      "directions": ["rtl", "rtl", "rtl", "ltr"],
+      "why": "a turn without a letter takes the previous turn's direction, at the start the next lettered turn's"
+    },
+    {
+      "texts": ["Hello.", "12", "مرحبا", "..."],
+      "directions": ["ltr", "ltr", "rtl", "rtl"],
+      "why": "each turn without a letter follows the lettered turn before it"
+    },
+    {
+      "texts": ["...", "12", "Hello.", "مرحبا"],
+      "directions": ["ltr", "ltr", "ltr", "rtl"],
+      "why": "several turns without a letter at the start take the first lettered turn's direction"
+    },
+    {
+      "texts": ["12", "...", ""],
+      "directions": ["none", "none", "none"],
+      "why": "no turn has a letter: no turn has a direction of its own"
+    }
+  ],
+  "standalone": [
+    { "text": "12", "direction": "ltr", "why": "a name with no letter falls back to ltr" },
+    {
+      "text": "٢٠٢٤",
+      "direction": "ltr",
+      "why": "a filename of Arabic-Indic digits falls back to ltr"
+    },
+    { "text": "...", "direction": "ltr", "why": "punctuation only falls back to ltr" },
+    {
+      "text": "محاضرة.wav",
+      "direction": "rtl",
+      "why": "a lettered filename keeps its own direction"
+    },
+    { "text": "Speaker 1", "direction": "ltr", "why": "a lettered name keeps its own direction" }
+  ]
+}

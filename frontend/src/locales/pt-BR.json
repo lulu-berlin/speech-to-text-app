@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "falha na reatribuição: {error}",
   "tui.segment.editPrompt": "Texto do segmento: {text}",
   "tui.segment.editFailed": "falha ao editar: {error}",
-  "tui.segment.revertFailed": "falha ao reverter: {error}"
+  "tui.segment.revertFailed": "falha ao reverter: {error}",
+  "tui.help.reorder": "A configuração bidi do mlterm precisa estar desativada: a TUI ordena o texto por conta própria.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 requer force_ltr yes no kitty: defina-o (ou inicie kitty -o force_ltr=yes), ou remova STT_TUI_RTL_WORDS para manter o padrão do kitty.",
+  "tui.help.kittyWords": "O kitty inverte sozinho as palavras da direita para a esquerda: a TUI escreve cada uma para o kitty invertê-la; com force_ltr yes, execute a TUI com STT_TUI_RTL_WORDS=0."
 }
