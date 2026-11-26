@@ -15,7 +15,10 @@ mod terminal;
 use std::time::Duration;
 
 use serde_json::json;
-use terminal::{OpenTranscript, open_transcript_sized, open_transcript_sized_on, style, token};
+use terminal::{
+    EventService, OpenTranscript, Tui, open_transcript_sized, open_transcript_sized_on, style,
+    token,
+};
 
 const WAIT: Duration = Duration::from_secs(20);
 /// Twenty seconds of silence at 16 kHz, mono: long enough for the five-second seek into the RTL turn.
@@ -75,14 +78,20 @@ fn turns_with_arabic_name() -> String {
 /// Opens [`turns`] with a clip, playing from the start, so a five-second seek reaches the RTL turn.
 fn open_rtl_playing() -> OpenTranscript {
     let mut open = open_transcript_sized_on(&turns(), 80, &[("STT_AUDIO_SINK", "frozen")]);
-    open.tui.press(b" ");
-    open.service
-        .next_get_from(&open.tui, WAIT)
+    play_from_start(&open.service, &mut open.tui);
+    open
+}
+
+/// Starts the transcript's playback with Space - the service answers the clip's GET - and waits
+/// until it plays from the start.
+fn play_from_start(service: &EventService, tui: &mut Tui) {
+    tui.press(b" ");
+    service
+        .next_get_from(tui, WAIT)
         .answer_bytes("200 OK", CLIP);
-    open.tui.wait_for(WAIT, |text| {
+    tui.wait_for(WAIT, |text| {
         text.contains("0:00 / 19:45") && text.contains('⏸')
     });
-    open
 }
 
 /// The screen row whose text holds `needle`.
@@ -268,13 +277,8 @@ fn with_rtl_words_a_click_and_the_cursor_land_where_the_words_are_drawn() {
 
     // Playing from the start, the first segment is the playhead's: its words are filled in the
     // accent role where kitty draws them.
-    tui.press(b" ");
-    service
-        .next_get_from(&tui, WAIT)
-        .answer_bytes("200 OK", CLIP);
-    let scene = tui.wait_for_scene(WAIT, |text| {
-        text.contains("0:00 / 19:45") && text.contains('⏸')
-    });
+    play_from_start(&service, &mut tui);
+    let scene = tui.wait_for_scene(WAIT, |text| text.contains('⏸'));
     let first = "רב שלום";
     let row = scene.row_of(first);
     assert_eq!(
