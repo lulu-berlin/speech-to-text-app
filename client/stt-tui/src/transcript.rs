@@ -295,6 +295,30 @@ impl Transcript {
         self.edit.as_ref().map(|(_, text)| text.as_str())
     }
 
+    /// The direction of the paragraph - the turn - holding the edit prompt's segment, by the rule
+    /// the transcript draws its turns with (roadmap item 76): `None` while no prompt is open, or
+    /// when no turn has a letter.
+    pub fn edit_paragraph(&self) -> Option<stt_client::direction::Direction> {
+        let (segment, _) = self.edit.as_ref()?;
+        let turns = &self.turns.turns;
+        let index = turns
+            .iter()
+            .position(|turn| turn.segments.iter().any(|stored| stored.id == *segment))?;
+        let texts: Vec<String> = turns
+            .iter()
+            .map(|turn| {
+                turn.segments
+                    .iter()
+                    .map(|stored| stored.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .collect();
+        stt_client::direction::turn_directions(
+            &texts.iter().map(String::as_str).collect::<Vec<_>>(),
+        )[index]
+    }
+
     /// Whether the edit prompt's segment was edited, so Ctrl-R there has whisper's text to restore.
     pub fn edit_reverts(&self) -> bool {
         self.edit

@@ -205,15 +205,12 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) -> Rect {
         );
         cursor_at_end(frame, areas[2], "tui.speakers.rename", "name", name);
     }
-    if let Some(text) = view.edit {
-        frame.render_widget(
-            Paragraph::new(stt_client::text(
-                "tui.segment.editPrompt",
-                &[("text", text)],
-            )),
-            areas[2],
-        );
-        cursor_at_end(frame, areas[2], "tui.segment.editPrompt", "text", text);
+    if let Some(draft) = view.edit {
+        let paragraph = match view.screen {
+            Screen::Transcript(transcript) => transcript.edit_paragraph(),
+            _ => None,
+        };
+        draw_edit_prompt(frame, areas[2], view, draft, paragraph);
     }
     if let Some(notice) = view.notice {
         frame.render_widget(Paragraph::new(notice), areas[3]);
@@ -3657,6 +3654,83 @@ fn cursor_at_end(frame: &mut Frame, area: Rect, key: &str, placeholder: &str, dr
     let column =
         prefix_width(key, placeholder) + u16::try_from(text_width(draft)).unwrap_or(u16::MAX);
     cursor(frame, area, 0, column);
+}
+
+/// The segment edit prompt on `area`'s row (roadmap item 76): its label, then a field to the row's
+/// end holding the draft - ordered for the terminal in the draft's own first letter's direction (a
+/// draft without a letter takes its `paragraph`'s, left to right when that has none either) and
+/// aligned by it, its start behind a `…` when it does not fit - and the cursor where the next
+/// letter typed in the draft's last letter's direction appears.
+fn draw_edit_prompt(
+    frame: &mut Frame,
+    area: Rect,
+    view: &View<'_>,
+    draft: &str,
+    paragraph: Option<stt_client::direction::Direction>,
+) {
+    use stt_client::direction::{Direction, letter_direction};
+    let label_width = prefix_width("tui.segment.editPrompt", "text");
+    let field_width = usize::from(area.width.saturating_sub(label_width));
+    let field = if view.no_color {
+        Style::new()
+    } else {
+        Style::new()
+            .fg(view.theme.text)
+            .bg(view.theme.surface_raised)
+    };
+    let direction = letter_direction(draft)
+        .or(paragraph)
+        .unwrap_or(Direction::Ltr);
+    // A cell is kept for the next letter, so the cursor always has one.
+    let shown = draft_tail(
+        draft,
+        u16::try_from(field_width.saturating_sub(1)).unwrap_or(u16::MAX),
+    );
+    // The row's field: the ordered glyphs, against the field's start or, right to left, its end.
+    let laid_out = |glyphs: Vec<Glyph>| {
+        let ordered = visual_order(glyphs, direction);
+        let blanks = std::iter::repeat_n(
+            (field, " ".to_string(), None),
+            field_width.saturating_sub(glyphs_width(&ordered)),
+        );
+        match direction {
+            Direction::Rtl => blanks.chain(ordered).collect::<Vec<Glyph>>(),
+            Direction::Ltr => ordered.into_iter().chain(blanks).collect(),
+        }
+    };
+    // The cursor goes where the next letter appears: the draft laid out with one more letter, in
+    // its last letter's direction, marks that cell.
+    let next = match last_letter_direction(&shown).unwrap_or(direction) {
+        Direction::Rtl => "א",
+        Direction::Ltr => "x",
+    };
+    let mut probed: Vec<Glyph> = glyphs_of(&[(field, shown.clone())]).collect();
+    probed.push((field, next.to_string(), Some(0)));
+    let probed = laid_out(probed);
+    let at = probed
+        .iter()
+        .position(|glyph| glyph.2.is_some())
+        .map_or(0, |index| glyphs_width(&probed[..index]));
+    let mut line = vec![Span::raw(stt_client::text(
+        "tui.segment.editPrompt",
+        &[("text", "")],
+    ))];
+    line.extend(spans_of(&laid_out(glyphs_of(&[(field, shown)]).collect())));
+    frame.render_widget(Paragraph::new(Line::from(line)), area);
+    cursor(
+        frame,
+        area,
+        0,
+        label_width + u16::try_from(at).unwrap_or(u16::MAX),
+    );
+}
+
+/// The direction of `text`'s last letter, if it has one.
+fn last_letter_direction(text: &str) -> Option<stt_client::direction::Direction> {
+    let mut buffer = [0u8; 4];
+    text.chars().rev().find_map(|character| {
+        stt_client::direction::letter_direction(character.encode_utf8(&mut buffer))
+    })
 }
 
 /// The catalog text `key` with `args` filled in and its keys highlighted in the accent colour, or

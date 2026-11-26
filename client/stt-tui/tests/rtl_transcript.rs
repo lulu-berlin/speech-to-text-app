@@ -220,3 +220,97 @@ fn the_playing_segment_is_filled_in_an_rtl_row() {
         scene.text()
     );
 }
+
+/// The edit prompt's label.
+const LABEL: &str = "Segment text: ";
+/// The prompt's field at 80 columns: the row after the label.
+const FIELD: usize = 80 - 14;
+
+/// Whether `screen` shows the edit prompt's row as `cells`, left to right (its trailing blanks
+/// aside), with the cursor shown on that row at `column`.
+fn prompt_shows(screen: &vt100::Screen, cells: &str, column: usize) -> bool {
+    if screen.hide_cursor() {
+        return false;
+    }
+    let text = terminal::screen_text(screen);
+    let Some((index, _)) = text
+        .lines()
+        .enumerate()
+        .find(|(_, line)| line.starts_with(LABEL) && line.trim_end() == cells)
+    else {
+        return false;
+    };
+    let (row, at) = screen.cursor_position();
+    index == row as usize && at as usize == column
+}
+
+/// Erases `text`'s characters from the prompt, one Backspace each.
+fn erase(tui: &mut terminal::Tui, text: &str) {
+    for _ in text.chars() {
+        tui.press(b"\x7f");
+    }
+}
+
+#[test]
+fn the_edit_prompt_draws_a_hebrew_draft_in_visual_order_with_the_cursor_where_typing_goes() {
+    let OpenTranscript {
+        service: _service,
+        mut tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript_sized(&turns(), 80);
+    tui.wait_for(WAIT, |text| text.contains(AFTER));
+
+    // The first segment's text replaced by a Hebrew one, as the user did: `e` opens the prompt on
+    // the first segment's text, Backspace clears its characters, and the Hebrew is typed.
+    let draft = "שלום רב מה שלומך";
+    tui.press(b"e");
+    tui.wait_for(WAIT, |text| text.contains("Segment text: WHO:"));
+    erase(&mut tui, MIXED);
+    tui.press(draft.as_bytes());
+
+    // A draft that is all Hebrew is one right-to-left run, right-aligned in the field after the
+    // label: the cells hold it reversed, against the row's end. Each new letter lands left of the
+    // run, so the cursor sits on the free cell there.
+    let width = draft.chars().count();
+    let cells = format!("{LABEL}{}{}", " ".repeat(FIELD - width), reversed(draft));
+    tui.wait_for_screen(WAIT, |screen| {
+        prompt_shows(screen, &cells, 14 + FIELD - width - 1)
+    });
+
+    // Erased back and retyped with a Latin first letter, the draft is left to right again, from
+    // the field's start; its Arabic run is reversed in place, and the next Arabic letter lands at
+    // that run's left end, so the cursor sits on the run's first cell.
+    erase(&mut tui, draft);
+    tui.press("WHO: مرحبا".as_bytes());
+    let cells = format!("{LABEL}WHO: {}", reversed("مرحبا"));
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 14 + 5));
+
+    // A draft wider than the field shows its end, the part being typed: its start is cut behind a
+    // `…`, which a right-to-left draft shows at the right; one cell stays free for the cursor.
+    erase(&mut tui, "WHO: مرحبا");
+    let long = [draft; 5].join(" ");
+    tui.press(long.as_bytes());
+    let tail: String = long
+        .chars()
+        .skip(long.chars().count() - (FIELD - 2))
+        .collect();
+    let cells = format!("{LABEL} {}…", reversed(&tail));
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 14));
+
+    // A draft without a letter takes its paragraph's direction: in the Arabic turn, `2024` is
+    // right-aligned, the cursor left of it.
+    tui.press(b"\x1b");
+    tui.wait_for(WAIT, |text| !text.contains(LABEL));
+    let with_number = format!("{} 2024 {}", reversed("بدأنا"), reversed("في عام"));
+    tui.press(b"j");
+    tui.wait_for_highlight(WAIT, &with_number);
+    tui.press(b"e");
+    tui.wait_for(WAIT, |text| text.contains(LABEL));
+    erase(&mut tui, WITH_NUMBER);
+    tui.press(b"2024");
+    let cells = format!("{LABEL}{}2024", " ".repeat(FIELD - 4));
+    tui.wait_for_screen(WAIT, |screen| {
+        prompt_shows(screen, &cells, 14 + FIELD - 4 - 1)
+    });
+}
