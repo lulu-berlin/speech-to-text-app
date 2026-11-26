@@ -75,6 +75,25 @@ fn turns_with_arabic_name() -> String {
     turns_of([MIXED, WITH_NUMBER, AFTER], "أحمد")
 }
 
+/// One Hebrew turn of two segments: `שלום רב` first, `מה שלומך` second.
+fn two_segment_hebrew_turn() -> String {
+    json!({
+        "hasMerges": false,
+        "speakers": [{"speakerId": 0, "speaker": "Speaker 1"}],
+        "turns": [{
+            "speakerId": 0,
+            "startMs": 0,
+            "endMs": 4000,
+            "text": "שלום רב מה שלומך",
+            "segments": [
+                {"id": 1, "startMs": 0, "endMs": 2000, "text": "שלום רב", "edited": false},
+                {"id": 2, "startMs": 2000, "endMs": 4000, "text": "מה שלומך", "edited": false},
+            ],
+        }],
+    })
+    .to_string()
+}
+
 /// Opens [`turns`] with a clip, playing from the start, so a five-second seek reaches the RTL turn.
 fn open_rtl_playing() -> OpenTranscript {
     let mut open = open_transcript_sized_on(&turns(), 80, &[("STT_AUDIO_SINK", "frozen")]);
@@ -208,31 +227,16 @@ fn with_rtl_words_each_rtl_word_keeps_its_letters_in_typed_order() {
 
 #[test]
 fn with_rtl_words_a_click_and_the_cursor_land_where_the_words_are_drawn() {
-    // One Hebrew turn of two segments: `שלום רב` first, `מה שלומך` second. Read from the right
-    // edge, the first segment's words come first - so left to right the row holds the second
-    // segment's words, then the first's, each word in typed order for kitty to turn.
-    let turns = json!({
-        "hasMerges": false,
-        "speakers": [{"speakerId": 0, "speaker": "Speaker 1"}],
-        "turns": [{
-            "speakerId": 0,
-            "startMs": 0,
-            "endMs": 4000,
-            "text": "שלום רב מה שלומך",
-            "segments": [
-                {"id": 1, "startMs": 0, "endMs": 2000, "text": "שלום רב", "edited": false},
-                {"id": 2, "startMs": 2000, "endMs": 4000, "text": "מה שלומך", "edited": false},
-            ],
-        }],
-    })
-    .to_string();
+    // [`two_segment_hebrew_turn`]: read from the right edge, the first segment's words come first
+    // - so left to right the row holds the second segment's words, then the first's, each word in
+    // typed order for kitty to turn.
     let OpenTranscript {
         service,
         mut tui,
         stream: _stream,
         state: _state,
     } = open_transcript_sized_on(
-        &turns,
+        &two_segment_hebrew_turn(),
         80,
         &[("STT_TUI_RTL_WORDS", "1"), ("STT_AUDIO_SINK", "frozen")],
     );
