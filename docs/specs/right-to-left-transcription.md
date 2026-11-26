@@ -235,10 +235,10 @@ chrome follow the app language, item 88.)
       of direction cases
 - [x] (discovered) A download of a task with a non-ASCII name (an RTL one included) keeps that name:
       the browser saves `محاضرة الأحد.txt`, not `transcript.txt`
-- [ ] (discovered) The TUI's segment edit prompt draws its draft in visual order after its label —
+- [x] (discovered) The TUI's segment edit prompt draws its draft in visual order after its label —
       the draft's own first letter's direction, a draft without a letter its turn's, and with no
-      lettered turn the app language's — and the cursor sits where the next typed letter appears: a
-      Hebrew draft reads correctly on screen, not backwards
+      lettered turn left to right, as the TUI's rows — and the cursor sits where the next typed
+      letter appears: a Hebrew draft reads correctly on screen, not backwards
 - [ ] (discovered) The TUI's speaker rename prompt draws the name in visual order by its own first
       letter, the cursor where the next typed letter appears (cycle 18's caret test, which asserted
       the logical order, is corrected)
@@ -486,6 +486,24 @@ chrome follow the app language, item 88.)
   restarts the per-user service whose sessions live in the process; CI's `gradle e2e` mode sets
   `E2E_BACKEND_CMD` and does not hit it). The RTL spec also passed alone in 24.4s. The two
   `(after item 70)` items stay unticked: they are item 70's implementation.
+
+- **Cycle 21 — 2026-11-26 — (discovered) the TUI's edit prompt draws its draft in visual order.**
+  Test: `client/stt-tui/tests/rtl_transcript.rs`
+  (`the_edit_prompt_draws_a_hebrew_draft_in_visual_order_with_the_cursor_where_typing_goes`). Red
+  at `ae3c7929` with the test uncommitted: the prompt's cells held the Hebrew draft in typed order.
+  Green: `a8a3a3e5` (the tree the green run was on) — client `cargo fmt --check`, `cargo clippy
+  --all-targets -- -D warnings`, `cargo test` green. Make it right (the user's choices, in the same
+  commit): the draft sits in a visible field after the label, right-aligned when RTL; a draft
+  without a letter takes its turn's direction; the cursor sits where the next letter in the draft's
+  last letter's direction appears; the direction is re-decided as the draft is typed; a draft wider
+  than the field shows its end behind a `…`. The user's visual check in kitty: with
+  `kitty -o force_ltr=yes` the draft and the transcript read correctly (the make-it-run build);
+  kitty's default mode reverses the letters of each RTL word itself, which became the kitty item.
+  Refactors (approved), each green on its own tree (client fmt, clippy, `cargo test`): `c0eddfdb`
+  `Transcript::paragraph_directions` computes the turns' directions once for the rows and the
+  prompt; `68fcc0a5` the prompt takes its label once; `c9e588b6` `last_letter_direction` moves to
+  `stt_client::direction`. The item's "app language's" fallback was reworded, at the user's choice,
+  to the TUI's left to right.
 
 ## Approval log
 
