@@ -242,6 +242,12 @@ chrome follow the app language, item 88.)
 - [ ] (discovered) The TUI's speaker rename prompt draws the name in visual order by its own first
       letter, the cursor where the next typed letter appears (cycle 18's caret test, which asserted
       the logical order, is corrected)
+- [ ] (discovered) In kitty's default mode (`force_ltr no`, which turns each right-to-left word's
+      letters itself and keeps the words left to right), an opt-in TUI setting makes the TUI write
+      each RTL word's letters in typed order while it orders the words and aligns the line, so the
+      text reads correctly and Arabic joins; the cursor, selection and clicks keep the drawn
+      positions; the `?` reference names `force_ltr yes` (or `kitty -o force_ltr=yes`) and the
+      setting when the environment names kitty
 
 ## Acceptance criteria
 
@@ -524,8 +530,14 @@ chrome follow the app language, item 88.)
   a non-ASCII name keeps that name (the end-to-end download of cycle 13 found it saved as
   `transcript.txt`): 20 items.
 - 2026-11-26 (workspace, the user's choices): two discovered items added after the user's report
-  that a segment edited to Hebrew in the TUI (kitty, which applies no bidi) read backwards — the
-  edit prompt and the rename prompt draw their draft in visual order, the cursor where the next
-  typed letter appears (an RTL draft's leftmost cell): 22 items. The draft's direction is the
-  2026-11-25 editor rule; the prompt's label is chrome and stays left to right. The cycles go on
-  top of the prepared commit `8c5a430e` (PR #143), which the root agent re-squashes.
+  that a segment edited to Hebrew in the TUI read backwards in kitty — the edit prompt and the
+  rename prompt draw their draft in visual order, the cursor where the next typed letter appears:
+  22 items. The draft's direction is the 2026-11-25 editor rule; the prompt's label is chrome and
+  stays left to right; an RTL draft is right-aligned in a visible field after the label. The cycles
+  go on top of the prepared commit `8c5a430e` (PR #143), which the root agent re-squashes.
+- 2026-11-26 (workspace, the user's choice): the user's screenshots showed kitty is not a terminal
+  without bidi: its default `force_ltr no` turns each RTL word's letters itself (the TUI's ordered
+  rows read with their letters backwards), and with `kitty -o force_ltr=yes` the transcript reads
+  correctly. A program can neither read nor set `force_ltr` (kitty's `query-terminal` does not
+  answer it), so the user chose an opt-in TUI setting for kitty's default mode, with the `?`
+  reference naming both: one discovered item, 23 items.
