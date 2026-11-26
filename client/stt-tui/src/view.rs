@@ -3050,27 +3050,20 @@ fn turn_rows(
         stt_client::direction::Direction::Ltr
     };
     // The speaker's name in its own direction, placed by the turn (as the browser isolates it).
-    let name: Vec<Glyph> = visual_order(
-        glyphs_of(&[(tint, name.to_string())]).collect(),
-        stt_client::direction::standalone_direction(name),
+    let name = written(
+        view,
+        visual_order(
+            glyphs_of(&[(tint, name.to_string())]).collect(),
+            stt_client::direction::standalone_direction(name),
+        ),
     );
-    let name = if view.rtl_words {
-        typed_words(name)
-    } else {
-        name
-    };
     let gap: Vec<Glyph> = glyphs_of(&[(Style::new(), "  ".to_string())]).collect();
     let clock: Vec<Glyph> = glyphs_of(&[(clock_style, time)]).collect();
     let header = header_row(name, gap, clock, width, rtl);
     let mut wrapped = vec![header];
     for row in wrap_tagged(&runs, width, &indent, &indent) {
         let content: Vec<Glyph> = row.into_iter().skip(after_time).collect();
-        let ordered = visual_order(content, base);
-        let ordered = if view.rtl_words {
-            typed_words(ordered)
-        } else {
-            ordered
-        };
+        let ordered = written(view, visual_order(content, base));
         let blank = (Style::new(), " ".to_string(), None);
         let mut line = Vec::new();
         if rtl {
@@ -3285,6 +3278,16 @@ fn typed_words(mut glyphs: Vec<Glyph>) -> Vec<Glyph> {
         }
     }
     glyphs
+}
+
+/// `glyphs`, in visual order, as the TUI writes them to the terminal: under `STT_TUI_RTL_WORDS`
+/// each right-to-left word's letters in typed order ([`typed_words`]), otherwise as ordered.
+fn written(view: &View<'_>, glyphs: Vec<Glyph>) -> Vec<Glyph> {
+    if view.rtl_words {
+        typed_words(glyphs)
+    } else {
+        glyphs
+    }
 }
 
 /// The turn's header row, `width` columns wide: its time and its speaker's name, the name in its
@@ -3749,12 +3752,7 @@ fn draw_typed_prompt(
     let mut line = vec![Span::raw(label)];
     // The cursor's cell above is counted in the visual order, where the terminal shows the draft;
     // kitty's default mode only has each RTL word's letters written in typed order.
-    let drawn = laid_out(glyphs_of(&[(field, shown)]).collect());
-    let drawn = if view.rtl_words {
-        typed_words(drawn)
-    } else {
-        drawn
-    };
+    let drawn = written(view, laid_out(glyphs_of(&[(field, shown)]).collect()));
     line.extend(spans_of(&drawn));
     frame.render_widget(Paragraph::new(Line::from(line)), area);
     cursor(
