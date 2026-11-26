@@ -33,8 +33,9 @@ fn reversed(run: &str) -> String {
     run.chars().rev().collect()
 }
 
-/// Three one-segment turns, 5 s apart, alternating Speaker 1 and Speaker 2.
-fn turns() -> String {
+/// Three one-segment turns with `texts`, 5 s apart, alternating the first speaker (named `first`)
+/// and Speaker 2.
+fn turns_of(texts: [&str; 3], first: &str) -> String {
     let turn = |index: u64, text: &str| {
         json!({
             "speakerId": index % 2,
@@ -53,17 +54,22 @@ fn turns() -> String {
     json!({
         "hasMerges": false,
         "speakers": [
-            {"speakerId": 0, "speaker": "Speaker 1"},
+            {"speakerId": 0, "speaker": first},
             {"speakerId": 1, "speaker": "Speaker 2"},
         ],
-        "turns": [turn(0, MIXED), turn(1, WITH_NUMBER), turn(2, AFTER)],
+        "turns": [turn(0, texts[0]), turn(1, texts[1]), turn(2, texts[2])],
     })
     .to_string()
 }
 
+/// The mixed, the Arabic and the Latin turn, Speaker 1's and Speaker 2's.
+fn turns() -> String {
+    turns_of([MIXED, WITH_NUMBER, AFTER], "Speaker 1")
+}
+
 /// [`turns`] with the first speaker named in Arabic, for the rename caret and the playing row.
 fn turns_with_arabic_name() -> String {
-    turns().replace("Speaker 1", "أحمد")
+    turns_of([MIXED, WITH_NUMBER, AFTER], "أحمد")
 }
 
 /// Opens [`turns`] with a clip, playing from the start, so a five-second seek reaches the RTL turn.
@@ -138,9 +144,7 @@ fn with_rtl_words_each_rtl_word_keeps_its_letters_in_typed_order() {
     // to right; with STT_TUI_RTL_WORDS set (any value but `0`) the TUI orders the words and aligns
     // the rows, and writes each RTL word's letters in typed order for kitty to turn. The transcript:
     // an Arabic speaker name, an Arabic comma after a word, and a Hebrew word with niqqud.
-    let seeded = turns_with_arabic_name()
-        .replace(MIXED, "WHO: مرحبا، بكم")
-        .replace(AFTER, "Thanks שָׁלוֹם.");
+    let seeded = turns_of(["WHO: مرحبا، بكم", WITH_NUMBER, "Thanks שָׁלוֹם."], "أحمد");
     let OpenTranscript {
         service: _service,
         mut tui,
