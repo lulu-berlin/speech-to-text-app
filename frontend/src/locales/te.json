@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "వక్తను మార్చలేకపోయాం: {error}",
   "tui.segment.editPrompt": "విభాగం టెక్స్ట్: {text}",
   "tui.segment.editFailed": "సవరణ విఫలమైంది: {error}",
-  "tui.segment.revertFailed": "పూర్వస్థితికి మార్చలేకపోయాం: {error}"
+  "tui.segment.revertFailed": "పూర్వస్థితికి మార్చలేకపోయాం: {error}",
+  "tui.help.reorder": "mlterm యొక్క bidi సెట్టింగ్ ఆఫ్‌లో ఉండాలి: TUI టెక్స్ట్‌ను స్వయంగా క్రమంలో పెడుతుంది.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 కి kitty లో force_ltr yes అవసరం: దాన్ని సెట్ చేయండి (లేదా kitty -o force_ltr=yes తో ప్రారంభించండి), లేదా kitty డిఫాల్ట్ కోసం STT_TUI_RTL_WORDS ను తీసివేయండి.",
+  "tui.help.kittyWords": "kitty కుడి నుండి ఎడమకు రాసే పదాలను తానే తిప్పుతుంది: kitty తిప్పేలా TUI ప్రతి పదాన్ని రాస్తుంది; force_ltr yes అయితే STT_TUI_RTL_WORDS=0 తో TUI ను నడపండి."
 }

@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "वक्ता बदलता आले नाही: {error}",
   "tui.segment.editPrompt": "विभागाचा मजकूर: {text}",
   "tui.segment.editFailed": "संपादन अयशस्वी: {error}",
-  "tui.segment.revertFailed": "पूर्वस्थितीत आणता आले नाही: {error}"
+  "tui.segment.revertFailed": "पूर्वस्थितीत आणता आले नाही: {error}",
+  "tui.help.reorder": "mlterm चे bidi सेटिंग बंद असणे आवश्यक आहे: TUI स्वतः मजकूर क्रमाने लावते.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 साठी kitty मध्ये force_ltr yes हवे: ते सेट करा (किंवा kitty -o force_ltr=yes ने सुरू करा), किंवा kitty चे पूर्वनिर्धारित ठेवण्यासाठी STT_TUI_RTL_WORDS काढा.",
+  "tui.help.kittyWords": "kitty उजवीकडून-डावीकडे शब्द स्वतः उलटवते: TUI प्रत्येक शब्द असा लिहिते की kitty तो उलटवेल; force_ltr yes असल्यास TUI ला STT_TUI_RTL_WORDS=0 सह चालवा."
 }

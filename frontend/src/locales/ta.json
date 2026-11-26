@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "பேச்சாளர் மாற்றம் தோல்வி: {error}",
   "tui.segment.editPrompt": "பிரிவு உரை: {text}",
   "tui.segment.editFailed": "திருத்தம் தோல்வி: {error}",
-  "tui.segment.revertFailed": "மீளமைப்பு தோல்வி: {error}"
+  "tui.segment.revertFailed": "மீளமைப்பு தோல்வி: {error}",
+  "tui.help.reorder": "mlterm இன் bidi அமைப்பு அணைக்கப்பட வேண்டும்: TUI தானே உரையை வரிசைப்படுத்துகிறது.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 க்கு kitty இல் force_ltr yes தேவை: அதை அமைக்கவும் (அல்லது kitty -o force_ltr=yes உடன் தொடங்கவும்), அல்லது kitty இன் இயல்புநிலைக்கு STT_TUI_RTL_WORDS ஐ நீக்கவும்.",
+  "tui.help.kittyWords": "kitty வலமிருந்து இடமாக எழுதும் சொற்களைத் தானே திருப்புகிறது: kitty திருப்பும் வகையில் TUI ஒவ்வொரு சொல்லையும் எழுதுகிறது; force_ltr yes எனில் STT_TUI_RTL_WORDS=0 உடன் TUI ஐ இயக்கவும்."
 }

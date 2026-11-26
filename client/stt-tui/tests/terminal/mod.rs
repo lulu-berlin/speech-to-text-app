@@ -126,18 +126,9 @@ impl Tui {
         let mut command = CommandBuilder::new(program);
         command.env("STT_CONFIG_DIR", state);
         command.env("STT_RUNTIME_DIR", state);
-        // The test decides the environment's proxy and colour choices: a CI or developer shell
-        // that exports them must not decide for it. The terminal reports true colour unless a test
-        // says otherwise.
-        command.env_remove("NO_COLOR");
-        command.env("COLORTERM", "truecolor");
-        // The app's language (item 88) comes from the system's: a developer's or CI's own locale
-        // must not decide what the test reads, so it starts in English and a test that wants
-        // another language sets `LC_ALL` itself.
-        for key in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {
-            command.env_remove(key);
-        }
-        command.env("LC_ALL", "C.UTF-8");
+        // The test decides the environment: a CI or developer shell's proxy, colour, language and
+        // terminal choices must not decide for it. Each variable below is removed, and a test that
+        // wants one sets it itself.
         for key in [
             "HTTP_PROXY",
             "HTTPS_PROXY",
@@ -147,9 +138,23 @@ impl Tui {
             "https_proxy",
             "all_proxy",
             "no_proxy",
+            "NO_COLOR",
+            // The app's language (item 88) comes from the system's.
+            "LANGUAGE",
+            "LC_ALL",
+            "LC_MESSAGES",
+            "LANG",
+            // A developer's kitty (its window id) or an explicit STT_TUI_RTL_WORDS must not turn
+            // kitty's default mode on.
+            "KITTY_WINDOW_ID",
+            "STT_TUI_RTL_WORDS",
         ] {
             command.env_remove(key);
         }
+        // The terminal names no kitty and reports true colour, and the app starts in English.
+        command.env("TERM", "xterm-256color");
+        command.env("COLORTERM", "truecolor");
+        command.env("LC_ALL", "C.UTF-8");
         for (key, value) in env {
             command.env(key, value);
         }
@@ -848,16 +853,22 @@ pub fn open_transcript_with(turns: &str) -> OpenTranscript {
 
 /// Opens `interview.mp3`'s transcript, its turns read as `turns`, in a terminal `cols` wide.
 pub fn open_transcript_sized(turns: &str, cols: u16) -> OpenTranscript {
+    open_transcript_sized_on(turns, cols, &[])
+}
+
+/// [`open_transcript_sized`] with `env` set on the TUI, for a transcript that plays on a sink.
+pub fn open_transcript_sized_on(turns: &str, cols: u16, env: &[(&str, &str)]) -> OpenTranscript {
     const SNAPSHOT: &str = include_str!("../../../../docs/api/snapshot.json");
     const WAIT: Duration = Duration::from_secs(20);
     let service = EventService::start();
     let state = tempfile::tempdir().unwrap();
     crate::support::write_bootstrap(state.path(), service.port);
-    let mut tui = Tui::start(
+    let mut tui = Tui::start_with_env(
         env!("CARGO_BIN_EXE_stt-tui").as_ref(),
         state.path(),
         cols,
         24,
+        env,
     );
     let mut stream = service.next_stream(WAIT);
     stream.send("snapshot", SNAPSHOT);

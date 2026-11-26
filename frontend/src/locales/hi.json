@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "फिर से असाइन करना विफल: {error}",
   "tui.segment.editPrompt": "खंड का पाठ: {text}",
   "tui.segment.editFailed": "संपादन विफल: {error}",
-  "tui.segment.revertFailed": "पूर्ववत करना विफल: {error}"
+  "tui.segment.revertFailed": "पूर्ववत करना विफल: {error}",
+  "tui.help.reorder": "mlterm की bidi सेटिंग बंद होनी चाहिए: TUI टेक्स्ट को खुद क्रम में लगाता है।",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 के लिए kitty में force_ltr yes चाहिए: इसे सेट करें (या kitty -o force_ltr=yes से शुरू करें), या kitty का डिफ़ॉल्ट रखने के लिए STT_TUI_RTL_WORDS हटाएँ।",
+  "tui.help.kittyWords": "kitty दाएँ-से-बाएँ शब्दों को खुद उलट देता है: TUI हर शब्द को ऐसे लिखता है कि kitty उसे उलट दे; force_ltr yes हो तो TUI को STT_TUI_RTL_WORDS=0 के साथ चलाएँ।"
 }

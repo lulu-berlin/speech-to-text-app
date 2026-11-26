@@ -103,6 +103,15 @@ pub struct View<'a> {
     pub history_offset: &'a std::cell::Cell<usize>,
     /// The footer hints a click performs, as the last frame drew them.
     pub footer_hits: &'a std::cell::RefCell<Vec<FooterHint>>,
+    /// Whether the environment names an emulator that reorders text itself: the key reference
+    /// then adds the notice that its setting must be off.
+    pub reorders: bool,
+    /// Whether the TUI writes for kitty's default mode (`rtl_words`): each right-to-left word is
+    /// written in typed order, for the terminal to turn.
+    pub rtl_words: bool,
+    /// Whether the environment names kitty: the key reference then adds the notice on its
+    /// `force_ltr` and `STT_TUI_RTL_WORDS`.
+    pub kitty: bool,
 }
 
 impl<'a> View<'a> {
@@ -195,22 +204,31 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) -> Rect {
         areas[1]
     };
     draw_screen(frame, page, view);
+    // A speaker's name in its own direction (a standalone text, left to right without a letter); a
+    // segment's draft in its own first letter's, else its paragraph's, else left to right.
     if let Some(name) = view.rename {
-        frame.render_widget(
-            Paragraph::new(stt_client::text("tui.speakers.rename", &[("name", name)])),
+        draw_typed_prompt(
+            frame,
             areas[2],
+            view,
+            ("tui.speakers.rename", "name"),
+            name,
+            stt_client::direction::standalone_direction(name),
         );
-        cursor_at_end(frame, areas[2], "tui.speakers.rename", "name", name);
     }
-    if let Some(text) = view.edit {
-        frame.render_widget(
-            Paragraph::new(stt_client::text(
-                "tui.segment.editPrompt",
-                &[("text", text)],
-            )),
+    if let Some(draft) = view.edit {
+        let paragraph = match view.screen {
+            Screen::Transcript(transcript) => transcript.edit_paragraph(),
+            _ => None,
+        };
+        draw_typed_prompt(
+            frame,
             areas[2],
+            view,
+            ("tui.segment.editPrompt", "text"),
+            draft,
+            stt_client::direction::editor_direction(draft, paragraph),
         );
-        cursor_at_end(frame, areas[2], "tui.segment.editPrompt", "text", text);
     }
     if let Some(notice) = view.notice {
         frame.render_widget(Paragraph::new(notice), areas[3]);
@@ -321,6 +339,41 @@ pub struct Dialog {
     pub confirm: String,
 }
 
+/// A notice's lines, split at the colon so the reference's table stays narrow: the catalog's `key`
+/// names the terminal's setting and why. Empty when no catalog text carries the key.
+fn notice_lines(key: &str) -> (String, String) {
+    let text = stt_client::text(key, &[]);
+    match text.split_once(": ") {
+        Some((first, second)) => (first.to_string(), second.to_string()),
+        None => (text, String::new()),
+    }
+}
+
+/// Whether the environment names an emulator that reorders text itself (mlterm, through `TERM`
+/// or `MLTERM`): the TUI orders each wrapped line itself, so its bidi setting must be off.
+pub fn reorders_text() -> bool {
+    std::env::var("TERM").is_ok_and(|value| value.contains("mlterm"))
+        || std::env::var("MLTERM").is_ok_and(|value| !value.is_empty())
+}
+
+/// Whether the environment names kitty - its `TERM`, or `KITTY_WINDOW_ID`, which a multiplexer
+/// run inside kitty keeps: kitty turns each right-to-left word's letters itself unless its
+/// `force_ltr` is on.
+pub fn kitty_text() -> bool {
+    std::env::var("TERM").is_ok_and(|value| value.contains("kitty"))
+        || std::env::var("KITTY_WINDOW_ID").is_ok_and(|value| !value.is_empty())
+}
+
+/// Whether the TUI writes for kitty's default mode (`force_ltr no`), which turns each right-to-left
+/// word's letters itself: `STT_TUI_RTL_WORDS=0` says no (kitty with `force_ltr yes`), any other
+/// value yes; unset or empty, the environment decides - yes where it names kitty (`kitty_text`).
+pub fn rtl_words() -> bool {
+    match std::env::var("STT_TUI_RTL_WORDS") {
+        Ok(value) if !value.is_empty() => value != "0",
+        _ => kitty_text(),
+    }
+}
+
 /// The page's full key reference, over the screen, as btop's help: a table of every key of the page,
 /// `Key:` in the accent and `Description:` muted, whether it can act now or not (the footer shows
 /// those that can, and leaves the rest to `? more`), and how to close it. A table taller than the
@@ -358,6 +411,9 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
     );
     lines.push(Line::default());
     lines.push(hint(view, "tui.help.close", &[]));
+    for line in &table.notices {
+        lines.push(Line::styled(line.clone(), fg(view, view.theme.muted)));
+    }
     let mut block = dialog_block(view, stt_client::text(help_title(view.screen), &[]))
         .padding(ratatui::widgets::Padding::horizontal(1));
     let more = fg(view, view.theme.muted);
@@ -374,7 +430,8 @@ fn draw_help(frame: &mut Frame, view: &View<'_>) {
 }
 
 /// The rows the key reference keeps around its table rows: its two borders, the header, a blank row
-/// and the line saying how to close it.
+/// and the line saying how to close it. The notices the environment calls for add their rows
+/// (`help_notices`), counted beside this constant.
 const HELP_CHROME: u16 = 5;
 /// The spaces between the key reference's columns.
 const HELP_GAP: usize = 4;
@@ -387,6 +444,8 @@ struct HelpTable {
     key_width: usize,
     first: usize,
     visible: usize,
+    /// The notices' rows under the table (`help_notices`), each notice after a blank row.
+    notices: Vec<String>,
 }
 
 /// Where the key reference is drawn over `frame`: what a click outside it is measured against.
@@ -421,18 +480,20 @@ fn help_table(frame: Rect, view: &View<'_>, scroll: usize) -> HelpTable {
         .chain([width_of(&stt_client::text("tui.help.description", &[]))])
         .max()
         .unwrap_or(0);
-    let visible = entries
-        .len()
-        .min(usize::from(frame.height.saturating_sub(2 + HELP_CHROME)))
-        .max(1)
-        .min(entries.len());
-    let first = scroll.min(entries.len() - visible);
     let close = crate::hints::line("tui.help.close", &[], Some(Color::Reset)).width();
     let title = width_of(&stt_client::text(help_title(screen), &[]));
     let content = (key_width + HELP_GAP + words_width).max(close).max(title);
     // The borders and a column of padding inside each.
     let width = (content as u16 + 4).min(frame.width);
-    let height = (visible as u16 + HELP_CHROME).min(frame.height);
+    let notices = help_notices(view, width.saturating_sub(4));
+    let chrome = HELP_CHROME + notices.len() as u16;
+    let visible = entries
+        .len()
+        .min(usize::from(frame.height.saturating_sub(2 + chrome)))
+        .max(1)
+        .min(entries.len());
+    let first = scroll.min(entries.len() - visible);
+    let height = (visible as u16 + chrome).min(frame.height);
     HelpTable {
         area: Rect {
             x: frame.x + (frame.width - width) / 2,
@@ -444,7 +505,39 @@ fn help_table(frame: Rect, view: &View<'_>, scroll: usize) -> HelpTable {
         key_width,
         first,
         visible,
+        notices,
     }
+}
+
+/// The notices the environment calls for under the key reference's table, as rows `width`
+/// columns wide: each after a blank row, split at its colon (`notice_lines`) and wrapped, so a long
+/// notice - or a long translation - never widens the reference. mlterm's names its bidi setting;
+/// kitty's names `force_ltr` and `STT_TUI_RTL_WORDS`, or says the mode is on.
+fn help_notices(view: &View<'_>, width: u16) -> Vec<String> {
+    let mut keys = Vec::new();
+    if view.reorders {
+        keys.push("tui.help.reorder");
+    }
+    if view.kitty {
+        keys.push(if view.rtl_words {
+            "tui.help.kittyWords"
+        } else {
+            "tui.help.kitty"
+        });
+    }
+    let mut rows = Vec::new();
+    for key in keys {
+        rows.push(String::new());
+        let (first, second) = notice_lines(key);
+        for part in [first, second].into_iter().filter(|part| !part.is_empty()) {
+            rows.extend(
+                wrap_tagged(&[(Style::new(), part, None)], width, &[], &[])
+                    .into_iter()
+                    .map(|row| row.into_iter().map(|glyph| glyph.1).collect::<String>()),
+            );
+        }
+    }
+    rows
 }
 
 /// The rows a modal has inside its border: what a list drawn in one shows at once.
@@ -2277,13 +2370,7 @@ fn draw_history_controls(
 ) {
     let muted = fg(view, view.theme.muted);
     let key = fg(view, view.theme.accent);
-    let raised = if view.no_color {
-        Style::new()
-    } else {
-        Style::new()
-            .fg(view.theme.text)
-            .bg(view.theme.surface_raised)
-    };
+    let raised = raised(view);
     // The query - its whole characters that fit after the field's leading blank - then blanks to
     // the field's width, counted in display columns, as drawn.
     let query = format!(
@@ -2856,15 +2943,16 @@ fn draw_transcript(frame: &mut Frame, area: Rect, view: &View<'_>, transcript: &
     let mut blocks: Vec<(u16, usize)> = Vec::new();
     // The segments counted over the turns, as the cursor counts them.
     let mut flat = 0usize;
+    let directions = transcript.paragraph_directions();
     for (turn_index, turn) in turns.turns.iter().enumerate() {
         let wrapped = turn_rows(
             view,
             transcript,
             turn_index,
             flat,
-            current,
             playing,
             inner.width,
+            directions[turn_index],
         );
         flat += turn.segments.len();
         blocks.push((wrapped.len() as u16, turn.segments.len().max(1)));
@@ -2912,22 +3000,23 @@ fn draw_transcript(frame: &mut Frame, area: Rect, view: &View<'_>, transcript: &
 }
 
 /// Turn `turn_index`'s rows, `width` columns wide: its speaker's name in the speaker's tint, then
-/// its segments - the cursor's (`current`) highlighted and the playhead's (`playing`) in the
-/// accent, each with its box while segments are marked - and its time under the name; each
-/// character carries the segment it shows, counted from `first`, the turn's first segment as the
-/// cursor counts them.
+/// its segments - the cursor's highlighted and the playhead's (`playing`) in the accent, each with
+/// its box while segments are marked - and its time under the name; each character carries the
+/// segment it shows, counted from `first`, the turn's first segment as the cursor counts them.
+/// The turn's `direction` orders each row (roadmap item 76): an RTL turn is mirrored.
 fn turn_rows(
     view: &View<'_>,
     transcript: &Transcript,
     turn_index: usize,
     first: usize,
-    current: Option<(usize, usize)>,
     playing: Option<(usize, usize)>,
     width: u16,
+    direction: Option<stt_client::direction::Direction>,
 ) -> Vec<Vec<Glyph>> {
     let turns = &transcript.turns;
     let turn = &turns.turns[turn_index];
     let marking = transcript.marking();
+    let current = transcript.position();
     let name = turns
         .speakers
         .iter()
@@ -2988,14 +3077,40 @@ fn turn_rows(
             Some(flat),
         ));
     }
-    let header: Vec<Glyph> = glyphs_of(&[
-        (clock_style, time),
-        (Style::new(), "  ".to_string()),
-        (tint, name.to_string()),
-    ])
-    .collect();
+    let rtl = direction == Some(stt_client::direction::Direction::Rtl);
+    let base = if rtl {
+        stt_client::direction::Direction::Rtl
+    } else {
+        stt_client::direction::Direction::Ltr
+    };
+    // The speaker's name in its own direction, placed by the turn (as the browser isolates it).
+    let name = written(
+        view,
+        visual_order(
+            glyphs_of(&[(tint, name.to_string())]).collect(),
+            stt_client::direction::standalone_direction(name),
+        ),
+    );
+    let gap: Vec<Glyph> = glyphs_of(&[(Style::new(), "  ".to_string())]).collect();
+    let clock: Vec<Glyph> = glyphs_of(&[(clock_style, time)]).collect();
+    let header = header_row(name, gap, clock, width, rtl);
     let mut wrapped = vec![header];
-    wrapped.extend(wrap_tagged(&runs, width, &indent, &indent));
+    for row in wrap_tagged(&runs, width, &indent, &indent) {
+        let content: Vec<Glyph> = row.into_iter().skip(after_time).collect();
+        let ordered = written(view, visual_order(content, base));
+        let blank = (Style::new(), " ".to_string(), None);
+        let mut line = Vec::new();
+        if rtl {
+            let pad = (width as usize).saturating_sub(after_time + glyphs_width(&ordered));
+            line.extend(std::iter::repeat_n(blank.clone(), pad));
+            line.extend(ordered);
+            line.extend(std::iter::repeat_n(blank, after_time));
+        } else {
+            line.extend(std::iter::repeat_n(blank, after_time));
+            line.extend(ordered);
+        }
+        wrapped.push(line);
+    }
     wrapped
 }
 
@@ -3160,6 +3275,54 @@ fn glyphs_of(parts: &[(Style, String)]) -> impl Iterator<Item = Glyph> + '_ {
     parts.iter().flat_map(|(style, text)| {
         crate::graphemes::of(text).map(move |cluster| (*style, cluster.to_string(), None))
     })
+}
+
+/// `glyphs` in the order the terminal draws them: its runs ordered by the Unicode bidi algorithm
+/// with `base` as the paragraph's direction, a paired bracket in a right-to-left run mirrored
+/// (roadmap item 76).
+fn visual_order(glyphs: Vec<Glyph>, base: stt_client::direction::Direction) -> Vec<Glyph> {
+    crate::bidi::visual(
+        glyphs,
+        |glyph| glyph.1.as_str(),
+        |glyph, mirrored| glyph.1 = mirrored,
+        base,
+    )
+}
+
+/// `glyphs`, in visual order, as the TUI writes them to the terminal: for kitty's default mode
+/// (`rtl_words`) each right-to-left word's letters in typed order (`bidi::typed_words`), otherwise
+/// as ordered.
+fn written(view: &View<'_>, glyphs: Vec<Glyph>) -> Vec<Glyph> {
+    if view.rtl_words {
+        crate::bidi::typed_words(glyphs, |glyph| glyph.1.as_str())
+    } else {
+        glyphs
+    }
+}
+
+/// The turn's header row, `width` columns wide: its time and its speaker's name, the name in its
+/// own direction and the two placed by the turn's - an RTL turn's against the right edge, padded
+/// on the left, an LTR turn's from the left.
+fn header_row(
+    name: Vec<Glyph>,
+    gap: Vec<Glyph>,
+    clock: Vec<Glyph>,
+    width: u16,
+    rtl: bool,
+) -> Vec<Glyph> {
+    let (parts, padded) = if rtl {
+        ([name, gap, clock], true)
+    } else {
+        ([clock, gap, name], false)
+    };
+    let mut row = parts.concat();
+    if padded {
+        let pad = (width as usize).saturating_sub(glyphs_width(&row));
+        let mut padded_row = vec![(Style::new(), " ".to_string(), None); pad];
+        padded_row.extend(row);
+        row = padded_row;
+    }
+    row
 }
 
 /// The columns `text` takes on screen: two for each wide (CJK, emoji) character, none for a
@@ -3492,6 +3655,17 @@ fn highlight(view: &View<'_>) -> Style {
     }
 }
 
+/// A typed field's style: the body text on the raised surface, or nothing when `NO_COLOR` is set.
+fn raised(view: &View<'_>) -> Style {
+    if view.no_color {
+        Style::new()
+    } else {
+        Style::new()
+            .fg(view.theme.text)
+            .bg(view.theme.surface_raised)
+    }
+}
+
 /// The width of a catalog template's text before its `{placeholder}`, in columns: where a draft
 /// filled into it starts.
 fn prefix_width(key: &str, placeholder: &str) -> u16 {
@@ -3536,11 +3710,67 @@ fn cursor(frame: &mut Frame, area: Rect, row: u16, column: u16) {
     frame.set_cursor_position((area.x + column, area.y + row));
 }
 
-/// Shows the cursor after a draft that fills `key`'s `{placeholder}`, on `area`'s first row.
-fn cursor_at_end(frame: &mut Frame, area: Rect, key: &str, placeholder: &str, draft: &str) {
-    let column =
-        prefix_width(key, placeholder) + u16::try_from(text_width(draft)).unwrap_or(u16::MAX);
-    cursor(frame, area, 0, column);
+/// A text prompt on `area`'s row - the segment edit and the speaker rename (roadmap item 76): the
+/// catalog template `key`'s label, then a field to the row's end holding `draft`, which fills its
+/// `{placeholder}` - ordered for the terminal in `direction` and aligned by it, its start behind a
+/// `…` when it does not fit - and the cursor where the next letter typed in the draft's last
+/// letter's direction appears.
+fn draw_typed_prompt(
+    frame: &mut Frame,
+    area: Rect,
+    view: &View<'_>,
+    (key, placeholder): (&str, &str),
+    draft: &str,
+    direction: stt_client::direction::Direction,
+) {
+    use stt_client::direction::{Direction, last_letter_direction};
+    // The catalog template ends in its draft: the label is the template with the draft empty.
+    let label = stt_client::text(key, &[(placeholder, "")]);
+    let label_width = u16::try_from(text_width(&label)).unwrap_or(u16::MAX);
+    let field_width = usize::from(area.width.saturating_sub(label_width));
+    let field = raised(view);
+    // A cell is kept for the next letter, so the cursor always has one.
+    let shown = draft_tail(
+        draft,
+        u16::try_from(field_width.saturating_sub(1)).unwrap_or(u16::MAX),
+    );
+    // The row's field: the ordered glyphs, against the field's start or, right to left, its end.
+    let laid_out = |glyphs: Vec<Glyph>| {
+        let ordered = visual_order(glyphs, direction);
+        let blanks = std::iter::repeat_n(
+            (field, " ".to_string(), None),
+            field_width.saturating_sub(glyphs_width(&ordered)),
+        );
+        match direction {
+            Direction::Rtl => blanks.chain(ordered).collect::<Vec<Glyph>>(),
+            Direction::Ltr => ordered.into_iter().chain(blanks).collect(),
+        }
+    };
+    // The cursor goes where the next letter appears: the draft laid out with one more letter, in
+    // its last letter's direction, marks that cell.
+    let next = match last_letter_direction(&shown).unwrap_or(direction) {
+        Direction::Rtl => "א",
+        Direction::Ltr => "x",
+    };
+    let mut probed: Vec<Glyph> = glyphs_of(&[(field, shown.clone())]).collect();
+    probed.push((field, next.to_string(), Some(0)));
+    let probed = laid_out(probed);
+    let at = probed
+        .iter()
+        .position(|glyph| glyph.2.is_some())
+        .map_or(0, |index| glyphs_width(&probed[..index]));
+    let mut line = vec![Span::raw(label)];
+    // The cursor's cell above is counted in the visual order, where the terminal shows the draft;
+    // kitty's default mode only has each RTL word's letters written in typed order.
+    let drawn = written(view, laid_out(glyphs_of(&[(field, shown)]).collect()));
+    line.extend(spans_of(&drawn));
+    frame.render_widget(Paragraph::new(Line::from(line)), area);
+    cursor(
+        frame,
+        area,
+        0,
+        label_width + u16::try_from(at).unwrap_or(u16::MAX),
+    );
 }
 
 /// The catalog text `key` with `args` filled in and its keys highlighted in the accent colour, or

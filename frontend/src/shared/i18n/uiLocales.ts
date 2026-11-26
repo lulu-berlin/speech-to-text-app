@@ -3,8 +3,7 @@
 // every locale, its own name and its whisper transcription code are readable without the app.
 import { uiLocales } from '../api/fixtures';
 import { CATALOGS } from './catalogs';
-
-export type TextDirection = 'ltr' | 'rtl';
+import type { TextDirection } from '../textDirection';
 
 export interface UiLocale {
   code: string;

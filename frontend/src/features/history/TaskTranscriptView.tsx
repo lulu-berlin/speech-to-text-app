@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useIntl } from 'react-intl';
+import { FileMessage } from '../../shared/ui/FileMessage';
 import { MoreVertical } from 'lucide-react';
 import { useMachine } from '@xstate/react';
 import { useNavigate, useParams } from 'react-router';
@@ -26,6 +27,7 @@ import { currentSegmentAt } from './segmentTiming';
 import { commandMachine } from '../../shared/state/commandMachine';
 import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { formatDuration } from '../../shared/formatDuration';
+import { standaloneDirection } from '../../shared/textDirection';
 import { formatTaskMeta } from './formatTask';
 import { TranscriptTurns } from './TranscriptTurns';
 import { AudioPlayer, playheadMs } from './AudioPlayer';
@@ -730,6 +732,9 @@ export function TaskTranscriptView() {
     );
   }
 
+  // The page's heading in every state: the file name in its own direction (item 76).
+  const title = <Title dir={standaloneDirection(task.filename)}>{task.filename}</Title>;
+
   // The shared delete confirmation, opened by the Delete button in either branch. The
   // dialog's open/closed lives in confirmActionMachine (confirming/running), not React state.
   const deleteDialog = (
@@ -742,7 +747,7 @@ export function TaskTranscriptView() {
       onConfirm={() => deleteSend({ type: 'CONFIRM' })}
       onCancel={() => deleteSend({ type: 'CANCEL' })}
     >
-      {t('history.delete.body', { filename: task.filename })}
+      <FileMessage id="history.delete.body" filename={task.filename} />
     </ConfirmDialog>
   );
 
@@ -751,7 +756,7 @@ export function TaskTranscriptView() {
     return (
       <Page measure="reading">
         <Stack gap="md">
-          <Title>{task.filename}</Title>
+          {title}
           <Text>{t('transcript.pending')}</Text>
           <TextLink to="/queue">{t('transcript.goToQueue')}</TextLink>
         </Stack>
@@ -804,7 +809,7 @@ export function TaskTranscriptView() {
     return (
       <Page measure="reading">
         <Stack gap="md">
-          <Title>{task.filename}</Title>
+          {title}
           <Text>{outcomeLine}</Text>
           {task.error !== null ? (
             <Text>{t('transcript.error', { message: task.error })}</Text>
@@ -839,7 +844,7 @@ export function TaskTranscriptView() {
     <Page measure="reading">
       <Stack gap="md">
         <Stack gap="xs">
-          <Title>{task.filename}</Title>
+          {title}
           <MetaText>{formatTaskMeta(task, intl)}</MetaText>
         </Stack>
         {audioBlock}
@@ -929,7 +934,11 @@ export function TaskTranscriptView() {
                       >
                         <option value="">{t('transcript.reassign.newSpeaker')}</option>
                         {(turns?.speakers ?? []).map((speaker) => (
-                          <option key={speaker.speakerId} value={String(speaker.speakerId)}>
+                          <option
+                            key={speaker.speakerId}
+                            value={String(speaker.speakerId)}
+                            dir={standaloneDirection(speaker.speaker)}
+                          >
                             {speaker.speaker}
                           </option>
                         ))}

@@ -354,7 +354,8 @@ describe('keyboard focus', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
     events.send('task-updated', { ...taskCompleted, id: 5, filename: 'lecture.m4a' });
-    await screen.findByText(/lecture\.m4a transcribed/);
+    // The finish notice (its filename is an isolated element, item 76) with its transcript link.
+    await screen.findByRole('link', { name: 'open' });
     const files = [new File(['x'], 'again.mp3', { type: 'audio/mpeg' })];
     fireEvent.drop(screen.getByRole('button', { name: /drop/i }), { dataTransfer: { files } });
     await screen.findByText(/Already uploaded/);

@@ -1,6 +1,13 @@
 import { join } from 'node:path';
 import { expect, type Locator, type Page, type Response } from '@playwright/test';
-import { appModeLaunchUrl, appUrl, loadState } from '../../lib/backend.ts';
+import {
+  appModeLaunchUrl,
+  appUrl,
+  loadState,
+  refreshStoredSession,
+  saveState,
+  startBackend,
+} from '../../lib/backend.ts';
 import { awaitTaskState } from '../../lib/await-task.ts';
 import type { TaskSnapshot } from '../../lib/await-task.ts';
 
@@ -189,9 +196,10 @@ export async function uploadAndOpen(page: Page, clip: string) {
 }
 
 // The text of each turn labelled with `speaker` in the transcript: the speaker's name sits
-// in a span right above the turn's text paragraph.
+// in a span right above the turn's text paragraph, isolated in a bdi of its own direction
+// (item 76).
 export function turnTextOf(page: Page, speaker: string): Locator {
-  return page.locator(`span:text-is("${speaker}") + p`);
+  return page.locator(`span:has(> bdi:text-is("${speaker}")) + p`);
 }
 
 // The positions of the first pending-queue row containing each name, in DOM order. The list is
@@ -297,4 +305,15 @@ export async function signIn(
   const configDir = dirs?.configDir ?? state.configDir ?? '';
   const runtimeDir = dirs?.runtimeDir ?? state.runtimeDir ?? '';
   await page.goto(appModeLaunchUrl({ configDir, runtimeDir }));
+}
+
+// Brings the run's shared service back up on its socket and data directory after a spec stopped
+// it, records its pid for the teardown, and signs [page] and the later specs' contexts in again:
+// the restarted service only knows the sessions made after it started (roadmap item 66).
+export async function startSharedBackend(page: Page): Promise<void> {
+  const { port, dataDir, configDir = '', runtimeDir = '' } = loadState();
+  const fresh = await startBackend({ port, dataDir });
+  saveState({ pid: fresh.pid });
+  await signIn(page);
+  await refreshStoredSession({ configDir, runtimeDir });
 }

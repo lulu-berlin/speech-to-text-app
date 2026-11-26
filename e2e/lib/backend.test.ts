@@ -38,6 +38,27 @@ const CIM = JSON.stringify([
   },
 ]);
 
+// The listing once the JVM's tree is gone: only the launcher is left.
+const WITHOUT_JVM = JSON.stringify([
+  { ProcessId: 735, ParentProcessId: 1, CommandLine: 'cmd.exe /c gradlew.bat e2e' },
+]);
+
+/**
+ * A Windows process listing that answers each look with the next of [cims] (`Get-CimInstance`'s
+ * JSON), the last one from then on, and counts the looks.
+ */
+function listings(...cims: string[]) {
+  let looks = 0;
+  return {
+    list: () => {
+      const cim = cims[Math.min(looks, cims.length - 1)] ?? '[]';
+      looks += 1;
+      return processes({ platform: 'win32', cimOutput: () => cim });
+    },
+    looks: () => looks,
+  };
+}
+
 test('on Windows the backend stop ends the app JVM tree with taskkill, not a POSIX group kill', async (t) => {
   // A POSIX signal — or a negative-pid group kill — would be the bug this test rules out.
   const signal = t.mock.method(process, 'kill', () => true);
@@ -45,7 +66,8 @@ test('on Windows the backend stop ends the app JVM tree with taskkill, not a POS
   const port = await backend.choosePort();
   await backend.stopBackend(735, port, DATA_DIR, {
     platform: 'win32',
-    list: () => processes({ platform: 'win32', cimOutput: () => CIM }),
+    // The JVM is listed until taskkill has ended it.
+    list: listings(CIM, WITHOUT_JVM).list,
     forceKill: async (pid) => {
       ended.push(pid);
       return true;
@@ -59,6 +81,65 @@ test('on Windows the backend stop ends the app JVM tree with taskkill, not a POS
   );
   assert.deepEqual(backend.taskkillArgs(4812), ['/pid', '4812', '/T', '/F']);
   assert.equal(signal.mock.callCount(), 0, 'no signal and no negative-pid group kill on Windows');
+});
+
+// Roadmap item 76 (discovered, PR run 713): `taskkill /F` returns, and the port closes, while the
+// dying JVM still holds `stt.db` — the RTL spec's seed then met `disk I/O error` opening it. The
+// stop returns only once the killed processes have left the listing.
+test('on Windows the backend stop returns only once the killed JVM has left the process list', async () => {
+  // The JVM is listed before the kill and for the first two looks after it.
+  const listing = listings(CIM, CIM, CIM, WITHOUT_JVM);
+  const port = await backend.choosePort();
+  await backend.stopBackend(735, port, DATA_DIR, {
+    platform: 'win32',
+    list: listing.list,
+    forceKill: async () => true,
+  });
+
+  assert.equal(
+    listing.looks(),
+    4,
+    'the stop looked until the JVM was no longer listed, and then returned',
+  );
+});
+
+test('on Windows a stop that kills the spawn tree waits for the app JVM to leave as well', async () => {
+  // The launcher (735) is ended first; its descendant JVM — the one holding `stt.db` — is listed
+  // for two more looks before it goes too.
+  const jvmOnly = JSON.stringify([
+    {
+      ProcessId: 4812,
+      ParentProcessId: 735,
+      CommandLine: `C:\\jdk\\bin\\java.exe -cp lib/* stt.MainKt ${DATA_DIR}`,
+    },
+  ]);
+  const listing = listings(CIM, jvmOnly, jvmOnly, '[]');
+  const port = await backend.choosePort();
+  await backend.stopBackend(735, port, DATA_DIR, {
+    platform: 'win32',
+    spawnTree: true,
+    list: listing.list,
+    forceKill: async () => true,
+  });
+
+  assert.equal(
+    listing.looks(),
+    4,
+    'the stop returned once the JVM, not only the launcher, had gone',
+  );
+});
+
+test('on Windows a stop whose killed JVM never leaves the listing fails, naming it', async () => {
+  const port = await backend.choosePort();
+  await assert.rejects(
+    backend.stopBackend(735, port, DATA_DIR, {
+      platform: 'win32',
+      list: listings(CIM).list,
+      forceKill: async () => true,
+      exitTimeoutMs: 300,
+    }),
+    /taskkill ended 4812, but 4812 still runs/,
+  );
 });
 
 // Roadmap item 79 (discovered): on Windows the Gradle-built backend is `stt-backend.bat`, and Node

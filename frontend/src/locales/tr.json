@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "yeniden atama başarısız: {error}",
   "tui.segment.editPrompt": "Segment metni: {text}",
   "tui.segment.editFailed": "düzenleme başarısız: {error}",
-  "tui.segment.revertFailed": "geri alma başarısız: {error}"
+  "tui.segment.revertFailed": "geri alma başarısız: {error}",
+  "tui.help.reorder": "mlterm'in bidi ayarı kapalı olmalı: TUI metni kendisi sıralar.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0, kitty'de force_ltr yes gerektirir: bunu ayarlayın (veya kitty -o force_ltr=yes ile başlatın) ya da kitty'nin varsayılanı için STT_TUI_RTL_WORDS'ü kaldırın.",
+  "tui.help.kittyWords": "kitty sağdan sola yazılan kelimeleri kendisi çevirir: TUI her kelimeyi kitty'nin çevireceği biçimde yazar; force_ltr yes kullanıyorsanız TUI'yi STT_TUI_RTL_WORDS=0 ile çalıştırın."
 }

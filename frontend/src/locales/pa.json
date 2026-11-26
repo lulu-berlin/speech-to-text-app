@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "ਮੁੜ-ਨਿਰਧਾਰਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ: {error}",
   "tui.segment.editPrompt": "ਹਿੱਸੇ ਦਾ ਟੈਕਸਟ: {text}",
   "tui.segment.editFailed": "ਸੋਧਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ: {error}",
-  "tui.segment.revertFailed": "ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਿਆ: {error}"
+  "tui.segment.revertFailed": "ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਿਆ: {error}",
+  "tui.help.reorder": "mlterm ਦੀ bidi ਸੈਟਿੰਗ ਬੰਦ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ: TUI ਆਪਣੇ ਆਪ ਟੈਕਸਟ ਨੂੰ ਕ੍ਰਮ ਵਿੱਚ ਲਗਾਉਂਦਾ ਹੈ।",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 ਲਈ kitty ਵਿੱਚ force_ltr yes ਚਾਹੀਦਾ ਹੈ: ਇਸਨੂੰ ਸੈੱਟ ਕਰੋ (ਜਾਂ kitty -o force_ltr=yes ਨਾਲ ਸ਼ੁਰੂ ਕਰੋ), ਜਾਂ kitty ਦਾ ਡਿਫ਼ਾਲਟ ਰੱਖਣ ਲਈ STT_TUI_RTL_WORDS ਹਟਾਓ।",
+  "tui.help.kittyWords": "kitty ਸੱਜੇ-ਤੋਂ-ਖੱਬੇ ਸ਼ਬਦਾਂ ਨੂੰ ਆਪ ਉਲਟਾ ਦਿੰਦਾ ਹੈ: TUI ਹਰ ਸ਼ਬਦ ਨੂੰ ਇਸ ਤਰ੍ਹਾਂ ਲਿਖਦਾ ਹੈ ਕਿ kitty ਉਸਨੂੰ ਉਲਟਾ ਦੇਵੇ; force_ltr yes ਹੋਵੇ ਤਾਂ TUI ਨੂੰ STT_TUI_RTL_WORDS=0 ਨਾਲ ਚਲਾਓ।"
 }

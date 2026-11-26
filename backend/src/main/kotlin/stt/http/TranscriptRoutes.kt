@@ -21,6 +21,7 @@ import stt.db.TaskRepository
 import stt.diarization.SpeakerTurn
 import stt.diarization.TurnSegment
 import stt.diarization.speakerTurns
+import stt.outputs.attachmentDisposition
 import stt.outputs.downloadFileName
 import stt.outputs.renderSrt
 import stt.outputs.renderTxt
@@ -64,7 +65,7 @@ fun Application.transcriptRoutes() {
                 }
             call.response.header(
                 HttpHeaders.ContentDisposition,
-                "attachment; filename=\"${downloadFileName(details.task.originalFilename, format.extension)}\"",
+                attachmentDisposition(downloadFileName(details.task.originalFilename, format.extension)),
             )
             call.respondBytes(content.toByteArray(), format.contentType)
         }

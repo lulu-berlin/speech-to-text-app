@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "再割り当てに失敗しました: {error}",
   "tui.segment.editPrompt": "セグメントのテキスト: {text}",
   "tui.segment.editFailed": "編集に失敗しました: {error}",
-  "tui.segment.revertFailed": "元に戻せませんでした: {error}"
+  "tui.segment.revertFailed": "元に戻せませんでした: {error}",
+  "tui.help.reorder": "mlterm の bidi 設定はオフにしてください: TUI がテキストの順序を自分で整えます。",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 には kitty の force_ltr yes が必要です: 設定するか (kitty -o force_ltr=yes で起動)、kitty の既定にするには STT_TUI_RTL_WORDS を外してください。",
+  "tui.help.kittyWords": "kitty は右から左に書く単語を自分で反転します: TUI は各単語を kitty が反転する形で書きます。force_ltr yes の場合は STT_TUI_RTL_WORDS=0 を付けて TUI を起動してください。"
 }

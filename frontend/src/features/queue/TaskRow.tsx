@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { HTMLAttributes, Ref } from 'react';
 import { useMachine } from '@xstate/react';
 import { useIntl } from 'react-intl';
+import { FileMessage } from '../../shared/ui/FileMessage';
 import { css, styled } from 'styled-components';
 import { ConnectionContext, useWriteControl } from '../../app/ConnectionContext';
 import { useErrorText } from '../../shared/i18n/useErrorText';
@@ -25,6 +26,7 @@ import { confirmActionMachine } from '../../shared/state/confirmActionMachine';
 import { rowActionMachine } from './rowActionMachine';
 import { Tooltip } from '../../shared/ui/Tooltip';
 import { RowContent, RowControls, RowName } from './rowParts';
+import { standaloneDirection } from '../../shared/textDirection';
 
 // The phase a task is in, as a text label next to its status (none while queued).
 const PHASE_LABEL_ID: Record<NonNullable<TaskPhase>, string> = {
@@ -252,7 +254,7 @@ export function TaskRow({
     >
       <Stack gap="sm">
         <RowContent>
-          <RowName>{task.filename}</RowName>
+          <RowName dir={standaloneDirection(task.filename)}>{task.filename}</RowName>
           <RowControls>
             {running && runningStatus !== null && task.phase !== null ? (
               <RowPhase $phase={task.phase}>{runningStatus}</RowPhase>
@@ -328,7 +330,7 @@ export function TaskRow({
       </Stack>
       <ConfirmDialog
         open={confirmingAction === 'cancel'}
-        title={t('queue.cancel.title', { filename: task.filename })}
+        title={<FileMessage id="queue.cancel.title" filename={task.filename} />}
         confirmLabel={t('queue.cancel.confirm')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}
@@ -339,7 +341,7 @@ export function TaskRow({
       </ConfirmDialog>
       <ConfirmDialog
         open={deleteState.matches('confirming') || deleteState.matches('running')}
-        title={t('queue.delete.title', { filename: task.filename })}
+        title={<FileMessage id="queue.delete.title" filename={task.filename} />}
         confirmLabel={t('queue.delete.confirm')}
         confirmDisabled={writes.disabled}
         confirmTitle={writes.title}

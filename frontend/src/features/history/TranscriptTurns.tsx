@@ -20,10 +20,13 @@ import { Icon } from '../../shared/ui/Icon';
 import { Stack } from '../../shared/ui/layout';
 import { Text } from '../../shared/ui/typography';
 import { formatDuration } from '../../shared/formatDuration';
+import { letterDirection, turnDirections, type TextDirection } from '../../shared/textDirection';
+import { IsolatedText } from '../../shared/ui/IsolatedText';
 
-// One turn of the reading column: its start time in a left gutter of one shared width,
-// and the speaker's name on its own line above the turn's text. On a phone the gutter
-// folds into one column, the time above the speaker.
+// One turn of the reading column: its start time in a gutter of one shared width at the turn's
+// start side, and the speaker's name on its own line above the turn's text. The row takes its
+// turn's direction (item 76), so an RTL turn has its gutter on the right and its name aligned
+// right. On a phone the gutter folds into one column, the time above the speaker.
 const TurnRow = styled.div`
   display: grid;
   grid-template-columns: ${(props) => props.theme.sizes.timeGutter} 1fr;
@@ -280,6 +283,7 @@ function SegmentEditor({
   onSave,
   onDiscard,
   onRevert,
+  paragraphDirection,
 }: {
   text: string;
   edited: boolean;
@@ -290,6 +294,8 @@ function SegmentEditor({
   onSave: (draft: string) => void;
   onDiscard: () => void;
   onRevert: () => void;
+  // The segment's paragraph's direction (item 76), or undefined when no turn has a letter.
+  paragraphDirection: TextDirection | undefined;
 }) {
   const t = useMessages();
   const intl = useIntl();
@@ -342,7 +348,10 @@ function SegmentEditor({
       <EditorArea
         ref={fieldRef}
         aria-label={t('transcript.editor.text')}
-        dir="auto"
+        // Item 76: the field takes the draft's own direction (its first letter), independent of
+        // the paragraph; a draft without a letter takes the paragraph's, and with none either it
+        // inherits the dialog's — the app language's.
+        dir={letterDirection(draft) ?? paragraphDirection}
         // A dialog has room: the field wraps a long segment over several rows (the user's
         // review 2026-10-23) — no line breaks are *stored* either way: every break in typed or
         // pasted text becomes a space, and Enter saves instead of breaking the line.
@@ -427,7 +436,7 @@ function EditDialog({
   onDiscard,
   children,
 }: {
-  title: string;
+  title: ReactNode;
   onDiscard: () => void;
   children: ReactNode;
 }) {
@@ -576,10 +585,16 @@ export function TranscriptTurns({
   const t = useMessages();
   const intl = useIntl();
   const tints = useTheme().colors.speakerTints;
+  // Item 76: each turn's direction (turnDirections), from the stored segment texts, never the
+  // view's placeholders. The whole row takes it — gutter, speaker name and text; the player and
+  // the app chrome keep the app language's.
+  const directions = turnDirections(
+    turnsBySpeaker.map(({ turn }) => turn.segments.map((segment) => segment.text).join(' ')),
+  );
   return (
     <TurnsList gap="lg">
       {turnsBySpeaker.map(({ turn, speaker }, index) => (
-        <TurnRow key={index}>
+        <TurnRow key={index} dir={directions[index]}>
           <TurnGutter>
             {reassigning ? (
               <SelectBox
@@ -597,10 +612,10 @@ export function TranscriptTurns({
             <Stack gap="xs">
               {speaker !== undefined ? (
                 <SpeakerName $color={speakerTint(tints, speaker.speakerId)}>
-                  {speaker.speaker}
+                  <IsolatedText text={speaker.speaker} />
                 </SpeakerName>
               ) : null}
-              <TurnText dir="auto">
+              <TurnText>
                 {turn.segments.map((segment) => {
                   // A segment whisper left empty (or whitespace only) is not a hole in the
                   // text: it shows a grayed-out placeholder and stays editable (item 52, user
@@ -664,9 +679,16 @@ export function TranscriptTurns({
                       {editing ? (
                         <EditDialog
                           title={
-                            speaker === undefined
-                              ? `${formatDuration(segment.startMs, intl)}–${formatDuration(segment.endMs, intl)}`
-                              : `${speaker.speaker} · ${formatDuration(segment.startMs, intl)}–${formatDuration(segment.endMs, intl)}`
+                            speaker === undefined ? (
+                              `${formatDuration(segment.startMs, intl)}–${formatDuration(segment.endMs, intl)}`
+                            ) : (
+                              // The name is isolated in its own direction (item 76), so an RTL
+                              // name cannot pull the times after it into its run.
+                              <>
+                                <IsolatedText text={speaker.speaker} />
+                                {` · ${formatDuration(segment.startMs, intl)}–${formatDuration(segment.endMs, intl)}`}
+                              </>
+                            )
                           }
                           onDiscard={onDiscardEdit}
                         >
@@ -680,6 +702,7 @@ export function TranscriptTurns({
                             onSave={(draft) => onSaveEdit(segment, draft)}
                             onDiscard={onDiscardEdit}
                             onRevert={() => onRevertEdit(segment)}
+                            paragraphDirection={directions[index]}
                           />
                         </EditDialog>
                       ) : null}{' '}

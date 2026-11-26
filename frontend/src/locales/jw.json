@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "Ngowahi pamicara gagal: {error}",
   "tui.segment.editPrompt": "Teks segmen: {text}",
   "tui.segment.editFailed": "Ngowahi gagal: {error}",
-  "tui.segment.revertFailed": "Wangsulaken gagal: {error}"
+  "tui.segment.revertFailed": "Wangsulaken gagal: {error}",
+  "tui.help.reorder": "Setelan bidi mlterm kedah dipunpateni: TUI ngurutaken teks piyambak.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 mbetahaken force_ltr yes ing kitty: setel (utawi wiwiti kitty -o force_ltr=yes), utawi busak STT_TUI_RTL_WORDS supados gawan kitty tetep.",
+  "tui.help.kittyWords": "kitty muwalik piyambak tembung saking tengen ngiwa: TUI nyerat saben tembung supados dipunwalik dening kitty; kanthi force_ltr yes, lampahaken TUI kanthi STT_TUI_RTL_WORDS=0."
 }

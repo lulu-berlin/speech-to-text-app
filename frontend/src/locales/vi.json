@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "gán lại thất bại: {error}",
   "tui.segment.editPrompt": "Văn bản đoạn: {text}",
   "tui.segment.editFailed": "sửa thất bại: {error}",
-  "tui.segment.revertFailed": "hoàn nguyên thất bại: {error}"
+  "tui.segment.revertFailed": "hoàn nguyên thất bại: {error}",
+  "tui.help.reorder": "Cài đặt bidi của mlterm phải được tắt: TUI tự sắp xếp thứ tự văn bản.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 cần force_ltr yes trong kitty: hãy đặt nó (hoặc khởi động kitty -o force_ltr=yes), hoặc bỏ STT_TUI_RTL_WORDS để giữ mặc định của kitty.",
+  "tui.help.kittyWords": "kitty tự đảo các từ viết từ phải sang trái: TUI viết mỗi từ để kitty đảo lại; với force_ltr yes, hãy chạy TUI với STT_TUI_RTL_WORDS=0."
 }

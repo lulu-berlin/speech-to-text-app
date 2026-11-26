@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "فشلت إعادة الإسناد: {error}",
   "tui.segment.editPrompt": "نص المقطع: {text}",
   "tui.segment.editFailed": "فشل التحرير: {error}",
-  "tui.segment.revertFailed": "فشل التراجع: {error}"
+  "tui.segment.revertFailed": "فشل التراجع: {error}",
+  "tui.help.reorder": "يجب إيقاف إعداد bidi في mlterm: واجهة TUI ترتّب النص بنفسها.",
+  "tui.help.kitty": "يتطلب STT_TUI_RTL_WORDS=0 ضبط force_ltr yes في kitty: اضبطه (أو شغّل kitty -o force_ltr=yes)، أو ألغِ STT_TUI_RTL_WORDS للإبقاء على وضع kitty الافتراضي.",
+  "tui.help.kittyWords": "يعكس kitty بنفسه حروف الكلمات المكتوبة من اليمين إلى اليسار: تكتب واجهة TUI كل كلمة ليعكسها kitty؛ ومع force_ltr yes شغّل واجهة TUI مع STT_TUI_RTL_WORDS=0."
 }

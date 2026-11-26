@@ -386,5 +386,8 @@
   "tui.speakers.reassignFailed": "اسپیکر تبدیل نہیں ہو سکا: {error}",
   "tui.segment.editPrompt": "قطعے کا متن: {text}",
   "tui.segment.editFailed": "ترمیم ناکام: {error}",
-  "tui.segment.revertFailed": "واپس لانا ناکام: {error}"
+  "tui.segment.revertFailed": "واپس لانا ناکام: {error}",
+  "tui.help.reorder": "mlterm کی bidi ترتیب بند ہونی چاہیے: TUI متن کو خود ترتیب دیتا ہے.",
+  "tui.help.kitty": "STT_TUI_RTL_WORDS=0 کے لیے kitty میں force_ltr yes درکار ہے: اسے سیٹ کریں (یا kitty -o force_ltr=yes سے شروع کریں)، یا kitty کا ڈیفالٹ رکھنے کے لیے STT_TUI_RTL_WORDS ہٹا دیں.",
+  "tui.help.kittyWords": "kitty دائیں سے بائیں لکھے الفاظ کو خود الٹ دیتا ہے: TUI ہر لفظ کو اس طرح لکھتا ہے کہ kitty اسے الٹ دے؛ force_ltr yes ہو تو TUI کو STT_TUI_RTL_WORDS=0 کے ساتھ چلائیں."
 }
