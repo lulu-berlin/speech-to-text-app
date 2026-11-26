@@ -198,6 +198,97 @@ fn with_rtl_words_each_rtl_word_keeps_its_letters_in_typed_order() {
 }
 
 #[test]
+fn with_rtl_words_a_click_and_the_cursor_land_where_the_words_are_drawn() {
+    // One Hebrew turn of two segments: `שלום רב` first, `מה שלומך` second. Read from the right
+    // edge, the first segment's words come first - so left to right the row holds the second
+    // segment's words, then the first's, each word in typed order for kitty to turn.
+    let turns = json!({
+        "hasMerges": false,
+        "speakers": [{"speakerId": 0, "speaker": "Speaker 1"}],
+        "turns": [{
+            "speakerId": 0,
+            "startMs": 0,
+            "endMs": 4000,
+            "text": "שלום רב מה שלומך",
+            "segments": [
+                {"id": 1, "startMs": 0, "endMs": 2000, "text": "שלום רב", "edited": false},
+                {"id": 2, "startMs": 2000, "endMs": 4000, "text": "מה שלומך", "edited": false},
+            ],
+        }],
+    })
+    .to_string();
+    let OpenTranscript {
+        service,
+        mut tui,
+        stream: _stream,
+        state: _state,
+    } = open_transcript_sized_on(
+        &turns,
+        80,
+        &[("STT_TUI_RTL_WORDS", "1"), ("STT_AUDIO_SINK", "frozen")],
+    );
+    let second = "שלומך מה";
+    let screen = tui.wait_for(WAIT, |text| text.contains(&format!("{second} רב שלום")));
+
+    // A click inside `שלומך`, the row's leftmost word, marks the second segment - the one kitty
+    // shows there - and not the first.
+    let (column, row) = terminal::position_of(&screen, second);
+    tui.click(column + 2, row);
+    tui.wait_for_highlight(WAIT, second);
+    assert!(
+        !tui.marked_text().contains("רב"),
+        "only the second segment is marked: {:?}",
+        tui.marked_text()
+    );
+
+    // `a` marks it for a move: each segment's box comes before its words in reading order - at
+    // their right - so the ticked box frames the second segment's words and the empty one the
+    // first's.
+    tui.press(b"a");
+    tui.wait_for(WAIT, |text| text.contains(&format!("{second} ☑ רב שלום ☐")));
+
+    // Its edit prompt: the draft right-aligned, its words in typed order, and the cursor on the
+    // free cell left of it, where kitty shows the next letter of its last word.
+    tui.press(b"e");
+    let label = "Segment text: ";
+    let (cells, column) = right_aligned(label, second);
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
+
+    // A Latin-first draft that ends in Hebrew: left to right, the Hebrew word in typed order, and
+    // the cursor on that word's first cell - where the next Hebrew letter shows, as without the
+    // mode.
+    erase(&mut tui, "מה שלומך");
+    tui.press("WHO: שלום".as_bytes());
+    let cells = format!("{label}WHO: שלום");
+    tui.wait_for_screen(WAIT, |screen| {
+        prompt_shows(screen, &cells, label.chars().count() + 5)
+    });
+    tui.press(b"\x1b");
+    tui.wait_for(WAIT, |text| !text.contains(label));
+
+    // Playing from the start, the first segment is the playhead's: its words are filled in the
+    // accent role where kitty draws them.
+    tui.press(b" ");
+    service
+        .next_get_from(&tui, WAIT)
+        .answer_bytes("200 OK", CLIP);
+    let scene = tui.wait_for_scene(WAIT, |text| {
+        text.contains("0:00 / 19:45") && text.contains('⏸')
+    });
+    let first = "רב שלום";
+    let row = scene.row_of(first);
+    assert_eq!(
+        style(&scene, row, first),
+        (
+            token(&["colors", "accentText"], "dark"),
+            token(&["colors", "accent"], "dark")
+        ),
+        "the playing segment's words are filled:\n{}",
+        scene.text()
+    );
+}
+
+#[test]
 fn a_click_on_an_rtl_row_marks_the_segment_drawn_there() {
     let OpenTranscript {
         service: _service,
