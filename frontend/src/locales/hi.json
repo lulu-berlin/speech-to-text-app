@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "खंड का पाठ: {text}",
   "tui.segment.editFailed": "संपादन विफल: {error}",
   "tui.segment.revertFailed": "पूर्ववत करना विफल: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm की bidi सेटिंग बंद होनी चाहिए: TUI टेक्स्ट को खुद क्रम में लगाता है।"
 }

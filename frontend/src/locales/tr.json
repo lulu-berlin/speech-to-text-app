@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "Segment metni: {text}",
   "tui.segment.editFailed": "düzenleme başarısız: {error}",
   "tui.segment.revertFailed": "geri alma başarısız: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm'in bidi ayarı kapalı olmalı: TUI metni kendisi sıralar."
 }

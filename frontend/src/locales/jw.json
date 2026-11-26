@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "Teks segmen: {text}",
   "tui.segment.editFailed": "Ngowahi gagal: {error}",
   "tui.segment.revertFailed": "Wangsulaken gagal: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "Setelan bidi mlterm kedah dipunpateni: TUI ngurutaken teks piyambak."
 }

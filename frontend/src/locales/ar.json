@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "نص المقطع: {text}",
   "tui.segment.editFailed": "فشل التحرير: {error}",
   "tui.segment.revertFailed": "فشل التراجع: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "يجب إيقاف إعداد bidi في mlterm: واجهة TUI ترتّب النص بنفسها."
 }

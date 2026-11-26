@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "ਹਿੱਸੇ ਦਾ ਟੈਕਸਟ: {text}",
   "tui.segment.editFailed": "ਸੋਧਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ: {error}",
   "tui.segment.revertFailed": "ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਿਆ: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm ਦੀ bidi ਸੈਟਿੰਗ ਬੰਦ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ: TUI ਆਪਣੇ ਆਪ ਟੈਕਸਟ ਨੂੰ ਕ੍ਰਮ ਵਿੱਚ ਲਗਾਉਂਦਾ ਹੈ।"
 }

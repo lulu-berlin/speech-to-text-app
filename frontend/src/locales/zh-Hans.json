@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "片段文本：{text}",
   "tui.segment.editFailed": "编辑失败：{error}",
   "tui.segment.revertFailed": "还原失败：{error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm 的 bidi 设置必须关闭: TUI 会自行排列文本。"
 }

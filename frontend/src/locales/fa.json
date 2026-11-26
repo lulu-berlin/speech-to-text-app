@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "متن بخش: {text}",
   "tui.segment.editFailed": "ویرایش انجام نشد: {error}",
   "tui.segment.revertFailed": "بازگردانی انجام نشد: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "تنظیم bidi در mlterm باید خاموش باشد: TUI خودش متن را مرتب می‌کند."
 }

@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "Texte du segment : {text}",
   "tui.segment.editFailed": "échec de la modification : {error}",
   "tui.segment.revertFailed": "échec du rétablissement : {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "Le paramètre bidi de mlterm doit être désactivé : le TUI ordonne lui-même le texte."
 }

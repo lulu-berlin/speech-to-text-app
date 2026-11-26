@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "Teks segmen: {text}",
   "tui.segment.editFailed": "gagal mengedit: {error}",
   "tui.segment.revertFailed": "gagal mengembalikan: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "Setelan bidi mlterm harus dinonaktifkan: TUI mengurutkan teks sendiri."
 }

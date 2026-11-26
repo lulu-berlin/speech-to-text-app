@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "విభాగం టెక్స్ట్: {text}",
   "tui.segment.editFailed": "సవరణ విఫలమైంది: {error}",
   "tui.segment.revertFailed": "పూర్వస్థితికి మార్చలేకపోయాం: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm యొక్క bidi సెట్టింగ్ ఆఫ్‌లో ఉండాలి: TUI టెక్స్ట్‌ను స్వయంగా క్రమంలో పెడుతుంది."
 }

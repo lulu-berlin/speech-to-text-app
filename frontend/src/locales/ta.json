@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "பிரிவு உரை: {text}",
   "tui.segment.editFailed": "திருத்தம் தோல்வி: {error}",
   "tui.segment.revertFailed": "மீளமைப்பு தோல்வி: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm இன் bidi அமைப்பு அணைக்கப்பட வேண்டும்: TUI தானே உரையை வரிசைப்படுத்துகிறது."
 }

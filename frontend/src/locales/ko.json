@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "구간 텍스트: {text}",
   "tui.segment.editFailed": "편집하지 못했습니다: {error}",
   "tui.segment.revertFailed": "되돌리지 못했습니다: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm의 bidi 설정을 꺼야 합니다: TUI가 텍스트 순서를 직접 정합니다."
 }

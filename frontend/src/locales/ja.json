@@ -387,5 +387,5 @@
   "tui.segment.editPrompt": "セグメントのテキスト: {text}",
   "tui.segment.editFailed": "編集に失敗しました: {error}",
   "tui.segment.revertFailed": "元に戻せませんでした: {error}",
-  "tui.help.reorder": "mlterm's bidi setting must be off: the TUI orders text itself."
+  "tui.help.reorder": "mlterm の bidi 設定はオフにしてください: TUI がテキストの順序を自分で整えます。"
 }
