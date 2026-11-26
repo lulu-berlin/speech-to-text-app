@@ -248,15 +248,15 @@ chrome follow the app language, item 88.)
       text reads correctly and Arabic joins; without it, rows are drawn as before
 - [x] (discovered) With `STT_TUI_RTL_WORDS=1`, the cursor, the selection and a click keep the drawn
       positions: they land on the word kitty shows there
-- [ ] (discovered) When the environment names kitty (`TERM=xterm-kitty` or `KITTY_WINDOW_ID`), the
+- [x] (discovered) When the environment names kitty (`TERM=xterm-kitty` or `KITTY_WINDOW_ID`), the
       `?` reference names `force_ltr yes` (or `kitty -o force_ltr=yes`) and `STT_TUI_RTL_WORDS=1`,
       and a terminal that names neither shows no such line
 - [x] (discovered, must not break) The documentation checks pass: the review pages are in their
       generated form, and the TUI's reorder notice is translated in every shipped locale, each
       review row naming a compared product and its wording
-- [ ] (discovered, must not break) The Nix-built frontend builds: its source holds the shared
+- [x] (discovered, must not break) The Nix-built frontend builds: its source holds the shared
       direction table its test imports
-- [ ] (discovered, must not break) On Windows, a spec that stops the backend and opens its
+- [x] (discovered, must not break) On Windows, a spec that stops the backend and opens its
       database (the RTL seed) finds the database released: the stop returns only once the killed
       processes are gone
 
@@ -585,6 +585,25 @@ chrome follow the app language, item 88.)
   segment's words are filled where they are drawn. Refactors (approved), each green on its own
   tree: `1d740f85` `play_from_start` starts the RTL tests' playback; `b5829fe8` the two-segment
   Hebrew turn is a named fixture.
+
+- **CI run 45756674254 — 2026-11-26 — on `9725ead4`** (`wip/76-ci`, dispatched by the user): every
+  job green, `CI (all checks)` success — the documentation checks, Windows (e2e) with the RTL
+  seed, Linux (Nix build), Linux (Nix flake check), macOS (Nix build + devenv), the flake-package
+  and bundle e2e among them. The Nix frontend and Windows items are ticked on this run.
+
+- **Cycle 26 — 2026-11-26 — (discovered) the TUI's `?` reference names kitty's settings.** Test:
+  `client/stt-tui/tests/help_bidi.rs` (`the_help_names_kittys_settings_when_the_environment_names_kitty`:
+  `TERM=xterm-kitty`, and `KITTY_WINDOW_ID` under another `TERM`, name `kitty`, `force_ltr` and
+  `STT_TUI_RTL_WORDS`; a terminal naming neither shows none of it). Red at `893d052b` with the
+  test uncommitted: the reference named no kitty setting. Green: `d5508e17` — client `cargo fmt
+  --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`; frontend `pnpm test` 395
+  passed; docs `pnpm test` 50 passed. Make it right (the user's choices, in the same commit): every
+  notice wraps to the reference's width instead of widening it (`help_notices`, tested at 80
+  columns); the clearer English wording; with `STT_TUI_RTL_WORDS` set the notice says the mode is
+  on (`tui.help.kittyWords`). Both texts are translated in the 27 locales, each review row citing
+  the page's settings comparison; the user approved them as written. Refactors (approved), each
+  green on its own tree: `9028f651` the mlterm help test opens the reference with `help_under`;
+  `b4a06428` `notice_lines` is private to the view.
 
 ## Approval log
 
