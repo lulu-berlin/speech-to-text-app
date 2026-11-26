@@ -159,7 +159,7 @@ fn a_click_on_an_rtl_row_marks_the_segment_drawn_there() {
 }
 
 #[test]
-fn the_rename_caret_sits_at_the_end_of_an_rtl_name() {
+fn the_rename_prompt_draws_an_rtl_name_in_visual_order_with_the_cursor_where_typing_goes() {
     let OpenTranscript {
         service: _service,
         mut tui,
@@ -167,31 +167,43 @@ fn the_rename_caret_sits_at_the_end_of_an_rtl_name() {
         state: _state,
     } = open_transcript_sized(&turns_with_arabic_name(), 80);
 
+    // `r` opens the rename prompt on the first speaker's Arabic name: an RTL name, right-aligned in
+    // the field after the label - the cells hold it reversed against the row's end - and the next
+    // Arabic letter lands left of it, so the cursor sits on the free cell there.
     tui.wait_for(WAIT, |text| text.contains("أحمد"));
     tui.press(b"r");
-    tui.wait_for_screen(WAIT, |screen| {
-        if screen.hide_cursor() {
-            return false;
-        }
-        let text = terminal::screen_text(screen);
-        let Some((index, line)) = text
-            .lines()
-            .enumerate()
-            .find(|(_, line)| line.contains("Rename: أحمد"))
-        else {
-            return false;
-        };
-        let prefix = "Rename: ";
-        let start = line.chars().take(line.find(prefix).unwrap()).count();
-        let draft = line[line.find(prefix).unwrap()..]
-            .chars()
-            .skip(prefix.chars().count())
-            .take_while(|character| *character != '│')
-            .collect::<String>();
-        let draft = draft.trim_end().chars().count();
-        let (row, column) = screen.cursor_position();
-        index == row as usize && column as usize == start + prefix.chars().count() + draft
-    });
+    let label = "Rename: ";
+    let field = 80 - label.chars().count();
+    let right_aligned = |name: &str| {
+        let width = name.chars().count();
+        (
+            format!("{label}{}{name}", " ".repeat(field - width)),
+            label.chars().count() + field - width - 1,
+        )
+    };
+    let (cells, column) = right_aligned(&reversed("أحمد"));
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
+
+    // Retyped with a Latin first letter, the name is left to right again, the cursor after it.
+    erase(&mut tui, "أحمد");
+    tui.press(b"Sam");
+    let cells = format!("{label}Sam");
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 8 + 3));
+
+    // A name without a letter is left to right, as a standalone name is: it does not take a
+    // paragraph's direction.
+    erase(&mut tui, "Sam");
+    tui.press(b"12");
+    let cells = format!("{label}12");
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, 8 + 2));
+
+    // Digits first and then Arabic: the first letter makes the name RTL. Read from the right, `12`
+    // comes first in its own order, then `د.` and `أحمد` - so left to right the cells hold the
+    // Arabic part reversed and then ` 12`.
+    erase(&mut tui, "12");
+    tui.press("12 د. أحمد".as_bytes());
+    let (cells, column) = right_aligned(&format!("{} 12", reversed("د. أحمد")));
+    tui.wait_for_screen(WAIT, |screen| prompt_shows(screen, &cells, column));
 }
 
 #[test]
@@ -226,8 +238,8 @@ const LABEL: &str = "Segment text: ";
 /// The prompt's field at 80 columns: the row after the label.
 const FIELD: usize = 80 - 14;
 
-/// Whether `screen` shows the edit prompt's row as `cells`, left to right (its trailing blanks
-/// aside), with the cursor shown on that row at `column`.
+/// Whether `screen` shows a prompt's row as `cells`, left to right from its label (its trailing
+/// blanks aside), with the cursor shown on that row at `column`.
 fn prompt_shows(screen: &vt100::Screen, cells: &str, column: usize) -> bool {
     if screen.hide_cursor() {
         return false;
@@ -236,7 +248,7 @@ fn prompt_shows(screen: &vt100::Screen, cells: &str, column: usize) -> bool {
     let Some((index, _)) = text
         .lines()
         .enumerate()
-        .find(|(_, line)| line.starts_with(LABEL) && line.trim_end() == cells)
+        .find(|(_, line)| line.trim_end() == cells)
     else {
         return false;
     };

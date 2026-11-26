@@ -198,19 +198,33 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) -> Rect {
         areas[1]
     };
     draw_screen(frame, page, view);
+    // A speaker's name in its own direction (a standalone text, left to right without a letter); a
+    // segment's draft in its own first letter's, else its paragraph's, else left to right.
     if let Some(name) = view.rename {
-        frame.render_widget(
-            Paragraph::new(stt_client::text("tui.speakers.rename", &[("name", name)])),
+        draw_typed_prompt(
+            frame,
             areas[2],
+            view,
+            ("tui.speakers.rename", "name"),
+            name,
+            stt_client::direction::standalone_direction(name),
         );
-        cursor_at_end(frame, areas[2], "tui.speakers.rename", "name", name);
     }
     if let Some(draft) = view.edit {
         let paragraph = match view.screen {
             Screen::Transcript(transcript) => transcript.edit_paragraph(),
             _ => None,
         };
-        draw_edit_prompt(frame, areas[2], view, draft, paragraph);
+        draw_typed_prompt(
+            frame,
+            areas[2],
+            view,
+            ("tui.segment.editPrompt", "text"),
+            draft,
+            stt_client::direction::letter_direction(draft)
+                .or(paragraph)
+                .unwrap_or(stt_client::direction::Direction::Ltr),
+        );
     }
     if let Some(notice) = view.notice {
         frame.render_widget(Paragraph::new(notice), areas[3]);
@@ -3636,28 +3650,22 @@ fn cursor(frame: &mut Frame, area: Rect, row: u16, column: u16) {
     frame.set_cursor_position((area.x + column, area.y + row));
 }
 
-/// Shows the cursor after a draft that fills `key`'s `{placeholder}`, on `area`'s first row.
-fn cursor_at_end(frame: &mut Frame, area: Rect, key: &str, placeholder: &str, draft: &str) {
-    let column =
-        prefix_width(key, placeholder) + u16::try_from(text_width(draft)).unwrap_or(u16::MAX);
-    cursor(frame, area, 0, column);
-}
-
-/// The segment edit prompt on `area`'s row (roadmap item 76): its label, then a field to the row's
-/// end holding the draft - ordered for the terminal in the draft's own first letter's direction (a
-/// draft without a letter takes its `paragraph`'s, left to right when that has none either) and
-/// aligned by it, its start behind a `…` when it does not fit - and the cursor where the next
-/// letter typed in the draft's last letter's direction appears.
-fn draw_edit_prompt(
+/// A text prompt on `area`'s row - the segment edit and the speaker rename (roadmap item 76): the
+/// catalog template `key`'s label, then a field to the row's end holding `draft`, which fills its
+/// `{placeholder}` - ordered for the terminal in `direction` and aligned by it, its start behind a
+/// `…` when it does not fit - and the cursor where the next letter typed in the draft's last
+/// letter's direction appears.
+fn draw_typed_prompt(
     frame: &mut Frame,
     area: Rect,
     view: &View<'_>,
+    (key, placeholder): (&str, &str),
     draft: &str,
-    paragraph: Option<stt_client::direction::Direction>,
+    direction: stt_client::direction::Direction,
 ) {
-    use stt_client::direction::{Direction, last_letter_direction, letter_direction};
+    use stt_client::direction::{Direction, last_letter_direction};
     // The catalog template ends in its draft: the label is the template with the draft empty.
-    let label = stt_client::text("tui.segment.editPrompt", &[("text", "")]);
+    let label = stt_client::text(key, &[(placeholder, "")]);
     let label_width = u16::try_from(text_width(&label)).unwrap_or(u16::MAX);
     let field_width = usize::from(area.width.saturating_sub(label_width));
     let field = if view.no_color {
@@ -3667,9 +3675,6 @@ fn draw_edit_prompt(
             .fg(view.theme.text)
             .bg(view.theme.surface_raised)
     };
-    let direction = letter_direction(draft)
-        .or(paragraph)
-        .unwrap_or(Direction::Ltr);
     // A cell is kept for the next letter, so the cursor always has one.
     let shown = draft_tail(
         draft,
