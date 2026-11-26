@@ -239,7 +239,7 @@ chrome follow the app language, item 88.)
       the draft's own first letter's direction, a draft without a letter its turn's, and with no
       lettered turn left to right, as the TUI's rows — and the cursor sits where the next typed
       letter appears: a Hebrew draft reads correctly on screen, not backwards
-- [ ] (discovered) The TUI's speaker rename prompt draws the name in visual order by its own first
+- [x] (discovered) The TUI's speaker rename prompt draws the name in visual order by its own first
       letter, the cursor where the next typed letter appears (cycle 18's caret test, which asserted
       the logical order, is corrected)
 - [ ] (discovered) In kitty's default mode (`force_ltr no`, which turns each right-to-left word's
@@ -504,6 +504,21 @@ chrome follow the app language, item 88.)
   prompt; `68fcc0a5` the prompt takes its label once; `c9e588b6` `last_letter_direction` moves to
   `stt_client::direction`. The item's "app language's" fallback was reworded, at the user's choice,
   to the TUI's left to right.
+
+- **Cycle 22 — 2026-11-26 — (discovered) the TUI's rename prompt draws the name in visual
+  order.** Test: `client/stt-tui/tests/rtl_transcript.rs`
+  (`the_rename_prompt_draws_an_rtl_name_in_visual_order_with_the_cursor_where_typing_goes`, which
+  replaces cycle 18's caret test: that test asserted the name's typed order). Red at `a4116e82`
+  with the test uncommitted: the prompt's cells held `أحمد` in typed order. Green: `bb5a5ec2` (the
+  tree the green run was on) — client `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test` green. Make it right (the user's choices, in the same commit): the rename
+  prompt shares the edit prompt's drawer (`draw_typed_prompt`): the visible field, an RTL name
+  right-aligned in it, the cursor where the next letter appears, a long name's end behind a `…`;
+  the test checks the direction re-decided as typed (`Sam`), a name without a letter left to right
+  (`12`), and a digits-first Arabic name RTL (`12 د. أحمد`). Refactors (approved), each green on its
+  own tree (client fmt, clippy, `cargo test`): `2155edc3` the prompt tests share a `right_aligned`
+  helper; `a1d6b969` `stt_client::direction::editor_direction` holds the editor rule; `398f29b5`
+  `raised(view)` is the typed field's style for History's search and the prompts.
 
 ## Approval log
 
