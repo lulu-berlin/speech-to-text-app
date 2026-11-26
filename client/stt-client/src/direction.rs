@@ -55,6 +55,14 @@ pub fn standalone_direction(text: &str) -> Direction {
     letter_direction(text).unwrap_or(Direction::Ltr)
 }
 
+/// A segment editor's direction, re-decided as its draft is typed: the draft's letter direction; a
+/// draft without a letter takes its `paragraph`'s, and left-to-right when that has none either.
+pub fn editor_direction(draft: &str, paragraph: Option<Direction>) -> Direction {
+    letter_direction(draft)
+        .or(paragraph)
+        .unwrap_or(Direction::Ltr)
+}
+
 /// The direction of each of a transcript's turns, given their texts in order: a turn takes its own
 /// letter direction; a turn without a letter takes the previous lettered turn's, or at the start of
 /// the transcript the next one's; `None` when no turn has a letter (the app language's then).

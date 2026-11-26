@@ -221,9 +221,7 @@ pub fn draw(frame: &mut Frame, view: &View<'_>) -> Rect {
             view,
             ("tui.segment.editPrompt", "text"),
             draft,
-            stt_client::direction::letter_direction(draft)
-                .or(paragraph)
-                .unwrap_or(stt_client::direction::Direction::Ltr),
+            stt_client::direction::editor_direction(draft, paragraph),
         );
     }
     if let Some(notice) = view.notice {
