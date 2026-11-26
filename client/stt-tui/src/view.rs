@@ -341,7 +341,7 @@ pub struct Dialog {
 
 /// A notice's lines, split at the colon so the reference's table stays narrow: the catalog's `key`
 /// names the terminal's setting and why. Empty when no catalog text carries the key.
-pub fn notice_lines(key: &str) -> (String, String) {
+fn notice_lines(key: &str) -> (String, String) {
     let text = stt_client::text(key, &[]);
     match text.split_once(": ") {
         Some((first, second)) => (first.to_string(), second.to_string()),
