@@ -246,7 +246,7 @@ chrome follow the app language, item 88.)
       letters itself and keeps the words left to right): with `STT_TUI_RTL_WORDS=1` the TUI writes
       each RTL word's letters in typed order while it orders the words and aligns the line, so the
       text reads correctly and Arabic joins; without it, rows are drawn as before
-- [ ] (discovered) With `STT_TUI_RTL_WORDS=1`, the cursor, the selection and a click keep the drawn
+- [x] (discovered) With `STT_TUI_RTL_WORDS=1`, the cursor, the selection and a click keep the drawn
       positions: they land on the word kitty shows there
 - [ ] (discovered) When the environment names kitty (`TERM=xterm-kitty` or `KITTY_WINDOW_ID`), the
       `?` reference names `force_ltr yes` (or `kitty -o force_ltr=yes`) and `STT_TUI_RTL_WORDS=1`,
@@ -570,6 +570,21 @@ chrome follow the app language, item 88.)
   kept in ja, yue, zh-Hans and zh-Hant for the TUI's two-line split. Refactor (approved):
   `1fcb08f7` the Windows stop tests read as sequences of listings (`listings(...cims)`). The Nix
   and Windows items stay unticked until `nix build .#frontend` and the PR's Windows e2e pass.
+
+- **Cycle 25 — 2026-11-26 — (discovered) kitty's default mode keeps the drawn positions.** Test:
+  `client/stt-tui/tests/rtl_transcript.rs`
+  (`with_rtl_words_a_click_and_the_cursor_land_where_the_words_are_drawn`): a Hebrew turn of two
+  segments; a click inside the row's leftmost word marks the second segment, the one drawn there;
+  its edit prompt's draft is right-aligned in typed-order words, the cursor on the free cell left
+  of it. It passed at its first run at `cbcf24f8` with the test uncommitted (no red): positions
+  are counted in the visual order, and a word's letters only trade places inside the word, which
+  one segment holds; the test guards the word boundary. Green: `71fad212` — client `cargo fmt
+  --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`. Make it right (the user's
+  choices, in the same commit): the marking boxes frame their own segment's words, a Latin-first
+  draft ending in Hebrew keeps its cursor on the Hebrew word's first cell, and the playing
+  segment's words are filled where they are drawn. Refactors (approved), each green on its own
+  tree: `1d740f85` `play_from_start` starts the RTL tests' playback; `b5829fe8` the two-segment
+  Hebrew turn is a named fixture.
 
 ## Approval log
 
